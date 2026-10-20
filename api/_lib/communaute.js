@@ -17,6 +17,11 @@
 //   POST { action: 'classement', periode }     (019 — jour|semaine|mois|annee ; le
 //                                               chiffre est COMPTÉ par la base)
 //   POST { action: 'inscrire', oui }           (019 — opt-in au classement)
+//   POST { action: 'classement', periode, groupe }  (020 — le classement d'UN groupe)
+//   POST { action: 'groupe-creer', nom }       (020 — rend le code du groupe)
+//   POST { action: 'groupe-entrer', code }     (020 — le code d'un accompagnement)
+//   POST { action: 'groupe-quitter', groupe }  (020)
+//   POST { action: 'groupe-code', groupe }     (020 — le créateur change le code)
 // TROIS ÉTATS, JAMAIS DEUX :
 //   · 200 `ok: true`                — lu / fait ;
 //   · 503 `erreur: 'non-installe'`  — la base n'a pas la 018 (PGRST202) : « la
@@ -38,6 +43,7 @@ const RAISONS = {
   session: 'Connecte-toi à VRM pour faire ça.',
   abonnement: "Ton abonnement n'est pas actif : la carte de la communauté est fermée pour l'instant.",
   pseudo: 'Ce pseudo ne va pas : 30 caractères au plus, sans « @ » (jamais ton adresse email).',
+  'pseudo-pris': 'Ce pseudo est déjà pris sur la carte : choisis-en un autre.',
   ville: 'Choisis une ville.',
   pays: "Ce pays n'est pas reconnu.",
   position: 'Je ne retrouve pas cette ville sur la carte. Choisis-en une dans la liste.',
@@ -48,9 +54,20 @@ const RAISONS = {
   'tu-as-bloque': 'Tu as bloqué cette personne. Débloque-la pour lui écrire.',
   'plafond-heure': '20 messages par heure au plus — réessaie un peu plus tard.',
   'plafond-jour': '5 nouvelles conversations par jour au plus — réessaie demain.',
+  'nom-groupe': 'Le nom du groupe fait de 2 à 40 caractères, sans « @ ».',
+  code: 'Ce code ne correspond à aucun groupe. Vérifie-le (8 caractères, lettres et chiffres).',
+  'trop-crees': 'Tu as déjà créé 5 groupes : c’est le maximum.',
+  'trop-groupes': 'Tu es déjà dans 10 groupes : quittes-en un d’abord.',
+  'groupe-plein': 'Ce groupe est complet (200 membres).',
+  'pas-createur': 'Seule la personne qui a créé le groupe peut changer son code.',
+  groupe: 'Tu ne fais pas partie de ce groupe.',
   discord: 'Ce pseudo Discord ne va pas : 2 à 32 caractères, lettres minuscules, chiffres, « . » ou « _ », sans « @ ».',
 };
 export const CLASSEMENT_NON_INSTALLE = "Le classement n'est pas encore activé sur ta base.";
+export const GROUPES_NON_INSTALLE = "Les groupes ne sont pas encore activés sur ta base.";
+// Un code de groupe : 8 caractères parmi l'alphabet sans I, O, 0, 1 (la forme de la 020).
+export const codeGroupe = (x) => String(x || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+export const CODE_GROUPE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
 export const PERIODES_CLASSEMENT = ['jour', 'semaine', 'mois', 'annee'];
 // La forme des pseudos Discord actuels (la même que la contrainte de la 019).
 export const DISCORD_RE = /^[a-z0-9._]{2,32}$/;
@@ -60,35 +77,71 @@ export const discordValide = (d) => DISCORD_RE.test(d) && !d.includes('..');
 // base arrondit encore (elle refuse toute autre valeur).
 export const arrondi = (x) => Math.round(Number(x) * 20) / 20;
 
-// ── LE GÉOCODAGE D'UNE VILLE (Nominatim, OpenStreetMap — gratuit, sans clé) ──
-const UA = { 'User-Agent': 'VRM/1.0 (carte de la communauté)', 'Accept-Language': 'fr' };
-function villeDe(j) {
+// ── LE GÉOCODAGE D'UNE VILLE — trois sources gratuites, sans clé ─────────────
+//   1. la Base Adresse Nationale (api-adresse.data.gouv.fr) : les communes de
+//      France, l'État la sert sans quota pour ce volume ;
+//   2. Photon (komoot, données OpenStreetMap) : le reste du monde ;
+//   3. Nominatim (OpenStreetMap) seulement si les deux autres n'ont rien rendu.
+// Chacune a 4 s ; une source muette ne fait pas échouer les autres. « Aucune
+// source n'a répondu » se dit (ok:false), jamais « aucune ville ».
+const UA = { 'User-Agent': 'VRM/1.0 (https://vrm.center)', 'Accept-Language': 'fr' };
+const enTemps = (f, url) => f(url, { headers: UA, signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+const ville = (nom, pays, region, lat, lon) => {
+  const la = Number(lat), lo = Number(lon);
+  if (!nom || !Number.isFinite(la) || !Number.isFinite(lo)) return null;
+  return { nom: String(nom).slice(0, 80), pays: String(pays || 'FR').toUpperCase().slice(0, 2) || 'FR', region: String(region || '').slice(0, 80), lat: arrondi(la), lon: arrondi(lo) };
+};
+function villeNominatim(j) {
   const a = (j && j.address) || {};
-  const nom = a.city || a.town || a.village || a.municipality || a.hamlet || j.name || '';
-  const lat = Number(j && j.lat), lon = Number(j && j.lon);
-  if (!nom || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { nom: String(nom).slice(0, 80), pays: String(a.country_code || '').toUpperCase().slice(0, 2) || 'FR',
-    region: String(a.state || a.county || a.country || '').slice(0, 80), lat: arrondi(lat), lon: arrondi(lon) };
+  return ville(a.city || a.town || a.village || a.municipality || a.hamlet || (j && j.name), a.country_code, a.state || a.county || a.country, j && j.lat, j && j.lon);
+}
+const villesBan = (j) => (j && Array.isArray(j.features) ? j.features : []).map((f) => {
+  const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+  const region = String(p.context || '').split(',').map((x) => x.trim()).filter(Boolean).slice(1).join(', ');
+  return ville(p.city || p.name, 'FR', region, c[1], c[0]);
+});
+const TYPES_VILLE = new Set(['city', 'town', 'village', 'locality', 'district', 'county']);
+const villesPhoton = (j) => (j && Array.isArray(j.features) ? j.features : []).filter((f) => {
+  const p = f.properties || {};
+  return TYPES_VILLE.has(p.type) || p.osm_value === 'city' || p.osm_value === 'town' || p.osm_value === 'village';
+}).map((f) => {
+  const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+  return ville(p.type === 'city' || p.type === 'town' || p.type === 'village' ? p.name : (p.city || p.name), p.countrycode, p.state || p.country, c[1], c[0]);
+});
+const lireJson = async (f, url) => { try { const r = await enTemps(f, url); if (!r.ok) return null; return await r.json(); } catch (_) { return null; } };
+function sansDoublons(villes) {
+  const vus = new Set();
+  return villes.filter(Boolean).filter((v) => { const k = v.nom.toLowerCase() + '|' + v.pays + '|' + v.lat + '|' + v.lon; if (vus.has(k)) return false; vus.add(k); return true; });
 }
 export async function geocoderVille({ q, lat, lon }, f = fetch) {
   try {
-    if (q) {
+    if (q != null && String(q).trim() !== '') {
       const t = String(q).trim().slice(0, 80);
       if (t.length < 2) return { ok: true, villes: [] };
-      const r = await f(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&featureType=settlement&q=${encodeURIComponent(t)}`, { headers: UA });
-      if (!r.ok) return { ok: false };
-      const j = await r.json();
-      if (!Array.isArray(j)) return { ok: false };
-      const vus = new Set();
-      const villes = j.map(villeDe).filter(Boolean).filter((v) => { const k = v.nom + '|' + v.pays + '|' + v.region; if (vus.has(k)) return false; vus.add(k); return true; });
-      return { ok: true, villes };
+      const e = encodeURIComponent(t);
+      const [ban, photon] = await Promise.all([
+        lireJson(f, `https://api-adresse.data.gouv.fr/search/?q=${e}&type=municipality&autocomplete=1&limit=6`),
+        lireJson(f, `https://photon.komoot.io/api/?q=${e}&limit=8&lang=fr`),
+      ]);
+      let villes = sansDoublons([...villesBan(ban), ...villesPhoton(photon)]);
+      if (!villes.length && ban === null && photon === null) {
+        const j = await lireJson(f, `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&featureType=settlement&q=${e}`);
+        if (!Array.isArray(j)) return { ok: false };
+        villes = sansDoublons(j.map(villeNominatim));
+      }
+      return { ok: true, villes: villes.slice(0, 8) };
     }
     const la = Number(lat), lo = Number(lon);
     if (!Number.isFinite(la) || !Number.isFinite(lo)) return { ok: true, villes: [] };
-    const r = await f(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=10&lat=${la}&lon=${lo}`, { headers: UA });
-    if (!r.ok) return { ok: false };
-    const v = villeDe(await r.json());
-    return { ok: true, villes: v ? [v] : [] };
+    const ban = await lireJson(f, `https://api-adresse.data.gouv.fr/reverse/?lon=${lo}&lat=${la}&type=municipality&limit=1`);
+    let villes = villesBan(ban).filter(Boolean);
+    if (!villes.length) villes = villesPhoton(await lireJson(f, `https://photon.komoot.io/reverse?lon=${lo}&lat=${la}&lang=fr`)).filter(Boolean);
+    if (!villes.length) {
+      const j = await lireJson(f, `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=10&lat=${la}&lon=${lo}`);
+      if (j === null && ban === null) return { ok: false };
+      const v = j && villeNominatim(j); if (v) villes = [v];
+    }
+    return { ok: true, villes: villes.slice(0, 1) };
   } catch (_) { return { ok: false }; }
 }
 
@@ -111,7 +164,9 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (!carte) return refus('session');
     if (carte.acces === false) return refus('abonnement');
     if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
-    return dire(200, { ok: true, carte: { moi: objet(carte.moi), profils: carte.profils }, conversations: l.data });
+    const c2 = { moi: objet(carte.moi), profils: carte.profils };
+    if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
+    return dire(200, { ok: true, carte: c2, conversations: l.data });
   }
 
   const action = String((corps && corps.action) || '');
@@ -133,7 +188,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     const d = await appel('vrm_communaute_rejoindre', { p_pseudo: String(corps.pseudo || '').slice(0, 60), p_ville: String(corps.ville || '').slice(0, 120),
       p_pays: String(corps.pays || 'FR').slice(0, 4), p_lat: arrondi(lat), p_lon: arrondi(lon) }, objet);
     if (d === undefined) return;
-    return d.ok === true ? dire(200, { ok: true, pid: d.pid }) : refus(String(d.raison || 'inconnue'));
+    return d.ok === true ? dire(200, { ok: true, pid: d.pid, pseudo: d.pseudo || null }) : refus(String(d.raison || 'inconnue'), d.raison === 'pseudo-pris' ? 409 : 400);
   }
   if (action === 'quitter') {
     const d = await appel('vrm_communaute_quitter', {}, (x) => typeof x === 'boolean');
@@ -182,16 +237,44 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   if (action === 'classement') {
     const periode = String((corps && corps.periode) || '');
     if (!PERIODES_CLASSEMENT.includes(periode)) return dire(400, { ok: false, erreur: 'periode', message: 'Période inconnue.' });
-    // Seule la PÉRIODE part : aucun chiffre n'est jamais transmis à la base.
-    const r = await rpcEquipe('vrm_communaute_classement', { p_periode: periode }, qui);
-    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE });
+    const groupe = corps && corps.groupe ? String(corps.groupe) : '';
+    if (groupe && !UUID_RE.test(groupe)) return refus('groupe', 404);
+    // Seule la PÉRIODE (et le groupe) part : aucun chiffre n'est jamais transmis à la base.
+    const r = groupe
+      ? await rpcEquipe('vrm_communaute_classement_groupe', { p_periode: periode, p_groupe: groupe }, qui)
+      : await rpcEquipe('vrm_communaute_classement', { p_periode: periode }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: groupe ? GROUPES_NON_INSTALLE : CLASSEMENT_NON_INSTALLE });
     if (r.etat !== 'ok') return pasSu();
     const c = objet(r.data);
     if (!c) return refus('session');
     if (c.acces === false) return refus('abonnement');
+    if (c.erreur === 'groupe') return refus('groupe', 404);
     if (!Array.isArray(c.lignes) || !Number.isFinite(Number(c.n))) return pasSu();
     return dire(200, { ok: true, classement: { periode: c.periode, debut: c.debut, fin: c.fin, n: Number(c.n), inscrit: c.inscrit === true,
-      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes } });
+      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes, groupe: c.groupe || null } });
+  }
+  if (action.startsWith('groupe-')) {
+    const nonInst = () => dire(503, { ok: false, erreur: 'non-installe', message: GROUPES_NON_INSTALLE });
+    let nom, args;
+    if (action === 'groupe-creer') {
+      const n = String((corps && corps.nom) || '').trim();
+      if (n.length < 2 || n.length > 40 || /[@<>]/.test(n)) return refus('nom-groupe');
+      nom = 'vrm_communaute_groupe_creer'; args = { p_nom: n };
+    } else if (action === 'groupe-entrer') {
+      const c = codeGroupe(corps && corps.code);
+      if (!CODE_GROUPE_RE.test(c)) return refus('code');
+      nom = 'vrm_communaute_groupe_rejoindre'; args = { p_code: c };
+    } else if (action === 'groupe-quitter' || action === 'groupe-code') {
+      const g = String((corps && corps.groupe) || '');
+      if (!UUID_RE.test(g)) return refus('groupe', 404);
+      nom = action === 'groupe-quitter' ? 'vrm_communaute_groupe_quitter' : 'vrm_communaute_groupe_code'; args = { p_groupe: g };
+    } else return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
+    const r = await rpcEquipe(nom, args, qui);
+    if (r.etat === 'absent') return nonInst();
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    if (r.data.ok !== true) return refus(String(r.data.raison || 'inconnue'), 409);
+    const { ok: _ok, ...reste } = r.data;
+    return dire(200, { ok: true, ...reste });
   }
   return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
 }
