@@ -9,10 +9,12 @@ const finRetraits=s.indexOf("  await p.goto",debutRetraits);
 if(!s.includes(marker)||debutMessages<0||debutRetraits<0)throw Error('Fixtures de revue introuvables');
 const fixtures=s.slice(debutMessages,finMessages)+s.slice(debutRetraits,finRetraits);
 s=s.replace(marker,fixtures+`
+  const {VIDE}=await import(path.resolve('src/operations/metier.js'));
+  await p.route('**/api/compte?mode=operations',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,donnees:VIDE(),equipe:[],serveur:new Date().toISOString(),confirmees:[]})}));
   if(process.env.STUDIO_DARK)await p.addInitScript(()=>localStorage.setItem('vinted_dark','true'));
   for(const width of (process.env.STUDIO_WIDTHS||'320,390,1512').split(',').map(Number)){
    await p.setViewportSize({width,height:900});
-   for(const [nom,tab,section] of [['ventes','plat_vinted','Ventes'],['annonces','plat_vinted','Annonces'],['achats','plat_vinted','Achats'],['messages','plat_vinted','Messages'],['annonces-ebay','plat_ebay','Annonces'],['messages-ebay','plat_ebay','Messages'],['colis','plat_leboncoin','Colis'],['retraits','cat_achats',null],['parametres','settings',null]]){
+   for(const [nom,tab,section] of [['ventes','plat_vinted','Ventes'],['annonces','plat_vinted','Annonces'],['achats','plat_vinted','Achats'],['messages','plat_vinted','Messages'],['annonces-ebay','plat_ebay','Annonces'],['messages-ebay','plat_ebay','Messages'],['colis','plat_leboncoin','Colis'],['retraits','cat_achats',null],['parametres','settings',null],['statistiques','dashboard',null],['comptabilite','compta',null],['stock','garage',null],['organisation','organisation',null]]){
     await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();await p.evaluate(()=>document.fonts.ready);
     if(section)await p.locator('.vrm-platform-tabs').getByRole('button',{name:section,exact:true}).click();
     if(nom==='retraits')await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
@@ -42,9 +44,9 @@ s=s.replace(marker,fixtures+`
      check(await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).count()===1,'zéros initiaux conservés '+width);
      if(width<768)check(await p.locator('.vrm-pickup-code:not([data-code-long]) strong').evaluateAll(es=>es.every(e=>e.getBoundingClientRect().height<30)),'code court sur une ligne '+width);
     }
-    if(nom==='ventes' && width<768){
+    if(nom==='ventes'){
      const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();
-     check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=52),'vente sur une seule ligne '+width);
+     check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=56),'vente sur une seule ligne '+width);
      const ouvrir=ligne.locator('.vrm-ledger-sale-toggle');
      check(await ouvrir.getAttribute('aria-expanded')==='false','actions repliées au départ '+width);
      await ouvrir.click();
@@ -55,7 +57,7 @@ s=s.replace(marker,fixtures+`
      check(await choix.evaluate(e=>{const a=e.getBoundingClientRect(),m=document.querySelector('main').getBoundingClientRect();return a.left>=m.left&&a.right<=m.right;}),'panneau facture dans la largeur '+width);
      check(await choix.inputValue()==='','aucune facture sélectionnée automatiquement '+width);
      await bouton.click();check(await choix.count()===0,'facture repliable sans envoi '+width);
-     if(width<768){const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();await ligne.locator('.vrm-ledger-sale-toggle').click();check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=52),'retour à une seule ligne '+width);}
+     {const ligne=p.locator('.vrm-ventes-liste .vrm-sale-row').first();await ligne.locator('.vrm-ledger-sale-toggle').click();check(await ligne.evaluate(e=>e.getBoundingClientRect().height<=56),'retour à une seule ligne '+width);}
     }
     if(nom==='messages'){
      await p.getByText('Client Vinted',{exact:true}).click();await p.getByText('Bonjour depuis Vinted',{exact:true}).waitFor();

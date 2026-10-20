@@ -1,0 +1,94 @@
+/* Finition Gestion : mêmes surfaces, repères et rythmes dans les espaces métier.
+   Les zones interactives restent à taille réelle, sans zoom de la page. */
+.vrm-app-shell{
+ --gestion-surface:#fffefa;--gestion-soft:#edf2ef;--gestion-line:#dce5e1;
+ --gestion-ink:#243d43;--gestion-muted:#52636b;--gestion-accent:#2b4548;
+}
+:root[data-theme=dark] .vrm-app-shell{
+ --gestion-surface:#243c40;--gestion-soft:#2c4548;--gestion-line:#385155;
+ --gestion-ink:#edf5f0;--gestion-muted:#b0c5bc;--gestion-accent:#bad7c9;
+}
+.vrm-main :is(.vrm-set-liste,.vrm-buy-list,.vrm-ann-grid,.vrm-pickup-point,.vrm-ventes-liste){
+ border:1px solid var(--gestion-line)!important;border-radius:8px!important;box-shadow:none!important;
+}
+.vrm-main :is(.vrm-set-ligne,.vrm-buy-row,.vrm-inbox-row,.vrm-pickup-card){box-shadow:none!important;}
+.vrm-main :is(.vrm-buy-price,.vrm-finance-result,.vrm-kpi-ventes-case,.vrm-stats-hero){font-variant-numeric:tabular-nums;}
+.vrm-main :is(.vrm-set-titre,.vrm-ledger-heading){color:var(--gestion-muted)!important;}
+.vrm-main .vrm-set-groupe{margin-bottom:18px!important;}
+.vrm-main .vrm-set-ligne{border-radius:0!important;min-height:48px;padding-block:8px!important;}
+.vrm-main .vrm-set-ic{border-radius:5px!important;background:var(--gestion-soft)!important;color:var(--gestion-ink)!important;}
+.vrm-main .vrm-set-h1{font-size:24px!important;letter-spacing:-.65px;margin-bottom:20px!important;}
+.vrm-main .vrm-set-carte{border-radius:8px!important;box-shadow:none!important;}
+.vrm-main .vrm-buy-row{padding-block:9px!important;border-radius:0!important;border-bottom:1px solid var(--gestion-line)!important;}
+.vrm-main .vrm-buy-title{font-weight:600!important;line-height:1.4;}
+.vrm-main .vrm-buy-ph{border-radius:4px!important;overflow:hidden;}
+.vrm-main .vrm-pickup-point{margin-bottom:12px!important;background:var(--gestion-surface)!important;}
+.vrm-main .vrm-pickup-point>div:first-child{background:var(--gestion-soft)!important;border-color:var(--gestion-line)!important;padding-block:8px!important;}
+.vrm-main .vrm-pickup-card{border-radius:0!important;border:0!important;border-bottom:1px solid var(--gestion-line)!important;margin-bottom:0!important;background:var(--gestion-surface)!important;}
+.vrm-main .vrm-pickup-card:last-child{border-bottom:0!important;}
+.vrm-main .vrm-pickup-code{border-radius:5px!important;box-shadow:none!important;}
+.vrm-main .vrm-inbox-row{border-radius:0!important;border:0!important;border-bottom:1px solid var(--gestion-line)!important;background:var(--gestion-surface)!important;min-height:64px!important;padding:10px 12px!important;}
+.vrm-main .vrm-inbox-row.is-current{background:var(--gestion-soft)!important;box-shadow:inset 3px 0 var(--gestion-accent)!important;}
+.vrm-main .vrm-inbox-row:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
+.vrm-main .vrm-chat-paire{border-radius:6px!important;background:var(--gestion-soft)!important;}
+.vrm-main .vrm-chat-paire-ph{width:40px!important;height:48px!important;border-radius:4px!important;}
+.vrm-main .vrm-chat-paire-n{font-size:12px!important;line-height:1.4!important;}
+.vrm-main .vrm-lbc-package{border-radius:6px!important;border-color:var(--gestion-line)!important;box-shadow:none!important;}
+.vrm-main .vrm-colis-carte{border-radius:6px!important;box-shadow:none!important;border-color:var(--gestion-line)!important;}
+.vrm-main .vrm-stock-views{gap:4px!important;border-radius:6px!important;}
+.vrm-main .vrm-finance-stock-grid{gap:12px!important;}
+.vrm-main :is(.vrm-stats-hero,.vrm-stats-calcul,.vrm-finance-stock){border-radius:8px!important;box-shadow:none!important;}
+/* L'espace équipe utilise aussi ce fichier lorsqu'il est rendu sans AppCoeur. */
+.vrm-operations{--ops-line:#dce5e1;}
+.vrm-operations .ops-liste{grid-template-columns:1fr;gap:0;border:1px solid var(--ops-line);border-radius:8px;overflow:hidden;}
+.vrm-operations .ops-carte{border:0;border-bottom:1px solid var(--ops-line);border-radius:0;padding:14px 16px;box-shadow:none;}
+.vrm-operations .ops-carte:last-child{border-bottom:0;}
+.vrm-operations .ops-carte-tete{margin-bottom:8px;}
+.vrm-operations .ops-carte h3{font-size:14px;}
+.vrm-operations .ops-chiffres{margin:8px 0 12px;}
+.vrm-operations .ops-chiffres strong{font-size:16px;}
+.vrm-operations :is(.ops-form,.ops-info,.ops-vide){border-radius:8px;box-shadow:none;}
+.vrm-operations .ops-onglets button[aria-current=page]{background:#2b4548;color:#fff;}
+/* Le même résumé en ligne sur ordinateur ; les détails sont ouverts au clic. */
+@media(min-width:768px){
+ .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;padding:10px 48px 10px 66px;background:var(--gestion-soft);font-size:11px;font-weight:600;border-bottom:1px solid var(--gestion-line);}
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle{display:grid;grid-template-columns:32px minmax(0,1fr) minmax(80px,120px) minmax(64px,100px) 24px;align-items:center;gap:12px;width:100%;min-height:52px;box-sizing:border-box;padding:6px 0;border:0;background:transparent;color:var(--gestion-ink);text-align:left;font:inherit;cursor:pointer;}
+ .vrm-main .vrm-ledger-photo-empty{width:32px;height:38px;display:flex;align-items:center;justify-content:center;background:var(--gestion-soft);border-radius:4px;overflow:hidden;}
+ .vrm-main .vrm-ledger-photo-empty>*{max-width:32px;max-height:38px;}
+ .vrm-main .vrm-ledger-sale-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600;}
+ .vrm-main .vrm-ledger-sale-state{font-size:11px;color:var(--gestion-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+ .vrm-main .vrm-ledger-sale-amount{font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;white-space:nowrap;text-align:right;}
+ .vrm-app-shell .vrm-main .vrm-sale-row{padding:0 12px!important;gap:0!important;}
+ .vrm-main .vrm-sale-row>.vrm-ledger-sale-content{display:none;}
+ .vrm-main .vrm-sale-row[data-ligne-ouverte=true]>.vrm-ledger-sale-content{display:flex;flex-direction:column;gap:10px;padding:12px 0;border-top:1px solid var(--gestion-line);}
+ .vrm-main .vrm-ann-grid{grid-template-columns:1fr!important;gap:0!important;}
+ .vrm-main .vrm-ann-card{border:0!important;border-radius:0!important;border-bottom:1px solid var(--gestion-line)!important;box-shadow:none!important;}
+ .vrm-main .vrm-ann-overview{padding:10px 64px 10px 12px!important;}
+ .vrm-main .vrm-ann-overview>a{width:48px!important;height:64px!important;border-radius:4px!important;}
+ .vrm-main .vrm-ann-ledger-info{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:4px 16px!important;}
+ .vrm-main .vrm-ann-ledger-info>div{grid-column:1;min-width:0;}
+ .vrm-main .vrm-ann-ledger-info>.vrm-ann-price-line{grid-column:2;grid-row:1 / span 3;flex-direction:column;align-items:flex-end!important;gap:6px!important;}
+ .vrm-main .vrm-ann-ledger-info [data-prix]{font-size:16px!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-inbox-row{min-height:60px!important;padding:8px 10px!important;}
+ .vrm-main .vrm-set-h1{font-size:22px!important;margin-bottom:16px!important;}
+ .vrm-main .vrm-set-ligne{padding-inline:10px!important;}
+ .vrm-main .vrm-set-lib{font-size:12px!important;}
+ .vrm-main .vrm-set-groupe{margin-bottom:16px!important;}
+ .vrm-main .vrm-pickup-card{padding:8px!important;gap:7px!important;}
+ .vrm-main .vrm-pickup-point>div:first-child{font-size:12px!important;}
+ .vrm-main .vrm-buy-ph{width:36px!important;height:48px!important;}
+ .vrm-main .vrm-buy-title{font-size:12px!important;}
+ .vrm-main .vrm-buy-price{font-size:13px!important;}
+ .vrm-main .vrm-chat-panel .vrm-bulle{box-shadow:none!important;border-radius:8px!important;}
+ .vrm-main .vrm-chat-panel .vrm-chat-head{padding-block:8px!important;}
+ .vrm-operations .ops-carte{padding:12px;}
+ .vrm-operations .ops-entete h2{font-size:22px;}
+}
+@media(prefers-reduced-motion:no-preference){
+ .vrm-main :is(.vrm-ledger-sale-toggle,.vrm-inbox-row,.vrm-set-ligne){transition:background-color .14s ease;}
+}
+@media(hover:hover){
+ .vrm-main :is(.vrm-ledger-sale-toggle,.vrm-inbox-row,.vrm-set-ligne):hover{background:var(--gestion-soft)!important;}
+}

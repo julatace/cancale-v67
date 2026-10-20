@@ -50,6 +50,7 @@ import './styles-atelier.css';
 import './styles-plateformes.css';
 import './styles-iphone.css';
 import './styles-mobile-studio.css';
+import './styles-gestion.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
