@@ -1,0 +1,460 @@
+/* Composition mobile Studio. Les données, les marques et les graphiques
+   conservent leur source ; seules les surfaces et la hiérarchie changent. */
+.vrm-mobile-sales-intro{display:none;}
+@media(max-width:767px){
+ .vrm-app-shell{--studio-paper:#eff1ed;--studio-ink:#243d43;--studio-muted:#657774;--studio-sage:#dce9df;--studio-line:#e6ebe5;--studio-card:#fffefa;--studio-soft:#edf2ef;--studio-ledger-label:#52636b;}
+ .vrm-app-shell .vrm-main{background-color:var(--studio-paper);background-image:url('/textures/vrm-grain.svg'),radial-gradient(ellipse at 0 0,#dce9df90,transparent 70%);}
+ .vrm-app-shell .vrm-app-header{min-height:54px;background-image:url('/textures/vrm-grain.svg'),linear-gradient(120deg,#21343e,#34544f);}
+ .vrm-main .vrm-market-space{background:transparent;}
+ .vrm-main .vrm-market-space>.vrm-market-heading{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);padding:0;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary{grid-row:1;grid-column:2;align-self:stretch;padding:0 15px 0 5px;background:#2b4548;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary>summary{font-size:11px;min-height:30px!important;padding:5px 0!important;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary[open]{grid-column:1 / -1;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary[open]>div{background:var(--studio-paper);padding:12px!important;border-radius:12px;}
+ .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]){grid-column:1;grid-row:1;padding:9px 12px!important;background:#2b4548;align-self:stretch;}
+ .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]) [data-fraicheur-ventes]{font-size:9px!important;color:#d0dfd8!important;white-space:nowrap;}
+ .vrm-main .vrm-market-space>.vrm-seg-cadre{grid-row:2;background:#2b4548!important;border-radius:0 0 18px 18px;box-shadow:0 7px 12px #21343e0c;overflow:hidden;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{padding:0 15px 7px;gap:20px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{font-size:12px!important;min-height:38px!important;}
+ .vrm-mobile-sales-intro{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;}
+ .vrm-mobile-eyebrow{display:block;color:var(--studio-muted);font-size:9px;font-weight:650;letter-spacing:1.5px;margin-bottom:5px;}
+ .vrm-mobile-sales-intro h2{margin:0;color:var(--studio-ink);font-size:27px;line-height:1.1;font-weight:700;letter-spacing:-1.2px;}
+ .vrm-mobile-resultats{font-size:10px;color:var(--studio-muted);white-space:nowrap;background:#e3e9e0;border:1px solid #d6e0d5;border-radius:7px;padding:5px 8px;}
+ .vrm-app-shell .vrm-main .vrm-sales-workbar{padding:0 0 5px!important;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:9px!important;}
+ .vrm-main .vrm-sales-workbar .vrm-sales-search-group{grid-column:1;grid-row:1;margin:0!important;min-width:0;}
+ .vrm-main .vrm-sales-workbar .vrm-list-search{border-radius:11px;background:#fffefb;box-shadow:0 2px 5px #21343e04;}
+ .vrm-main .vrm-sales-workbar .vrm-list-search input{min-height:42px;padding-block:10px!important;border:1px solid #d9e1d8!important;background:transparent!important;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee{grid-column:1 / -1;grid-row:2;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button{border:0!important;background:#e3e8e1!important;color:#52665f!important;min-height:32px!important;font-size:10px!important;padding-inline:11px!important;border-radius:7px!important;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button[aria-pressed=true]{background:#2b4548!important;color:#fff!important;box-shadow:0 2px 4px #21343e14;}
+ .vrm-main [data-raison-bord]{background:#e8eade!important;border-left:2px solid #ad9658!important;border-radius:0 8px 8px 0!important;padding:7px 9px!important;font-size:10px!important;line-height:1.4!important;}
+ .vrm-main [data-raison-bord] .vrm-label-help>summary{min-height:24px!important;padding:4px 0 0!important;font-size:9px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:12px 12px 0!important;border-radius:17px!important;background:linear-gradient(135deg,#fffefa,#ffffff)!important;border:1px solid #fff!important;box-shadow:0 5px 14px #21343e07,0 1px 1px #21343e05;gap:0!important;margin-bottom:12px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:76px minmax(0,1fr)!important;grid-template-rows:auto auto auto;gap:3px 12px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:76px!important;height:106px!important;grid-column:1;grid-row:1 / span 3;border-radius:10px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-info{grid-column:2;grid-row:1!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:13px!important;line-height:1.4!important;font-weight:650!important;letter-spacing:-.2px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:10px!important;margin-top:5px!important;gap:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{padding:2px 5px;background:#e8efe5;color:#355646!important;font-weight:550!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{grid-column:2;grid-row:2;font-size:22px!important;letter-spacing:-.7px;text-align:left;justify-self:start;line-height:1.25!important;margin-top:2px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>[data-benef-vente]{grid-column:2;grid-row:3;text-align:left;justify-self:start;font-size:11px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action{grid-column:1 / -1;grid-row:4;margin:6px 0!important;justify-self:stretch;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action [data-bouton-bord]{flex-direction:row!important;gap:8px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button{border-radius:7px!important;min-height:34px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-action button:not(:disabled):not([aria-disabled=true]){background:#2b4548!important;color:#fff!important;border-color:#2b4548!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{border-top:1px solid var(--studio-line);padding:3px 0 0;margin:1px 0 0;gap:0 3px;}
+ .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{color:#5b6e68!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice{margin:0 -12px;padding:1px 12px!important;background:#f4f6ef;border-radius:0 0 17px 17px;border-color:var(--studio-line)!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{color:#355646!important;min-height:36px!important;font-size:10px!important;}
+ .vrm-app-shell .vrm-tabbar{padding:5px 8px max(6px,env(safe-area-inset-bottom));border-radius:19px 19px 0 0;background:linear-gradient(115deg,#21343e,#34544f)!important;}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab{min-height:49px;border-radius:11px;}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]{background:#ffffff13;box-shadow:inset 0 1px #ffffff12;}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]::before{display:none;}
+ .vrm-app-shell .vrm-tabbar .vrm-nav-label{font-size:9px;}
+ /* Accueil : le bilan forme une carte horizontale, puis vient la courbe. */
+ .vrm-day-layout .vrm-day-top{grid-template-columns:minmax(0,1fr)!important;gap:10px;}
+ .vrm-day-layout .vrm-day-money{grid-column:1!important;grid-row:1!important;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;padding:16px!important;background:linear-gradient(120deg,#2b4548,#34544f)!important;border:1px solid #ffffff25!important;color:#fff;border-radius:17px;box-shadow:0 6px 14px #21343e15;}
+ .vrm-day-money .vrm-day-head{grid-column:1 / -1;}
+ .vrm-day-money .vrm-day-k,.vrm-day-money .vrm-day-note{color:#c5d6cf!important;}
+ .vrm-day-money .vrm-day-hero-n{grid-column:1;grid-row:2;font-size:34px!important;color:#fff!important;letter-spacing:-1.2px;}
+ .vrm-day-money .vrm-day-meta{grid-column:1;grid-row:3;color:#c5d6cf!important;}
+ .vrm-day-money .vrm-day-meta b,.vrm-day-money [data-vendu-jour],.vrm-day-money .vrm-day-lien{color:#d4e6c8!important;}
+ .vrm-day-money .vrm-day-recu{grid-column:2;grid-row:2 / span 2;border-top:0!important;border-left:1px solid #ffffff25!important;margin:0!important;padding:0 0 0 12px!important;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;max-width:112px;}
+ .vrm-day-money .vrm-day-recu-n{color:#f1f7ef!important;font-size:22px!important;}
+ .vrm-day-money .vrm-day-note{font-size:9px;}
+ .vrm-day-layout .vrm-day-wallet{grid-column:1!important;grid-row:2!important;display:flex!important;gap:12px;padding:12px 15px!important;align-items:center;background:#e1e8dd!important;border:1px solid #d4decf!important;border-radius:12px;box-shadow:none;}
+ .vrm-day-layout .vrm-day-wallet>div{flex:1;min-width:0;}
+ .vrm-day-layout .vrm-day-week{grid-column:1!important;grid-row:3!important;padding:15px!important;border-radius:17px;background:#fffefa!important;border-color:#fff!important;}
+ .vrm-day-layout .vrm-day-task{border-radius:12px!important;background:#fffefa!important;box-shadow:0 2px 5px #21343e04!important;}
+ .vrm-day-layout .vrm-day-bar{background:#fffefa!important;border:1px solid #fff!important;box-shadow:0 2px 7px #21343e05;}
+ .vrm-day-layout .vrm-day-bar-n{color:var(--studio-ink)!important;font-size:22px;}
+ .vrm-day-layout .vrm-day-bar-l{color:var(--studio-muted)!important;font-size:9px;}
+ .vrm-day-layout .vrm-day-bar-ic{color:#56766a!important;}
+ .vrm-day-layout .vrm-day-bar>button{border-color:var(--studio-line)!important;min-height:61px!important;}
+ :root[data-theme=dark] .vrm-app-shell{--studio-paper:#17262d;--studio-ink:#edf5f0;--studio-muted:#b0c5bc;--studio-line:#ffffff14;--studio-card:#243c40;--studio-soft:#2c4548;--studio-ledger-label:#b0c5bc;}
+ :root[data-theme=dark] .vrm-mobile-resultats,:root[data-theme=dark] .vrm-main [data-raison-bord]{background:#34443b!important;color:#e2e8d7;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-row,:root[data-theme=dark] .vrm-main .vrm-sales-workbar .vrm-list-search,:root[data-theme=dark] .vrm-day-layout :is(.vrm-day-bar,.vrm-day-task,.vrm-day-week){background:#243c40!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-invoice,:root[data-theme=dark] .vrm-day-layout .vrm-day-wallet{background:#2d443a!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button,:root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{color:#c5d9ce!important;}
+}
+@media(max-width:359px){
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:66px minmax(0,1fr)!important;gap:3px 9px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:66px!important;height:96px!important;}
+ .vrm-day-money .vrm-day-recu{max-width:95px;padding-left:9px!important;}
+}
+@media(max-width:767px){
+ .vrm-day-money .vrm-day-hero-n{min-width:0;overflow-wrap:anywhere;}
+ .vrm-day-wallet .vrm-day-wallet-n{overflow-wrap:anywhere;}
+}
+@media(max-width:767px){
+ /* Le résumé développé occupe sa propre rangée : la fraîcheur des données
+    ne doit jamais recouvrir ses chiffres ni intercepter les clics. */
+ .vrm-main .vrm-market-space>.vrm-platform-summary[open]{grid-row:2;}
+ .vrm-main .vrm-market-space:has(>.vrm-platform-summary[open])>.vrm-seg-cadre{grid-row:3;}
+}
+/* À densité réelle sur ordinateur, le pied de la carte stock restait juste
+   sous la fenêtre de 900 px : réduire les marges conserve tous ses accès. */
+@media(min-width:1024px){
+ .vrm-day-layout .vrm-day-stock{padding:16px!important;}
+ .vrm-day-stock-total{margin:10px 0;}
+ .vrm-day-stock-links{margin-top:8px;padding-top:6px;}
+}
+
+/* Finition : moins de hauteur, davantage d’alignements utiles. */
+@media(max-width:767px){
+ .vrm-day-layout .vrm-day-wallet{padding:11px 14px!important;gap:10px;}
+ .vrm-day-layout .vrm-day-wallet>div{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;row-gap:3px;align-items:center;}
+ .vrm-day-wallet .vrm-day-k{grid-column:1;grid-row:1;font-size:9px;letter-spacing:.7px;}
+ .vrm-day-wallet .vrm-day-note{grid-column:1;grid-row:2;font-size:10px;line-height:1.35;}
+ .vrm-day-wallet .vrm-day-wallet-n{grid-column:2;grid-row:1 / span 2;margin-top:0;font-size:21px;letter-spacing:-.5px;text-align:right;max-width:40vw;}
+ .vrm-day-layout .vrm-day-wallet:has(>div:nth-child(2))>div{grid-template-columns:minmax(0,1fr);}
+ .vrm-day-layout .vrm-day-wallet:has(>div:nth-child(2)) .vrm-day-wallet-n{grid-column:1;grid-row:2;text-align:left;}
+ .vrm-day-layout .vrm-day-wallet:has(>div:nth-child(2)) .vrm-day-note{grid-row:3;}
+ .vrm-day-layout .vrm-day-task{border-color:#e0e7de!important;border-left:3px solid #91ab96!important;padding:9px 11px!important;}
+ .vrm-day-task .vrm-day-task-action{background:#edf1e8;padding:7px 9px;border-radius:7px;color:#3e5f50!important;font-size:10px!important;}
+ .vrm-day-layout .vrm-day-greeting{margin-bottom:10px;}
+ .vrm-day-layout .vrm-day-week{padding:13px!important;}
+ .vrm-mobile-sales-intro{margin-bottom:10px;align-items:flex-end;}
+ .vrm-mobile-sales-intro .vrm-mobile-eyebrow{display:none;}
+ .vrm-mobile-sales-intro h2{font-size:25px;letter-spacing:-.9px;}
+ .vrm-mobile-resultats{background:transparent;border:0;padding:0 0 3px;font-size:11px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action{justify-content:flex-start!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-overview:not(:has([data-benef-vente])) .vrm-sale-action{grid-column:2;grid-row:3;margin:2px 0!important;align-self:start;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button:is(:disabled,[aria-disabled=true]){background:#eef1ec!important;color:#859087!important;border:1px solid #dfe5db!important;opacity:1!important;box-shadow:none!important;}
+ .vrm-main .vrm-ventes-liste [data-bord-vinted]{color:#386b65!important;text-decoration:underline;text-decoration-color:#a7c0b3;text-underline-offset:3px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:9px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{display:flex;align-items:center;min-height:36px!important;width:100%;text-align:left;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button:hover{background:#e7eee0;}
+ :root[data-theme=dark] .vrm-day-task .vrm-day-task-action{background:#344b40;color:#d3e4d8!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste [data-bord-vinted]{color:#b4d8c4!important;}
+ :root[data-theme=dark] .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button:is(:disabled,[aria-disabled=true]){background:#30443d!important;color:#a5b6ab!important;border-color:#ffffff15!important;}
+}
+
+/* Continuité des écrans secondaires. */
+@media(max-width:767px){
+ /* La première rangée existe aussi sans message de fraîcheur. */
+ .vrm-main .vrm-market-space::before{content:'';grid-row:1;grid-column:1 / -1;align-self:stretch;background:#2b4548;pointer-events:none;}
+ .vrm-main .vrm-ann-grid{gap:10px!important;}
+ .vrm-main .vrm-ann-card{background:#fffefa!important;border:1px solid #fff!important;border-radius:15px!important;box-shadow:0 3px 12px #21343e07!important;margin-bottom:8px;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:12px!important;gap:12px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:68px!important;height:92px!important;border-radius:9px;overflow:hidden;background:#e8ede5;}
+ .vrm-main .vrm-ann-card [data-titre]{font-size:13px!important;line-height:1.45!important;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:20px!important;letter-spacing:-.5px;}
+ .vrm-main .vrm-ann-actions{background:#f3f5ee;border-color:#e2e8dc!important;}
+ .vrm-main .vrm-msg-list{margin:0!important;border:1px solid #fff!important;border-radius:14px!important;overflow:hidden;box-shadow:0 3px 12px #21343e06;}
+ .vrm-main .vrm-inbox-row{background:#fffefa!important;padding:12px!important;min-height:76px;border-color:#e3e9df!important;}
+ .vrm-main .vrm-inbox-row.is-current{background:#e7eee3!important;box-shadow:inset 3px 0 #678875!important;}
+ .vrm-main .vrm-msg-name{font-size:13px;}
+ .vrm-main .vrm-msg-extrait{font-size:12px;line-height:1.4;}
+ .vrm-main .vrm-msg-bar>.vrm-inbox-filters button[aria-pressed=true]{background:#2b4548!important;color:#fff!important;}
+ .vrm-main .vrm-lbc-package{background:#fffefa!important;border:1px solid #fff!important;border-radius:14px!important;box-shadow:0 3px 12px #21343e07;}
+ .vrm-main .vrm-lbc-package [data-imprime-lbc]{background:#2b4548!important;color:#fff!important;font-size:12px!important;min-height:40px!important;padding:9px!important;}
+ .vrm-main .vrm-pickup-point{background:#fffefa!important;border:1px solid #fff!important;border-radius:15px!important;box-shadow:0 3px 12px #21343e07;}
+ .vrm-main .vrm-pickup-point>div:first-child{background:#e5ece0!important;border-color:#dce5d7!important;}
+ .vrm-main .vrm-pickup-card{background:#fffefa!important;}
+ .vrm-main .vrm-pickup-collect{background:#e8eee1!important;color:#375846!important;border-color:#d9e2d0!important;font-size:11px!important;}
+ .vrm-main .vrm-set-liste{border:1px solid #fff!important;background:#fffefa!important;border-radius:14px!important;box-shadow:0 3px 12px #21343e06;overflow:hidden;}
+ .vrm-main .vrm-set-ligne{min-height:49px;padding:10px 13px!important;gap:9px;}
+ .vrm-main .vrm-set-lib{font-size:13px;min-width:0;}
+ .vrm-main .vrm-set-val{font-size:11px;max-width:42%;overflow-wrap:anywhere;}
+ .vrm-main .vrm-set-titre{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:#657774!important;}
+ .vrm-chat-panel{background:#eff1ed!important;}
+ .vrm-chat-panel .vrm-chat-head{background:#2b4548!important;color:#fff!important;border-color:#ffffff15!important;}
+ .vrm-chat-panel .vrm-chat-head :is(button,.vrm-chat-head-n){color:#f4f8f3!important;}
+ .vrm-chat-panel .vrm-chat-head-s{color:#cfddd3!important;}
+ .vrm-chat-panel .vrm-chat-shortcuts{background:#e1e9db;border-color:#d2decd!important;}
+ .vrm-chat-panel .vrm-chat-shortcuts button{color:#375846!important;font-size:12px;}
+ .vrm-chat-panel .vrm-bulle{background:#fffefa!important;border:1px solid #e2e8dc!important;font-size:14px;box-shadow:0 1px 2px #21343e04;}
+ .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#2b4548!important;color:#fff!important;border-color:#2b4548!important;}
+ .vrm-chat-panel .vrm-chat-event-colis{background:#e5ecdf!important;border:1px solid #d6e0cf!important;border-radius:12px;}
+ .vrm-chat-panel :is(.vrm-chat-send,.vrm-chat-vinted){background:#2b4548!important;color:#fff!important;border-radius:10px;font-size:13px;}
+ .vrm-chat-panel .vrm-chat-compose>textarea{background:#fffefa!important;border-color:#d9e1d4!important;}
+ :root[data-theme=dark] .vrm-main :is(.vrm-ann-card,.vrm-inbox-row,.vrm-lbc-package,.vrm-pickup-point,.vrm-pickup-card,.vrm-set-liste){background:#243c40!important;border-color:#ffffff12!important;}
+ :root[data-theme=dark] .vrm-main :is(.vrm-ann-actions,.vrm-pickup-point>div:first-child,.vrm-pickup-collect){background:#344b40!important;color:#d4e5d8!important;}
+ :root[data-theme=dark] .vrm-chat-panel{background:#17262d!important;}
+ :root[data-theme=dark] .vrm-chat-panel .vrm-bulle{background:#2a4144!important;color:#edf5ed!important;border-color:#ffffff15!important;}
+ :root[data-theme=dark] .vrm-chat-panel :is(.vrm-chat-event-colis,.vrm-chat-shortcuts){background:#344b40!important;color:#e1ebdf!important;border-color:#ffffff15!important;}
+}
+/* Un code reste intégral et copiable, quelle que soit sa longueur. */
+.vrm-main .vrm-pickup-code{display:grid;grid-template-columns:minmax(0,1fr)!important;grid-template-areas:none!important;gap:3px!important;min-width:0;max-width:100%;padding:8px!important;align-content:center;}
+.vrm-main .vrm-pickup-code>span{grid-column:1;grid-row:1;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;font-size:10px!important;line-height:1.3;letter-spacing:.2px;}
+.vrm-main .vrm-pickup-code>strong{grid-column:1;grid-row:2;min-width:0;max-width:100%;white-space:normal!important;overflow-wrap:anywhere;word-break:normal;line-height:1.3;letter-spacing:.02em!important;}
+.vrm-main .vrm-pickup-code>small{grid-column:1;grid-row:3;justify-self:end;font-size:10px!important;line-height:1.3;}
+
+@media(max-width:767px){
+ .vrm-main .vrm-pickup-code>span{font-size:9px!important;text-transform:none!important;letter-spacing:0;word-break:normal;overflow-wrap:normal;}
+ .vrm-main .vrm-pickup-code>strong{font-size:clamp(16px,5.1vw,20px)!important;}
+ .vrm-main .vrm-pickup-code[data-code-long=true]>strong{font-size:clamp(13px,3.6vw,14px)!important;}
+}
+
+@media(max-width:767px){
+ .vrm-main .vrm-market-space .vrm-seg-cadre{background:#2b4548!important;}
+ .vrm-main :is([data-poster=ebay],.vrm-set-connect){background:#2b4548!important;color:#fff!important;border-radius:10px!important;font-size:13px!important;min-height:42px!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-achats .vrm-pickup-collect{padding:0 9px!important;}
+ .vrm-main .vrm-pickup-code[data-code-long=true]>strong{font-size:clamp(12px,3.3vw,14px)!important;}
+}
+
+/* Densité téléphone demandée : moins de hauteur et de répétitions. */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-app-header{min-height:48px;padding-block:2px!important;}
+ .vrm-app-shell .vrm-day-layout{padding-top:8px!important;padding-inline:10px!important;}
+ .vrm-day-layout .vrm-day-greeting{display:none;}
+ .vrm-day-layout .vrm-day-bar{margin-bottom:8px;border-radius:10px;}
+ .vrm-day-layout .vrm-day-bar>button{min-height:50px!important;padding:6px 3px;gap:2px 4px;}
+ .vrm-day-layout .vrm-day-bar-n{font-size:19px;}
+ .vrm-day-layout .vrm-day-bar-l{font-size:9px;}
+ .vrm-day-layout .vrm-day-task-list{gap:5px!important;}
+ .vrm-day-layout .vrm-day-task{padding:7px 9px!important;gap:8px!important;}
+ .vrm-day-layout .vrm-day-task-title{font-size:11px!important;line-height:1.35!important;}
+ .vrm-day-task .vrm-day-task-action{font-size:9px!important;padding:6px 8px;}
+ .vrm-day-layout .vrm-day-money{padding:12px!important;gap:4px 9px;border-radius:13px;}
+ .vrm-day-money .vrm-day-hero-n{font-size:28px!important;}
+ .vrm-day-money .vrm-day-recu-n{font-size:19px!important;}
+ .vrm-day-money .vrm-day-meta{font-size:9px;}
+ .vrm-day-money .vrm-day-recu{max-width:104px;padding-left:9px!important;}
+ .vrm-day-layout .vrm-day-wallet{padding:8px 11px!important;border-radius:10px;}
+ .vrm-day-wallet .vrm-day-wallet-n{font-size:18px;}
+ .vrm-day-layout .vrm-day-week{padding:11px!important;border-radius:13px;}
+ .vrm-day-layout .vrm-day-week-n{font-size:18px;}
+ .vrm-day-layout .vrm-day-top{gap:8px;margin-bottom:9px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{padding:0 12px 5px;gap:17px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{font-size:11px!important;min-height:34px!important;padding-block:7px!important;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary>summary{min-height:25px!important;font-size:10px;}
+ .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]){padding:6px 12px!important;}
+ .vrm-mobile-sales-intro{margin-bottom:8px;}
+ .vrm-mobile-sales-intro h2{font-size:22px;}
+ .vrm-mobile-resultats{font-size:10px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:10px 10px 0!important;border-radius:12px!important;margin-bottom:8px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:60px minmax(0,1fr)!important;gap:2px 9px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:60px!important;height:84px!important;border-radius:8px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:12px!important;line-height:1.35!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:9px!important;margin-top:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{font-size:9px;padding:2px 4px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:19px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button{min-height:32px!important;font-size:10px!important;padding-inline:8px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{font-size:10px!important;height:32px!important;min-height:32px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-details>summary{min-height:32px!important;font-size:10px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice{margin-inline:-10px;padding-inline:10px!important;border-radius:0 0 12px 12px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{min-height:32px!important;font-size:10px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:10px!important;gap:9px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:58px!important;height:78px!important;}
+ .vrm-main .vrm-ann-card [data-titre]{font-size:12px!important;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:18px!important;}
+ .vrm-main .vrm-inbox-row{padding:10px!important;min-height:65px;gap:9px;}
+ .vrm-main .vrm-msg-name{font-size:12px;}
+ .vrm-main .vrm-msg-extrait{font-size:11px;}
+ .vrm-main .vrm-set-ligne{min-height:44px;padding:8px 11px!important;}
+ .vrm-main .vrm-set-lib{font-size:12px;}
+ .vrm-main .vrm-achats .vrm-pickup-card{padding:10px!important;gap:8px!important;}
+ .vrm-main .vrm-pickup-point>div:first-child{padding-block:9px!important;}
+ .vrm-chat-panel .vrm-chat-head{min-height:50px;}
+ .vrm-chat-panel .vrm-chat-head-n{font-size:14px;}
+ .vrm-chat-panel .vrm-chat-head-s{font-size:10px;}
+ .vrm-chat-panel .vrm-bulle{font-size:13px;padding:8px 11px;}
+ .vrm-chat-panel .vrm-chat-history{padding:12px!important;}
+ .vrm-app-shell .vrm-tabbar{padding:4px 6px max(4px,env(safe-area-inset-bottom));}
+ .vrm-app-shell .vrm-tabbar>.vrm-tab{min-height:44px;padding-block:4px;}
+}
+
+/* Les listes de travail sont des lignes, pas des cartes de tableau de bord. */
+.vrm-invoice-short{display:none;}
+@media(max-width:767px){
+ .vrm-main .vrm-ventes-liste{background:var(--studio-card)!important;border:1px solid var(--studio-line)!important;border-radius:12px!important;overflow:hidden!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:9px 9px 3px!important;margin:0;border:0!important;border-bottom:1px solid var(--studio-line)!important;border-radius:0!important;box-shadow:none;background:transparent!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row:last-child{border-bottom:0!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:48px minmax(0,1fr) auto!important;gap:2px 8px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:48px!important;height:68px!important;grid-column:1;grid-row:1 / span 2;border-radius:6px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-info{grid-column:2;grid-row:1!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{grid-column:3;grid-row:1;font-size:16px!important;max-width:78px;text-align:right;justify-self:end;letter-spacing:-.4px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>[data-benef-vente]{grid-column:3;grid-row:2;text-align:right;justify-self:end;max-width:78px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-overview .vrm-sale-action{grid-column:2 / -1!important;grid-row:2!important;margin:0!important;align-self:end;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview:has([data-benef-vente]) .vrm-sale-action{padding-right:65px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button{min-height:28px!important;padding-inline:6px!important;font-size:10px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{grid-template-columns:minmax(0,1fr) auto auto;padding-top:0;margin-top:4px;border-top:0;gap:0 5px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{grid-column:2;grid-row:1;background:transparent!important;border:0!important;border-radius:0;margin:0;padding:0!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-details{grid-column:3;grid-row:1;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice[data-ouvert=true]{grid-column:1 / -1;grid-row:2;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-details[open]{grid-column:1 / -1;grid-row:3;}
+ .vrm-main .vrm-ventes-liste .vrm-invoice-full{display:none;}
+ .vrm-main .vrm-ventes-liste .vrm-invoice-short{display:inline;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice>button{min-height:30px!important;padding:0 4px!important;width:auto;white-space:nowrap;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{padding-inline:3px!important;font-size:10px!important;min-height:30px!important;height:30px!important;}
+ .vrm-main .vrm-shared-sale{padding:9px!important;margin-bottom:0;border:0!important;border-bottom:1px solid var(--studio-line)!important;border-radius:0;box-shadow:none;background:var(--studio-card);}
+ .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:42px minmax(0,1fr) auto!important;gap:6px 9px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{width:42px!important;height:58px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-title{font-size:12px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-meta{font-size:10px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-price>.vrm-display{font-size:15px!important;}
+ .vrm-main .vrm-ann-card{margin:0;border-radius:0!important;border:0!important;border-bottom:1px solid var(--studio-line)!important;box-shadow:none!important;}
+ .vrm-main .vrm-ann-grid{gap:0!important;border-radius:12px;overflow:hidden;border:1px solid var(--studio-line);}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:9px!important;gap:9px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:44px!important;height:60px!important;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:16px!important;}
+ .vrm-main .vrm-lbc-package{padding:9px!important;border-radius:10px!important;box-shadow:none;}
+ .vrm-main .vrm-lbc-package [data-imprime-lbc]{min-height:34px!important;font-size:11px!important;padding:7px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card{padding:9px!important;gap:7px!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-market-space .vrm-shared-sale{padding:8px!important;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order{border-bottom:1px solid var(--studio-line);}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order .vrm-shared-sale{border-bottom:0!important;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions{margin:0 9px 3px 59px!important;padding:0!important;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions>summary{min-height:28px!important;padding:0!important;font-size:10px;}
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions[open]{margin:0 9px 8px!important;}
+}
+
+/* Outils de liste compacts et colis avec actions à côté de la vignette. */
+@media(max-width:767px){
+ .vrm-main .vrm-sales-workbar .vrm-list-search input{border:0!important;box-shadow:none!important;}
+ .vrm-main .vrm-kpi-ventes{margin-bottom:9px;}
+ .vrm-main .vrm-kpi-ventes-grille{gap:6px;}
+ .vrm-main .vrm-kpi-ventes-case{padding:9px 10px;border-radius:10px;}
+ .vrm-main .vrm-kpi-ventes-lib{font-size:9px;letter-spacing:.4px;}
+ .vrm-main .vrm-kpi-ventes-val{font-size:18px;line-height:1.2;margin-top:3px;white-space:normal;overflow-wrap:anywhere;}
+ .vrm-main .vrm-kpi-ventes-sub,.vrm-main .vrm-kpi-ventes-note{font-size:10px;line-height:1.35;}
+ .vrm-app-shell .vrm-main .vrm-shared-workbar{padding:8px!important;gap:6px;margin-bottom:8px!important;}
+ .vrm-main .vrm-shared-workbar>input{padding:8px 10px!important;margin-bottom:5px!important;}
+ .vrm-main .vrm-shared-workbar .vrm-sales-filters>button{padding:6px 8px!important;min-height:32px!important;}
+ .vrm-main .vrm-ann-toolbar{gap:5px!important;margin-bottom:7px!important;}
+ .vrm-main .vrm-ann-search{min-height:38px;}
+ .vrm-main .vrm-ann-search input{padding-block:7px!important;}
+ .vrm-main .vrm-ann-workbar .vrm-stock-views{gap:5px;}
+ .vrm-main .vrm-ann-workbar .vrm-stock-views button{min-height:30px!important;padding:6px 9px!important;font-size:10px!important;}
+ .vrm-main .vrm-ann-stock-tools{margin-bottom:6px!important;}
+ .vrm-main .vrm-ann-stock-tools>summary{min-height:32px!important;font-size:11px;}
+ .vrm-main [data-places-wrap]{margin-bottom:8px!important;}
+ .vrm-main [data-places-wrap]>summary{padding:7px 10px!important;min-height:34px!important;gap:6px!important;}
+ .vrm-main [data-places-wrap]>summary span{font-size:11px!important;}
+ .vrm-main .vrm-lbc-package{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:4px 9px;padding:8px!important;}
+ .vrm-main .vrm-lbc-package-head{display:contents!important;}
+ .vrm-main .vrm-lbc-package-head>:first-child{grid-column:1;grid-row:1 / span 2;width:42px!important;height:56px!important;}
+ .vrm-main .vrm-lbc-package-head>div{grid-column:2;grid-row:1;}
+ .vrm-main .vrm-lbc-package-head>a{grid-column:3;grid-row:1 / span 2;}
+ .vrm-main .vrm-lbc-package-actions{grid-column:2 / -1;grid-row:2;display:flex!important;flex-wrap:nowrap!important;gap:5px!important;margin-top:0!important;align-self:end;min-width:0;}
+ .vrm-main .vrm-lbc-package .vrm-lbc-package-actions>*{min-height:32px!important;padding:6px 7px!important;font-size:10px!important;border-radius:7px!important;box-sizing:border-box;}
+ .vrm-main .vrm-lbc-package .vrm-lbc-package-primary{flex:1 1 auto!important;min-width:0;max-width:none!important;background:#2b4548!important;color:#fff!important;display:flex;align-items:center;justify-content:center;line-height:1.3;text-decoration:none;}
+ .vrm-main .vrm-achats .vrm-pickup-details>summary{min-height:32px;margin:-5px 0 -7px;font-size:10px;}
+ .vrm-main .vrm-pickup-point>div:first-child{padding-top:7px!important;padding-bottom:7px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card{padding-block:8px!important;}
+}
+
+/* Les commandes occasionnelles forment une seule barre ; leurs panneaux
+   s’ouvrent dans le flux et ne recouvrent jamais les articles ni les alertes. */
+.vrm-label-short{display:none;}
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar{align-items:stretch;gap:5px!important;}
+ .vrm-main .vrm-ann-search{flex:1 1 0!important;min-width:0;border:1px solid var(--studio-line);border-radius:10px;background:var(--studio-card);padding-left:10px;gap:6px;}
+ .vrm-main .vrm-ann-search input{border:0!important;background:transparent!important;padding-left:0!important;box-shadow:none;min-width:0;}
+ .vrm-main .vrm-ann-search>button{flex:0 0 36px;width:36px;min-width:36px;min-height:38px!important;padding:0!important;border:0!important;background:transparent!important;border-radius:0;}
+ .vrm-main .vrm-ann-outils>button{background:var(--studio-card)!important;border-color:var(--studio-line)!important;border-radius:10px!important;}
+ .vrm-main .vrm-ann-stock-tools,.vrm-main [data-places-wrap]{display:inline-block;width:calc(50% - 6px);vertical-align:top;margin-bottom:9px!important;}
+ .vrm-main .vrm-ann-stock-tools{margin-right:8px;}
+ .vrm-main .vrm-ann-stock-tools>summary,.vrm-main [data-places-wrap]>summary{display:flex;align-items:center;min-height:34px!important;box-sizing:border-box;padding:6px 9px!important;border:1px solid var(--studio-line);border-radius:8px;background:var(--studio-card);box-shadow:none!important;font-size:11px;}
+ .vrm-main .vrm-ann-stock-tools>summary::after{margin-left:auto;}
+ .vrm-main .vrm-ann-stock-tools[open],.vrm-main [data-places-wrap][open]{display:block;width:100%;margin-right:0;}
+ .vrm-main .vrm-ann-stock-tools .vrm-label-full,.vrm-main [data-places-wrap] .vrm-label-full{display:none;}
+ .vrm-main .vrm-ann-stock-tools .vrm-label-short,.vrm-main [data-places-wrap] .vrm-label-short{display:inline;}
+ .vrm-main [data-places-wrap]>summary>span:nth-child(3){font-size:9px!important;}
+ .vrm-main .vrm-ann-stock-tools[open]>summary,.vrm-main [data-places-wrap][open]>summary{background:#e4ecdf;}
+ :root[data-theme=dark] .vrm-main .vrm-ann-stock-tools[open]>summary,:root[data-theme=dark] .vrm-main [data-places-wrap][open]>summary{background:#344b40;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-kpi-ventes-grille{gap:0;border:1px solid var(--studio-line);border-radius:10px;background:var(--studio-card);overflow:hidden;}
+ .vrm-main .vrm-kpi-ventes-case{background:transparent!important;border:0!important;border-radius:0;box-shadow:none;padding:8px 10px;min-width:0;}
+ .vrm-main .vrm-kpi-ventes-case+.vrm-kpi-ventes-case{border-left:1px solid var(--studio-line)!important;}
+ .vrm-app-shell .vrm-main .vrm-shared-workbar{border:0!important;box-shadow:none!important;background:transparent!important;padding:0!important;margin-bottom:8px!important;}
+ .vrm-main .vrm-shared-workbar>.vrm-sales-filters{margin-bottom:0!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) 40px 40px!important;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-search{grid-column:1!important;grid-row:1!important;width:100%;max-width:none!important;box-sizing:border-box;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-tri{grid-column:2!important;grid-row:1!important;width:40px!important;max-width:40px!important;min-width:0;box-sizing:border-box;}
+ .vrm-main .vrm-ann-toolbar .vrm-ann-outils{grid-column:3!important;grid-row:1!important;}
+}
+
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar .vrm-ann-outils>button{width:40px!important;min-width:40px!important;max-width:40px;box-sizing:border-box;}
+}
+
+/* Direction Gestion : repères de colonnes et lignes compactes sur téléphone.
+   Montant désigne le prix de vente, sans le présenter comme un revenu net. */
+.vrm-ledger-heading{display:none;}
+@media(max-width:767px){
+ .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;gap:12px;padding:9px 10px 9px 54px;background:var(--studio-soft,#edf2ef);border-bottom:1px solid var(--studio-line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--studio-ledger-label,#52636b);}
+ .vrm-main .vrm-ventes-liste{border-radius:8px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:8px 9px 2px!important;gap:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:2px 8px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:12px!important;font-weight:600!important;line-height:1.35!important;letter-spacing:-.1px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:10px!important;gap:4px 7px!important;margin-top:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:15px!important;font-variant-numeric:tabular-nums;letter-spacing:-.2px!important;}
+ .vrm-main .vrm-ventes-liste [data-benef-vente]{font-variant-numeric:tabular-nums;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:2px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:5px 8px!important;}
+ .vrm-main .vrm-shared-sale .vrm-display{font-variant-numeric:tabular-nums;}
+}
+
+/* Même grille de lecture pour l'inventaire publié : photo, article, prix. */
+@media(max-width:767px){
+ .vrm-main .vrm-ann-ledger-heading{border:1px solid var(--studio-line);border-radius:8px 8px 0 0;padding-left:54px;}
+ .vrm-main .vrm-ann-ledger-heading+.vrm-ann-grid{border-top:0;border-radius:0 0 8px 8px;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:8px 9px!important;gap:8px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-ledger-info{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px!important;align-content:start;}
+ .vrm-main .vrm-ann-ledger-info>div{grid-column:1 / -1;min-width:0;}
+ .vrm-main .vrm-ann-ledger-info>[data-titre]{grid-column:1;grid-row:1;font-size:12px!important;font-weight:600!important;line-height:1.35!important;}
+ .vrm-main .vrm-ann-ledger-info>.vrm-ann-price-line{grid-column:2;grid-row:1 / span 2;display:flex!important;flex-direction:column;align-items:flex-end!important;gap:4px!important;max-width:100px;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:15px!important;font-variant-numeric:tabular-nums;line-height:1.35;}
+ .vrm-main .vrm-ann-ledger-info>div:nth-child(3){grid-column:1;grid-row:2;font-size:10px!important;}
+ .vrm-main .vrm-ann-card [data-chiffres]{font-variant-numeric:tabular-nums;padding-top:3px;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions{padding:0 9px 3px 53px!important;border-top:0!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions>summary{min-height:32px;display:flex;align-items:center;gap:5px;font-size:10px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-title{line-height:1.35!important;overflow-wrap:anywhere;}
+ .vrm-main .vrm-shared-sale .vrm-sale-price{min-width:0;max-width:120px;}
+ .vrm-main .vrm-shared-sale .vrm-sale-price>.vrm-display{white-space:nowrap;}
+}
+.vrm-sale-row:focus-within,.vrm-ann-card:focus-within{outline:2px solid #809b91;outline-offset:-2px;}
+
+@media(max-width:767px){
+ .vrm-main .vrm-ann-grid .vrm-ann-card{display:flex!important;flex-direction:column!important;border-radius:0!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions{position:static;display:block!important;align-self:stretch;padding:0 9px 3px 53px!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions>summary{position:static;width:auto;height:auto;min-height:32px!important;justify-content:flex-start;white-space:nowrap;padding:0!important;font-size:10px!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-actions>summary::before{content:none;}
+ .vrm-main .vrm-ann-grid .vrm-ann-actions>summary>*{display:inline-flex!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
+ .vrm-main .vrm-ann-grid .vrm-ann-actions[open]>div{padding:0 0 8px!important;}
+}
+
+/* Une vente = une seule ligne ; le bouton ouvre les actions existantes. */
+.vrm-ledger-sale-toggle{display:none;}
+.vrm-ledger-sale-content{display:contents;}
+@media(max-width:767px){
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto 24px;align-items:center;gap:6px;width:100%;min-height:48px;padding:4px 0;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer;}
+ .vrm-main .vrm-ledger-sale-toggle>img,.vrm-main .vrm-ledger-photo-empty{width:28px;height:36px;object-fit:cover;border-radius:3px;background:var(--studio-paper);display:flex;align-items:center;justify-content:center;}
+ .vrm-main .vrm-ledger-sale-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:600;}
+ .vrm-main .vrm-ledger-sale-state{font-size:9px;white-space:nowrap;color:var(--studio-muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;}
+ .vrm-main .vrm-ledger-sale-state:empty{display:none;}
+ .vrm-main .vrm-ledger-sale-amount{font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
+ .vrm-app-shell .vrm-main .vrm-sale-row{padding:0 9px!important;gap:0!important;}
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-content{display:none;}
+ .vrm-main .vrm-sale-row[data-ligne-ouverte=true]>.vrm-ledger-sale-content{display:flex;flex-direction:column;gap:8px;padding:8px 0 10px;border-top:1px solid var(--studio-line);}
+ .vrm-main .vrm-shared-sale .vrm-ledger-sale-toggle{grid-template-columns:28px minmax(0,1fr) auto 24px;}
+ .vrm-main .vrm-ledger-sale-toggle:focus-visible{outline:2px solid #617d73;outline-offset:-2px;border-radius:4px;}
+}
+
+@media(max-width:767px){
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:0 9px!important;gap:0!important;}
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle{box-sizing:border-box;}
+ .vrm-main .vrm-ledger-photo-empty>*{max-width:28px!important;max-height:36px!important;}
+ .vrm-main .vrm-shared-sale .vrm-ledger-sale-toggle{grid-template-columns:28px minmax(0,1fr) auto auto 24px;}
+ .vrm-main .vrm-ledger-sale-state:empty{display:block;}
+ .vrm-main .vrm-ventes-liste>.vrm-ledger-heading{padding-left:53px;padding-right:39px;}
+}
+
+@media(max-width:767px){
+ .vrm-app-shell .vrm-main :is(input,textarea)::placeholder{color:var(--studio-muted);opacity:1;}
+}
