@@ -122,7 +122,7 @@ const CSS = `
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-.acc-marque img{width:32px;height:32px;border-radius:8px;display:block}
+.acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:#21343e;padding:2px;box-sizing:border-box}
 .acc-marque b{font-family:'Space Grotesk','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
 .acc-ancres{display:flex;gap:2px;margin-left:22px}
 .acc-ancres a{color:${K.muted};font-size:14px;font-weight:500;padding:8px 10px;border-radius:8px;text-decoration:none;transition:color 160ms ease}
@@ -363,7 +363,7 @@ const CSS = `
 /* Téléphone. */
 @media (max-width:759px){
   .acc-nav .acc-in{height:56px;gap:8px}
-  .acc-marque img{width:28px;height:28px}
+  .acc-marque img{width:32px;height:32px}
   .acc-marque b{font-size:17px}
   .acc-nav .acc-btn{height:38px;padding:0 12px;font-size:13.5px}
   .acc-nav .acc-lien{font-size:14px;padding:0 4px}
@@ -529,7 +529,7 @@ export default function Accueil({ onEntrer }) {
       <header className={`acc-nav${defile ? ' defile' : ''}`}>
         <div className="acc-in">
           <a className="acc-marque" href="/" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: moins ? 'auto' : 'smooth' }); }} aria-label="VRM — haut de la page">
-            <img src="/vrm-logo-96.png" alt="" width="32" height="32" />
+            <img className="vrm-brand-asset" src="/vrm-logo-192.png" srcSet="/vrm-logo-96.png 96w, /vrm-logo-192.png 192w" sizes="32px" alt="" width="32" height="32" />
             <b>VRM</b>
           </a>
           <nav className="acc-ancres" aria-label="Sections">
@@ -727,7 +727,7 @@ export default function Accueil({ onEntrer }) {
       <footer className="acc-pied">
         <div className="acc-in">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/vrm-logo-96.png" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
+            <img className="vrm-brand-asset" src="/vrm-logo-192.png" srcSet="/vrm-logo-96.png 96w, /vrm-logo-192.png 192w" sizes="32px" alt="" width="22" height="22" style={{ borderRadius: 6 }} />
             <span>© {new Date().getFullYear()} VRM · VRM n’est pas affilié à Vinted, Leboncoin ou eBay.</span>
           </div>
           <nav aria-label="Informations légales">

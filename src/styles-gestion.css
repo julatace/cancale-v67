@@ -144,3 +144,24 @@
 .vrm-app-shell .vrm-main.vrm-ledger-drawer-body .vrm-ventes-liste .vrm-sale-details{width:100%;}
 .vrm-ledger-drawer-body .vrm-cout-rangee>.vrm-cout-label,.vrm-ledger-drawer-body .vrm-cout-rangee>form{grid-column:1 / -1;}
 .vrm-app-shell .vrm-main.vrm-ledger-drawer-body .vrm-ventes-liste .vrm-sale-details>summary{width:100%!important;box-sizing:border-box;min-height:44px!important;}
+
+/* Une seule présentation du logo officiel, sans recadrage ni filtre. */
+.vrm-brand-asset{object-fit:contain!important;filter:none!important;opacity:1;flex-shrink:0;}
+.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#21343e;display:flex;align-items:center;justify-content:center;}
+.vrm-app-shell .vrm-header-logo>img.vrm-logo{width:40px!important;height:40px!important;border-radius:0!important;box-shadow:none!important;}
+.vrm-sidebar-brand img.vrm-logo{border-radius:0!important;box-shadow:none!important;}
+.vrm-brand-auth{background:#21343e;padding:2px;box-sizing:border-box;object-fit:contain!important;}
+/* Le panneau doit rester lisible même lorsque la liste est dézoomée. */
+@media(min-width:1024px){
+ .vrm-ledger-drawer{width:min(600px,100%);}
+ .vrm-ledger-drawer-head h2{font-size:22px;}
+ .vrm-ledger-drawer-head p{font-size:14px;}
+ .vrm-ledger-drawer-head span{font-size:12px;}
+}
+.vrm-main .vrm-ledger-sale-toggle[aria-expanded=true]{background:var(--gestion-soft)!important;box-shadow:inset 3px 0 var(--gestion-accent);}
+.vrm-main .vrm-sales-workbar .vrm-filter-recap{padding-top:6px;}
+.vrm-main .vrm-inbox-row[data-nonlu="1"]{box-shadow:inset 3px 0 var(--gestion-accent)!important;background:var(--gestion-soft)!important;}
+@media(max-width:767px){
+ .vrm-app-shell .vrm-app-header{padding-block:4px!important;}
+ .vrm-main .vrm-set-ic{width:28px;height:28px;flex-shrink:0;}
+}

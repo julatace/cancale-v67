@@ -10045,8 +10045,8 @@ let _logoSeq = 0;
 function VrmLogo({ size = 40, style, anim = false }) {
   // srcSet : le navigateur prend la 96 px (10 Ko) quand elle suffit — l'en-tête
   // affiche le logo à 38-44 px — et la 192 px (32 Ko) sur un écran très dense.
-  return <img src="/vrm-logo-192.png" srcSet="/vrm-logo-96.png 96w, /vrm-logo-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-logo-anim' : 'vrm-logo'}
-    style={{ width: size, height: size, borderRadius: Math.round(size * 0.24), objectFit: 'contain', display: 'block', ...(style || {}) }}/>;
+  return <img src="/vrm-logo-192.png" srcSet="/vrm-logo-96.png 96w, /vrm-logo-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
+    style={{ width: size, height: size, borderRadius: 0, objectFit: 'contain', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
 function VrmWord({ height = 22, color, accent, style }) {
@@ -42986,7 +42986,7 @@ function AbonnementRequis({ info }) {
   return (
     <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
-        <img src="/vrm-logo-96.png" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
+        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-192.png" srcSet="/vrm-logo-96.png 96w, /vrm-logo-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
         <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
         <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
@@ -43125,7 +43125,7 @@ const boiteEquipe = () => ({ maxWidth: 760, margin: '0 auto' });
 function TeteEquipe({ titre, sous, onPropre }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-      <img src="/vrm-logo-96.png" alt="VRM" width="36" height="36" style={{ borderRadius: 8, display: 'block' }}/>
+      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-192.png" srcSet="/vrm-logo-96.png 96w, /vrm-logo-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 8, display: 'block' }}/>
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: -0.3 }}>{titre}</div>
         {sous && <div style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{sous}</div>}
