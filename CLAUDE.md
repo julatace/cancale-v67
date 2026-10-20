@@ -10244,8 +10244,62 @@ de cartes personnalisables n'existait : un réglage dédié.
 « Rien ne se passe après une vente eBay » (etat.md) : une commande eBay payée n'était visible que dans eBay → Ventes. État K par K, lu dans le code : `docs/passation/notes/agent-ebay/etat.md` (en tête).
 - **Une règle** `colisEbay` (`api/_lib/ebay-a-expedier.js`, importée par l'app ET le serveur, §11) : à poster = `etatCommandeEbay(o).peutExpedier`, pas d'annulation demandée, un envoi (`fulfillmentInstructionsType` SHIP_TO ou absent — jamais un colis caché) ; « Ne poste pas » = annulation demandée (inconnue ⇒ demandée) ; date limite `lineItemFulfillmentInstructions.shipByDate` (ancien nom lu en repli — `ebay-agent.js` ne lisait que lui) ; authentification d'eBay signalée. `null` = pas su, jamais `[]`.
 - **Lecteurs** : Colis (bloc « Ventes eBay à poster » : N° par le SKU via `numLigneEbay`, jours, emplacement, « Étiquette sur eBay ↗ » vers `ebay.fr/sh/ord/details?orderid=` — adresse NON mesurée —, « Suivi et message à l'acheteur » → `?tab=ebay_ventes` + `DEMANDE_EBAY_CIBLE` ; « Ne poste pas » en tête, → `?tab=ebay_agent` ; total du haut Vinted + eBay ; âge des commandes au-delà de 6 h), Ma journée (« À envoyer » au même nombre, `data-ebay`), `vrm_colis_aposter` (+ `ebay`, `nePasPoster`), `api/widget.js` (`ship.total` comprend eBay, `ship.ebay`, `ship.auMoins`), `api/ship-reminders.js` (rappel aussi pour un vendeur eBay seul, sans mémo quand rien n'est lisible ni à dire), bilan du lundi (« au moins » si eBay illisible). L'étiquette se prend DANS eBay (§2.8) : VRM n'achète rien.
-- ⚠️ **Les commandes eBay ne se relisent que sur synchro** (Compte eBay → Rafraîchir, ou la relecture des 6 h quand une règle d'offre est posée) tant que K5 (VRM fermé, migrations 014 + 015) n'existe pas : Colis dit leur âge.
+- ~~Les commandes eBay ne se relisent que sur synchro~~ — **depuis le 20 octobre elles se relisent toutes seules** (section « eBay se relit tout seul » juste en dessous) ; Colis dit toujours leur âge.
 - Preuves : `audit-ebay-colis.cjs` (règle + vraies routes widget et rappel, 9 rouges sur 65eec06, 3 mutations rouges) ; banc `ebay-colis.cjs` (`BANC_PORT`, 390/1512, 28 rouges sur le build de 65eec06, mutation « Ma journée sans eBay » rouge). Aucun appel réel à eBay ; formes de l'API Fulfillment tirées de la doc.
+
+### Leboncoin : le compte connecté lu sur le compteur de messagerie (20 octobre, 5.195)
+Julien : « pour Leboncoin il capte pas les bonnes données ni le bon compte ».
+**Mesuré (lecture seule, extension installée 5.194)** : il a DEUX comptes
+Leboncoin — un **particulier** (ses 10 annonces de baskets, 3 avec réf VRM) et un
+**pro** (`SHOPCANCALE`). Connecté sur le particulier (compteur de messagerie relevé
+à 11:16), `lbc_accounts` ne contenait QUE le pro, rangé « particulier », venu de
+`linked_accounts` ; « dernier vu » dans la fiche Leboncoin nommait donc le mauvais
+compte, Messages Leboncoin affichait « Compte Leboncoin » sans nom pour le vrai,
+et ses annonces sans réf VRM n'étaient plus rafraîchies depuis le 20 septembre
+(3 d'entre elles, vendues sur Leboncoin, encore « active » en base).
+- **Causes (code actuel, pas la version installée)** : `members/me/account` (seule
+  source « session » de la 5.186) a la forme `{account:{account_id,type},
+  member:{account_id, nickname:{value}, contact:{email}}}` — aucun couple id + nom
+  lisible : la session n'a JAMAIS été reconnue, `vrmLbcCompte` jamais posé,
+  `myads` jamais rangé sans réf ; `linked_accounts` = les AUTRES comptes liés, et
+  `is_business_user` n'était pas lu.
+- **La session = le compteur `messaging/proxy/api/hal/{userId}/counter`** (relu par
+  la page pour le seul compte connecté — mesuré dans les deux sens). Garde : un id
+  présent dans la dernière liste des comptes liés (`vrmLbcLies`, 12 h) n'est jamais
+  la session. Nom et type : seulement la fiche `user-card/v2/{id}/infos` dont
+  `user_id` = l'id de session, ou une entrée déjà rangée sous cet id. Changer de
+  compte efface le nom d'avant (`noterSessionLbc`). Écrit dans `lbc_accounts` avec
+  `sessionAt`, au changement, à un nom appris, sinon toutes les 6 h.
+- `is_business_user` tranche pro/particulier (`detectLbcAccount`). Les ads de
+  `myads` et du tableau pro sont taguées du compte de session ; inconnu ⇒ rien.
+- **Une règle des deux côtés (§11)** : un compte à `sessionAt` est à lui
+  (`comptesLbcSession`, app + extension), comme un compte prouvé par une vente.
+  L'app : la fiche dit « connecté en dernier : X, pro/particulier »
+  (`compteLbcConnecte`, jamais le dernier vu), la liste des comptes compte les
+  annonces par `account` (elle comptait `lbcUser`, donc 0), Messages nomme le type.
+- Preuves : `audit-lbc-session.cjs` (formes réelles, données inventées, le vrai
+  `background.js` à état) **8 rouges sur origin/main**, 0 après ; 3 mutations
+  (garde des comptes liés, fiche d'un autre id, règle de session des files) ⇒ rouges.
+- ⚠️ **Non mesuré / non corrigé** : que le compteur ne soit jamais relevé pour un
+  compte lié (mesuré deux fois, pas prouvé) ; `account.account_id` de
+  `members/me/account` vs `user_id` (pas lu exprès) ; une bascule de compte dans
+  le même onglet où `myads` arrive avant le nouveau compteur taguerait l'ancien
+  compte ; les annonces disparues de `myads` restent « active » (pas de jugement
+  sur une liste paginée) ; `lbc_ventes` toujours sans date de vente et pas relues
+  depuis le 7 octobre ; `lbc_recon.paths` plein (300/300 : les chemins neufs ne
+  s'ajoutent plus).
+- **Geste de Julien** : installer la 5.195, puis ouvrir leboncoin.fr → « Mes
+  annonces » sur CHACUN de ses deux comptes, et « Mes transactions » une fois.
+
+
+### eBay se relit tout seul : à l'ouverture, toutes les ~10 min, et au cron du matin (20 octobre)
+Julien : « pour eBay ça doit se relire tout seul ou se rafraîchir à l'ouverture de l'app, mais je dois rien avoir à faire ».
+- **App ouverte** (`relireEbaySiVieux`, `useRelectureEbay` monté dans `AppCoeur`, session obligatoire) : à l'ouverture, chaque minute tant que l'app est VISIBLE, et au retour au premier plan, chaque compte eBay actif dont `ebay_orders.capturedAt` (lu en scalaire, **en base** : partagé entre appareils) a plus de **10 min** est relu par `POST /api/ebay {action:'relire'}`. Un appel en vol par onglet, verrou de 2 min entre onglets (`vrm_ebay_relecture_vol`, commodité d'appareil). « Pas su » (base ou eBay) ⇒ rien n'est vidé et on recule par compte : 10, 20, 40, 60 min (`vrm_ebay_recul`) ; sans connexion eBay : 6 h ; principal sous-entendu sans ligne `ebay_orders` : jamais appelé. Après une relecture rangée : `vrm:ebay-maj` — `useComptesEbay` rend une nouvelle référence (eBay → Ventes, Annonces, la coque relisent), Colis et Ma journée (`ebayTick`) et la cloche (`preuveTick`) relisent, sans recharger.
+- **`action:'relire'`** (`handleRelire`, toujours 12 fonctions) : mesuré dans le code, la synchro complète coûte par compte 3 appels + jusqu'à 20 GetItem + l'Inventory API + la réécriture des règles d'offre ; `relire` fait **deux lectures** — la page 0 des commandes (`relireCommandesCompte`, `api/_lib/ebay-relecture.js`, même fusion `fusionCommandesEbay` en comparer-et-échanger que `handleSync`) et un `GetMyeBaySelling` (annonces en ligne + programmées : l'anti double vente lit leur SKU). Le `detail` déjà rangé d'une annonce est gardé par itemId ; ancienne ligne illisible ⇒ annonces pas réécrites ; règles d'offre et stock non touchés (la synchro complète, sur clic ou aux 6 h, reste).
+- **App fermée** : `api/ship-reminders.js` relit les commandes eBay de CHAQUE vendeur (`relireCommandesVendeur` : comptes actifs de SON registre, SON jeton chacun) **avant** de compter le rappel et le bilan du lundi ; borné à 20 s par vendeur (8 vendeurs en parallèle, comme avant) ; un échec ne bloque rien (dernière capture, « au moins » comme avant) ; le bilan du cron porte `ebayRelu` (nombres, aucun jeton). Pas de nouveau cron.
+- Aucune règle d'argent ni de colis changée (`colisEbay`, `montantRecuEbay` intouchés).
+- Preuves : banc `ebay-relecture.cjs` (port `BANC_PORT`, 390 tactile + 1512, horloge pilotée, données inventées) **30 contrôles, 18 rouges sur le build d'origin/main** ; mutation « borne de 10 min retirée » ⇒ appels multiples (rouge). Banc `ebay-relecture-cron.cjs` (vraies routes `ship-reminders` et `ebay` `relire`, base cloisonnée à 2 vendeurs, faux eBay) **14 contrôles, 6 rouges sur origin/main**.
+- ⚠️ **Non mesuré** : les quotas d'appels eBay réels (au pire 2 appels par compte toutes les 10 min par vendeur dont l'app est ouverte, + 1 par compte au cron) ; la durée réelle d'un `GetMyeBaySelling` sur son compte ; rien n'a été envoyé à eBay pour de vrai.
 
 ---
 

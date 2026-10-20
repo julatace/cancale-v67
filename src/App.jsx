@@ -61,7 +61,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.194.0';
+const EXT_ATTENDUE = '5.195.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -12580,7 +12580,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
           {[
             ['Catégorie', categorie || 'Leboncoin la propose (il la devine du titre)'],
-            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (dernier vu : ${compteLbc.name})` : ''}`],
+            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (connecté en dernier : ${compteLbc.name}${compteLbc.type === 'pro' ? ', pro' : compteLbc.type === 'particulier' ? ', particulier' : ''})` : ''}`],
             ['Options payantes', 'aucune — VRM publie sans booster'],
           ].map(([k, val], i) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
@@ -14528,10 +14528,111 @@ function useComptesEbay() {
     const lire = (f) => lireComptesEbay(f).then((v) => { if (!stop) setC(v); });
     lire(false);
     const h = () => lire(true);
+    // (20 octobre) Une relecture eBay faite sans geste (`relireEbaySiVieux`) :
+    // les comptes n'ont pas changé, mais leurs lignes, si — une NOUVELLE
+    // référence fait relire chaque écran qui en dépend (eBay → Ventes,
+    // Annonces, la coque), sans recharger.
+    const m = () => { if (!stop) setC((v) => (Array.isArray(v) ? [...v] : v)); };
     window.addEventListener('vrm:ebay-comptes', h);
-    return () => { stop = true; window.removeEventListener('vrm:ebay-comptes', h); };
+    window.addEventListener('vrm:ebay-maj', m);
+    return () => { stop = true; window.removeEventListener('vrm:ebay-comptes', h); window.removeEventListener('vrm:ebay-maj', m); };
   }, []);
   return c;
+}
+// ── eBAY SE RELIT TOUT SEUL (20 octobre) ────────────────────────────────────
+// Julien : « pour eBay ça doit se relire tout seul ou se rafraîchir à
+// l'ouverture de l'app, mais je dois rien avoir à faire ». Avant, les
+// commandes eBay ne se relisaient que sur « ↻ Rafraîchir depuis eBay » ou aux
+// 6 h quand une règle d'offre était posée : une vente eBay n'arrivait dans
+// Colis, Ma journée ou la cloche qu'après un geste.
+// ⇒ À l'ouverture de l'app, puis toutes les minutes tant qu'elle est ouverte
+//   et VISIBLE (et au retour au premier plan), chaque compte eBay dont les
+//   commandes ont été lues il y a plus de 10 min est relu par la route
+//   (`action: 'relire'` : commandes + annonces en ligne / programmées, deux
+//   lectures eBay — jamais la synchro complète et ses 20 GetItem).
+// Bornes :
+//   · l'âge se juge sur la date de la capture RANGÉE EN BASE
+//     (`ebay_orders.capturedAt`, lue en scalaire, §4.4) — partagée entre ses
+//     appareils : un téléphone et un ordinateur ouverts ensemble ne relisent
+//     pas chacun ; la mémoire de l'onglet ne sert qu'à NE PAS relire la base
+//     quand on sait déjà que c'est frais ;
+//   · un seul appel en vol (cet onglet), et un verrou de 2 min entre onglets
+//     (`vrm_ebay_relecture_vol`, une commodité d'appareil) ;
+//   · « pas su » (base ou eBay qui ne répond pas) ⇒ rien n'est vidé (la route
+//     garde la dernière capture) et on RECULE : 10, 20, 40 puis 60 min par
+//     compte (`vrm_ebay_recul`) ; un compte sans connexion eBay attend 6 h.
+// Après une relecture rangée : `vrm:ebay-maj` — les écrans relisent.
+const RELECTURE_EBAY_MS = 10 * 60 * 1000;
+const RECUL_EBAY_MS = [10, 20, 40, 60].map((m) => m * 60000);
+const RECUL_EBAY_SANS_CONNEXION_MS = 6 * 3600 * 1000;
+const VOL_EBAY_MS = 2 * 60 * 1000;
+const _capEbay = new Map();            // ref → capturedAt connu (cet onglet)
+let _relectureEbayVol = null;
+const lireLocalJson = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } };
+const ecrireLocalJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+function relireEbaySiVieux() {
+  if (_relectureEbayVol) return _relectureEbayVol;
+  _relectureEbayVol = (async () => {
+    try {
+      if (!AUTH.session || !AUTH.session.access_token) return { fait: 0, raison: 'session' };
+      const comptes = await lireComptesEbay();
+      if (!Array.isArray(comptes) || !comptes.length) return { fait: 0, raison: 'comptes' };
+      const maintenant = Date.now();
+      const recul = lireLocalJson('vrm_ebay_recul');
+      // Ce qu'on sait déjà frais (cet onglet) ou en recul : aucune lecture.
+      const candidats = comptes.filter((c) => {
+        const r = recul[c.ref];
+        if (r && Number(r.prochain) > maintenant) return false;
+        const cap = _capEbay.get(c.ref);
+        return !(cap && maintenant - cap < RELECTURE_EBAY_MS);
+      });
+      if (!candidats.length) return { fait: 0, raison: 'frais' };
+      const vol = Number(lireLocalJson('vrm_ebay_relecture_vol').at) || 0;
+      if (maintenant - vol < VOL_EBAY_MS) return { fait: 0, raison: 'autre-onglet' };
+      const lu = await lireEbayParCompte('ebay_orders', 'capturedAt:data->>capturedAt', candidats);
+      if (!lu) return { fait: 0, raison: 'pas-su' };
+      const aRelire = [];
+      for (const { compte, ligne } of lu.lignes) {
+        if (ligne === undefined) continue;                       // pas su : on ne devine pas
+        if (compte.implicite && ligne === null) continue;        // aucun compte eBay relié
+        const cap = ligne ? (Number(ligne.capturedAt) || Date.parse(ligne.capturedAt || '') || 0) : 0;
+        if (cap && maintenant - cap < RELECTURE_EBAY_MS) { _capEbay.set(compte.ref, cap); continue; }
+        aRelire.push(compte);
+      }
+      if (!aRelire.length) return { fait: 0, raison: 'frais' };
+      ecrireLocalJson('vrm_ebay_relecture_vol', { at: maintenant });
+      let fait = 0;
+      for (const c of aRelire) {
+        let ok = false, raison = '';
+        try {
+          const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'relire', ...corpsCompteEbay(c.ref) }) });
+          const j = await r.json().catch(() => null);
+          ok = !!(r.ok && j && j.ok === true && j.lu && j.lu.commandes === true);
+          raison = (j && j.reason) || '';
+        } catch (_) { ok = false; }
+        const rc = lireLocalJson('vrm_ebay_recul');
+        if (ok) { delete rc[c.ref]; _capEbay.set(c.ref, Date.now()); fait++; }
+        else if (raison === 'not-connected') rc[c.ref] = { echecs: 0, prochain: Date.now() + RECUL_EBAY_SANS_CONNEXION_MS };
+        else { const n = (Number(rc[c.ref] && rc[c.ref].echecs) || 0) + 1; rc[c.ref] = { echecs: n, prochain: Date.now() + RECUL_EBAY_MS[Math.min(n, RECUL_EBAY_MS.length) - 1] }; }
+        ecrireLocalJson('vrm_ebay_recul', rc);
+      }
+      ecrireLocalJson('vrm_ebay_relecture_vol', { at: 0 });
+      if (fait) { try { window.dispatchEvent(new Event('vrm:ebay-maj')); } catch (_) {} }
+      return { fait, raison: fait ? '' : 'echec' };
+    } catch (_) { return { fait: 0, raison: 'erreur' }; }
+  })();
+  _relectureEbayVol.finally(() => { _relectureEbayVol = null; });
+  return _relectureEbayVol;
+}
+function useRelectureEbay() {
+  React.useEffect(() => {
+    const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireEbaySiVieux(); };
+    tic();
+    const t = setInterval(tic, 60000);
+    document.addEventListener('visibilitychange', tic);
+    window.addEventListener('focus', tic);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };
+  }, []);
 }
 // Lit la ligne `base` (projetée par `select`, §4.4) de CHAQUE compte actif —
 // une requête par compte, exactement la requête d'avant pour le principal.
@@ -27606,6 +27707,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:ext', f);
     return () => { mort = true; window.removeEventListener('vrm:ext', f); };
   }, []);
+  // (20 octobre) Une relecture eBay faite sans geste ⇒ Colis et Ma journée
+  // relisent les commandes, sans recharger (l'âge dit dans Colis suit).
+  const [ebayTick, setEbayTick] = useState(0);
+  useEffect(() => { const f = () => setEbayTick((t) => t + 1); window.addEventListener('vrm:ebay-maj', f); return () => window.removeEventListener('vrm:ebay-maj', f); }, []);
   useEffect(() => { (async () => {
     // §4.4 : seulement le tableau des commandes, jamais le blob de la ligne.
     // (9 octobre) Les commandes de TOUS ses comptes eBay : le CA déclaré
@@ -27620,7 +27725,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
       setEbayLuA(ts.length ? Math.min(...ts) : null);
     }
-  })(); }, []);
+  })(); }, [ebayTick]);
   // ── LES COLIS eBAY À POSTER — UNE règle (`colisEbay`, api/_lib) pour Colis,
   //    Ma journée, la publication `vrm_colis_aposter` (la cloche), le widget et
   //    le rappel du matin (§11). Trois états : undefined en cours · null pas su ·
@@ -40168,6 +40273,22 @@ function comptesLbcProuves(ventes, items) {
   }
   return s;
 }
+// 5.195 (20 oct.) : un compte dont l'extension a VU la session dans son navigateur
+// (`sessionAt`, posé seulement sur le compteur de messagerie du compte connecté)
+// est le sien aussi — une identité, comme une vente. La MÊME règle vit dans
+// l'extension (`comptesLbcSession`, §11).
+function comptesLbcSession(accounts) {
+  const s = new Set();
+  for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
+  return s;
+}
+// Le compte Leboncoin connecté en DERNIER dans son navigateur (session vue), sinon
+// rien : « le dernier compte vu » n'est pas « le compte connecté ».
+function compteLbcConnecte(accounts) {
+  const l = Object.values(accounts || {}).filter((a) => a && a.sessionAt);
+  l.sort((a, b) => String(b.sessionAt).localeCompare(String(a.sessionAt)));
+  return l[0] || null;
+}
 function annonceLbcALui(ad, prouves) {
   return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
@@ -40831,7 +40952,7 @@ function MessagesLeboncoin() {
         return (
           <div key={l.id} data-compte-lbc={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{(d.comptes[l.id] || {}).pro ? ' · pro' : ''}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{((d.comptes[l.id] || {}).pro || (d.acc[l.id] || {}).type === 'pro') ? ' · pro' : (d.acc[l.id] || {}).type === 'particulier' ? ' · particulier' : ''}</div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
                 {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu — connecte-toi une fois à ce compte sur leboncoin.fr'}
               </div>
@@ -40985,8 +41106,11 @@ function LeboncoinScreen() {
     const labelsComptes = load('vinted_account_labels', {}) || {};
     const nomCompteDe = (u) => { const a = (vaRows || []).find((x) => String(x.vinted_user_id) === String(u)); return labelsComptes[String(u)] || (a && a.login) || ''; };
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
-    const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
-      .sort((a, b) => String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
+    const accsLbc = (accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {};
+    // Le compte connecté en dernier (session vue) d'abord, puis les autres.
+    const lbcAccounts = Object.values(accsLbc).filter(Boolean)
+      .sort((a, b) => String(b.sessionAt || '').localeCompare(String(a.sessionAt || '')) || String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
+    const lbcConnecte = compteLbcConnecte(accsLbc);
     // Annonces Leboncoin réellement captées (par l'extension). On s'en sert pour
     // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
@@ -41006,7 +41130,7 @@ function LeboncoinScreen() {
     const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
     const ventesLbcKO = lbcVentesRows === null;
     const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].data && lbcVentesRows[0].data.ventes) || {};
-    const prouves = comptesLbcProuves(ventesLbc, lbcItems);
+    const prouves = new Set([...comptesLbcProuves(ventesLbc, lbcItems), ...comptesLbcSession(accsLbc)]);
     const numFrom = numDeTitreLbc;
     // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
     //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la
@@ -41155,8 +41279,10 @@ function LeboncoinScreen() {
       .map(([id, n]) => { const a = adParId.get(String(id)) || {}; return { id, numero: String(n), titre: a.subject || a.title || '', image: (Array.isArray(a.images) && a.images[0]) || '' }; });
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
-    for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    // L'annonce porte son compte dans `account` (capture du fond) ou `lbcUser`
+    // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
+    for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
+    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -41183,7 +41309,7 @@ function LeboncoinScreen() {
   const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
-      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcAccounts && data.lbcAccounts[0]} onClose={() => setFiche(null)} onMarquer={marquer}/>}
+      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
       <div className="vrm-lbc-tete" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
             au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
@@ -41652,9 +41778,9 @@ function LeboncoinScreen() {
                   {String(a.name || '?').slice(0, 1).toUpperCase()}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || `#${a.id}`}</span>
-                  <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                    {nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
+                  <span data-compte-lbc-nom={a.id} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || 'nom pas encore lu'}{a.type === 'pro' ? ' · pro' : a.type === 'particulier' ? ' · particulier' : ''}</span>
+                  <span data-compte-lbc-annonces={nb} style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
+                    {data.lbcConnecte && String(data.lbcConnecte.id) === String(a.id) ? 'connecté en dernier · ' : ''}{nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
                   </span>
                 </span>
               </div>
@@ -45433,6 +45559,7 @@ function AppCoeur() {
   // comme complet. `ebayCmdTous` garde le détail par compte pour le résumé
   // de l'onglet eBay (le compte choisi, ou tous).
   const comptesEbay = useComptesEbay();
+  useRelectureEbay();
   // (17 oct.) LE MODE STREAM FLOUTE PARTOUT (src/streamFlou.js) : on lui donne
   // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
   // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui
@@ -46163,7 +46290,11 @@ function AppCoeur() {
     const signal = regrouperSignaux(() => setPreuveTick(t => t + 1), SIGNAL_MIN_MS, 1500);
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && ['preuves', 'label', 'ventes'].includes(d.quoi)) signal(); };
     window.addEventListener('vrm:ext', f);
-    return () => { signal.arreter(); window.removeEventListener('vrm:ext', f); };
+    // (20 octobre) Et une relecture eBay faite sans geste (nouvelle vente eBay,
+    // annonce terminée) : la cloche recompte aussi.
+    const fe = () => signal();
+    window.addEventListener('vrm:ebay-maj', fe);
+    return () => { signal.arreter(); window.removeEventListener('vrm:ext', f); window.removeEventListener('vrm:ebay-maj', fe); };
   }, []);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0) return;
