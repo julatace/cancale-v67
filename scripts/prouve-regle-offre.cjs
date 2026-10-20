@@ -64,14 +64,14 @@ const MUTATIONS = [
   // (11 octobre) L'écriture SANS comparer la version (l'upsert d'avant) : deux
   // gestes sur deux cartes du même compte s'effacent.
   ['sans-cas', LIB, "      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&${cond}&select=id`, {", "      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}${p.filtre}&select=id`, {", ['R-concurrence']],
-  ['relu-aucune', API, ": { lu: false, raison: raisonKo, lueA: Date.now(), par: 'regle', _force: true } });", ": { lu: true, offresActives: null, accepte: null, refuse: null, lueA: Date.now(), par: 'regle', _force: true } });", ['R-relu-ko']],
-  ['tombee-pas-su', API, '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : ((avant && avant.lu === true) ? false : null),', '      tombee: aRegle ? (post.ok ? post.lecture.accepte == null : null) : false,', ['R-prix-change']],
+  ['relu-aucune', API, "{lu:false,raison,lueA:Date.now(),observee:post.ok?post.lecture:null}", "{lu:true,offresActives:null,accepte:null,refuse:null,lueA:Date.now()}", ['R-relu-ko']],
+  ['tombee-pas-su', API, ': null) : ((avant && avant.lu === true) ? false : null),', ': null) : false,', ['R-prix-change']],
   ['sync-detail', API, '      const { _regle, ...detail } = d;', '      const detail = d; const _regle = d._regle;', ['R-sync']],
   // ── (11 octobre, revue — tour 2) ──
   // une lecture RATÉE remplace de nouveau une règle connue (ou une écriture incertaine).
   ['lecture-ratee-remplace', API, "      if (!_force && avant && v.lu !== true && v.raison === 'lecture-ratee') continue;\n", '', ['R-lecture-ratee']],
   // la lecture datée à l'ARRIVÉE de la réponse (et non au départ de la question).
-  ['luea-arrivee', API, '    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Number.isFinite(t0) ? t0 : Date.now() },', '    lecture: { lu: true, offresActives: en, accepte: a.v, refuse: r.v, devise: a.dev || r.dev || deviseAnnonce, prix: p.v, offresFaites: nb == null ? null : Number(nb), lueA: Date.now() },', ['R-course']],
+  ['luea-arrivee', API, 'lueA:Number.isFinite(t0)?t0:Date.now()}', 'lueA:Date.now()}', ['R-course']],
   // la liste d'une synchro efface une entrée sans regarder si elle est plus récente qu'elle.
   ['garder-sans-age', API, ' && (Number(items[k] && items[k].lueA) || 0) < garder.a) delete items[k];', ') delete items[k];', ['R-course']],
   // un montant qui s'arrondit à 0 redevient « valable » (« > 0 »).
@@ -84,7 +84,7 @@ const MUTATIONS = [
   // « Relire chez eBay » ne sort plus la règle d'une annonce qu'eBay ne montre plus.
   ['lire-sans-garder', API, '  const garder = L.complet ? { ids: aMoi, a: tListe } : null;', '  const garder = null;', ['R-lire-absente']],
   // (app) « règle active » redevient « connue » seule (le filtre brut d'avant).
-  ['engage-connue-seule', APP, "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));", "const regleEngage = (e) => (!e ? null : (e.etat === 'connue' ? 'oui' : null));", ['R-engage']],
+  ['engage-connue-seule', APP, "const regleEngage = (e) => (!e ? null : (e.engagement==='oui'?'oui':e.etat === 'connue' ? 'oui' : (e.etat === 'pas-su' && e.risque === true ? 'peut-etre' : null)));", "const regleEngage = (e) => (!e ? null : (e.engagement==='oui'?'oui':e.etat === 'connue' ? 'oui' : null));", ['R-engage']],
   // (app) une règle d'annonce terminée compte de nouveau (la liste n'est plus lue).
   ['engage-sans-liste', APP, '      if (filtre && !prix.has(id) && (Number(e.lueA) || 0) < Number(c.cap) - 10 * 60000) continue;\n', '', ['R-engage']],
   // (app) « ✓ … reste à » sur un seuil relu, offres activées ou non pas montré.
@@ -152,7 +152,7 @@ if (!SEULE) {
   else {
     const r = lancer(path.join(RACINE, 'scripts', 'audit-offres-auto.cjs'), ['--src', dest]);
     const s = (r.stdout || '') + (r.stderr || '');
-    dit(r.status !== 0 && /❌[^\n]*aucune route n'appelle une acceptation/.test(s), 'une route qui appelle RespondToBestOffer fait passer audit-offres-auto au ROUGE', `sortie ${r.status}`);
+    dit(r.status !== 0 && /❌[^\n]*aucune acceptation programmée/.test(s), 'une route qui appelle RespondToBestOffer fait passer audit-offres-auto au ROUGE', `sortie ${r.status}`);
     const r0 = lancer(path.join(RACINE, 'scripts', 'audit-offres-auto.cjs'), []);
     dit(r0.status === 0, 'et l\'arbre courant le laisse vert', `sortie ${r0.status}`);
   }

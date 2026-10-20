@@ -279,8 +279,10 @@
  .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-details[open]{grid-column:1 / -1;grid-row:3;}
  .vrm-main .vrm-ventes-liste .vrm-invoice-full{display:none;}
  .vrm-main .vrm-ventes-liste .vrm-invoice-short{display:inline;}
- .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice>button{min-height:30px!important;padding:0 4px!important;width:auto;white-space:nowrap;}
- .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{padding-inline:3px!important;font-size:10px!important;min-height:30px!important;height:30px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice>button{min-height:44px!important;margin-block:-7px;padding:0 4px!important;width:auto;white-space:nowrap;}
+ /* (20 oct., revue) « Saisir le prix », « Relier un achat », la facture : 44 px au
+    doigt (30 px depuis la vente compacte) ; la marge négative garde la ligne aussi fine. */
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{padding-inline:3px!important;font-size:10px!important;min-height:44px!important;height:44px!important;margin-block:-7px;}
  .vrm-main .vrm-shared-sale{padding:9px!important;margin-bottom:0;border:0!important;border-bottom:1px solid var(--studio-line)!important;border-radius:0;box-shadow:none;background:var(--studio-card);}
  .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:42px minmax(0,1fr) auto!important;gap:6px 9px!important;}
  .vrm-main .vrm-shared-sale .vrm-sale-photo{width:42px!important;height:58px!important;}
@@ -411,7 +413,7 @@
  .vrm-main .vrm-ann-ledger-info>div:nth-child(3){grid-column:1;grid-row:2;font-size:10px!important;}
  .vrm-main .vrm-ann-card [data-chiffres]{font-variant-numeric:tabular-nums;padding-top:3px;}
  .vrm-main .vrm-ann-card .vrm-ann-actions{padding:0 9px 3px 53px!important;border-top:0!important;}
- .vrm-main .vrm-ann-card .vrm-ann-actions>summary{min-height:32px;display:flex;align-items:center;gap:5px;font-size:10px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions>summary{min-height:44px;margin-block:-6px;display:flex;align-items:center;gap:5px;font-size:10px!important;}
  .vrm-main .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
  .vrm-main .vrm-shared-sale .vrm-sale-title{line-height:1.35!important;overflow-wrap:anywhere;}
  .vrm-main .vrm-shared-sale .vrm-sale-price{min-width:0;max-width:120px;}
@@ -423,6 +425,9 @@
  .vrm-main .vrm-ann-grid .vrm-ann-card{display:flex!important;flex-direction:column!important;border-radius:0!important;}
  .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions{position:static;display:block!important;align-self:stretch;padding:0 9px 3px 53px!important;}
  .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions>summary{position:static;width:auto;height:auto;min-height:32px!important;justify-content:flex-start;white-space:nowrap;padding:0!important;font-size:10px!important;}
+ /* (20 oct., revue) « Gérer l'annonce » faisait 32 px au doigt : 44 px de zone,
+    la marge négative garde la fiche aussi compacte qu'avant. */
+ .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions>summary{min-height:44px!important;margin-block:-6px;}
  .vrm-main .vrm-ann-grid .vrm-ann-actions>summary::before{content:none;}
  .vrm-main .vrm-ann-grid .vrm-ann-actions>summary>*{display:inline-flex!important;}
  .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
@@ -457,4 +462,23 @@
 
 @media(max-width:767px){
  .vrm-app-shell .vrm-main :is(input,textarea)::placeholder{color:var(--studio-muted);opacity:1;}
+}
+
+/* (20 oct., revue) Dans une vente ou un colis OUVERT, les gestes étaient tombés à
+   28-32 px de haut au doigt (« Bordereau », « Modifier », la facture, les gestes
+   d'une commande eBay ou d'un colis Leboncoin). La ligne reste fine repliée ;
+   ouverte, chaque geste fait 44 px affichés (§7). */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button,
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-details>summary,
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice button,
+ .vrm-main .vrm-market-space[aria-label=eBay] .vrm-ebay-order-actions>summary,
+ .vrm-main .vrm-lbc-package .vrm-lbc-package-actions>*{min-height:44px!important;}
+}
+
+/* (20 oct., revue) Comptabilité garde ses titres en casse normale (revue du
+   17 oct., banc `compta-stock-ui`) : les capitales espacées des groupes de
+   Réglages ne s'appliquent pas à ses sections. */
+@media(max-width:767px){
+ .vrm-main .vrm-set-titre.vrm-titre-compta{text-transform:none;letter-spacing:0;font-size:12px;}
 }
