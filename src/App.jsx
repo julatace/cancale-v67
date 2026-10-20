@@ -29467,6 +29467,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // `vinted_used_numeros` (append-only, 249 entrées en base). Le compteur monte,
   // et c'est le comportement voulu : il compte les paires passées, pas le stock.
   // Numéros pris : toutes les sources, et on n'en retire JAMAIS aucun.
+  // Les numéros réservés par l'extension sur la page de dépôt Vinted (règle
+  // `numerosReserves`). Trois états : undefined pas encore lu · null pas su ·
+  // un objet. « Pas su » ⇒ on ne numérote pas une annonce NEUVE (sinon elle
+  // pourrait prendre le numéro écrit à côté du bouton d'une autre).
+  const [reservesNum, setReservesNum] = useState(undefined);
+  const relireReservesNum = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`, { headers: sbAuth() });
+      if (!res.ok) { setReservesNum((v) => (v === undefined ? null : v)); return; }
+      const rows = await res.json();
+      setReservesNum(numerosReserves(Array.isArray(rows) && rows[0] ? rows[0].data : null));
+    } catch (_) { setReservesNum((v) => (v === undefined ? null : v)); }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { relireReservesNum(); }, [listings.items]);
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});
@@ -29475,8 +29490,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Ce qui est en ligne / au garage reste pris quoi qu'il arrive.
     for (const it of (listings.items||[])) { const n=parseInt(String(numeros[it.id]?.numero),10); if(!isNaN(n)) taken.add(n); }
     garageNums.forEach(g=>{ const n=parseInt(String(g),10); if(!isNaN(n)) taken.add(n); });
+    if (reservesNum) reservesNum.cles.forEach((c) => { const n = /^\d+$/.test(c) ? Number(c) : NaN; if (!isNaN(n)) taken.add(n); });
     return taken;
-  }, [usedNumeros, numeros, saleOv, listings.items, garageNums]);
+  }, [usedNumeros, numeros, saleOv, listings.items, garageNums, reservesNum]);
   // Les mêmes sources, en CLÉS (B125, 125…) : c'est ce qui protège un numéro à
   // lettres, que l'ensemble d'entiers ci-dessus ne voit pas.
   const takenCles = useMemo(() => {
@@ -29485,8 +29501,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     Object.values(numeros).forEach(e => add(e && e.numero));
     Object.values(saleOv).forEach(e => add(e && e.numero));
     garageNums.forEach(add);
+    if (reservesNum) reservesNum.cles.forEach((c) => t.add(c));
     return t;
-  }, [usedNumeros, numeros, saleOv, garageNums]);
+  }, [usedNumeros, numeros, saleOv, garageNums, reservesNum]);
   const nextNumero = useMemo(() => prochainLibre(new Set(takenNums), new Set(takenCles), prefNum), [takenNums, takenCles, prefNum]);
 
 
@@ -31994,6 +32011,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // depuis le téléphone recevait N°319 alors que son carton portait N°777.
     // Attendre deux secondes coûte moins cher qu'un numéro faux à vie.
     if (sales.items === null || !txnPret) return;
+    if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
     // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
@@ -32041,6 +32059,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
              || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
              || null;
+      // Le numéro AFFICHÉ À CÔTÉ DU BOUTON « Publier » de Vinted pour CETTE
+      // annonce (réservé puis lié par l'extension, par son identifiant) : il
+      // l'a écrit sur le carton. Seulement s'il n'est pas déjà sur une autre fiche.
+      if (!num) { const r = reservesNum.parItem[String(it.id)]; if (r && !Object.keys(nextNum).some((k) => k !== String(it.id) && nextNum[k] && cleNum(nextNum[k].numero) === cleNum(r))) num = r; }
       if (!num) num = numeroReprenable(pk && byPhoto[pk]); // réutilisation par PHOTO (jamais un numéro d'archive)
       // Prochain numéro = le premier JAMAIS UTILISÉ. `taken` contient tous les
       // numéros déjà donnés (à vie, §5.40) : la séquence monte et ne redescend
@@ -32066,7 +32088,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum]);
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
