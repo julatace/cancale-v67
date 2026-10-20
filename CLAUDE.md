@@ -178,6 +178,28 @@ qu'aucune règle n'en désigne une.
   Seule exception : une annonce **sans** numéro en reçoit un automatiquement.
 - **Deux paires présentes sous le même numéro** est le seul risque irréversible de
   l'app : c'est le seul endroit où le rouge est justifié.
+- ⚠️⚠️ **LES DOUBLONS SE RÈGLENT TOUT SEULS (20 octobre, décision de Julien :
+  « l'app fait elle-même les changements… elle ne doit plus jamais se tromper,
+  j'ai failli perdre 100 euros »).** Seule exception à « rien ne change un numéro
+  tout seul ». Règle pure `doublonsAReattribuer` (App.jsx) : une vente À POSTER
+  garde le N° (les annonces qui le portent changent) ; sinon, entre annonces en
+  ligne, le N° saisi à la main gagne, puis le plus ANCIEN (`numberedAt`) ; garage
+  ou vente annulée en jeu ⇒ rien n'est deviné, le bloc rouge reste. Le numéro
+  neuf vient de `prochainLibre` (jamais servi), est brûlé, et la fiche porte
+  `reattribue: {de, vers, at, ecrit?}`. « Pas su » ne change rien (nuage pas
+  chargé, numérotation pas relue, annonces ou ventes d'un compte pas lues). Une
+  fois par paire et par ouverture (`DOUBLONS_FAITS`) ; au chargement, une
+  réattribution faite sur l'appareil et pas encore au nuage GAGNE
+  (`fusionNumerosAuChargement`), sinon chaque rechargement redonnait un AUTRE
+  numéro. La liste « nouveaux numéros à écrire sur tes cartons »
+  (`data-numeros-a-ecrire`, Annonces et Colis) reste jusqu'à « C'est écrit » ;
+  l'impression demande si un N° est porté par deux fiches ou si son nouveau N°
+  n'est pas encore écrit (`confirmerNumerosAVerifier`). Preuves : banc
+  `numeros-doublons.cjs` (7 rouges sur l'avant ; sans la garde du chargement ⇒
+  rouge), `audit-impression-carton.cjs` (4 rouges sur l'avant). Mesuré le
+  20 oct. : N°51, 52, 59, 73 en double (une paire du 14 oct., une renumérotée le
+  18) — la seconde de chaque paire reçoit un numéro neuf à la prochaine
+  ouverture de VRM.
 
 ### Les chiffres
 - **Le chiffre faux est la porte pour le corriger.** « Coût d'achat · 1/184
@@ -4803,6 +4825,220 @@ de l'agent eBay).
   la 016 appliquée : Réglages → Mon compte → Équipe → inviter l'adresse de son
   aide, la prévenir ; elle crée son compte VRM avec cette adresse, la confirme, et
   arrive directement sur « Colis à préparer ».
+
+### La carte de la communauté : migration 018 (20 octobre) — PAS APPLIQUÉE ; écran livré
+Julien : « un onglet avec une carte où les utilisateurs de VRM peuvent mettre
+leur emplacement quand on est connecté, pour s'écrire si on est dans la même
+ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
+(`?tab=communaute`, `src/communaute/Communaute.jsx`, chargé au clic).
+- **Décisions (ne pas rediscuter)** : opt-in strict (invisible par défaut,
+  « Me retirer de la carte » SUPPRIME la ligne) ; jamais une position exacte —
+  une VILLE choisie, rangée arrondie à **0,05° (≈ 5 km)** ; « Me localiser »
+  PROPOSE la ville la plus proche, rien n'est rangé avant sa confirmation (la
+  position du téléphone n'est jamais envoyée à la base) ; des autres : un
+  pseudo (défaut `vrm_prenom`, sinon « Revendeur »), une ville, un pays — jamais
+  l'email, jamais l'identifiant du compte (un `pid` public tiré au hasard),
+  jamais un compte Vinted ; messages seulement entre personnes VISIBLES,
+  1–500 caractères, **20/h et 5 nouvelles conversations/jour** ; texte brut
+  (React échappe, aucun lien rendu) ; Bloquer (ses messages sont rangés
+  « masqués » : il ne le sait pas, et il disparaît de la carte de celui qui
+  bloque) ; Signaler (rangé avec un extrait de ses 5 derniers messages,
+  lisible par le PROPRIÉTAIRE seul : `vrm_communaute_signalements()`, pas
+  d'écran) ; rien d'IA, rien de payant ; abonnement = `vrm_acces_pour` (qui ne
+  paie plus ne voit plus, n'écrit plus, n'est plus montré).
+- **Le ludique, honnête** : épingles regroupées au zoom (le nombre de personnes,
+  `grouperParPixels`), la sienne en accent avec un pouls (coupé par « réduire
+  les animations »), « près de toi » (≤ 30 km), « N autres à {ville} »,
+  🥇 premier de sa ville (le plus ancien inscrit de la ville), « 👋 Coucou » en
+  un geste. Tout vient de la liste lue ; zéro inscrit ⇒ « Personne n'est encore
+  sur la carte — sois le premier », aucun chiffre, aucune épingle.
+- **Base** : `supabase/migrations/018-communaute.sql`, modèle de la 016 — cinq
+  tables (`vrm_communaute_profils`, `_conversations`, `_messages`, `_blocages`,
+  `_signalements`), RLS activé ET forcé, aucune règle, tous droits retirés (aux
+  deux séquences aussi), EMPREINTE de forme ; dix fonctions SECURITY DEFINER,
+  `search_path` vide, identité dans le jeton. La contrainte refuse toute
+  coordonnée non arrondie (même écrite par le propriétaire de la table).
+  Aucune table existante n'est touchée. « Fermer mon compte » appelle
+  `vrm_communaute_effacer` (clé de service) entre l'équipe et les photos ; base
+  sans la 018 ⇒ 0 ; muette ⇒ fermeture INCOMPLÈTE, dite.
+- **Route** : `api/compte.js?mode=communaute` (`api/_lib/communaute.js`, toujours
+  12 fonctions), au nom de l'appelant (jamais la clé de service) ; GET → carte +
+  conversations ; POST `rejoindre · quitter · ecrire · fil · bloquer · signaler ·
+  ville`. Trois états : 200 · 503 `non-installe` (« La carte de la communauté
+  n'est pas encore activée sur ta base ») · 503 `pas-su` (« pas pu lire », jamais
+  « personne ») · refus réel dit en clair. Le géocodage (`ville`) passe par
+  Nominatim (OpenStreetMap, gratuit), session exigée, coordonnées arrondies
+  côté serveur aussi.
+- **Carte** : Leaflet **1.9.4** depuis cdnjs, chargé à l'ouverture de l'écran
+  (jamais au démarrage), fond CARTO (voyager / dark_all — sombre suivi) avec
+  l'attribution OpenStreetMap + CARTO. Injoignable ⇒ la même communauté en
+  liste. Les épingles sont de vrais boutons (44 px) écoutés directement : le
+  « clic » de Leaflet ne partait pas au doigt dans la coque zoomée à 80 %.
+  Les feuilles (FermeAuRetour) et le toast vivent sur `<body>` (portail) : dans
+  la coque, un `position:fixed` restait sous la barre du bas.
+- **Preuves** : `scripts/audit-communaute-sql.cjs` (Postgres jetable, socle
+  `agent-sql/supabase-min.sql` + 005-007) — **82 contrôles** ; `--prouve`
+  **17/17 mutations** au rouge (lecture des messages d'autrui, position exacte
+  rangée, sans arrondi, bloqué qui écrit, anon qui lit, retrait qui garde la
+  ligne, identifiant de compte exposé, invisible qui écrit, plafonds, signalements
+  lus par tous, droits de table, effacement incomplet, abonnement ignoré, bloqué
+  encore visible, forme ignorée, vérification aveugle aux droits) ; l'essai
+  annulé ne laisse rien ; `--verifier` voit 10 gardes touchées. Banc
+  `scripts/bancs/communaute.cjs` (port `BANC_PORT`, deux personnes, faux
+  PostgREST aux règles de la 018, le VRAI `api/compte.js`, Leaflet servi à la
+  place de cdnjs — `BANC_LEAFLET_DIR`, sinon `npm pack leaflet@1.9.4` dans le
+  dossier temporaire) — **42 contrôles**, **21 rouges** sur le build d'avant (§6.1) ;
+  `BANC_MUTATION=bloque-ecrit` ⇒ 2 rouges, `opt-in` ⇒ 5 rouges.
+  `audit-fermer-compte.cjs` +3 (effacée chez lui seul, base sans la 018, muette).
+  `verif_visuel` et `verif_dark` rendent l'écran.
+- **Non mesuré** : la 018 n'a jamais tourné sur sa vraie base (Postgres 16 au
+  banc, 17.6 en production) ; Nominatim depuis Vercel (politique d'usage : un
+  appel par recherche, pas de cache) ; un vrai Leaflet au doigt sur un vrai
+  téléphone ; aucun écran de modération (le propriétaire lit les signalements par
+  `select public.vrm_communaute_signalements();` sous sa session, ou la table
+  dans l'outil SQL) ; aucune notification d'un nouveau message (relu toutes les
+  30 s écran ouvert, 15 s fil ouvert).
+- **Gestes de Julien** (rien ne change pour personne avant) : (1)
+  `node scripts/communaute-sql/essai-annule.cjs > essai.sql`, coller dans
+  l'outil SQL de Supabase, lire la ligne `essai` (`tables: 5, rls: true`) ;
+  (2) appliquer `supabase/migrations/018-communaute.sql`, VRM fermé ;
+  (3) `node scripts/communaute-sql/essai-annule.cjs --verifier`, coller, exiger
+  `ok: true`. Ensuite : Gestion → Communauté → « Apparaître sur la carte ».
+
+### Communauté : pseudo Discord et classement des ventes — migration 019 (20 octobre) — ✅ APPLIQUÉE LE 20 OCTOBRE
+Julien : « pour la carte ça peut être le compte discord » et « un classement entre
+tous les membres, sur les journées, les semaines, les mois ». Fichier
+`supabase/migrations/019-communaute-discord-classement.sql`, **sur la 018 (en
+production) sans la modifier** — deux colonnes sur `vrm_communaute_profils`
+(`discord`, `classement`), mêmes gardes (RLS forcé, aucune règle, aucun droit,
+SECURITY DEFINER `search_path` vide, identité par `auth.uid()`, empreinte AVANT —
+celle de la 018 — et APRÈS). La 018 rejouée après la 019 est REFUSÉE (empreinte) :
+voulu. **Elle ne contient aucune suppression** (l'outil SQL de Supabase demande
+une confirmation pour ce mot) : elle se colle d'un bloc.
+- **Discord** (`vrm_communaute_discord`) : facultatif, vide par défaut, retiré par
+  un pseudo vide ; 2-32 caractères `[a-z0-9._]`, jamais « .. », ni @ < > (contrainte
+  + fonction ; l'écran retire un « @ » de tête et met en minuscules). Montré aux
+  membres visibles de la carte (`vrm_communaute_carte` remplacée, +`discord`).
+  Aucun appel à Discord.
+- **Classement** (`vrm_communaute_classement(p_periode)`, `jour|semaine|mois|annee`,
+  Europe/Paris, semaine du lundi) : opt-in strict (`…_classement_inscrire`, il faut
+  être sur la carte : pseudo et ville en viennent ; quitter la carte retire du
+  classement ; y revenir ne réinscrit pas). **Le chiffre = le NOMBRE de ventes
+  Vinted, jamais des euros**, COMPTÉ PAR LA BASE (la route n'envoie que la période,
+  aucune fonction ne reçoit un nombre). **Règle mesurée le 20 oct. (lecture seule)**,
+  celle de `ventesFaites` : `harvest_{uid}_orders_sold → payload.my_orders` des
+  lignes du membre (owner = lui), comptes LIÉS à lui (`vinted_accounts.owner`) et pas
+  masqués (`main.vinted_accounts_hidden`) ; statut qui ne matche pas
+  annul|cancel|refus|rembours|retour|suspend|paiement échoué ; daté par `date` (ISO
+  avec décalage, illisible ⇒ rien, `vrm_communaute_ts`, exécutée par personne) ;
+  dédoublonné par `transaction_id` (mesuré : 554 lignes, 527 transactions — le même
+  compte porté par deux propriétaires). Limites dites : Vinted seul (pas Leboncoin
+  ni eBay), une vente n'existe qu'une fois captée. Rang `rank()` (ex aequo), top 100
+  + soi, bloqués masqués, abonnement `vrm_acces_pour`. Rend rang, pid, pseudo,
+  ville, pays, ventes — jamais l'identifiant du compte.
+- **Fermer mon compte** : rien à ajouter, `vrm_communaute_effacer` (018) efface la
+  ligne entière (colonnes comprises) — l'audit le vérifie.
+- **Route** : `action: discord | inscrire | classement` (`api/_lib/communaute.js`),
+  « pas encore activé » sur PGRST202. **Écran** : onglets Carte · Classement ;
+  Discord sur sa présence et sous chaque personne (Copier) ; classement : « Tu es
+  Xᵉ sur N », sa ligne mise en avant, zéro inscrit ⇒ « sois le premier », panne ⇒
+  « pas pu lire le classement », sans la 019 ⇒ ni Discord ni classement.
+- **Preuves** : `audit-communaute-sql.cjs` (section 019 : 137 contrôles en tout,
+  `--prouve` **30/30** dont chiffre envoyé par le client, non-inscrit visible, vente
+  annulée comptée, autre vendeur, compte non lié, compte masqué, sans dédoublonnage,
+  fuseau UTC, Discord libre, effacement) ; `essai-annule.cjs` joue maintenant la
+  019 (`--migration` répétable, vérification = 018 + 019, sans le mot interdit) ;
+  banc `communaute.cjs` +019 (1512 clair, 390 tactile sombre).
+- ✅ **Appliquée en production le 20 octobre** (sur son « ok on fait discord »), par
+  l'outil (aucune suppression dedans). Vérifiée : 5 tables, RLS forcé, aucun droit
+  direct, les 14 fonctions identiques au fichier (md5). La 018 avait été complétée
+  juste avant : ses 3 fonctions qui contiennent le mot « delete » (quitter, bloquer,
+  effacer) ont été collées par Julien dans l'outil SQL (l'outil de la session attend
+  une confirmation humaine pour ce mot et expire).
+
+### Communauté : les groupes à code (accompagnement) — migration 020 (20 octobre) — ✅ APPLIQUÉE LE 20 OCTOBRE
+Julien : « pour le classement et la carte, un endroit où je peux mettre un code pour
+que les membres d'un accompagnement puissent comparer leurs résultats ». Fichier
+`supabase/migrations/020-communaute-groupes.sql`, sur la 019 (refusée sans elle,
+empreinte d'avant), deux tables `vrm_communaute_groupes` (nom, code, créateur) et
+`vrm_communaute_membres` (groupe, `pid`, `quitte_le`), mêmes gardes que la 018 (RLS
+forcé, aucune règle ni droit, SECURITY DEFINER, empreinte des 7 tables). **Aucune
+suppression dans le fichier** (pas même une clé étrangère « on delete ») : il se
+colle d'un bloc, et l'outil de la session peut l'appliquer.
+- **Le code** : 8 caractères de l'alphabet sans I, O, 0, 1 (32⁸), tiré par la base ;
+  tapé avec tirets, espaces, minuscules, il est normalisé. Seul le créateur le change
+  (l'ancien ne marche plus ; les membres restent). 5 groupes créés, 10 rejoints, 200
+  membres au plus.
+- **Une adhésion porte le `pid` public de la carte, jamais le compte** : quitter la
+  carte (la ligne part) fait quitter tous ses groupes ; y revenir donne un nouveau
+  `pid`, dans aucun groupe. « Fermer mon compte » : `vrm_communaute_effacer` (018)
+  efface la ligne de la carte, ses adhésions ne se relient plus à rien (un `pid` au
+  hasard, ni compte ni email) ; un groupe qu'il avait créé perd seulement son
+  créateur. ⚠️ Le NOM d'un groupe reste (c'est le groupe des autres membres).
+- **Entrer dans un groupe est un consentement dit avant** (« ses membres verront ton
+  pseudo, ta ville et ton NOMBRE de ventes ») : le classement du groupe montre ses
+  membres SANS l'opt-in du classement public (qui reste à part). Il faut être sur la
+  carte. Blocages et abonnement : comme la carte.
+- **Une règle de comptage** : `vrm_communaute_classement_calc(periode, groupe)`
+  (aide interne, exécutée par personne) porte le comptage de la 019 mot pour mot ;
+  `vrm_communaute_classement(text)` (public) et `vrm_communaute_classement_groupe`
+  (membres seulement, sinon `erreur: 'groupe'`) l'appellent. `vrm_communaute_carte`
+  rend en plus `groupes` (les miens : nom, code, créateur ?, `pid` des membres).
+- **Route** : `action: groupe-creer | groupe-entrer | groupe-quitter | groupe-code`,
+  et `classement` avec `groupe` (`api/_lib/communaute.js`) ; sans la 020 : « Les
+  groupes ne sont pas encore activés sur ta base ». **Écran** (Carte et Classement) :
+  bloc « Groupe d'accompagnement » (Entrer un code · Créer un groupe · choix « Tous
+  les membres » / un groupe · code lisible ABCD-2345, Copier, Nouveau code pour le
+  créateur, Quitter) ; le groupe choisi filtre la carte, ses chiffres et le
+  classement. Base sans la 020 : aucun bloc (`carte.groupes` absent).
+- **Preuves** : `audit-communaute-sql.cjs` section 020 (~60 contrôles ; 6 mutations
+  rouges : non-membre qui lit, code changé par un autre, groupe qui compte tout le
+  monde, membre parti compté, bloqué visible, groupes d'autrui) ; banc
+  `communaute.cjs` partie 020 (1512 clair, 390 tactile sombre, et base sans la 020) ;
+  mutation de l'écran « filtre de groupe retiré » ⇒ 4 rouges.
+- **Pseudo unique** (même migration, demande du même jour) : index unique sur
+  `lower(pseudo)` + `vrm_communaute_rejoindre` redéfinie (« pseudo-pris », 409) ;
+  vide ⇒ « Revendeur-XXXX ». L'écran propose « Utiliser mon pseudo Discord ».
+- ✅ **Appliquée en production le 20 octobre** (sur son « ok fait tout »), par l'outil.
+  Vérifiée : 7 tables, RLS forcé, aucun droit direct, 22 fonctions identiques au
+  fichier (md5), empreinte `c86baf95…`.
+- **« Se connecter avec Discord »** (20 octobre, `api/_lib/discord.js`, toujours 12
+  fonctions) : OAuth2 Discord, portée `identify` SEULE, aucun jeton Discord gardé.
+  `POST ?mode=discord-debut` (session) rend l'adresse Discord + un nonce en cookie
+  HttpOnly ; `GET ?mode=discord` (retour, adresse déclarée chez Discord :
+  `https://vrm.center/api/compte?mode=discord`) vérifie le `state` signé ET le nonce
+  (le lien ne marche que dans le navigateur qui l'a demandé, une fois — leçon eBay
+  du 6 octobre), lit le pseudo, renvoie à l'app avec `#discord=…&preuve=…` ; l'app
+  rend la preuve AVEC SA SESSION (`action: discord-verifie`) et la base range le
+  pseudo (`vrm_communaute_discord`). Preuve liée au compte VRM et au pseudo, 15 min.
+  Ancien compte « nom#1234 » ⇒ dit, jamais inventé. Sans `DISCORD_CLIENT_ID` /
+  `DISCORD_CLIENT_SECRET` (Vercel, Production) : pas de bouton, la saisie à la main
+  reste. Application Discord de Julien : identifiant `1562176038098702467` (public) ;
+  ⚠️ son premier secret a été collé dans une conversation et RÉINITIALISÉ — le secret
+  ne vit que sur Vercel. Preuves : `audit-discord-oauth.cjs` (14 ; mutations
+  « sans nonce » 3 rouges, « sans preuve » 2) ; banc `communaute.cjs` (bouton, départ
+  chez Discord, retour rangé, preuve d'un autre compte refusée, pas réglé ⇒ pas de
+  bouton). Non mesuré : le vrai Discord (bloqué d'ici).
+
+### Carte de la communauté : « la ville ne rentre pas, la carte n'apparaît pas » (20 octobre)
+Mesuré : **0 ligne** dans `vrm_communaute_profils` — personne n'avait pu rejoindre.
+- **La ville** : le serveur ne demandait qu'à Nominatim (OpenStreetMap), qui refuse
+  souvent les serveurs partagés (Vercel). Trois sources désormais (`geocoderVille`) :
+  la **Base Adresse Nationale** (`api-adresse.data.gouv.fr`, communes de France),
+  **Photon** (komoot, le reste du monde), puis Nominatim si les deux se taisent ;
+  4 s chacune, User-Agent ASCII. Si le serveur ne joint rien, le **navigateur**
+  interroge la BAN lui-même (un nom tapé, jamais une position). Les villes se
+  proposent **pendant la frappe** (350 ms) ; toucher une ville la met dans le champ.
+- **La carte** : Leaflet n'est plus chargé depuis cdnjs (un bloqueur, un réseau ou
+  le relais privé d'iCloud l'empêchaient) : paquet npm `leaflet@1.9.4` (BSD-2),
+  morceau à part chargé à l'ouverture de la carte. `invalidateSize` sur
+  ResizeObserver (carte grise quand la boîte change de taille) ; fond OSM si les
+  tuiles CARTO ne viennent pas ; sur téléphone la carte annule le zoom 80 % de la
+  coque (`zoom:1.25`, Leaflet ne sait pas compter avec un zoom CSS parent).
+- ⚠️ Non mesuré : les trois services de géocodage depuis Vercel (bloqués d'ici) ;
+  la carte sur un vrai téléphone. Banc `communaute.cjs` : 129 contrôles (frappe,
+  pseudo pris, Leaflet refusé ⇒ liste ; il coupe le service worker et marque le
+  rechargement de `main.jsx` déjà fait pour ce cas).
 
 ### Leboncoin et eBay rangés comme Vinted : résumé, puis Ventes / Achats / Annonces (3 octobre)
 Demande du 2 octobre : « plus d'écran Aperçu intermédiaire ». Les deux onglets
@@ -10247,6 +10483,103 @@ de cartes personnalisables n'existait : un réglage dédié.
 - ~~Les commandes eBay ne se relisent que sur synchro~~ — **depuis le 20 octobre elles se relisent toutes seules** (section « eBay se relit tout seul » juste en dessous) ; Colis dit toujours leur âge.
 - Preuves : `audit-ebay-colis.cjs` (règle + vraies routes widget et rappel, 9 rouges sur 65eec06, 3 mutations rouges) ; banc `ebay-colis.cjs` (`BANC_PORT`, 390/1512, 28 rouges sur le build de 65eec06, mutation « Ma journée sans eBay » rouge). Aucun appel réel à eBay ; formes de l'API Fulfillment tirées de la doc.
 
+### Leboncoin : le compte connecté lu sur le compteur de messagerie (20 octobre, 5.195)
+Julien : « pour Leboncoin il capte pas les bonnes données ni le bon compte ».
+**Mesuré (lecture seule, extension installée 5.194)** : il a DEUX comptes
+Leboncoin — un **particulier** (ses 10 annonces de baskets, 3 avec réf VRM) et un
+**pro** (`SHOPCANCALE`). Connecté sur le particulier (compteur de messagerie relevé
+à 11:16), `lbc_accounts` ne contenait QUE le pro, rangé « particulier », venu de
+`linked_accounts` ; « dernier vu » dans la fiche Leboncoin nommait donc le mauvais
+compte, Messages Leboncoin affichait « Compte Leboncoin » sans nom pour le vrai,
+et ses annonces sans réf VRM n'étaient plus rafraîchies depuis le 20 septembre
+(3 d'entre elles, vendues sur Leboncoin, encore « active » en base).
+- **Causes (code actuel, pas la version installée)** : `members/me/account` (seule
+  source « session » de la 5.186) a la forme `{account:{account_id,type},
+  member:{account_id, nickname:{value}, contact:{email}}}` — aucun couple id + nom
+  lisible : la session n'a JAMAIS été reconnue, `vrmLbcCompte` jamais posé,
+  `myads` jamais rangé sans réf ; `linked_accounts` = les AUTRES comptes liés, et
+  `is_business_user` n'était pas lu.
+- **La session = le compteur `messaging/proxy/api/hal/{userId}/counter`** (relu par
+  la page pour le seul compte connecté — mesuré dans les deux sens). Garde : un id
+  présent dans la dernière liste des comptes liés (`vrmLbcLies`, 12 h) n'est jamais
+  la session. Nom et type : seulement la fiche `user-card/v2/{id}/infos` dont
+  `user_id` = l'id de session, ou une entrée déjà rangée sous cet id. Changer de
+  compte efface le nom d'avant (`noterSessionLbc`). Écrit dans `lbc_accounts` avec
+  `sessionAt`, au changement, à un nom appris, sinon toutes les 6 h.
+- `is_business_user` tranche pro/particulier (`detectLbcAccount`). Les ads de
+  `myads` et du tableau pro sont taguées du compte de session ; inconnu ⇒ rien.
+- **Une règle des deux côtés (§11)** : un compte à `sessionAt` est à lui
+  (`comptesLbcSession`, app + extension), comme un compte prouvé par une vente.
+  L'app : la fiche dit « connecté en dernier : X, pro/particulier »
+  (`compteLbcConnecte`, jamais le dernier vu), la liste des comptes compte les
+  annonces par `account` (elle comptait `lbcUser`, donc 0), Messages nomme le type.
+- Preuves : `audit-lbc-session.cjs` (formes réelles, données inventées, le vrai
+  `background.js` à état) **8 rouges sur origin/main**, 0 après ; 3 mutations
+  (garde des comptes liés, fiche d'un autre id, règle de session des files) ⇒ rouges.
+- ⚠️ **Non mesuré / non corrigé** : que le compteur ne soit jamais relevé pour un
+  compte lié (mesuré deux fois, pas prouvé) ; `account.account_id` de
+  `members/me/account` vs `user_id` (pas lu exprès) ; une bascule de compte dans
+  le même onglet où `myads` arrive avant le nouveau compteur taguerait l'ancien
+  compte ; les annonces disparues de `myads` restent « active » (pas de jugement
+  sur une liste paginée) ; `lbc_ventes` toujours sans date de vente et pas relues
+  depuis le 7 octobre ; `lbc_recon.paths` plein (300/300 : les chemins neufs ne
+  s'ajoutent plus). ✅ Les quatre : corrigés en 5.198 (section suivante).
+- **Geste de Julien** : installer la 5.195, puis ouvrir leboncoin.fr → « Mes
+  annonces » sur CHACUN de ses deux comptes, et « Mes transactions » une fois.
+
+
+### Leboncoin, les quatre restes : date de vente, vendue hors vente, chemins vivants, compte de la page (20 octobre, 5.198)
+Restes mesurés par la passe 5.195 (lecture seule, sa base), tous corrigés.
+- ⚠️⚠️ **Date de vente** : la date ne vit QUE dans la liste v3
+  (`[].created_at`, ISO, mesuré au format `2026-…T…Z`) — le détail v2 n'en porte
+  aucune (`updated_at`, `sent_at` seulement). Ses 3 ventes vendeur viennent du
+  détail (10-01, avant la 5.131) et la liste n'a plus été rangée depuis. Cause
+  trouvée dans le code : la liste et les détails lus juste après (5 au plus, à
+  ~150 ms) arrivaient ENSEMBLE ; chaque `rangerLbcVentes` relisait la ligne puis
+  la réécrivait entière — le dernier écrivain, parti d'une lecture d'avant,
+  effaçait les `dateVente` de la liste. Prouvé : liste + détail envoyés ensemble
+  ⇒ date perdue 5 fois sur 5 sur origin/main. ⇒ Les rangements passent à la file
+  (`_lbcVentesChaine`). Et une vente ouverte DIRECTEMENT (lien, notification),
+  jamais vue datée : `lbc-inject.js` relit les listes dont il a vu le SITE
+  demander l'adresse exacte (`vrm_lbc_listes`, localStorage de la page, 3 au
+  plus — jamais une adresse devinée), au plus une fois par 6 h ; ces relectures
+  ne relancent pas la lecture des détails (le plafond de 5 par page tient).
+  Jamais l'heure de capture.
+- **Vendue sur Leboncoin = plus en vente** : une règle, texte pour texte, dans
+  l'app, l'extension et le serveur (`<lbc-en-vente-regle>` :
+  `annoncesLbcVendues`, `annonceLbcEnVente`) — la vente prouvée (`isSeller`, non
+  annulée) prime sur un `status: 'active'` périmé ; jamais un jugement sur une
+  absence dans une liste paginée. Les lecteurs l'appliquaient déjà chacun à sa
+  façon ; ils passent tous par elle (`lireLbcAnnonces`, compteur, écran
+  Leboncoin, `annoncesLbcParNumero`). ⚠️ Un lecteur l'ignorait : la pastille
+  « Aussi sur Leboncoin » de l'écran Annonces (`vinted_lbc_posted` seul) — elle
+  ne s'affiche plus pour une paire dont la vente Leboncoin est prouvée
+  (`lbcAussi`, via `doublesVenteLbc`) ; ventes illisibles ⇒ rien n'est retiré.
+- **`lbc_recon.paths`** (300/300, vieux format, plus rien n'entrait) :
+  `fusionnerCheminsLbc` — le plus récent d'abord, un chemin revu remonte, les plus
+  anciens tombent ; les chemins qui servent (vente, transaction, bordereau, PDF,
+  ≥ 400, compte, messagerie…) gardent jusqu'à la moitié des places ; l'ancienne
+  forme nue s'efface devant sa forme neuve ; aucun nouveau chemin ⇒ aucune
+  écriture. La page envoie ses 200 chemins PLUS RÉCENTS.
+- ⚠️⚠️ **Bascule de compte dans le même onglet** : une liste « à moi » (`myads`,
+  tableau pro) part avec le compte du compteur relu DANS LE MÊME DOCUMENT
+  (avant elle, sinon elle attend le premier compteur — 90 s au plus) ; deux
+  comptes dans un document ⇒ plus rien n'est attribué. Le fond tague avec CE
+  compte (`sessionDeListe`, jamais un compte lié), plus avec `vrmLbcCompte`
+  (le dernier vu, peut-être l'ancien) ; sans compte joint ⇒ rien de tagué.
+- Preuves : `audit-lbc-restes.cjs` (vrais `background.js` + `lbc-inject.js` dans
+  un `vm`, règle de l'app et route serveur exécutées, données inventées) —
+  **15 rouges sur origin/main**, 0 après ; 7 mutations (file retirée, compte du
+  fond, chemins figés, règle app sans la vente, déjà-datée ignorée, liste sans
+  attente, bascule ignorée) ⇒ toutes rouges. `audit-lbc-session` et
+  `audit-lbc-comptes` servent la forme neuve (compte joint par la page).
+- ⚠️ **Non mesuré** : qu'une bascule de compte Leboncoin recharge toujours la
+  page (si elle ne rechargeait pas, un `myads` arrivé entre la bascule et le
+  compteur suivant serait tagué du premier compteur du document) ; la requête
+  exacte de la liste des VENTES (onglet Ventes de « Mes transactions ») — seule
+  l'adresse vue est relue ; si ses 3 ventes n'y figurent plus, rien ne les datera.
+- **Geste de Julien** : installer la 5.198, ouvrir « Mes transactions » sur
+  Leboncoin (onglet Ventes) une fois sur le compte particulier.
 
 ### eBay se relit tout seul : à l'ouverture, toutes les ~10 min, et au cron du matin (20 octobre)
 Julien : « pour eBay ça doit se relire tout seul ou se rafraîchir à l'ouverture de l'app, mais je dois rien avoir à faire ».
@@ -10271,8 +10604,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **95 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **87 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **97 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **88 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -10593,8 +10926,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 96 audits
-scripts/bancs/                  les 87 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 97 audits
+scripts/bancs/                  les 88 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
@@ -10780,3 +11113,135 @@ Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), ca
 - **Leboncoin → Colis** disait « Aucun colis » sans lecture de « Mes transactions » ⇒ « pas encore lu » (`data-lbc-colis-vide`). **Organisation** : la lecture ratée n'est plus rouge (§7) et dit que rien n'est perdu.
 - Bancs mis à la forme « une ligne par vente » sans les affaiblir (ouvrir la vente comme lui, viser le bouton VISIBLE) : achats-hors-plateforme, deux-extensions (+ `BANC_PORT`), menu-range (le bouton caché « Tous les écrans » de l'en-tête), ventes-bordereau, revendeurs, perfv (logo renommé `/vrm-logo-*`, l'en-tête « Article · état » n'est pas une vente), journee-premium (le bonjour à 0 px sur téléphone est compact), prouve-regle-offre (5 ancres suivies jusqu'au code actuel).
 - **Rouges AVANT #596, laissés (cause à part, notés)** : compact, dictee, lbc-publier-app (H : téléphone), mobile, numeros-lettres, numeros-remise-a-zero, photos-vinted, pont, sauvegarde, serie (la porte « Coût d'achat » introuvable sur Ventes), session, stats-premium (choix de Julien du 18 oct.), prouve-regle-offre (« base d'avant » : l'arbre `/tmp/avant-regle` n'existe que chez qui le fabrique).
+
+### Audit de bout en bout sur ses données du 20 octobre — 7 écarts corrigés, le reste juste
+Copie fraîche de sa base (lecture seule, `execute_sql` ; un résultat trop gros
+est rangé par l'outil dans un fichier, lu sans passer par le contexte), rangée
+dans `scripts/bancs/fx/rows.json` (gitignoré, PDF remplacés par 12 octets, jetons
+retirés), servie à l'app par un mini-PostgREST (`scripts/bancs/_minipgrest.cjs` :
+`meta->>`, `data->>`, `or=`, `cs.`, projection, `Range`). Chaque écran et chaque
+section rendus à 390 tactile et 1512, clair et sombre : aucun écran mort, aucun
+débordement, aucune erreur. Chaque chiffre comparé à une requête SQL écrite à
+part (règles de ce dossier, pas le code).
+- **Justes** (mesure = écran) : à envoyer 16 · à retirer 6 et leurs 6 codes ·
+  bordereaux prêts 16 · annonces en ligne 52 (11+0+14+9+8+10+0, la lecture
+  complète la plus récente de chaque compte) · « à vérifier sur carton » 34 ·
+  vendu octobre 2 626,80 € / 47 ventes · aujourd'hui 45 € · reçu octobre
+  1 145,67 € (19 versements) · CA déclaré août 2 311,40 · sept. 4 330,90 ·
+  2026 10 349,77 € · en attente 2 145,80 € sur 6 porte-monnaie, disponible
+  0,67 € · messages non lus < 7 j : 8 · 4 doublons de N° sur Colis · Leboncoin
+  finalisé 133 € (2 sans date, « à dater »).
+- **Corrigés** (banc `audit-reel-20oct.cjs`, données inventées, 24 rouges sur
+  11bac30, chaque correctif réaffaibli ⇒ rouge) :
+  1. Comptes liés : « lié le » lisait `updated_at` (renouvellement des jetons) —
+     sept comptes de juillet-août « liés le 20/10/2026 » ⇒ `created_at`.
+  2. Statistiques : « Finalisé sur Vinted » 8 480,97 € excluait **99 ventes
+     masquées (2 157,80 €)** sans le dire, pendant que le CA déclaré (10 638,77 €)
+     les compte ⇒ le chiffre ne bouge pas, la carte et la ligne « Vinted » de
+     « par plateforme » le DISENT (`nMasque`/`caMasque`, `data-finalise-masquees`).
+  3. Leboncoin : « 2 vendues sur Vinted — à retirer » pour UNE paire (N°18 marquée
+     publiée ET vue sur Leboncoin) ⇒ une ligne par N°, celle qui a le lien.
+  4. eBay : VRM-48 (publiée le 15) affichée « N°48 », reliée — aucune fiche ne
+     porte plus 48 (sa paire est la N°53 depuis le 18) ⇒ « à vérifier · pas
+     reliée » (`numEbayLu` : zéro porteur, fiches lues ⇒ `null`).
+  5. eBay → Compte : une route muette affichait « eBay pas encore configuré —
+     ajoute tes clés dans Vercel » ⇒ trois états (`data-ebay-statut`).
+  6. Ma journée ne disait pas les **deux paires sous un même N°** (N°50, 58, 60,
+     88 ; trois sur une paire à poster) ⇒ une ligne urgente, la liste de Colis.
+  7. Fraîcheur : seul jujuf38 (6 j) était nommé, pas julatace35260 (3 j) ⇒ tous
+     les comptes en retard, chacun avec son âge (`dataAgeComptes`).
+- **Notés, pas corrigés** : Messages « Non lues 156 » compte de vieux drapeaux
+  (comptes pas relus : jujuf38 48) quand Ma journée dit 8 (< 7 j, libellé dit) ;
+  « total des ventes payées eBay indisponible » alors qu'eBay est lu à 0 commande ;
+  Leboncoin → Messages : le compteur (id `8442c3e8…`, celui des annonces) et le
+  compte SHOPCANCALE (`faf3fbba…`, comptes liés) font deux lignes — c'est
+  l'extension 5.195 (#610) qui les rapproche ; l'écran Leboncoin compte « 1 à
+  confirmer » (une annonce du compte orphelin `3170782324`) que l'écran Annonces
+  ne montre pas (décision « compte orphelin » toujours à trancher par Julien) ;
+  Compta « Vendu juin 41 € · Finalisé 1 512,70 € » (le vendu exclut les ventes
+  masquées, le finalisé non — deux règles écrites, à trancher).
+- **Reprise du 20 oct. (après fusion d'origin/main ac29d0e)** : banc refait sur le
+  build d'ac29d0e — 24 rouges, 0 après ; mutation « `updated_at` + zéro porteur
+  relié » ⇒ 8 rouges ; audits et bancs voisins (eBay, Leboncoin, annonces,
+  comptes, Ma journée, chiffres croisés) verts.
+- **Gestes de Julien** : (1) **l'annonce eBay VRM-82 « Nike air max 1 noir taille
+  44 » (128137572355) est probablement la paire vendue sur Vinted le 18 (tomj606,
+  N°81, à poster)** — la terminer sur eBay après avoir regardé les photos (VRM ne
+  peut pas la relier par identité) ; (2) corriger les 4 doublons de N° avant
+  d'imprimer (Colis) ; (3) repasser sur Vinted connecté sur **jujuf38** (6 j) et
+  **julatace35260** (3 j) ; (4) les 34 numéros à vérifier sur carton.
+### Ce qui casse en production côté serveur — mesuré le 20 octobre
+Lecture seule : Vercel (erreurs 7 j, journaux 50 min, déploiements), Supabase (journaux
+edge/PostgREST/Postgres/auth sur 24 h glissantes, conseillers, `pg_stat_statements`),
+lignes `plantage_*`, `email_inconnu_*`, quarantaine, journal des emails.
+- **La base va bien.** Plus AUCUNE réponse 5xx de PostgREST depuis la 017 (dernière :
+  18 oct. 02:51 ; 101 le 17-18, 112 le 13-14) ; écritures de `main` toutes en 2xx
+  (≤ 1 s). Postgres : 3 erreurs de syntaxe (l'outil SQL) et rien d'autre. Auth : un
+  500 « unexpected EOF » isolé, aucun `refresh_token_already_used`, aucun 429. Aucun
+  déploiement en échec sur 7 jours. Plantages : 2 lignes (15 et 16 oct.), rien depuis.
+  Quarantaine : vide (593 lignes déjà rejouées). `email_inconnu_*` : des « Commande
+  mise à jour », « transfert bancaire », « remboursée » — gardés EXPRÈS sans action.
+- **Corrigé : le tableau des erreurs de production n'affichait que du bruit.** Le seul
+  groupe (1 336 lignes, 6 routes, depuis le 31 juillet) était `[DEP0169] url.parse()`,
+  émis par Node 24 de Vercel et `web-push` — aucune ligne de `api/` ne l'appelle.
+  `api/_lib/sans-bruit.js`, importé EN PREMIER par les 12 routes, retire CE code et
+  rien d'autre. `audit-sans-bruit.cjs` (charge chaque route pour de vrai,
+  `--pending-deprecation`) : 44 contrôles, 29 rouges sur l'avant, 4 rouges sous la
+  mutation « tout couper ». ⚠️ À vérifier après déploiement : si la plateforme émet
+  l'avertissement AVANT de charger le module, il reviendra (une fois par instance).
+- **Geste de Julien — l'ANCIEN script Gmail tourne encore, toutes les minutes** :
+  ~1 390 lectures × 3 par jour, directement sur la base avec l'ancienne clé publique
+  (`vrm_email_config`, `email_invoice_*`, `vrm_pro_facture`), toutes en **401** (les
+  clés JWT d'avant sont refusées). Les emails passent quand même (il retombe sur sa
+  date de secours) mais **aucune facture Pro ne peut partir**. Recoller
+  `scripts/gmail-forwarder.gs` du dépôt (avec sa clé), puis poser
+  `EMAIL_INBOUND_SECRET` sur Vercel — absente aujourd'hui, la route des emails
+  accepte donc encore un envoi sans clé (§ « la route des emails exige sa clé »).
+- Noté, normal : `rpc/vrm_equipe_lister` → 404 (~60/jour, une par ouverture) tant que
+  la 016 n'est pas appliquée (la route dit « pas encore activé ») ; quelques 401 au
+  réveil de l'iPhone (jeton expiré, le renouvellement et la reprise d'envoi existent).
+- Noté pour Julien : `STRIPE_SECRET_KEY` absente de Vercel (paiement non branché) ; le
+  commentaire de `STRIPE_PRICE_LOOKUP` dit encore « 9,99 € ».
+
+### Les bancs rouges sur `main` au 20 octobre — causes, et ceux laissés rouges
+Chaque banc lancé SEUL, la cause trouvée avant de toucher quoi que ce soit.
+- ⚠️⚠️ **`numeros-remise-a-zero` — défaut de l'APP, sur les numéros.** Après le bloc « Recharger » (écran périmé, écriture refusée par `vrm_numeros_perimes`), le « 999 » tapé sur l'écran périmé REPARTAIT au nuage : la fusion du chargement du 18 octobre (`fusionNumerosAuChargement`) gardait la fiche de l'appareil « inconnue du nuage ». `rechargerEnGardantLesSaisies` pose maintenant `vrm_recharge_sans_fiches` (sessionStorage) et le chargement suivant ne fusionne pas les FICHES (le pool reste une union, les saisies sont rejouées sans numéro par `rejouerSaisies`). Rouge sur le build d'avant, vert après ; `numeros-panne` (la fusion qui sauve les numéros de la panne) reste vert.
+- **Bancs périmés, mis à jour sans les affaiblir** : `numeros-lettres` (série « B » : B126 après le plus haut, règle « jamais dans un trou » du 18 oct.) · `sauvegarde` (`framenavigated` part aussi pour un `pushState`/`back` d'une feuille qui se ferme : un vrai rechargement se juge sur `load`, et un contrôle positif « l'écriture réussie recharge » prouve que l'autre n'est pas vacant) · `lbc-publier-app` H (un téléphone dont l'extension répond agit ici depuis la 5.188 : H rend un iPhone SANS extension, H2 l'autre sens) · `photos-vinted` O (passer par Vinted affichait Ventes, l'extension en mettait les photos en cache, et Ma journée ne demandait rien hors ligne : le scénario n'était plus réel) · `compact`, `mobile` (vente repliée depuis fc4c73e/5cdffcb : on OUVRE la ligne ; vignette 36 × 48 du design ; le menu des écrans s'ouvre par « Gestion » en bas) · `dictee` (le champ se trouve par son `aria-label`) · `serie` (la case s'appelle « Bénéfice », reconnue à son titre ; la « suggestion » cliquée était la ligne de vente derrière la modale — on ne prend qu'un « C'est ça » d'une ligne de la saisie).
+- **Instables sous charge seulement** (verts lancés seuls) : `pont`, `session`.
+- **Laissés rouges, choix de design de Julien** : `stats-premium` (866a90d) et `mobile` — « navigation lisible » : les libellés de la barre du bas sont à **9 px** depuis 0bbc78e (`styles-mobile-studio.css`, 19 oct.) contre 11 px exigés. Tout le reste du banc est vert (vérifié en neutralisant ce seul contrôle). À trancher par Julien : remonter la taille, ou accepter 9 px.
+
+### L'extension d'après ce qu'elle fait VRAIMENT chez lui (20 octobre, 5.197)
+Audit en lecture seule de sa production (`panel_diag_capture` de la 5.194, journaux de la passerelle Supabase sur 24 h, `vinted_item_details`, fraîcheur `harvest_*`). ⚠️ Les compteurs `n` sont CUMULÉS depuis toujours (toutes versions) : un compteur non nul ne dit pas que le défaut vit encore — on lit l'échantillon daté (`rates.*.at`) et les journaux du jour.
+- ⚠️⚠️ **`vinted_accounts` réécrite jusqu'à 90 fois PAR MINUTE** (687 `POST` en 73 min, journaux du 20 oct.) : chaque requête de la page Vinted qui porte un `x-csrf-token` envoie un message `csrf` → `captureDomain` → la ligne entière, jetons identiques. Désormais une écriture quand les jetons ou le csrf CHANGENT, ou toutes les 30 min au plus (`empreinteCompte` FNV, jamais un jeton en clair ; `vrmCompteEcrit` dans `chrome.storage.local` ; posée seulement après une écriture réussie ; effacée par `noterRefus`). `audit-compte-ecritures.cjs` : 20 csrf ⇒ 1 écriture (20 sur l'avant), 3 mutations rouges.
+- ⚠️⚠️ **La page d'une annonce relue toutes les 6 h pour rien, et les 17 pauses Vinted venaient de là.** `fiche_codes_absents` 650 = `photos_page_ecrit` 650, échantillon `cles=` vide : `__NEXT_DATA__` ne porte plus l'annonce, les codes (catégorie, marque, couleur) ne sont JAMAIS trouvés (0 fiche sur 233 en base), donc `!codes` relançait chaque annonce. Et `photos_page_refuse_429` 17 = `vinted_frein_429` 17 : la pause qui suit refuse aussi bordereaux et réponses (`vinted_pause_refus` 8). ⇒ `aRelirePageAnnonce` : déjà lue par la page (`pageAt`) et restée incomplète ⇒ 3 jours (`PAGE_REESSAI_INCOMPLET_MS`) ; aucune photo ⇒ tout de suite. Le flux Next « app router » est lu (`texteDuFluxNext`, `objetsAutourDeLId` : seul l'objet dont l'id est celui de l'annonce, §5) et le format est NOTÉ (`fiche_format_*`, `pageFormat`, échantillon `fiche_codes` avec `next_data/next_f/id_vu`). ⚠️ **Non mesuré** : la vraie page (403 d'ici) — c'est `fiche_format_*` qui dira si le flux porte l'annonce.
+- ⚠️⚠️ **Une photo qui n'est PAS de la paire partait sur Leboncoin/eBay** (§5) : le même fichier `02_024a3_…` dans 29 annonces (toujours en position nPhotos+1, balayage d'images de la page), `06_01e6b_…` dans 17 (capture du panneau, position 6). ⇒ balayage plafonné à `nPhotos` ; `retirerPhotosEtrangeres` (un fichier présent dans ≥ 3 annonces aux couvertures toutes différentes, couverture d'aucune) à chaque écriture de `vinted_item_details` — la ligne entière se répare à la prochaine capture. Deux annonces d'une même paire ne déclenchent rien.
+- **`saveItemDetailMaintenant` (panneau) effaçait la fiche lue sur la page** (codes, `photoIds`) : gardée.
+- **`ventes_lecture_ratee` 164 sur 615** : la cause est maintenant notée (`ventes_lecture_ratee_{statut|pause}`) ; une pause déjà ouverte garde la garde entière.
+- **App** : « un site a changé le format de sa réponse messages » (État des connexions) venait des 250 `forme_inconnue_champ_conversation` des extensions < 5.193 (corps d'ERREUR `{code,message,message_code}`) ; l'échantillon du 17 oct. l'aurait affiché jusqu'au 24. `estCorpsErreurVinted` l'écarte (`audit-derive-erreur.cjs`, rouge sur l'avant).
+- **Constatés, pas des défauts actifs** : tous les `ecriture_ratee_*_400` (corrigés en 5.193 : 0 réponse ≥ 400 de son Chrome en 24 h) ; `forme_inconnue_champ_conversation` / `conversation_lecture_ou_forme_ratee` (5.193) ; `photos_annonce_refuse_404` (ancien chemin `/api/v2/items`, retiré) ; `ignore_partiel_*` (garde §4.2, voulue ; inbox fusionnée depuis 5.162) ; `ignore_billing_hors_sujet`, `ignore_dressing_autre_membre`, `abandon_sans_compte_*` (déconnecté) ; `label_ko_statuts_200_200_200` (PDF pas encore prêt, réessayé — `label_abandon_apres_essais` 9 : l'email prend le relais) ; `bordereau_refuse_400` 6 (`validation_error` de Vinted, 13 oct.) ; `*_refuse_401` (jeton du compte) ; `relais_*_reseau` (ordinateur en veille). Comptes `3156028798` (3 j) et `3191111372` (6 j) pas ouverts dans Chrome : leurs annonces restent relues publiquement (`enligne`).
+- ⚠️ **Hors extension, à Julien** : **4 173 lectures refusées (401) en 24 h** par l'ANCIEN script Gmail (Google Apps Script, `email_invoice_*`, `vrm_pro_facture` lus avec la clé publique) — recoller `scripts/gmail-forwarder.gs`.
+- Preuves : `audit-photos-passif.cjs` 35 contrôles (9 rouges sur la 5.195, 4 mutations rouges) ; `audit-compte-ecritures.cjs` ; `audit-derive-erreur.cjs`. Bancs badge, popup, session, pont, leboncoin verts. Extension **5.197.0**, zip régénéré, `EXT_ATTENDUE` suivie, aucune entrée d'`EXT_CAPACITES`.
+
+### Une vente, une photo : la ligne et le détail montrent la même (20 octobre)
+Julien : « quand je clique sur la vente d'une paire, il y a une AUTRE photo qui apparaît ».
+- **Cause** : la ligne repliée de Ventes affichait la PREMIÈRE source (`PhotoVente src={photo}`), le détail déplié choisissait la sienne parmi plusieurs (`PhotoVenteSources` : la première qui CHARGE). Dès que la vignette de la commande ne chargeait pas, les deux images divergeaient ; et la ligne retombait sur `photoArticle(resolvedEntry(o))`, qui peut venir d'un ancien verrou `vinted_txn_link` posé par TITRE (§5).
+- **Mesuré (lecture seule)** : sur 606 ventes, les sources par identité (commande, annonce par `txnItem`, coffre) portent toutes la MÊME photo (même dossier CDN : 0 écart) — c'est le CHOIX entre elles qui différait, pas les données. 8 fiches ont un achat relié, dont 5 avec sa photo (celle du vendeur à qui il a acheté).
+- **Correctif** : une liste de sources pour la ligne ET le détail (`photosVenteVintedCandidates` + la fiche N° de CETTE annonce, par `txnItem` seulement) ; le choix et les échecs vivent dans un magasin partagé par vente (`cle` = [compte, transaction], `__choixPhotoVente`) : ce que l'un affiche, l'autre l'affiche. Plus de repli sur `resolvedEntry`. La photo de l'achat relié est dite « Photo de l'achat » / « Achat relié · … ».
+- Preuves : banc `photo-vente.cjs` (données inventées, CDN servi par le banc, 390 tactile + 1512) — **7 rouges sur le build d'avant**, vert après ; mutations « ligne sur `PhotoVente` » ⇒ 2 rouges, « repli sur la fiche du verrou » ⇒ 2 rouges.
+- ⚠️ Non mesuré : l'écran chez lui (aucun cas réel où les deux images diffèrent n'a pu être capté d'ici — le défaut vient d'un échec de chargement, propre à l'appareil).
+
+### L'extension sur Orion iPhone, Safari et tous les navigateurs — capacités mesurées, vrais replis (20 octobre, 5.199)
+Julien : « qu'elle marche sur Orion sur l'iPhone, pareil que sur Chrome », puis « tous les navigateurs ». Table des API par navigateur, sources et marche à suivre : **`docs/boutiques-extension.md`** (sections 1 à 7). Sources : copie publique des pages d'aide de Kagi (`kagisearch/kagi-docs`), notes de version d'Orion (`orion-updates-cdn`), extraits du forum d'Orion (bloqué d'ici), **MDN browser-compat-data** pour Safari et Firefox Android.
+- **Le fond MESURE ses API** (`mesurerCapacites`, `CAP`), jamais l'agent utilisateur. Présente ⇒ le chemin de Chrome à l'identique. Absente ⇒ un vrai remplacement qui garde la fonction :
+  · `cookies` → content.js lit `document.cookie` sur vinted.fr et donne les 3 cookies utiles (`vrm-cookies`, onglet Vinted et SON domaine seulement, rangés dans `vrmCookiesPage`) ; une session neuve relance la capture. Sur Chrome : un seul message `veux` → non ;
+  · `alarms` → `PERIODES` (une liste pour les deux chemins), minuteries + `vrmMinuteries` daté dans `chrome.storage.local` ; au réveil (iOS a suspendu le fond) ce qui est en retard repart **une fois** (`rattraperMinuteries`) ;
+  · `scripting` / monde MAIN → `executerMain` : la MÊME fonction, ses requêtes partent de la page par le relais (fond → content.js par `tabs.sendMessage`, sinon boîte aux lettres `vrmPageReq`/`vrmPageRep` → inject.js `CANCALE_VINTED_REQ`, GET `/api/` seulement, en-têtes `accept`/`x-csrf-token` seuls). Un refus ORDINAIRE d'`executeScript` (onglet fermé) reste un refus ;
+  · scripts `world: MAIN` ignorés → `lbc-inject.js`/`vc-inject.js` se posent eux-mêmes par `<script>` (signe : `chrome.runtime.id` sans `document.currentScript`) ; `vc-inject.js` devient web-accessible ;
+  · `externally_connectable` qui refuse (Orion, ticket 13767) → `versExtension` repasse par le pont sur un refus CERTAIN (`lastError`/levée), jamais sur un délai ;
+  · `downloads` → les deux autres portes du bordereau ; `tabs` refusé dans la fenêtre → `window.open`.
+- **L'extension le DIT** : `etatPourApp` porte `nav: {remplace, indispo}` (absent sur Chrome) ; le panneau d'état de l'app l'écrit en une phrase (`phraseNavigateur`, `data-etat-nav`). `indispo: ['cookies']` = la page n'a montré aucune session (déconnecté, ou cookies HttpOnly) — jamais une identité devinée.
+- **Paquets** : `zip-extension.cjs --safari` (dossier `VRM-safari/` pour `xcrun safari-web-extension-converter` : fond non persistant, `downloads` retiré, Safari 16.4+). Orion : le paquet **Firefox** d'abord (`boutiqueOrion`, Orion préfère `background.scripts`). `web-ext lint` du paquet Firefox : 0 / 0 / 0.
+- **App** : `navigateurIci` reconnaît DuckDuckGo, Yandex, Vivaldi (marqueurs UA) et Orion (`window.KAGI`, documenté par Kagi) ; `extensionIci` dit ce que chaque navigateur accepte ; premiers pas : DuckDuckGo « aucune extension », Orion iPhone sa consigne (`data-premiers-orion="dans-orion"`).
+- **Au doigt** : le bandeau de dépôt Leboncoin tient à 390 px et ses boutons font 44 px (`pointer: coarse` + `hover: none` seulement — rien ne change à la souris). Banc `leboncoin.cjs` (`BANC_PORT`).
+- Preuves : `audit-extension-navigateurs.cjs` sections G-I (profils `chromium`, `firefox-android`, `safari-ios`, `orion-ios`, `orion-ios-pire` dans `_fond-vm.cjs` — option `retirer`, `storage.onChanged` à état) : **30 rouges sur origin/main** (§6.1) ; `--mutation cookies|alarms|main` ⇒ 1 · 4 · 2 rouges ; parité : sans `scripting` ni `tabs.sendMessage`, exactement les mêmes requêtes Vinted que Chrome.
+- ⚠️ **Non mesuré** : aucun vrai Orion, iPhone, Safari ni Firefox Android ; la liste officielle d'API d'Orion (feuille Google, bloquée) ; si les cookies de session de Vinted sont HttpOnly (déterminant sans API `cookies`) ; WebKit absent du conteneur. **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (kit prêt, section 3), puis essayer Orion sur l'iPhone (section 2) ; Safari : Mac + Xcode + compte Apple 99 $/an (section 4).

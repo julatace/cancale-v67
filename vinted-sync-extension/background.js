@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.194.0';
+const CODE_VERSION = '5.200.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -56,6 +56,44 @@ const SUPABASE_URL = 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
 const VINTED_DOMAINS = ['www.vinted.fr', 'www.vinted.com', 'www.vinted.it', 'www.vinted.de'];
+
+// ══════════════════════════════════════════════════════════════════════════
+// CE QUE CE NAVIGATEUR SAIT FAIRE — MESURÉ, JAMAIS DEVINÉ (20 octobre, Orion)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « qu'elle marche sur Orion sur l'iPhone, pareil que sur Chrome ».
+// Orion (Kagi) a SA propre implémentation des API d'extension, et sur iOS
+// Apple en limite la portée : sa liste officielle n'est pas joignable d'ici,
+// et rien ne dit que `cookies`, `alarms`, `scripting` (monde MAIN),
+// `downloads` ou `externally_connectable` y marchent. On ne lit donc PAS
+// l'agent utilisateur : on regarde, une fois, ce qui EXISTE ici. Une API
+// présente garde le chemin de Chrome à l'identique ; une API absente prend un
+// chemin de remplacement qui garde la FONCTION :
+//   · cookies   → la page Vinted les donne au script de contenu (`vrm-cookies`) ;
+//   · alarms    → minuteries + rattrapage daté dans `chrome.storage.local`
+//                 (iOS suspend le fond : rien ne se perd, tout repart au réveil) ;
+//   · scripting (monde MAIN) → le relais de la page (content.js ↔ inject.js) ;
+//   · downloads → les deux autres portes du bordereau (API Vinted, inject.js) ;
+//   · externally_connectable → le pont de la page (comme Firefox).
+// Ce qui ne se remplace pas est DIT à l'app (`nav` dans l'état du pont).
+function mesurerCapacites() {
+  const fn = (o, k) => { try { return !!(o && typeof o[k] === 'function'); } catch (_) { return false; } };
+  const ev = (o) => { try { return !!(o && typeof o.addListener === 'function'); } catch (_) { return false; } };
+  let c = null; try { c = (typeof chrome !== 'undefined' && chrome) || null; } catch (_) { c = null; }
+  c = c || {};
+  return {
+    cookies: fn(c.cookies, 'get'),
+    cookiesEvt: ev(c.cookies && c.cookies.onChanged),
+    alarms: fn(c.alarms, 'create') && ev(c.alarms && c.alarms.onAlarm),
+    scripting: fn(c.scripting, 'executeScript'),
+    downloads: ev(c.downloads && c.downloads.onCreated),
+    tabsMsg: fn(c.tabs, 'sendMessage'),
+    externe: ev(c.runtime && c.runtime.onMessageExternal),
+    popup: fn(c.action, 'setPopup'),
+  };
+}
+const CAP = mesurerCapacites();
+// `executeScript` existe mais refuse le monde MAIN (constaté au premier essai).
+let CAP_MAIN_REFUSE = false;
 
 // ── COMPTE VENDEUR (multi-vendeurs) ────────────────────────────────────────
 // Une fois la base passee en multi-vendeurs, la cle publique « anon » n'a plus
@@ -683,10 +721,54 @@ function jwtPayload(token) {
   try { const p = token.split('.')[1]; const j = b64urlDecode(p); return j ? JSON.parse(j) : null; } catch (_) { return null; }
 }
 function getCookie(domain, name) {
+  // Orion iPhone : sans API `cookies`, la page Vinted les donne (voir `vrm-cookies`).
+  if (!CAP.cookies) return cookieDeLaPage(domain, name);
   return new Promise((resolve) => {
     try { chrome.cookies.get({ url: `https://${domain}`, name }, (c) => resolve(c ? c.value : null)); }
     catch (_) { resolve(null); }
   });
+}
+// ── LES COOKIES DE SESSION, LUS PAR LA PAGE (navigateur sans API `cookies`) ──
+// Le script de contenu de vinted.fr lit `document.cookie` (ce que la page voit
+// elle-même) et l'envoie ici ; on le range dans `chrome.storage.local` (§4.9 :
+// iOS suspend le fond, une variable de module ne survivrait pas). Seuls les
+// trois noms utiles sont acceptés, seulement depuis un onglet Vinted, et pour
+// SON domaine. ⚠️ Si Vinted pose ces cookies en HttpOnly, la page ne les voit
+// pas : la session reste « pas vue », et c'est DIT à l'app (`nav`), jamais
+// remplacé par une identité devinée.
+const COOKIES_PAGE_STORE = 'vrmCookiesPage';
+const COOKIES_UTILES = ['access_token_web', 'refresh_token_web', 'anon_id'];
+async function cookieDeLaPage(domain, name) {
+  try {
+    const o = (await chrome.storage.local.get(COOKIES_PAGE_STORE))[COOKIES_PAGE_STORE] || {};
+    const d = o[String(domain || '')];
+    const v = d && d.c && d.c[name];
+    return typeof v === 'string' && v ? v : null;
+  } catch (_) { return null; }
+}
+let cookiesPageTimer = null;
+async function recevoirCookiesPage(msg, sender) {
+  if (CAP.cookies) return { ok: true, ignore: true };
+  let hote = ''; try { hote = new URL(String((sender && sender.tab && sender.tab.url) || (sender && sender.url) || '')).hostname; } catch (_) {}
+  if (!VINTED_DOMAINS.includes(hote) || String(msg.domain || '') !== hote) return { ok: false, raison: 'site' };
+  const c = {};
+  const src = msg.c && typeof msg.c === 'object' ? msg.c : {};
+  for (const k of COOKIES_UTILES) if (typeof src[k] === 'string' && src[k].length > 0 && src[k].length <= 8192) c[k] = src[k];
+  let avant = null;
+  try {
+    const o = (await chrome.storage.local.get(COOKIES_PAGE_STORE))[COOKIES_PAGE_STORE] || {};
+    avant = o[hote] || null;
+    o[hote] = { c, vu: !!c.access_token_web, at: Date.now() };
+    await chrome.storage.local.set({ [COOKIES_PAGE_STORE]: o });
+  } catch (_) { return { ok: false, raison: 'stockage' }; }
+  // L'équivalent de `cookies.onChanged` : une session qui change (connexion,
+  // bascule de compte, renouvellement) relance la capture, comme sur Chrome.
+  const change = !avant || (avant.c || {}).access_token_web !== c.access_token_web || (avant.c || {}).refresh_token_web !== c.refresh_token_web;
+  if (change && c.access_token_web) {
+    clearTimeout(cookiesPageTimer);
+    cookiesPageTimer = setTimeout(() => { captureDomain(hote).then(() => runActive()).catch(() => {}); }, 2000);
+  }
+  return { ok: true, vu: !!c.access_token_web };
 }
 
 // ⚠️ UNE ÉCRITURE RATÉE SE DIT AVEC SON CODE (4 octobre, 5.155). `supabaseUpsert`
@@ -942,6 +1024,10 @@ async function noterRefus(uid, domain, raison) {
     const cur = (await chrome.storage.local.get('vrmRefus')).vrmRefus || {};
     cur[String(uid)] = { at: Date.now(), domain, raison };
     await chrome.storage.local.set({ vrmRefus: cur });
+    // 5.197 : un compte refusé/supprimé n'est plus « déjà écrit » — réautorisé,
+    // sa ligne repart tout de suite (pas dans 30 min).
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    if (m[String(uid)]) { delete m[String(uid)]; await chrome.storage.local.set({ vrmCompteEcrit: m }); }
   } catch (_) {}
 }
 async function oublierRefus(uid) {
@@ -989,8 +1075,44 @@ async function captureDomain(domain) {
     updated_at: new Date().toISOString(),
   };
   if (lastCsrfByDomain[domain]) row.csrf_token = lastCsrfByDomain[domain];
-  await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  // ⚠️⚠️ 20 octobre (5.197) — UNE ÉCRITURE PAR CHANGEMENT, PAS PAR REQUÊTE.
+  //    Mesuré en production (journaux du 20 octobre) : jusqu'à 90 écritures de
+  //    `vinted_accounts` PAR MINUTE, 687 en 73 min. Chaque requête de la page
+  //    Vinted portant un `x-csrf-token` envoie un message `csrf` → ici → la
+  //    ligne entière réécrite, jetons identiques. On n'écrit que si les jetons
+  //    (ou le csrf) ont CHANGÉ, ou une fois toutes les 30 min au plus.
+  //    L'empreinte vit dans `chrome.storage.local` (§4.9) ; perdue, elle ne
+  //    coûte qu'une écriture de plus. Elle n'est posée qu'après une écriture
+  //    RÉUSSIE : un refus de la base fait réessayer à la requête suivante.
+  const sig = empreinteCompte(row);
+  if (await compteDejaEcrit(uid, sig)) { noterDiag('compte_inchange'); return uid; }
+  const ok = await supabaseUpsert('vinted_accounts', [row], 'vinted_user_id');
+  if (ok !== false) await noterCompteEcrit(uid, sig);
   return uid;
+}
+
+const COMPTE_REECRIT_MS = 30 * 60 * 1000;
+// Empreinte courte (FNV-1a 32 bits) : on ne garde JAMAIS un jeton en clair
+// dans le stockage de l'extension pour cette comparaison.
+function empreinteCompte(row) {
+  const s = [row.vinted_user_id, row.domain, row.access_token, row.refresh_token, row.anon_id, row.csrf_token || ''].join('|');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16) + ':' + s.length;
+}
+async function compteDejaEcrit(uid, sig) {
+  try {
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    const e = m[String(uid)];
+    return !!(e && e.sig === sig && Date.now() - Number(e.at || 0) < COMPTE_REECRIT_MS);
+  } catch (_) { return false; }                    // pas su : on écrit (comme avant)
+}
+async function noterCompteEcrit(uid, sig) {
+  try {
+    const m = (await chrome.storage.local.get('vrmCompteEcrit')).vrmCompteEcrit || {};
+    m[String(uid)] = { sig, at: Date.now() };
+    await chrome.storage.local.set({ vrmCompteEcrit: m });
+  } catch (_) {}
 }
 
 async function captureAllAccounts() {
@@ -1638,6 +1760,16 @@ async function storeHarvest(domain, type, id, body) {
 // --- Messages venant de content.js ----------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Navigateur sans `alarms` (Orion iPhone) : chaque réveil rattrape les
+  // tâches périodiques en retard (iOS a pu suspendre le fond entre-temps).
+  if (!CAP.alarms) rattraperMinuteries();
+  // Navigateur sans API `cookies` : la page Vinted donne les siens (voir
+  // `recevoirCookiesPage`). Sur Chrome, `veux` répond non et rien d'autre ne part.
+  if (msg && msg.from === 'vrm-cookies') {
+    if (msg.action === 'veux') { sendResponse({ ok: true, veux: !CAP.cookies }); return true; }
+    recevoirCookiesPage(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
   if (!msg || msg.from !== 'cancale-content') {
     // FRAÎCHEUR : pour chaque compte, quand ses annonces ont-elles été captées
     // pour la dernière fois ? C'est LA question qui compte — un compte capté
@@ -2001,7 +2133,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if (msg.account && msg.account.id) await storeLbcAccount(msg.account);
             sendResponse({ ok: true }); return;
           }
-          if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body, msg.session); sendResponse({ ok: true }); return; }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
           // range un échantillon capé par famille d'endpoint, pour voir la FORME
           // (où vivent l'état, l'acheteur, le bordereau) — sans rien analyser
@@ -2027,8 +2159,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
           // La messagerie Leboncoin : le nombre de non-lus d'un compte, et ses
           // comptes liés. Rangés dans `lbc_messages` (voir storeLbcMessages).
-          if (msg.action === 'lbcMsgCompteur' && msg.userId) { await storeLbcMessages({ compteur: { userId: String(msg.userId).slice(0, 64), unread: Number(msg.unread) } }); sendResponse({ ok: true }); return; }
-          if (msg.action === 'lbcComptes' && Array.isArray(msg.comptes)) { await storeLbcMessages({ comptes: msg.comptes }); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcMsgCompteur' && msg.userId) { await storeLbcMessages({ compteur: { userId: String(msg.userId).slice(0, 64), unread: Number(msg.unread) } }); try { await noterSessionLbc(String(msg.userId).slice(0, 64)); } catch (_) {} sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcComptes' && Array.isArray(msg.comptes)) { try { await noterComptesLies(msg.comptes); } catch (_) {} await storeLbcMessages({ comptes: msg.comptes }); sendResponse({ ok: true }); return; }
           // SONDE PHOTOS (lecture seule, aucun contenu) : à quoi ressemblent les
           // vignettes acceptées + combien l'extension a posé. Sert à MESURER la
           // vraie mécanique de l'uploader Leboncoin (blob ? http ? multiple ?),
@@ -3350,24 +3482,84 @@ async function vintedGetHtml(acc, endpoint) {
 // photos — on ne prend QUE l'objet dont l'id == celui de l'annonce (§5,
 // l'identité prime, jamais un autre article). Repli : balayage des grandes
 // images vinted.net du HTML.
+// Le texte du flux Next « app router » : la page porte des
+// `<script>self.__next_f.push([1,"…"])</script>` dont le 2ᵉ élément est une
+// chaîne JSON. On ne garde que ce qui se décode proprement.
+function texteDuFluxNext(html) {
+  try {
+    const re = /self\.__next_f\.push\(\[\s*\d+\s*,\s*("(?:[^"\\]|\\[\s\S])*")\s*\]\)/g;
+    let txt = '', m, n = 0;
+    while ((m = re.exec(html)) && n < 2000) { n++; try { const v = JSON.parse(m[1]); if (typeof v === 'string') txt += v; } catch (_) {} }
+    return txt;
+  } catch (_) { return ''; }
+}
+// Les objets JSON COMPLETS et bien fermés qui entourent une mention de l'id de
+// l'annonce (`"id":123`). Un fragment tronqué est ignoré, jamais deviné.
+function objetsAutourDeLId(txt, cible) {
+  const out = [];
+  try {
+    const re = new RegExp('"id"\\s*:\\s*"?' + String(cible).replace(/\D/g, '') + '(?!\\d)', 'g');
+    let m, essais = 0;
+    while ((m = re.exec(txt)) && essais < 12 && out.length < 6) {
+      essais++;
+      // On remonte jusqu'à 40 accolades ouvrantes en arrière : la plus proche
+      // qui s'ouvre AVANT la mention et se ferme APRÈS est l'objet qui la porte.
+      let k = m.index, tours = 0;
+      while (k > 0 && tours < 40) {
+        k = txt.lastIndexOf('{', k - 1); if (k < 0) break; tours++;
+        let p = 0, fin = -1, chaine = false, ech = false;
+        for (let j = k; j < txt.length && j < k + 400000; j++) {
+          const c = txt[j];
+          if (ech) { ech = false; continue; }
+          if (c === '\\') { ech = true; continue; }
+          if (c === '"') { chaine = !chaine; continue; }
+          if (chaine) continue;
+          if (c === '{') p++;
+          else if (c === '}') { p--; if (!p) { fin = j; break; } }
+        }
+        if (fin < 0 || fin < m.index) continue;
+        try { const o = JSON.parse(txt.slice(k, fin + 1)); if (o && typeof o === 'object') { out.push(o); break; } } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  return out;
+}
 function extraireDetailPage(html, id) {
-  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [], couleur: '' };
+  const out = { photos: [], description: '', codes: null, cles: null, photoIds: [], couleur: '', format: 'aucun', nextData: false, nextFlux: false, idVu: false };
   if (!html) return out;
   try {
+    const cible = String(id);
+    out.idVu = html.indexOf(cible) >= 0;
     const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     let data = null;
-    if (m) { try { data = JSON.parse(m[1]); } catch (_) {} }
-    if (data) {
-      const cible = String(id);
-      let found = null;
-      const vu = new Set();
-      const walk = (o, prof) => {
-        if (!o || found || prof > 9 || typeof o !== 'object') return;
-        if (vu.has(o)) return; vu.add(o);
-        if (String(o.id) === cible && Array.isArray(o.photos) && o.photos.length) { found = o; return; }
-        for (const k of Object.keys(o)) walk(o[k], prof + 1);
-      };
-      walk(data, 0);
+    if (m) { out.nextData = true; try { data = JSON.parse(m[1]); } catch (_) {} }
+    let found = null;
+    const vu = new Set();
+    const walk = (o, prof) => {
+      if (!o || found || prof > 12 || typeof o !== 'object') return;
+      if (vu.has(o)) return; vu.add(o);
+      if (String(o.id) === cible && Array.isArray(o.photos) && o.photos.length) { found = o; return; }
+      for (const k of Object.keys(o)) walk(o[k], prof + 1);
+    };
+    if (data) { walk(data, 0); if (found) out.format = 'next_data'; }
+    // ⚠️⚠️ 20 octobre (5.197) — MESURÉ CHEZ JULIEN : `fiche_codes_absents` = 650
+    //    = `photos_page_ecrit` 650, et l'échantillon dit `cles=` (vide). Sur ses
+    //    pages d'annonce, `__NEXT_DATA__` ne porte plus l'objet de l'annonce :
+    //    les photos venaient TOUTES du balayage d'images ci-dessous, et les
+    //    codes (catégorie, marque, couleur) n'étaient JAMAIS trouvés. Le routeur
+    //    « app » de Next diffuse ses données dans `self.__next_f.push([1,"…"])`
+    //    (comme Leboncoin, 12 sept.) : on lit ce flux, et on n'y prend QUE
+    //    l'objet dont l'id est celui de l'annonce (§5). Je n'ai jamais vu la
+    //    page (403) : `out.format` dit ce qui a servi, pour la passe suivante.
+    if (!found) {
+      const flux = texteDuFluxNext(html);
+      if (flux) {
+        out.nextFlux = true;
+        for (const o of objetsAutourDeLId(flux, cible)) { walk(o, 0); if (found) break; }
+        if (found) out.format = 'next_f';
+      }
+    }
+    {
       if (found) {
         for (const p of found.photos) { const u = p && (p.full_size_url || p.url || (p.thumbnails && p.thumbnails.length && p.thumbnails[p.thumbnails.length - 1].url)); if (typeof u === 'string' && /vinted\.net\//i.test(u) && !out.photos.includes(u)) out.photos.push(u); }
         if (typeof found.description === 'string') out.description = found.description;
@@ -3398,6 +3590,7 @@ function extraireDetailPage(html, id) {
       }
     }
     if (!out.photos.length) {
+      out.format = 'html';
       const re = /https:\/\/images\d*\.vinted\.net\/[^"'\\\s)]+/gi;
       const vus = new Set(); let mm;
       while ((mm = re.exec(html)) && out.photos.length < 25) {
@@ -3410,6 +3603,71 @@ function extraireDetailPage(html, id) {
     }
   } catch (_) {}
   return out;
+}
+// ⚠️⚠️ 20 octobre (5.197) — QUAND RELIRE LA PAGE D'UNE ANNONCE.
+//    Mesuré chez Julien : 650 pages lues, 650 « fiche_codes_absents », et les
+//    17 freins 429 de Vinted (`photos_page_refuse_429` = `vinted_frein_429`) —
+//    la pause qui suit refuse aussi les bordereaux et les réponses. Cause : une
+//    annonce était relue toutes les 6 h tant que ses CODES manquaient… or la
+//    page ne les donnait jamais. Une annonce déjà lue par la page et restée
+//    incomplète n'est relue qu'après `PAGE_REESSAI_INCOMPLET_MS` (3 jours) ; une
+//    annonce jamais lue par la page (ou à qui il manque ENCORE des photos alors
+//    qu'on n'en a aucune) passe tout de suite.
+const PAGE_REESSAI_INCOMPLET_MS = 3 * 24 * 3600 * 1000;
+function aRelirePageAnnonce(it, d0, maintenant) {
+  const d = d0 || {};
+  const veut = Number((it && it.nPhotos) || 0);
+  const a = (d.photos || []).length;
+  const manquePhotos = veut > 1 && a < veut;
+  const manqueCodes = !d.codes;
+  if (!manquePhotos && !manqueCodes) return false;
+  if (a === 0) return true;                                   // rien capté : on lit
+  const lu = Date.parse(d.pageAt || '');
+  if (isFinite(lu) && (maintenant || Date.now()) - lu < PAGE_REESSAI_INCOMPLET_MS) return false;
+  return true;
+}
+// La photo d'une annonce s'identifie par son fichier sur le CDN
+// (`/t/{empreinte}/f800/…`), jamais par sa taille ni sa signature `?s=`.
+function clePhotoVinted(u) {
+  const s = String(u || '').split('?')[0];
+  const m = /\/t\/([^/]+)\//.exec(s);
+  return m ? m[1] : s.replace(/\/(f\d+|tc|large|full)\//, '/');
+}
+// ⚠️⚠️ 20 octobre (5.197) — UNE PHOTO QUI N'EST PAS DE L'ANNONCE (§5).
+//    Mesuré : le même fichier (`02_024a3_…`) dans les photos de 29 annonces
+//    DIFFÉRENTES, un autre (`06_01e6b_…`) dans 17 — une image de la page
+//    (bandeau, autre article), jamais une paire. Elle partait sur Leboncoin et
+//    eBay comme photo de la paire. Règle, par IDENTITÉ de fichier, jamais par
+//    ressemblance : un fichier présent dans des annonces aux couvertures
+//    (1re photo) TOUTES différentes — au moins 3 — et qui n'est la couverture
+//    d'aucune n'appartient à aucune. Deux annonces de la même paire (mêmes
+//    photos, même couverture) ne déclenchent jamais rien.
+function retirerPhotosEtrangeres(carte) {
+  if (!carte || typeof carte !== 'object') return 0;
+  const couvertures = new Set();
+  const parCle = new Map();                       // clé → Set des couvertures des annonces qui la portent
+  for (const k of Object.keys(carte)) {
+    const ph = carte[k] && Array.isArray(carte[k].photos) ? carte[k].photos : [];
+    if (!ph.length) continue;
+    const couv = clePhotoVinted(ph[0]);
+    couvertures.add(couv);
+    for (const u of ph.slice(1)) {
+      const c = clePhotoVinted(u);
+      if (!parCle.has(c)) parCle.set(c, new Set());
+      parCle.get(c).add(couv);
+    }
+  }
+  const etrangeres = new Set();
+  for (const [c, couvs] of parCle) if (couvs.size >= 3 && !couvertures.has(c)) etrangeres.add(c);
+  if (!etrangeres.size) return 0;
+  let n = 0;
+  for (const k of Object.keys(carte)) {
+    const e = carte[k];
+    if (!e || !Array.isArray(e.photos) || e.photos.length < 2) continue;
+    const garde = [e.photos[0]].concat(e.photos.slice(1).filter((u) => !etrangeres.has(clePhotoVinted(u))));
+    if (garde.length !== e.photos.length) { n += e.photos.length - garde.length; carte[k] = Object.assign({}, e, { photos: garde }); }
+  }
+  return n;
 }
 async function capterPhotosAnnonces(uid) {
   try {
@@ -3438,15 +3696,11 @@ async function capterPhotosAnnonces(uid) {
       if (dr === null) return 0;                          // pas su ≠ « rien capté » : on ne rejoue pas à l'aveugle
       dej = (dr[0] && dr[0].data) || {};
     } catch (_) {}
+    const maintenant = Date.now();
     const manquants = items.filter((it) => {
       if (!it || !it.id) return false;
       if (it.is_closed || it.is_hidden || it.is_draft) return false;   // en ligne seulement
-      const veut = Number(it.nPhotos || 0);
-      const d0 = dej[String(it.id)] || {};
-      const a = (d0.photos || []).length;
-      // Il manque des photos, OU la fiche de codes (pour republier). La même
-      // lecture de page donne les deux : aucune requête de plus par annonce.
-      return (veut > 1 && a < veut) || !d0.codes;
+      return aRelirePageAnnonce(it, dej[String(it.id)], maintenant);
     }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
     if (!manquants.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
@@ -3483,7 +3737,12 @@ async function capterPhotosAnnonces(uid) {
       const kk = String(it.id);
       const prev = dej[kk] || {};
       const desc = String(it2.description || '').trim();
-      const photos = urls.filter(Boolean).slice(0, 24);
+      // 5.197 : le balayage d'images de la page (`format: 'html'`) attrapait
+      // aussi une image qui n'est PAS de l'annonce, toujours APRÈS les siennes
+      // (mesuré : la même photo étrangère en position nPhotos+1 sur 29 de ses
+      // annonces). Quand Vinted dit combien l'annonce en a, on n'en garde pas plus.
+      const veutN = Number(it.nPhotos || 0);
+      const photos = urls.filter(Boolean).slice(0, (det.format === 'html' && veutN > 0) ? veutN : 24);
       // MESURE (§6, « on ne prend que 5 photos », 29 sept.) : si on en récupère
       // MOINS que Vinted n'en annonce (`nPhotos`), on note combien + les CLÉS de
       // la réponse (jamais le corps) — pour trancher si l'API de détail limite,
@@ -3491,12 +3750,13 @@ async function capterPhotosAnnonces(uid) {
       if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
       dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
         codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []),
-        couleur: det.couleur || prev.couleur || '' };
+        couleur: det.couleur || prev.couleur || '', pageAt: new Date().toISOString(), pageFormat: det.format || '' };
       dirty = true; lues.push(kk);
       noterDiag('photos_page_ecrit');
       // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
       if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
-      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'cles=' + (det.cles || []).join(',').slice(0, 600)); }
+      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'format=' + det.format + ' next_data=' + (det.nextData ? 'oui' : 'non') + ' next_f=' + (det.nextFlux ? 'oui' : 'non') + ' id_vu=' + (det.idVu ? 'oui' : 'non') + ' cles=' + (det.cles || []).join(',').slice(0, 560)); }
+      noterDiag('fiche_format_' + (det.format || 'aucun'));
     }
     // ⚠️ 5.193 — on RELIT la ligne au moment d'écrire et on n'y pose que NOS
     //    fiches (`lues`) : une fiche rangée pendant la boucle (page d'annonce
@@ -3509,6 +3769,8 @@ async function capterPhotosAnnonces(uid) {
         if (rr === null) return false;
         const cur = (rr[0] && rr[0].data) || {};
         for (const kk of lues) cur[kk] = dej[kk];
+        const retirees = retirerPhotosEtrangeres(cur);
+        if (retirees) noterDiag('photos_etrangeres_retirees');
         return supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
       });
       if (!ecrit) for (const kk of lues) delete memo[`${uid}_${kk}`];
@@ -3657,6 +3919,77 @@ async function ongletVinted(prefere) {
     return (tabs || []).find((t) => ongletEstVinted(t) && t.status === 'complete') || null;
   } catch (_) { return null; }
 }
+// ── LE RELAIS DE LA PAGE : « exécuter dans le monde MAIN » SANS `scripting` ──
+// (Orion iPhone, 20 octobre.) Chrome injecte la fonction dans la page
+// (`executeScript`, world MAIN) : la requête part DE LA PAGE, avec ses cookies.
+// Un navigateur qui n'a pas `scripting`, ou qui refuse le monde MAIN, garde la
+// même fonction — exécutée ici — mais chacune de ses requêtes part de la page
+// par le relais : fond → content.js (`chrome.tabs.sendMessage`, sinon une
+// boîte aux lettres dans `chrome.storage.local`) → inject.js (monde MAIN, déjà
+// posé par une balise `<script>`) → `fetch` de la page. Mêmes requêtes, même
+// origine, même file Vinted (`requeteVinted`), mêmes garde-fous (§3).
+// Sur Chrome, `executerMain` fait exactement l'appel d'avant : rien ne change.
+const PAGE_REQ_STORE = 'vrmPageReq', PAGE_REP_STORE = 'vrmPageRep';
+const reponsePage = (o) => (o && typeof o === 'object')
+  ? { status: Number(o.status) || 0, ok: !!o.ok, origine: String(o.origine || ''),
+      json: async () => { if (o.json === undefined || o.json === null) throw new Error('vide'); return o.json; } }
+  : { status: 0, ok: false, origine: '', json: async () => { throw new Error('rien'); } };
+function demandeParStockage(req, fin) {
+  let ecoute = null;
+  try {
+    ecoute = (ch, zone) => {
+      try {
+        if (zone !== 'local' || !ch || !ch[PAGE_REP_STORE]) return;
+        const v = ch[PAGE_REP_STORE].newValue;
+        if (!v || v.id !== req.id) return;
+        try { chrome.storage.onChanged.removeListener(ecoute); } catch (_) {}
+        try { chrome.storage.local.remove(PAGE_REP_STORE); } catch (_) {}
+        fin(v);
+      } catch (_) {}
+    };
+    chrome.storage.onChanged.addListener(ecoute);
+    chrome.storage.local.set({ [PAGE_REQ_STORE]: Object.assign({}, req, { at: Date.now() }) });
+  } catch (_) { try { if (ecoute) chrome.storage.onChanged.removeListener(ecoute); } catch (_) {} fin(null); }
+}
+function fetchParLaPage(tabId, p, headers) {
+  const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  const req = { vrm: 'fetchPage', id, p: String(p || ''), h: (headers && typeof headers === 'object') ? headers : {} };
+  return new Promise((res) => {
+    let fini = false, t = null;
+    const fin = (o) => { if (fini) return; fini = true; clearTimeout(t); res(reponsePage(o)); };
+    t = setTimeout(() => fin(null), 25000);
+    if (CAP.tabsMsg && tabId != null) {
+      try {
+        chrome.tabs.sendMessage(tabId, req, (o) => {
+          void (chrome.runtime && chrome.runtime.lastError);
+          if (o && typeof o === 'object' && o.id === id) fin(o); else demandeParStockage(req, fin);
+        });
+        return;
+      } catch (_) {}
+    }
+    demandeParStockage(req, fin);
+  });
+}
+async function executerMain(tabId, func, args) {
+  if (CAP.scripting && !CAP_MAIN_REFUSE) {
+    try { return await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', args, func }); }
+    catch (e) {
+      const m = String((e && e.message) || e || '');
+      // Un refus ORDINAIRE (onglet fermé, page qui navigue) reste un refus, comme avant.
+      if (!/world|MAIN|unsupported|not supported|not implemented|is not a function|Unexpected property/i.test(m)) throw e;
+      CAP_MAIN_REFUSE = true;
+      try { noterDiag('nav_main_refuse'); } catch (_) {}
+    }
+  }
+  let loc = null;
+  try { const t = await chrome.tabs.get(tabId); loc = new URL(String((t && t.url) || '')); } catch (_) { loc = null; }
+  const relais = {
+    fetch: (p, init) => fetchParLaPage(tabId, p, init && init.headers),
+    location: loc ? { hostname: loc.hostname, origin: loc.origin } : { hostname: '', origin: '' },
+  };
+  try { noterDiag('nav_relais_page'); } catch (_) {}
+  return [{ result: await func(...(args || []), relais) }];
+}
 async function lecteurPublic(domain) {
   let tabId = ((await ongletVinted(null)) || {}).id;
   const csrf = lastCsrfByDomain[domain] || '';
@@ -3668,12 +4001,14 @@ async function lecteurPublic(domain) {
     tabId = tab.id;
     return requeteVinted('public', async () => {
       try {
-        const res = await chrome.scripting.executeScript({
-          target: { tabId }, world: 'MAIN', args: [chemin, csrf],
-          func: async (p, csrfTok) => {
+        const res = await executerMain(tabId, async (p, csrfTok, __relais) => {
+            // `__relais` n'existe que hors de Chrome (navigateur sans monde MAIN) :
+            // la même fonction, ses requêtes passent par la page (`executerMain`).
+            const L = __relais ? __relais.location : (typeof location !== 'undefined' ? location : null);
+            const fetch = __relais ? __relais.fetch : globalThis.fetch;
             // Hors de Vinted, AUCUNE requête : un fetch relatif partirait chez l'autre site.
-            const hote = String((typeof location !== 'undefined' && location.hostname) || '');
-            const origine = String((typeof location !== 'undefined' && location.origin) || '');
+            const hote = String((L && L.hostname) || '');
+            const origine = String((L && L.origin) || '');
             if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(hote)) return { status: 0, ok: false, json: null, horsVinted: true, origine };
             try {
               const h = { accept: 'application/json' };
@@ -3682,8 +4017,7 @@ async function lecteurPublic(domain) {
               let json = null; try { json = await r.json(); } catch (_) {}
               return { status: r.status, ok: r.ok, json, origine };
             } catch (_) { return { status: 0, ok: false, json: null, origine }; }
-          },
-        });
+          }, [chemin, csrf]);
         const o = res && res[0] && res[0].result;
         if (!o || typeof o !== 'object') return { status: 0, ok: false, json: null };
         // La réponse ne vient pas de Vinted : « rien lu » — jamais une pause Vinted.
@@ -4248,7 +4582,7 @@ async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
   if (suivi) suivi.pagesLues = 0;
   for (let page = 1; page <= maxPages; page++) {
     const r = await vintedGet(acc, `/api/v2/my_orders?type=${type}&page=${page}&per_page=40`);
-    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) { if (suivi) suivi.statut = r && r.status; break; }
+    if (!r.ok || !r.json || !Array.isArray(r.json.my_orders)) { if (suivi) { suivi.statut = r && r.status; if (r && r.pause) suivi.pause = true; } break; }
     if (suivi) suivi.pagesLues++;
     all = all.concat(r.json.my_orders);
     pagination = r.json.pagination || pagination;
@@ -4370,11 +4704,9 @@ async function pageActiveFetch() {
   // boîte, porte-monnaie, une trentaine de requêtes après le refus.
   const rep = await requeteVinted('page', async () => {
    try {
-    const res = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world: 'MAIN',
-      args: [csrf, knownPid],
-      func: async (csrfTok, knownPidArg) => {
+    const res = await executerMain(tab.id, async (csrfTok, knownPidArg, __relais) => {
+        // Hors de Chrome (sans monde MAIN), ses requêtes partent par la page.
+        const fetch = __relais ? __relais.fetch : globalThis.fetch;
         let frein = 0;                        // Vinted a dit « ralentis » : plus rien ne part
         const get = async (p) => {
           if (frein) return null;
@@ -4441,8 +4773,7 @@ async function pageActiveFetch() {
         // est deja connecte — c'est le meme profil de trafic qu'une visite.
         const wallet = pid ? await get('/api/v2/users/' + pid + '/payouts') : null;
         return { who: who || null, listings: listings || null, listingsComplet, pid: pid || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
-      },
-    });
+      }, [csrf, knownPid]);
     const o = res && res[0] && res[0].result;
     // Le statut que la file regarde : le frein reçu dans la page, sinon « lu ».
     return { status: (o && o.frein) || (o ? 200 : 0), ok: !!o, out: o || null };
@@ -4721,42 +5052,73 @@ function alarmeSiAbsente(nom, opts) {
     chrome.alarms.get(nom, (a) => { void (chrome.runtime && chrome.runtime.lastError); if (!a) { try { chrome.alarms.create(nom, opts); } catch (_) {} } });
   } catch (_) { try { chrome.alarms.create(nom, opts); } catch (_) {} }
 }
-try {
-  // Capture des comptes toutes les 10 min ; fetch actif toutes les 20 min
-  // (assez pour etre a jour, assez espace pour rester discret).
-  alarmeSiAbsente('cancale-sync', { periodInMinutes: 10 });
-  alarmeSiAbsente('cancale-active', { periodInMinutes: 20 });
-  // ⚠️ ENTRETIEN DE LA SESSION VENDEUR. Le jeton d'accès dure ~1 h ; il n'était
-  // renouvelé qu'au moment d'écrire, et SEULEMENT si la base est cloisonnée.
-  // Une fois la migration passée, une extension restée ouverte sans écrire
-  // aurait laissé mourir son jeton, puis serait retombée sur la clé publique —
-  // c'est-à-dire, sous RLS, plus aucune capture enregistrée, en silence.
-  // 40 min : bien avant l'heure, et rien ne part si aucune session n'existe.
-  alarmeSiAbsente('vrm-session', { periodInMinutes: 40 });
-  // Photos des annonces : tant qu'un onglet Vinted est ouvert, on complète tout
-  // seul, sans attendre une navigation (Julien, 29 sept.). Voir `tickPhotos`.
-  alarmeSiAbsente('vrm-photos', { periodInMinutes: 1 });
-  // 5.183 : le relais du téléphone — 30 s, le minimum de Chrome. Rien ne part
-  // sans session VRM (voir `relaisTick`).
-  alarmeSiAbsente('vrm-relais', { periodInMinutes: 0.5 });
-  chrome.alarms.onAlarm.addListener((a) => {
-    if (a.name === 'cancale-sync') captureAllAccounts();
-    else if (a.name === 'cancale-active') runActive();
-    else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
-    else if (a.name === 'vrm-photos') tickPhotos();
-    else if (a.name === 'vrm-relais') relaisTick('alarme');
-    // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
-    // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
-    // une longue période calme attendrait la prochaine capture pour être écrit.
-    majTampon(() => {});
-    // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
-    // session) repart ici — la file vit dans `chrome.storage.local`.
-    viderSuppressions();
-    // 11 octobre : les morceaux Leboncoin en attente (au plus une écriture par
-    // 30 s) partent ici si le service worker s'est endormi entre-temps.
-    try { viderLbcRecon(); viderLbcCatalogue(); } catch (_) {}
-  });
-} catch (_) {}
+// Les tâches périodiques : nom → minutes. UNE liste pour les deux chemins.
+// Capture des comptes toutes les 10 min ; fetch actif toutes les 20 min
+// (assez pour etre a jour, assez espace pour rester discret).
+// ⚠️ ENTRETIEN DE LA SESSION VENDEUR (`vrm-session`, 40 min). Le jeton d'accès
+// dure ~1 h ; il n'était renouvelé qu'au moment d'écrire, et SEULEMENT si la
+// base est cloisonnée. Une fois la migration passée, une extension restée
+// ouverte sans écrire aurait laissé mourir son jeton, puis serait retombée sur
+// la clé publique — c'est-à-dire, sous RLS, plus aucune capture enregistrée,
+// en silence. 40 min : bien avant l'heure, et rien ne part sans session.
+// Photos des annonces (`vrm-photos`, 1 min) : tant qu'un onglet Vinted est
+// ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
+// 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
+// Rien ne part sans session VRM (voir `relaisTick`).
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5 };
+function surAlarme(a) {
+  if (a.name === 'cancale-sync') captureAllAccounts();
+  else if (a.name === 'cancale-active') runActive();
+  else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
+  else if (a.name === 'vrm-photos') tickPhotos();
+  else if (a.name === 'vrm-relais') relaisTick('alarme');
+  // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
+  // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
+  // une longue période calme attendrait la prochaine capture pour être écrit.
+  majTampon(() => {});
+  // 5.165 : une suppression vue mais pas encore rangée (base muette, pas de
+  // session) repart ici — la file vit dans `chrome.storage.local`.
+  viderSuppressions();
+  // 11 octobre : les morceaux Leboncoin en attente (au plus une écriture par
+  // 30 s) partent ici si le service worker s'est endormi entre-temps.
+  try { viderLbcRecon(); viderLbcCatalogue(); } catch (_) {}
+}
+// ── SANS `chrome.alarms` (Orion iPhone, 20 octobre) ─────────────────────────
+// Des minuteries tant que le fond est éveillé, ET la date du dernier passage de
+// chaque tâche dans `chrome.storage.local` : iOS suspend le fond dès que
+// l'écran se verrouille ou que l'onglet passe derrière ; au réveil (n'importe
+// quel message, un onglet qui charge), ce qui est en retard repart UNE fois —
+// jamais une rafale de rattrapage (une tâche en retard de 3 h tourne une fois).
+// Les garde-fous de chaque tâche (garde, plafonds, file Vinted, pause) sont
+// ceux de Chrome : seule l'horloge change.
+const MINUTERIES_STORE = 'vrmMinuteries';
+let _rattrapageA = 0, _rattrapageEnCours = false;
+async function rattraperMinuteries(force) {
+  if (CAP.alarms || _rattrapageEnCours) return;
+  if (!force && Date.now() - _rattrapageA < 15000) return;
+  _rattrapageEnCours = true; _rattrapageA = Date.now();
+  try {
+    let vus = {};
+    try { vus = (await chrome.storage.local.get(MINUTERIES_STORE))[MINUTERIES_STORE] || {}; } catch (_) { return; }   // stockage illisible : on ne rejoue rien
+    const maintenant = Date.now(), dus = [];
+    for (const nom of Object.keys(PERIODES)) {
+      const der = Number(vus[nom]) || 0;
+      if (maintenant - der >= PERIODES[nom] * 60000 - 1000) { dus.push(nom); vus[nom] = maintenant; }
+    }
+    if (!dus.length) return;
+    try { await chrome.storage.local.set({ [MINUTERIES_STORE]: vus }); } catch (_) { return; }   // noté AVANT d'agir : pas de double tour
+    for (const nom of dus) { try { surAlarme({ name: nom }); } catch (_) {} }
+  } finally { _rattrapageEnCours = false; }
+}
+if (CAP.alarms) {
+  try {
+    for (const nom of Object.keys(PERIODES)) alarmeSiAbsente(nom, { periodInMinutes: PERIODES[nom] });
+    chrome.alarms.onAlarm.addListener(surAlarme);
+  } catch (_) {}
+} else {
+  try { setInterval(() => { rattraperMinuteries(true); }, 30000); } catch (_) {}
+  rattraperMinuteries(true);
+}
 
 // ── CAPTURE À CHAQUE VISITE SUR VINTED ──────────────────────────────────────
 // Demande de Julien : « à chaque fois que je vais sur Vinted, l'extension capte
@@ -4812,9 +5174,13 @@ async function rafraichirVentes(uid) {
   // Aucune page rendue par Vinted : c'est une lecture RATÉE, pas « aucune vente ».
   if (!sold || !Array.isArray(sold.my_orders) || !suivi.pagesLues) {
     noterDiag('ventes_lecture_ratee');
+    // 5.197 : 164 lectures ratées sur 615 chez Julien, sans savoir pourquoi —
+    // on note le statut (une pause demandée par Vinted, un 401, une coupure).
+    noterDiag('ventes_lecture_ratee_' + (suivi.pause ? 'pause' : String(suivi.statut || 0)));
     // 429 / 403 : c'est VINTED qui dit « ralentis » ou « non ». Ce n'est pas un
     // échec à réessayer vite — la garde entière reste (§3, la limite de volume).
-    const freine = suivi.statut === 429 || suivi.statut === 403;
+    // Pendant une pause déjà ouverte non plus : aucune requête n'est partie.
+    const freine = suivi.pause || suivi.statut === 429 || suivi.statut === 403;
     return { ok: false, ecrit: false, raison: freine ? 'vinted-freine' : 'lecture', garder: freine };
   }
   if (!sold.my_orders.length) return { ok: true, ecrit: false, raison: 'aucune' };
@@ -5129,6 +5495,10 @@ async function saveItemDetailMaintenant(id, detail) {
     // La couleur affichée par Vinted : jamais écrasée par du vide.
     couleur: String(detail.couleur || '').trim().slice(0, 60) || prev.couleur || '',
   };
+  // On garde ce que la page de l'annonce a appris (codes, date de lecture) :
+  // l'écrasement par une lecture du panneau les perdait.
+  for (const k of ['codes', 'photoIds', 'pageAt', 'pageFormat']) if (prev[k] !== undefined && cur[key][k] === undefined) cur[key][k] = prev[k];
+  if (retirerPhotosEtrangeres(cur)) noterDiag('photos_etrangeres_retirees');
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
 }
 
@@ -5593,9 +5963,31 @@ async function etatPourApp() {
   //    récent que lui, voir `rechargerSiCodePerime`) ; `ext` = l'identifiant de
   //    CETTE extension, à qui l'app adresse sa session (jamais à toutes).
   let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {}
+  // 20 octobre : ce que CE navigateur n'a pas (Orion iPhone…), mesuré par
+  // l'extension elle-même. Absent sur Chrome (tout est là) : l'état est inchangé.
+  const nav = await avecDelai(etatNavigateur(), 300, null).catch(() => null);
   return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus },
     vintedPasSu ? { vintedPasSu: true } : {},
-    pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {});
+    pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
+    nav ? { nav } : {});
+}
+// `remplace` : l'API manque, un autre chemin garde la fonction (rien à faire).
+// `indispo` : rien ne la remplace ICI, aujourd'hui — l'app le dit, une fois.
+//   · `cookies` : la page Vinted n'a montré aucune session (déconnecté, ou
+//     cookies invisibles aux scripts) — sans elle, rien ne se capte.
+//   · `cookies-passu` : le stockage n'a pas répondu (« pas su », pas « non »).
+async function etatNavigateur() {
+  const remplace = [], indispo = [];
+  if (!CAP.cookies) {
+    let vu = null;
+    try { const o = (await chrome.storage.local.get(COOKIES_PAGE_STORE))[COOKIES_PAGE_STORE] || {}; vu = Object.keys(o).some((k) => o[k] && o[k].vu); } catch (_) { vu = null; }
+    if (vu === true) remplace.push('cookies'); else indispo.push(vu === null ? 'cookies-passu' : 'cookies');
+  }
+  if (!CAP.alarms) remplace.push('alarms');
+  if (!CAP.scripting || CAP_MAIN_REFUSE) remplace.push('scripting');
+  if (!CAP.downloads) remplace.push('downloads');
+  if (!CAP.externe) remplace.push('externe');
+  return (remplace.length || indispo.length) ? { remplace, indispo } : null;
 }
 // Le bordereau de CETTE vente est-il déjà rangé (avec son PDF) ? Une lecture
 // scalaire (§4.4) — `null` = la base n'a pas répondu (« pas su » ≠ « non »).
@@ -7945,25 +8337,52 @@ function comptesLbcProuves(ventes, items) {
   }
   return s;
 }
+// 5.195 : un compte dont la SESSION a été vue dans son navigateur (`sessionAt`)
+// est le sien aussi (même règle que `comptesLbcSession` dans l'app, §11).
+function comptesLbcSession(accounts) {
+  const s = new Set();
+  for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
+  return s;
+}
 function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account))))); }
-// Une vente Leboncoin annulée ne fait pas partir la paire (même règle que
-// `lbcAnnulee` dans l'app).
-const venteLbcAnnulee = (o) => o.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((o.parcelStatus || '') + ' ' + (o.stepStatus || '') + ' ' + (o.stepLabel || ''));
+// <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
+// serveur (§11 ; `audit-lbc-restes.cjs` compare les trois). Une annonce Leboncoin
+// n'est « en vente » que si son état ne la dit pas morte ET qu'aucune vente
+// PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
+// prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
+// vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
+// une liste paginée — seulement sur une vente vue.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+function annoncesLbcVendues(ventes) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    if (v.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((v.parcelStatus || '') + ' ' + (v.stepStatus || '') + ' ' + (v.stepLabel || ''))) continue;
+    s.add(String(v.itemId));
+  }
+  return s;
+}
+function annonceLbcEnVente(ad, vendues) {
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+}
+// </lbc-en-vente-regle>
 // Ses annonces Leboncoin : celles qu'on peut lui attribuer, moins celles qu'il
 // a VENDUES là-bas (elles n'y sont plus en vente). `ok:false` = la base n'a pas
 // répondu sur les annonces. Une lecture ratée des VENTES n'attribue rien de plus
 // (on retombe sur la règle d'avant) — jamais l'inverse.
 async function lireLbcAnnonces() {
-  const [rows, vRows] = await Promise.all([
+  const [rows, vRows, aRows] = await Promise.all([
     sbGet('app_data?id=eq.lbc_listings&select=data'),
     sbGet('app_data?id=eq.lbc_ventes&select=data'),
+    sbGet('app_data?id=eq.lbc_accounts&select=data'),
   ]);
   if (rows === null) return { ok: false, ligne: false, items: [] };
   const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
   const ventes = (vRows && vRows[0] && vRows[0].data && vRows[0].data.ventes) || {};
-  const prouves = comptesLbcProuves(ventes, items);
-  const vendus = new Set(Object.values(ventes).filter((v) => v && v.isSeller === true && v.itemId != null && !venteLbcAnnulee(v)).map((v) => String(v.itemId)));
-  return { ok: true, ligne: !!(rows && rows[0]), items: Object.values(items).filter((ad) => ad && estALui(ad, prouves) && !vendus.has(String(ad.id))) };
+  const accs = (aRows && aRows[0] && aRows[0].data && aRows[0].data.accounts) || {};
+  const prouves = new Set([...comptesLbcProuves(ventes, items), ...comptesLbcSession(accs)]);
+  const vendues = annoncesLbcVendues(ventes);
+  return { ok: true, ligne: !!(rows && rows[0]), items: Object.values(items).filter((ad) => ad && estALui(ad, prouves) && annonceLbcEnVente(ad, vendues)) };
 }
 // Lit les annonces Leboncoin captées (ligne lbc_listings) sous forme de tableau.
 async function readLbcItems() {
@@ -8440,8 +8859,7 @@ async function buildLbcData() {
   const lbcItems = await readLbcItems();
   const lbcByRef = new Map();
   for (const ad of lbcItems) {
-    const dead = /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
-    if (dead) continue;
+    if (LBC_ANNONCE_MORTE.test(String(ad.status || ''))) continue;
     for (const k of adRefKeys(ad, liens, main.vrm_numerotation)) if (!lbcByRef.has(k)) lbcByRef.set(k, ad);
   }
   // Clés de rapprochement d'une annonce Vinted : son numéro VRM + le « nXXXX »
@@ -8533,7 +8951,7 @@ async function buildLbcData() {
       if (m) keysKnown.add(cleNum(m[1]));
     }
     for (const ad of lbcItems) {
-      if (/(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''))) continue;
+      if (LBC_ANNONCE_MORTE.test(String(ad.status || ''))) continue;
       const keys = adRefKeys(ad, liens, main.vrm_numerotation);
       if (!keys.length) { unlinked.push(lbcRow(ad, keys)); continue; }
       if (keys.some((k) => keysOnline.has(k))) continue;   // encore en ligne sur Vinted
@@ -8583,7 +9001,7 @@ async function buildLbcData() {
       // ⚠️ LA MÊME règle que `readLbcItems` (`estALui`), pas une copie qui dérive :
       //    celle-ci oubliait `customRef`, que l'app accepte — un troisième écart
       //    sur la même notion.
-      lbcCount = lu.items.filter((v) => !/(supprim|delete|expir|refus|sold|vendu)/i.test(String(v.status || ''))).length;
+      lbcCount = lu.items.filter((v) => !LBC_ANNONCE_MORTE.test(String(v.status || ''))).length;
     }
   } catch (_) {}
   if (lbcCount === 0) lbcJamaisLu = true;       // rien d'attribuable = rien vu
@@ -8720,9 +9138,13 @@ async function storeLbcAccount(acc) {
     //    `linked_accounts`, ne matche pas et reste.
     for (const id of Object.keys(merged)) {
       const s = merged[id] && merged[id].source;
-      if (s && LBC_URL_AUTRUI.test(String(s))) delete merged[id];
+      if (s && LBC_URL_AUTRUI.test(String(s)) && !merged[id].sessionAt) delete merged[id];
     }
-    { const { courant: _c, ...sansCourant } = acc; merged[String(acc.id)] = Object.assign({}, merged[String(acc.id)], sansCourant, { seenAt: new Date().toISOString() }); }
+    { const { courant: _c, session: _s, ...sansCourant } = acc; const nowIso = new Date().toISOString();
+      const ancien = merged[String(acc.id)] || {};
+      // Une entrée de SESSION garde sa source d'avant si elle en avait une « moi »
+      // (on ne remplace pas un nom lu par une source sans nom).
+      merged[String(acc.id)] = Object.assign({}, ancien, sansCourant, { seenAt: nowIso }, acc.session === true ? { sessionAt: nowIso } : {}); }
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
@@ -8734,6 +9156,79 @@ async function storeLbcAccount(acc) {
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
     noterFlux('leboncoin', _okFlux !== false);
   } catch (_) {}
+}
+// ══════════════════════════════════════════════════════════════════════════
+// ⚠️⚠️ LE COMPTE LEBONCOIN CONNECTÉ, ENFIN LU (20 octobre, 5.195). Julien : « il
+//    capte pas les bonnes données ni le bon compte ». MESURÉ sur sa base (lecture
+//    seule) : il a DEUX comptes Leboncoin — `Totomondu` (8442c3e8…, particulier,
+//    ses 10 annonces de baskets) et `SHOPCANCALE` (faf3fbba…, pro). Connecté sur
+//    Totomondu à 11:14, la base disait « SHOPCANCALE, particulier » :
+//    · `members/me/account` (la seule source « session » de la 5.186) a la forme
+//      `{account:{account_id,type}, member:{account_id, first_name, nickname:{value}}}`
+//      — aucun couple id + nom que `detectLbcAccount` sache lire : le compte de
+//      session n'a JAMAIS été reconnu, donc `vrmLbcCompte` jamais posé, donc
+//      « mes annonces » (`myads`) jamais rangées sans réf VRM ;
+//    · `users/me/linked_accounts` liste les AUTRES comptes liés (connecté sur
+//      Totomondu, il rend SHOPCANCALE seul), et `is_business_user` n'était pas lu
+//      ⇒ SHOPCANCALE rangé « particulier » alors qu'il est pro.
+// ⇒ L'identité de la session : le compteur de messagerie
+//   `messaging/proxy/api/hal/{userId}/counter` — la page ne le relit QUE pour le
+//   compte connecté (mesuré : 8442c3e8 à 11:16, pendant que linked_accounts
+//   listait faf3fbba ; et le compteur de faf3fbba quand il était sur le compte
+//   pro). Garde : un id présent dans la dernière liste des comptes LIÉS n'est
+//   jamais pris pour la session (c'est un autre compte). Le NOM ne vient que
+//   d'une fiche dont l'`user_id` est EXACTEMENT celui de la session
+//   (`user-card/v2/{id}/infos`) ou d'une entrée déjà connue sous cet id — jamais
+//   d'un titre, jamais d'une fréquence (§5). Nom pas encore lu ⇒ id seul.
+const LBC_LIES_MS = 12 * 3600e3;
+async function noterComptesLies(comptes) {
+  const ids = (comptes || []).map((c) => String((c && c.id) || '')).filter(Boolean).slice(0, 10);
+  if (!ids.length) return;
+  try { await chrome.storage.local.set({ vrmLbcLies: { ids, at: Date.now() } }); } catch (_) {}
+  // Le compte de session courant ne peut pas être dans sa propre liste de
+  // comptes liés : s'il y est, ce qu'on croyait la session ne l'est plus.
+  try {
+    const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte;
+    if (c && c.v === 2 && c.id && ids.includes(String(c.id))) await chrome.storage.local.remove('vrmLbcCompte');
+  } catch (_) {}
+}
+function typeLbcDe(v) {
+  const t = String(v == null ? '' : v);
+  if (v === true || /^pro|business|company|store/i.test(t)) return 'pro';
+  if (v === false || /^(part|priv|individual|personal)/i.test(t)) return 'particulier';
+  return '';
+}
+async function noterSessionLbc(userId, ident) {
+  const id = String(userId || '').trim();
+  if (!/^[0-9a-f-]{8,64}$/i.test(id)) return false;
+  let local = {};
+  try { local = await chrome.storage.local.get(['vrmLbcLies', 'vrmLbcCompte', 'vrmLbcSessionEcrit']); } catch (_) { return false; }
+  const lies = local.vrmLbcLies;
+  if (lies && Array.isArray(lies.ids) && Date.now() - Number(lies.at || 0) < LBC_LIES_MS && lies.ids.includes(id)) { noterDiag('lbc_session_compte_lie'); return false; }
+  const avant = local.vrmLbcCompte;
+  const meme = !!(avant && avant.v === 2 && String(avant.id) === id);
+  let name = (ident && ident.name) || (meme ? String(avant.name || '') : '');
+  let type = (ident && ident.type) || (meme ? String(avant.type || '') : '');
+  // Un nom déjà rangé SOUS CET ID (une fiche à son id, une capture d'avant).
+  if (!name || !type) {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
+      const a = rows && rows[0] && rows[0].data && rows[0].data.accounts && rows[0].data.accounts[id];
+      if (a && !(a.source && LBC_URL_AUTRUI.test(String(a.source)) && !a.sessionAt)) { name = name || String(a.name || ''); type = type || String(a.type || ''); }
+    } catch (_) {}
+  }
+  const neuf = { v: 2, id, name, type, at: Date.now(), source: 'compteur' };
+  try { await chrome.storage.local.set({ vrmLbcCompte: neuf }); } catch (_) {}
+  // Écrit dans `lbc_accounts` au changement de compte, à un nom/type appris, ou
+  // toutes les 6 h — jamais à chaque relevé du compteur.
+  const e = local.vrmLbcSessionEcrit || {};
+  if (e.id === id && e.name === name && e.type === type && Date.now() - Number(e.at || 0) < 6 * 3600e3) return true;
+  const acc = { id, session: true, platform: 'leboncoin', source: 'session:messagerie' };
+  if (name) acc.name = name;
+  if (type) acc.type = type;
+  await storeLbcAccount(acc);
+  try { await chrome.storage.local.set({ vrmLbcSessionEcrit: { id, name, type, at: Date.now() } }); } catch (_) {}
+  return true;
 }
 // RECON : on garde un échantillon des réponses Leboncoin (chemins d'API + un bout
 // de corps) pour brancher l'extraction au millimètre. Ligne dédiée lbc_recon.
@@ -8768,7 +9263,7 @@ function fusionnerMorceauLbc(t0, patch) {
   for (const k of Object.keys(patch || {})) {
     const v = patch[k];
     if (v === undefined) continue;
-    if (k === 'paths') { t.paths = [...new Set([...(t.paths || []), ...(Array.isArray(v) ? v : [])])].slice(0, 600); continue; }
+    if (k === 'paths') { t.paths = fusionnerCheminsLbc(t.paths, v, 600); continue; }
     if (k === 'sample') { t.samples = [v, ...(t.samples || [])].slice(0, 6); continue; }
     if (k === 'schemaOne') {
       if (v && v.endpoint) { t.schemas = Object.assign({}, t.schemas || {}); t.schemas[String(v.endpoint).slice(0, 120)] = { cles: (v.cles || []).slice(0, 200), at: new Date().toISOString() }; }
@@ -8782,6 +9277,34 @@ function fusionnerMorceauLbc(t0, patch) {
   }
   return t;
 }
+// ⚠️⚠️ (20 oct., 5.196) LES CHEMINS VUS ÉTAIENT FIGÉS. `lbc_recon.paths` gardait
+//    les 300 PREMIERS chemins jamais vus : mesuré le 20 octobre, la ligne est
+//    pleine (300/300) depuis des semaines, au vieux format (sans méthode, sans
+//    statut) — aucun chemin neuf ne s'ajoutait plus, la mesure qui devait faire
+//    trouver le bordereau Leboncoin était muette. ⇒ Le plus RÉCENT d'abord : un
+//    chemin revu remonte, les plus anciens tombent. Ce qui SERT ne tombe pas
+//    avant le reste : les chemins de vente/transaction/bordereau, de compte, de
+//    messagerie, tout PDF et tout échec (≥ 400) gardent jusqu'à la moitié des
+//    places. Un ancien chemin sans méthode dont la forme neuve est là s'efface
+//    (doublon). Borné, toujours.
+const LBC_CHEMINS_MAX = 300;
+const LBC_CHEMIN_UTILE = /(transaction|purchase|order|label|parcel|shipping|deliver|voucher|myads|classifieds|account|users?\/me|messaging|counter|packages|\[pdf\]|→ [45]\d\d)/i;
+function fusionnerCheminsLbc(avant, neufs, max) {
+  const n = (Array.isArray(neufs) ? neufs : []).filter((x) => typeof x === 'string' && x).slice(-400);
+  const tous = [...new Set([...n.slice().reverse(), ...(Array.isArray(avant) ? avant : []).filter((x) => typeof x === 'string' && x)])];
+  // Forme neuve « GET host/chemin → 200 [json] » présente ⇒ l'ancienne « host/chemin » est un doublon.
+  const avecMethode = (x) => /^[A-Z]+ /.test(x);
+  const nus = new Set(tous.map((x) => { const m = /^[A-Z]+ (\S+)/.exec(x); return m ? m[1] : null; }).filter(Boolean));
+  const propres = tous.filter((x) => avecMethode(x) || !nus.has(x));
+  if (propres.length <= max) return propres;
+  // Ordre de garde : les utiles (jusqu'à la moitié), puis les chemins au format
+  // neuf du plus récent au plus ancien, puis l'ancien format (rangé jadis du plus
+  // ancien au plus récent) en partant de la FIN. L'ordre rangé, lui, ne bouge pas.
+  const neufsF = propres.filter(avecMethode), vieuxF = propres.filter((x) => !avecMethode(x));
+  const gardes = new Set(propres.filter((x) => LBC_CHEMIN_UTILE.test(x)).slice(0, Math.floor(max / 2)));
+  for (const x of [...neufsF, ...vieuxF.slice().reverse()]) { if (gardes.size >= max) break; gardes.add(x); }
+  return propres.filter((x) => gardes.has(x));
+}
 // Applique les morceaux accumulés à la ligne lue (même règles qu'avant).
 const garderRecents = (d, max) => {
   const ks = Object.keys(d);
@@ -8792,7 +9315,9 @@ const garderRecents = (d, max) => {
 };
 function appliquerMorceauxLbc(prev, t) {
   const next = Object.assign({ paths: [], samples: [] }, prev);
-  if (t.paths) next.paths = [...new Set([...(next.paths || []), ...t.paths])].slice(0, 300);
+  // Rien de neuf (que des chemins déjà rangés) ⇒ la ligne ne bouge pas : un
+  // simple réordonnancement ne vaut pas une écriture (§ « 40 Mo par visite »).
+  if (t.paths) { const deja = new Set(next.paths || []); if (t.paths.some((x) => !deja.has(x))) next.paths = fusionnerCheminsLbc(next.paths, t.paths, LBC_CHEMINS_MAX); }
   if (t.samples) next.samples = [...t.samples, ...(next.samples || [])].slice(0, 6);
   if (t.schemas) next.schemas = garderRecents(Object.assign({}, next.schemas || {}, t.schemas), 80);
   for (const k of Object.keys(LBC_DICTS)) {
@@ -9008,7 +9533,21 @@ function extraireVentesLbc(url, body) {
   }
   return [];
 }
-async function rangerLbcVentes(list) {
+// ⚠️⚠️ (20 oct., 5.196) UNE ÉCRITURE À LA FOIS. La liste des transactions (la
+//    seule qui porte la DATE de vente) et les détails lus juste après (jusqu'à
+//    5, à ~150 ms d'écart) arrivaient en même temps : chacun relisait la ligne,
+//    fusionnait SA part et réécrivait la ligne entière — le dernier écrivain,
+//    parti d'une lecture faite AVANT l'écriture de la liste, effaçait les dates
+//    qu'elle venait de poser. Prouvé (audit-lbc-restes.cjs) : la liste et un
+//    détail envoyés ensemble ⇒ plus aucune `dateVente`. Les rangements passent
+//    maintenant à la file : chacun relit ce que le précédent a écrit.
+let _lbcVentesChaine = Promise.resolve();
+function rangerLbcVentes(list) {
+  const p = _lbcVentesChaine.then(() => rangerLbcVentesUneFois(list));
+  _lbcVentesChaine = p.catch(() => {});
+  return p;
+}
+async function rangerLbcVentesUneFois(list) {
   if (!list || !list.length) return;
   const prev = await sbGet('app_data?id=eq.lbc_ventes&select=data');
   if (prev === null) return;                          // pas su ≠ vide — on n'écrase rien
@@ -9262,7 +9801,7 @@ function detectLbcAccount(data, url) {
   // d'autrui (voir le bloc ci-dessus). Sinon on ne prend rien.
   if (!LBC_URL_MOI.test(u) || LBC_URL_AUTRUI.test(u)) return null;
   const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
-    || o.siren || o.siret || o.is_pro != null || o.store_id || o.storeId || o.company_name);
+    || o.siren || o.siret || o.is_pro != null || o.is_business_user != null || o.store_id || o.storeId || o.company_name);
   const session = LBC_URL_SESSION.test(u);
   const walk = (node, depth, key, dansListe) => {
     if (best || !node || depth > 8 || typeof node !== 'object') return;
@@ -9272,7 +9811,10 @@ function detectLbcAccount(data, url) {
       || node.pseudo || node.pseudonym || node.name || node.display_name || node.displayName;
     const cleMoi = /^(user|account|store|owner|me|profile|pro|seller|self|current)/i.test(String(key || ''));
     if (id && name && (marqueurMoi(node) || (cleMoi && (node.pseudo || node.pseudonym || node.email)))) {
-      const pro = !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
+      // 5.195 : `linked_accounts` dit `is_business_user` (mesuré) — c'est LUI qui
+      // tranche quand il est présent (SHOPCANCALE était rangé « particulier »).
+      const pro = typeof node.is_business_user === 'boolean' ? node.is_business_user
+        : !!(node.siren || node.siret || node.store_id || node.storeId || node.company_name || node.is_pro);
       best = { id: String(id), name: String(name), type: pro ? 'pro' : 'particulier', platform: 'leboncoin', source: String(url || '').slice(0, 120) };
       if (session && !dansListe) best.courant = true;
       return;
@@ -9294,7 +9836,7 @@ async function comptesMiens() {
   try {
     const rows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     const accs = (rows && rows[0] && rows[0].data && rows[0].data.accounts) || {};
-    for (const id in accs) { const src = accs[id] && accs[id].source; if (!src || (LBC_URL_MOI.test(String(src)) && !LBC_URL_AUTRUI.test(String(src)))) s.add(String(id)); }
+    for (const id in accs) { const src = accs[id] && accs[id].source; if ((accs[id] && accs[id].sessionAt) || !src || (LBC_URL_MOI.test(String(src)) && !LBC_URL_AUTRUI.test(String(src)))) s.add(String(id)); }
   } catch (_) {}
   return s;
 }
@@ -9372,7 +9914,28 @@ function noterPackPhoto(data, url) {
   chainePack = fait.catch(() => false);
   return fait;
 }
-async function handleLbcRaw(url, body) {
+// ⚠️⚠️ (20 oct., 5.196) LE COMPTE D'UNE LISTE « À MOI » VIENT DE LA PAGE QUI L'A
+//    REÇUE, PLUS DU DERNIER COMPTE VU PAR LE FOND. Changer de compte Leboncoin
+//    dans le même onglet recharge la page : « mes annonces » du NOUVEAU compte
+//    peut arriver avant son compteur de messagerie, et le fond, qui gardait
+//    l'ancien `vrmLbcCompte`, la rangeait sous l'ANCIEN compte (ses annonces
+//    mélangées à celles de l'autre, §5). ⇒ `lbc-inject.js` joint à une liste
+//    « à moi » le compte du compteur relu DANS LE MÊME DOCUMENT, AVANT elle (ou
+//    la retient jusqu'au premier compteur de ce document) ; un second compte vu
+//    dans le même document ⇒ rien n'est plus joint. Ici : sans ce compte joint
+//    (ou s'il est un compte LIÉ), on ne tague rien — jamais l'ancien.
+async function sessionDeListe(sessionPage) {
+  const id = String(sessionPage || '').trim();
+  if (!/^[0-9a-f-]{8,64}$/i.test(id)) return null;
+  let local = {};
+  try { local = await chrome.storage.local.get(['vrmLbcLies', 'vrmLbcCompte']); } catch (_) { return null; }
+  const lies = local.vrmLbcLies;
+  if (lies && Array.isArray(lies.ids) && Date.now() - Number(lies.at || 0) < LBC_LIES_MS && lies.ids.includes(id)) return null;
+  const c = local.vrmLbcCompte;
+  const meme = !!(c && c.v === 2 && String(c.id) === id);
+  return { id, name: meme ? String(c.name || '') : '', type: meme ? String(c.type || '') : '' };
+}
+async function handleLbcRaw(url, body, sessionPage) {
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
   if (LBC_URL_PACKS.test(String(url || ''))) { try { await noterPackPhoto(data, url); } catch (_) {} }
@@ -9389,7 +9952,19 @@ async function handleLbcRaw(url, body) {
   //    Compte de session inconnu ⇒ on ne tague rien (blanc plutôt que faux, §5).
   const listeMoi = /\/adfinder\/v\d+\/myads\b/i.test(String(url || ''));
   let sess = null;
-  if (listeMoi) { try { const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; if (c && c.v === 2 && c.id) sess = c; } catch (_) {} }
+  try { const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; if (c && c.v === 2 && c.id) sess = c; } catch (_) {}
+  // 5.195 : la fiche publique DU compte de session (même id, exactement) donne
+  // son nom et son type. Jamais celle d'un autre id (§5).
+  { const m = /\/user-card\/v\d+\/([0-9a-f-]{8,64})\/infos/i.exec(String(url || ''));
+    if (m && sess && String(m[1]) === String(sess.id) && data && String(data.user_id || '') === String(sess.id) && data.name) {
+      try { await noterSessionLbc(sess.id, { name: String(data.name).slice(0, 60), type: typeLbcDe(data.account_type) }); } catch (_) {}
+      return;
+    } }
+  if (sess) miens.add(String(sess.id));
+  // Le compte qui TAGUE une liste « à moi » : celui que la page a joint (même
+  // document), jamais `vrmLbcCompte` (le dernier vu, peut-être l'ancien).
+  const sessListe = await sessionDeListe(sessionPage);
+  if (sessListe) miens.add(sessListe.id);
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
   if (acct) await storeLbcAccount(acct);
@@ -9435,9 +10010,9 @@ async function handleLbcRaw(url, body) {
         //    compte connecté. On les tague pour relier chaque paire à SON compte
         //    Leboncoin (il en aura plusieurs) — sans compte détecté, on laisse
         //    vide (mieux vaut un blanc qu'un faux, §5).
-        account: acct ? acct.id : null,
-        accountName: acct ? acct.name : null,
-        accountType: acct ? acct.type : null,
+        account: acct ? acct.id : (sessListe ? sessListe.id : null),
+        accountName: acct ? acct.name : (sessListe ? (sessListe.name || null) : null),
+        accountType: acct ? acct.type : (sessListe ? (sessListe.type || null) : null),
         platform: 'leboncoin',
       });
     }
@@ -9472,7 +10047,7 @@ async function handleLbcRaw(url, body) {
         //    « caché », juste pas rangé (élargir une lecture sans l'attribuer,
         //    c'est inventer des données). `miens` vide ⇒ seule la réf VRM garde.
         const ownerId = String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '');
-        const aMoiParSession = !!(listeMoi && sess && (!ownerId || ownerId === String(sess.id)));
+        const aMoiParSession = !!(listeMoi && sessListe && (!ownerId || ownerId === sessListe.id));
         if (refVRM || (ownerId && miens.has(ownerId)) || aMoiParSession) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
@@ -9485,8 +10060,8 @@ async function handleLbcRaw(url, body) {
           //    annonces et le flux « découverte » d'autrui) : on prend l'owner
           //    porté par l'annonce ELLE-MÊME, jamais le compte de session (qui,
           //    ici, ne prouverait pas que le chalet d'à côté est à lui, §5).
-          account: ownerId || (aMoiParSession ? String(sess.id) : null),
-          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? String(sess.name || '') || null : null),
+          account: ownerId || (aMoiParSession ? sessListe.id : null),
+          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? sessListe.name || null : null),
           platform: 'leboncoin',
         });
       }

@@ -184,12 +184,13 @@ const VENTES = [
   { txId: '163516245', title: 'autre paire', price: 1500, stepStatus: 'cancelled', stepLabel: 'Annulée', label: null },
 ];
 
+const PORT = Number(process.env.BANC_PORT) || 4491;
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 (async () => {
   const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE(/optionsreel/.test(q.url) ? 'optionsreel' : /\/confirmation/.test(q.url) ? 'confirmation' : /obligatoire/.test(q.url) ? 'obligatoire' : /basdepage/.test(q.url) ? 'basdepage' : /boost/.test(q.url) ? 'boost' : /photosreel/.test(q.url) ? 'photosreel' : /photoscont/.test(q.url) ? 'photoscont' : /photos1/.test(q.url) ? 'photos1' : /etape3/.test(q.url) ? 'etape3' : /etape2/.test(q.url) ? 'etape2' : /depot/.test(q.url))); });
-  await new Promise((res) => srv.listen(4491, res));
+  await new Promise((res) => srv.listen(PORT, res));
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const pg = await b.newPage({ viewport: { width: 1280, height: 900 } });
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -215,7 +216,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     };
   }, { queue: QUEUE, removals: REMOVALS, ventes: VENTES });
 
-  await pg.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
   await pg.addScriptTag({ content: SRC });
   await pg.waitForTimeout(1200);
 
@@ -259,7 +260,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });   // ⚠️ auto : plus de bouton « Pré-remplir »
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p2.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p2.goto(`http://localhost:${PORT}/depot`, { waitUntil: 'domcontentloaded' });
     await p2.addScriptTag({ content: SRC });
     // ⚠️ L'extension fait tout TOUTE SEULE (Julien, 20 sept.) : plus de « Pré-remplir »
     //    à cliquer. Sur une page de dépôt, `autoPrefill` lit la paire en attente
@@ -299,7 +300,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });
         return rep({ ok: true }); }, onMessage: { addListener(fn) { window.__ecouteurs.push(fn); } } } };
     }, { queue: QUEUE });
-    await p2b.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p2b.goto(`http://localhost:${PORT}/depot`, { waitUntil: 'domcontentloaded' });
     await p2b.addScriptTag({ content: SRC });
     await p2b.waitForTimeout(2500);
     const id = String(QUEUE[0].id);
@@ -347,7 +348,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.queue[0] });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p3.goto('http://localhost:4491/recherche', { waitUntil: 'domcontentloaded' });
+    await p3.goto(`http://localhost:${PORT}/recherche`, { waitUntil: 'domcontentloaded' });
     await p3.addScriptTag({ content: SRC });
     await p3.waitForTimeout(2500);
     const filtres = await p3.evaluate(() => ({
@@ -395,7 +396,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: d.queue, removals: [], unlinked: [], postedList: [], stats: { onlineCount: 3, numberedCount: 3, postedCount: 0, lbcCount: 0, lbcJamaisLu: true } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p4.goto('http://localhost:4491/', { waitUntil: 'domcontentloaded' });
+    await p4.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
     await p4.addScriptTag({ content: SRC });
     await p4.waitForTimeout(1100);
     dit(!e4.length, 'aucune erreur sur une page au nouveau format', e4[0] || '');
@@ -447,7 +448,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: QUEUE[0] });
-    await p6.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await p6.goto(`http://localhost:${PORT}/depot/etape2`, { waitUntil: 'domcontentloaded' });
     await p6.addScriptTag({ content: SRC });
     await p6.waitForTimeout(4200);           // surveillance à la seconde + pose 1re photo (700ms) puis groupée (900ms)
     const etat = await p6.evaluate(() => ({
@@ -525,7 +526,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad });
-    await pg.goto('http://localhost:4491/depot/etape3', { waitUntil: 'domcontentloaded' });
+    await pg.goto(`http://localhost:${PORT}/depot/etape3`, { waitUntil: 'domcontentloaded' });
     await pg.addScriptTag({ content: SRC });
     await pg.waitForTimeout(3200);   // surveillance à la seconde + ouverture des menus
     const r = await lireCombos(pg); r.errs = errs;
@@ -556,7 +557,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: QUEUE[0] });
-    await pg.goto('http://localhost:4491/depot/photoscont', { waitUntil: 'domcontentloaded' });
+    await pg.goto(`http://localhost:${PORT}/depot/photoscont`, { waitUntil: 'domcontentloaded' });
     await pg.addScriptTag({ content: SRC });
     await pg.waitForTimeout(8000);
     const r = await pg.evaluate(() => ({ cont: window.__contAt || [], photos: window.__photoAt || [],
@@ -623,7 +624,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     //    uploader (c'est ce que Julien voit). On le prouve à la main.
     const pbulk = await b.newPage({ viewport: { width: 1200, height: 900 } });
     await pbulk.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
-    await pbulk.goto('http://localhost:4491/depot/photos1', { waitUntil: 'domcontentloaded' });
+    await pbulk.goto(`http://localhost:${PORT}/depot/photos1`, { waitUntil: 'domcontentloaded' });
     const nBulk = await pbulk.evaluate(() => {
       const uf = document.getElementById('uf');
       const dt = new DataTransfer();
@@ -639,7 +640,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const eseq = []; pseq.on('pageerror', (e) => eseq.push(e.message));
     await pseq.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await pseq.addInitScript(initChrome, { ad: adPhotos });
-    await pseq.goto('http://localhost:4491/depot/photos1', { waitUntil: 'domcontentloaded' });
+    await pseq.goto(`http://localhost:${PORT}/depot/photos1`, { waitUntil: 'domcontentloaded' });
     await pseq.addScriptTag({ content: SRC });
     await pseq.waitForTimeout(5000);   // pose séquentielle + attentes entre photos
     const nSeq = await pseq.evaluate(() => document.querySelectorAll('#previews img').length);
@@ -656,7 +657,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     const ereel = []; preel.on('pageerror', (e) => ereel.push(e.message));
     await preel.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await preel.addInitScript(initChrome, { ad: adPhotos });
-    await preel.goto('http://localhost:4491/depot/photosreel', { waitUntil: 'domcontentloaded' });
+    await preel.goto(`http://localhost:${PORT}/depot/photosreel`, { waitUntil: 'domcontentloaded' });
     await preel.addScriptTag({ content: SRC });
     await preel.waitForTimeout(6000);
     const reel = await preel.evaluate(() => ({
@@ -683,7 +684,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
       await pg.addInitScript(initChrome, { ad: adPub });
-      await pg.goto('http://localhost:4491/depot/boost', { waitUntil: 'domcontentloaded' });
+      await pg.goto(`http://localhost:${PORT}/depot/boost`, { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: srcJs });
       await pg.waitForTimeout(9000);
       const r = await pg.evaluate(() => ({
@@ -716,7 +717,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
       await pg.addInitScript(initChrome, { ad: adPub });
-      await pg.goto('http://localhost:4491/depot/basdepage', { waitUntil: 'domcontentloaded' });
+      await pg.goto(`http://localhost:${PORT}/depot/basdepage`, { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: SRC });
       await pg.waitForTimeout(9000);
       const r = await pg.evaluate(() => ({ fin: window.__fin, paidx: window.__paidx, annx: window.__annx, banner: (document.getElementById('vrm-lbc-banner') || {}).innerText || '' }));
@@ -732,7 +733,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
       await pg.addInitScript(initChrome, { ad });
-      await pg.goto('http://localhost:4491/deposer-une-annonce/options?optionsreel', { waitUntil: 'domcontentloaded' });
+      await pg.goto(`http://localhost:${PORT}/deposer-une-annonce/options?optionsreel`, { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: srcJs });
       await pg.waitForTimeout(9000);
       const r = await pg.evaluate(() => ({ cont: window.__cont, sel: window.__sel, paye: window.__paye,
@@ -770,7 +771,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
       const pg = await b.newPage({ viewport: { width: 1200, height: 900 } });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
       await pg.addInitScript(initChrome, { ad: adPub });
-      await pg.goto('http://localhost:4491/deposer-une-annonce/confirmation', { waitUntil: 'domcontentloaded' });
+      await pg.goto(`http://localhost:${PORT}/deposer-une-annonce/confirmation`, { waitUntil: 'domcontentloaded' });
       await pg.addScriptTag({ content: SRC });
       await pg.waitForTimeout(2500);
       const msgs = await pg.evaluate(() => window.__msgs || []);
@@ -801,7 +802,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getQueue') return rep({ ok: true, queue: [d.ad], removals: [], unlinked: [], postedList: [], stats: { onlineCount: 1, numberedCount: 1 } });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: QUEUE[0] });
-    await pd.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await pd.goto(`http://localhost:${PORT}/depot/etape2`, { waitUntil: 'domcontentloaded' });
     const AUTO = 'Superbe paire, taille 40, portée deux fois. Envoi rapide et soigné.';
     await pd.evaluate((txt) => {
       const el = document.querySelector('textarea[name="body"]');
@@ -841,7 +842,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'photoBytes') return rep({ ok: true, photos: [] });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: AD_FICHE });
-    await pf.goto('http://localhost:4491/depot/etape2', { waitUntil: 'domcontentloaded' });
+    await pf.goto(`http://localhost:${PORT}/depot/etape2`, { waitUntil: 'domcontentloaded' });
     await pf.evaluate(() => {
       const fixe = (sel, txt) => { const el = document.querySelector(sel); const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, txt); el.dispatchEvent(new Event('input', { bubbles: true })); };
       fixe('textarea[name="body"]', 'Texte écrit par Leboncoin tout seul.');
@@ -881,7 +882,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
         return rep({ ok: true }); }, onMessage: { addListener() {} } } };
     }, { ad: { ...QUEUE[0], photos: [] } });
-    await po.goto('http://localhost:4491/depot/obligatoire', { waitUntil: 'domcontentloaded' });
+    await po.goto(`http://localhost:${PORT}/depot/obligatoire`, { waitUntil: 'domcontentloaded' });
     await po.addScriptTag({ content: SRC });
     await po.waitForTimeout(9000);
     const manque = await po.evaluate(() => window.__envoyes.filter((m) => m.action === 'depotProgres' && m.progres && m.progres.etape === 'champ-manquant').map((m) => m.progres.manque));
@@ -915,7 +916,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
         return rep({ ok: true });
       }, onMessage: { addListener() {} } } };
     }, { queue: QUEUE });
-    await p7.goto('http://localhost:4491/depot', { waitUntil: 'domcontentloaded' });
+    await p7.goto(`http://localhost:${PORT}/depot`, { waitUntil: 'domcontentloaded' });
     await p7.addScriptTag({ content: SRC });
     await p7.waitForTimeout(1400);
     const apres1 = await p7.evaluate(() => window.__formes.length);
@@ -1080,6 +1081,40 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     dit(!fuite, 'et aucune valeur saisie ne part avec la structure');
     dit(!e7.length, 'aucune erreur pendant l’enregistrement des étapes', e7[0] || '');
     await p7.close();
+  }
+
+  // ── 20 OCTOBRE : LE BANDEAU DE DÉPÔT SUR UN IPHONE (390 px, au doigt) ─────
+  // Orion iPhone et Firefox Android : pas de souris. Le bandeau doit tenir dans
+  // l'écran, et ses boutons se toucher (44 px). À la souris, rien ne change.
+  for (const [nom, opts] of [['iPhone 390 px', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }], ['ordinateur', { viewport: { width: 1280, height: 900 } }]]) {
+    const ctx = await b.newContext(opts);
+    const pg = await ctx.newPage();
+    const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+    await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+    // La vraie page Leboncoin déclare sa largeur d'écran (meta viewport) : la fixture aussi.
+    await pg.route(/localhost:\d+\/depot$/, async (r) => { const rep = await r.fetch(); const html = (await rep.text()).replace(/<head>/i, '<head><meta name="viewport" content="width=device-width, initial-scale=1">'); r.fulfill({ response: rep, body: /<head>/i.test(html) ? html : '<meta name="viewport" content="width=device-width, initial-scale=1">' + html }); });
+    await pg.addInitScript((d) => {
+      window.chrome = { runtime: { id: 'banc', lastError: null, sendMessage: (m, cb) => {
+        const rep = (o) => { try { cb && cb(o); } catch (_) {} };
+        if (m && m.action === 'getPending') return rep({ ok: true, ad: d.ad });
+        if (m && m.action === 'photoBytes') return rep({ ok: true, photos: [] });
+        return rep({ ok: true }); }, onMessage: { addListener() {} } } };
+    }, { ad: QUEUE[0] });
+    await pg.goto(`http://localhost:${PORT}/depot`, { waitUntil: 'domcontentloaded' });
+    await pg.addScriptTag({ content: SRC });
+    await pg.waitForFunction(() => !!document.getElementById('vrm-lbc-banner'), null, { timeout: 8000 }).catch(() => {});
+    const r = await pg.evaluate(() => {
+      const el = document.getElementById('vrm-lbc-banner');
+      if (!el) return null;
+      const bb = el.getBoundingClientRect();
+      const boutons = [...el.querySelectorAll('button')].map((x) => Math.round(x.getBoundingClientRect().height));
+      return { gauche: bb.left, droite: bb.right, largeur: window.innerWidth, boutons };
+    });
+    await ctx.close();
+    dit(!errs.length, `${nom} : aucune erreur de page avec le bandeau`, errs[0] || '');
+    dit(!!r && r.gauche >= 0 && r.droite <= r.largeur, `${nom} : le bandeau de dépôt tient dans l'écran`, JSON.stringify(r));
+    if (nom.startsWith('iPhone')) dit(!!r && r.largeur <= 400 && r.boutons.length > 0 && r.boutons.every((h) => h >= 44), 'iPhone : chaque bouton du bandeau se touche (≥ 44 px)', JSON.stringify(r && r.boutons));
+    else dit(!!r && r.boutons.every((h) => h < 44), 'ordinateur : les boutons du bandeau gardent leur taille d’avant (rien ne change à la souris)', JSON.stringify(r && r.boutons));
   }
 
   await b.close(); srv.close();

@@ -6,6 +6,7 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
+const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
@@ -15,10 +16,10 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
-import { photoArticle, photoCommande, photoVenteVinted, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
+import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
-import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -61,7 +62,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.194.0';
+const EXT_ATTENDUE = '5.200.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6296,6 +6297,14 @@ function versExtension(id, msg, timeoutMs = 5000) {
   if ((!rt0 || !/^[a-p]{32}$/.test(String(id || ''))) && ID_EXT.test(String(id || '')) && __vmrExtReady) {
     return vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs);
   }
+  // 20 octobre (Orion iPhone) : la page peut AVOIR `chrome.runtime.sendMessage`
+  // sans que le canal adressé n'arrive (Orion : « externally_connectable.matches
+  // avec runtime.sendMessage échoue », note de version, ticket 13767). Un refus
+  // CERTAIN du canal (erreur levée, `lastError` : rien n'a été livré) repasse par
+  // le pont, toujours adressé à CETTE extension par son identifiant (bridge.js
+  // ne relaie que pour le sien). Jamais sur un simple délai : un message peut
+  // être en route, l'envoyer deux fois ne se rattrape pas.
+  const parLePont = () => (ID_EXT.test(String(id || '')) && __vmrExtReady) ? vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs) : Promise.resolve(null);
   return new Promise((res) => {
     const rt = canalExt();
     if (!rt || !/^[a-p]{32}$/.test(String(id || ''))) { res(null); return; }
@@ -6305,9 +6314,10 @@ function versExtension(id, msg, timeoutMs = 5000) {
       rt.sendMessage(String(id), msg, (r) => {
         if (fini) return; fini = true; clearTimeout(t);
         let e = null; try { e = rt.lastError; } catch (_) { e = null; }
-        res(e ? null : (r || null));
+        if (e) { parLePont().then(res, () => res(null)); return; }
+        res(r || null);
       });
-    } catch (_) { if (!fini) { fini = true; clearTimeout(t); res(null); } }
+    } catch (_) { if (!fini) { fini = true; clearTimeout(t); parLePont().then(res, () => res(null)); } }
   });
 }
 // « SE CONNECTER AVEC VRM » : l'extension ouvre VRM avec `?lier-extension=<son
@@ -6680,9 +6690,34 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
   );
 }
 // Plusieurs sources certaines d’une vente : ne pas laisser un lien mort masquer son archive.
-function PhotoVenteSources({candidats,onBesoinAlternative,onSourceChargee,style,...props}){
- const key=JSON.stringify(candidats),[favori,setFavori]=useState(null),[echecs,setEchecs]=useState({key,urls:[]});
+// ── UNE VENTE, UNE PHOTO (20 octobre) ────────────────────────────────────────
+// Julien : « quand je clique sur la vente d'une paire, il y a une AUTRE photo
+// qui apparaît ». La ligne repliée montrait la PREMIÈRE source (`PhotoVente`),
+// le détail déplié choisissait la sienne (`PhotoVenteSources`, la première qui
+// charge) : dès que la vignette de la commande ne chargeait pas, les deux ne
+// montraient plus la même image. Le choix vit maintenant ICI, par vente
+// (`cle` = [compte, transaction]) : la ligne et le détail lisent la même
+// source et les mêmes échecs — ce que l'un affiche, l'autre l'affiche.
+const __choixPhotoVente = new Map();
+const __choixPhotoVenteSubs = new Set();
+const choixPhotoVente = (cle, key) => { const c = cle != null ? __choixPhotoVente.get(cle) : null; return c && c.key === key ? c : { key, favori: null, echecs: [] }; };
+const poserChoixPhotoVente = (cle, key, patch) => {
+  if (cle == null) return;
+  const cur = choixPhotoVente(cle, key), next = { ...cur, ...patch(cur), key };
+  if (next.favori === cur.favori && next.echecs.length === cur.echecs.length) return;
+  __choixPhotoVente.set(cle, next);
+  if (__choixPhotoVente.size > 600) __choixPhotoVente.delete(__choixPhotoVente.keys().next().value);
+  __choixPhotoVenteSubs.forEach(fn => { try { fn(cle); } catch (_) {} });
+};
+function PhotoVenteSources({candidats,cle,onBesoinAlternative,onSourceChargee,style,...props}){
+ const key=JSON.stringify(candidats),[favoriLocal,setFavoriLocal]=useState(null),[echecsLocal,setEchecsLocal]=useState({key,urls:[]});
  const [,maj]=React.useReducer(n=>n+1,0);
+ React.useEffect(()=>{ if(cle==null)return undefined; const fn=c=>{ if(c===cle)maj(); }; __choixPhotoVenteSubs.add(fn); return ()=>{ __choixPhotoVenteSubs.delete(fn); }; },[cle]);
+ const partage=cle!=null?choixPhotoVente(cle,key):null;
+ const favori=partage?(partage.favori?{key,url:partage.favori}:null):favoriLocal;
+ const echecs=partage?{key,urls:partage.echecs}:echecsLocal;
+ const setFavori=v=>{ if(partage)poserChoixPhotoVente(cle,key,()=>({favori:v.url})); else setFavoriLocal(v); };
+ const setEchecs=f=>{ if(partage)poserChoixPhotoVente(cle,key,cur=>({echecs:f({key,urls:cur.echecs}).urls})); else setEchecsLocal(f); };
  const echecNatif=key===echecs.key?echecs.urls:[];
  const echecsActuels=React.useRef(echecNatif);echecsActuels.current=echecNatif;
  const etat=url=>echecNatif.includes(url)?'ko':photosVinted.estPhotoVinted(url)?(photosVinted.estMorte(url)?'ko':photosVinted.etatRendu(url)):'natif';
@@ -7468,9 +7503,16 @@ const rejouerSaisies = () => {
   }
   return { n, prix, nonRejoue };
 };
+const RECHARGE_SANS_FICHES = 'vrm_recharge_sans_fiches';
 const rechargerEnGardantLesSaisies = () => {
   memoriserSaisies();
   try { const v = _verNum.nuage; if (v != null) sessionStorage.setItem('vrm_recharge_numerotation', String(v)); } catch (_) {}
+  // ⚠️ (20 octobre) Les FICHES de cet écran sont périmées — c'est pour ça qu'on
+  //    recharge. Sans ce drapeau, la fusion du chargement (18 octobre) gardait
+  //    leurs numéros (« fiche que le nuage ne connaît pas ») et le « 999 » tapé
+  //    sur l'écran périmé repartait au nuage. Les saisies, elles, sont rejouées
+  //    SANS numéro par `rejouerSaisies`. Le pool reste une union (toujours sûr).
+  try { sessionStorage.setItem(RECHARGE_SANS_FICHES, '1'); } catch (_) {}
   try { window.location.reload(); } catch (_) {}
 };
 // Les copies d'APPAREIL qui portent des numéros (jamais synchronisées) : à
@@ -7513,6 +7555,14 @@ const fusionNumerosAuChargement = (k, nuage, local) => {
         const c = out[id];
         const nLocal = String(e.numero == null ? '' : e.numero).trim();
         if (!c) { out[id] = e; ajoute++; continue; }
+        // Un doublon réglé sur l'appareil (20 oct.) et pas encore arrivé au
+        // nuage : le nuage porte encore l'ANCIEN numéro. Sans ça, chaque
+        // rechargement repartait du doublon et lui donnait un AUTRE numéro neuf
+        // (un carton ne peut pas suivre). L'appareil gagne, et seulement là.
+        const r = e.reattribue;
+        if (r && nLocal && cleNum(nLocal) === cleNum(r.vers) && cleNum(c.numero) === cleNum(r.de) && !c.reattribue) {
+          out[id] = { ...c, ...e }; ajoute++; continue;
+        }
         if (nLocal && !String(c.numero == null ? '' : c.numero).trim()) {
           out[id] = { ...c, numero: e.numero, numberedAt: e.numberedAt || c.numberedAt, ...(e.auto != null ? { auto: e.auto } : {}), ...(e.manuelAt ? { manuelAt: e.manuelAt } : {}) };
           ajoute++;
@@ -7532,6 +7582,7 @@ const CLES_FUSION_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros'];
 // confirme ou la corrige (`cartonVerifie`). Une donnée datée, pas une règle :
 // rien d'autre ne lit cette fenêtre.
 const PANNE_NUMEROS = { de: '2026-10-11T14:58:00.000Z', a: '2026-10-18T09:30:00.000Z' };
+const DOUBLONS_FAITS = new Set();
 const ficheAVerifier = (f) => {
   if (!f || typeof f !== 'object' || !String(f.numero == null ? '' : f.numero).trim() || f.cartonVerifie) return false;
   if (f.auto === false) return false;
@@ -8269,6 +8320,29 @@ const confirmerNumerosAVerifier = async (numeros) => {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const cles = new Set((numeros || []).filter(Boolean).map((n) => cleNum(n)));
     if (!cles.size) return true;
+    // ⚠️ 20 octobre (« j'ai failli perdre 100 euros ») : DEUX fiches sous le même
+    // numéro, c'est deux paires — tamponner ce numéro peut envoyer la mauvaise.
+    const parCle = {};
+    for (const f of Object.values(fiches)) { const k = f && cleNum(f.numero); if (k && cles.has(k)) (parCle[k] = parCle[k] || []).push(f); }
+    const doubles = Object.keys(parCle).filter((k) => parCle[k].length > 1);
+    if (doubles.length) {
+      const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'une paire').join(' · ')}`).join('\n');
+      const ok = await askConfirm({
+        title: doubles.length > 1 ? `${doubles.length} numéros portés par deux paires` : `Le N°${doubles[0]} est porté par deux paires`,
+        desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner la mauvaise paire. Vérifie la photo et le titre avant d'imprimer.`,
+        ok: 'C\'est la bonne paire, imprimer', cancel: 'Annuler',
+      });
+      if (!ok) return false;
+    }
+    const pasEcrit = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && reattribueAEcrire(f));
+    if (pasEcrit.length) {
+      const ok = await askConfirm({
+        title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
+        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'une paire'}`).join('\n')}\n\nCette paire a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
+        ok: 'Oui, c\'est écrit', cancel: 'Annuler',
+      });
+      if (!ok) return false;
+    }
     const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
     if (!doute.length) return true;
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
@@ -10032,9 +10106,6 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
 //
 // Graisse constante 4.8, hauteur 20, largeur ~15 par lettre : le R porte une
 // contre-forme (le trou de sa panse) obtenue par fill-rule evenodd.
-const L_V = 'M0 0 H4.8 L7.5 13.6 L10.2 0 H15 L9.9 20 H5.1 Z';
-const L_R = 'M0 0 H10.2 a5.6 5.6 0 0 1 1.6 11 L15.6 20 H10.2 L7 11.6 H4.8 V20 H0 Z M4.8 3.9 V7.9 H9.6 a2 2 0 0 0 0-4 Z';
-const L_M = 'M0 20 V0 H5.2 L7.6 8.4 L10 0 H15.2 V20 H10.9 V8.2 L8.9 14.6 H6.3 L4.3 8.2 V20 Z';
 
 let _logoSeq = 0;
 // Identité officielle : logo VRM angulaire choisi par Julien (piste 02).
@@ -10047,7 +10118,7 @@ function VrmWord({ height = 22, color, style }) {
   return <span role="img" aria-label="VRM" style={{ display: 'inline-block', width: height * 4, height, flexShrink: 0, backgroundColor: color || C.text, mask: 'url(/vrm-wordmark-v3.png) center / contain no-repeat', WebkitMask: 'url(/vrm-wordmark-v3.png) center / contain no-repeat', ...style }}/>;
 }
 
-const LOGO_CANCALE = "data:image/png;base64,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";
+const LOGO_CANCALE = "data:image/png;base64,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";
 
 // Barre de navigation du bas (façon Vinted) : un onglet dédié par catégorie.
 // Défilable horizontalement (plus de 5 entrées).
@@ -10314,6 +10385,8 @@ const PLUS_TABS=[
      ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
      simplement plus dans le menu. */
   {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
+  /* La carte de la communauté (20 oct., migration 018) : opt-in, la ville seule, messages entre revendeurs. */
+  {id:'communaute',   icon:'pin',     emoji:'📍',label:'Communauté',   desc:'La carte des revendeurs VRM, et leur messagerie'},
   /* ⚠️ « Masqués » RETIRÉ du menu le 1er oct. (demande de Julien : « dans les
      paramètres, ça prend de la place pour rien »). L'écran reste monté et
      joignable par Réglages → Comptabilité → « Ventes et achats masqués ». */
@@ -11905,6 +11978,13 @@ function LignePanne({ children }) {
 // non empaquetée » — et proposait de TÉLÉCHARGER un zip sur un téléphone, où il
 // ne sert à rien. La seule ligne vraie (« fais-le sur un ordinateur ») était en
 // tout petit, tout en bas.
+// Les clés d'une RÉPONSE D'ERREUR de Vinted (corps `{code, message,
+// message_code, errors, payload}`) : un échantillon de « dérive de forme » qui
+// n'a QUE celles-là est un refus, pas un renommage (voir État des connexions).
+const CLES_ERREUR_VINTED = new Set(['code', 'message', 'message_code', 'errors', 'payload']);
+function estCorpsErreurVinted(cles) {
+  return Array.isArray(cles) && cles.length > 0 && cles.includes('message_code') && cles.every(k => CLES_ERREUR_VINTED.has(String(k)));
+}
 function useSansSouris() {
   const lire = () => {
     try {
@@ -12560,7 +12640,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
           {[
             ['Catégorie', categorie || 'Leboncoin la propose (il la devine du titre)'],
-            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (dernier vu : ${compteLbc.name})` : ''}`],
+            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (connecté en dernier : ${compteLbc.name}${compteLbc.type === 'pro' ? ', pro' : compteLbc.type === 'particulier' ? ', particulier' : ''})` : ''}`],
             ['Options payantes', 'aucune — VRM publie sans booster'],
           ].map(([k, val], i) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
@@ -12866,6 +12946,10 @@ function EtatActions({ onNav, ordi, sombre }) {
               n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
           {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
           {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+          {/* 20 octobre (Orion iPhone, Safari…) : ce que l'extension dit de CE
+              navigateur — les API qui lui manquent, remplacées ou non. Une
+              phrase, une fois ; rien sur Chrome (tout y est). */}
+          {(() => { const nv = __vmrEtat && __vmrEtat.nav; const p = !extKo && phraseNavigateur(nv); return p ? <div data-etat-nav={(nv.indispo || []).length ? 'indispo' : 'remplace'} style={{ padding: '5px 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>{p}</div> : null; })()}
           {/* Le constat qui vaut aussi d'un téléphone : quand l'extension (où
               qu'elle tourne) a écrit pour la dernière fois. Elle n'écrit que
               quand tu passes sur Vinted : un long silence n'est pas une panne,
@@ -12996,9 +13080,11 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       )}
       {/* 19 octobre : le BON geste selon le navigateur du téléphone (mesuré,
           docs/boutiques-extension.md) — jamais une boutique qui n'existe pas. */}
-      {(mobile === 'samsung' || mobile === 'android') && <p style={{margin:'0 0 10px'}} data-premiers-mobile={mobile}>
+      {(mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo') && <p style={{margin:'0 0 10px'}} data-premiers-mobile={mobile}>
         {mobile === 'samsung'
           ? <><b style={{color:C.text}}>Samsung Internet</b> n’accepte pas cette extension&nbsp;: ses modules sont réservés aux développeurs que Samsung choisit.</>
+          : mobile === 'duckduckgo'
+          ? <><b style={{color:C.text}}>DuckDuckGo</b> n’accepte aucune extension.</>
           : <>{nomNavigateurIci()} sur Android n’accepte aucune extension.</>}{' '}
         {LIENS_BOUTIQUES.firefox
           ? <>Sur ce téléphone, <b style={{color:C.text}}>Firefox pour Android</b> (gratuit) l’accepte&nbsp;: installe Firefox (bouton ci-dessous), ouvre <b style={{color:C.text}}>vrm.center</b> dedans, et l’écran te guidera.</>
@@ -13006,11 +13092,12 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       </p>}
       {mobile === 'firefox-android' && <p style={{margin:'0 0 10px'}} data-premiers-mobile="firefox-android-pas-encore">Firefox pour Android accepte l’extension, mais sa version Firefox n’est pas encore en ligne dans la boutique de Firefox.</p>}
       <p style={{margin:0}}>
-        {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android'
+        {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'
           ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: </>
           : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. </>}
         ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
       </p>
+      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Tu es dans <b style={{color:C.text}}>Orion</b>&nbsp;: il installe l’extension depuis la boutique de Firefox{orion ? <> (bouton ci-dessous) — puis reviens ici, l’écran avance tout seul</> : <>, où elle n’est pas encore en ligne</>}. VRM n’y a pas encore été essayé sur un vrai iPhone&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
     </>
   ) : boutique.lien ? (
@@ -13021,7 +13108,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Installe-la depuis la boutique de {nomNavigateurIci()} (bouton ci-dessous) et clique «&nbsp;Ajouter&nbsp;». Reviens ensuite ici&nbsp;: l’écran avance tout seul.</p>
     </>
-  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung') ? (
+  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion') ? (
     /* Le zip est un paquet Chromium : Firefox et Safari ne l'installent pas.
        Firefox : paquet prêt, mais pas encore publié (`LIENS_BOUTIQUES`) ;
        Safari : aucune version. On dit où ça marche aujourd'hui, sans promesse. */
@@ -13030,7 +13117,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav + '-pas-encore'}>
-        {boutique.nav === 'firefox'
+        {boutique.nav === 'orion'
+          ? <>Orion installe l’extension depuis la boutique de Firefox, où elle n’est pas encore en ligne. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
+          : boutique.nav === 'firefox'
           ? <>La version Firefox de l’extension n’est pas encore en ligne dans la boutique de Firefox. En attendant, ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>
           : <>{nomNavigateurIci()} n’accepte pas cette extension. Ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera sur cet ordinateur — tu y retrouveras exactement cet écran.</>}
       </p>
@@ -13063,13 +13152,13 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
   const bouton = (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
     ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
-    : (!fait.ext && orion && boutique.nav === 'safari' && !(sansSouris && estAndroid()))
+    : (!fait.ext && orion && (boutique.nav === 'safari' || boutique.nav === 'orion') && !(sansSouris && estAndroid()))
     ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>
-    : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android'))
+    : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'))
     ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer Firefox pour Android</a>
     : (!fait.ext && sansSouris)
     ? null   // un zip sur un téléphone est du poids mort, pas un geste
-    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung'))
+    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion'))
     ? null   // le zip est un paquet Chromium : rien à proposer ici
     : !fait.ext
     ? <a href="/VRM-extension.zip" download style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger l’extension</a>
@@ -13195,7 +13284,7 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa) {
   const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (o.price!=null ? Number(o.price)/100 : 0), 0) : null;
   const caEbay = ebayCa != null ? ebayCa : null;
   return [
-    { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' },
+    { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
     { nom:'eBay', ca:caEbay, note:caEbay==null?'total des ventes payées en euros indisponible':'ventes payées' },
     { nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },
@@ -13329,8 +13418,18 @@ function PrixMarche({ data, baseKO }) {
 //    (« Ventes Vinted à jour »), et elle ne s'affiche pas au-dessus de la section
 //    Annonces, où le dressing a sa propre date (`FraicheurAnnonces`) : on y lisait
 //    « ✓ à jour » et, trois lignes plus bas, « annonces lues hier ».
-function FraicheurDonnees({ jours, compte, siAJour = true }) {
+function FraicheurDonnees({ jours, compte, comptes = null, siAJour = true }) {
   if (jours == null) return null;
+  // (20 oct.) Plusieurs comptes en retard : chacun nommé, avec son âge.
+  const liste = Array.isArray(comptes) ? comptes.filter((x) => x && x.login) : [];
+  if (jours > 1 && liste.length > 1) {
+    const noms = liste.map((x, i) => <React.Fragment key={x.login}>{i ? (i === liste.length - 1 ? ' et ' : ', ') : ''}<b>{x.login}</b> ({x.jours} j)</React.Fragment>);
+    return (
+      <div data-fraicheur-comptes={liste.map((x) => x.login + ':' + x.jours).join(',')} style={{fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
+        Les données de {noms} ne sont plus à jour : une de leurs ventes récentes peut manquer, et un colis déjà expédié peut encore apparaître. Repasse sur Vinted connecté sur chacun de ces comptes pour les rafraîchir.
+      </div>
+    );
+  }
   // L'accueil ne dit rien quand tout va bien (« trop de texte », 30 sept.) :
   // seule l'alerte d'une capture ancienne y a sa place.
   if (jours <= 1 && !siAJour) return null;
@@ -13528,7 +13627,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
     </div></ResumePlateforme>
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
         ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
-    <div style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} siAJour={siAJour}/></div>
+    <div style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={siAJour}/></div>
     </>
   );
 }
@@ -13626,7 +13725,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   </div>;
 }
 
-function LigneVenteCompacte({ photo, titre, etat, etatNoeud = null, montant, children, initialOuvert = false, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, etat, etatNoeud = null, montant, children, initialOuvert = false, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -13645,7 +13744,7 @@ function LigneVenteCompacte({ photo, titre, etat, etatNoeud = null, montant, chi
   const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
   return <div {...props} data-ligne-ouverte={ouvert}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
-      <span className="vrm-ledger-photo-empty"><PhotoVente src={photo} size={28} portrait/></span>
+      <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={28} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
       <span className="vrm-ledger-sale-state" title={etat}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
@@ -15911,7 +16010,11 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   }, []);
   React.useEffect(() => {
     let stop = false;
-    fetch('/api/ebay').then(r => r.json()).then(j => { if (!stop) setSt({ ready: !!(j && j.ready), canConsent: !!(j && j.canConsent) }); }).catch(() => { if (!stop) setSt({ ready: false, canConsent: false }); });
+    // (20 oct., audit) TROIS ÉTATS : une route qui ne répond pas (503, coupure,
+    // réponse illisible) n'est PAS « eBay pas configuré ». Avant, tout échec
+    // affichait « Ajoute tes clés eBay dans Vercel » — le mauvais geste, sur un
+    // simple hoquet. Seul un `ready` booléen rendu par la route décide.
+    fetch('/api/ebay').then(r => r.ok ? r.json() : null).then(j => { if (stop) return; setSt(j && typeof j.ready === 'boolean' ? { ready: j.ready, canConsent: !!j.canConsent } : { passu: true }); }).catch(() => { if (!stop) setSt({ passu: true }); });
     lireStatut();
     return () => { stop = true; };
   }, [lireStatut]);
@@ -16044,8 +16147,12 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
       {retour && <div style={{ fontSize: 12.5, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
       {st === null ? (
         <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
+      ) : st.passu ? (
+        <div data-ebay-statut="passu" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+          Je n'ai pas pu vérifier la connexion eBay : le serveur n'a pas répondu. Rien n'est perdu — rouvre cet écran dans un instant.
+        </div>
       ) : !st.ready ? (
-        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
+        <div data-ebay-statut="non-configure" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
           eBay n'est <b>pas encore configuré</b>. Ajoute tes clés eBay dans Vercel (App ID, Dev ID, Cert ID), puis le RuName — la marche à suivre est dans <b>docs/ebay-api.md</b>. Tant que ce n'est pas fait, rien ne part sur eBay.
         </div>
       ) : !st.canConsent ? (
@@ -18986,7 +19093,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
-        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte}/>
+        <FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes}/>
         <Card style={{padding:18}}>
           <div style={{...eti,marginBottom:4}}>Vinted · chiffre d'affaires</div>
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:C.text}}>{p.ca==null?'—':fmt(p.ca)}</div>
@@ -19422,6 +19529,11 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             (l'ombre « -1px » de StatBox compact). */}
         <div className="vrm-display" style={{...sHero,fontSize:28,marginTop:6}}>{fmt(liveStats&&liveStats.caEncaisse!=null?liveStats.caEncaisse:ca)}</div>
         <div style={{...sNote,marginTop:6}}>Ventes finalisées, Vinted seul (tous comptes) · au jour de la vente · Leboncoin et eBay sont dans « Finalisé par plateforme »</div>
+        {liveStats && liveStats.nMasque > 0 && liveStats.caEncaisse != null && (
+          <div data-finalise-masquees={liveStats.nMasque} data-finalise-masquees-eur={Math.round(liveStats.caMasque*100)} style={{...sNote,marginTop:4}}>
+            {liveStats.nMasque>1 ? `Sans tes ${liveStats.nMasque} ventes masquées (${fmt(liveStats.caMasque)}) — elles restent dans ton CA déclaré (Comptabilité).` : `Sans ta vente masquée (${fmt(liveStats.caMasque)}) — elle reste dans ton CA déclaré (Comptabilité).`}
+          </div>
+        )}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginTop:16,borderTop:`1px solid ${C.border}`}}>
           {/* Bénéfice/marge : un tiret tant qu'aucun prix d'achat n'est saisi
               (sinon on afficherait le CA comme « bénéfice », ce qui est faux —
@@ -24345,7 +24457,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                       {/* ⚠️ « maj » est de l'abréviation d'informaticien (§7), et
                           l'heure À LA SECONDE ne sert à rien : on lit cette ligne
                           pour savoir si c'est frais, pas pour horodater. */}
-                      {acc.updated_at ? `lié le ${new Date(acc.updated_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
+                      {/* (20 oct., audit sur données réelles) « lié le » lisait
+                          `updated_at` — la date du dernier RENOUVELLEMENT des
+                          jetons (§4.3 : `updated_at` ment) : ses sept comptes,
+                          liés en juillet et août, se disaient « liés le
+                          20/10/2026 ». La date de liaison est `created_at`. */}
+                      {acc.created_at ? `lié le ${new Date(acc.created_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
                     </div>
                     {(()=>{ const h=acctHealth(acc); return (<>
                       <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} data-etat-source={h.source||''} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
@@ -24525,6 +24642,43 @@ function conflitsDeNumeros(porteurs) {
   return out.sort((a, b) => triNum(a.numero, b.numero));
 }
 // </conflits-numeros-regle>
+// <doublons-reattribuer-regle>
+// ⚠️⚠️ 20 OCTOBRE — DÉCISION DE JULIEN : « pour les numéros qui ont été en
+// double, je veux que l'app fasse elle-même les changements : elle redonne des
+// nouveaux numéros et on n'en parle plus ; par contre elle ne doit plus jamais
+// se tromper — tout à l'heure j'ai failli perdre 100 euros ». Ça remplace, POUR
+// LES DOUBLONS SEULEMENT, la règle « rien ne change un numéro tout seul » (§5).
+// Qui GARDE le numéro (une seule paire), qui en reçoit un NEUF :
+//   · une vente À POSTER le porte ⇒ elle le garde (son bordereau peut déjà être
+//     imprimé avec) ; toutes les annonces en ligne qui le portent changent ;
+//   · sinon, deux annonces en ligne ou plus : garde celle dont le numéro a été
+//     saisi À LA MAIN, puis celle numérotée la PREMIÈRE ; les autres changent ;
+//   · tout autre cas (deux cases du garage, une vente annulée encore là…) n'est
+//     PAS réglé tout seul : on ne devine pas (§5), le bloc rouge reste.
+// Rend [{ id, ancien }] — les annonces à renuméroter. Fonction PURE.
+function doublonsAReattribuer(conflits, fiches) {
+  const out = [];
+  for (const c of (conflits || [])) {
+    const p = c.porteurs || [];
+    const annonces = p.filter((x) => x.type === 'annonce' && fiches && fiches[x.id] && cleNum(fiches[x.id].numero) === cleNum(c.numero));
+    if (!annonces.length) continue;
+    const ventes = p.filter((x) => x.type === 'vente');
+    const autres = p.filter((x) => x.type !== 'annonce' && x.type !== 'vente');
+    if (autres.length) continue;                       // garage / annulée : pas deviné
+    let bouger;
+    if (ventes.length === 1) bouger = annonces;
+    else if (!ventes.length && annonces.length >= 2) {
+      const rang = (x) => { const f = fiches[x.id] || {}; return [f.auto === false || f.manuelAt ? 0 : 1, String(f.numberedAt || '9999'), String(x.id)]; };
+      const tri = [...annonces].sort((a, b) => { const ra = rang(a), rb = rang(b); for (let i = 0; i < 3; i++) { if (ra[i] < rb[i]) return -1; if (ra[i] > rb[i]) return 1; } return 0; });
+      bouger = tri.slice(1);
+    } else continue;
+    for (const x of bouger) out.push({ id: String(x.id), ancien: String(fiches[x.id].numero) });
+  }
+  return out;
+}
+// Une paire qui a reçu un numéro neuf et dont le carton porte encore l'ancien.
+const reattribueAEcrire = (f) => !!(f && f.reattribue && !f.reattribue.ecrit && cleNum(f.numero) === cleNum(f.reattribue.vers));
+// </doublons-reattribuer-regle>
 // Un état de commande qui fait REVENIR la paire : elle n'est pas vendue.
 // ⚠️ Même expression que côté extension (`background.js`) — une notion, une
 //    règle (§11). Deux copies qui divergeraient donneraient deux files.
@@ -27651,6 +27805,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ne trompe pas ; une fausse pastille verte, si). Le « sur quel COMPTE LBC »
   // reste gaté sur la capture de ses propres annonces LBC (lbc_accounts vide).
   const [lbcPosted, setLbcPosted] = useState(() => new Set());
+  // (20 oct.) « Aussi sur Leboncoin » = EN VENTE là-bas. Une paire marquée publiée
+  // dont la vente Leboncoin est PROUVÉE (la même règle que l'écran Leboncoin,
+  // `annoncesLbcVendues` → `doublesVenteLbc`) n'y est plus en vente : la pastille
+  // ne le dit plus (l'alerte « vendue sur Leboncoin, encore sur Vinted » le dit).
+  // Ventes illisibles ⇒ rien n'est retiré (pas su ≠ vendue).
+  const [lbcVentesAnn, setLbcVentesAnn] = useState(null);
+  const [lbcItemsAnn, setLbcItemsAnn] = useState(null);
+  const lbcAussi = React.useMemo(() => {
+    if (!lbcVentesAnn || !lbcPosted.size || !annoncesLbcVendues(lbcVentesAnn).size) return lbcPosted;
+    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const { doublons } = doublesVenteLbc({ ventes: lbcVentesAnn, items: lbcItemsAnn || {}, liens, numeros, enLigne: lbcPosted });
+    const ici = new Set(doublons.flatMap((d) => d.surVinted || []));
+    if (!ici.size) return lbcPosted;
+    return new Set([...lbcPosted].filter((id) => !ici.has(id)));
+  }, [lbcPosted, lbcVentesAnn, lbcItemsAnn, numeros]);
   // (16 oct.) Les N° des paires EN LIGNE sur eBay — par le SKU « VRM-{n°} »
   // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
   // aucune pastille eBay, jamais une fausse.
@@ -27671,6 +27840,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const rows = await r.json();
       const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
+      if (!Array.isArray(ids) || !ids.length) return;
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      if (!vr.ok) return;
+      const vrows = await vr.json();
+      const ventes = (Array.isArray(vrows) && vrows[0] && vrows[0].ventes) || {};
+      setLbcVentesAnn(ventes);
+      if (annoncesLbcVendues(ventes).size) { const it = await lbcAnnoncesSession(); if (it) setLbcItemsAnn(it); }
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
   // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
@@ -28593,11 +28769,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ph = orderPhoto(a);
     return (
       <div style={{display:'flex',alignItems:'center',gap:7,margin:'0 0 8px',padding:'5px 7px',borderRadius:8,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`}}>
-        <div style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-          {ph ? <PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
+        {/* La photo de l'ACHAT (celle du vendeur à qui tu l'as achetée), pas
+            celle de la paire vendue : elle est dite comme telle (20 oct.). */}
+        <div title="Photo de l'achat (prise par le vendeur)" style={{width:30,height:30,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          {ph ? <PhotoVinted src={ph} alt="Photo de l'achat" data-photo-achat="1" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:14}}>🧾</span>}
         </div>
         <div style={{flex:'1 1 90px',minWidth:0}}>
-          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}>{a.title||'Achat relié'}</div>
+          <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}><span style={{color:C.muted,fontWeight:500}}>Achat relié · </span>{a.title||'sans titre'}</div>
           <div style={{fontSize:10,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
             Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')} ${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
           </div>
@@ -30135,6 +30313,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // panne de synchronisation : leur N° a pu être redonné (`PANNE_NUMEROS`).
   const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer].filter((it) => ficheAVerifier(numeros[it.id])),
   [annBase, annAConfirmer, numeros]);
+  // Les paires qui ont reçu un numéro NEUF (doublon réglé) et dont le carton
+  // porte encore l'ancien : dites jusqu'à « C'est écrit » (sinon le bordereau
+  // dit N°90 et le carton N°51 — la mauvaise paire part).
+  const aEcrireCarton = useMemo(() => [...(listings.items || []), ...(listings.aConfirmer || [])].filter((it) => reattribueAEcrire(numeros[it.id])),
+  [listings.items, listings.aConfirmer, numeros]);
   // Le numéro que porte la paire sur eBay, par IDENTITÉ seulement : un brouillon
   // eBay préparé depuis CETTE annonce (`pairId`), et la référence (SKU) de
   // l'annonce eBay qu'il a créée. Jamais un rapprochement par titre (§5).
@@ -30204,6 +30387,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     toast(`« ${it.title} » → N°${prov} · écris-le sur son étiquette`);
     return true;
   };
+  // ── LES DOUBLONS SE RÈGLENT TOUT SEULS (20 octobre, sa décision) ─────────
+  // `doublonsAReattribuer` dit qui change ; ici on donne les numéros NEUFS
+  // (jamais un numéro déjà servi : `prochainLibre` part du plus haut) et on les
+  // brûle. « Pas su » ne change rien : nuage pas chargé, version de la
+  // numérotation pas relue, une liste d'annonces incomplète (un compte pas lu
+  // peut porter la paire qui GARDE le numéro). Une paire n'est renumérotée
+  // qu'UNE fois par ouverture (`DOUBLONS_FAITS`, module : deux écrans montés
+  // ensemble ne lui donneraient pas deux numéros).
+  useEffect(() => {
+    if (!cloudReady || !numerotationPermise()) return;
+    if (!listings.items || listings.loading || listings.incomplet || listings.error) return;
+    if (!sales.items || (Array.isArray(sales.failedUids) && sales.failedUids.length)) return;
+    const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
+    if (!a.length) return;
+    const pris = new Set([...takenNums, ...numsOccupes]), prisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
+    const tous = [...(listings.items || []), ...(listings.aConfirmer || [])];
+    const now = new Date().toISOString(), faits = [];
+    for (const x of a) {
+      const it = tous.find((y) => String(y.id) === x.id); if (!it) continue;
+      DOUBLONS_FAITS.add(x.id + ':' + cleNum(x.ancien));
+      const neuf = prochainLibre(pris, prisK, prefNum);
+      updatePair(it, { numero: neuf, auto: true, numberedAt: now, cartonVerifie: null, reattribue: { de: x.ancien, vers: neuf, at: now } });
+      recordUsed(neuf);
+      faits.push(`N°${x.ancien} → N°${neuf}`);
+    }
+    if (faits.length) toast(`Numéros en double réglés : ${faits.join(' · ')} — écris le nouveau sur le carton`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, conflitsNum, listings.items, listings.loading, listings.incomplet, sales.items, sales.failedUids]);
+  const marquerReattribueEcrit = (it) => {
+    const f = numeros[String(it.id)] || {};
+    if (!f.reattribue) return;
+    updatePair(it, { reattribue: { ...f.reattribue, ecrit: new Date().toISOString() }, cartonVerifie: new Date().toISOString() });
+  };
+  const blocAEcrire = () => aEcrireCarton.length > 0 && (
+    <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux paires : VRM a donné un numéro neuf à l'une d'elles. Barre l'ancien sur son carton et écris le nouveau.</div>
+      {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; return (
+        <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}</span>
+          <button type="button" onClick={() => marquerReattribueEcrit(it)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est écrit</button>
+        </div>); })}
+    </div>);
   const confirmerCarton = async (it) => {
     const f = numeros[it.id] || {};
     const autres = autresPorteurs(it);
@@ -30622,7 +30848,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
     for (const it of arr) {
       if (it.promoted === true) boostees++;
-      if (lbcPosted.has(String(it.id))) aussiLbc++;
+      if (lbcAussi.has(String(it.id))) aussiLbc++;
       const p = it.price!=null ? Number(it.price) : 0;
       if (it.price!=null) val += p;
       if (it.favourites!=null) { favs+=it.favourites; hasFav=true; }
@@ -30641,7 +30867,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, listingDates, lbcPosted]);
+  }, [annBase, numeros, listingDates, lbcAussi]);
   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
   // Même motif que `vrm_colis_aposter` (§11) : l'écran qui a toutes les sources
   // publie, le serveur lit — il ne recalcule jamais `annBase`. ⚠️ On ne publie
@@ -33668,8 +33894,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const e = effEntry(o); const num = e?.numero;
     const baseE = resolvedEntry(o);
     const lst = listings.items || _acctCache.listings?.items || [];
-    const photo = photoVenteVinted(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions) || photoArticle(baseE);
-    const sourcesPhoto = photosVenteVintedCandidates(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions);
+    // UNE liste de sources, la même pour la ligne repliée et le détail : la
+    // photo de la commande, puis l'annonce, la transaction, le coffre, et la
+    // fiche N° de CETTE annonce (par identité `txnItem`). Plus de repli sur
+    // `resolvedEntry` : il peut venir d'un ancien verrou posé par titre.
+    const ficheIdentite = txnItem[tx] != null ? numeros[String(txnItem[tx])] || null : null;
+    const sourcesPhoto = photosVenteVintedCandidates(o, lst, txnItem[tx], photosVentesArchivees, photosVentesTransactions, ficheIdentite);
+    const photo = sourcesPhoto[0] || null;
     const ov = saleOv[tx] || {};
     const hidden = isHidden(o);
     const cell = num ? garageCellOf(garageGrid, num) : null;
@@ -34299,6 +34530,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tab:'cat_bord',prio:limite?0.2:1.5,
             photos:cochesNonPartis.map(x=>orderPhoto(x.o)).filter(ph=>ph && !imgMortes.has(ph)).slice(0,3)});
         }
+        // (20 oct., audit sur données réelles) DEUX PAIRES SOUS UN MÊME N° — le
+        // seul risque irréversible (§5) — n'étaient dites QUE sur Colis. Mesuré
+        // chez Julien : 4 numéros (dont 3 sur une paire à poster), et Ma journée,
+        // l'écran qu'il ouvre le matin, n'en disait rien. La même liste que Colis
+        // (`conflitsNum`, §11), une ligne, le geste là-bas.
+        if(conflitsNum.length){
+          const nb=conflitsNum.length;
+          jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
+            title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
+            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon la mauvaise paire part`,
+            tab:'cat_bord',prio:0.05});
+        }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
         // ⚠️ LE SOUS-TITRE DOIT DIRE CE QU'IL PEUT FAIRE, PAS SEULEMENT COMBIEN.
         // Mesuré le 1er septembre : « Retirer 15 colis — récupère-les avec ton
@@ -34908,6 +35151,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const photo = pre.photo;
             const sourcesPhoto = pre.sourcesPhoto;
             const clePhoto=JSON.stringify([String(o._acc?.vinted_user_id),String(o.transaction_id)]);
+            // La ligne repliée et le détail déplié montrent LA MÊME photo : mêmes
+            // sources, même choix partagé (`cle`), voir `PhotoVenteSources`.
+            const photoSourcesProps={candidats:sourcesPhoto,cle:clePhoto,alt:'',loading:'lazy',decoding:'async',onSourceChargee:url=>photosVentesValides.current.set(clePhoto,url),onBesoinAlternative:()=>{photosVentesValides.current.delete(clePhoto);setPhotosVentesForcees(prev=>{const next=new Set(prev);next.add(clePhoto);return next;});}};
             const baseNum = baseE?.numero || '';
             const baseBuy = baseE && baseE.buyPrice!=null && String(baseE.buyPrice).trim()!=='' ? String(baseE.buyPrice) : '';
             // Les gestes passent par `actionsVentes` : une ligne gardée telle
@@ -34916,11 +35162,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte photo={photo} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources candidats={sourcesPhoto.length?sourcesPhoto:[photo]} alt="" loading="lazy" decoding="async" onSourceChargee={url=>photosVentesValides.current.set(clePhoto,url)} onBesoinAlternative={()=>{photosVentesValides.current.delete(clePhoto);setPhotosVentesForcees(prev=>{const next=new Set(prev);next.add(clePhoto);return next;});}} style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  {photo?<PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                 </div>
                 <div className="vrm-sale-info" style={{flex:'1 1 auto',minWidth:0}}>
                   <div className="vrm-sale-title" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.2,
@@ -36760,6 +37006,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
+          {blocAEcrire()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
@@ -37027,7 +37274,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const {it,price,sugg,why,atFloor} = rp;
                     const num = numeros[it.id]?.numero;
                     const eb = baisseEbayDe(rp);
-                    const surLbcAussi = lbcPosted.has(String(it.id));
+                    const surLbcAussi = lbcAussi.has(String(it.id));
                     return (
                       <div key={it.id} style={{borderTop:`1px solid ${C.warn}22`}}>
                       <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px'}}>
@@ -37252,7 +37499,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const achat = prixAchatDe(e, buyByNum);
             const boost = feesOf(e);
             const marge = (it.price!=null && achat!=null && !isNaN(achat)) ? Math.round(Number(it.price) - achat - boost) : null;
-            const ailleurs = lbcPosted.has(String(it.id));
+            const ailleurs = lbcAussi.has(String(it.id));
             const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
@@ -37640,7 +37887,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
-        <div style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte}/></div>
+        <div style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes}/></div>
         <NoAcc/>
         {/* RÉCAP EN HAUT : combien de COLIS restent à envoyer. On compte ce que
             Vinted attend de toi (moisson de l'extension), pas les emails reçus :
@@ -37925,6 +38172,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ DEUX PAIRES, UN SEUL NUMÉRO = la mauvaise chaussure part. C'est le
             risque le plus coûteux de l'app : une fois le mauvais carton envoyé,
             rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
+        {blocAEcrire()}
         {conflitsNum.length > 0 && (
           <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:10,padding:'12px 14px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
@@ -40272,9 +40520,47 @@ function comptesLbcProuves(ventes, items) {
   }
   return s;
 }
+// 5.195 (20 oct.) : un compte dont l'extension a VU la session dans son navigateur
+// (`sessionAt`, posé seulement sur le compteur de messagerie du compte connecté)
+// est le sien aussi — une identité, comme une vente. La MÊME règle vit dans
+// l'extension (`comptesLbcSession`, §11).
+function comptesLbcSession(accounts) {
+  const s = new Set();
+  for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
+  return s;
+}
+// Le compte Leboncoin connecté en DERNIER dans son navigateur (session vue), sinon
+// rien : « le dernier compte vu » n'est pas « le compte connecté ».
+function compteLbcConnecte(accounts) {
+  const l = Object.values(accounts || {}).filter((a) => a && a.sessionAt);
+  l.sort((a, b) => String(b.sessionAt).localeCompare(String(a.sessionAt)));
+  return l[0] || null;
+}
 function annonceLbcALui(ad, prouves) {
   return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
+
+// <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
+// serveur (§11 ; `audit-lbc-restes.cjs` compare les trois). Une annonce Leboncoin
+// n'est « en vente » que si son état ne la dit pas morte ET qu'aucune vente
+// PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
+// prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
+// vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
+// une liste paginée — seulement sur une vente vue.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+function annoncesLbcVendues(ventes) {
+  const s = new Set();
+  for (const v of Object.values(ventes || {})) {
+    if (!v || v.isSeller !== true || v.itemId == null) continue;
+    if (v.stepStatus === 'cancelled' || /annul|cancel|refund|rembours/i.test((v.parcelStatus || '') + ' ' + (v.stepStatus || '') + ' ' + (v.stepLabel || ''))) continue;
+    s.add(String(v.itemId));
+  }
+  return s;
+}
+function annonceLbcEnVente(ad, vendues) {
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+}
+// </lbc-en-vente-regle>
 
 // Les annonces Leboncoin captées (226 Ko mesurés le 4 octobre) : lues une fois
 // par session au plus pour le centre de notifications. `null` = pas su.
@@ -40435,6 +40721,14 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   // puis revenue — la règle de `conflitsDeNumeros`, §11) ; sinon il ne désigne personne.
   if (porteurs.length > 2 || (porteurs.length === 2 && normTitle(porteurs[0].title || '') !== normTitle(porteurs[1].title || ''))) return null;
   if (porteurs.length === 2 && porteurs.some((f) => ficheAVerifier(f))) return null;
+  // (20 oct., audit sur données réelles) AUCUNE fiche ne porte ce N° : l'annonce
+  // ne désigne personne. Mesuré chez Julien : VRM-48 (publiée le 15, pendant la
+  // panne) — sa paire est devenue la N°53 le 18 et plus aucune fiche ne porte
+  // « 48 » ; l'écran eBay affichait pourtant « N°48 » comme une annonce reliée,
+  // et la comptait hors des « pas reliées ». Une paire revendue sur Vinted n'y
+  // aurait déclenché aucun retrait. ⚠️ Seulement quand les fiches SONT lues : un
+  // appareil neuf, avant l'arrivée du nuage, n'en a aucune (« pas su »).
+  if (!porteurs.length && Object.keys(fiches).length) return null;
   if (porteurs.length === 1) {
     const f = porteurs[0], pub = id ? _depuisEbay.get(id) : undefined;
     const quand = Date.parse(f.manuelAt || f.numberedAt || '');
@@ -40935,7 +41229,7 @@ function MessagesLeboncoin() {
         return (
           <div key={l.id} data-compte-lbc={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{(d.comptes[l.id] || {}).pro ? ' · pro' : ''}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{((d.comptes[l.id] || {}).pro || (d.acc[l.id] || {}).type === 'pro') ? ' · pro' : (d.acc[l.id] || {}).type === 'particulier' ? ' · particulier' : ''}</div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
                 {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu — connecte-toi une fois à ce compte sur leboncoin.fr'}
               </div>
@@ -41089,8 +41383,11 @@ function LeboncoinScreen() {
     const labelsComptes = load('vinted_account_labels', {}) || {};
     const nomCompteDe = (u) => { const a = (vaRows || []).find((x) => String(x.vinted_user_id) === String(u)); return labelsComptes[String(u)] || (a && a.login) || ''; };
     const accRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
-    const lbcAccounts = Object.values(((accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {})).filter(Boolean)
-      .sort((a, b) => String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
+    const accsLbc = (accRows && accRows[0] && accRows[0].data && accRows[0].data.accounts) || {};
+    // Le compte connecté en dernier (session vue) d'abord, puis les autres.
+    const lbcAccounts = Object.values(accsLbc).filter(Boolean)
+      .sort((a, b) => String(b.sessionAt || '').localeCompare(String(a.sessionAt || '')) || String(b.seenAt || '').localeCompare(String(a.seenAt || '')));
+    const lbcConnecte = compteLbcConnecte(accsLbc);
     // Annonces Leboncoin réellement captées (par l'extension). On s'en sert pour
     // reconnaître TOUT SEUL ce qui est déjà en ligne là-bas, via la référence
     // pro (CustomRef) ou le « nXXXX » du titre — même logique que l'extension,
@@ -41110,7 +41407,7 @@ function LeboncoinScreen() {
     const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
     const ventesLbcKO = lbcVentesRows === null;
     const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].data && lbcVentesRows[0].data.ventes) || {};
-    const prouves = comptesLbcProuves(ventesLbc, lbcItems);
+    const prouves = new Set([...comptesLbcProuves(ventesLbc, lbcItems), ...comptesLbcSession(accsLbc)]);
     const numFrom = numDeTitreLbc;
     // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
     //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la
@@ -41121,7 +41418,6 @@ function LeboncoinScreen() {
     // Toutes les clés passent par `cleNum` (« VRM-b125 » = « B125 »), des deux
     // côtés — la même règle que l'extension (`adRefKeys`, §11).
     const adKeys = (ad) => clesAnnonceLbc(ad, liens);
-    const isDead = (ad) => /(supprim|delete|expir|refus|sold|vendu)/i.test(String(ad.status || ''));
     // ⚠️ ET ON NE GARDE QUE CE QU'ON PEUT LUI ATTRIBUER. Mesuré le 13 septembre :
     //    81 annonces rangées par la capture n'étaient pas les siennes (chalets,
     //    gîtes — le flux « découverte » de la page qu'il regardait). Sans ce
@@ -41134,8 +41430,8 @@ function LeboncoinScreen() {
     // Une annonce qu'il a VENDUE sur Leboncoin n'y est plus en vente : elle ne
     // compte ni « en ligne », ni « à retirer », ni « non reliée » — elle a son
     // propre bloc (vendue ici, encore sur Vinted ?).
-    const { vendusLbc } = doublesVenteLbc({ ventes: ventesLbc, items: lbcItems, liens, numeros });
-    const liveAds = lbcAds.filter(ad => !isDead(ad) && aLui(ad) && !vendusLbc.has(String(ad.id)));
+    const vendusLbc = annoncesLbcVendues(ventesLbc);
+    const liveAds = lbcAds.filter(ad => annonceLbcEnVente(ad, vendusLbc) && aLui(ad));
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
     const vKeys = (id, title) => { const e = numeros[id] || {}; const ks = []; if (e.numero) ks.push(cleNum(e.numero)); const m = numFrom(title || e.title); if (m) ks.push(cleNum(m)); return ks; };
@@ -41221,6 +41517,18 @@ function LeboncoinScreen() {
       for (const id in numeros) { const en = numeros[id] || {}; const k2 = cleNum(en.numero); if (k2 && ks.includes(k2)) { etat = etatDe(id); break; } }
       removals.push({ numero: ks[0], title: ad.subject || '', lbc: true, url: ad.url || '', etat });
     }
+    // (20 oct., audit sur données réelles) UNE PAIRE, UNE LIGNE. La même paire
+    // arrivait par les deux sources — marquée « publiée » par VRM ET vue sur
+    // Leboncoin avec sa référence : « 2 vendues sur Vinted — à retirer » pour
+    // UNE paire (N°18, écrite deux fois). L'annonce vue sur Leboncoin l'emporte
+    // (elle porte son lien) ; le N° est l'identité, jamais le titre.
+    {
+      const vuesLbc = new Set(removals.filter((r) => r.lbc).map((r) => cleNum(r.numero)).filter(Boolean));
+      for (let i = removals.length - 1; i >= 0; i--) {
+        const r = removals[i];
+        if (!r.lbc && r.numero !== '?' && vuesLbc.has(cleNum(r.numero))) removals.splice(i, 1);
+      }
+    }
     removals.sort((a, b) => triNum(a.numero, b.numero));
     // ── L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ────────
     // Les paires que Vinted propose encore à la vente (`onlineIds`), et celles que
@@ -41259,8 +41567,10 @@ function LeboncoinScreen() {
       .map(([id, n]) => { const a = adParId.get(String(id)) || {}; return { id, numero: String(n), titre: a.subject || a.title || '', image: (Array.isArray(a.images) && a.images[0]) || '' }; });
     // Répartition des annonces LBC par compte (plusieurs comptes possibles).
     const parCompte = {};
-    for (const ad of liveAds) { const k = String(ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
-    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    // L'annonce porte son compte dans `account` (capture du fond) ou `lbcUser`
+    // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
+    for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
+    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
@@ -41287,7 +41597,7 @@ function LeboncoinScreen() {
   const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
-      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcAccounts && data.lbcAccounts[0]} onClose={() => setFiche(null)} onMarquer={marquer}/>}
+      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
       <div className="vrm-lbc-tete" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
             au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
@@ -41411,7 +41721,7 @@ function LeboncoinScreen() {
             {vendues.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-les de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.</div>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.</div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger))}
               </Card>
             )}
@@ -41756,9 +42066,9 @@ function LeboncoinScreen() {
                   {String(a.name || '?').slice(0, 1).toUpperCase()}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || `#${a.id}`}</span>
-                  <span style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                    {nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
+                  <span data-compte-lbc-nom={a.id} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || 'nom pas encore lu'}{a.type === 'pro' ? ' · pro' : a.type === 'particulier' ? ' · particulier' : ''}</span>
+                  <span data-compte-lbc-annonces={nb} style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
+                    {data.lbcConnecte && String(data.lbcConnecte.id) === String(a.id) ? 'connecté en dernier · ' : ''}{nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
                   </span>
                 </span>
               </div>
@@ -44654,7 +44964,13 @@ function ConnexionsSetting() {
       const recents = Object.keys(rates)
         .filter(k => /^forme_/.test(k))
         .map(k => ({ type: k.slice('forme_'.length), ...(rates[k] || {}) }))
-        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; });
+        .filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; })
+        // 20 oct. : un échantillon dont les clés sont celles d'une RÉPONSE
+        // D'ERREUR de Vinted (`code`, `message`, `message_code`…) n'est pas un
+        // renommage : c'est un refus, jugé à tort comme une conversation par les
+        // extensions < 5.193 (mesuré chez Julien : 250 fausses alertes). On ne
+        // le montre pas comme « un site a changé son format ».
+        .filter(x => !estCorpsErreurVinted(x.cles));
       setDrift(recents);
     } catch (_) { setDerniereExt(null); setDrift(null); }
   })(); }, []);
@@ -45202,7 +45518,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','vinted_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','vinted_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -45644,11 +45960,12 @@ function AppCoeur() {
         const verLocale = versionNumerotation();
         const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
         let ajoutsLocaux = 0;
+        let sansFiches = false; try { sansFiches = sessionStorage.getItem(RECHARGE_SANS_FICHES) === '1'; sessionStorage.removeItem(RECHARGE_SANS_FICHES); } catch (_) {}
         SYNC_KEYS.forEach(k => {
           if (k === 'vinted_accounts') return;
           if (cloud[k] === undefined || cloud[k] === null) return;
           let val = cloud[k];
-          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale) {
+          if (CLES_FUSION_NUMEROS.includes(k) && verNuage === verLocale && !(sansFiches && k === 'vinted_annonce_numeros')) {
             let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
             const f = fusionNumerosAuChargement(k, val, loc);
             val = f.val; ajoutsLocaux += f.ajoute;
@@ -45887,6 +46204,7 @@ function AppCoeur() {
       // confondus (total de tous les comptes). stockValue = Σ des prix d'achat des
       // annonces réellement en ligne. online = nb d'annonces en ligne.
       let caMois=0, caEncaisse=0, enCours=0, ventesMois=0, enAttente=0, online=0, unread=0, stockValue=0, soldTotal=0, ok=false;
+      let nMasque=0, caMasque=0;
       // VENTES DU JOUR : nombre de paires vendues aujourd'hui + leur montant.
       // ⚠️ C'est bien la VENTE (le moment où ça part), pas l'argent viré sur ton
       // compte — les deux sont décalés de plusieurs jours chez Vinted.
@@ -45991,7 +46309,11 @@ function AppCoeur() {
       for(const { a, sold, list, conv, actif } of perAcc){
         if(!actif) continue;
         if(sold.ok){ ok=true; for(const o of sold.items){
-          if(hiddenTx.has(String(o.transaction_id))) continue;
+          // (20 oct., audit) Une vente masquée d'un ✕ sort de ces chiffres — mais
+          // elle RESTE du CA déclaré (décision du 3 octobre). On la compte à part
+          // pour que le « finalisé » le DISE (§5 : un total partiel ne se présente
+          // pas comme complet) : chez Julien, 99 ventes, 2 157,80 €.
+          if(hiddenTx.has(String(o.transaction_id))){ if(classifyOrderStatus(o.status)==='completed'){ nMasque++; caMasque+=(o.price?.amount!=null?Number(o.price.amount):0); } continue; }
           const st=classifyOrderStatus(o.status);
           const amt0=(o.price?.amount!=null?Number(o.price.amount):0);
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
@@ -46091,7 +46413,7 @@ function AppCoeur() {
       //    n'est pas une panne » (§5) sur la fraîcheur. On ne compte que les
       //    comptes ACTIFS, et on NOMME celui qui est en retard : sans son nom,
       //    impossible de savoir sur quel compte repasser (il en a neuf).
-      let dataAgeJours=null, dataAgeCompte='';
+      let dataAgeJours=null, dataAgeCompte='', dataAgeComptes=null;
       try{
         const ecartes=new Set([...(load('vinted_accounts_hidden',[])||[]),...(load('vinted_accounts_blocked',[])||[])].map(String));
         const loginDe=(uid)=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===uid); return a?String(a.login||''):''; };
@@ -46100,10 +46422,17 @@ function AppCoeur() {
         if(rf.ok){ const rows=rf.rows; let vieux=null, qui='';
           for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(vieux==null||t<vieux)){ vieux=t; qui=m[1]; } }
           if(vieux!=null){ dataAgeJours=Math.max(0,Math.round((Date.now()-vieux)/86400000)); dataAgeCompte=loginDe(qui); }
+          // (20 oct., audit) TOUS les comptes en retard, pas le seul plus vieux :
+          // chez Julien jujuf38 (6 j) ET julatace35260 (3 j) — seul le premier
+          // était nommé, et il ne savait pas qu'il fallait repasser sur l'autre
+          // (la règle de la revue 5.165 : chaque compte nommé, avec son âge).
+          const parUid={};
+          for(const row of (Array.isArray(rows)?rows:[])){ const m=/^harvest_([^_]+)_/.exec(row&&row.id||''); if(!m||!uidsVivants.has(m[1])||ecartes.has(m[1])) continue; const t=Date.parse(row.cap||''); if(!isNaN(t)&&(parUid[m[1]]==null||t<parUid[m[1]])) parUid[m[1]]=t; }
+          dataAgeComptes=Object.entries(parUid).map(([u,t])=>({login:loginDe(u)||u,jours:Math.max(0,Math.round((Date.now()-t)/86400000))})).filter(x=>x.jours>1).sort((x,y)=>y.jours-x.jours);
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,
+      setLiveStats({caMois,caEncaisse,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
         annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
@@ -47213,6 +47542,7 @@ function AppCoeur() {
         {tab==='masques' &&<EcranMasques comptes={vintedAccounts} ordi={ordi}/>}
         {tab==='compta'&&platSub==='factures'&&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
+        {tab==='communaute'&&<Suspense fallback={<p style={{padding:20}}>Chargement de la communauté…</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense>}
         {tab==='organisation'&&<Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}

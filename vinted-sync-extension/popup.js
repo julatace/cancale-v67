@@ -61,6 +61,14 @@ async function reparerSiPerime() {
   return 'recharge';
 }
 
+// Navigateur sans API `tabs` utilisable (20 octobre, Orion iPhone : la fenêtre
+// est une feuille) : on ouvre VRM comme une page le ferait. Sur Chrome on
+// n'arrive jamais ici (`chrome.tabs.create` répond).
+function ouvrirSansTabs(url) {
+  try { const w = window.open(url, '_blank'); if (w) return true; } catch (_) {}
+  try { window.location.href = url; return true; } catch (_) {}
+  return false;
+}
 // L'onglet actif (fenêtre de l'icône) : c'est lui qui décide l'onglet de VRM.
 function ongletActif() {
   return new Promise((res) => {
@@ -89,7 +97,7 @@ function ouvrirVRMPourLier(urlActive) {
         if (o) chrome.tabs.update(o.id, { url: cible, active: true }, () => { try { chrome.windows.update(o.windowId, { focused: true }); } catch (_) {} fin(true); });
         else chrome.tabs.create({ url: cible }, () => fin(true));
       });
-    } catch (_) { try { chrome.tabs.create({ url: cible }, () => fin(true)); } catch (_) { fin(false); } }
+    } catch (_) { try { chrome.tabs.create({ url: cible }, () => fin(true)); } catch (_) { fin(ouvrirSansTabs(cible)); } }
   });
 }
 async function lierAvecVRM() {
@@ -214,7 +222,7 @@ function ouvrirVRM() {
         if (t) chrome.tabs.update(t.id, { url: cible, active: true }, () => { try { chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} window.close(); });
         else chrome.tabs.create({ url: cible }, () => window.close());
       });
-    } catch (_) { try { chrome.tabs.create({ url: cible }); } catch (_) {} window.close(); }
+    } catch (_) { try { chrome.tabs.create({ url: cible }); } catch (_) { ouvrirSansTabs(cible); } window.close(); }
   };
   try { chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => aller(tabs && tabs[0] && tabs[0].url)); }
   catch (_) { aller(''); }

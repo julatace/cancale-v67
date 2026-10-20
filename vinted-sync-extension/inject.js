@@ -403,6 +403,32 @@
       } catch (_) {}
     }, false);
   } catch (_) {}
+  // ── LE RELAIS DE LA PAGE (20 octobre, Orion iPhone) ──────────────────────
+  // Un navigateur sans `scripting` (ou sans monde MAIN) ne peut pas injecter
+  // une fonction ici : le fond demande alors UNE requête GET, relayée par
+  // content.js, et on la fait d'ici — exactement ce que la fonction injectée
+  // aurait fait sur Chrome (même page, mêmes cookies). Seulement un chemin
+  // relatif de l'API Vinted, seulement en lecture ; la réponse repart par le
+  // même relais. Sur Chrome personne ne l'appelle.
+  try {
+    window.addEventListener('message', async (e) => {
+      try {
+        if (e.source !== window || !e.data || e.data.__tag !== 'CANCALE_VINTED_REQ') return;
+        const id = String(e.data.id || ''), p = String(e.data.p || '');
+        if (!id || !/^\/(api|web\/api)\//.test(p)) return;
+        const h = {};
+        const src = e.data.h && typeof e.data.h === 'object' ? e.data.h : {};
+        for (const k of Object.keys(src)) if (/^(accept|x-csrf-token)$/i.test(k)) h[k] = String(src[k]);
+        let out = { status: 0, ok: false, json: null };
+        try {
+          const r = await window.fetch(p, { credentials: 'include', headers: h });
+          let json = null; try { json = await r.json(); } catch (_) {}
+          out = { status: r.status, ok: r.ok, json };
+        } catch (_) {}
+        window.postMessage({ __tag: 'CANCALE_VINTED_REP', id, status: out.status, ok: out.ok, json: out.json, origine: location.origin }, location.origin);
+      } catch (_) {}
+    }, false);
+  } catch (_) {}
   const apiGet = async (path) => {
     if (freinVinted) return null;                         // Vinted a freiné : plus rien ne part
     try {

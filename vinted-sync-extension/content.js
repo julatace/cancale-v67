@@ -65,4 +65,79 @@
       chrome.runtime.sendMessage(m);
     } catch (_) { /* le service worker peut etre endormi, on ignore */ }
   }, false);
+
+  // ── NAVIGATEUR SANS API `cookies` / SANS MONDE MAIN (20 octobre, Orion) ──
+  // (1) Les cookies de session : le fond demande s'il en a besoin (`veux`) —
+  //     sur Chrome il répond non et RIEN d'autre ne part. Sinon on lui donne
+  //     les trois cookies que la page voit, à l'ouverture puis à chaque
+  //     changement (toutes les 10 s tant que la page est visible, et au retour
+  //     au premier plan : iOS suspend tout en arrière-plan).
+  // (2) Le relais de la page : une requête GET demandée par le fond part
+  //     d'inject.js (monde MAIN) et sa réponse revient ici.
+  const NOMS = ['access_token_web', 'refresh_token_web', 'anon_id'];
+  const lireCookies = () => {
+    const c = {};
+    try {
+      for (const part of String(document.cookie || '').split(';')) {
+        const i = part.indexOf('='); if (i < 0) continue;
+        const k = part.slice(0, i).trim();
+        if (NOMS.includes(k)) { try { c[k] = decodeURIComponent(part.slice(i + 1).trim()); } catch (_) { c[k] = part.slice(i + 1).trim(); } }
+      }
+    } catch (_) {}
+    return c;
+  };
+  let dernierEnvoi = null;
+  const envoyerCookies = () => {
+    try {
+      const c = lireCookies(); const sig = JSON.stringify(c);
+      if (sig === dernierEnvoi) return;
+      chrome.runtime.sendMessage({ from: 'vrm-cookies', domain: location.hostname, c }, (r) => {
+        void (chrome.runtime && chrome.runtime.lastError);
+        if (r && r.ok) dernierEnvoi = sig;
+      });
+    } catch (_) {}
+  };
+  try {
+    chrome.runtime.sendMessage({ from: 'vrm-cookies', action: 'veux' }, (r) => {
+      void (chrome.runtime && chrome.runtime.lastError);
+      if (!r || !r.veux) return;
+      envoyerCookies();
+      setInterval(() => { if (document.visibilityState !== 'hidden') envoyerCookies(); }, 10000);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { dernierEnvoi = null; envoyerCookies(); } });
+    });
+  } catch (_) {}
+
+  const enAttente = new Map();
+  window.addEventListener('message', (event) => {
+    if (event.source !== window || !event.data || event.data.__tag !== 'CANCALE_VINTED_REP') return;
+    const f = enAttente.get(String(event.data.id || ''));
+    if (f) { enAttente.delete(String(event.data.id)); f(event.data); }
+  }, false);
+  const demanderPage = (req) => new Promise((res) => {
+    const id = String((req && req.id) || '');
+    if (!id || !/(^|\.)vinted\.[a-z.]+$/i.test(location.hostname)) { res(null); return; }
+    const t = setTimeout(() => { enAttente.delete(id); res(null); }, 20000);
+    enAttente.set(id, (d) => { clearTimeout(t); res({ id, status: d.status, ok: d.ok, json: d.json, origine: d.origine }); });
+    try { window.postMessage({ __tag: 'CANCALE_VINTED_REQ', id, p: req.p, h: req.h }, location.origin); } catch (_) { enAttente.delete(id); clearTimeout(t); res(null); }
+  });
+  try {
+    chrome.runtime.onMessage.addListener((m, sender, sendResponse) => {
+      if (!m || m.vrm !== 'fetchPage') return false;
+      demanderPage(m).then(sendResponse, () => sendResponse(null));
+      return true;
+    });
+  } catch (_) {}
+  // La boîte aux lettres (navigateur sans `tabs.sendMessage`) : une demande
+  // posée par le fond dans `chrome.storage.local`, prise par UN onglet Vinted.
+  try {
+    chrome.storage.onChanged.addListener((ch, zone) => {
+      try {
+        if (zone !== 'local' || !ch || !ch.vrmPageReq) return;
+        const req = ch.vrmPageReq.newValue;
+        if (!req || req.vrm !== 'fetchPage' || Date.now() - Number(req.at || 0) > 20000) return;
+        if (document.visibilityState === 'hidden') return;   // l'onglet visible répond
+        demanderPage(req).then((o) => { if (o) chrome.storage.local.set({ vrmPageRep: o }); });
+      } catch (_) {}
+    });
+  } catch (_) {}
 })();

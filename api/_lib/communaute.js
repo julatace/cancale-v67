@@ -1,0 +1,303 @@
+// ── LA CARTE DE LA COMMUNAUTÉ, CÔTÉ SERVEUR (api/compte.js?mode=communaute) ──
+// Migration 018. Toutes les garanties vivent dans la BASE : les fonctions
+// `vrm_communaute_*` prennent l'identité dans le jeton (`auth.uid()`), jamais
+// dans un paramètre ; elles arrondissent la position, ne rendent jamais
+// l'identifiant du compte ni l'email, et ne laissent lire que ses propres
+// conversations. Cette route ne fait que relayer, AVEC LE JETON DE L'APPELANT
+// (jamais la clé de service), et géocode une ville (OpenStreetMap, gratuit) :
+//   GET                                        → { ok, carte, conversations }
+//   POST { action: 'rejoindre', pseudo, ville, pays, lat, lon }
+//   POST { action: 'quitter' }
+//   POST { action: 'ecrire', pid, texte }
+//   POST { action: 'fil', conv }               (marque lus les messages reçus)
+//   POST { action: 'bloquer', conv, oui }
+//   POST { action: 'signaler', conv, raison }
+//   POST { action: 'ville', q } | { action: 'ville', lat, lon }
+//   POST { action: 'discord', discord }        (019 — vide ⇒ retiré)
+//   POST { action: 'classement', periode }     (019 — jour|semaine|mois|annee ; le
+//                                               chiffre est COMPTÉ par la base)
+//   POST { action: 'inscrire', oui }           (019 — opt-in au classement)
+//   POST { action: 'classement', periode, groupe }  (020 — le classement d'UN groupe)
+//   POST { action: 'groupe-creer', nom }       (020 — rend le code du groupe)
+//   POST { action: 'groupe-entrer', code }     (020 — le code d'un accompagnement)
+//   POST { action: 'groupe-quitter', groupe }  (020)
+//   POST { action: 'groupe-code', groupe }     (020 — le créateur change le code)
+// TROIS ÉTATS, JAMAIS DEUX :
+//   · 200 `ok: true`                — lu / fait ;
+//   · 503 `erreur: 'non-installe'`  — la base n'a pas la 018 (PGRST202) : « la
+//     carte n'est pas encore activée sur ta base », jamais une carte vide ;
+//   · 503 `erreur: 'pas-su'`        — la base n'a pas répondu : rien n'est
+//     affirmé (ni « personne », ni « refusé ») ;
+//   · 4xx `erreur: <raison>`        — un refus RÉEL, dit en clair.
+import { jetonDe } from './session.js';
+import { sbCle } from './cle.js';
+import { rpcEquipe } from './equipe.js';
+import { discordConfigure, lirePreuve } from './discord.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+const commeAppelant = (jeton) => ({ apikey: ANON, Authorization: `Bearer ${jeton}` });
+
+export const COMMUNAUTE_NON_INSTALLE = "La carte de la communauté n'est pas encore activée sur ta base.";
+export const COMMUNAUTE_PAS_SU = "Je n'ai pas pu joindre la base — rien n'a changé. Réessaie dans un instant.";
+const RAISONS = {
+  session: 'Connecte-toi à VRM pour faire ça.',
+  abonnement: "Ton abonnement n'est pas actif : la carte de la communauté est fermée pour l'instant.",
+  pseudo: 'Ce pseudo ne va pas : 30 caractères au plus, sans « @ » (jamais ton adresse email).',
+  'pseudo-pris': 'Ce pseudo est déjà pris sur la carte : choisis-en un autre.',
+  ville: 'Choisis une ville.',
+  pays: "Ce pays n'est pas reconnu.",
+  position: 'Je ne retrouve pas cette ville sur la carte. Choisis-en une dans la liste.',
+  texte: 'Un message fait de 1 à 500 caractères.',
+  invisible: 'Mets-toi sur la carte pour écrire aux autres : on n’écrit qu’entre personnes visibles.',
+  introuvable: "Cette personne n'est plus sur la carte.",
+  soi: "C'est toi !",
+  'tu-as-bloque': 'Tu as bloqué cette personne. Débloque-la pour lui écrire.',
+  'plafond-heure': '20 messages par heure au plus — réessaie un peu plus tard.',
+  'plafond-jour': '5 nouvelles conversations par jour au plus — réessaie demain.',
+  'nom-groupe': 'Le nom du groupe fait de 2 à 40 caractères, sans « @ ».',
+  code: 'Ce code ne correspond à aucun groupe. Vérifie-le (8 caractères, lettres et chiffres).',
+  'trop-crees': 'Tu as déjà créé 5 groupes : c’est le maximum.',
+  'trop-groupes': 'Tu es déjà dans 10 groupes : quittes-en un d’abord.',
+  'groupe-plein': 'Ce groupe est complet (200 membres).',
+  'pas-createur': 'Seule la personne qui a créé le groupe peut changer son code.',
+  groupe: 'Tu ne fais pas partie de ce groupe.',
+  discord: 'Ce pseudo Discord ne va pas : 2 à 32 caractères, lettres minuscules, chiffres, « . » ou « _ », sans « @ ».',
+};
+export const CLASSEMENT_NON_INSTALLE = "Le classement n'est pas encore activé sur ta base.";
+export const GROUPES_NON_INSTALLE = "Les groupes ne sont pas encore activés sur ta base.";
+// Un code de groupe : 8 caractères parmi l'alphabet sans I, O, 0, 1 (la forme de la 020).
+export const codeGroupe = (x) => String(x || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+export const CODE_GROUPE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+export const PERIODES_CLASSEMENT = ['jour', 'semaine', 'mois', 'annee'];
+// La forme des pseudos Discord actuels (la même que la contrainte de la 019).
+export const DISCORD_RE = /^[a-z0-9._]{2,32}$/;
+export const discordValide = (d) => DISCORD_RE.test(d) && !d.includes('..');
+
+// Arrondi à 0,05° (≈ 5 km) : le serveur n'envoie jamais plus précis, et la
+// base arrondit encore (elle refuse toute autre valeur).
+export const arrondi = (x) => Math.round(Number(x) * 20) / 20;
+
+// ── LE GÉOCODAGE D'UNE VILLE — trois sources gratuites, sans clé ─────────────
+//   1. la Base Adresse Nationale (api-adresse.data.gouv.fr) : les communes de
+//      France, l'État la sert sans quota pour ce volume ;
+//   2. Photon (komoot, données OpenStreetMap) : le reste du monde ;
+//   3. Nominatim (OpenStreetMap) seulement si les deux autres n'ont rien rendu.
+// Chacune a 4 s ; une source muette ne fait pas échouer les autres. « Aucune
+// source n'a répondu » se dit (ok:false), jamais « aucune ville ».
+const UA = { 'User-Agent': 'VRM/1.0 (https://vrm.center)', 'Accept-Language': 'fr' };
+const enTemps = (f, url) => f(url, { headers: UA, signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+const ville = (nom, pays, region, lat, lon) => {
+  const la = Number(lat), lo = Number(lon);
+  if (!nom || !Number.isFinite(la) || !Number.isFinite(lo)) return null;
+  return { nom: String(nom).slice(0, 80), pays: String(pays || 'FR').toUpperCase().slice(0, 2) || 'FR', region: String(region || '').slice(0, 80), lat: arrondi(la), lon: arrondi(lo) };
+};
+function villeNominatim(j) {
+  const a = (j && j.address) || {};
+  return ville(a.city || a.town || a.village || a.municipality || a.hamlet || (j && j.name), a.country_code, a.state || a.county || a.country, j && j.lat, j && j.lon);
+}
+const villesBan = (j) => (j && Array.isArray(j.features) ? j.features : []).map((f) => {
+  const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+  const region = String(p.context || '').split(',').map((x) => x.trim()).filter(Boolean).slice(1).join(', ');
+  return ville(p.city || p.name, 'FR', region, c[1], c[0]);
+});
+const TYPES_VILLE = new Set(['city', 'town', 'village', 'locality', 'district', 'county']);
+const villesPhoton = (j) => (j && Array.isArray(j.features) ? j.features : []).filter((f) => {
+  const p = f.properties || {};
+  return TYPES_VILLE.has(p.type) || p.osm_value === 'city' || p.osm_value === 'town' || p.osm_value === 'village';
+}).map((f) => {
+  const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+  return ville(p.type === 'city' || p.type === 'town' || p.type === 'village' ? p.name : (p.city || p.name), p.countrycode, p.state || p.country, c[1], c[0]);
+});
+const lireJson = async (f, url) => { try { const r = await enTemps(f, url); if (!r.ok) return null; return await r.json(); } catch (_) { return null; } };
+function sansDoublons(villes) {
+  const vus = new Set();
+  return villes.filter(Boolean).filter((v) => { const k = v.nom.toLowerCase() + '|' + v.pays + '|' + v.lat + '|' + v.lon; if (vus.has(k)) return false; vus.add(k); return true; });
+}
+export async function geocoderVille({ q, lat, lon }, f = fetch) {
+  try {
+    if (q != null && String(q).trim() !== '') {
+      const t = String(q).trim().slice(0, 80);
+      if (t.length < 2) return { ok: true, villes: [] };
+      const e = encodeURIComponent(t);
+      const [ban, photon] = await Promise.all([
+        lireJson(f, `https://api-adresse.data.gouv.fr/search/?q=${e}&type=municipality&autocomplete=1&limit=6`),
+        lireJson(f, `https://photon.komoot.io/api/?q=${e}&limit=8&lang=fr`),
+      ]);
+      let villes = sansDoublons([...villesBan(ban), ...villesPhoton(photon)]);
+      if (!villes.length && ban === null && photon === null) {
+        const j = await lireJson(f, `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&featureType=settlement&q=${e}`);
+        if (!Array.isArray(j)) return { ok: false };
+        villes = sansDoublons(j.map(villeNominatim));
+      }
+      return { ok: true, villes: villes.slice(0, 8) };
+    }
+    const la = Number(lat), lo = Number(lon);
+    if (!Number.isFinite(la) || !Number.isFinite(lo)) return { ok: true, villes: [] };
+    const ban = await lireJson(f, `https://api-adresse.data.gouv.fr/reverse/?lon=${lo}&lat=${la}&type=municipality&limit=1`);
+    let villes = villesBan(ban).filter(Boolean);
+    if (!villes.length) villes = villesPhoton(await lireJson(f, `https://photon.komoot.io/reverse?lon=${lo}&lat=${la}&lang=fr`)).filter(Boolean);
+    if (!villes.length) {
+      const j = await lireJson(f, `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=10&lat=${la}&lon=${lo}`);
+      if (j === null && ban === null) return { ok: false };
+      const v = j && villeNominatim(j); if (v) villes = [v];
+    }
+    return { ok: true, villes: villes.slice(0, 1) };
+  } catch (_) { return { ok: false }; }
+}
+
+const objet = (v) => (v && typeof v === 'object' ? v : null);
+
+export async function routeCommunaute(req, res, { utilisateur, corps }) {
+  const jeton = jetonDe(req);
+  const dire = (code, c) => res.status(code).json(c);
+  const nonInstalle = () => dire(503, { ok: false, erreur: 'non-installe', message: COMMUNAUTE_NON_INSTALLE });
+  const pasSu = () => dire(503, { ok: false, erreur: 'pas-su', message: COMMUNAUTE_PAS_SU });
+  const refus = (raison, code = 400) => dire(raison === 'session' ? 401 : raison === 'abonnement' ? 403 : code, { ok: false, erreur: raison, message: RAISONS[raison] || `La base a refusé (${raison}).` });
+  if (!utilisateur || !jeton) return refus('session');
+  const qui = commeAppelant(jeton);
+
+  if (req.method === 'GET') {
+    const [c, l] = await Promise.all([rpcEquipe('vrm_communaute_carte', {}, qui), rpcEquipe('vrm_communaute_conversations', {}, qui)]);
+    if (c.etat === 'absent' || l.etat === 'absent') return nonInstalle();
+    if (c.etat !== 'ok' || l.etat !== 'ok') return pasSu();
+    const carte = objet(c.data);
+    if (!carte) return refus('session');
+    if (carte.acces === false) return refus('abonnement');
+    if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
+    const c2 = { moi: objet(carte.moi), profils: carte.profils };
+    if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
+    return dire(200, { ok: true, carte: c2, conversations: l.data, discordConnexion: discordConfigure() });
+  }
+
+  const action = String((corps && corps.action) || '');
+  if (action === 'ville') {
+    const g = await geocoderVille({ q: corps.q, lat: corps.lat, lon: corps.lon });
+    if (!g.ok) return dire(503, { ok: false, erreur: 'geocodage', message: "Je n'ai pas pu chercher la ville (le service de carte ne répond pas). Réessaie dans un instant." });
+    return dire(200, { ok: true, villes: g.villes });
+  }
+  const conv = String((corps && corps.conv) || '');
+  const appel = async (nom, args, forme) => {
+    const r = await rpcEquipe(nom, args, qui);
+    if (r.etat === 'absent') { nonInstalle(); return undefined; }
+    if (r.etat !== 'ok' || !forme(r.data)) { pasSu(); return undefined; }
+    return r.data;
+  };
+  if (action === 'rejoindre') {
+    const lat = Number(corps.lat), lon = Number(corps.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return refus('position');
+    const d = await appel('vrm_communaute_rejoindre', { p_pseudo: String(corps.pseudo || '').slice(0, 60), p_ville: String(corps.ville || '').slice(0, 120),
+      p_pays: String(corps.pays || 'FR').slice(0, 4), p_lat: arrondi(lat), p_lon: arrondi(lon) }, objet);
+    if (d === undefined) return;
+    return d.ok === true ? dire(200, { ok: true, pid: d.pid, pseudo: d.pseudo || null }) : refus(String(d.raison || 'inconnue'), d.raison === 'pseudo-pris' ? 409 : 400);
+  }
+  if (action === 'quitter') {
+    const d = await appel('vrm_communaute_quitter', {}, (x) => typeof x === 'boolean');
+    if (d === undefined) return;
+    return dire(200, { ok: true, retire: d });
+  }
+  if (action === 'ecrire') {
+    const pid = String(corps.pid || '');
+    if (!UUID_RE.test(pid)) return refus('introuvable');
+    const texte = String(corps.texte || '');
+    if (!texte.trim() || texte.length > 500) return refus('texte');
+    const d = await appel('vrm_communaute_ecrire', { p_pid: pid, p_texte: texte }, objet);
+    if (d === undefined) return;
+    return d.ok === true ? dire(200, { ok: true, conv: d.conv }) : refus(String(d.raison || 'inconnue'), 409);
+  }
+  if (action === 'fil' || action === 'bloquer' || action === 'signaler') {
+    if (!UUID_RE.test(conv)) return dire(404, { ok: false, erreur: 'conv', message: "Cette conversation n'existe pas." });
+    if (action === 'fil') {
+      const r = await rpcEquipe('vrm_communaute_fil', { p_conv: conv }, qui);
+      if (r.etat === 'absent') return nonInstalle();
+      if (r.etat !== 'ok') return pasSu();
+      if (r.data === null) return dire(404, { ok: false, erreur: 'conv', message: "Cette conversation n'existe pas." });
+      if (!objet(r.data) || !Array.isArray(r.data.messages)) return pasSu();
+      return dire(200, { ok: true, fil: r.data });
+    }
+    const d = action === 'bloquer'
+      ? await appel('vrm_communaute_bloquer', { p_conv: conv, p_oui: corps.oui !== false }, (x) => typeof x === 'boolean')
+      : await appel('vrm_communaute_signaler', { p_conv: conv, p_raison: String(corps.raison || '').slice(0, 300) }, (x) => typeof x === 'boolean');
+    if (d === undefined) return;
+    return d ? dire(200, { ok: true }) : dire(409, { ok: false, erreur: 'refuse', message: action === 'signaler' ? "Je n'ai pas pu ranger ton signalement (20 par jour au plus)." : "Rien n'a changé." });
+  }
+  if (action === 'discord') {
+    const d = String((corps && corps.discord) || '').trim().toLowerCase();
+    if (d && !discordValide(d)) return refus('discord');
+    const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
+  }
+  if (action === 'discord-verifie') {
+    // Le pseudo vient de Discord (OAuth) : la preuve signée le lie à CE compte VRM.
+    const d = String((corps && corps.discord) || '').trim().toLowerCase();
+    if (!discordValide(d) || !lirePreuve(corps && corps.preuve, utilisateur.id, d))
+      return dire(400, { ok: false, erreur: 'preuve', message: 'Ce lien Discord a expiré ou ne vient pas de toi : reconnecte-toi avec Discord.' });
+    const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
+  }
+  if (action === 'inscrire') {
+    const r = await rpcEquipe('vrm_communaute_classement_inscrire', { p_oui: corps.oui === true }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE });
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    return r.data.ok === true ? dire(200, { ok: true, classement: r.data.classement === true }) : refus(String(r.data.raison || 'inconnue'));
+  }
+  if (action === 'classement') {
+    const periode = String((corps && corps.periode) || '');
+    if (!PERIODES_CLASSEMENT.includes(periode)) return dire(400, { ok: false, erreur: 'periode', message: 'Période inconnue.' });
+    const groupe = corps && corps.groupe ? String(corps.groupe) : '';
+    if (groupe && !UUID_RE.test(groupe)) return refus('groupe', 404);
+    // Seule la PÉRIODE (et le groupe) part : aucun chiffre n'est jamais transmis à la base.
+    const r = groupe
+      ? await rpcEquipe('vrm_communaute_classement_groupe', { p_periode: periode, p_groupe: groupe }, qui)
+      : await rpcEquipe('vrm_communaute_classement', { p_periode: periode }, qui);
+    if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: groupe ? GROUPES_NON_INSTALLE : CLASSEMENT_NON_INSTALLE });
+    if (r.etat !== 'ok') return pasSu();
+    const c = objet(r.data);
+    if (!c) return refus('session');
+    if (c.acces === false) return refus('abonnement');
+    if (c.erreur === 'groupe') return refus('groupe', 404);
+    if (!Array.isArray(c.lignes) || !Number.isFinite(Number(c.n))) return pasSu();
+    return dire(200, { ok: true, classement: { periode: c.periode, debut: c.debut, fin: c.fin, n: Number(c.n), inscrit: c.inscrit === true,
+      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes, groupe: c.groupe || null } });
+  }
+  if (action.startsWith('groupe-')) {
+    const nonInst = () => dire(503, { ok: false, erreur: 'non-installe', message: GROUPES_NON_INSTALLE });
+    let nom, args;
+    if (action === 'groupe-creer') {
+      const n = String((corps && corps.nom) || '').trim();
+      if (n.length < 2 || n.length > 40 || /[@<>]/.test(n)) return refus('nom-groupe');
+      nom = 'vrm_communaute_groupe_creer'; args = { p_nom: n };
+    } else if (action === 'groupe-entrer') {
+      const c = codeGroupe(corps && corps.code);
+      if (!CODE_GROUPE_RE.test(c)) return refus('code');
+      nom = 'vrm_communaute_groupe_rejoindre'; args = { p_code: c };
+    } else if (action === 'groupe-quitter' || action === 'groupe-code') {
+      const g = String((corps && corps.groupe) || '');
+      if (!UUID_RE.test(g)) return refus('groupe', 404);
+      nom = action === 'groupe-quitter' ? 'vrm_communaute_groupe_quitter' : 'vrm_communaute_groupe_code'; args = { p_groupe: g };
+    } else return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
+    const r = await rpcEquipe(nom, args, qui);
+    if (r.etat === 'absent') return nonInst();
+    if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    if (r.data.ok !== true) return refus(String(r.data.raison || 'inconnue'), 409);
+    const { ok: _ok, ...reste } = r.data;
+    return dire(200, { ok: true, ...reste });
+  }
+  return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
+}
+
+// « Fermer mon compte » (clé de service) : nombre effacé, 0 si la base n'a pas
+// la 018, `null` si la base n'a pas répondu.
+export async function effacerCommunaute(owner, SERVICE) {
+  if (!UUID_RE.test(String(owner || ''))) return null;
+  if (!SERVICE) return null;
+  const r = await rpcEquipe('vrm_communaute_effacer', { p_owner: owner }, sbCle(SERVICE));
+  if (r.etat === 'absent') return 0;
+  if (r.etat !== 'ok') return null;
+  const n = Number(r.data);
+  return Number.isFinite(n) ? n : null;
+}

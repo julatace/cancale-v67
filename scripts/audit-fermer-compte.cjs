@@ -41,6 +41,7 @@ const reset = () => {
     // Le mode équipe (migration 016) : A est vendeur d'une équipe ET membre de
     // celle de B. `null` = la base n'a pas la 016 (fonction absente).
     equipe: [{ id: 'e1', vendeur: A, membre: '33333333-3333-4333-8333-333333333333' }, { id: 'e2', vendeur: B, membre: A }, { id: 'e3', vendeur: B, membre: null }],
+    communaute: [{ owner: A }, { owner: B }],
     subs: { sub_A: { id: 'sub_A', customer: 'cus_A', status: 'active' }, sub_B: { id: 'sub_B', customer: 'cus_B', status: 'active' } },
   };
   deletes = []; appelsStripe = []; pannes = new Set(); proprioRpc = null;
@@ -90,6 +91,17 @@ global.fetch = async (url, opts = {}) => {
     const avant = base.equipe.length;
     base.equipe = base.equipe.filter((x) => x.vendeur !== o && x.membre !== o);
     return rep(avant - base.equipe.length);
+  }
+  if (u.includes('/rest/v1/rpc/vrm_communaute_effacer')) {
+    // Exécutable par la clé de service SEULE (018).
+    if (String(h.apikey || '') !== 'sb_secret_banc' || h.Authorization) return rep({ message: 'permission denied' }, 401);
+    if (base.communaute === null) return rep({ code: 'PGRST202', message: 'Could not find the function' }, 404);
+    if (pannes.has('communaute')) return rep('<html>522</html>', 522);
+    const o = JSON.parse(opts.body || '{}').p_owner;
+    deletes.push('communaute:' + o);
+    const avant = base.communaute.length;
+    base.communaute = base.communaute.filter((x) => x.owner !== o);
+    return rep(avant - base.communaute.length);
   }
   const mr = /\/rest\/v1\/(app_data|vinted_accounts|detourage_usage)\?(.*)$/.exec(u);
   if (mr && m === 'DELETE') {
@@ -175,7 +187,7 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     dit(intactB(), 'l’autre vendeur est INTACT (lignes, comptes Vinted, compteurs, photos, compte, abonnement)');
     const rest = deletes.filter((x) => x.includes('/rest/v1/'));
     dit(rest.length === 3 && rest.every((x) => new RegExp(`/rest/v1/(app_data|vinted_accounts|detourage_usage)\\?owner=eq\\.${A}$`).test(x)), 'chaque suppression porte owner=eq.<lui> et RIEN d’autre', rest.map((x) => x.split('/rest/v1/')[1]).join(' · '));
-    const ordre = deletes.map((x) => x.includes('admin/users') ? 'auth' : x.startsWith('stockage') ? 'photos' : x.startsWith('equipe') ? 'equipe' : x.split('/rest/v1/')[1].split('?')[0]);
+    const ordre = deletes.map((x) => x.includes('admin/users') ? 'auth' : x.startsWith('stockage') ? 'photos' : x.startsWith('equipe') ? 'equipe' : x.startsWith('communaute') ? 'communaute' : x.split('/rest/v1/')[1].split('?')[0]);
     dit(ordre[ordre.length - 1] === 'auth' && ordre.indexOf('app_data') < ordre.indexOf('auth'), 'ordre : données, puis comptes, puis photos, puis le compte de connexion', ordre.join(' → '));
     const res = appelsStripe.find((x) => x.m === 'POST');
     dit(!!res && /cancel_at_period_end=true/.test(res.corps) && base.subs.sub_A.cancel_at_period_end, 'l’abonnement est résilié à la fin de la période payée (aucun nouveau prélèvement)');
@@ -236,6 +248,24 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     const r = await fermer('aa.bb.A', { confirmation: 'vendeuse.a@exemple.test' });
     const c = r.corps || {};
     dit(c.ok === false && r.code >= 500 && base.utilisateurs.has(A) && /équipe/.test(c.message || ''), 'équipe illisible : fermeture INCOMPLÈTE, dite, compte de connexion gardé', c.message);
+  });
+
+  console.log('\n── Sa présence sur la carte de la communauté (migration 018) part avec lui');
+  await essaie('communauté effacée', async () => {
+    reset();
+    const r = await fermer('aa.bb.A', { confirmation: 'vendeuse.a@exemple.test' });
+    dit(r.code === 200 && deletes.includes('communaute:' + A) && base.communaute.length === 1 && base.communaute[0].owner === B, 'vrm_communaute_effacer est appelée pour LUI (clé de service), les autres restent', JSON.stringify(base.communaute));
+  });
+  await essaie('base sans la 018', async () => {
+    reset(); base.communaute = null;
+    const r = await fermer('aa.bb.A', { confirmation: 'vendeuse.a@exemple.test' });
+    dit(r.code === 200 && !base.utilisateurs.has(A), 'base sans la 018 : rien à effacer, la fermeture aboutit', `HTTP ${r.code}`);
+  });
+  await essaie('communauté illisible', async () => {
+    reset(); pannes.add('communaute');
+    const r = await fermer('aa.bb.A', { confirmation: 'vendeuse.a@exemple.test' });
+    const c = r.corps || {};
+    dit(c.ok === false && r.code >= 500 && base.utilisateurs.has(A) && /carte de la communauté/.test(c.message || ''), 'communauté illisible : fermeture INCOMPLÈTE, dite, compte de connexion gardé', c.message);
   });
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
