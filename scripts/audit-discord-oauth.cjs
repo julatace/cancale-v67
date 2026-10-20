@@ -59,6 +59,15 @@ const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-2
   dit(/discord-erreur=ancien/.test(r6.h.location), 'un ancien compte « nom#1234 » : pas de pseudo inventé, c’est dit');
   const r7 = await retour({ error: 'access_denied', state }, nonce);
   dit(/discord-erreur=annule/.test(r7.h.location), 'refusé chez Discord : « annulé », rien n’a changé');
+  // 1 bis. Lancé depuis Paramètres → Mon compte : le retour y revient (20 oct.).
+  const rc = res(); await d.debutDiscord({}, rc, { id: A }, { ou: 'compte' });
+  const uc = new URL(rc.corps.url); const stc = uc.searchParams.get('state');
+  const noncec = (/vrm_discord_etat=([0-9a-f]{32})/.exec(String(rc.h['set-cookie'] || '')) || [])[1];
+  const rc2 = await retour({ code: 'abcdefghij12', state: stc }, noncec);
+  dit(/^\/\?tab=settings&vue=compte#discord=julien\.vrm&preuve=[^&]+&ou=compte$/.test(String(rc2.h.location)), 'lancé depuis Mon compte : le retour revient à Paramètres → Mon compte', rc2.h.location);
+  const rc3 = await retour({ code: 'abcdefghij12', state: String(stc).replace('.c.', '.') }, noncec);
+  dit(/discord-erreur=lien/.test(String(rc3.h.location)), 'la destination fait partie de la signature (la retirer : refusé)', rc3.h.location);
+  dit(/^\/\?tab=communaute#/.test(loc), 'sans destination : le retour revient à la carte, comme avant');
   // 2. La preuve : liée au compte VRM et au pseudo.
   const preuve = h.get('preuve');
   const lire = d.lirePreuve;

@@ -27,6 +27,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
+import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -42399,6 +42400,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     { id:'profil', titre:null, items:[
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
     ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
+    // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
+    AUTH.user && { id:'discord', titre:'Discord', items:[
+      { id:'discord', type:'el', el:<DiscordCompte key="discord"/> },
+    ], pied:'Facultatif. VRM ne lit que ton pseudo Discord (jamais ton email, tes serveurs ni tes messages). Il est proposé quand tu apparais sur la carte de la communauté.' },
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
     ]},
@@ -43522,6 +43527,87 @@ function ColisEquipe({ vendeur, de, onPropre }) {
 }
 
 // ── RÉGLAGES → MON COMPTE → ÉQUIPE ─────────────────────────────────────────
+// ── DISCORD RELIÉ AU COMPTE (20 oct.) ────────────────────────────────────────
+// Julien : « connecter mon compte Discord à mon compte qui est déjà connecté ».
+// Sans être sur la carte : le pseudo VÉRIFIÉ (OAuth, preuve signée) est rangé
+// par la route dans `app_data.vrm_discord` (api/_lib/communaute.js). Le retour
+// de Discord revient ICI (`?tab=settings&vue=compte`, `ou=compte`).
+// Trois états : `undefined` lecture · `null` pas su · `{discord, connexion}`.
+function DiscordCompte() {
+  const [lu, setLu] = React.useState(undefined);
+  const [occupe, setOccupe] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const appel = React.useCallback(async (corps) => {
+    try {
+      const r = await fetch('/api/compte?mode=communaute', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+      const j = await r.json().catch(() => null);
+      return j && typeof j === 'object' ? j : { ok: false };
+    } catch (_) { return { ok: false }; }
+  }, []);
+  const relire = React.useCallback(async () => {
+    const j = await appel({ action: 'discord-compte' });
+    setLu(j.ok ? { discord: typeof j.discord === 'string' ? j.discord : '', connexion: j.discordConnexion === true } : null);
+  }, [appel]);
+  React.useEffect(() => {
+    (async () => {
+      // Le retour de Discord, mis de côté par main.jsx (seulement s'il vient d'ICI).
+      let brut = '';
+      try { brut = sessionStorage.getItem('vrm_discord_retour') || ''; } catch (_) {}
+      const h = new URLSearchParams(brut);
+      if (brut && h.get('ou') === 'compte') {
+        try { sessionStorage.removeItem('vrm_discord_retour'); } catch (_) {}
+        const err = h.get('discord-erreur'), d = h.get('discord'), preuve = h.get('preuve');
+        if (err) setMsg(DISCORD_ERREURS[err] || DISCORD_ERREURS.discord);
+        else if (d) {
+          setOccupe(true);
+          const r = await appel({ action: 'discord-compte-verifie', discord: d, preuve });
+          setOccupe(false);
+          setMsg(r.ok ? `Ton compte Discord « ${r.discord} » est relié à ton compte VRM.` : (r.message || DISCORD_ERREURS.discord));
+        }
+      }
+      relire();
+    })();
+  }, [appel, relire]);
+  const connecter = async () => {
+    setOccupe(true); setMsg('');
+    try {
+      const r = await fetch('/api/compte?mode=discord-debut', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ ou: 'compte' }) });
+      const j = await r.json().catch(() => null);
+      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { window.location.href = j.url; return; }
+      setMsg((j && j.message) || DISCORD_ERREURS.discord);
+    } catch (_) { setMsg(DISCORD_ERREURS.discord); }
+    setOccupe(false);
+  };
+  const retirer = async () => {
+    if (!(await askConfirm({ title: 'Retirer ton Discord ?', desc: 'Il n’est plus relié à ton compte VRM (ni affiché sur la carte, s’il y était).', ok: 'Retirer', cancel: 'Annuler', danger: true }))) return;
+    setOccupe(true); setMsg('');
+    const r = await appel({ action: 'discord-compte-retirer' });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || "Je n'ai pas pu joindre la base — rien n'a changé. Réessaie dans un instant."); return; }
+    setMsg('Ton Discord est retiré de ton compte.');
+    relire();
+  };
+  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
+  const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45 }}>{msg}</div>;
+  if (lu === undefined) return <div data-discord-compte="chargement" style={{ fontSize: 13, color: C.muted, padding: '4px 0' }}>Lecture de ton Discord…{note}</div>;
+  if (lu === null) return (
+    <div data-discord-compte="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5, padding: '4px 0' }}>
+      Je n'ai pas pu lire ton Discord — la base n'a pas répondu. <button type="button" onClick={relire} style={{ ...bouton(false), marginLeft: 6 }}>Réessayer</button>{note}
+    </div>
+  );
+  return (
+    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 14, color: C.text, padding: '4px 0' }}>
+      <div style={{ marginBottom: 8 }}>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : 'Aucun compte Discord relié.'}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} style={bouton(true)}>{occupe ? 'Un instant…' : lu.discord ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>}
+        {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} style={bouton(false)}>Retirer</button>}
+      </div>
+      {!lu.connexion && !lu.discord && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>{DISCORD_ERREURS['non-configure']}</div>}
+      {note}
+    </div>
+  );
+}
+
 function EquipeSetting() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const [lu, setLu] = React.useState(undefined);

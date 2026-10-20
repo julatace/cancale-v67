@@ -22,6 +22,12 @@
 //   POST { action: 'groupe-entrer', code }     (020 — le code d'un accompagnement)
 //   POST { action: 'groupe-quitter', groupe }  (020)
 //   POST { action: 'groupe-code', groupe }     (020 — le créateur change le code)
+//   POST { action: 'discord-compte' }          (20 oct. — le Discord relié au COMPTE,
+//                                               sans être sur la carte : app_data
+//                                               `vrm_discord`, lu et écrit avec la
+//                                               session de l'appelant, RLS)
+//   POST { action: 'discord-compte-verifie', discord, preuve }
+//   POST { action: 'discord-compte-retirer' }
 // TROIS ÉTATS, JAMAIS DEUX :
 //   · 200 `ok: true`                — lu / fait ;
 //   · 503 `erreur: 'non-installe'`  — la base n'a pas la 018 (PGRST202) : « la
@@ -146,6 +152,43 @@ export async function geocoderVille({ q, lat, lon }, f = fetch) {
   } catch (_) { return { ok: false }; }
 }
 
+// ── LE DISCORD DU COMPTE (20 oct.) ───────────────────────────────────────────
+// « Connecter mon compte Discord à mon compte déjà connecté » : sans présence
+// sur la carte, `vrm_communaute_discord` (019) refuse (« invisible »). Le pseudo
+// VÉRIFIÉ vit donc dans une ligne `app_data` propre au compte (`vrm_discord`),
+// écrite par CETTE route avec le jeton de l'appelant (RLS : owner = lui) et
+// seulement après la preuve signée. ⚠️ RLS laisse aussi le navigateur écrire sa
+// propre ligne : la confiance est celle de la saisie à la main de la carte, qui
+// est permise — la ligne ne sert qu'à lui (Mon compte, proposition sur la carte).
+// Aucune migration. Trois états : objet lu · `null` (aucune) · `undefined` pas su.
+export const DISCORD_COMPTE_ID = 'vrm_discord';
+const SB_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+async function lireDiscordCompte(owner, qui) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&select=discord:data->>discord,at:data->>at`, { headers: qui });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return undefined;
+    const d = rows[0] && String(rows[0].discord || '');
+    return d && discordValide(d) ? { discord: d, at: rows[0].at || null } : null;
+  } catch (_) { return undefined; }
+}
+async function rangerDiscordCompte(owner, qui, d) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...qui, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner, id: DISCORD_COMPTE_ID, data: { v: 1, discord: d, verifie: true, at: new Date().toISOString() } }]),
+    });
+    return r.ok;
+  } catch (_) { return false; }
+}
+async function effacerDiscordCompte(owner, qui) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}`, { method: 'DELETE', headers: { ...qui, Prefer: 'return=minimal' } });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
 const objet = (v) => (v && typeof v === 'object' ? v : null);
 
 export async function routeCommunaute(req, res, { utilisateur, corps }) {
@@ -229,6 +272,38 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
     return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
   }
+  if (action === 'discord-compte') {
+    const lu = await lireDiscordCompte(utilisateur.id, qui);
+    if (lu === undefined) return pasSu();
+    return dire(200, { ok: true, discord: lu ? lu.discord : null, depuis: lu ? lu.at : null, discordConnexion: discordConfigure() });
+  }
+  if (action === 'discord-compte-verifie') {
+    // Même preuve que la carte : le pseudo lu chez Discord, lié à CE compte VRM.
+    const d = String((corps && corps.discord) || '').trim().toLowerCase();
+    if (!discordValide(d) || !lirePreuve(corps && corps.preuve, utilisateur.id, d))
+      return dire(400, { ok: false, erreur: 'preuve', message: 'Ce lien Discord a expiré ou ne vient pas de toi : reconnecte-toi avec Discord.' });
+    if (!(await rangerDiscordCompte(utilisateur.id, qui, d))) return pasSu();
+    // Déjà sur la carte ? On y met aussi le pseudo (la 019 refuse sinon : « invisible », sans effet).
+    const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
+    const carte = r.etat === 'ok' && objet(r.data) && r.data.ok === true;
+    return dire(200, { ok: true, discord: d, carte });
+  }
+  if (action === 'discord-compte-retirer') {
+    const lu = await lireDiscordCompte(utilisateur.id, qui);
+    if (lu === undefined) return pasSu();
+    if (!(await effacerDiscordCompte(utilisateur.id, qui))) return pasSu();
+    // Sur la carte, on ne retire le pseudo que s'il est CELUI du compte (un pseudo tapé à la main reste).
+    let carte = false;
+    if (lu) {
+      const c = await rpcEquipe('vrm_communaute_carte', {}, qui);
+      const moi = c.etat === 'ok' && objet(c.data) && objet(c.data.moi);
+      if (moi && moi.discord === lu.discord) {
+        const r = await rpcEquipe('vrm_communaute_discord', { p_discord: '' }, qui);
+        carte = r.etat === 'ok' && objet(r.data) && r.data.ok === true;
+      }
+    }
+    return dire(200, { ok: true, discord: null, carte });
+  }
   if (action === 'discord-verifie') {
     // Le pseudo vient de Discord (OAuth) : la preuve signée le lie à CE compte VRM.
     const d = String((corps && corps.discord) || '').trim().toLowerCase();
@@ -237,6 +312,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
     if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
     if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+    if (r.data.ok === true) await rangerDiscordCompte(utilisateur.id, qui, d);   // relié aussi au compte (Mon compte)
     return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
   }
   if (action === 'inscrire') {

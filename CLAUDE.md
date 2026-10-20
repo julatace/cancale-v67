@@ -4998,6 +4998,34 @@ colle d'un bloc, et l'outil de la session peut l'appliquer.
   chez Discord, retour rangé, preuve d'un autre compte refusée, pas réglé ⇒ pas de
   bouton). Non mesuré : le vrai Discord (bloqué d'ici).
 
+### Discord relié au COMPTE, depuis Mon compte, sans être sur la carte (20 octobre)
+Julien : « connecter mon compte Discord à mon compte qui est déjà connecté ». Le
+bouton n'existait que sur la présence de la carte, et `vrm_communaute_discord`
+(019) refuse sans présence (« invisible »). **Aucune migration** :
+- Le pseudo VÉRIFIÉ vit dans `app_data.vrm_discord` (`{v, discord, verifie, at}`),
+  écrit par la route (`api/_lib/communaute.js`, actions `discord-compte` ·
+  `discord-compte-verifie` · `discord-compte-retirer`) avec le JETON de l'appelant
+  (RLS : owner = lui), seulement après la preuve signée (`lirePreuve`). ⚠️ RLS laisse
+  aussi le navigateur écrire sa propre ligne : même confiance que la saisie à la main
+  de la carte (permise) — la ligne ne sert qu'à lui. « Fermer mon compte » l'efface
+  (lignes `app_data` du vendeur).
+- Paramètres → Mon compte → **Discord** (`DiscordCompte`, trois états) : « Se
+  connecter avec Discord » (si `DISCORD_CLIENT_*` réglés), « Retirer » (confirmé).
+- Le `state` porte la destination SIGNÉE (`ts.owner.c.mac`, forme d'avant à trois
+  morceaux = la carte) : le retour revient à `/?tab=settings&vue=compte#…&ou=compte`.
+  La carte laisse un retour `ou=compte` à Mon compte. Erreurs : `src/communaute/discordErreurs.js` (§11).
+- Déjà sur la carte : le pseudo vérifié y est posé aussi ; « Retirer » ne l'enlève de
+  la carte que s'il est celui du compte. La vérification faite depuis la carte range
+  aussi la ligne du compte. Sur la carte : « Afficher mon Discord relié » et
+  « Utiliser mon pseudo Discord » le PROPOSENT (jamais posé tout seul).
+- Preuves : banc `discord-compte.cjs` (`BANC_PORT`, 1512 + 390 tactile, le vrai
+  `api/compte.js`, RLS simulé) 29 contrôles, ROUGE sur le build d'origin/main,
+  vert après ; `lirePreuve` réaffaibli ⇒ 4 rouges. `audit-discord-oauth.cjs` +3
+  (destination signée). `communaute.cjs` reste vert (137).
+- Non mesuré : le vrai Discord ; l'écriture `app_data?on_conflict=owner,id` avec le
+  jeton du vendeur sur SA base (forme de superpdp, mais jamais faite avec un jeton
+  utilisateur ici).
+
 ### Carte de la communauté : « la ville ne rentre pas, la carte n'apparaît pas » (20 octobre)
 Mesuré : **0 ligne** dans `vrm_communaute_profils` — personne n'avait pu rejoindre.
 - **La ville** : le serveur ne demandait qu'à Nominatim (OpenStreetMap), qui refuse
