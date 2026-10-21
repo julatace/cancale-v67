@@ -10766,6 +10766,52 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
   seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
   faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
 
+### Retour → stock : « Retours en cours » dans Colis (21 octobre)
+Fonction retenue le 11 octobre. **Mesuré (lecture seule)** : une VENTE en retour
+a sa transaction à `status` 440 « Retour initié » ; son `ship_status_title` dit
+où en est le colis de retour (vide / « Bordereau envoyé au vendeur » = pas
+parti · « colis déposé… » = en route · « Commande livrée ! » = ambigu, peut être
+la livraison d'origine) ; la liste des ventes passe ensuite à « Remboursement
+effectué » (`failed`), la transaction reste figée à 440. 13 ventes 440 en base,
+dont 1 en cours (oct.), 1 figée sur une vente finalisée (pas un retour), le
+reste remboursé en août-sept. Aucune donnée de retour dans les conversations
+n'a été utilisée.
+- **Une règle pure** `src/retoursStock.js` (`retoursEnCours`, `remiseEnStock`) :
+  la paire par IDENTITÉ (correction de la vente, sinon transaction → annonce →
+  fiche N°), **jamais le titre** ; étapes initié · en route · reçu chez toi ·
+  remboursé ; « reçu » n'est JAMAIS déduit (même « Vinted dit livrée ») : c'est
+  SON clic (`vinted_retours_recus`, existant) ; non réclamée = la paire revient
+  aussi ; remboursé de plus de 45 j et pas noté reçu ⇒ replié, jamais caché.
+  Trois états (ventes pas lues · pas su · lu), ce qui manque nommé (états des
+  transactions, ventes d'un compte, retours eBay).
+- **eBay** : les retours Post-Order (`action: 'retours'`, la route existante),
+  lus seulement sur Colis, une fois par 10 min, pour les comptes eBay RELIÉS
+  (une ligne `ebay_orders`) ; N° par le SKU de la ligne de commande
+  (`numLigneEbay`) ; clos sans remboursement ⇒ rien ne revient. Accepter /
+  rembourser reste dans eBay → À traiter.
+- **Colis → « Retours en cours »** (`RetoursEnCoursBloc`, `data-retours-encours`,
+  `data-retour*`) : N°, étape, compte, lien Vinted/eBay ; « Reçu chez moi ? » ;
+  « Remise en stock » (seulement reçu ET relié) : garde le N° ; porté par une
+  autre paire PRÉSENTE ⇒ la feuille DEMANDE (« Remettre en stock sans N° » ou
+  Annuler, jamais deviné) ; ancien N° (013) ⇒ « numéro neuf à la
+  republication ». Rangé dans `vinted_retours_remis` (synchronisé, rattrapé par
+  `onCloudReady`, rejoué comme geste) ; la ligne passe « à republier » (lien
+  `vinted.fr/items/new`) jusqu'à republication (N° en ligne, annonce rouverte ou
+  photo exacte). **Rien d'autre ne change** : ni pool, ni fiche, ni numéros
+  présents. Le CA n'est pas touché (le remboursement en sort par les règles
+  existantes, §11).
+- **Une voix (§7)** : la liste « qui te reviennent » d'Annonces → Conseils est
+  remplacée par une ligne qui mène à Colis. La carte « litiges » de Statistiques
+  reste (elle compte aussi suspendues et pertes).
+- Preuves : `audit-retours-stock.cjs` (vraie règle, 31 contrôles, `--prouve`
+  **6/6** : relié par titre, livrée = reçu, conflit ignoré, pas su = vide,
+  finalisée gardée, correction ignorée) ; banc `bancs/retours-stock.cjs`
+  (`BANC_PORT`, `BANC_DIST`, 390 tactile + 1512, ventes inventées) — rouge sur
+  le build d'origin/main (**20 rouges**), vert après, **4 rouges** sur un build « relié par titre ».
+- **Non mesuré** : un vrai retour eBay (aucune commande eBay en base) ; le lien
+  `ebay.fr/rt/ReturnDetails` ; « Commande livrée » sous 440 n'est jamais lu
+  comme reçu (le sens sûr).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
