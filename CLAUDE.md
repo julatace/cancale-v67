@@ -4870,8 +4870,7 @@ ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
   Nominatim (OpenStreetMap, gratuit), session exigée, coordonnées arrondies
   côté serveur aussi.
 - **Carte** : Leaflet **1.9.4** depuis cdnjs, chargé à l'ouverture de l'écran
-  (jamais au démarrage), fond CARTO (voyager / dark_all — sombre suivi) avec
-  l'attribution OpenStreetMap + CARTO. Injoignable ⇒ la même communauté en
+  (jamais au démarrage), fond OpenFreeMap depuis le 21 oct. (voir « La carte sans clé d'API »). Injoignable ⇒ la même communauté en
   liste. Les épingles sont de vrais boutons (44 px) écoutés directement : le
   « clic » de Leaflet ne partait pas au doigt dans la coque zoomée à 80 %.
   Les feuilles (FermeAuRetour) et le toast vivent sur `<body>` (portail) : dans
@@ -10926,6 +10925,34 @@ n'a été utilisée.
 - Preuves : `audit-retrait-confirmer.cjs` (vrai `background.js`, 33 contrôles ; **12 rouges sur origin/main** ; mutations `date-du-dernier-message`, `sonne-a-chaque-changement`, `lecture-ratee-lue-vide`, `annee-devinee` ⇒ rouges) ; banc `retrait-conv-push.cjs` (vraies routes `push` + `email-inbound`, 15 contrôles ; **9 rouges sur origin/main** ; « email sans clé du code » ⇒ 2 rouges) ; banc `a-confirmer.cjs` (port `BANC_PORT`, 390 tactile + 1512, trois états ; **rouge sur le build d'origin/main** ; mutation « illisible lu vide » ⇒ rouge). `_fond-vm.cjs` fournit `AbortController`.
 - ⚠️ **Non mesuré** : la forme d'un « Confirmation nécessaire » côté ACHETEUR (jamais vu) ; une conversation dont `conversation_id` est un UUID (`orders_*` récents) est-elle lue par `/api/v2/conversations/{uuid}` ? (c'est déjà le cas de `capterRetraits`) ; un vrai push depuis l'extension. Le retour qui revient au point relais côté VENDEUR (« Rends-toi au point relais … », statut 440) n'est toujours pas proposé au retrait (`retraitDeConversation` écarte le côté vendeur) — à trancher.
 - **Geste de Julien** : installer la 5.204 (remplacer le dossier, puis ⟳ dans chaque Chrome).
+
+### La carte sans clé d'API : OpenFreeMap (21 octobre)
+Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CARTO
+(`basemaps.cartocdn.com`) et les tuiles OSM directes sont retirés partout.
+- **Fond** : OpenFreeMap (instance publique : aucune inscription, aucune clé,
+  aucun cookie, usage commercial permis), styles `liberty` (clair) et `dark`
+  (sombre — « pas encore complet » selon ses auteurs). Attribution affichée :
+  OpenFreeMap · © OpenMapTiles · © OpenStreetMap. Conditions lues dans les dépôts
+  `hyperknot/openfreemap(-styles)` (openfreemap.org bloqué d'ici).
+- **Moteur** : `maplibre-gl` 6.11.2 (BSD-3) + `@maplibre/maplibre-gl-leaflet`
+  0.1.4 (ISC), calque sous Leaflet (épingles et regroupement inchangés).
+  `src/fondCarte.js` (une règle : style, attribution, chargement, WebGL).
+  Chargé à l'ouverture de la carte SEULEMENT : 289 Ko compressés + worker 508 Ko
+  + CSS 10 Ko ; aucun morceau d'entrée ne le contient (l'audit le vérifie).
+- **Repli** : WebGL absent, style ou tuiles en erreur, ou rien au bout de 12 s ⇒
+  la communauté en liste (jamais une carte grise). Mini-carte des points relais
+  (`FondMiniCarte`) ⇒ fond uni, épingles gardées — ⚠️ elle est injoignable
+  aujourd'hui (`openRelayPicker` n'a aucun appelant) : pas de banc.
+- **CSP** : `vercel.json` ne pose que `frame-ancestors` ⇒ rien à changer. Si une
+  CSP complète est posée : `connect-src`/`img-src https://tiles.openfreemap.org`,
+  `worker-src 'self' blob:`.
+- Preuves : banc `communaute.cjs` (OpenFreeMap servi par le banc, `liberty` puis
+  `dark` demandés, aucune requête `cartocdn`/`tile.openstreetmap`, fond coupé ⇒
+  liste) 144 verts, **8 rouges sur le build d'avant** ; `audit-fond-carte.cjs`
+  6 contrôles, 3 rouges sur l'avant.
+- **Non mesuré** : la vraie instance OpenFreeMap depuis son téléphone ; WebGL sur
+  un vrai iPhone ; le rendu du style `dark`.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

@@ -3840,6 +3840,26 @@ function CarrierBadge({ carrier, size = 22 }) {
   );
 }
 
+// Le fond vectoriel de la mini-carte (MapLibre chargé à la demande).
+function FondMiniCarte({ lat, lon, zoom, sombre }) {
+  const boite = React.useRef(null);
+  const [etat, setEtat] = React.useState('charge');
+  React.useEffect(() => {
+    let vivant = true, carte = null;
+    import('./fondCarte.js').then((f) => {
+      if (!f.webglDispo()) throw new Error('webgl');
+      return f.chargerMaplibre().then((ml) => {
+        if (!vivant || !boite.current) return;
+        carte = new ml.Map({ container: boite.current, style: f.styleCarte(sombre), center: [lon, lat], zoom, interactive: false, attributionControl: false });
+        carte.once('load', () => { if (vivant) setEtat('pret'); });
+        carte.on('error', () => { if (vivant) setEtat((e) => (e === 'pret' ? e : 'ko')); });
+      });
+    }).catch(() => { if (vivant) setEtat('ko'); });
+    return () => { vivant = false; if (carte) carte.remove(); };
+  }, [lat, lon, zoom, sombre]);
+  return <div ref={boite} data-mini-fond={etat} aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />;
+}
+
 function OsmMap({ points, height = 230, selected, onSelect }) {
   const pts = (points || []).filter(p => p && p.lat && p.lon);
   if (!pts.length) return null;
@@ -3858,20 +3878,14 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
   const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
   const c = proj(clat, clon, z);
-  const xi = Math.floor(c.x), yi = Math.floor(c.y);
-  const tiles = [];
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) tiles.push({ dx, dy, x: xi + dx, y: yi + dy });
-  // Fond de carte clair et épuré (CartoDB « Voyager ») — rendu pro, façon Vinted.
-  const tileUrl = (x, y) => `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/${z}/${x}/${y}.png`;
-  const tileUrlHi = (x, y) => `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
-  const px = (2 + (c.x - xi)) * 256, py = (1 + (c.y - yi)) * 256;
+  // Fond : OpenFreeMap (sans clé, src/fondCarte.js), dessiné par MapLibre,
+  // immobile, centré sur le même point et à la même échelle que les épingles
+  // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
+  // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
+  const sombreCarte = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
   return (
-    <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#eaeef2' }}>
-      <div style={{ position: 'absolute', width: 1280, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
-        {tiles.map((t, i) => (
-          <img key={i} src={tileUrl(t.x, t.y)} onError={(e)=>{ if(e.target.dataset.f!=='1'){e.target.dataset.f='1'; e.target.src=`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`;} }} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256 }} />
-        ))}
-      </div>
+    <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1a1f27' : '#eaeef2' }}>
+      <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
       {(() => {
         // Anti-chevauchement : on écarte les épingles trop proches en spirale.
         const placed = [];
@@ -3915,7 +3929,7 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
           </div>
         );
       })}
-      <span style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6b7280', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>© OpenStreetMap · CARTO</span>
+      <span data-mini-carte-attribution style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6b7280', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
     </div>
   );
 }
