@@ -72,6 +72,18 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
   if (cible === 'app_data' || cible.startsWith('app_data?')) {
     const q = new URLSearchParams(qs);
     const idF = (q.get('id') || '').replace(/^eq\./, ''), ownF = (q.get('owner') || '').replace(/^eq\./, '');
+    // La clé de SERVICE (la preuve Discord en attente) : aucune RLS, filtre owner exigé.
+    if (process.env.SUPABASE_SERVICE_KEY && h.apikey === process.env.SUPABASE_SERVICE_KEY && !qui) {
+      if (methode === 'POST') { for (const r of (Array.isArray(corps.json) ? corps.json : [corps.json])) { B.lignes[r.owner] = B.lignes[r.owner] || {}; B.lignes[r.owner][r.id] = r.data; } return json(undefined, 201); }
+      const d = ownF && B.lignes[ownF] && B.lignes[ownF][idF];
+      if (methode === 'GET') return json(d ? [{ data: d }] : []);
+      if (methode === 'DELETE') { if (d) delete B.lignes[ownF][idF]; return json(undefined, 204); }
+      if (methode === 'PATCH') {
+        const att = q.get('data->>essais');
+        if (!d || (att != null && att !== 'eq.' + String(d.essais))) return json([]);
+        B.lignes[ownF][idF] = corps.json.data; return json([{ data: corps.json.data }]);
+      }
+    }
     if (methode === 'GET') {
       if (!uid || idF !== 'vrm_discord') return json([], 200, { 'content-range': '0-0/0' });
       // RLS : seulement SES lignes, quel que soit le filtre demandé.
@@ -111,15 +123,16 @@ const srv = http.createServer((q, r) => {
 });
 
 let compte = null;
-async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?tab=settings&vue=compte', fragment = '' }) {
+async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?tab=settings&vue=compte', fragment = '', ticket = '' }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: 'block' });
   const pg = await ctx.newPage();
   const appels = [];
-  await pg.addInitScript(({ s, sombre }) => {
+  await pg.addInitScript(({ s, sombre, ticket }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_reglages_vue', 'compte'); } catch (_) {}
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
-  }, { s: session(qui), sombre });
+    try { if (ticket && !sessionStorage.getItem('banc_ticket_pose')) { sessionStorage.setItem('banc_ticket_pose', '1'); localStorage.setItem('vrm_discord_ticket', JSON.stringify({ t: ticket, ou: 'compte', at: Date.now() })); } } catch (_) {}
+  }, { s: session(qui), sombre, ticket });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
     const rq = r.request(), u = rq.url();
     if (/supabase\.co\//.test(u)) {
@@ -132,9 +145,10 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
-    if (u.pathname === '/api/compte' && ['communaute', 'abonnement', 'discord-debut'].includes(mode)) {
+    if (u.pathname === '/api/compte' && ['communaute', 'abonnement', 'discord-debut', 'discord-attente'].includes(mode)) {
       let corps = null; try { corps = rq.postData() ? JSON.parse(rq.postData()) : null; } catch (_) {}
       if (mode === 'discord-debut') appels.push('debut:' + JSON.stringify(corps));
+      if (mode === 'discord-attente') appels.push('attente:' + JSON.stringify(corps));
       const res = { code: 200, corps: null, setHeader() {}, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, end() { return this; } };
       const lecteur = corps ? (async function* () { yield Buffer.from(JSON.stringify(corps)); })() : null;
       const req = { method: rq.method(), query: Object.fromEntries(u.searchParams), headers: rq.headers(), body: corps || undefined, [Symbol.asyncIterator]() { return lecteur ? lecteur[Symbol.asyncIterator]() : (async function* () {})(); } };
@@ -216,6 +230,47 @@ const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const e = document.queryS
       dit(B.profils[A].discord === 'alice.discord', 'sur la carte : le pseudo Discord vérifié s’y affiche aussi');
       await o.ctx.close();
     });
+    // ── TÉLÉPHONE, retour arrivé dans un AUTRE navigateur (revue de sécurité du
+    //    21 oct.) : la preuve rangée ne sort qu'avec le code montré là-bas.
+    //    Sans lui, quelqu'un qui envoyait SON lien à une autre personne prenait
+    //    le pseudo Discord vérifié de celle-ci.
+    for (const [largeur, sombre] of [[390, true], [1512, false]]) {
+      console.log(`\n── ${largeur} px · Discord sur le téléphone : le code à retaper`);
+      await essaie(`code ${largeur}`, async () => {
+        reset();
+        process.env.SUPABASE_SERVICE_KEY = 'sb_secret_banc';
+        const r = { h: {}, corps: null, statusCode: 200, setHeader(k, v) { this.h[k.toLowerCase()] = v; }, status(n) { this.statusCode = n; return this; }, json(x) { this.corps = x; return this; }, end(x) { this.sortie = x; return this; } };
+        await discordMod.debutDiscord({}, r, { id: A }, { ou: 'compte' });
+        const ticket = r.corps.ticket, state = new URL(r.corps.url).searchParams.get('state');
+        const faux = async (url, o) => /oauth2\/token/.test(url) ? { ok: true, json: async () => ({ access_token: 't' }) } : /users\/@me/.test(url) ? { ok: true, json: async () => ({ username: 'alice.discord', discriminator: '0' }) } : global.fetch(url, o);
+        const r2 = { h: {}, statusCode: 200, setHeader(k, v) { this.h[k.toLowerCase()] = v; }, end(x) { this.sortie = x; return this; } };
+        await discordMod.retourDiscord({ query: { code: 'abcdefghij12', state }, headers: { cookie: '' } }, r2, faux);
+        const pageAilleurs = String(r2.sortie || '');
+        const code = ((/data-discord-code="">(\d{3}) (\d{3})</.exec(pageAilleurs) || []).slice(1).join(''));
+        dit(/^\d{6}$/.test(code), 'la page de l’autre navigateur montre un code à 6 chiffres', pageAilleurs.slice(-300));
+        const o = await ouvrir(nav, { qui: A, largeur, sombre, ticket });
+        await o.pg.waitForSelector('[data-discord-demande-code]', { timeout: 8000 }).catch(() => {});
+        dit(!!(await o.pg.$('[data-discord-demande-code]')), 'de retour dans VRM : une feuille demande le code', o.appels.filter((x) => x.startsWith('attente')).join(' ') + ' · ticket=' + (await o.pg.evaluate(() => localStorage.getItem('vrm_discord_ticket'))));
+        dit(!(B.lignes[A] && B.lignes[A].vrm_discord), 'rien n’est relié avant le code');
+        await o.pg.fill('[data-discord-code-saisie]', code === '000000' ? '000001' : '000000');
+        await o.pg.click('[data-discord-code-valider]');
+        await o.pg.waitForSelector('[data-discord-code-erreur]', { timeout: 8000 }).catch(() => {});
+        const err = await o.pg.$eval('[data-discord-code-erreur]', (e) => e.innerText).catch(() => '');
+        dit(/pas le bon code/i.test(err) && !(B.lignes[A] && B.lignes[A].vrm_discord), 'un mauvais code : dit, et rien n’est relié', err);
+        const cible = await o.pg.$('[data-discord-code-saisie]');
+        const bb = cible ? await cible.boundingBox() : null;
+        const bv = await o.pg.$('[data-discord-code-valider]'); const bbv = bv ? await bv.boundingBox() : null;
+        dit(!!bb && bb.height >= 44 && !!bbv && bbv.height >= 44 && bb.x >= 0 && bb.x + bb.width <= largeur, 'champ et bouton à 44 px, dans l’écran', JSON.stringify([bb, bbv]));
+        await o.pg.fill('[data-discord-code-saisie]', code.slice(0, 3) + ' ' + code.slice(3));
+        await o.pg.click('[data-discord-code-valider]');
+        await o.pg.waitForSelector('[data-discord-compte="relie"]', { timeout: 10000 }).catch(() => {});
+        const ligne = B.lignes[A] && B.lignes[A].vrm_discord;
+        dit(!!ligne && ligne.discord === 'alice.discord' && ligne.verifie === true, 'le bon code (même tapé avec une espace) : Discord est relié au compte', JSON.stringify(ligne || null) + ' · ' + o.pg.url() + ' · ' + o.appels.filter((x) => x.startsWith('NAV')).slice(-2).join(' ').slice(-190));
+        dit(!(B.lignes[A] && B.lignes[A].discord_attente), 'la preuve en attente est effacée (une seule fois)');
+        dit(!(await o.pg.$('[data-discord-demande-code]')), 'la feuille est partie');
+        await o.ctx.close();
+      });
+    }
     console.log('\n── 1512 px · Discord pas réglé sur le serveur');
     await essaie('pas réglé', async () => {
       reset(); delete process.env.DISCORD_CLIENT_SECRET;
