@@ -29,3 +29,13 @@ La double vérification protège la connexion, pas les règles de séparation SQ
 Ces changements ne prouvent pas que les lignes historiques ont été attribuées au bon propriétaire. Ils ne remplacent toujours pas l'application et la vérification de la migration 021 dans Supabase. Aucune donnée, vente ou identité n'est automatiquement réattribuée.
 
 Les écritures de capture et lectures génériques de l’extension exigent également une session. Elles gardent une seule identité pour le corps, les filtres et les en-têtes ; le corps ne peut plus imposer un propriétaire différent. Les caches de visite et de pseudos sont rattachés à l’identité VRM. Le stockage eBay côté serveur exige toujours un propriétaire explicite, sans repli vers les jetons de l’installation.
+
+## Réception et notifications — suppression des derniers replis partagés
+
+La réception HTTP exige la clé partagée quelle que soit la forme du message. Clé serveur absente : 503, aucun traitement. Clé absente ou incorrecte dans la requête : 401, aucun accès aux données. Un rejeu interne depuis la réclamation d'un email garde le vendeur déjà vérifié par cette route ; une propriété du corps HTTP ne suffit jamais à imposer ce vendeur.
+
+Une adresse inconnue ne revient plus au propriétaire de l'installation, même si le registre est vide ou ne contient qu'un vendeur : l'absence d'autres adresses ne prouve pas qu'aucun autre utilisateur n'existe. Le message est mis de côté sous le propriétaire neutre, sans vente créée ni notification à un autre vendeur. Une réception mal formée est refusée sans accusé de rangement ; le collecteur la conserve pour reprise.
+
+Les lectures et écritures métier de la réception imposent un contexte propriétaire et la clé `(owner,id)`. Sans schéma de séparation confirmé, le traitement est refusé. Les notifications exigent toujours la session vérifiée sur la route utilisateur et un propriétaire explicite dans les tâches serveur. Elles n'utilisent plus les appareils du propriétaire de l'installation par défaut. Les réponses HTTP privées ne sont pas mises en cache.
+
+La migration SQL 021 reste indispensable et n'a pas été appliquée par cette session. Ces contrôles ne certifient ni l'attribution historique des lignes ni la possession réelle de toutes les adresses supplémentaires déclarées dans le registre : ce dernier point requiert encore un parcours de preuve d'adresse. Aucune réattribution ni suppression automatique n'est effectuée.

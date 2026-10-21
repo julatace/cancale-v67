@@ -50,7 +50,7 @@ const B = '99999999-8888-7777-6666-555555555555';   // second vendeur
 process.env.VRM_OWNER_UID = A;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
-delete process.env.EMAIL_INBOUND_SECRET;
+process.env.EMAIL_INBOUND_SECRET='cle-banc-notifications';
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
@@ -150,7 +150,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
   const inbound = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js'));
   const libPush = await import('file://' + path.join(RACINE, 'api', '_lib', 'push.js'));
   let libAcces = {}; try { libAcces = await import('file://' + path.join(RACINE, 'api', '_lib', 'abonnement.js')); } catch (_) {}
-  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
+  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-notifications'}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
   const reset = () => {
     base.clear(); pannes = []; acces = {}; pushes.length = 0;
     if (typeof libPush.oublierPrefsVues === 'function') libPush.oublierPrefsVues();
