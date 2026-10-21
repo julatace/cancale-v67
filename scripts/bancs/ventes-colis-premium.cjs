@@ -185,7 +185,11 @@ const communs = (m, vp, errs) => {
         await pg.waitForTimeout(800);
         const lu = await pg.evaluate(() => {
           const rows = [...document.querySelectorAll('.vrm-sale-row[data-tx]')];
-          const prix = rows.map((r) => { const t = (r.querySelector('[data-prix-vente]') || {}).getAttribute ? r.querySelector('[data-prix-vente]').getAttribute('data-prix-vente') : null; return t == null ? null : Number(t); });
+          // (21 oct., refonte d5cc962) Le détail d'une vente vit dans un TIROIR, un
+          // portail hors de la ligne : on lit le prix dans la ligne OU dans le
+          // tiroir que son bouton commande (aria-controls).
+          const prix = rows.map((r) => { const tg = r.querySelector('.vrm-ledger-sale-toggle'); const tir = tg && tg.getAttribute('aria-controls') ? document.getElementById(tg.getAttribute('aria-controls')) : null;
+            const el = r.querySelector('[data-prix-vente]') || (tir && tir.querySelector('[data-prix-vente]')); const t = el ? el.getAttribute('data-prix-vente') : null; return t == null ? null : Number(t); });
           return { n: rows.length, prix };
         });
         dit(lu.n === ATTENDU.toutes, `« Toutes » rend ${ATTENDU.toutes} ventes (l’annulée n’y est pas)`, `${lu.n}`);
