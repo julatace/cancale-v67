@@ -96,6 +96,10 @@ async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://check
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
+  // (21 oct.) Le compte propriétaire sans double vérification voit au démarrage
+  // l'écran qui la propose (banc `mfa-proprio.cjs`). Ce banc juge la carte
+  // d'abonnement : on note « Plus tard » d'aujourd'hui, comme il le ferait.
+  await pg.addInitScript((uid) => { try { localStorage.setItem('vrm_mfa_plus_tard_' + uid, String(Date.now())); } catch (_) {} }, SESSION.user.id);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     // ⚠️ Le faux site est SERVI : s'il ne répondait pas, Chromium afficherait
     //    une page d'erreur à une autre adresse, et le contrôle « jamais suivie »

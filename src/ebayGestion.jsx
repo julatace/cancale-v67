@@ -8,6 +8,7 @@ import CoutsVente from './CoutsVente.jsx';
 import './ebay-interface.css';
 import {offresAffichees} from './ebayOffresVue.js';
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
+import {messageEbayNonLu} from '../api/_lib/ebay-messages-nonlus.js';
 import {useBrouillonCommande} from './brouillonsCommandesEbay.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
@@ -116,7 +117,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
   <div className="vrm-message-workspace"><div className="vrm-inbox-column">{Array.isArray(rows) && rows.length>0 && <input type="search" aria-label="Rechercher un message eBay" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un échange…" style={{...S.input,marginBottom:10}}/>}
    {busy && rows===null && <p style={{fontSize:12,color:C.muted}}>Lecture des messages…</p>}
    {rows && !affiches.length && <p style={{fontSize:12,color:C.muted}}>Aucun échange dans cette sélection.</p>}
-   <div className="vrm-msg-list" style={{border:`1px solid ${C.border}`,background:C.card,display:affiches.length?undefined:'none'}}>{affiches.map(m=>{const aRepondre=/^unanswered$/i.test(m.status || '') && !(m.responses || []).length;const apercu=corpsLisible(m.body || '').replace(/\s+/g,' ').trim();const nom=m.sender || 'Acheteur',sujet=m.subject || m.titre || '',heure=heureCourte(m.date);return <button type="button" key={m.id} data-ebay-message={m.id} data-nonlu={aRepondre?'1':undefined} aria-label={[nom,sujet,heure,aRepondre?'pas encore de réponse':''].filter(Boolean).join(' ')} className={selected?.id===m.id?'vrm-inbox-row is-current':'vrm-inbox-row'} onClick={()=>selectMessage(m)} style={{color:C.text}}>
+   <div className="vrm-msg-list" style={{border:`1px solid ${C.border}`,background:C.card,display:affiches.length?undefined:'none'}}>{affiches.map(m=>{const aRepondre=messageEbayNonLu(m);const apercu=corpsLisible(m.body || '').replace(/\s+/g,' ').trim();const nom=m.sender || 'Acheteur',sujet=m.subject || m.titre || '',heure=heureCourte(m.date);return <button type="button" key={m.id} data-ebay-message={m.id} data-nonlu={aRepondre?'1':undefined} aria-label={[nom,sujet,heure,aRepondre?'pas encore de réponse':''].filter(Boolean).join(' ')} className={selected?.id===m.id?'vrm-inbox-row is-current':'vrm-inbox-row'} onClick={()=>selectMessage(m)} style={{color:C.text}}>
      <span className="vrm-msg-av" aria-hidden="true" style={{background:C.card2 || C.bg}}><span className="vrm-msg-ini" style={{color:C.muted}}>{nom.trim().charAt(0).toUpperCase() || '·'}</span></span>
      <span className="vrm-msg-body">
       <span className="vrm-msg-l1"><b className="vrm-msg-name">{nom}</b>{heure && <span className="vrm-msg-time" style={{color:aRepondre?C.accent:C.muted}}>{heure}</span>}</span>
