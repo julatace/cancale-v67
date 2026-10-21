@@ -10794,6 +10794,37 @@ Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), ca
 - **Captcha (Turnstile)** : toujours ÉTEINT (`TURNSTILE_SITE_KEY` vide), `audit-anti-bot` et banc `captcha` prêts. Ordre des gestes, sans en sauter un : (0) **d'abord l'extension** — sa fenêtre se connecte encore par mot de passe (`background.js`, `grant_type=password`, sans jeton) : retirer ce repli (ou le remplacer par `vrm.center/?lier-extension=<id>`) et publier cette version, sinon la connexion par mot de passe de l'extension sera refusée ; (1) Cloudflare → Turnstile → widget « Managed » pour `vrm.center` ; (2) clé de SITE dans `VITE_TURNSTILE_SITE_KEY` (Vercel, Production), redéployer, vérifier le widget sur vrm.center/?connexion ; (3) seulement ensuite Supabase → Authentication → Attack Protection → CAPTCHA → Turnstile + clé SECRÈTE (jamais dans le dépôt) ; (4) citer Cloudflare dans la politique de confidentialité. Retour arrière : Supabase d'abord, puis vider la clé.
 - Preuves : banc `ebay-messages-journee.cjs` (port 8621, 390 tactile + 1512, données inventées) ; banc `mfa-proprio.cjs` (port 8611, faux GoTrue de `double-verification.cjs`) ; `ebay-relecture-cron.cjs` étendu (la vraie route `relire` range le résumé, `repondre` le décrémente, eBay illisible n'écrit rien) ; `audit-ebay-messages-nonlus.cjs` (`--mutation=reponses|fenetre|complet|retire` ⇒ rouges).
 - ⚠️ **Non mesuré** : la forme réelle de `GetMemberMessages` sur ses comptes (doc d'eBay) ; le coût en quota d'un `GetMemberMessages` de plus par relecture.
+
+### « Le boost est-il rentable ? » (Statistiques, 21 octobre)
+Fonction retenue le 11 octobre. Carte `BoostRentable` sous « Ce qui se vend »
+(une seule voix, §7), règle pure `src/boostRentable.js`.
+- **Mesuré (lecture seule)** : `promoted` = 0 `true` sur 380 annonces captées (347
+  `false`, 33 sans le champ) ; « Boost payé » (`vinted_annonce_numeros[id].fees`)
+  saisi sur 0 fiche sur 478 ; `boost_forme` n'a vu que `bumps`
+  (`minimum_price.has_free_bumps`, 41 fois) ; `invoice_lines` des porte-monnaie :
+  aucune ligne de boost. ⇒ Aujourd'hui la carte dit « pas assez de ventes pour
+  juger » — c'est juste.
+- **Règle** : vente → annonce par la transaction (`txn[tx].item`), jamais par le
+  titre ; boostée = `promoted === true` OU « Boost payé » > 0 ; non boostée =
+  `promoted === false` sans montant ; absent = pas compté (dit). Comparaison
+  limitée aux tranches de prix (< 30, 30-60, 60-100, ≥ 100 €) où il y a des deux
+  côtés ; moins de 5 de chaque côté ⇒ aucun chiffre ; chaque mesure (délai
+  médian, vues, favoris, marge médiane boost déduit) exige 5 valeurs connues de
+  chaque côté, sinon « — ». La marge d'une boostée exige son montant saisi
+  (sinon coût inconnu) et son prix d'achat (`prixAchatDe`). Annulées et comptes
+  écartés exclus. Transactions, annonces ou fiches illisibles ⇒ « pas pu lire ».
+  Mêmes lectures que « Ce qui se vend » (`lireExtrasRepartition`, qui garde
+  maintenant `promoted`, `views`, `favourites`). Un repère : n'entre dans aucun
+  total. Aucune couleur verte/rouge.
+- ⚠️ Vinted ne dit « boostée » que PENDANT le boost : une paire boostée puis
+  vendue après la fin compte parmi « les autres » si le montant n'est pas saisi
+  (la carte le dit).
+- Preuves : `audit-boost-rentable.cjs` (18 contrôles ; `--prouve` 7/7 mutations :
+  seuil, absent = non boostée, sans tranche, boost non déduit, marge sans
+  montant, « pas su » lu vide, rapprochement par titre) ; banc
+  `bancs/boost-rentable.cjs` (`BANC_PORT`, 1512 + 390 tactile, données
+  inventées) 32 contrôles, rouge sur le build d'origin/main, rouge sous mutation.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
