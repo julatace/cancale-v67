@@ -32140,7 +32140,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(!['achats','journee'].includes(curSub)||!buysBase.length)return;
     let stop=false;
     (async()=>{
-      const demandes=[...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc}_txn_${o.transaction_id}`))];
+      const demandes=[...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))];
       const resultat={};
       for(let i=0;i<demandes.length;i+=100){
         const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,suivi:data->payload->transaction->shipment->>tracking_code,suivi2:data->payload->transaction->shipment->>tracking_number,suivi3:data->payload->transaction->>tracking_code,photo:data->payload->transaction->item_photo`,{strict:true});

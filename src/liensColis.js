@@ -9,7 +9,7 @@ export function achatDuColis(colis,achats,index={}){
  const candidats=new Map();
  for(const a of achats||[]){
   const id=String(a?.transaction_id||'');if(!id)continue;
-  if(tx?id===tx:suivisAchat(a,index).includes(suivi))candidats.set(String(a._acc||'')+':'+id,a);
+  if(tx?id===tx:suivisAchat(a,index).includes(suivi))candidats.set(String(a._acc?.vinted_user_id||a._acc||'')+':'+id,a);
  }
  return candidats.size===1?[...candidats.values()][0]:null;
 }
