@@ -591,3 +591,11 @@ Modification minimale dans le domaine eBay : uniquement `portee` dans `api/_lib/
 QR MFA généré localement depuis l’URI native, clé manuelle repliée, remplacement d’un facteur non vérifié. La clé montrée en capture n’est pas automatiquement révoquée : l’utilisateur doit recommencer la configuration depuis sa session.
 
 **Base réelle : migration 021 toujours NON exécutée par Codex, faute d’accès d’administration Supabase. Ne pas déclarer l’incident définitivement résolu.**
+
+## Suite sécurité — réception et push (sans modification MFA)
+
+Le vendeur a reporté la double vérification et refusé les SMS payants : la branche codex/mfa-sms ne doit pas être fusionnée. Travail présent repart de main/PR635 ; aucun code SMS repris.
+
+Réception publique : clé obligatoire pour tous les formats, pas seulement Gmail partagé. Contexte vendeur obligatoire pour les lectures/écritures métier, conflit owner,id. Plus de repli attribuant un email inconnu au propriétaire d'installation : quarantaine privée neutre et reprise après association. Push : authentification obligatoire sur la route et contexte obligatoire côté serveur, même si la sonde dit ancien schéma. Tests synthétiques actualisés pour enregistrer explicitement les adresses et le contexte des notifications.
+
+Limites encore ouvertes : SQL021 non appliquée faute d'accès administrateur ; attribution historique non auditée ; possession des adresses supplémentaires déclarées à prouver (ne pas confondre déclaration et preuve de propriété). Aucun email ou push réel envoyé par les tests.

@@ -14,7 +14,7 @@
 import webpush from 'web-push';
 import crypto from 'node:crypto';
 
-import { withOwnerAll, conflictTarget, proprietaireCourant } from './owner.js';
+import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { accesVendeur } from './abonnement.js';
 
@@ -38,13 +38,10 @@ export const cloisonnee = async () => {
 };
 
 // Le vendeur dont on lit/écrit les appareils : celui de la requête (session
-// vérifiée, adresse de réception d'un email, tour du rappel quotidien), sinon le
-// propriétaire de l'installation. ⚠️ Jamais « tout le monde » : sur une base
-// cloisonnée sans vendeur, on ne lit rien et on n'écrit rien.
-const OWNER_INSTALL = process.env.VRM_OWNER_UID || '';
-export const vendeurDuPush = () => proprietaireCourant() || OWNER_INSTALL;
+// vérifiée, adresse de réception d'un email, tour du rappel quotidien).
+// Sans vendeur explicite, aucune lecture ni écriture des appareils.
+export const vendeurDuPush = () => proprietaireCourant();
 async function pourCeVendeur(url) {
-  if (!(await cloisonnee())) return url;            // une seule boutique : inchangé
   const o = vendeurDuPush();
   if (!o) return null;
   return url + (url.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}`;
@@ -269,14 +266,9 @@ async function ecrireSubsSi(lu, subs, prefs) {
       if (!Array.isArray(j)) return 'ko';
       return j.length ? 'ok' : 'conflit';
     }
-    let row, conflit;
-    if (await cloisonnee()) {
-      const o = vendeurDuPush();
-      if (!o) return 'ko';
-      row = { owner: o, id: 'push_subs', data }; conflit = 'owner,id';
-    } else {
-      row = withOwnerAll([{ id: 'push_subs', data }])[0]; conflit = conflictTarget('id');
-    }
+    const o = vendeurDuPush();
+    if (!o) return 'ko';
+    const row = { owner: o, id: 'push_subs', data }, conflit = 'owner,id';
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflit}`, {
       method: 'POST',
       headers: { ...HEADERS, Prefer: 'resolution=ignore-duplicates,return=representation' },

@@ -30,7 +30,7 @@ const OWNER = '11111111-2222-3333-4444-555555555555';
 process.env.VRM_OWNER_UID = OWNER;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
-delete process.env.EMAIL_INBOUND_SECRET;
+process.env.EMAIL_INBOUND_SECRET='cle-banc-notifications';
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
@@ -83,7 +83,7 @@ global.fetch = async (url, opts = {}) => {
   if (sel === 'owner' && u.searchParams.get('limit') === '1') return rep([]);   // base cloisonnée
   const id = decodeURIComponent((u.searchParams.get('id') || '').replace(/^eq\./, ''));
   if (pannes.has(id)) return new Response(HTML522, { status: 522, headers: { 'content-type': 'text/html' } });
-  if (id === 'vrm_email_owners') return rep([]);
+  if (id === 'vrm_email_owners') return rep([{owner:OWNER,data:{adresses:{'boite@banc.test':{owner:OWNER}}}}]);
   const lignes = filtrer(u);
   if (sel.startsWith('data->')) { const k = sel.slice(6); return rep(lignes.map(([, d]) => ({ [k]: d && d[k] }))); }
   return rep(lignes.map(([cle, d]) => ({ owner: cle.split('|')[0], id: cle.split('|')[1], data: d })));
@@ -102,7 +102,7 @@ const dispo = (corpsCode = 'Votre code de retrait est 482913\n') => mr(`Votre co
   try { inbound = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js')); } catch (e) { dit(false, 'api/email-inbound.js se charge', e.message); }
   try { libPush = await import('file://' + path.join(RACINE, 'api', '_lib', 'push.js')); } catch (_) { libPush = {}; }
   try { libAbo = await import('file://' + path.join(RACINE, 'api', '_lib', 'abonnement.js')); } catch (_) {}
-  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
+  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-notifications'}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
   const reset = (prefs) => {
     base.clear(); pannes = new Set(); acces = true; pushes.length = 0;
     if (typeof libPush.oublierPrefsVues === 'function') libPush.oublierPrefsVues();
@@ -178,9 +178,8 @@ const dispo = (corpsCode = 'Votre code de retrait est 482913\n') => mr(`Votre co
     reset();
     base.set(`${OWNER}|email_track_mondialrelay_${SUIVI}`, { type: 'suivi', suivi: SUIVI, code: '999111', lieu: 'Autre Lieu' });
     pannes.add(`email_track_mondialrelay_${SUIVI}`);
-    await recoit(dispo(''));
-    const p = relais()[0] || {};
-    dit(relais().length === 1 && !/999111/.test(p.body || ''), 'la ligne d’avant illisible : pas de code venu d’ailleurs, la notification dit seulement le lieu lu', p.body);
+    const r=await recoit(dispo(''));
+    dit(r.code===503 && relais().length===0 && base.get(`${OWNER}|email_track_mondialrelay_${SUIVI}`).code==='999111', 'ligne précédente illisible : reprise demandée, aucun écrasement ni notification trompeuse');
   });
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

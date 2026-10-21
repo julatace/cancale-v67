@@ -29,6 +29,7 @@ let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, 'le contrôle a levé : ' + String(e && e.message || e).slice(0, 160)); } };
 
+process.env.EMAIL_INBOUND_SECRET='cle-banc-rattacher';
 const J = '11111111-1111-1111-1111-111111111111';   // propriétaire de l'installation : la quarantaine d'AVANT est chez lui
 const B = '22222222-2222-2222-2222-222222222222';   // un autre vendeur
 const C = '33333333-3333-3333-3333-333333333333';   // un troisième
@@ -451,7 +452,7 @@ const BASE_TROIS = () => [
   let inbound3 = null;
   await essaie('partie 3 : chargement', async () => { inbound3 = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js')); });
   const SHOP = 'boutique-de-banc@exemple.test';
-  const venteVers = (to, n) => ({ method: 'POST', query: {}, headers: {}, body: {
+  const venteVers = (to, n) => ({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-rattacher'}, body: {
     from: 'no-reply@vinted.fr', to, subject: `Ton article est vendu ! (banc ${n})`,
     text: `acheteur-de-banc a acheté [Paire de banc ${n}] n°${n} 42,00 €\nPrépare ton colis.`, html: '<p>vendu</p>', attachments: [] } });
   const envoyer3 = async (mail) => { const r = faireRes(); await inbound3.default(mail, r); return r; };
@@ -500,8 +501,8 @@ const BASE_TROIS = () => [
     if (!inbound3) return;
     base3 = [registre(J, ['recu@vrm.center'])]; panne3 = {};
     const lj = await lister3('jeton-de-J');
-    dit(lj.code === 200 && lj.corps.installation && lj.corps.installation.repli === true && perso(lj) && perso(lj).n === 0,
-      "l'autre sens : seul à avoir déclaré, le repli joue encore — et rien n'est annoncé à tort", JSON.stringify(lj.corps.installation));
+    dit(lj.code === 200 && lj.corps.installation && lj.corps.installation.repli === false && perso(lj) && perso(lj).n === 0,
+      "même seul à déclarer, aucun repli sur une adresse inconnue", JSON.stringify(lj.corps.installation));
     const ancien = process.env.VRM_OWNER_UID; process.env.VRM_OWNER_UID = '';
     const sans = await lister3('jeton-de-J');
     process.env.VRM_OWNER_UID = ancien;

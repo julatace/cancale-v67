@@ -144,12 +144,9 @@ function regNormalise(registre) {
 // ⚠️ Une seule règle (§11) : `resoudreProprietaire` l'appelle, et l'écran de
 // Réglages en tire sa phrase (par la route) au lieu d'affirmer que tout revient
 // au propriétaire de l'installation.
-export function repliInstallation(registre, defaut) {
-  const dft = String(defaut || '').trim();
-  if (!dft) return false;
-  const reg = regNormalise(registre);
-  return !Object.keys(reg).some((a) => reg[a] && reg[a] !== dft);
-}
+// L'absence d'un second vendeur dans le registre ne prouve pas que le mail
+// appartient au premier. Un nouvel utilisateur peut ne pas avoir fini son setup.
+export function repliInstallation(_registre, _defaut) { return false; }
 
 export const ADRESSE_COLLECTRICE = 'vrm.vinted35@gmail.com';
 export function estAdresseCollectrice(adresse) {
@@ -193,30 +190,8 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   // Une boîte collective ne prouve jamais à quel utilisateur appartient le mail.
   if(partagee)return {owner:'',via:'quarantaine',cause:'boite-partagee',raison:'adresse personnelle de réception absente ou non reconnue dans le transfert vers la boîte collective'};
 
-  // 3. Installation à UN SEUL vendeur : tout lui appartient, c'est explicite et
-  //    réglé par lui (VRM_OWNER_UID). Ce n'est PAS une devinette.
-  //
-  // ⚠️⚠️ MAIS « un seul vendeur » N'EST VRAI QUE TANT QU'IL EST SEUL. Le jour
-  //    où l'app accueille quelqu'un d'autre, ce repli devient exactement la
-  //    devinette que tout ce fichier interdit : un email arrivé sur une adresse
-  //    que le NOUVEAU vendeur n'a pas encore déclarée partirait chez le
-  //    propriétaire de l'installation — son bordereau, son code de retrait, sa
-  //    vente, dans la boutique d'un autre. Et ça ne se voit pas : celui qui
-  //    l'attendait ne saura jamais qu'il a existé.
-  //    ⇒ Dès que le registre déclare un propriétaire AUTRE que celui de
-  //      l'installation, il y a démonstrablement plus d'un vendeur : le repli
-  //      s'éteint et on passe en quarantaine (réparable d'un clic).
-  //    ⚠️ Et il ne s'éteint PAS avant : tant que Julien est seul — registre
-  //      vide, ou ne portant que ses propres adresses — rien ne change. C'est
-  //      l'incident du 16 au 22 août (593 emails en quarantaine, zéro traité,
-  //      ses codes de retrait perdus) qu'on ne refait pas.
-  const dft = String(defaut || '').trim();
-  if (dft && repliInstallation(reg, dft)) return { owner: dft, via: 'installation' };
-  if (dft) {
-    return { owner: '', via: 'quarantaine', cause: liste.length ? 'inconnue' : 'aucune',
-      raison: 'adresse de réception inconnue, et l’app compte plusieurs vendeurs' };
-  }
-
+  // Un registre vide ou limité à un vendeur ne prouve pas la propriété
+  // d'une adresse inconnue. Aucune attribution par défaut à l'installation.
   // 4. On ne sait pas → quarantaine. Jamais d'attribution au hasard.
   return { owner: '', via: 'quarantaine', cause: liste.length ? 'inconnue' : 'aucune',
     raison: liste.length ? 'adresse de réception inconnue' : 'aucune adresse de réception lisible' };
