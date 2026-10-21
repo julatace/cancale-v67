@@ -11,6 +11,10 @@
     {
       "path": "/api/ship-reminders",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/rappel-soir",
+      "schedule": "0 18 * * *"
     }
   ],
   "rewrites": [
@@ -37,6 +41,10 @@
     {
       "source": "/api/detourage",
       "destination": "/api/ai?mode=detourage"
+    },
+    {
+      "source": "/api/rappel-soir",
+      "destination": "/api/ship-reminders?moment=soir"
     }
   ],
   "headers": [

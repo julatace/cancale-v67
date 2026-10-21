@@ -29,6 +29,7 @@ import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
 import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
+import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1342,6 +1343,23 @@ const codeNotif = (code) => { const c = String(code || '').trim(); return (/\d/.
 // « 2026-08-23 » → « 23/08 ». Une date illisible ne devient jamais un faux.
 const dateBref = (d) => { const m = String(d || '').match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}` : ''; };
 
+// ── LA CLÉ ANTI-DOUBLON D'UNE NOTIFICATION DE COLIS (21 octobre) ───────────
+// ⚠️⚠️ « ARRIVÉ AU POINT DE RETRAIT » ÉTAIT AVALÉ PAR « EN TRANSIT ». Toutes les
+//    étapes d'un colis partageaient la clé `track-{suivi}` : dès que Julien a
+//    activé « Suivi du colis » (ses préférences mesurées : `suivi: true`), le
+//    premier « en transit » consommait la clé, et la notification qui compte —
+//    celle qui porte le CODE et le LIEU — ne partait jamais.
+// ⇒ « À retirer » a SA clé (`relais-{suivi}-code|sans`), une fois par n° de
+//   suivi ; et une seconde fois seulement si un email plus tardif apporte le
+//   code qui manquait au premier (« quand on le connaît »). Les autres étapes
+//   gardent la clé d'avant, à l'identique.
+export function cleNotifColis(track, rowId) {
+  const t = track || {};
+  const id = t.suivi || rowId || '';
+  if (t.status !== 'available') return `track-${id}`;
+  return `relais-${id}-${codeNotif(t.code) ? 'code' : 'sans'}`;
+}
+
 export function bodyNotifColis(track, carrier) {
   const t = track || {};
   const nom = nomTransporteur(carrier);
@@ -1555,8 +1573,13 @@ export async function traiterEmail(req, res) {
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
-      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
+      // (21 oct.) La ligne d'avant est relue aussi pour un colis « disponible » :
+      // sa DATE D'ARRIVÉE (`arriveLe`) ne doit pas être remplacée par celle d'un
+      // rappel (« Libère de la place… », « Le temps file… »).
+      let prevLigne = null;
+      if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
         const prev = await supabaseGetRow(rowId);
+        prevLigne = prev || null;
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
           if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
@@ -1571,6 +1594,7 @@ export async function traiterEmail(req, res) {
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
+        ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
@@ -1584,7 +1608,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: `${icons[track.status]} ${titles[track.status]}`,
         body: bodyNotifColis(track, carrier),
-        tag: `track-${track.suivi || rowId}`, url: '/?tab=cat_achats',
+        tag: cleNotifColis(track, rowId), url: '/?tab=cat_achats',
       }, track.status === 'available' ? 'colis' : 'suivi'); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
