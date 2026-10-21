@@ -10,6 +10,7 @@ import './_lib/sans-bruit.js';
 import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, cloisonnee } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
+import { notifierRetraitConversation } from './email-inbound.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -72,6 +73,14 @@ async function traiter(req, res) {
     //      déjà inscrit ne réécrit plus la liste à chaque ouverture de l'app.
     const PAS_CONCLU = { erreur: 'base-occupee', message: "Je n'ai pas pu enregistrer cet appareil : la liste de tes appareils changeait au même moment. Rien n'est perdu — réessaie." };
     const echec = (raison) => (raison === 'lecture' ? PAS_LU : raison === 'conflit' ? PAS_CONCLU : PAS_ECRIT);
+    // (21 oct.) L'EXTENSION a rangé un code de retrait NEUF lu dans une
+    // conversation Vinted : « 📍 Colis à retirer ». Elle ne donne que le n° de
+    // transaction ; la ligne est relue ici, au nom de CE vendeur.
+    if (body.action === 'retrait') {
+      const r = await notifierRetraitConversation(String(body.tx || ''));
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
     if (body.action === 'subscribe') {
       const sub = body.sub;
       if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }

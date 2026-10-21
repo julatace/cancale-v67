@@ -463,25 +463,30 @@ const enAttente = () => {
   if (!_memoEnAttente.has(qui)) _memoEnAttente.set(qui, new Set());
   return _memoEnAttente.get(qui);
 };
-async function shouldNotify(key) {
+async function shouldNotify(key, aussi = []) {
   const cles = (Array.isArray(key) ? key : [key]).filter(Boolean);
   if (!cles.length) return true;
+  // 21 oct. : `aussi` = des clés ÉCRITES en plus de la première (un colis
+  // annoncé par l'email ET par la conversation partage la clé de son CODE de
+  // retrait : la seconde voie la trouve et se tait). Reconnues comme les autres.
+  const ecrites = [cles[0], ...(aussi || []).filter(Boolean)];
+  cles.push(...ecrites.slice(1));
   const attente = enAttente();
   try {
     let lu = await supabaseLireRow('push_dedup');
     if (!lu.lu) lu = await supabaseLireRow('push_dedup');
     if (!lu.lu) {
       if (cles.some((k) => attente.has(k))) return false;
-      attente.add(cles[0]);
+      ecrites.forEach((k) => attente.add(k));
       while (attente.size > 300) attente.delete(attente.values().next().value);
       return true;
     }
     const keys = (lu.data && Array.isArray(lu.data.keys)) ? lu.data.keys : [];
     if (cles.some((k) => keys.includes(k) || attente.has(k))) return false;
     const enPlus = [...attente].filter((k) => !keys.includes(k));
-    const next = [cles[0], ...enPlus, ...keys].slice(0, 300);
+    const next = [...ecrites, ...enPlus.filter((k) => !ecrites.includes(k)), ...keys].slice(0, 300);
     if (await supabaseUpsert([{ id: 'push_dedup', data: { keys: next } }])) attente.clear();
-    else attente.add(cles[0]);                      // pas rangé : l'instance s'en souvient (la route répondra 503)
+    else ecrites.forEach((k) => attente.add(k));                      // pas rangé : l'instance s'en souvient (la route répondra 503)
     return true;
   } catch (_) { return true; }
 }
@@ -496,7 +501,7 @@ async function shouldNotify(key) {
 // consulte dans l'app, où le badge suffit.
 // Envoie une notification UNE seule fois (clé = son tag, déjà unique), et
 // seulement si cette catégorie est active.
-async function pushOnce(payload, categorie, alias = []) {
+async function pushOnce(payload, categorie, alias = [], aussi = []) {
   try {
     // ⚠️ REJEU EN LOT : on rattrape des emails vieux de plusieurs jours. Sonner
     //    pour chacun, c'est des centaines de notifications d'un coup pour des
@@ -508,8 +513,9 @@ async function pushOnce(payload, categorie, alias = []) {
     if (!(await pushCategorieActive(cat))) return;
     // `_cat` est un marqueur interne : il ne part pas dans la notification.
     const { _cat, ...notif } = payload || {};
-    if (await shouldNotify(notif.tag ? [notif.tag, ...alias] : null)) await sendPushToAll(notif);
-  } catch (_) {}
+    if (await shouldNotify(notif.tag ? [notif.tag, ...alias] : null, aussi)) { await sendPushToAll(notif); return true; }
+    return false;
+  } catch (_) { return false; }
 }
 
 // ⚠️ ON NE JETTE PLUS AUCUN EMAIL.
@@ -1360,6 +1366,16 @@ export function cleNotifColis(track, rowId) {
   return `relais-${id}-${codeNotif(t.code) ? 'code' : 'sans'}`;
 }
 
+// (21 oct.) LE CODE DE RETRAIT EST L'IDENTITÉ COMMUNE de l'email et de la
+// conversation Vinted (aucune autre : l'email n'a pas la transaction, la
+// conversation n'a presque jamais le n° de suivi — §5). La première voie qui
+// annonce un colis AVEC son code écrit `retrait-code-{CODE}` ; la seconde le
+// trouve et se tait. Sans code : aucune clé commune (on ne devine pas).
+export function cleCodeRetrait(code) {
+  const c = codeNotif(code).toUpperCase().replace(/[\s-]/g, '');
+  return c ? `retrait-code-${c}` : '';
+}
+
 export function bodyNotifColis(track, carrier) {
   const t = track || {};
   const nom = nomTransporteur(carrier);
@@ -1377,6 +1393,45 @@ export function bodyNotifColis(track, carrier) {
   }
   // Livré / en transit / info : le message court d'avant, sans changement.
   return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : ${t.label || ''}.`;
+}
+
+// ── « 📍 COLIS À RETIRER » DEPUIS LA CONVERSATION VINTED (21 octobre) ──────
+// L'extension range un code de retrait lu dans une conversation
+// (`panel_colis_relais`, par n° de transaction) et prévient : « regarde la
+// transaction X ». On ne croit PAS ce qu'elle dirait du code ou du lieu : on
+// relit SA ligne, au nom du vendeur (contexte posé par api/push.js), et on
+// décide d'ici. Trois états : 503 « pas su » (la base n'a pas répondu — elle
+// réessaiera), 404 (rien sous ce numéro), 200 (envoyée, ou pas à envoyer :
+// sans code, trop ancienne, déjà annoncée par l'email ou plus tôt).
+// Anti-doublon : la clé `relais-{suivi}-code` si la conversation porte un n° de
+// suivi (la même que l'email), sinon `relais-tx{tx}-code` ; et TOUJOURS la clé
+// du code, partagée avec l'email.
+const RETRAIT_NOTIF_AGE_MAX_MS = 72 * 3600000;
+export function notifRetraitConversation(e, tx) {
+  const code = codeNotif(e && e.code);
+  if (!code) return null;
+  const lieu = lieuBref(e.lieu);
+  const nom = nomTransporteur(e.transporteur);
+  const parts = [lieu ? `${nom} — à retirer chez ${lieu}` : `${nom} — arrivé au point de retrait`, `Code : ${code}`];
+  const titre = String(e.titre || '').trim().slice(0, 60);
+  return {
+    payload: { title: '📍 Colis à retirer', body: (titre ? `${titre} · ` : '') + parts.join('. ') + '.',
+      tag: e.suivi ? `relais-${e.suivi}-code` : `relais-tx${tx}-code`, url: '/?tab=cat_achats' },
+    aussi: [cleCodeRetrait(code)],
+  };
+}
+export async function notifierRetraitConversation(tx) {
+  if (!/^\d{1,20}$/.test(String(tx || ''))) return { status: 400, raison: 'transaction' };
+  const lu = await supabaseLireRow('panel_colis_relais');
+  if (!lu.lu) return { status: 503, raison: 'pas-su' };
+  const e = lu.data && lu.data[String(tx)];
+  if (!e) return { status: 404, raison: 'inconnu' };
+  const n = notifRetraitConversation(e, String(tx));
+  if (!n) return { status: 200, envoye: false, raison: 'sans-code' };
+  const at = Date.parse(e.at || '');
+  if (!(at > Date.now() - RETRAIT_NOTIF_AGE_MAX_MS)) return { status: 200, envoye: false, raison: 'ancien' };
+  const envoye = await pushOnce(n.payload, 'colis', [], n.aussi);
+  return { status: 200, envoye: !!envoye };
 }
 
 // ── LA CLÉ PARTAGÉE AVEC LE SCRIPT GMAIL ────────────────────────────────────
@@ -1609,7 +1664,8 @@ export async function traiterEmail(req, res) {
         title: `${icons[track.status]} ${titles[track.status]}`,
         body: bodyNotifColis(track, carrier),
         tag: cleNotifColis(track, rowId), url: '/?tab=cat_achats',
-      }, track.status === 'available' ? 'colis' : 'suivi'); } catch (_) {}
+      }, track.status === 'available' ? 'colis' : 'suivi', [],
+      track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.201.0';
+const CODE_VERSION = '5.203.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1724,6 +1724,9 @@ async function storeHarvest(domain, type, id, body) {
   // pour Vinted Go (aucun email ne les porte).
   if (type === 'conversation') {
     try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r, uid); } catch (_) {}
+    // 5.203 : une conversation captée en passant dit aussi si une confirmation
+    // (« Tout est OK ») attend — ou si elle est réglée (l'entrée sort).
+    try { const c = confirmationDeConversation(parsed); if (c) await noterConfirmation(c, uid); } catch (_) {}
   }
 
   // Une fiche d'annonce vient d'arriver → on la met au COFFRE (texte complet +
@@ -4464,7 +4467,7 @@ function retraitDeConversation(conv) {
     // ⚠️ CÔTÉ ACHETEUR UNIQUEMENT. Côté vendeur, « la commande est arrivée »
     // veut dire que l'ACHETEUR l'a reçue — ce n'est pas un colis pour nous.
     if (String(t.current_user_side || '') === 'seller') return null;
-    let trouve = null;
+    let trouve = null, arriveMs = null;
     for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
       if (!m || (m.entity_type !== 'action_message' && m.entity_type !== 'status_message')) continue;
       const e = m.entity || {};
@@ -4473,6 +4476,12 @@ function retraitDeConversation(conv) {
       const brut = titre + ' ' + sous;
       if (CONV_SORTANT.test(brut)) continue;   // un colis qui PART, jamais à retirer
       if (!CONV_ARRIVE.test(brut)) continue;
+      // 5.203 : la VRAIE date d'arrivée = l'heure du PREMIER message d'arrivée
+      // (`created_at_ts`, mesuré le 21 oct. : ISO avec décalage, « 2026-10-13T
+      // 10:08:35+02:00 »). Un rappel plus tardif ne la repousse pas. Illisible ⇒
+      // rien (l'app retombe sur « au plus tard », jamais une date inventée).
+      const ms = msDeTsMessage(m);
+      if (ms && (arriveMs === null || ms < arriveMs)) arriveMs = ms;
       // On garde le HTML BRUT : « Scanne ton code de retrait » est un LIEN, et
       // c'est derrière lui que vit le QR (capture d'écran de Julien).
       trouve = { titre, sous, html: String(e.subtitle || ''), actions: e.actions || [] };
@@ -4530,9 +4539,22 @@ function retraitDeConversation(conv) {
       photo: (t.item_photo && t.item_photo.url) || null,
       lieu, code, qr, transporteur, conv: cid,
       url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
+      ...(arriveMs ? { arriveLe: new Date(arriveMs).toISOString() } : {}),
       at: new Date().toISOString(),
     };
   } catch (_) { return null; }
+}
+// L'heure d'un message de conversation (5.203). Vinted l'écrit en ISO avec
+// décalage (mesuré) ; une forme en secondes ou millisecondes est lue aussi.
+// Rend des millisecondes, ou `null` (illisible, ou absurde : avant 2020 ou plus
+// d'un jour dans le futur) — jamais une date devinée.
+function msDeTsMessage(m) {
+  const v = m && (m.created_at_ts ?? (m.entity && m.entity.created_at_ts) ?? m.created_at);
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  const ms = Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(v));
+  if (!Number.isFinite(ms) || ms < Date.UTC(2020, 0, 1) || ms > Date.now() + 86400000) return null;
+  return ms;
 }
 
 // La ligne DÉDIÉE que l'app lit (motif anti-clobber §35 : le panneau n'écrit
@@ -4562,8 +4584,17 @@ async function noterRetrait(r, uid) {
     const avant = cur[r.tx];
     // Un message plus récent qui ne NOMME pas le transporteur ne l'efface pas.
     if (!r.transporteur && avant && avant.transporteur) r = { ...r, transporteur: avant.transporteur };
+    // 5.203 : la date d'arrivée déjà rangée est la PREMIÈRE vue — un rappel
+    // relu plus tard ne la repousse pas, une relecture sans elle ne l'efface pas.
+    if (avant && avant.arriveLe && !isNaN(Date.parse(avant.arriveLe))
+        && (!r.arriveLe || Date.parse(avant.arriveLe) <= Date.parse(r.arriveLe))) r = { ...r, arriveLe: avant.arriveLe };
     // Rien de neuf → aucune écriture (égress, §34).
-    if (avant && avant.code === r.code && avant.lieu === r.lieu && avant.qr === r.qr && (avant.transporteur || '') === (r.transporteur || '')) return false;
+    if (avant && avant.code === r.code && avant.lieu === r.lieu && avant.qr === r.qr && (avant.transporteur || '') === (r.transporteur || '')
+        && (avant.arriveLe || '') === (r.arriveLe || '')) return false;
+    // 5.203 : un CODE NEUF (aucun avant, ou un autre) appelle « 📍 Colis à
+    // retirer » — la voie email était seule à sonner. Seulement un vrai code
+    // (des chiffres, `CODE_APRES`) ; un lieu sans code ne sonne pas.
+    const codeNeuf = !!(r.code && /\d/.test(String(r.code)) && (!avant || avant.code !== r.code));
     const limite = Date.now() - RETRAIT_MAX_J * 86400000;
     const out = {};
     for (const k in cur) { const v = cur[k]; if (v && Date.parse(v.at || '') > limite) out[k] = v; }
@@ -4572,8 +4603,218 @@ async function noterRetrait(r, uid) {
     if (ok === false) { noterDiag('retrait_conv_ecriture_ratee'); return null; }
     noterDiag('retrait_conv_ecrit');
     if (uid) notifierApp({ type: 'maj', quoi: 'retrait', uid: String(uid), tx: String(r.tx) });
+    if (codeNeuf) { await mettreNotifRetrait(r.tx); await envoyerNotifsRetrait(); }
     return true;
   } catch (_) { return null; }
+}
+
+// ── « 📍 COLIS À RETIRER » QUAND L'EXTENSION RANGE UN CODE NEUF (5.203) ─────
+// Seul le serveur sait envoyer une notification (clé VAPID). On lui dit QUELLE
+// transaction (jamais le code ni le lieu : il relit SA ligne `panel_colis_relais`
+// avec la session du vendeur, et décide). L'anti-doublon vit chez lui
+// (`push_dedup`, partagé avec la voie email par le code de retrait).
+// La file vit dans `chrome.storage.local` (§4.9) : un envoi raté (réseau, 5xx,
+// session absente) est retenté à la visite suivante, 24 h au plus ; un refus
+// jugé (4xx) est oublié. Le serveur dédoublonne : un nouvel essai ne sonne pas
+// deux fois.
+const NOTIF_RETRAIT_URL = 'https://vrm.center/api/push';
+const NOTIF_RETRAIT_MAX_MS = 24 * 3600000;
+async function mettreNotifRetrait(tx) {
+  try {
+    if (!/^\d+$/.test(String(tx || ''))) return;
+    const f = (await chrome.storage.local.get('vrmRetraitNotifs')).vrmRetraitNotifs || {};
+    if (!f[tx]) f[tx] = { at: Date.now(), essais: 0 };
+    await chrome.storage.local.set({ vrmRetraitNotifs: f });
+  } catch (_) {}
+}
+async function envoyerNotifsRetrait() {
+  try {
+    const f = (await chrome.storage.local.get('vrmRetraitNotifs')).vrmRetraitNotifs || {};
+    const txs = Object.keys(f);
+    if (!txs.length) return 0;
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('retrait_notif_sans_session'); return 0; }   // pas su : on garde
+    let n = 0;
+    for (const tx of txs.slice(0, 5)) {
+      const e = f[tx] || {};
+      if (Date.now() - Number(e.at || 0) > NOTIF_RETRAIT_MAX_MS) { delete f[tx]; continue; }
+      let status = 0;
+      try {
+        const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+        const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+          body: JSON.stringify({ action: 'retrait', tx: String(tx) }) });
+        clearTimeout(t); status = r.status;
+      } catch (_) { status = 0; }
+      if (status >= 200 && status < 300) { delete f[tx]; n++; noterDiag('retrait_notif_envoyee'); }
+      else if (status >= 400 && status < 500 && status !== 401 && status !== 429) { delete f[tx]; noterDiag(`retrait_notif_refus_${status}`); }
+      else { f[tx] = { ...e, essais: Number(e.essais || 0) + 1 }; noterDiag(`retrait_notif_ko_${status || 'reseau'}`); }
+    }
+    await chrome.storage.local.set({ vrmRetraitNotifs: f });
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ══ À CONFIRMER AVANT LA DATE LIMITE (5.203, 21 octobre) ═════════════════════
+// MESURÉ en lecture seule sur sa base (21 oct.) : le seul message qui porte une
+// date limite de confirmation est l'action « Confirmation nécessaire » —
+// `event_type: delivered`, actions `all_is_good` (« Tout est OK ») et
+// `i_have_issues`, `interpolation_values.subtitle.return_shipment_date`
+// (« 21 sept. 15:59 », SANS année), « tu disposeras de 2 jours ». Vu dans 2
+// conversations, toutes deux côté VENDEUR, `event_group: return_shipment` :
+// c'est un RETOUR qui lui revient (vente en statut 440) et qu'il doit vérifier.
+// Côté acheteur, aucune conversation captée ne porte ce message (13 achats :
+// « Livrée » puis « Profite de ta commande ! »). La règle est donc posée sur la
+// FORME du message (l'action `all_is_good`), pas sur le côté : un achat qui la
+// porte un jour est pris pareil (`quoi: 'achat'`), un retour (`'retour'`).
+// En attente seulement si c'est la DERNIÈRE action de la conversation (une
+// action plus récente — « Ta vente est finalisée », un remboursement — dit que
+// c'est réglé). L'ANNÉE se lit sans deviner : le message a sa date complète
+// (`created_at_ts`) ; on garde l'année (ou la suivante) qui place la limite
+// entre la veille du message et 30 jours après. Sinon : `limiteMs: null`, « pas
+// su », et l'app recopie le texte de Vinted tel quel.
+const CONFIRMER_ACTION = 'all_is_good';
+const MOIS_FR = { 'janv': 0, 'jan': 0, 'févr': 1, 'fevr': 1, 'fév': 1, 'fev': 1, 'mars': 2, 'mar': 2, 'avr': 3, 'mai': 4, 'juin': 5,
+  'juil': 6, 'août': 7, 'aout': 7, 'sept': 8, 'sep': 8, 'oct': 9, 'nov': 10, 'déc': 11, 'dec': 11 };
+// L'instant UTC d'une heure de Paris (le texte de Vinted est en heure de Paris).
+function msDeParis(y, mo, d, h, mi) {
+  const voulu = Date.UTC(y, mo, d, h, mi);
+  let g = voulu;
+  for (let i = 0; i < 2; i++) {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }).formatToParts(new Date(g))) p[x.type] = Number(x.value);
+    g += voulu - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+  }
+  return g;
+}
+// « 21 sept. 15:59 » + l'instant du message ⇒ { limiteMs, limite: 'AAAA-MM-JJTHH:MM' } ou null.
+function limiteDeConfirmation(texte, msgMs) {
+  const m = String(texte || '').trim().match(/^(\d{1,2})\s+([a-zéûô]+)\.?(?:\s+(\d{1,2})[:h](\d{2}))?/i);
+  if (!m || !msgMs) return null;
+  const mo = MOIS_FR[m[2].toLowerCase()];
+  const d = Number(m[1]), h = m[3] != null ? Number(m[3]) : 23, mi = m[4] != null ? Number(m[4]) : 59;
+  if (mo == null || d < 1 || d > 31 || h > 23 || mi > 59) return null;
+  const y0 = new Date(msgMs).getUTCFullYear();
+  for (const y of [y0, y0 + 1]) {
+    if (new Date(Date.UTC(y, mo, d)).getUTCMonth() !== mo) continue;     // 31 sept. : n'existe pas
+    const ms = msDeParis(y, mo, d, h, mi);
+    if (ms >= msgMs - 86400000 && ms <= msgMs + 30 * 86400000) {
+      return { limiteMs: ms, limite: `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}` };
+    }
+  }
+  return null;
+}
+// Rend null (rien à juger : pas de transaction), { tx, resolu: true } (aucune
+// confirmation en attente), ou l'entrée à ranger.
+function confirmationDeConversation(conv) {
+  try {
+    const c = (conv && conv.conversation) || conv || {};
+    const t = c.transaction || {};
+    const tx = String(t.id || '');
+    if (!/^\d+$/.test(tx)) return null;
+    const msgs = Array.isArray(c.messages) ? c.messages : [];
+    let derniere = null, derniereMs = -1;
+    for (const m of msgs) {
+      if (!m || m.entity_type !== 'action_message') continue;
+      const ms = msDeTsMessage(m) || 0;
+      if (ms >= derniereMs) { derniere = m; derniereMs = ms; }
+    }
+    const e = (derniere && derniere.entity) || {};
+    const acts = Array.isArray(e.actions) ? e.actions : [];
+    if (!derniere || !acts.some(a => a && a.action === CONFIRMER_ACTION)) return { tx, resolu: true };
+    const iv = (e.interpolation_values && e.interpolation_values.subtitle) || {};
+    const brut = String(iv.return_shipment_date || '').trim();
+    const msgMs = msDeTsMessage(derniere);
+    const lim = limiteDeConfirmation(brut, msgMs);
+    const cid = String(c.id || '');
+    const cote = String(t.current_user_side || '');
+    return {
+      tx, conv: cid, item: String(t.item_id || ''),
+      titre: String(t.item_title || c.subtitle || c.description || '').slice(0, 120),
+      photo: (t.item_photo && t.item_photo.url) || null,
+      quoi: (derniere.event_group === 'return_shipment' || cote === 'seller') ? 'retour' : 'achat',
+      limiteTexte: brut.slice(0, 40),
+      limite: lim ? lim.limite : null, limiteMs: lim ? lim.limiteMs : null,
+      msgAt: msgMs ? new Date(msgMs).toISOString() : null,
+      url: c.conversation_url || (cid ? `https://www.vinted.fr/inbox/${cid}` : ''),
+      at: new Date().toISOString(),
+    };
+  } catch (_) { return null; }
+}
+// La ligne DÉDIÉE (`panel_a_confirmer`, jamais `main`), indexée par transaction.
+// Lire-fusionner-réécrire GARDÉ : une lecture ratée n'écrit RIEN. Une entrée
+// réglée (`resolu`) est retirée ; une entrée dont la limite est passée depuis
+// 7 jours (ou lue il y a plus de 30 jours) est purgée. Rend true (écrit) ·
+// false (rien de neuf) · null (la base n'a pas répondu ou a refusé).
+async function noterConfirmation(c, uid) {
+  if (!c || !c.tx) return false;
+  try {
+    const rows = await sbGet('app_data?id=eq.panel_a_confirmer&select=data');
+    if (rows === null) return null;
+    const cur = (rows[0] && rows[0].data) || {};
+    const avant = cur[c.tx];
+    if (c.resolu && !avant) return false;
+    const entree = c.resolu ? null : { ...c, uid: String(uid || '') };
+    if (avant && entree && avant.limite === entree.limite && avant.limiteTexte === entree.limiteTexte
+        && avant.conv === entree.conv && avant.quoi === entree.quoi && avant.uid === entree.uid) return false;
+    const out = {};
+    const tropVieux = Date.now() - 30 * 86400000, limPassee = Date.now() - 7 * 86400000;
+    for (const k in cur) {
+      const v = cur[k]; if (!v || k === c.tx) continue;
+      if (Number.isFinite(v.limiteMs) && v.limiteMs < limPassee) continue;
+      if (!(Date.parse(v.at || '') > tropVieux)) continue;
+      out[k] = v;
+    }
+    if (entree) out[c.tx] = entree;
+    const ok = await supabaseUpsert('app_data', [{ id: 'panel_a_confirmer', data: out }], 'id');
+    if (ok === false) { noterDiag('confirmer_ecriture_ratee'); return null; }
+    noterDiag(entree ? 'confirmer_ecrit' : 'confirmer_regle');
+    if (uid) notifierApp({ type: 'maj', quoi: 'confirmer', uid: String(uid), tx: String(c.tx) });
+    return true;
+  } catch (_) { return null; }
+}
+// Les conversations à lire : un ACHAT « Commande livrée » qui attend son geste
+// (`needs_action`), et une VENTE dont le retour est en cours (« Retour initié »,
+// le colis qui revient) — jamais une commande finalisée, annulée, remboursée.
+const A_CONFIRMER_ACHAT = (o) => !!o && /livr[ée]e/i.test(String(o.status || '')) && !/pas encore|non r[ée]clam|finalis|annul|rembours/i.test(String(o.status || ''))
+  && String(o.transaction_user_status || '') === 'needs_action';
+const A_CONFIRMER_RETOUR = (o) => !!o && /retour/i.test(String(o.status || '')) && !/finalis|annul|rembours|effectu/i.test(String(o.status || ''));
+const CONFIRMER_MAX_PAR_VISITE = 3;
+async function capterConfirmations(uid) {
+  try {
+    if (!uid) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const ra = await sbGet(`app_data?id=eq.harvest_${uid}_orders_purchased&select=v:data->payload->my_orders`);
+    const rv = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
+    if (ra === null || rv === null) return 0;                                   // pas su : rien
+    const liste = (r) => (r && r[0] && Array.isArray(r[0].v)) ? r[0].v : [];
+    const cibles = [...liste(ra).filter(A_CONFIRMER_ACHAT), ...liste(rv).filter(A_CONFIRMER_RETOUR)]
+      .filter(o => o.conversation_id != null && o.transaction_id != null);
+    if (!cibles.length) return 0;
+    const memo = (await chrome.storage.local.get('vrmConfirmerFaits')).vrmConfirmerFaits || {};
+    let n = 0;
+    for (const o of cibles) {
+      if (n >= CONFIRMER_MAX_PAR_VISITE) break;
+      const cid = String(o.conversation_id);
+      if (memo[cid] && Date.now() - Number(memo[cid]) < BORD_RETRY_MS) continue;
+      const refus = await gardeLecture(uid, acc, 'colis');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Colis à confirmer non lu : ${refus.error}`); break; }
+      memo[cid] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/conversations/${encodeURIComponent(cid)}`);
+      if (!rep.ok || !rep.json) { noterDiag(`confirmer_conv_refuse_${rep.status}`); if (memoApresEchec(memo, cid, rep, BORD_RETRY_MS)) break; continue; }
+      const c = confirmationDeConversation(rep.json);
+      if (!c) { noterDiag('confirmer_conv_sans_transaction'); continue; }
+      // L'identité de la commande prime : la conversation doit porter SA transaction.
+      if (String(c.tx) !== String(o.transaction_id)) { noterDiag('confirmer_conv_autre_tx'); continue; }
+      const ecrit = await noterConfirmation(c, uid);
+      if (ecrit === null) { delete memo[cid]; break; }
+    }
+    await chrome.storage.local.set({ vrmConfirmerFaits: memo });
+    return n;
+  } catch (_) { return 0; }
 }
 
 // ── LES TRANSACTIONS QUI NE S'EXPÉDIENT PLUS (17 octobre, besoin du chantier 4).
@@ -5512,6 +5753,10 @@ async function visiteVinted() {
     //    sur eBay). La moisson de 20:34 l'aurait prouvée dans la minute.
     await capterPreuvesVente(uid);
     await capterRetraits(uid);
+    // 5.203 : les notifications « colis à retirer » restées en file (envoi raté)
+    // et les colis à confirmer avant leur date limite.
+    await envoyerNotifsRetrait();
+    await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
     // (le CA déclaré est daté à ce jour-là — demande du 3 octobre).
