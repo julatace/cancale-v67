@@ -150,13 +150,18 @@ async function brancher(p){
     if(nom==='Vinted'){
       await p.locator('.vrm-sale-row').first().waitFor();
       // (20 oct.) Vente « une ligne » (#596-#598) : la photo agrandissable vit dans la vente ouverte.
-      await p.evaluate(()=>{const r=document.querySelector('.vrm-sale-row[data-ligne-ouverte="false"]');if(r)r.querySelector('.vrm-ledger-sale-toggle').click();});
-      await p.locator('.vrm-sale-row').first().getByRole('button',{name:/Agrandir la photo/}).waitFor();
-      await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});
-      check(await p.locator('.vrm-sale-row').first().locator('img').first().evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
+      // (21 oct.) Ouverte, la vente se détaille dans un TIROIR (portail, `aria-controls` de sa ligne).
+      const idT=await p.evaluate(()=>{const r=document.querySelector('.vrm-sale-row');const t=r&&r.querySelector('.vrm-ledger-sale-toggle');if(!t)return null;if(r.getAttribute('data-ligne-ouverte')==='false')t.click();return t.getAttribute('aria-controls');});
+      const zoneV=idT?p.locator(`[id="${idT}"]`):p.locator('.vrm-sale-row').first();
+      await zoneV.getByRole('button',{name:/Agrandir la photo/}).waitFor();
+      await zoneV.locator('img').first().evaluate(e=>e.complete&&e.naturalWidth>0?1:new Promise(ok=>{e.addEventListener('load',ok,{once:true});setTimeout(ok,8000);}));
+      check(await zoneV.locator('img').first().evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
+      if(idT){await p.locator(`[id="${idT}"] button[aria-label="Fermer les détails de la vente"]`).click().catch(()=>{});await p.waitForTimeout(300);}
       const outil=await p.locator('.vrm-sales-workbar').boundingBox();
-      const liste=await p.locator('.vrm-sale-row').first().boundingBox();
-      const fin=await p.locator('.vrm-sale-row').last().boundingBox();
+      // Les tiroirs (cachés) portent aussi `.vrm-sale-row` : on mesure la LISTE seule.
+      const lignes=p.locator('.vrm-sale-row:not(.vrm-ledger-drawer .vrm-sale-row)');
+      const liste=await lignes.first().boundingBox();
+      const fin=await lignes.last().boundingBox();
       const analyse=await p.locator('.vrm-sales-analysis').boundingBox();
       check(outil.y+outil.height<=liste.y && outil.height<150, 'outils regroupés et compacts avant les ventes '+width);
       check(analyse.y>=fin.y+fin.height, 'analyse placée après la liste '+width);
@@ -165,7 +170,7 @@ async function brancher(p){
    if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-desktop.png')});await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-390.png')});}
    await p.setViewportSize({width:390,height:844});
    if(nom==='eBay'){
-    check((await p.locator('[data-ebay-vente="inconnu-1"]').locator('.vrm-sale-price').innerText()).trim()==='—','montant vide eBay affiché inconnu plutôt que zéro');
+    check((await p.locator('[data-ebay-vente="inconnu-1"]').locator('.vrm-ledger-sale-amount, .vrm-sale-price').first().innerText()).trim()==='—','montant vide eBay affiché inconnu plutôt que zéro');
     const search=p.getByLabel('Rechercher une vente');
     await search.fill('AcheteurOrdi');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay par acheteur');
     await search.fill('CHARGEUR-USB');check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'recherche eBay sur un article secondaire et son SKU');
@@ -180,21 +185,23 @@ async function brancher(p){
   await p.goto(base+'/?tab=plat_vinted');
   await p.getByLabel('Rechercher dans les ventes Vinted').fill('Nike');
   await p.waitForFunction(()=>{const img=document.querySelector('.vrm-sale-row img');return img?.complete && img.naturalWidth>0;});check(await p.locator('.vrm-sale-row').first().locator('img').first().evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo de vente retrouvée depuis transaction sans annonce ni archive');
-  await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===1);
+  await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row:not(.vrm-ledger-drawer .vrm-sale-row)').length===1);
   await p.getByLabel('Rechercher dans les ventes Vinted').evaluate(e=>e.blur());
-  const vente=p.locator('.vrm-sale-row').first();
+  const ligneV=p.locator('.vrm-sale-row:not(.vrm-ledger-drawer .vrm-sale-row)').first();
   // (20 oct.) La vente « une ligne » s'ouvre d'abord, puis « Modifier ».
-  if((await vente.getAttribute('data-ligne-ouverte'))==='false') await vente.locator('.vrm-ledger-sale-toggle').click();
+  // (21 oct.) Ouverte, elle se détaille dans un TIROIR (`aria-controls`).
+  if((await ligneV.getAttribute('data-ligne-ouverte'))==='false') await ligneV.locator('.vrm-ledger-sale-toggle').click();
+  const vente=p.locator(`[id="${await ligneV.locator('.vrm-ledger-sale-toggle').getAttribute('aria-controls')}"]`);
   await vente.locator('.vrm-sale-details > summary').click();
   await vente.getByPlaceholder("prix d'achat",{exact:true}).fill('40');await vente.getByPlaceholder("prix d'achat",{exact:true}).press('Tab');
   await vente.getByText('Détail des frais et du bénéfice',{exact:true}).click();
   await vente.getByLabel('Commission plateforme',{exact:true}).fill('10,50');await vente.getByLabel('Commission plateforme',{exact:true}).press('Tab');
-  await p.waitForFunction(()=>document.querySelector('.vrm-sale-price')?.textContent.includes('69,50'));
+  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('69,50'));
   check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'frais déduits et bénéfice indiqué estimé');
   await vente.getByRole('checkbox',{name:/Tous les frais sont renseignés/}).check();
   check(!(await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'confirmation des frais rend le bénéfice complet');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3');await vente.getByLabel('Port payé par moi',{exact:true}).press('Tab');
-  await p.waitForFunction(()=>document.querySelector('.vrm-sale-price')?.textContent.includes('66,50'));
+  await p.waitForFunction(()=>document.querySelector('.vrm-ledger-drawer-host:not([hidden]) .vrm-sale-price')?.textContent.includes('66,50'));
   check((await vente.locator('.vrm-sale-price').innerText()).includes('estimé'),'nouveau frais déduit et confirmation invalidée');
   await vente.getByLabel('Port payé par moi',{exact:true}).fill('3abc');await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.blur());
   check(!(await vente.getByLabel('Port payé par moi',{exact:true}).evaluate(e=>e.validity.valid)),'montant invalide refusé sans modifier le bénéfice');
@@ -206,6 +213,8 @@ async function brancher(p){
 
   // Fermer le clavier simulé après saisie et changements de largeur avant de naviguer.
   await p.evaluate(()=>document.activeElement?.blur());
+  // (21 oct.) Le tiroir de la vente (feuille du bas sur téléphone) se ferme avant de naviguer, comme lui.
+  await vente.locator('button[aria-label="Fermer les détails de la vente"]').click().catch(()=>{});
   const navigation=p.getByRole('navigation',{name:'Navigation principale'});
   await navigation.getByRole('button',{name:'Gestion',exact:true}).click();await p.getByRole('menuitem',{name:'Stock',exact:true}).click();
   await navigation.getByRole('button',{name:'Vinted',exact:true}).click();await p.locator('.vrm-platform-tabs').getByRole('button',{name:'Ventes',exact:true}).click();

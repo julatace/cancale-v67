@@ -87,7 +87,10 @@ async function main() {
         // ── Phase 2 : base KO, on recharge → BaseInjoignable montre le code ────
         baseDown = true;
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(2500);
+        // On attend l'ÉTAT (la panne dite), jamais un délai fixe : sous charge,
+        // les trois essais de la sonde de schéma dépassent 2,5 s.
+        await pg.waitForFunction(() => /joindre tes données/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(500);
         const vu = await pg.evaluate(() => {
           const bloc = document.querySelector('[data-codes-hors-ligne]');
           return { base: /Je n’arrive pas à joindre tes données|joindre tes données/.test(document.body.innerText), aBloc: !!bloc, texte: bloc ? bloc.innerText : '' };

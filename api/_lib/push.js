@@ -102,6 +102,7 @@ export const PUSH_DEFAUT = {
   colis:    true,   // colis à retirer (porte le code de retrait)
   offre:    true,   // une offre attend une réponse
   expedier: true,   // colis à poster (rappel quotidien)
+  soir:     true,   // la veille au soir : « Demain : N colis à poster » (api/ship-reminders.js?moment=soir)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
   doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)

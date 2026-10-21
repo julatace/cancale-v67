@@ -79,7 +79,10 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
     const plie=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().evaluate(e=>{const r=e.getBoundingClientRect();return {h:r.height,visible:r.width>0&&r.height>0};}).catch(()=>null);
     if(plie){check(plie.visible && plie.h<=64,'ligne repliée compacte '+tab+' ('+Math.round(plie.h)+' px)');
       await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});}
-    const pos=await p.locator('.vrm-sale-row').first().evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
+    // (21 oct.) La vente ouverte se détaille dans un TIROIR (portail, `aria-controls` du bouton de la ligne) : on y mesure.
+    const idT=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().getAttribute('aria-controls').catch(()=>null);
+    const cibleVente=idT&&await p.locator(`[id="${idT}"] .vrm-sale-row`).count()?p.locator(`[id="${idT}"] .vrm-sale-row`).first():p.locator('.vrm-sale-row').first();
+    const pos=await cibleVente.evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
     // ⚠️ L'écran Ventes de Vinted a sa propre liste depuis le 16 octobre (b8d11f2, « Ventes premium », `.vrm-ventes-liste` : vignette CARRÉE 56 × 56 sur téléphone) ; Leboncoin et eBay gardent la ligne partagée 64 × 84. Chaque liste est jugée sur SA taille exacte, photo à gauche des informations.
     //    Et depuis #545 (« plateformes premium », 16 octobre) Leboncoin et eBay ont, AU TÉLÉPHONE, leur ligne d'app native
     //    (`styles-mineral.css` : vignette portrait 52 × 68). Ce banc est à 390 px : c'est cette taille-là qu'il exige.

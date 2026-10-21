@@ -210,23 +210,27 @@ async function main() {
           if (vp.width < 600) await tog.tap(); else await tog.click();
           await pg.waitForTimeout(400);
         }
-        const btn = row.locator('[data-cout-vente-saisir]');
+        // (21 oct.) La vente ouverte se détaille dans un TIROIR (portail sur
+        // <body>, `aria-controls` du bouton de la ligne) : on y cherche.
+        const idTiroir = await row.locator('.vrm-ledger-sale-toggle').first().getAttribute('aria-controls').catch(() => null);
+        const zone = idTiroir ? pg.locator(`[id="${idTiroir}"]`) : row;
+        const btn = zone.locator('[data-cout-vente-saisir]');
         dit((await btn.count()) === 1 && (await btn.isVisible()), `${T} « Saisir le prix » est visible sur la vente, sans ouvrir « Modifier »`);
-        dit((await row.locator('[data-cout-vente-relier]').count()) === 1, `${T} « Relier un achat » est juste à côté`);
+        dit((await zone.locator('[data-cout-vente-relier]').count()) === 1, `${T} « Relier un achat » est juste à côté`);
         const h = await btn.evaluate((e) => Math.round(e.getBoundingClientRect().height));
         dit(h >= 44, `${T} « Saisir le prix » est une cible d’au moins 44 px`, h + ' px');
-        const benefAvant = await row.locator('[data-benef-vente]').getAttribute('data-benef-vente').catch(() => null);
+        const benefAvant = await zone.locator('[data-benef-vente]').getAttribute('data-benef-vente').catch(() => null);
         if (vp.width < 600) await btn.tap(); else await btn.click();
-        await row.locator('[data-cout-vente-champ]').waitFor({ timeout: 3000 });
+        await zone.locator('[data-cout-vente-champ]').waitFor({ timeout: 3000 });
         await pg.keyboard.type('25');
         await capture(pg, `vente-saisie-${vp.width}`);
-        await row.locator('[data-cout-vente-ok]').click();
+        await zone.locator('[data-cout-vente-ok]').click();
         await pg.waitForTimeout(1800);
-        const benef = await row.locator('[data-benef-vente]').getAttribute('data-benef-vente').catch(() => null);
+        const benef = await zone.locator('[data-benef-vente]').getAttribute('data-benef-vente').catch(() => null);
         dit(benef === '55.00', `${T} le bénéfice de CETTE vente passe à 80 − 25 = 55`, `avant ${benefAvant} · après ${benef}`);
         const ov = ((dernierMain() || {}).vinted_sale_overrides || {})['9301'];
         dit(!!ov && ov.buyPrice === '25,00' && !ov.buyFromId, `${T} écrit dans vinted_sale_overrides[9301].buyPrice, sans achat relié`, JSON.stringify(ov || null));
-        dit((await row.locator('[data-cout-vente]').count()) === 0, `${T} une fois le coût connu, les deux boutons disparaissent`);
+        dit((await zone.locator('[data-cout-vente]').count()) === 0, `${T} une fois le coût connu, les deux boutons disparaissent`);
         dit((await deborde(pg)) <= 1, `${T} ventes : aucun débordement horizontal`);
         await capture(pg, `vente-apres-${vp.width}`);
         dit(errs.length === 0, `${T} aucune erreur de page`, errs.join(' | ').slice(0, 160));

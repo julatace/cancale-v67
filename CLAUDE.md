@@ -10665,6 +10665,107 @@ Julien : « des anti-bot, des captcha et une vérification par téléphone si po
 - Preuves : banc `captcha.cjs` (faux GoTrue qui refuse sans jeton ou jeton rejoué, faux Turnstile servi à la place de Cloudflare, il fabrique lui-même le build « clé posée » ; 390 tactile + 1512) — **54 contrôles** ; **34 rouges sur origin/main** (build d'avant : aucun widget, aucun jeton ; les 20 verts sont la section « clé vide » et les contrôles d'absence) ; mutation « jeton non joint » ⇒ **18 rouges**. `audit-anti-bot.cjs` (captcha.js exécuté, `api/relais.js` exécutée) : 17 contrôles, 7 rouges sur l'avant.
 - **Non mesuré** : le vrai Turnstile et le vrai GoTrue de production (formes tirées du code de GoTrue et de la doc) ; le texte exact du refus de GoTrue (traduit dès qu'il contient « captcha ») ; la politique de confidentialité devra citer Cloudflare (Turnstile) le jour où la clé est posée.
 
+### Discord sur téléphone, connexion refaite, accueil corrigé (21 octobre)
+Julien : « sur téléphone on ne peut pas se connecter à Discord », « l'accueil est nul et l'onglet connexion », « créer son compte VRM avec Discord ».
+- ⚠️⚠️ **Cause Discord** : sur iPhone, l'app d'écran d'accueil n'a pas les cookies de Safari, et l'app Discord renvoie le retour dans le navigateur par défaut ⇒ le nonce en cookie manquait toujours (« lien invalide »). Le `state` signé porte maintenant le ticket (`ts.owner.[cp].ticket.mac`, forme d'avant acceptée avec cookie). Même navigateur ⇒ comme avant. Autre navigateur ⇒ page « retourne dans VRM » (sans script, CSP stricte) et la preuve est rangée côté serveur (`app_data.discord_attente`, clé de service, owner = celui du state, empreinte sha256 du ticket) ; l'app qui a lancé la reprend (`POST mode=discord-attente {ticket}`, session, une fois, 15 min ; base muette ⇒ 503) au retour au premier plan (`src/communaute/discordAttente.js`, `ecouterDiscord` dans `AppCoeur`).
+  ⚠️⚠️ **Fermé le 21 oct. (revue de sécurité)** : quelqu'un qui envoyait SON lien Discord à une autre personne récupérait le pseudo VÉRIFIÉ de celle-ci (l'app de l'expéditeur reprenait la preuve d'office). Dans l'autre navigateur la page montre maintenant un **code à 6 chiffres** (sans la preuve) ; `discord-attente` ne rend la preuve qu'avec lui (`requis` · `faux` 5 essais, chacun compté par comparer-et-échanger AVANT la réponse, non compté ⇒ 503 · `epuise` ⇒ ligne effacée) ; l'app le demande (`DemandeCodeDiscord`, sur la coque). Corrigé au passage : la reprise ne rechargeait pas quand seul le fragment changeait, et fermer la feuille (retour d'historique) annulait la navigation. `audit-discord-oauth.cjs` 32 contrôles (8 rouges sur l'avant ; mutations `sanssignature|sanspreuve|sansempreinte|sanscode|sanscompte` rouges) ; banc `discord-compte.cjs` 45 (8 rouges sur le build d'avant). ⚠️ Portée réelle : la saisie à la main d'un pseudo Discord reste permise sur la carte, et « vérifié » n'est montré à personne d'autre — ce défaut cassait la promesse de la vérification, pas une barrière visible.
+- **Connexion** (`AuthScreen`) : marque sur l'ardoise (deux colonnes ≥ 900 px, en-tête sur téléphone), champs 50 px / 16 px (Safari ne zoome plus), liens 44 px, la phrase « Retrouve ta boutique » retirée (redite). Logique intacte.
+- **Créer son compte avec Discord** : le bouton existe déjà (`OAUTH_PROVIDERS`, affiché seulement si Supabase l'active : `providerEnabled`) ; il dit « Créer mon compte avec Discord » en inscription. Le vérificateur PKCE est aussi gardé 10 min dans `localStorage` (retour dans un nouvel onglet). ⚠️ **Geste de Julien** : Supabase → Authentication → Providers → Discord : activer, coller l'identifiant de l'application Discord et son secret ; dans l'application Discord (OAuth2 → Redirects), ajouter `https://lgonxzrzjcqthjtbdpzo.supabase.co/auth/v1/callback`. Mesuré le 21 oct. : aucune identité Discord en base (4 comptes par email).
+- **Accueil** : « VR / M » coupé dans la colonne VRM/Toi corrigé, plateformes en pastilles de couleur (plus de faux boutons), textes plus lisibles. `accueil.cjs` 171 verts.
+- **Sécurité** : `Referrer-Policy`, `Permissions-Policy` (caméra, micro, position : le site seul ; paiement, USB… coupés), `Cross-Origin-Opener-Policy: same-origin-allow-popups`, HSTS. Conseillers Supabase : rien d'anormal (tables fermées et fonctions « ma donnée seulement » voulues). Erreurs de production : aucune depuis le 20 oct. midi.
+
+### La date d'arrivée de chaque colis à retirer (21 octobre)
+Julien : « Améliore les colis, je veux que l'on voie la date à laquelle il est arrivé. »
+- **Une règle** (`api/_lib/arrivee-colis.js`, importée par l'app ET `api/email-inbound`, §11) ; une ligne `LigneArrivee` sous le titre de chaque carte d'Achats → À retirer (email, colis vu par Vinted, retirés en attente, jamais retirés) : « Arrivé le 18 oct. · il y a 3 j », neutre ; `data-arrive-le="AAAA-MM-JJ"` (ou `inconnue`) et `data-arrive-sur="oui|borne"`. Elle était cachée dans « Détails du colis » et FAUSSE une fois sur cinq.
+- ⚠️⚠️ **Mesuré (lecture seule)** : `email_track_*.receivedAt` est la date du DERNIER email — les rappels (« Le temps file… », « Libère de la place dans la consigne… ») réécrivent la ligne : **6 des 30** colis « disponibles » portaient la date d'un rappel. Email d'arrivée (« … est disponible », « … est arrivé en relais ») ⇒ date sûre ; rappel, « TR : », sujet inconnu ⇒ « **Arrivé au plus tard le** » ; le serveur garde désormais `arriveLe` (premier email d'arrivée, relu sur la ligne d'avant) — les lignes déjà rangées n'en ont pas.
+- **Colis vu seulement par Vinted** : aucune date d'arrivée en base (la commande porte la date d'ACHAT, la transaction celle du paiement — mesuré sur ses 3 colis ; leurs conversations ne sont pas rangées). `panel_colis_relais.at` = heure de LECTURE par l'extension ⇒ « au plus tard » ; rien ⇒ « Date d'arrivée inconnue ». Jamais l'heure de capture présentée comme l'arrivée.
+- Preuves : banc `colis-arrivee.cjs` (390 tactile + 1512, données inventées) **16 rouges sur le build d'avant**, rouge sous la mutation « rappel daté comme l'arrivée » (4) ; `audit-arrivee-colis.cjs` (la vraie route : « disponible » le 16 puis rappel le 20 ⇒ `arriveLe` le 16) 2 rouges sur l'avant, rouge si la ligne d'avant n'est pas passée.
+- Non fait : Colis (à expédier) — rien ne date l'arrivée chez l'acheteur ; l'extension pourrait ranger l'heure du MESSAGE d'arrivée de la conversation (`created_at_ts`) — chantier extension.
+### Colis au point relais et rappel de la veille au soir (21 octobre)
+Julien : « fait tout » — deux notifications.
+- **Colis acheté arrivé au point relais** : la notification existait déjà
+  (`api/email-inbound.js`, catégorie **`colis`**, activée par défaut, « 📍 Colis
+  à retirer ») avec le lieu et le code (`bodyNotifColis` : `codeNotif` écarte
+  « suivant » et tout code sans chiffre ; le QR n'entre jamais dans le texte).
+  **Aucune préférence nouvelle** : en créer une seconde pour la même chose serait
+  deux règles pour une notion (§11). ⚠️⚠️ **Défaut trouvé et corrigé** : toutes
+  les étapes d'un colis partageaient la clé anti-doublon `track-{suivi}` ; Julien
+  a activé « Suivi du colis » (`suivi: true`, mesuré le 11 oct.), donc le premier
+  « en transit » consommait la clé et **« arrivé au point de retrait » ne sonnait
+  jamais**. `cleNotifColis` : « à retirer » a sa clé `relais-{suivi}-code|sans`
+  (une fois par n° de suivi, et une seconde seulement si un email plus tardif
+  apporte le code qui manquait) ; les autres étapes gardent la clé d'avant à
+  l'identique. Ouvre `?tab=cat_achats`. ⚠️ Au déploiement, un colis déjà notifié
+  « à retirer » peut re-sonner UNE fois sur un rappel du transporteur (l'ancienne
+  clé n'est pas reprise en alias : elle aurait gardé le défaut).
+- **Rappel de la veille au soir** : second cron `vercel.json`
+  `/api/ship-reminders?moment=soir` à **18:00 UTC** (20 h à Paris l'été, 19 h
+  l'hiver ; le plan Hobby décale d'au plus une heure). Même route (12 fonctions),
+  même garde `CRON_SECRET`, boucle par vendeur, eBay relu d'abord. « Demain : N
+  colis à poster — dont X déjà en retard, Y avec la date limite demain ». N =
+  **la règle du widget et du bilan** (`txsAExpedier` : résumé de l'extension ou
+  `aExpedier`, cochés « posté » et masqués exclus, eBay par `colisEbay`) ; le
+  « dont » lit les dates limites des bordereaux de CES ventes et d'eBay (limite
+  aujourd'hui ou avant = en retard demain). Préférence nouvelle **`soir`**
+  (« 🌙 Colis de demain »), activée par défaut, la même dans `PUSH_CATS` et
+  `PUSH_DEFAUT`. Rien ne part : rien à poster, ventes Vinted illisibles, mémo
+  `soir_reminder_dedup` illisible / non écrit (écrit AVANT l'envoi, une fois par
+  jour de Paris), préférence coupée, abonnement coupé. eBay illisible ⇒ « au
+  moins N », eBay nommé. Le passage du soir n'envoie ni le rappel du matin, ni
+  l'URSSAF, ni le bilan. « Avant midi » n'est pas dit : aucune heure limite n'est
+  captée (les dates limites sont des jours).
+- Preuves : bancs `colis-relais-push.cjs` (vraie route des emails, 14 contrôles ;
+  3 rouges sur le code d'avant ; mutation « clé commune » 3 rouges) et
+  `rappel-soir.cjs` (vraie route, deux vendeurs, widget comparé, 17 contrôles ;
+  10 rouges sur le code d'avant ; mutations « sans mémo du jour » 2 rouges,
+  « eBay illisible dit complet » 1 rouge).
+- ⚠️ **Non mesuré** : que Vercel accepte un `path` de cron avec `?moment=soir`
+  (documenté, jamais vu passer ici) et le second cron sur ce plan — **si le
+  déploiement refuse `vercel.json`, retirer ce cron** (un cron refusé bloque tous
+  les déploiements) ; l'heure réelle d'exécution ; aucune notification réelle
+  envoyée. Le code de retrait lu par l'extension dans une conversation Vinted
+  (`panel_colis_relais`) ne déclenche aucune notification (extension non touchée).
+
+### « Tout sur le N° » : la recherche par numéro (21 octobre)
+Julien : « une recherche par numéro, partout ». La loupe de l'en-tête (la
+recherche globale existante, `gsOpen`) : un **numéro** tapé (« 128 », « B128 »,
+« n128 », « N°128 », « #128 », « 007 ») fait passer devant le bloc
+**`ToutSurLeNumero`** — la fiche (en ligne · à confirmer · plus en ligne), ses
+ventes Vinted / Leboncoin / eBay, l'annonce eBay, le bordereau (prêt · imprimé ·
+posté · en attente du PDF), le carton du Stock (meuble + case), le double
+(rouge, §5 — seul rouge du bloc) et la réattribution (`reattribue` : « remplacé
+par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque ligne
+(44 px) mène à son écran ; le Stock s'ouvre sur le carton coloré.
+- **Une règle pure** `toutSurLeNumero(q, données, règles, séries)`
+  (`src/rechercheNumero.js`) : par CLÉ (`cleNum`), jamais par sous-chaîne
+  (« 12 » ≠ 128), jamais par titre. Vente Vinted = correction posée sur la vente
+  (`vinted_sale_overrides.numero`), sinon transaction → annonce (`txnItem`) →
+  fiche. eBay (`numLigneEbay`, `numEbayLu` : lien, SKU + carte 013), Leboncoin
+  (`numeroLbcIdentite`), double (`conflitsDeNumeros`, annonce + vente à poster +
+  vente annulée avant l'envoi + Stock), Stock (`ouEstNumero`) : les règles de
+  l'app, injectées, pas réécrites (§11). « n128 » vaut 128 sauf si « N » est une
+  vraie série (préfixe ou archive).
+- **Archive B (013)** : « 128 » et « B128 » ne se mélangent jamais ; si l'ancien
+  existe, une ligne le dit (« L'ancien N°B128 existe aussi — le voir »).
+- **Trois états** : `trouve` · `rien` (tout lu, jamais servi) · `passu` (rien
+  trouvé et une source illisible — jamais « jamais servi ») ; ce qui n'a pas pu
+  être lu est nommé (`data-tout-manques`). Les sources sont lues UNE fois à
+  l'ouverture de la recherche (`numData`, chaque source `null` sur échec) :
+  dressings + règle « en ligne », ventes, transactions (scalaires,
+  `TXN_META_SELECT`), bordereaux (`meta->>_pdf`), ventes Leboncoin (annonces
+  seulement si une vente n'a pas de lien), commandes et annonces eBay (tous les
+  comptes, un illisible ⇒ pas su), et **le Stock dans sa ligne `vrm_room`** (la
+  copie de l'appareil peut manquer). La paire exacte n'est plus répétée dans la
+  liste « Paires numérotées » en dessous (§7).
+- Preuves : `audit-recherche-numero.cjs` (vraies règles d'App.jsx + module, 34
+  contrôles, deux paires au même titre N°40/N°41 jamais mélangées ; `--prouve`
+  **6/6** : sous-chaîne, titre, archive mélangée, pas su = rien, double ignoré,
+  correction ignorée) ; banc `bancs/recherche-numero.cjs` (port 8431, données
+  inventées, 390 tactile + 1512) — rouge sur le build d'avant, vert après.
+- **Non mesuré** : sa vraie base (données inventées) ; une vente reliée par sa
+  seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
+  faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

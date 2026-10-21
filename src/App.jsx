@@ -1,4 +1,5 @@
 import {resumerStockJournee} from './stockJournee.js';
+import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -16,6 +17,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
+import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -29,7 +31,7 @@ import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
-import { noterTicketDiscord, ecouterDiscord } from "./communaute/discordAttente.js";
+import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -10809,6 +10811,109 @@ function EmptyState({ icon, title, desc, action }) {
 // `icon` accepte soit un nom d'icône au trait (même jeu que la barre du bas —
 // l'écran et son onglet portent alors exactement le même symbole), soit un
 // emoji pour les écrans qui n'ont pas d'onglet dédié.
+// ── « TOUT SUR LE N° » : LE BLOC DE LA RECHERCHE (21 octobre) ──────────────
+// Rend ce que `toutSurLeNumero` (src/rechercheNumero.js) a trouvé PAR IDENTITÉ.
+// Aucune couleur (§7) sauf le rouge des deux paires présentes sous ce N° (§5).
+// Chaque ligne mène à son écran. `numData` absent = lecture en cours.
+function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
+  const lecture = !numData;
+  const nd = numData || {};
+  const numeros = load('vinted_annonce_numeros', {}) || {};
+  const cloud = isCloudReady();
+  const fichesLues = cloud || Object.keys(numeros).length ? numeros : null;
+  const shipDone = load('vinted_ship_done', {}) || {};
+  const liensLbc = load('vrm_lbc_liens', {}) || {};
+  const series = [prefixeNumeros(), archiveNumeros()];
+  const lu = (v) => (v === undefined ? null : v);
+  const rn = toutSurLeNumero(q, {
+    fiches: fichesLues, pool: cloud ? load('vinted_used_numeros', null) : null,
+    enLigne: lu(nd.enLigne), aConfirmer: nd.aConfirmer || null,
+    comptesOk: comptesRecherche(comptes),
+    ventes: lu(nd.ventes), txnItem: lu(nd.txnItem),
+    saleOv: load('vinted_sale_overrides', {}) || {},
+    bordereaux: lu(nd.bordereaux),
+    imprimes: load('vinted_bords_printed', {}) || {}, postes: shipDone,
+    lbcVentes: lu(nd.lbcVentes), ebayCommandes: lu(nd.ebayCommandes), ebayAnnonces: lu(nd.ebayAnnonces),
+    plan: lu(nd.plan),
+    archive: archiveNumeros(),
+  }, {
+    cleNum, conflits: conflitsDeNumeros, ouStock: ouEstNumero,
+    numEbayLigne: numLigneEbay,
+    numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
+    numLbc: (v) => numeroLbcIdentite(v, nd.lbcItems || null, liensLbc),
+    aPoster: (o) => aExpedier(o) && !shipDone[String(o.transaction_id)],
+    // Posté = le colis est parti (transit, relais, livré, finalisé) — la
+    // même étiquette que la carte de la vente (`etapeVente`, §11).
+    expediee: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).step >= 2,
+    revenue: (o) => classifyOrderStatus(o && o.status) === 'cancelled' && !/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test((o && o.status) || ''),
+  }, series);
+  if (rn.etat === 'invalide') return null;
+  const k = rn.cle;
+  const jour = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+  const lien = { minHeight: 44, background: 'transparent', border: 0, padding: 0, color: C.text, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 };
+  const ligne = (cle, attrs, titre, detail, onClick) => (
+    <button key={cle} type="button" className="vrm-tout-num-ligne" {...attrs} onClick={onClick}
+      style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</span>
+        {detail && <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 2 }}>{detail}</span>}
+      </span>
+      <span aria-hidden="true" style={{ fontSize: 17, color: C.muted }}>›</span>
+    </button>
+  );
+  const titreSec = (t) => <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, margin: '12px 2px 2px' }}>{t}</div>;
+  const ETAT_ANN = { 'en-ligne': 'En ligne sur Vinted', 'a-confirmer': 'À confirmer (dernière lecture ancienne)', 'plus-en-ligne': 'Plus en ligne', passu: 'Annonces pas encore lues' };
+  const ETAT_BORD = { pret: 'Prêt à imprimer', imprime: 'Imprimé', poste: 'Posté', attente: 'En attente du PDF' };
+  const { vinted, lbc, ebay } = rn.ventes;
+  const rien = rn.etat === 'rien';
+  const rienDautre = !rn.annonces.length && !vinted.length && !lbc.length && !ebay.length && !rn.annoncesEbay.length && !rn.stock && !rn.reattribues.length;
+  return (
+    <div data-tout-num={k} data-tout-etat={lecture && rn.etat !== 'trouve' ? 'lecture' : rn.etat} data-tout-lecture={lecture ? '1' : '0'} style={{ marginTop: 10, padding: '10px 12px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Tout sur le N°{k}</div>
+      {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}
+      {rn.double && (
+        <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.danger}`, color: C.danger, fontSize: 13, fontWeight: 600 }}>
+          Deux paires présentes portent le N°{k}. Vérifie les cartons avant d'imprimer un bordereau.
+          <button type="button" onClick={() => onNav('cat_annonces')} style={{ ...lien, display: 'block', marginTop: 4, color: C.danger }}>Voir dans Annonces</button>
+        </div>
+      )}
+      {rn.reattribues.map((r) => (
+        <div key={'r' + r.id + r.sens} data-tout-reattribue={r.sens} style={{ marginTop: 8, fontSize: 13, color: C.text }}>
+          {r.sens === 'parti'
+            ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'une paire'} » porte maintenant le <b>N°{r.vers}</b>. </>
+            : <>Ce numéro remplace le N°{r.de} (doublon réglé){r.ecrit ? '.' : ' — pas encore écrit sur le carton.'}</>}
+          {r.sens === 'parti' && <button type="button" onClick={() => onChercher(r.vers)} style={lien}>Voir le N°{r.vers}</button>}
+        </div>
+      ))}
+      {rn.annonces.length > 0 && titreSec('La paire')}
+      {rn.annonces.map((a) => ligne('a' + a.id, { 'data-tout-annonce': a.id, 'data-tout-annonce-etat': a.etat }, a.title || '(sans titre)', ETAT_ANN[a.etat] + (a.price ? ' · ' + prixCourt(String(a.price).replace(',', '.')) : ''), () => onNav('cat_annonces')))}
+      {(vinted.length + lbc.length + ebay.length + rn.annoncesEbay.length) > 0 && titreSec('Ventes et autres plateformes')}
+      {vinted.map((o) => ligne('v' + o._tx, { 'data-tout-vente': 'vinted', 'data-tout-tx': o._tx }, o.title || '(sans titre)', `Vente Vinted · ${etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label}${o.date ? ' · ' + jour(o.date) : ''}`, () => onNav('cat_ventes')))}
+      {lbc.map((v) => ligne('l' + v._id, { 'data-tout-vente': 'leboncoin' }, v.title || '(sans titre)', `Vente Leboncoin · ${lbcAnnulee(v) ? 'annulée' : lbcFinalisee(v) ? 'finalisée' : 'en cours'}${v.price != null ? ' · ' + lbcEuro(v.price) : ''}`, () => onNav('plat_leboncoin')))}
+      {ebay.map((c) => ligne('e' + c.orderId, { 'data-tout-vente': 'ebay' }, ((c.lineItems || [])[0] || {}).title || 'Commande eBay', `Vente eBay · ${commandeEbayEngagee(c) ? 'payée' : 'annulée ou remboursée'}${c.creationDate ? ' · ' + jour(c.creationDate) : ''}`, () => onNav('ebay_ventes')))}
+      {rn.annoncesEbay.map((a) => ligne('ea' + a.itemId, { 'data-tout-annonce-ebay': String(a.itemId) }, a.title || 'Annonce eBay', 'En vente sur eBay', () => onNav('ebay_annonces')))}
+      {rn.bordereaux.length > 0 && titreSec('Bordereau')}
+      {rn.bordereaux.map((b) => ligne('b' + b.tx, { 'data-tout-bord': b.tx, 'data-tout-bord-etat': b.etat }, ETAT_BORD[b.etat], 'Colis de la vente Vinted', () => onNav('cat_bord')))}
+      {(rn.stock || rn.annonces.length > 0) && titreSec('Stock')}
+      {rn.stock
+        ? ligne('s', { 'data-tout-stock': rn.stock.itemName || 'range' }, `Rangé : ${rn.stock.itemName || 'un meuble'}`, [rn.stock.roomName, rn.stock.nom].filter(Boolean).join(' · '), () => onStock(k))
+        : rn.annonces.length > 0 && <div data-tout-stock="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{rn.manques.includes('ton Stock') ? 'Stock pas encore lu.' : 'Pas rangé dans le Stock.'}</div>}
+      {rn.etat === 'trouve' && rienDautre && rn.servi &&
+        <div data-tout-servi="1" style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Ce numéro a déjà servi, mais aucune fiche ne le porte aujourd'hui.</div>}
+      {rien && <div data-tout-rien="1" style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Le N°{k} n'a jamais servi.</div>}
+      {!rien && rn.manques.length > 0 && (
+        <div data-tout-manques={rn.manques.length} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>
+          {lecture ? 'Lecture en cours…' : `Pas pu lire : ${rn.manques.join(', ')}.`}{rn.etat === 'passu' && !lecture ? ' Rien trouvé dans le reste — réessaie dans un instant.' : ''}
+        </div>
+      )}
+      {rn.ancien && (
+        <button type="button" data-tout-ancien={rn.ancien} onClick={() => onChercher(rn.ancien)} style={{ ...lien, display: 'block', marginTop: 4 }}>
+          L'ancien N°{rn.ancien} existe aussi (d'avant la remise à zéro) — le voir
+        </button>
+      )}
+    </div>
+  );
+}
 function ScreenHead({ icon, title, desc, right }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -13803,6 +13908,17 @@ function PhotoArticleAgrandissable({src,titre,children}) {
   </>;
 }
 
+// (21 oct.) LA DATE D'ARRIVÉE D'UN COLIS À RETIRER — une ligne, la même sur
+// chaque carte (§11 : la règle vit dans api/_lib/arrivee-colis.js, partagée
+// avec le serveur). « Arrivé le 18 oct. · il y a 3 j » ; une date qui n'est
+// qu'une borne (rappel, lecture de la conversation) dit « au plus tard » ;
+// inconnue ⇒ « Date d'arrivée inconnue », jamais une date inventée. Neutre
+// (§7) : l'urgence, c'est la date limite, déjà dite à part.
+function LigneArrivee({arr, style}) {
+  return <div className="vrm-arrive" data-arrive-le={arr ? jourLocal(arr.ms) : 'inconnue'} data-arrive-sur={arr ? arr.sur : ''}
+    title={arr && arr.sur==='borne' ? 'Le colis était déjà au point relais ce jour-là ; la date exacte de son arrivée n’est pas connue.' : undefined}
+    style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.3,...(style||{})}}>{texteArrivee(arr)}</div>;
+}
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
@@ -13860,6 +13976,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, etat, etatNoeud =
       <span className="vrm-ledger-sale-amount">{montant}</span>
       <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
+    {ouvert && <FermeAuRetour fermer={close}/>}
     {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE · DÉTAILS ET ACTIONS</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
@@ -13957,7 +14075,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   // qu'on ne sait pas relier n'est pas inventé : le titre seul est tamponné.
   const imprimerLbc = async (o, n) => {
     const r0 = await vmrPdfLbc(o.label && o.label.voucherUrl);
-    if (!r0.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r0.error ? ' — ' + r0.error : ''}. Il s'ouvre tel quel.`); try { window.open(o.label.voucherUrl, '_blank'); } catch (_) {} return; }
+    if (!r0.dataUrl) { libererOngletPdf(); toast(`Bordereau Leboncoin illisible${r0.error ? ' — ' + r0.error : ''}. Il s'ouvre tel quel.`); try { if (/^https:\/\//i.test(String(o.label.voucherUrl))) window.open(o.label.voucherUrl, '_blank', 'noopener'); } catch (_) {} return; }
     try {
       const bytes = b64ToBytes(r0.dataUrl.split(',')[1] || '');
       const { width, height } = await readPdfFirstPageSize(bytes);
@@ -13998,7 +14116,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
           {principal === 'imprimer' && extSait('lbcpdf') === 'ok'
             ? <button type="button" className="vrm-lbc-package-primary" data-imprime="1" data-imprime-lbc={o.txId} onClick={() => imprimerLbc(o, n)} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>🖨 Imprimer le bordereau</button>
             : principal === 'imprimer'
-            ? <a className="vrm-lbc-package-primary" href={o.label.voucherUrl} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
+            ? <a className="vrm-lbc-package-primary" href={/^https:\/\//i.test(String(o.label.voucherUrl)) ? o.label.voucherUrl : undefined} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>🖨 Imprimer le bordereau</a>
             : <a className="vrm-lbc-package-primary" href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>↗ Générer le bordereau</a>}
           <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 10, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
         </div>
@@ -36150,6 +36268,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
+                        <LigneArrivee arr={arriveeColisVinted(rel)}/>
                         {/* ⚠️ « Il manque des infos utiles » (Julien). Le prix et
                             la date SONT portés par la commande Vinted (§5 retrait :
                             transaction_id, date, titre, prix, statut) — la MÊME
@@ -36410,6 +36529,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               qu'on SAIT — le transporteur — et le n° reste sur sa
                               ligne, une seule fois. */}
                           <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||carrierName(t.carrier)}</div>
+                          <LigneArrivee arr={arriveeColisEmail(t)}/>
                           {/* ⚠️ NI LE LIEU NI LE GESTE ICI : ils sont écrits une
                               fois, en tête de la destination. Les répéter sur
                               chaque ligne, c'était trois fois la même phrase sur
@@ -36423,16 +36543,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               depuis quand le colis attend, c'est ce qui dit s'il faut y
                               aller aujourd'hui. La date vient de l'email lui-même — et
                               un email rejoué garde SA date d'origine (api/email-rattacher). */}
-                          <details className="vrm-pickup-details"><summary>Détails du colis</summary>{(t.suivi || t.receivedAt) && (()=>{
-                            const d = t.receivedAt ? new Date(t.receivedAt) : null;
-                            const ok = d && !isNaN(d);
-                            const j = ok ? Math.round((Date.now() - d.getTime()) / 86400000) : null;
-                            return <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {t.suivi && <span style={{fontFamily:'monospace',letterSpacing:.5}}>n° {t.suivi}</span>}
-                              {t.suivi && ok && ' · '}
-                              {ok && <span>arrivé le {d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}{j>0?` · il y a ${j} j`:j===0?" · aujourd'hui":''}</span>}
-                            </div>;
-                          })()}{jours!=null && <div style={{fontSize:11,color:C.muted}}>Date limite : {new Date(t.limite).toLocaleDateString('fr-FR')}</div>}</details>
+                          {/* (21 oct.) La date d'arrivée est sortie de ce repli (ligne
+                              visible au-dessus) : `receivedAt` était la date du DERNIER
+                              email, souvent un rappel. */}
+                          <details className="vrm-pickup-details"><summary>Détails du colis</summary>{t.suivi && (
+                            <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              <span style={{fontFamily:'monospace',letterSpacing:.5}}>n° {t.suivi}</span>
+                            </div>)}{jours!=null && <div style={{fontSize:11,color:C.muted}}>Date limite : {new Date(t.limite).toLocaleDateString('fr-FR')}</div>}</details>
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
@@ -36617,6 +36734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
+                        <LigneArrivee arr={arriveeColisEmail(t)}/>
                         {t.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
                       </div>
                       {qi && (
@@ -36658,6 +36776,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
+                        <LigneArrivee arr={tk ? arriveeColisEmail(tk) : arriveeColisVinted(relaisDe(o))}/>
                         {tk&&tk.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {tk.suivi}</div>}
                       </div>
                       {qi && (
@@ -36708,9 +36827,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.oublies.map((t,i)=>{
                 const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
-                const j=Math.floor((Date.now()-new Date(t.receivedAt||0).getTime())/86400000);
+                const arr=arriveeColisEmail(t);
                 return (
-                  <div key={colisKey(t)||i} data-oublie="" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
+                  <div key={colisKey(t)||i} data-oublie="" data-arrive-le={arr?jourLocal(arr.ms):'inconnue'} data-arrive-sur={arr?arr.sur:''} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
                     <CarrierBadge carrier={t.carrier} size={20}/>
                     <div style={{flex:'1 1 150px',minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -36719,7 +36838,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* (revue du 19 oct.) L'âge est ce qui compte ici : la ligne
                           passe à la ligne au lieu d'être coupée (« il y a… » à 390 px). */}
                       <div data-oublie-info="" style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
-                        n° {t.suivi||'?'} · arrivé le {new Date(t.receivedAt||0).toLocaleDateString('fr-FR')} · <b style={{color:C.warn,whiteSpace:'nowrap'}}>il y a {isFinite(j)?j:'?'} j</b>
+                        n° {t.suivi||'?'} · <b style={{color:C.warn,fontWeight:600}}>{texteArrivee(arr)}</b>
                       </div>
                     </div>
                     {/* Les gestes forment UN groupe, poussé à droite : « Je l'ai eu »
@@ -42288,6 +42407,7 @@ const PUSH_CATS = [
   { id:'argent',   def:true,  titre:'💰 Argent viré',       desc:'Vinted a versé ton argent.' },
   { id:'colis',    def:true,  titre:'📍 Colis à retirer',   desc:'Arrivé au relais, avec le code de retrait.' },
   { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
+  { id:'soir',     def:true,  titre:'🌙 Colis de demain',   desc:"La veille vers 20 h : combien de colis poster demain, et lesquels sont en retard." },
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
@@ -45515,6 +45635,49 @@ export default function App() {
     : coeur;
 }
 
+// ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
+// Discord lancé depuis le téléphone, retour arrivé dans un AUTRE navigateur : la
+// page montre un code à 6 chiffres, et la preuve ne sort que si on le retape ICI.
+// Sans ce code, quelqu'un qui envoyait SON lien à une autre personne prenait le
+// pseudo Discord vérifié de celle-ci. Une feuille UNE fois, sur la coque.
+function DemandeCodeDiscord() {
+  const [e, setE] = React.useState(etatCodeDiscord());
+  const [code, setCode] = React.useState('');
+  const [envoi, setEnvoi] = React.useState(false);
+  React.useEffect(() => suivreCodeDiscord(setE), []);
+  if (!e.attend && !e.fin) return null;
+  const fermer = () => { oublierTicketDiscord(); setCode(''); };
+  const chiffres = code.replace(/\D/g, '');
+  const valider = async () => {
+    if (chiffres.length !== 6 || envoi) return;
+    setEnvoi(true);
+    try { await reprendreDiscord(enTeteSession, chiffres); } finally { setEnvoi(false); }
+  };
+  return (
+    <div data-discord-demande-code="" role="dialog" aria-modal="true" aria-label="Code Discord" style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:16 }}>
+      <FermeAuRetour fermer={fermer}/>
+      <div style={{ width:'100%', maxWidth:420, background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 18px', marginBottom:'env(safe-area-inset-bottom)' }}>
+        {e.fin ? (<>
+          <div style={{ fontWeight:700, fontSize:17, marginBottom:8 }}>Discord n'est pas relié</div>
+          <div style={{ fontSize:15, marginBottom:16 }}>{e.fin}</div>
+          <button type="button" onClick={fermer} style={{ minHeight:44, width:'100%', borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Fermer</button>
+        </>) : (<>
+          <div style={{ fontWeight:700, fontSize:17, marginBottom:6 }}>Tape le code Discord</div>
+          <div style={{ fontSize:15, marginBottom:14 }}>Le navigateur qui s'est ouvert après Discord affiche un code à 6 chiffres. Tape-le ici pour relier ton compte Discord à VRM.</div>
+          <input data-discord-code-saisie="" value={code} onChange={ev => setCode(ev.target.value.replace(/[^\d ]/g, '').slice(0, 7))} onKeyDown={ev => { if (ev.key === 'Enter') valider(); }}
+            inputMode="numeric" autoComplete="one-time-code" aria-label="Code à 6 chiffres" placeholder="123 456"
+            style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:22, letterSpacing:4, textAlign:'center', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
+          {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:14, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
+          <div style={{ display:'flex', gap:8 }}>
+            <button type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
+            <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:8, border:'none', background:C.accent, color:'#fff', fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
+          </div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
 function AppCoeur() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
@@ -45857,6 +46020,42 @@ function AppCoeur() {
     const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
     setGsData({online,sold,bought,lbc});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
+  // ── « TOUT SUR LE N° » (21 octobre) : les sources de la recherche par
+  // numéro, lues UNE fois à l'ouverture de la recherche. Chaque source rend
+  // `null` quand la base n'a pas répondu (« pas su » ≠ « rien », §4.1) : la
+  // règle (`toutSurLeNumero`, src/rechercheNumero.js) le dit au lieu d'affirmer
+  // « jamais servi ». Scalaires seulement pour les bordereaux et les
+  // transactions (§4.4), pagination stricte (§4.5).
+  const [numData,setNumData]=useState(null);
+  useEffect(()=>{ if(!gsOpen){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
+    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
+    // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
+    // manquer (purgée à la remise à zéro, appareil neuf) — on la lit ici.
+    const [lstRows, soldRows, txnItem, bE, bL, lbcRows, cE, planLu]=await Promise.all([
+      sb('app_data?id=like.harvest_*_listings&select=id,data'),
+      sb('app_data?id=like.harvest_*_orders_sold&select=id,data'),
+      (async()=>{ try{ const rows=await lireTout(TXN_META_SELECT,{strict:true}); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); } return m; }catch(_){ return null; } })(),
+      lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
+      lireTout('id=like.harvest_*_label_*&select=id,tx:meta->>tx,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
+      sb('app_data?id=eq.lbc_ventes&select=ventes:data->ventes'),
+      lireComptesEbay().catch(()=>null),
+      loadRoomPlan().catch(()=>undefined),
+    ]);
+    const plan=planLu===undefined?null:normalizePlan(planLu);
+    let enLigne=null, aConfirmer=null;
+    if(lstRows){ try{ const lu=await lireLignesEnLigne(lstRows); enLigne=new Set(); aConfirmer=new Set();
+      for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
+      for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id)); }catch(_){ enLigne=null; aConfirmer=null; } }
+    let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(o); } } } }
+    const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
+    let lbcVentes=null, lbcItems=null;
+    if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
+      const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
+    let ebayCommandes=null, ebayAnnonces=null;
+    if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
+      [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders','orders:data->orders','orders'), tous('ebay_listings','items:data->items','items')]); }
+    if(vivant) setNumData({enLigne,aConfirmer,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
+  })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
   // clavier : une seule règle, sinon les trois finissent par diverger.
@@ -47353,12 +47552,14 @@ function AppCoeur() {
         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
         const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
         let pairs=[], ventes=[], achats=[];
+        const kNumQ = lireNumeroCherche(gsQ, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
         if(q){
           // Paires numérotées (index principal : N°, titre, marque).
           const okUid = comptesRecherche(vintedAccounts);
           pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
             .filter(e=> !okUid || !e.accountId || okUid.has(String(e.accountId)))
             .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
+            .filter(e=> !kNumQ || cleNum(e.numero||'')!==kNumQ)   // la paire exacte est dans « Tout sur le N° »
             .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
             .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
             .slice(0,40);
@@ -47368,6 +47569,9 @@ function AppCoeur() {
         }
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
+        // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
+        // N° » passe devant, par identité (src/rechercheNumero.js).
+        const estNumQ = !!kNumQ;
         // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
         // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
         // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
@@ -47389,7 +47593,8 @@ function AppCoeur() {
           </div>
           <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
             {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
-            {q && total===0 && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
+            {q && total===0 && !estNumQ && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
+            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
             {pairs.map(p=>(
               <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
@@ -47477,6 +47682,7 @@ function AppCoeur() {
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
+        <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}

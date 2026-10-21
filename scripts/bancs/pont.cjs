@@ -323,6 +323,11 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
   const ouvrirVente = async (tx) => {
     const sel = tx ? `[data-bouton-bord][data-tx="${tx}"]` : '[data-bouton-bord]';
     const ouverte = await pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return null;
+      // (21 oct.) Le détail d'une vente vit dans un TIROIR (portail caché tant
+      // qu'il est fermé) : on ouvre la ligne qui le commande.
+      const tiroir = b.closest('.vrm-ledger-drawer');
+      if (tiroir) { const host = tiroir.closest('.vrm-ledger-drawer-host'); if (host && !host.hidden) return true;
+        const t = document.querySelector(`.vrm-ledger-sale-toggle[aria-controls="${tiroir.id}"]`); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }
       const ligne = b.closest('[data-ligne-ouverte]'); if (!ligne || ligne.getAttribute('data-ligne-ouverte') === 'true') return true;
       const t = ligne.querySelector('.vrm-ledger-sale-toggle'); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }, sel);
     if (ouverte === null) return false;
