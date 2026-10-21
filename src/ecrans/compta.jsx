@@ -4,8 +4,139 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "../facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "../superpdp.js";
-import { ABONNEMENTS_COURANTS, Btn, C, COMPTA_CATS, COMPTA_DEFAUT, Card, DEMANDE_SAISIE_PRIX, DEPENSE_CATS, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, Input, MOIS_NOMS_FR, PERIODES_BENEF, PERIODES_CA, PROFIL_CHAMPS, REGLAGE_PAS_LU, SB_CONFLICT, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, aPayerUrssaf, askConfirm, caParPeriodes, chercherEntreprise, comptaChargesAnnee, comptaChargesMois, comptaVide, compteEcarte, couvertureBenefice, echeancesAbonnement, enTeteSession, entForInvoice, extSait, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, generateFacturXPdf, generatePDF, isCloudReady, libelleYm, lireReglage, load, netApresUrssafDe, nextUrssafDeadline, onCloudReady, ouvrirDocumentImprimable, parseMontant, rCompId, save, sbAuth, setProInvoiceStatus, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, useBeneficeCalcul, useLigneUrssaf, useVentesCoque, ventesDeclarables, ventesFaites, verifierSiren, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ymListe } from "../App.jsx";
+import { Btn, C, COMPTA_DEFAUT, Card, DEMANDE_SAISIE_PRIX, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, Input, MOIS_COMPTA, PRIX_CGV_LISIBLE, REGLAGE_PAS_LU, SB_CONFLICT, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, _entreprisesLues, aPayerUrssaf, askConfirm, buildFacturXBytes, comptaChargesAnnee, comptaChargesMois, compteEcarte, couvertureBenefice, debutPeriode, decalerPeriode, echeancesAbonnement, enTeteSession, entForInvoice, extSait, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, generatePDF, isCloudReady, libellePeriodeCa, lireReglage, load, netApresUrssafDe, nextUrssafDeadline, onCloudReady, ouvrirDocumentImprimable, save, sbAuth, setProInvoiceStatus, tauxUrssaf, toast, tod, tsCommande, useBeneficeCalcul, useLigneUrssaf, useVentesCoque, ventesDeclarables, ventesFaites, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs } from "../App.jsx";
 
+// ── PROFIL FISCAL : le SIREN se vérifie, il ne se bloque pas (16 octobre) ────
+// SIREN = 9 chiffres, SIRET = SIREN + 5 chiffres ; les deux portent une clé de
+// Luhn. On DIT qu'il est invalide (une faute de frappe part sur chaque reçu
+// envoyé au comptable, §5), on n'empêche jamais d'enregistrer : lui seul sait.
+// Exception connue : La Poste (SIREN 356000000) — ses SIRET ne suivent pas Luhn
+// mais une somme de chiffres multiple de 5.
+const luhnOk = (ch) => { let s = 0; for (let i = 0; i < ch.length; i++) { let n = Number(ch[ch.length - 1 - i]); if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; } s += n; } return s % 10 === 0; };
+async function generateFacturXPdf(inv, ent){
+  try{
+    const out = await buildFacturXBytes(inv, ent);
+    const blob=new Blob([out],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
+}
+const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
+const DEPENSE_CATS = [
+  { k: 'Emballage', ex: 'cartons, papier bulle, scotch' },
+  { k: 'Fournitures', ex: 'étiquettes, sachets, stylos' },
+  { k: 'Matériel', ex: 'imprimante thermique, lampe photo' },
+  { k: 'Transport', ex: 'essence pour aller au relais' },
+  { k: 'Frais plateforme', ex: 'boost, option de mise en avant' },
+  { k: 'Autre', ex: 'ce que tu as payé' },
+];
+// Les abonnements les plus courants d'un revendeur : un clic remplit le NOM.
+// Le prix n'est rempli que pour VRM (celui des CGV, §11) — les autres, on ne
+// connaît pas son offre : il le tape (jamais un tarif deviné, §2.3).
+const ABONNEMENTS_COURANTS = [
+  { nom: 'VRM', prix: () => (String(PRIX_CGV_LISIBLE).match(/\d+(?:,\d+)?/) || [''])[0] },
+  { nom: 'Canva' },
+  { nom: 'Lightroom' },
+  { nom: 'Photoroom' },
+];
+const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length);
+// Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
+// renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
+const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
+const verifierSiren = (brut) => {
+  const ch = String(brut || '').replace(/[\s.-]/g, '');
+  if (!ch) return { etat: 'vide' };
+  if (!/^\d+$/.test(ch)) return { etat: 'invalide', raison: 'il ne doit contenir que des chiffres' };
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide', raison: `${ch.length} chiffre${ch.length > 1 ? 's' : ''} — un SIREN en a 9, un SIRET 14` };
+  const type = ch.length === 9 ? 'SIREN' : 'SIRET';
+  const siren = ch.slice(0, 9);
+  if (!luhnOk(siren)) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIREN ne correspond pas (faute de frappe ?)' };
+  if (type === 'SIRET' && !(siren === '356000000' ? ch.split('').reduce((s, c) => s + Number(c), 0) % 5 === 0 : luhnOk(ch))) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIRET ne correspond pas (faute de frappe ?)' };
+  return { etat: 'ok', type, siren };
+};
+// `series` = { vendu, finalise, recu } — chacune une liste `{ts, eur}` ou `null`
+// (« pas su » ⇒ la colonne vaut `null`, jamais 0).
+const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
+  const s0 = debutPeriode(maintenant, p);
+  const somme = (liste, a, b) => {
+    if (!Array.isArray(liste)) return null;
+    let eur = 0, nb = 0;
+    for (const l of liste) if (l && l.ts >= a && l.ts < b) { eur += Number(l.eur) || 0; nb += 1; }
+    return { eur: Math.round(eur * 100) / 100, n: nb };
+  };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = decalerPeriode(s0, p, -i), f = decalerPeriode(d, p, 1);
+    out.push({ cle: d.toISOString(), libelle: libellePeriodeCa(d, p), enCours: i === 0,
+      vendu: somme(series.vendu, d.getTime(), f.getTime()), finalise: somme(series.finalise, d.getTime(), f.getTime()), recu: somme(series.recu, d.getTime(), f.getTime()) });
+  }
+  return out;
+};
+
+// ── CA PAR PÉRIODE — vendu · finalisé · reçu (versé) ─────────────────────────
+// Julien appelle « encaissé » l'argent versé ; le CA déclaré ne dit jamais
+// « encaissé » (§5 : l'app ne connaît pas les recettes encaissées au sens de
+// l'URSSAF, et Leboncoin n'est pas daté au versement). D'où « reçu (versé) ».
+// AUCUNE règle de vente n'est écrite ici (§11) :
+//   · VENDU    = `ventesFaites` (au jour de la vente, en cours comprises, hors
+//                annulées et hors ventes/comptes cachés — la règle de Ma journée) ;
+//   · FINALISÉ = `ventesDeclarables` (lignes + « à dater »), au jour de la VENTE ;
+//   · REÇU     = `ventesDeclarables`, au jour du VERSEMENT (Vinted), de la vente
+//                (Leboncoin), de la commande (eBay) — `recuDuMois`, la date des
+//                barres de Ma journée, sans le registre des déclarations.
+// Les sources sont celles que la COQUE lit déjà (ventes de tous les comptes,
+// Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
+// Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
+const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];          // chiffres → réponse (une fois par session)
+async function chercherEntreprise(brut) {
+  const ch = String(brut || '').replace(/\D/g, '');
+  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide' };
+  if (_entreprisesLues.has(ch)) return _entreprisesLues.get(ch);
+  try {
+    const r = await fetch(`/api/compte?mode=entreprise&siret=${ch}`, { headers: enTeteSession() });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j && (j.etat === 'trouve' || j.etat === 'inconnu')) { _entreprisesLues.set(ch, j); return j; }
+    return { etat: 'passu' };
+  } catch (_) { return { etat: 'passu' }; }
+}
+const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
+
+// ── FACTURATION ÉLECTRONIQUE — Factur-X et récap e-reporting (16 octobre) ────
+// VRM PRÉPARE, le vendeur ENVOIE depuis sa plateforme agréée gratuite : aucune
+// connexion à une plateforme, aucune fonction payante (§2.9). Les règles vivent
+// dans `src/facturationElectronique.js` ; les ventes viennent de
+// `ventesDeclarables` (datées au versement, comme le CA déclaré) — AUCUNE règle
+// de vente n'est écrite ici (§11). Le numéro de facture : une série par année
+// (`FX-AAAA-0001`), rangée dans `vrm_compta.facturx` (synchronisé), donnée UNE
+// fois par vente (regénérer la même vente redonne le même numéro et la même
+// date). ⚠️ Tant que le nuage n'est pas arrivé, on ne numérote pas : un appareil
+// neuf repartirait de 0001 et doublerait un numéro déjà donné.
+const ymListe = (n = 12, maintenant = Date.now()) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
+const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS_COMPTA[Number(m) - 1] || ''} ${a}`; };
+const telechargerFichier = (contenu, nom, type) => {
+  const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+};
+const MOIS_NOMS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+// ── TON BÉNÉFICE, BRUT ET NET (19 octobre, Julien : « le bénéfice brut et net ») ─
+// AUCUNE règle de vente ni aucun prix d'achat n'est relu ici (§11) :
+//   · BRUT et NET DES VENTES = la somme des jours publiés par l'écran Ventes
+//     (`vrm_benefice_jours`, `ajouterVenteBenefice`) — le même nombre que ses
+//     cartes « Bénéfice brut / net » sur la même période ;
+//   · CHARGES = `comptaChargesMois` / `comptaChargesAnnee` (celles de cet écran) ;
+//   · COTISATIONS = `aPayerUrssaf` sur la part VINTED du CA déclaré publié
+//     (`vinted_urssaf_mois`) ; depuis la publication `v: 2` (Leboncoin et eBay
+//     reliés par identité), sur le CA déclaré des trois (`caBeneficeDuMois`).
+// Le NET final n'est écrit que si TOUTES les ventes de la période ont leur prix
+// d'achat : sinon un « — », la raison, et la porte (saisie en série). Trois
+// états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
+const PERIODES_BENEF = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
 
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt}) {

@@ -2,8 +2,65 @@
 // Le code ci-dessous est celui d'App.jsx, sans changement ; ce qu'il lit d'App.jsx
 // vient de l'import ci-dessous (liaisons vivantes : le thème `C` reste à jour).
 import React, { useState, useMemo, useEffect } from "react";
-import { Btn, C, Card, DEMANDE_SAISIE_PRIX, DayWeekNote, ENTREPRISE_VIDE, FermeAuRetour, FraicheurAnnonces, INV_STATUS, Icon, Input, PhotoVinted, ScreenHead, StatBox, TOTAL_SLOTS, aPayerUrssaf, annotateAndDownloadBordereau, askConfirm, caParPlateforme, classifyOrderStatus, compteEcarte, entForInvoice, extractPairNumber, fetchHarvest, fetchVintedListings, fetchVintedOrders, fmt, fmtN, generatePDF, getISOWeekKey, lireExtrasRepartition, load, netApresUrssafDe, nomPays, normTitle, orderPhoto, repartitionsVentes, save, tauxUrssaf, texteEnLigne, toast, tod, uid, useVentesCoque } from "../App.jsx";
+import { Btn, C, Card, DEMANDE_SAISIE_PRIX, DayWeekNote, ENTREPRISE_VIDE, FermeAuRetour, FraicheurAnnonces, INV_STATUS, Icon, Input, PhotoVinted, ScreenHead, StatBox, TOTAL_SLOTS, aPayerUrssaf, annotateAndDownloadBordereau, askConfirm, caParPlateforme, classifyOrderStatus, compteEcarte, dateMiseEnLigneMs, entForInvoice, extractBrand, extractModel, extractSize, fetchHarvest, fetchVintedListings, fetchVintedOrders, fmt, generatePDF, lireExtrasRepartition, load, montantCommande, netApresUrssafDe, normTitle, orderPhoto, save, tauxUrssaf, texteEnLigne, toast, tod, uid, useVentesCoque } from "../App.jsx";
 
+
+// Detecte un numero de paire ecrit dans un titre Vinted, au format "nXX",
+// "n XX" ou "n°XX" (ex: "Adidas spezial n20" -> "20"). Sert UNIQUEMENT de
+// suggestion lors de l'import : l'attribution du numero reste manuelle.
+const extractPairNumber = (text) => {
+  if (!text) return null;
+  const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(text);
+  return m ? m[1] : null;
+};
+const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
+function getISOWeekKey(){
+  const d=new Date();const day=d.getDay()||7;
+  d.setDate(d.getDate()+4-day);
+  const y=d.getFullYear();
+  const wk=Math.ceil(((d-new Date(y,0,1))/864e5+1)/7);
+  return `${y}-W${String(wk).padStart(2,'0')}`;
+}
+const nomPays = (cc) => {
+  try { if (typeof Intl !== 'undefined' && Intl.DisplayNames) { const n = new Intl.DisplayNames(['fr'], { type: 'region' }).of(cc); if (n && n !== cc) return n; } } catch (_) {}
+  return cc;
+};
+// LA RÈGLE, pure (testée par scripts/audit-repartitions.cjs) : des ventes, un
+// index transaction → {item, cc}, un index annonce → {brand, size, createdTs},
+// les dates lues sur la page. Rend des comptes PAR NOTION avec leur couverture.
+const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
+  const garde = (Array.isArray(ventes) ? ventes : []).filter((o) => o && classifyOrderStatus(o.status) !== 'cancelled' && !(typeof ecarte === 'function' && ecarte(o)));
+  const vide = () => ({ par: {}, n: 0 });
+  const R = { total: garde.length, marques: vide(), tailles: vide(), modeles: vide(), pays: txn ? vide() : null, delai: null };
+  const ajoute = (b, k, eur) => { if (!k) return; const e = b.par[k] || (b.par[k] = { k, n: 0, eur: 0 }); e.n += 1; e.eur += eur; b.n += 1; };
+  const jours = [];
+  for (const o of garde) {
+    const eur = montantCommande(o);
+    const tx = String(o.transaction_id || '');
+    const t = (txn && tx && txn[tx]) || null;
+    const it = (t && t.item && items && items[t.item]) || null;
+    ajoute(R.marques, (it && it.brand) || extractBrand(o.title) || '', eur);
+    const taille = String((it && it.size) || extractSize(o.title) || '').replace(/^T(?=\d)/i, '').replace('.', ',').trim();
+    ajoute(R.tailles, taille, eur);
+    ajoute(R.modeles, extractModel(o.title) || '', eur);
+    if (R.pays && t && t.cc) ajoute(R.pays, t.cc, eur);
+    if (it) {
+      const enLigne = dateMiseEnLigneMs(it, dates || null);
+      const vendu = Date.parse(o.date || '');
+      if (enLigne != null && vendu > 0 && vendu >= enLigne) jours.push((vendu - enLigne) / 86400000);
+    }
+  }
+  if (items) {
+    jours.sort((a, b) => a - b);
+    R.delai = jours.length ? {
+      n: jours.length,
+      moyenne: jours.reduce((a, b) => a + b, 0) / jours.length,
+      mediane: jours.length % 2 ? jours[(jours.length - 1) / 2] : (jours[jours.length / 2 - 1] + jours[jours.length / 2]) / 2,
+      rapide: jours.filter((j) => j <= 7).length,
+    } : { n: 0 };
+  }
+  return R;
+};
 
 /* ── Editable cell ───────────────────────────────────── */
 function Cell({value, onChange, align="left", mono=false}) {

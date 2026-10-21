@@ -3,8 +3,172 @@
 // vient de l'import ci-dessous (liaisons vivantes : le thème `C` reste à jour).
 import React, { useState, useMemo, useEffect } from "react";
 import { polyDe, estRectangle, normaliserPoly, rectDans, empreinte, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, FORMES, caler } from "../stockRegles.js";
-import { Btn, C, COL_H, Card, DEMANDE_STOCK_CHERCHE, FURN_COLORS, FURN_TYPES, GARAGE_AMBIANCES, INV_STATUS, Icon, Input, LAYOUT, PhotoVinted, ROOM_DEFAULT, Room3D, ScreenHead, Segmente, SheetShell, askConfirm, askText, casesDe, clavierNum, cleNum, dimsMeuble, extractSize, libererNumeroDuPlan, load, loadRoomPlan, meubleACases, meublesDuPlan, nomCase, normTitle, normalizePlan, numsCase, numsPresents, ouEstNumero, premiereCaseLibre, rangerNumeroDansPlan, save, saveRoomPlan, toast, triNum } from "../App.jsx";
+import { Btn, C, COL_H, Card, DEMANDE_STOCK_CHERCHE, FURN_TYPES, INV_STATUS, Icon, Input, LAYOUT, PhotoVinted, ROOM_DEFAULT, Room3D, SUPABASE_URL, ScreenHead, Segmente, SheetShell, askConfirm, askText, clavierNum, cleNum, extractSize, load, normTitle, normalizePlan, numsPresents, save, saveRoomPlan, sbAuth, toast, triNum } from "../App.jsx";
 
+const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+
+// ── L'ASSISTANT DE RANGEMENT (vue 2D) — règles pures ───────────────────────
+// Julien : un assistant qui l'aide à RANGER (quelle paire dans quelle case),
+// avec une vue 2D simple. Il lit le MÊME plan que la 3D (`vrm_room`) et la
+// MÊME liste des paires présentes (`numsPresents`, publiée par Annonces, §11).
+// ⚠️ Il ne touche JAMAIS un numéro : il écrit un N° existant dans une case
+//    vide, ou retire d'une case le N° d'une paire qui n'est plus là.
+// Un meuble « à cases » : un rangement (pas un décor), ni pile ni boîte seule
+// (eux portent leur numéro sur le carton, ils n'ont pas de case libre).
+const meubleACases = (it) => { const ft = FURN_TYPES[it && it.type]; return !!ft && !ft.deco && !ft.pile && !ft.box; };
+const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.max(1, (it && it.cols) || 1) });
+// La physique d'une case (src/stockRegles.js) : 'colonne' (mur de boîtes, la
+// colonne tombe), 'pile' (un plateau tient ses boîtes empilées), 'cintre'.
+const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; return { mode: modeCase(ft), cap: capaciteCase(ft, it, wallH || 3.4) }; };
+// GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
+// trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
+// (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
+// ⚠️ Seulement pour un MUR de boîtes : sur un plateau (étagère, table) rien ne
+//    tombe d'un plateau à l'autre — chaque case garde sa pile.
+const graviteCases = (slots, nr, nc, mode) => {
+  const out = {};
+  if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
+  for (let c = 0; c < nc; c++) {
+    const pleins = [];
+    for (let r = 0; r < nr; r++) { const a = numsCase((slots || {})[r + '_' + c]); if (a.length) pleins.push(a); }
+    let r = nr - 1;
+    for (let i = pleins.length - 1; i >= 0 && r >= 0; i--) { out[r + '_' + c] = pleins[i]; r--; }
+  }
+  return out;
+};
+// La position d'une case dite en français (la 3D écrit la même chose).
+const nomCase = (nr, key, mode, it) => {
+  const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r;
+  const ft = FURN_TYPES[it && it.type] || {};
+  if (mode === 'cintre') return `cintre ${c + 1}`;
+  if (mode === 'pile' && ft.build === 'table') return `plateau · place ${c + 1}`;
+  if (mode === 'pile') return `${rang === 1 ? '1ᵉʳ' : rang + 'ᵉ'} plateau depuis le bas · case ${c + 1}`;
+  return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`;
+};
+// Les meubles à cases du plan, dans l'ordre LISIBLE : pièce, puis meuble (ordre
+// de pose), puis colonne de gauche à droite, chaque colonne du bas vers le haut.
+const meublesDuPlan = (plan) => {
+  const out = [];
+  ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
+    if (!meubleACases(it)) return;
+    const { nr, nc } = dimsMeuble(it); const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode) });
+  }));
+  return out;
+};
+// Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
+const ouEstNumero = (plan, num) => {
+  const t = cleNum(num); if (!t) return null;
+  for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
+    if (meubleACases(it)) {
+      const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode);
+      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k, mode, it) };
+    }
+    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile', pileIdx: it.nums.findIndex(v => cleNum(v) === t) };
+    if (it.num != null && cleNum(it.num) === t) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'boîte seule' };
+  }
+  return null;
+};
+// (17 oct.) « Mon local en photo » (`LocalPhoto`, la ligne `vrm_local`) n'est
+// plus rendu nulle part depuis que le Stock ne garde que la pièce : retiré.
+// La ligne reste en base (rien n'est effacé) ; `compressImage` sert ailleurs.
+
+// ── « Plan du local » : pièce virtuelle vue de dessus ──────────────────────
+// Personnalise ta pièce (murs), pose des meubles (commode, étagère, table,
+// boîtes, penderie), déplace-les, puis ouvre chaque meuble EN VUE DE FACE pour
+// ranger tes N° dans ses tiroirs/rayons (empilables). La recherche te montre le
+// meuble + la case. Rangé dans une ligne Supabase dédiée (vrm_room).
+const loadRoomPlan = async () => {
+  // Trois états : l'objet lu · null (aucune ligne) · undefined (la base n'a
+  // pas répondu — « pas su », l'assistant de rangement ne propose rien).
+  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return undefined; const rows = await res.json(); if (!Array.isArray(rows)) return undefined; return rows[0]?.data || null; } catch (_) { return undefined; }
+};
+const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
+// ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
+// que changer des COULEURS et des INTENSITÉS de lumière (0 risque de casser le
+// rendu), appliquées en direct sur la scène. « Clair » = exactement le rendu
+// d'origine (aucune régression). wall/floor à null = on garde la matière de base.
+const GARAGE_AMBIANCES = [
+  { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#eef1f6', sky:'#fff3e0', ground:'#a6a290', hemi:0.92, ambient:0.20, sun:'#fff1dc', sunI:1.05, fill:'#dfe8ff', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
+  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#efe6d8', sky:'#ffe4bd', ground:'#8a7a5a', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#e8ddc8', fillI:0.24, wall:'#e8ded0', floor:'#ffe7cf', exposure:1.15 },
+  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#0e1220', sky:'#3a4a80', ground:'#0c0f18', hemi:0.55, ambient:0.16, sun:'#9fb8ff', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#161c2e', floor:'#242a40', exposure:1.28 },
+  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#171310', sky:'#ffe6b8', ground:'#1c140c', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#fff0d0', fillI:0.30, wall:'#26201b', floor:'#5f4e3a', exposure:1.20 },
+  { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#d6d9dd', sky:'#e2e8ef', ground:'#9a9ea4', hemi:0.90, ambient:0.26, sun:'#f2f5ff', sunI:1.00, fill:'#dfe8ff', fillI:0.32, wall:'#c6cace', floor:'#c2c6ca', exposure:1.08 },
+];
+// La PREMIÈRE case libre : la plus basse case vide de la première colonne qui
+// en a une. Avec la gravité, c'est exactement là qu'une boîte posée atterrit.
+// Sur un plateau : la case la plus basse qui a encore de la place.
+const premiereCaseLibre = (plan) => {
+  for (const m of meublesDuPlan(plan)) {
+    if (m.mode === 'pile' || m.mode === 'cintre') {
+      for (let r = m.nr - 1; r >= 0; r--) for (let c = 0; c < m.nc; c++) {
+        const key = r + '_' + c; if ((m.vue[key] || []).length < m.cap) return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key, m.mode, m.it) };
+      }
+      continue;
+    }
+    for (let c = 0; c < m.nc; c++) {
+      let plein = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) plein++;
+      if (plein < m.nr) { const key = (m.nr - 1 - plein) + '_' + c; return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key) }; }
+    }
+  }
+  return null;
+};
+// Ranger UN numéro dans la colonne d'une case : il atterrit sur la plus basse
+// case vide de cette colonne (gravité). Refuse — sans rien écrire — un numéro
+// déjà posé ailleurs (deux cases pour une paire = « dans laquelle est-elle ? »)
+// ou une colonne pleine. Rend { plan, ou } ou { erreur }.
+// Sur un plateau, il s'empile DANS la case choisie (tant qu'elle a la place).
+const rangerNumeroDansPlan = (plan, itemId, key, num) => {
+  const v = String(num == null ? '' : num).trim(); if (!v) return { erreur: 'Aucun numéro.' };
+  const deja = ouEstNumero(plan, v);
+  if (deja) return { erreur: `N°${v} est déjà rangé dans « ${deja.itemName} » — rien n'a été changé.` };
+  let res = null, plein = false;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !meubleACases(it)) return it;
+    const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
+    if (!(c >= 0 && c < nc)) return it;
+    const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    if (mode === 'pile' || mode === 'cintre') {
+      const slots = empilerDansCase(graviteCases(it.slots, nr, nc, mode), key, v, cap);
+      if (!slots) { plein = true; return it; }
+      res = { itemName: it.name, roomName: rm.name, key, nom: nomCase(nr, key, mode, it) };
+      return { ...it, slots };
+    }
+    const vue = graviteCases(it.slots, nr, nc);
+    let nPleins = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) nPleins++;
+    if (nPleins >= nr) return it;
+    const k = (nr - 1 - nPleins) + '_' + c;
+    const slots = { ...vue, [k]: [v] };
+    // Grille de boîtes pleine ⇒ une rangée de plus vers le haut (la 3D fait pareil).
+    let grow = {};
+    if ((FURN_TYPES[it.type] || {}).build === 'grille' && Object.keys(slots).length >= nr * nc) {
+      const maxRows = Math.max(1, Math.floor(((rm.room && rm.room.wallH) || 3.4) / (it.cell || 0.5)));
+      if (nr < maxRows) {
+        grow = { rows: nr + 1 };
+        // On décale tout d'une rangée vers le bas des index (la nouvelle rangée est en haut, r=0).
+        const dec = {}; for (const kk in slots) { const p = kk.split('_'); dec[(+p[0] + 1) + '_' + p[1]] = slots[kk]; }
+        res = { itemName: it.name, roomName: rm.name, key: (+k.split('_')[0] + 1) + '_' + c, nom: nomCase(nr + 1, (+k.split('_')[0] + 1) + '_' + c) };
+        return { ...it, ...grow, slots: dec };
+      }
+    }
+    res = { itemName: it.name, roomName: rm.name, key: k, nom: nomCase(nr, k) };
+    return { ...it, slots };
+  }) }));
+  if (!res) return { erreur: plein ? 'Cette case est pleine — choisis une autre case.' : 'Cette colonne est pleine — choisis une autre case.' };
+  return { plan: { ...plan, rooms }, ou: res };
+};
+// Retirer d'une case le numéro d'une paire qui n'est plus là (sur son clic).
+// Ceux du dessus descendent (la colonne d'un mur de boîtes, ou la pile d'un plateau).
+const libererNumeroDuPlan = (plan, itemId, num) => {
+  const t = cleNum(num); let fait = false;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !meubleACases(it)) return it;
+    const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const slots = {};
+    for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
+    return fait ? { ...it, slots: graviteCases(slots, nr, nc, mode) } : it;
+  }) }));
+  return fait ? { ...plan, rooms } : null;
+};
 
 // ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
 // Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment

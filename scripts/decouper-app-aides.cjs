@@ -66,6 +66,15 @@ for (;;) {
     if (!refs.every((r) => blocs.includes(top(r)))) continue;
     if (b.constantViolations.length) continue;
     if (citeParScript(nom)) continue;
+    // ⚠️ Une aide qui RÉASSIGNE une variable d'App.jsx (`_comptesEbay = null`)
+    // ne peut pas partir : importée, cette variable serait en lecture seule.
+    let ecritApp = false;
+    const sp0 = b.path; const st0 = sp0.isVariableDeclarator() ? sp0.parentPath : sp0;
+    st0.traverse({ 'AssignmentExpression|UpdateExpression'(ap) {
+      const ids = ap.isAssignmentExpression() ? Object.keys(ap.get('left').getBindingIdentifiers()) : (ap.node.argument.type === 'Identifier' ? [ap.node.argument.name] : []);
+      for (const n of ids) { const nb = ap.scope.getBinding(n); if (nb && nb.scope.block === ast.program && top(nb.path) !== s) ecritApp = true; }
+    } });
+    if (ecritApp) continue;
     aBouger.push({ nom, fichier: [...lecteurs.get(nom)][0], s });
   }
   if (!aBouger.length) break;

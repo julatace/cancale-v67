@@ -2,8 +2,459 @@
 // Le code ci-dessous est celui d'App.jsx, sans changement ; ce qu'il lit d'App.jsx
 // vient de l'import ci-dessous (liaisons vivantes : le thème `C` reste à jour).
 import React from "react";
-import { BoutonBordereau, CONDITIONS_RETRAIT_AUTO, EBAY_CONDITIONS, EBAY_ECARTS, EBAY_SKIN, EXT_ATTENDUE, Icon, JOURS_LETTRE, JOURS_NOM, NUM_OK, OFFRE_VEND_LA_PAIRE, PLANIF_HORIZON_MS, PLANIF_MIN_MS, PREUVE_PAR_VISITE, PhotoVente, PhotoVinted, RAISON_CONNEXION_EBAY, RAISON_RETRAIT_AUTO, REGLES_LOT_MAX, SELLER_HUB_PROGRAMMEES, SUPABASE_URL, ScreenHead, aExpedier, achatParNum, ageRegleJ, appelEbay, askConfirm, attenduDe, autoRemplirAttributs, caEbayPayees, centsR, clavierNum, cleNum, cleVerifEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, departDePreregle, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEbayDeVinted, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, fichesPourEbay, heuresDuLot, idBrouillonEbay, isCloudReady, itemDeBrouillon, jourParisTexte, jumellesParPhoto, lbcAnnoncesSession, libellePreregle, lignesFraisEbay, lireBrouillonsEbay, lireEbayParCompte, lireEbayTous, lirePreuvesVenteVinted, lireReglesEbay, load, localApresRegle, marquerEbay, messageOffreCreation, modifierBrouillonsEbay, montantSaisi, nomCompteEbay, noterLienEbay, numDeSkuEbay, numEbayLu, numerosDejaVendus, offreEnvoyeeProgrammee, onCloudReady, onVmrExt, ouVenduesTexte, parisVersUtc, partsParis, prixAchatDe, prixCompatibleRegle, programmeesConnues, quandParisTexte, raisonExtGlobale, regleEngage, regleVieille, reglesEngagees, resultatRegleOffre, resultatReviseEbay, retraitsEbayAutoPermis, rythmeEbay, save, sbAuth, seRelitChezEbay, seuilDePourcent, seuilTropBas, signalerComptesEbay, skuEbayDe, skuEbayDouteux, texteOffresDejaFaites, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useSansSouris, uuidEnvoiEbay, valideRegleOffre, vmrCmd, vmrExtPresent } from "../App.jsx";
+import { BoutonBordereau, CONDITIONS_RETRAIT_AUTO, EBAY_SKIN, EXT_ATTENDUE, Icon, NUM_OK, OFFRE_VEND_LA_PAIRE, PAS_SU_SANS_RELECTURE, PLANIF_HORIZON_MS, PLANIF_MIN_MS, PREUVE_PAR_VISITE, PhotoVente, PhotoVinted, SB_CONFLICT, SUPABASE_URL, ScreenHead, aExpedier, ageRegleJ, appelEbay, askConfirm, attenduDe, caEbayPayees, centsR, clavierNum, cleNum, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, fichesPourEbay, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcDescription, lireAnnoncesVintedEnLigne, lireEbayParCompte, lireEbayTous, lirePreuvesVenteVinted, lireReglesEbay, lireTout, load, localApresRegle, marquerEbay, messageOffreCreation, montantSaisi, nomCompteEbay, noterLienEbay, numDeSkuEbay, numEbayLu, numerosDejaVendus, numsPresents, onCloudReady, onVmrExt, ouVenduesTexte, partsParis, prixAchatDe, prixCompatibleRegle, programmeesConnues, raisonExtGlobale, regleEngage, regleVieille, reglesEngagees, resultatRegleOffre, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, skuEbayDe, skuEbayDouteux, texteOffresDejaFaites, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useSansSouris, valideRegleOffre, vmrCmd, vmrExtPresent, withOwner } from "../App.jsx";
 
+const JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+// (17 oct.) La description qui part sur eBay : la règle de Leboncoin (§11 —
+// texte publicitaire de Vinted écarté, libellé « Description » collé retiré),
+// plus les deux restes que le libellé peut laisser : un « : » de tête, ou le
+// mot « Description » tout seul (Julien : « j'ai "description" qui s'affiche
+// dans la description, ça ne sert à rien »). Jamais une vraie description.
+const descriptionEbayPropre = (brut) => {
+  const t = lbcDescription(brut).replace(/^[:\-–]\s*/, '').trim();
+  return /^description$/i.test(t) ? '' : t;
+};
+// « 2026-10-23 » + « 19:00 » (heure de Paris) → instant UTC. TROIS issues :
+// `{ms}` · `{ambigu, ms}` (la nuit du changement d'heure, 02:00–02:59 existe
+// deux fois : `ms` = la première) · `{inexistant}` (l'heure sautée au
+// printemps) · `{invalide}`.
+function parisVersUtc(date, heure) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || '')), h = /^(\d{1,2}):(\d{2})$/.exec(String(heure || ''));
+  if (!m || !h) return { invalide: true };
+  const y = +m[1], mo = +m[2], d = +m[3], hh = +h[1], mi = +h[2];
+  if (hh > 23 || mi > 59 || mo < 1 || mo > 12) return { invalide: true };
+  const base = Date.UTC(y, mo - 1, d, hh, mi);
+  if (new Date(base).getUTCDate() !== d) return { invalide: true };
+  const voulu = `${String(hh).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+  const ok = [];
+  for (const dec of [1, 2]) { const t = base - dec * 3600000; const p = partsParis(t); if (p.date === `${m[1]}-${m[2]}-${m[3]}` && p.heure === voulu) ok.push(t); }
+  if (!ok.length) return { inexistant: true };
+  if (ok.length > 1) return { ambigu: true, ms: Math.min(...ok) };
+  return { ms: ok[0] };
+}
+// Le jour suivant, dans le calendrier (pas « + 24 h » : après le 25 octobre
+// une journée dure 25 h, et « 18:00 tous les jours » deviendrait 17:00).
+const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return t.toISOString().slice(0, 10); };
+const minutesDe = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
+const JOURS_NOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+// « ven. 23 oct. » (un jour de Paris, donné « YYYY-MM-DD »).
+const jourParisTexte = (date) => { const [y, mo, d] = String(date).split('-').map(Number); return `${JOURS_COURTS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]} ${d} ${MOIS_COURTS[mo - 1]}`; };
+const EBAY_RYTHME_DEFAUT = {
+  parJour: 3, de: '18:00', a: '21:00', jours: [true, true, true, true, true, true, true], ecart: 30, ordre: 'selection',
+  preregles: [
+    { id: 'maintenant', jour: 'maintenant', heure: '' },
+    { id: 'soir', jour: 'auj', heure: '20:00' },
+    { id: 'demain', jour: 'demain', heure: '12:30' },
+    { id: 'dimanche', jour: 'dow0', heure: '20:00' },
+  ],
+  risqueCompris: false,
+};
+
+// ── LES FRAIS D'eBAY, EN FRANÇAIS ─────────────────────────────────────────────
+// Lus PAR NOM par le serveur (`frais.total` = ListingFee, le total) ; un nom
+// qu'on ne connaît pas s'affiche tel quel plutôt que d'être deviné.
+const NOMS_FRAIS_EBAY = { InsertionFee: 'mise en vente', SchedulingFee: 'programmation', GalleryFee: 'galerie', GalleryPlusFee: 'galerie plus', SubtitleFee: 'sous-titre', BoldFee: 'gras', FeaturedFee: 'mise en avant', InternationalInsertionFee: 'mise en vente internationale', ListingDesignerFee: 'modèle d\'annonce' };
+
+// ── LES BROUILLONS eBAY : une ligne DÉDIÉE par vendeur (`ebay_brouillons`) ───
+// Jamais dans `main` (la ligne la plus lue du projet, §4.4). Lue projetée.
+// TROIS états : `null` = pas su (la base n'a pas répondu) · un objet = lu
+// (vide si aucun brouillon). Une modification relit, fusionne, réécrit — et
+// n'écrit RIEN si la lecture a échoué : repartir d'un objet vide effacerait
+// tous ses brouillons (la famille « lecture KO, écriture OK », §5).
+async function lireBrouillonsEbay() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_brouillons&select=items:data->items`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return null;
+    const it = rows[0] && rows[0].items;
+    const out = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
+    // Un brouillon publié garde l'IDENTITÉ de sa paire (`pairId`) et son annonce.
+    try { for (const b of Object.values(out)) { const iid = b && ((b.programme && b.programme.itemId) || b.itemId); if (b && b.pairId && iid) noterLienEbay(iid, b.pairId, b.numero, 'brouillon'); } } catch (_) {}
+    return out;
+  } catch (_) { return null; }
+}
+// ── PUBLIER une annonce sur eBay depuis VRM ─────────────────────────────────
+// Piloté par la MESURE : on demande à eBay (action pubinfo) la catégorie et les
+// attributs OBLIGATOIRES à partir du titre, et on ne montre QUE les champs
+// qu'eBay exige. L'humain confirme tout avant l'envoi (aucune publication à
+// l'aveugle). Un refus eBay s'affiche tel quel ; aucune annonce n'est créée.
+const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1500', 'Neuf sans boîte'], ['1750', 'Neuf avec défauts']];
+// Remplit les caractéristiques eBay à partir de la paire — SANS JAMAIS DEVINER
+// (§5). On ne pose qu'une valeur AUTORISÉE par eBay (a.valeurs) : la pointure
+// exacte, la marque exacte, ou une valeur qui apparaît SANS AMBIGUÏTÉ (une
+// seule) comme mot du titre. Zéro ou plusieurs correspondances ⇒ on laisse
+// vide (« mieux vaut un blanc qu'un faux »). Un attribut en texte libre n'est
+// jamais rempli automatiquement (on ne connaît pas ses valeurs valides).
+// (17 oct.) La description quand Vinted n'en a pas été captée : les FAITS de la
+// paire (marque, pointure, état enregistrés par Vinted, son N° de référence),
+// rien d'autre. Une phrase commerciale inventée serait pire qu'un champ court.
+function descriptionDeFaits(p) {
+  if (!p) return '';
+  const l = [];
+  if (p.title) l.push(String(p.title).trim());
+  if (p.marque) l.push(`Marque : ${p.marque}`);
+  if (p.tailleVinted || p.taille) l.push(`Pointure : ${String(p.tailleVinted || p.taille).replace('.', ',')}`);
+  if (p.etat) l.push(`État : ${p.etat}`);
+  if (p.num) l.push(`Référence : VRM-${p.num}`);
+  return l.length > 1 ? l.join('\n') : '';
+}
+// (17 oct.) L'ÉTAT eBay à partir de l'état que VINTED a écrit sur l'annonce —
+// seulement vers un état qu'eBay PROPOSE pour cette catégorie (sa liste,
+// `conditions`), jamais deviné : « Neuf avec étiquette » → 1000, « Neuf sans
+// étiquette » → 1500, un état d'occasion (« Très bon état », « Bon état »,
+// « Satisfaisant ») → 3000. Inconnu ou absent de la liste d'eBay ⇒ null.
+function etatEbayDeVinted(etat, conditions) {
+  const e = String(etat || '').toLowerCase();
+  if (!e) return null;
+  const id = /neuf avec/.test(e) ? '1000' : /neuf sans/.test(e) ? '1500' : /(tr[eè]s bon|bon [eé]tat|satisfaisant)/.test(e) ? '3000' : null;
+  if (!id) return null;
+  if (Array.isArray(conditions) && conditions.length && !conditions.some((c) => String(c && c.id) === id)) return null;
+  return id;
+}
+// `faits` : ce que Vinted a ENREGISTRÉ pour la paire (marque, pointure) — pas
+// une déduction. Ils remplissent aussi un champ eBay en texte libre (la marque
+// n'a souvent pas de liste chez eBay) ; une déduction du titre, jamais.
+function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) {
+  const out = {};
+  const hay = ' ' + String(titre || '').toLowerCase() + ' ';
+  const echap = (s) => String(s).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const a of attributs || []) {
+    if (!a) continue;
+    const nl = String(a.nom || '').toLowerCase();
+    if (!Array.isArray(a.valeurs) || !a.valeurs.length) {   // texte libre : jamais deviné — seulement un FAIT capté
+      if (/marque|brand/.test(nl) && faits.marque) out[a.nom] = String(faits.marque);
+      else if (/pointure|taille|size/.test(nl) && faits.taille) out[a.nom] = String(faits.taille).replace('.', ',');
+      continue;
+    }
+    if (/pointure|taille|size/.test(nl) && taille) {
+      const t = String(taille).replace(',', '.');
+      const m = a.valeurs.find(v => String(v).replace(',', '.') === t);
+      if (m) { out[a.nom] = m; continue; }
+    }
+    if (/marque|brand/.test(nl) && marque) {
+      const m = a.valeurs.find(v => String(v).toLowerCase() === String(marque).toLowerCase());
+      if (m) { out[a.nom] = m; continue; }
+    }
+    // Générique : une valeur eBay (≥ 3 lettres) présente comme MOT du titre, et
+    // une seule — sinon on ne tranche pas.
+    const hits = a.valeurs.filter(v => { const w = echap(v); return String(v).length >= 3 && new RegExp('(^|[^a-z0-9])' + w + '([^a-z0-9]|$)').test(hay); });
+    if (hits.length === 1) out[a.nom] = hits[0];
+  }
+  return out;
+}
+const JOURS_LETTRE = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+// « ven. 23 oct. à 19:00 » pour un instant.
+const quandParisTexte = (ms) => { const p = partsParis(ms); return `${jourParisTexte(p.date)} à ${p.heure}`; };
+function heuresDuLot({ depart, parJour, de, a, jours, ecart, n, maintenant }) {
+  const deMin = minutesDe(de), aMin = minutesDe(a);
+  const pas = Number(ecart), quota = Math.floor(Number(parJour));
+  if (!(Number.isFinite(deMin) && Number.isFinite(aMin) && deMin <= aMin)) return { erreur: 'La plage horaire est mal réglée (« de » doit venir avant « à »).' };
+  if (!(pas >= 1 && quota >= 1)) return { erreur: 'Le rythme est mal réglé.' };
+  if (!Array.isArray(jours) || !jours.some(Boolean)) return { erreur: 'Coche au moins un jour de la semaine.' };
+  const ouverture = (date) => { const r = parisVersUtc(date, de); return r.ms != null ? r.ms : parisVersUtc(date, `${String(Math.min(23, Math.floor(deMin / 60) + 1)).padStart(2, '0')}:${String(deMin % 60).padStart(2, '0')}`).ms; };
+  let cur, immediatPossible = false;
+  if (depart === 'maintenant') { cur = maintenant; immediatPossible = true; }
+  else {
+    const r = parisVersUtc(depart && depart.date, depart && depart.heure);
+    if (r.invalide) return { erreur: 'Choisis une date et une heure de départ.' };
+    if (r.inexistant) return { erreur: 'Cette heure n\'existe pas cette nuit-là (changement d\'heure) — choisis-en une autre.' };
+    if (r.ambigu) return { erreur: 'Cette heure existe deux fois cette nuit-là (changement d\'heure) — choisis-en une autre.' };
+    cur = Math.max(r.ms, maintenant + PLANIF_MIN_MS);
+  }
+  const heures = []; let horsHorizon = 0; let jourCourant = null, nJour = 0, garde = 0;
+  while (heures.length + horsHorizon < n && garde++ < 20000) {
+    if (horsHorizon || cur > maintenant + PLANIF_HORIZON_MS) { horsHorizon++; continue; }
+    const p = partsParis(cur); const min = p.h * 60 + p.mi;
+    if (!jours[p.jour] || min > aMin || (jourCourant === p.date && nJour >= quota)) { cur = ouverture(jourSuivant(p.date)); immediatPossible = false; continue; }
+    if (min < deMin) { cur = ouverture(p.date); immediatPossible = false; continue; }
+    const immediat = immediatPossible && heures.length === 0 && cur === maintenant;
+    if (!immediat && cur < maintenant + PLANIF_MIN_MS) { cur = maintenant + PLANIF_MIN_MS; immediatPossible = false; continue; }
+    if (jourCourant !== p.date) { jourCourant = p.date; nJour = 0; }
+    heures.push({ ms: cur, immediat, date: p.date, heure: p.heure, utc: immediat ? '' : new Date(cur).toISOString() });
+    nJour++; immediatPossible = false;
+    cur += pas * 60000;
+  }
+  return { heures, horsHorizon };
+}
+
+// ── LE RYTHME : un réglage SYNCHRONISÉ, propre à chaque vendeur ───────────────
+// (`vrm_ebay_rythme`, rattrapé par `onCloudReady` seulement s'il est resté au
+// défaut, §5.49). Les préréglages de départ sont modifiables : « Ce soir
+// 20 h » n'est qu'une habitude, pas une mesure.
+const EBAY_ECARTS = [15, 30, 45, 60, 90, 120, 180];
+const rythmeEbay = (v) => {
+  const r = { ...EBAY_RYTHME_DEFAUT, ...(v && typeof v === 'object' ? v : {}) };
+  if (!Array.isArray(r.jours) || r.jours.length !== 7) r.jours = EBAY_RYTHME_DEFAUT.jours;
+  if (!Array.isArray(r.preregles) || !r.preregles.length) r.preregles = EBAY_RYTHME_DEFAUT.preregles;
+  return r;
+};
+const libellePreregle = (p) => {
+  if (!p || p.jour === 'maintenant') return 'Maintenant';
+  const h = String(p.heure || '').replace(/^0/, '').replace(':00', ' h').replace(':', ' h ');
+  if (p.jour === 'auj') return (minutesDe(p.heure) >= 17 * 60 ? 'Ce soir ' : 'Aujourd\'hui ') + h;
+  if (p.jour === 'demain') return 'Demain ' + h;
+  const k = /^dow(\d)$/.exec(p.jour || ''); return k ? JOURS_NOM[+k[1]].replace(/^./, (c) => c.toUpperCase()) + ' ' + h : h;
+};
+// Le départ concret d'un préréglage : `'maintenant'` ou `{date, heure}` (Paris).
+function departDePreregle(p, maintenant) {
+  if (!p || p.jour === 'maintenant') return 'maintenant';
+  const auj = partsParis(maintenant).date;
+  if (p.jour === 'auj') return { date: auj, heure: p.heure };
+  if (p.jour === 'demain') return { date: jourSuivant(auj), heure: p.heure };
+  const k = /^dow(\d)$/.exec(p.jour || ''); if (!k) return { date: auj, heure: p.heure };
+  let d = auj;
+  for (let i = 0; i < 8; i++) {
+    const [y, mo, dd] = d.split('-').map(Number);
+    const r = parisVersUtc(d, p.heure);
+    if (new Date(Date.UTC(y, mo - 1, dd)).getUTCDay() === +k[1] && r.ms != null && r.ms > maintenant) return { date: d, heure: p.heure };
+    d = jourSuivant(d);
+  }
+  return { date: auj, heure: p.heure };
+}
+// Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
+// montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
+// programmée), la mise en vente, puis tout autre frais non nul.
+function lignesFraisEbay(frais, programmee) {
+  const f = frais || {};
+  const out = [];
+  if (programmee) out.push({ cle: 'programmation', nom: 'programmation', montant: f.programmation == null ? null : f.programmation });
+  out.push({ cle: 'insertion', nom: 'mise en vente', montant: f.insertion == null ? null : f.insertion });
+  for (const l of (f.lignes || [])) if (!/^(InsertionFee|Schedul)/i.test(l.nom)) out.push({ cle: l.nom, nom: NOMS_FRAIS_EBAY[l.nom] || l.nom, montant: l.montant });
+  return out;
+}
+async function modifierBrouillonsEbay(changer) {
+  const cur = await lireBrouillonsEbay();
+  if (cur === null) return { ok: false, raison: 'lecture' };
+  let items;
+  try { items = changer({ ...cur }); } catch (_) { return { ok: false, raison: 'erreur' }; }
+  // (6 octobre) `false` : rien à changer (la relecture a montré qu'il ne fallait
+  // pas écrire) — on n'écrit RIEN, pas même la ligne telle qu'on l'a lue.
+  if (items === false) return { ok: true, items: cur, inchange: true };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([withOwner({ id: 'ebay_brouillons', data: { items, majAt: Date.now() } })]),
+    });
+    return r.ok ? { ok: true, items } : { ok: false, raison: 'ecriture' };
+  } catch (_) { return { ok: false, raison: 'ecriture' }; }
+}
+const idBrouillonEbay = () => { try { if (crypto && crypto.randomUUID) return 'b-' + crypto.randomUUID().slice(0, 13); } catch (_) {} return 'b-' + Date.now().toString(36); };
+// L'identifiant d'ENVOI (32 hex) : eBay refuse un second ajout portant le même
+// (488) — c'est ce qui empêche une coupure réseau de créer deux annonces.
+const uuidEnvoiEbay = () => { try { if (crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').toUpperCase(); } catch (_) {} const h = () => Math.floor(Date.now() * 1000 % 65536).toString(16).padStart(4, '0'); return (Date.now().toString(16) + h() + h() + h() + h() + h()).toUpperCase().slice(0, 32).padEnd(32, '0'); };
+// Un brouillon → l'annonce qui part chez eBay. UNE règle pour le formulaire
+// (« Vérifier », « Publier ») ET la liste des brouillons (§11) : impossible de
+// vérifier autre chose que ce qu'on programme.
+function itemDeBrouillon(d) {
+  if (!d) return { err: 'Brouillon introuvable.' };
+  const cat = d.categorie || {};
+  if (!cat.id) return { err: 'Choisis la catégorie eBay.' };
+  const asp = d.aspects || {};
+  const manquants = (cat.requis || []).filter((n) => !String(asp[n] || '').trim());
+  if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
+  const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
+  if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
+  if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
+  // (19 oct., revue « argent ») « 1.250 » partait en 1,25 €, « 74 € » en NaN :
+  // la MÊME lecture que toute saisie de montant (`montantSaisi`) — le serveur
+  // refuse aussi (`prixLu`), ceci dit pourquoi AVANT d'envoyer.
+  { const px = montantSaisi(typeof d.prix === 'number' ? String(d.prix) : d.prix); if (!(px > 0)) return { err: 'Un prix en euros, par exemple 74 ou 74,50.' }; }
+  // L'IDENTITÉ de la paire part avec l'annonce : le serveur en fait le SKU
+  // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
+  // qu'un faux.
+  const numero = d.numero && skuEbayDe(d.numero) ? cleNum(d.numero) : '';
+  // (9 octobre) LA RÈGLE D'OFFRE de la nouvelle annonce : c'est eBay qui
+  // acceptera, au montant fixé. Validée ici (la même règle que la carte et la
+  // route, `valideRegleOffre`) ; sans règle, l'`item` est EXACTEMENT celui
+  // d'avant (même clé de vérification, mêmes corps envoyés).
+  const offreA = String(d.offreAccepte == null ? '' : d.offreAccepte).trim();
+  const offreR = String(d.offreRefuse == null ? '' : d.offreRefuse).trim();
+  let offre;
+  if (offreA || offreR) {
+    const a = montantSaisi(offreA), r = montantSaisi(offreR);      // null (vide) · nombre · NaN (illisible ⇒ refusé par valideRegleOffre)
+    const prix = Number(String(d.prix).replace(',', '.'));
+    const v = valideRegleOffre({ accepte: a, refuse: r, prix });
+    if (!v.ok) return { err: 'Règle d\'offre : ' + v.err };
+    if (v.accepte != null) {
+      const bas = seuilTropBas(v.accepte, prix);
+      if (bas && d.offreSousMoitie !== true) return { err: 'Règle d\'offre : moins de la moitié du prix — coche « je fixe volontairement » dans le brouillon.' };
+      offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
+    }
+  }
+  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).trim().replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
+}
+// Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
+const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
+// « Une règle pour toutes » : le seuil d'un pourcentage du prix, arrondi au
+// centime SUPÉRIEUR (jamais sous le pourcentage choisi : l'arrondi à l'euro du
+// dessous perdait jusqu'à 3 points sur les petits prix, au profit de
+// l'acheteur). 50 à 99 % ; null si le prix est trop bas pour un seuil.
+function seuilDePourcent(prix, pct) {
+  const C = Math.round(Number(prix) * 100);
+  if (!(C > 0) || !Number.isInteger(pct) || pct < 50 || pct > 99) return null;
+  const X = Math.ceil(C * pct / 100);
+  return (X > 0 && X < C) ? X / 100 : null;
+}
+const seRelitChezEbay = (e) => !!e && e.etat === 'pas-su' && !PAS_SU_SANS_RELECTURE.includes(e.raison);
+// La règle d'offre qu'un brouillon a ENVOYÉE avec sa programmation (eBay ne la
+// relit pas avant le départ) — la liste des programmées ET l'alerte « à
+// annuler » la lisent ici (§11). Un nombre, ou null.
+function offreEnvoyeeProgrammee(brouillons, itemId) {
+  for (const d of Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {})) {
+    if (d && d.programme && String(d.programme.itemId) === String(itemId)) { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? a : null; }
+  }
+  return null;
+}
+// Le prix d'achat d'une paire PAR SON N° — seulement si UNE seule fiche porte
+// ce N° (ambigu ⇒ absent : rien n'est dit). Le prix d'achat ne se devine
+// jamais : la valeur est un nombre (connu) ou null (paire reliée, pas saisi).
+function achatParNum(fiches, buyByNum) {
+  const n = new Map(), v = new Map();
+  for (const f of Object.values(fiches || {})) { const k = cleNum(f && f.numero); if (!k) continue; n.set(k, (n.get(k) || 0) + 1); v.set(k, prixAchatDe(f, buyByNum)); }
+  const out = new Map();
+  for (const [k, c] of n) if (c === 1) out.set(k, v.get(k));
+  return out;
+}
+function useEbayPaires(comptes) {
+  const [paires, setPaires] = React.useState([]);
+  const [enLigne, setEnLigne] = React.useState(undefined);
+  // (revue du 8 octobre) TOUS ses comptes ont-ils répondu ? Le retrait
+  // automatique en dépend, et l'écran eBay dit pourquoi une paire n'est pas
+  // partie toute seule : la même lecture que la coque (§11).
+  const [toutesLues, setToutesLues] = React.useState(undefined);
+  // Les fiches N° sont un réglage SYNCHRONISÉ lu au montage : sur le premier
+  // écran d'un appareil neuf, le nuage arrive après (§5.49) — on recalcule.
+  const [nuage, setNuage] = React.useState(0);
+  React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
+  React.useEffect(() => { let stop = false; (async () => {
+    try {
+      const fiches = load('vinted_annonce_numeros', {}) || {};
+      const presents = numsPresents();
+      // ⚠️ NE PROPOSER QUE LES PAIRES EN LIGNE (plainte de Julien : « il y a des
+      // paires déjà vendues »). Aucune annonce lisible ⇒ `online` reste `null` :
+      // on ne filtre pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
+      // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
+      const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
+      const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {}, marqueMap = lu.marque || {}, tailleMap = lu.taille || {};
+      if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
+      if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
+      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+      let details = {};
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
+        if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
+      } catch (_) { /* réseau : on se contente de la couverture */ }
+      // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
+      // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
+      // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
+      // description. ⚠️ Remesuré le 17 oct. : le dressing PORTE la marque
+      // (`brand`, 372/373) — elle est lue là d'abord, le coffre n'est qu'un
+      // repli (annonce absente du dressing). Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
+      // on fait sans (rien n'est inventé à la place).
+      let coffre = {};
+      try {
+        const rows = await lireTout('id=like.coffre_*&select=id,brand:data->>brand,etat:data->>etat,size:data->>size,desc:data->>desc');
+        for (const r of (Array.isArray(rows) ? rows : [])) { const m = /^coffre_[^_]+_(.+)$/.exec(String(r.id || '')); if (m) coffre[m[1]] = r; }
+      } catch (_) { coffre = {}; }
+      const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
+      const vus = new Set(), out = [];
+      for (const id in fiches) {
+        const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
+        if (!n || vus.has(n)) continue;
+        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
+        if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
+        vus.add(n);
+        const cover = f.photo || couvMap[String(id)] || null;
+        const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
+        const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
+        const cf = coffre[String(id)] || {};
+        const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
+        // (17 oct.) « Description » collé devant le texte (le libellé de la page
+        // Vinted, mesuré : « Descriptionautry reelwind gris… ») partait dans la
+        // description eBay. La même règle que Leboncoin (`lbcDescription`, §11).
+        const dscPropre = descriptionEbayPropre(dsc);
+        const desc = (dscPropre && !PUB.test(dscPropre)) ? dscPropre : '';   // sa vraie description Vinted, jamais le texte pub ni le libellé
+        const titreP = String(f.title || titreMap[String(id)] || '').trim();
+        const marque = String(marqueMap[String(id)] || cf.brand || '').trim();
+        const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
+        const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
+        out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+      }
+      out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
+      if (!stop) setPaires(out);
+    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); setToutesLues(false); } }
+  })(); return () => { stop = true; }; }, [comptes, nuage]);
+  return { paires, enLigne, toutesLues };
+}
+
+// Les raisons d'échec de la connexion eBay, dites en clair (la route renvoie
+// un code ; un code inconnu est montré tel quel plutôt que caché).
+const RAISON_CONNEXION_EBAY = {
+  'identite-illisible': 'je n\'ai pas pu savoir quel compte eBay vient de se connecter — rien n\'a été ajouté, réessaie',
+  'principal-inconnu': 'je n\'ai pas pu relire ton premier compte eBay pour savoir si c\'est le même — rien n\'a été ajouté. Réessaie ; s\'il n\'est plus à toi, déconnecte-le d\'abord',
+  'comptes-pas-su': 'je n\'ai pas pu relire tes comptes eBay (la base n\'a pas répondu) — rien n\'a été rangé, réessaie',
+  'registre-ko': 'le compte est relié, mais je n\'ai pas pu le noter dans la liste de tes comptes — réessaie la connexion',
+  'store-failed': 'je n\'ai pas pu ranger la connexion (la base n\'a pas répondu) — réessaie',
+};
+
+// ── eBay → Annonces · PROGRAMMÉES (5 octobre) ────────────────────────────────
+// Ce qu'eBay mettra en ligne, groupé par jour (heure de Paris). La vérité est
+// la liste qu'eBay rend (`ebay_programmees`) ; ce que VRM vient de programmer
+// s'y ajoute en attendant la relecture. Statuts : Programmée · En ligne ·
+// « Pas partie à l'heure » (plus de 30 min après l'heure, eBay la garde
+// toujours en attente) · « à relire » (l'heure est passée depuis la dernière
+// lecture : on ne suppose rien).
+const SELLER_HUB_PROGRAMMEES = 'https://www.ebay.fr/sh/lst/scheduled';
+
+// ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
+// Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
+// elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
+// Aperçu ne les affichait que connexion OUVERTE). Cet onglet lit les annonces
+// captées DIRECTEMENT : « rien lu ≠ rien », on montre ce qu'on a même si la
+// connexion OAuth est momentanément tombée.
+// ⚠️⚠️ 5 octobre — Julien : « pour eBay je ne sais pas pourquoi le site est si
+// peu développé, tu as accès à mon compte et tu ne fais rien de ouf ». Mesuré le
+// jour même : ses 2 annonces eBay n'avaient AUCUN lien à une paire, donc une
+// paire vendue sur Vinted pouvait rester en vente ici sans que VRM le voie.
+// L'écran porte maintenant, dans cet ordre :
+//   1. l'anti double vente (`doublesVenteEbay`, la MÊME règle que le centre de
+//      notifications, §11) : « vendue sur Vinted → retire-la d'eBay » (un clic +
+//      une confirmation, eBay seul : sans retour) et « vendue sur eBay → retire-la
+//      de Vinted » (le lien ; VRM ne touche jamais une annonce Vinted, §3) ;
+//   2. ce qui n'a pas pu être lu, dit UNE fois (§7) — jamais « rien à retirer » ;
+//   3. le publieur, qui pose désormais le SKU `VRM-{n°}` ;
+//   4. l'offre aux observateurs (eBay choisit les destinataires, §3) et les
+//      annonces pas encore reliées, chacune dite une fois au-dessus de la liste.
+// ── « UNE RÈGLE POUR TOUTES » (9 octobre) ───────────────────────────────────
+// Un pourcentage du prix de chaque annonce de la VUE : un aperçu, ligne par
+// ligne, de ce qui partirait — rien ne part avant la confirmation, puis une
+// annonce après l'autre (jamais en parallèle : 4 à 9 appels eBay chacune), et
+// un bilan COMPLET (la somme des issues vaut le total). Le montant est calculé
+// une fois et FIXÉ (eBay ne connaît qu'un montant). Le refus n'est jamais
+// touché par ce geste (le serveur renvoie celui qui existe).
+// Ce qui n'est pas cochable : une paire vendue ou en vente sur deux comptes,
+// une vente pas vérifiée, une règle pas encore lue (« relis-la d'abord » : on
+// ne remplace pas ce qu'on n'a pas vu), un prix trop bas, un refus au-dessus.
+// Ce qui est décoché par défaut : remplacer une règle par une PLUS BASSE, et une
+// annonce reliée à aucune paire (eBay la vendrait sans que VRM sache laquelle).
+const REGLES_LOT_MAX = 25;
+const RAISON_RETRAIT_AUTO = {
+  'pas-su': 'je n\'ai pas pu tout vérifier (une annonce ou une vente Vinted pas lue)',
+  'sku': 'le N° de son annonce eBay ne correspond pas à la paire',
+  'numero-partage': 'ce N° est porté par plusieurs paires dans VRM',
+  'revenue-une-fois': 'cette paire est déjà revenue une fois (remboursée ou retournée)',
+  'vente-non-confirmee': 'la vente n\'est pas encore confirmée par ta liste de ventes Vinted',
+  'compte-bloque': 'la vente est sur un compte que Vinted a bloqué',
+  'liste-perimee': 'ta liste de ventes de ce compte n\'a pas été relue depuis plus de 48 h',
+  'date-pas-sue': 'je ne connais pas la date de mise en ligne de l\'annonce eBay',
+  'ebay-apres-vente': 'l\'annonce eBay a été mise en ligne après la vente',
+  'deja-terminee': 'eBay la dit déjà terminée',
+};
 // (17 oct.) Julien : « trop de texte, ça rend moche » (écran Annonces eBay). Une
 // explication qui ne change pas d'une fois à l'autre se replie derrière un « ⓘ »
 // au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.

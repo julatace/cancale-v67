@@ -9,8 +9,188 @@ import { noterTicketDiscord } from "../communaute/discordAttente.js";
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { normAdresse } from "../../api/_lib/proprietaire-email.js";
-import { ADRESSE_RECEPTION_OK, APERCU_MAX, AUTH, BUILD_ID, BlocComptesMuets, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_SAISIE_PRIX, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, IMPR_MODES, INV_STATUS, Icon, IconeReglage, LignePanne, MM_PT, MULTI_USER, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PUSH_CATS, REGLAGE_PAS_LU, RETOUR_ABONNEMENT, RETOUR_VUE, SB_CONFLICT, STATUT_FACTURE, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, TYPES_BORDEREAU, ZOOMS, ZOOM_KEY, _reglagesEcoute, _reglagesRates, actionEquipe, applyZoom, archiveNumeros, askConfirm, askText, authSetEmail, authSetPassword, authSignOut, bordereauFormatKey, choisirResiliation, choisirVueEquipe, codePerime, compterReglesEbay, dateLisible, deleteVintedAccount, dessinerPdf, enTeteSession, estCorpsErreurVinted, extEnRetard, fermerMonCompte, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, lienFacture, ligneDeSaSession, lireAbonnement, lireAdressesVues, lireEquipe, lireFactures, lireMisDeCote, lirePdfLigne, lireReglage, lireTout, load, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, montantLisible, nomTypeBordereau, oauthStart, onCloudReady, onVmrExt, ouvrirStripe, phrasePersonne, poserBordereau, poserStream, prefixeNumeros, prixLisible, providerEnabled, qrEnSrc, readZoom, save, sbAuth, smartDefaultBordPos, sondeLectureSansCompte, supprimerDonneesCompte, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, useBeneficeJournee, useEtatEmailsComptes, useEtroitReglages, useMisDeCote, useSansSouris, useStream, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette } from "../App.jsx";
+import { AUTH, BUILD_ID, BlocComptesMuets, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_SAISIE_PRIX, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, IMPR_MODES, INV_STATUS, Icon, IconeReglage, LignePanne, MM_PT, MULTI_USER, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, REGLAGE_PAS_LU, RETOUR_ABONNEMENT, RETOUR_VUE, SB_CONFLICT, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, TAUX_URSSAF_DEFAUT, TYPES_BORDEREAU, ZOOM_KEY, _reglagesEcoute, _reglagesRates, actionEquipe, applyZoom, archiveNumeros, askConfirm, askText, authSetEmail, authSetPassword, authSignOut, bordereauFormatKey, chargerPdfjs, choisirVueEquipe, codePerime, compterReglesEbay, deleteVintedAccount, enTeteSession, estCorpsErreurVinted, extEnRetard, familiesDeCompte, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, ligneDeSaSession, lireAbonnement, lireEquipe, lireMisDeCote, lirePdfLigne, lireReglage, lireTout, load, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, oauthStart, onCloudReady, onVmrExt, ouvrirStripe, phrasePersonne, poserBordereau, poserStream, prefixeNumeros, prixLisible, providerEnabled, qrEnSrc, readZoom, save, sbAuth, smartDefaultBordPos, sondeLectureSansCompte, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, useBeneficeJournee, useEtatEmailsComptes, useMisDeCote, useSansSouris, useStream, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette } from "../App.jsx";
 
+// La forme acceptée pour une adresse de réception (saisie à la main OU
+// suggérée) : une seule règle.
+const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
+const supprimerDonneesCompte = async (uid0, login, scopes) => {
+  const uid = String(uid0 || '').trim();
+  if (!uid) return { ok: false, n: 0 };
+  let n = 0;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
+    if (!r.ok) return { ok: false, n: 0 };               // « pas su » : on n'efface rien à l'aveugle
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return { ok: false, n: 0 };
+    const cibles = rows.filter(x => familiesDeCompte(uid, String(x.id), scopes));
+    if (cibles.length) {
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST',
+        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(cibles.map(x => withOwner({ id: x.id, data: { supprime: true, uid, purgedAt: new Date().toISOString() } }))),
+      });
+      if (!w.ok) return { ok: false, n: 0 };
+      n = cibles.length;
+    }
+    // « Le compte et ses jetons » : la ligne vinted_accounts (DELETE marche là,
+    // autre table). Récupérable en reconnectant l'extension sur ce compte.
+    if (scopes.compte) {
+      try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }) }); } catch (_) {}
+    }
+    return { ok: true, n };
+  } catch (_) { return { ok: false, n: 0 }; }
+};
+const nomTypeBordereau = (t) => (TYPES_BORDEREAU.find(([k]) => k === t) || [, 'Autre mise en page'])[1];
+// Dessine la page 1..n d'un PDF (octets) dans un canvas, avec un cadre en
+// pointillés autour de `zone` (coordonnées PDF) — « ce qui part en thermique ».
+const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = null } = {}) => {
+  const L = await chargerPdfjs();
+  const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets }).promise;
+  const pg = await d.getPage(page);
+  const v0 = pg.getViewport({ scale: 1 });
+  const dpr = Math.min(2, window.devicePixelRatio || 1), sc = (largeur / v0.width) * dpr;
+  const v = pg.getViewport({ scale: sc });
+  canvas.width = Math.round(v.width); canvas.height = Math.round(v.height);
+  canvas.style.width = `${Math.round(v.width / dpr)}px`; canvas.style.height = `${Math.round(v.height / dpr)}px`;
+  const c2 = canvas.getContext('2d'); c2.fillStyle = '#fff'; c2.fillRect(0, 0, canvas.width, canvas.height);
+  await pg.render({ canvasContext: c2, viewport: v }).promise;
+  if (zone) {
+    const H = v0.height;
+    c2.save(); c2.strokeStyle = '#2458E6'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
+  }
+  return d.numPages;
+};
+
+// ── RÉGLAGES → IMPRIMANTE ET BORDEREAUX (17 octobre) ────────────────────────
+// Julien : « dans les paramètres, imprimante thermique et normale ; tous les
+// types de bordereau avec une visualisation pour chaque type collecté par
+// l'app ». Le choix est LE réglage `vrm_imprimante` — le même que les deux
+// pastilles de l'écran Colis (§11 : un réglage, deux portes).
+// Les aperçus se calculent sur SES bordereaux, dans son navigateur, au clic :
+// ils lisent des PDF (≈ 70 Ko chacun), donc rien ne part tant qu'il ne le
+// demande pas, et jamais plus de `APERCU_MAX` (§4.4).
+const APERCU_MAX = 24;
+
+const PUSH_CATS = [
+  { id:'vente',    def:true,  titre:'💸 Vendu',            desc:"Une paire vient d'être vendue." },
+  { id:'argent',   def:true,  titre:'💰 Argent viré',       desc:'Vinted a versé ton argent.' },
+  { id:'colis',    def:true,  titre:'📍 Colis à retirer',   desc:'Arrivé au relais, avec le code de retrait.' },
+  { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
+  { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
+  { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
+  { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
+  { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
+  { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
+  { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
+  { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
+  { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
+  { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
+  { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
+];
+
+// Téléphone (< 768 px) : les panneaux longs passent dans un sous-écran.
+// `matchMedia` qui lève ⇒ « pas su » ⇒ la disposition d'ordinateur, où tout
+// reste déplié (rien n'est caché sur une mesure ratée).
+function useEtroitReglages() {
+  const q = '(max-width: 767px)';
+  const lire = () => { try { return window.matchMedia(q).matches; } catch (_) { return false; } };
+  const [v, setV] = React.useState(lire);
+  React.useEffect(() => {
+    let mq; try { mq = window.matchMedia(q); } catch (_) { return undefined; }
+    const maj = () => setV(mq.matches);
+    try { mq.addEventListener('change', maj); } catch (_) { return undefined; }
+    return () => { try { mq.removeEventListener('change', maj); } catch (_) {} };
+  }, []);
+  return v;
+}
+// Julien trouvait encore « trop serré » au minimum : on descend plus bas.
+// 0,65 fait tenir une fois et demie plus de contenu qu'à 100 %.
+const ZOOMS = [['0.65', 'Minus'], ['0.75', 'Petit'], ['0.85', 'Compact'], ['1', 'Normal'], ['1.1', 'Grand']];
+const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
+
+// MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
+// · `{ factures, carte }` lu. ⚠️ « Pas su » ne s'affiche JAMAIS comme « aucune
+// facture » : quelqu'un qui cherche une facture pour sa compta en conclurait
+// qu'elle n'existe pas.
+async function lireFactures() {
+  try {
+    const r = await fetch('/api/compte?mode=factures', { headers: enTeteSession(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && Array.isArray(j.factures) ? { factures: j.factures, carte: j.carte || null } : null;
+  } catch (_) { return null; }
+}
+// Résilier (à la fin de la période payée) ou annuler la résiliation.
+async function choisirResiliation(reprendre) {
+  try {
+    const r = await fetch(`/api/compte?mode=${reprendre ? 'reprendre' : 'resilier'}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok) return { ok: true, annuleFinPeriode: !!j.annuleFinPeriode, finPeriode: j.finPeriode || null };
+    return { ok: false, message: (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant." };
+  } catch (_) { return { ok: false, message: 'Pas de connexion. Réessaie dans un instant.' }; }
+}
+const montantLisible = (n, devise) => {
+  if (!Number.isFinite(Number(n))) return '—';
+  try { return Number(n).toLocaleString('fr-FR', { style: 'currency', currency: String(devise || 'eur').toUpperCase() }); }
+  catch (_) { return `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`; }
+};
+const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', uncollectible: 'Impayée' };
+// Seuls les liens de Stripe s'ouvrent depuis la liste (le serveur filtre déjà ;
+// on ne fait pas confiance à une seule moitié).
+const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
+
+// ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
+// La politique de confidentialité promet l'effacement ; il fallait écrire à une
+// adresse qui n'existe pas encore. Le serveur fait le travail
+// (api/compte.js?mode=fermer) et rend ce qui a été fait ET ce qui ne l'a pas
+// été : l'écran l'affiche tel quel — jamais « compte fermé » sur un échec.
+// Trois états de réponse : `{ ok:true }` fermé · `{ ok:false, message }` dit
+// par le serveur · pas de réponse = PAS SU (on ne prétend ni l'un ni l'autre).
+async function fermerMonCompte(confirmation) {
+  try {
+    const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation }) });
+    const j = await r.json().catch(() => null);
+    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
+    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
+  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
+}
+
+// ── LES ADRESSES OÙ ARRIVENT DÉJÀ TES EMAILS ─────────────────────────────────
+// Mesuré le 6 octobre (lecture seule, sa vraie base) : parmi les lignes
+// `email_*`, SEULES `email_inconnu_*` gardent l'adresse de destination — le
+// champ `to` (l'en-tête « À », 1 053 lignes sur 1 053, 17 formes, dont
+// « Hide My Email <…@icloud.com> »). C'est l'un des champs que lit la règle
+// d'arrivée (`adressesDeLivraison`) : la déclarer suffit à ce que les emails
+// suivants lui reviennent. Une IDENTITÉ — l'adresse où ses propres emails sont
+// arrivés —, jamais une ressemblance.
+// ⚠️ SES lignes seulement (session, RLS) : jamais les adresses du tas mis de
+//    côté, qui peuvent être celles d'un autre vendeur.
+// ⚠️ Des suggestions, pas un total : les 1 000 plus récentes suffisent (§4.5
+//    vaut pour un total ; aucun n'est affiché ici). Scalaire `meta->>to` : la
+//    ligne porte jusqu'à 200 Ko d'email brut, jamais rapatrié (§4.4).
+// Rend un tableau `{ adresse, n, dernier }` (le plus fréquent d'abord), ou
+// `null` si la lecture a échoué — rien n'est alors suggéré, rien n'est affirmé.
+async function lireAdressesVues() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=to:meta->>to,quand:meta->>receivedAt&order=meta->>receivedAt.desc&limit=1000`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const vues = {};
+    for (const x of j) {
+      for (const brut of String((x && x.to) || '').split(/[,;]/)) {
+        const a = normAdresse(brut);
+        if (!a || !ADRESSE_RECEPTION_OK.test(a)) continue;
+        const v = vues[a] || (vues[a] = { adresse: a, n: 0, dernier: '' });
+        v.n++;
+        if (String((x && x.quand) || '') > v.dernier) v.dernier = String(x.quand || '');
+      }
+    }
+    return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
+  } catch (_) { return null; }
+}
 
 function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
   const ref = React.useRef(null);

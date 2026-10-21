@@ -202,16 +202,6 @@ const lbcDescription = (brut) => {
   return t.replace(/^\s*Description\s*(?=\S)/, '').trim();
 };
 
-// (17 oct.) La description qui part sur eBay : la règle de Leboncoin (§11 —
-// texte publicitaire de Vinted écarté, libellé « Description » collé retiré),
-// plus les deux restes que le libellé peut laisser : un « : » de tête, ou le
-// mot « Description » tout seul (Julien : « j'ai "description" qui s'affiche
-// dans la description, ça ne sert à rien »). Jamais une vraie description.
-const descriptionEbayPropre = (brut) => {
-  const t = lbcDescription(brut).replace(/^[:\-–]\s*/, '').trim();
-  return /^description$/i.test(t) ? '' : t;
-};
-
 const LBC_TITRE_MAX = 50;
 const lbcTitre = (brand, base, size, max) => {
   let t = String(base || '').replace(/\s+/g, ' ').trim();
@@ -2113,33 +2103,6 @@ const familiesDeCompte = (uid, id, scopes) => {
   if (/^(conv_)/.test(r)) return scopes.messages;
   // Le reste (seen_urls, diag, offer_statuts…) ne part qu'avec « tout le compte ».
   return !!scopes.compte;
-};
-const supprimerDonneesCompte = async (uid0, login, scopes) => {
-  const uid = String(uid0 || '').trim();
-  if (!uid) return { ok: false, n: 0 };
-  let n = 0;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?or=(id.like.harvest_${uid}_*,id.like.coffre_${uid}_*)&select=id`, { headers: sbAuth() });
-    if (!r.ok) return { ok: false, n: 0 };               // « pas su » : on n'efface rien à l'aveugle
-    const rows = await r.json();
-    if (!Array.isArray(rows)) return { ok: false, n: 0 };
-    const cibles = rows.filter(x => familiesDeCompte(uid, String(x.id), scopes));
-    if (cibles.length) {
-      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
-        method: 'POST',
-        headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-        body: JSON.stringify(cibles.map(x => withOwner({ id: x.id, data: { supprime: true, uid, purgedAt: new Date().toISOString() } }))),
-      });
-      if (!w.ok) return { ok: false, n: 0 };
-      n = cibles.length;
-    }
-    // « Le compte et ses jetons » : la ligne vinted_accounts (DELETE marche là,
-    // autre table). Récupérable en reconnectant l'extension sur ce compte.
-    if (scopes.compte) {
-      try { await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${uid}`, { method: 'DELETE', headers: sbAuth({ Prefer: 'return=minimal' }) }); } catch (_) {}
-    }
-    return { ok: true, n };
-  } catch (_) { return { ok: false, n: 0 }; }
 };
 
 
@@ -5716,29 +5679,6 @@ function vmrPhotoIssue(url, timeoutMs = 8000) {
 }
 function vmrPhoto(url, timeoutMs = 8000) { return vmrPhotoIssue(url, timeoutMs).then((r) => (r && r.dataUrl) || null); }
 
-// Le PDF d'un bordereau Leboncoin, lu par l'extension (5.136) : il est derrière
-// SA session Leboncoin, la page ne peut pas le lire. `{dataUrl}` ou `{error}`.
-function vmrPdfLbc(url, timeoutMs = 15000) {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ error: 'extension absente' }); return; }
-    const reqId = 'l' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    let done = false, grace = null, dernier = null;
-    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
-    // Une erreur de PONT (« Extension context invalidated », « pont ») vient d'un
-    // bridge orphelin (voir `vmrDemande`) : on attend encore le pont vivant.
-    const onMsg = (e) => {
-      if (!(e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId)) return;
-      const v = { dataUrl: e.data.dataUrl || null, error: e.data.error || '' };
-      if (v.dataUrl || !pontOrphelin(v.error)) { fin(v); return; }
-      dernier = v;
-      if (!grace) grace = setTimeout(() => fin(dernier), VMR_GRACE_VIDE_MS);
-    };
-    window.addEventListener('message', onMsg);
-    setTimeout(() => fin({ error: 'pas de réponse' }), timeoutMs);
-    try { window.postMessage({ __vmr: 'pdfLbc', reqId, url }, '*'); } catch (_) { fin({ error: 'pont' }); }
-  });
-}
-
 // 5.183 : un GESTE (jamais une lecture) part par le relais sur le téléphone.
 function vmrExec(q, timeoutMs = 15000) {
   if (q && String(q.method || 'POST').toUpperCase() !== 'GET' && relaisVivant()) return relaisExec(q);
@@ -7106,15 +7046,6 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   return { ok: okUn, items, pagination, lu: okUn ? Date.now() : null };
 };
 
-// Detecte un numero de paire ecrit dans un titre Vinted, au format "nXX",
-// "n XX" ou "n°XX" (ex: "Adidas spezial n20" -> "20"). Sert UNIQUEMENT de
-// suggestion lors de l'import : l'attribution du numero reste manuelle.
-const extractPairNumber = (text) => {
-  if (!text) return null;
-  const m = /\bn\s*°?\s*(\d{1,5})\b/i.exec(text);
-  return m ? m[1] : null;
-};
-
 // ── L'IDENTITÉ D'UN NUMÉRO DE RANGEMENT : « 125 », « B125 », « C123 »… ──────
 // Julien, 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
 // des fois elles commencent par B125, C123 ». Deux saisies désignent le MÊME
@@ -8063,7 +7994,6 @@ const typeBordereau = (PL, doc) => {
     return { type: t || 'autre', cle: `${t || 'autre'}·${sens}`, sens, W, H };
   } catch (_) { return { type: 'autre', cle: 'autre·?', sens: '?', W: 0, H: 0 }; }
 };
-const nomTypeBordereau = (t) => (TYPES_BORDEREAU.find(([k]) => k === t) || [, 'Autre mise en page'])[1];
 
 // Le lecteur de PDF des APERÇUS (pdf.js), chargé au premier aperçu demandé —
 // jamais avant, et seulement pour dessiner : l'impression n'en a pas besoin.
@@ -8080,36 +8010,6 @@ const chargerPdfjs = () => _pdfjs || (_pdfjs = new Promise((ok, ko) => {
     document.head.appendChild(sc);
   } catch (e) { _pdfjs = null; ko(e); }
 }));
-// Dessine la page 1..n d'un PDF (octets) dans un canvas, avec un cadre en
-// pointillés autour de `zone` (coordonnées PDF) — « ce qui part en thermique ».
-const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = null } = {}) => {
-  const L = await chargerPdfjs();
-  const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets }).promise;
-  const pg = await d.getPage(page);
-  const v0 = pg.getViewport({ scale: 1 });
-  const dpr = Math.min(2, window.devicePixelRatio || 1), sc = (largeur / v0.width) * dpr;
-  const v = pg.getViewport({ scale: sc });
-  canvas.width = Math.round(v.width); canvas.height = Math.round(v.height);
-  canvas.style.width = `${Math.round(v.width / dpr)}px`; canvas.style.height = `${Math.round(v.height / dpr)}px`;
-  const c2 = canvas.getContext('2d'); c2.fillStyle = '#fff'; c2.fillRect(0, 0, canvas.width, canvas.height);
-  await pg.render({ canvasContext: c2, viewport: v }).promise;
-  if (zone) {
-    const H = v0.height;
-    c2.save(); c2.strokeStyle = '#2458E6'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
-    c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
-  }
-  return d.numPages;
-};
-
-// ── RÉGLAGES → IMPRIMANTE ET BORDEREAUX (17 octobre) ────────────────────────
-// Julien : « dans les paramètres, imprimante thermique et normale ; tous les
-// types de bordereau avec une visualisation pour chaque type collecté par
-// l'app ». Le choix est LE réglage `vrm_imprimante` — le même que les deux
-// pastilles de l'écran Colis (§11 : un réglage, deux portes).
-// Les aperçus se calculent sur SES bordereaux, dans son navigateur, au clic :
-// ils lisent des PDF (≈ 70 Ko chacun), donc rien ne part tant qu'il ne le
-// demande pas, et jamais plus de `APERCU_MAX` (§4.4).
-const APERCU_MAX = 24;
 
 // ── OUVRIR UN PDF, JAMAIS LE TÉLÉCHARGER EN DOUCE (3 octobre) ──────────────
 // Julien : « quand j'appuie sur imprimer sur ordi, ça télécharge le bordereau et
@@ -8481,7 +8381,6 @@ const fmt  = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',')+' €';
 // juste à côté. UNE forme pour les écrans Ventes et Annonces — l'entier quand
 // le montant est rond, sinon deux décimales, toujours une espace avant €.
 const prixCourt = (n) => { const v = Number(n); if (n == null || n === '' || !isFinite(v)) return '—'; const c = Math.round(v * 100) / 100; return (Number.isInteger(c) ? String(c) : c.toFixed(2).replace('.', ',')) + ' €'; };
-const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
 const uid  = () => Math.random().toString(36).slice(2,9);
 const tod  = () => new Date().toLocaleDateString('fr-FR');
 
@@ -8676,13 +8575,6 @@ function extractCountry(address){
     }
   }
   return 'France';
-}
-function getISOWeekKey(){
-  const d=new Date();const day=d.getDay()||7;
-  d.setDate(d.getDate()+4-day);
-  const y=d.getFullYear();
-  const wk=Math.ceil(((d-new Date(y,0,1))/864e5+1)/7);
-  return `${y}-W${String(wk).padStart(2,'0')}`;
 }
 
 // ── Notifications ──────────────────────────────────────
@@ -12111,79 +12003,6 @@ function BoutonToutGenerer({ items }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PUBLIER DEPUIS L'APP (5.130) — « c'est l'application qui contrôle l'extension »
-// ══════════════════════════════════════════════════════════════════════════════
-// Les panneaux sur leboncoin.fr et ebay.fr sont retirés : le geste vit ici. L'app
-// n'envoie qu'un IDENTIFIANT ; l'extension relit la paire dans SA file (vendue,
-// décochée ou preuve illisible → refusée), ouvre le dépôt et remplit — et sur
-// Leboncoin publie sans booster (décision du 20 septembre).
-// GRISÉ et jamais caché quand l'extension ne peut pas (§ BoutonBordereau) ; la
-// raison commune est dite UNE fois au-dessus de la liste (`RaisonPublication`).
-// `croitVendue` (revue du 11 octobre, défaut 12) : VRM sait la paire REVENUE
-// (vente remboursée ensuite), mais une extension antérieure à la règle de
-// l'instantané (`EXT_CAPACITES.preuves`) la croit encore vendue et refuserait
-// de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
-// UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
-const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sait pas qu'une vente remboursée fait revenir la paire) et refuserait de la publier : mets-la à jour (${EXT_ATTENDUE}).`;
-// ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
-//    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
-//    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
-//    « Publication en cours… » 15 minutes, et un clic ne faisait RIEN, sans un
-//    mot (`if (… enCours) return;`). Désormais :
-//      · un clic refusé DIT pourquoi, toujours (grisé, déjà publiée, en cours) ;
-//      · « en cours » renvoie la commande : l'extension remet l'onglet du dépôt
-//        devant s'il est ouvert, ou relance s'il a été fermé ;
-//      · un dépôt arrêté ou fermé passe à « Le dépôt n'a pas abouti —
-//        Réessayer » (l'extension le dit, `depotArrete` / onglet fermé) ;
-//      · le bouton annonce les photos CAPTÉES sur le total de l'annonce — le
-//        dépôt part avec ce qui est capté, jamais plus.
-// ⚠️⚠️ Revue du 11 octobre : « LE DÉPÔT N'A PAS ABOUTI » ÉTAIT UNE AFFIRMATION
-//    SUR UNE MESURE QUI N'A PAS EU LIEU. L'arrêt à 90 s arrive justement quand
-//    un champ obligatoire ne se devine pas (Univers*), c'est-à-dire quand il
-//    FINIT À LA MAIN — et VRM ne voit pas la page de fin. « Réessayer » ouvrait
-//    alors un second dépôt qui PUBLIE TOUT SEUL (prouvé : 2 onglets de dépôt,
-//    `publier: true`) : la paire en ligne deux fois. L'arrêt veut dire « pas
-//    su », pas « échec » : on le dit, on nomme « Déjà publiée », et relancer
-//    demande une confirmation (l'extension l'exige aussi, `confirme`).
-const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant que VRM voie la fin", 'onglet-quitte': "l'onglet du dépôt est parti sur une autre page avant que VRM voie la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin avant la fin' };
-// ══════════════════════════════════════════════════════════════════════════════
-// LA FICHE « PUBLIER SUR LEBONCOIN » (5.182, 16 octobre)
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien : « je veux que le poste d'annonce sur leboncoin se fasse comme pour
-// eBay, pour tout gérer depuis VRM ». Leboncoin n'a pas d'API : c'est
-// l'extension qui remplit le dépôt dans son Chrome. La fiche lui montre AVANT
-// ce qui partira — titre (50 car.), description avec sa référence VRM-{n°},
-// prix, état, les photos captées (choisies et ordonnées), la catégorie et le
-// compte — et le laisse corriger. Puis UN bouton : l'app envoie l'annonce
-// corrigée, l'extension la REVÉRIFIE (`valideAnnonceLbc`, la même règle des
-// deux côtés, §11), ouvre le dépôt, remplit, publie sans option payante, et
-// raconte l'avancement que la fiche affiche en direct.
-// ⚠️ Ce qui ne bouge pas : une paire vendue, décochée ou déjà publiée est
-//    refusée par l'extension (elle relit SA file) ; un dépôt en cours n'est pas
-//    relancé ; un dépôt dont VRM n'a pas vu la fin ne repart qu'avec sa
-//    confirmation (il a pu le finir à la main) ; jamais un bouton payant.
-// ⚠️ Une extension plus ancienne que la 5.182 ne sait pas recevoir la fiche :
-//    publier « tel quel » reste possible (elle publie SA version, comme avant),
-//    mais une fiche CORRIGÉE ne part pas — le bouton le dit, il ne promet rien.
-const ETAPES_FICHE_LBC = [
-  ['ouverture', 'Dépôt ouvert sur Leboncoin'],
-  ['remplissage', 'Titre, description, prix'],
-  ['photos', 'Photos'],
-  ['publication', 'Publication, sans option payante'],
-];
-const RANG_PROGRES_LBC = { ouverture: 0, remplissage: 1, 'champ-manquant': 1, photos: 2, etapes: 2, publication: 3, 'publication-refusee': 3 };
-function defautsFicheLbc(q) {
-  const etat = String(q.etat || '').trim();
-  return {
-    title: q.title || '',
-    price: q.prix != null && isFinite(Number(q.prix)) ? Number(q.prix).toFixed(2).replace('.', ',') : '',
-    etat,
-    description: descriptionLbcDe({ ref: 'VRM-' + q.numero, texte: q.texte, base: q.base || q.vinted, marque: q.marque, taille: q.taille, etat, couleur: q.couleur }),
-    photos: Array.isArray(q.photosAll) ? q.photosAll.slice(0, LBC_PHOTOS_MAX) : [],
-  };
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 // PUIS-JE AGIR SUR VINTED DEPUIS CETTE PAGE ? (Julien, 5 octobre)
 // ══════════════════════════════════════════════════════════════════════════════
 // « Quand je me connecte sur VRM, je veux savoir s'il y a un compte connecté et
@@ -13461,12 +13280,6 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
     </div>
   );
 }
-// ── PUBLIER une annonce sur eBay depuis VRM ─────────────────────────────────
-// Piloté par la MESURE : on demande à eBay (action pubinfo) la catégorie et les
-// attributs OBLIGATOIRES à partir du titre, et on ne montre QUE les champs
-// qu'eBay exige. L'humain confirme tout avant l'envoi (aucune publication à
-// l'aveugle). Un refus eBay s'affiche tel quel ; aucune annonce n'est créée.
-const EBAY_CONDITIONS = [['3000', 'Occasion'], ['1000', 'Neuf avec boîte'], ['1500', 'Neuf sans boîte'], ['1750', 'Neuf avec défauts']];
 // ⚠️ LA LIVRAISON EST GÉRÉE PAR eBay (Julien, 27 sept. : « c'est pas moi qui
 // choisis le prix, c'est eBay qui me propose »). MESURÉ à blanc
 // (VerifyAddFixedPriceItem) : son compte est en livraison gérée par eBay, qui
@@ -13516,69 +13329,6 @@ function ebayTitre(base, taille, max) {
 const EBAY_SKIN = Object.defineProperties({}, Object.fromEntries(
   Object.keys(THEMES.light).map(k => [k, { enumerable:true, get:() => C[k] }])
 ));
-// Remplit les caractéristiques eBay à partir de la paire — SANS JAMAIS DEVINER
-// (§5). On ne pose qu'une valeur AUTORISÉE par eBay (a.valeurs) : la pointure
-// exacte, la marque exacte, ou une valeur qui apparaît SANS AMBIGUÏTÉ (une
-// seule) comme mot du titre. Zéro ou plusieurs correspondances ⇒ on laisse
-// vide (« mieux vaut un blanc qu'un faux »). Un attribut en texte libre n'est
-// jamais rempli automatiquement (on ne connaît pas ses valeurs valides).
-// (17 oct.) La description quand Vinted n'en a pas été captée : les FAITS de la
-// paire (marque, pointure, état enregistrés par Vinted, son N° de référence),
-// rien d'autre. Une phrase commerciale inventée serait pire qu'un champ court.
-function descriptionDeFaits(p) {
-  if (!p) return '';
-  const l = [];
-  if (p.title) l.push(String(p.title).trim());
-  if (p.marque) l.push(`Marque : ${p.marque}`);
-  if (p.tailleVinted || p.taille) l.push(`Pointure : ${String(p.tailleVinted || p.taille).replace('.', ',')}`);
-  if (p.etat) l.push(`État : ${p.etat}`);
-  if (p.num) l.push(`Référence : VRM-${p.num}`);
-  return l.length > 1 ? l.join('\n') : '';
-}
-// (17 oct.) L'ÉTAT eBay à partir de l'état que VINTED a écrit sur l'annonce —
-// seulement vers un état qu'eBay PROPOSE pour cette catégorie (sa liste,
-// `conditions`), jamais deviné : « Neuf avec étiquette » → 1000, « Neuf sans
-// étiquette » → 1500, un état d'occasion (« Très bon état », « Bon état »,
-// « Satisfaisant ») → 3000. Inconnu ou absent de la liste d'eBay ⇒ null.
-function etatEbayDeVinted(etat, conditions) {
-  const e = String(etat || '').toLowerCase();
-  if (!e) return null;
-  const id = /neuf avec/.test(e) ? '1000' : /neuf sans/.test(e) ? '1500' : /(tr[eè]s bon|bon [eé]tat|satisfaisant)/.test(e) ? '3000' : null;
-  if (!id) return null;
-  if (Array.isArray(conditions) && conditions.length && !conditions.some((c) => String(c && c.id) === id)) return null;
-  return id;
-}
-// `faits` : ce que Vinted a ENREGISTRÉ pour la paire (marque, pointure) — pas
-// une déduction. Ils remplissent aussi un champ eBay en texte libre (la marque
-// n'a souvent pas de liste chez eBay) ; une déduction du titre, jamais.
-function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) {
-  const out = {};
-  const hay = ' ' + String(titre || '').toLowerCase() + ' ';
-  const echap = (s) => String(s).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  for (const a of attributs || []) {
-    if (!a) continue;
-    const nl = String(a.nom || '').toLowerCase();
-    if (!Array.isArray(a.valeurs) || !a.valeurs.length) {   // texte libre : jamais deviné — seulement un FAIT capté
-      if (/marque|brand/.test(nl) && faits.marque) out[a.nom] = String(faits.marque);
-      else if (/pointure|taille|size/.test(nl) && faits.taille) out[a.nom] = String(faits.taille).replace('.', ',');
-      continue;
-    }
-    if (/pointure|taille|size/.test(nl) && taille) {
-      const t = String(taille).replace(',', '.');
-      const m = a.valeurs.find(v => String(v).replace(',', '.') === t);
-      if (m) { out[a.nom] = m; continue; }
-    }
-    if (/marque|brand/.test(nl) && marque) {
-      const m = a.valeurs.find(v => String(v).toLowerCase() === String(marque).toLowerCase());
-      if (m) { out[a.nom] = m; continue; }
-    }
-    // Générique : une valeur eBay (≥ 3 lettres) présente comme MOT du titre, et
-    // une seule — sinon on ne tranche pas.
-    const hits = a.valeurs.filter(v => { const w = echap(v); return String(v).length >= 3 && new RegExp('(^|[^a-z0-9])' + w + '([^a-z0-9]|$)').test(hay); });
-    if (hits.length === 1) out[a.nom] = hits[0];
-  }
-  return out;
-}
 // ════════════════════════════════════════════════════════════════════════════
 // eBay — BROUILLONS ET PLANIFICATEUR (5 octobre)
 // Julien : « tout doit être personnalisable : le nombre d'annonces qu'il peut
@@ -13606,36 +13356,6 @@ function partsParis(ms) {
   const pad = (n) => String(n).padStart(2, '0');
   return { y, mo, d, h, mi, date: `${y}-${pad(mo)}-${pad(d)}`, heure: `${pad(h)}:${pad(mi)}`, jour: new Date(Date.UTC(y, mo - 1, d)).getUTCDay() };
 }
-// « 2026-10-23 » + « 19:00 » (heure de Paris) → instant UTC. TROIS issues :
-// `{ms}` · `{ambigu, ms}` (la nuit du changement d'heure, 02:00–02:59 existe
-// deux fois : `ms` = la première) · `{inexistant}` (l'heure sautée au
-// printemps) · `{invalide}`.
-function parisVersUtc(date, heure) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || '')), h = /^(\d{1,2}):(\d{2})$/.exec(String(heure || ''));
-  if (!m || !h) return { invalide: true };
-  const y = +m[1], mo = +m[2], d = +m[3], hh = +h[1], mi = +h[2];
-  if (hh > 23 || mi > 59 || mo < 1 || mo > 12) return { invalide: true };
-  const base = Date.UTC(y, mo - 1, d, hh, mi);
-  if (new Date(base).getUTCDate() !== d) return { invalide: true };
-  const voulu = `${String(hh).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
-  const ok = [];
-  for (const dec of [1, 2]) { const t = base - dec * 3600000; const p = partsParis(t); if (p.date === `${m[1]}-${m[2]}-${m[3]}` && p.heure === voulu) ok.push(t); }
-  if (!ok.length) return { inexistant: true };
-  if (ok.length > 1) return { ambigu: true, ms: Math.min(...ok) };
-  return { ms: ok[0] };
-}
-// Le jour suivant, dans le calendrier (pas « + 24 h » : après le 25 octobre
-// une journée dure 25 h, et « 18:00 tous les jours » deviendrait 17:00).
-const jourSuivant = (date) => { const [y, mo, d] = date.split('-').map(Number); const t = new Date(Date.UTC(y, mo - 1, d + 1)); return t.toISOString().slice(0, 10); };
-const minutesDe = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m ? (+m[1]) * 60 + (+m[2]) : NaN; };
-const JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
-const JOURS_LETTRE = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
-const JOURS_NOM = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-// « ven. 23 oct. » (un jour de Paris, donné « YYYY-MM-DD »).
-const jourParisTexte = (date) => { const [y, mo, d] = String(date).split('-').map(Number); return `${JOURS_COURTS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]} ${d} ${MOIS_COURTS[mo - 1]}`; };
-// « ven. 23 oct. à 19:00 » pour un instant.
-const quandParisTexte = (ms) => { const p = partsParis(ms); return `${jourParisTexte(p.date)} à ${p.heure}`; };
 
 // ── LES HEURES D'UN LOT (une fonction PURE du temps, sans aucun hasard) ──────
 // Règle, dans le calendrier de Paris :
@@ -13651,183 +13371,7 @@ const quandParisTexte = (ms) => { const p = partsParis(ms); return `${jourParisT
 //     restants RESTENT des brouillons, et on dit combien.
 const PLANIF_MIN_MS = 20 * 60 * 1000;
 const PLANIF_HORIZON_MS = 21 * 86400000 - 10 * 60 * 1000;
-function heuresDuLot({ depart, parJour, de, a, jours, ecart, n, maintenant }) {
-  const deMin = minutesDe(de), aMin = minutesDe(a);
-  const pas = Number(ecart), quota = Math.floor(Number(parJour));
-  if (!(Number.isFinite(deMin) && Number.isFinite(aMin) && deMin <= aMin)) return { erreur: 'La plage horaire est mal réglée (« de » doit venir avant « à »).' };
-  if (!(pas >= 1 && quota >= 1)) return { erreur: 'Le rythme est mal réglé.' };
-  if (!Array.isArray(jours) || !jours.some(Boolean)) return { erreur: 'Coche au moins un jour de la semaine.' };
-  const ouverture = (date) => { const r = parisVersUtc(date, de); return r.ms != null ? r.ms : parisVersUtc(date, `${String(Math.min(23, Math.floor(deMin / 60) + 1)).padStart(2, '0')}:${String(deMin % 60).padStart(2, '0')}`).ms; };
-  let cur, immediatPossible = false;
-  if (depart === 'maintenant') { cur = maintenant; immediatPossible = true; }
-  else {
-    const r = parisVersUtc(depart && depart.date, depart && depart.heure);
-    if (r.invalide) return { erreur: 'Choisis une date et une heure de départ.' };
-    if (r.inexistant) return { erreur: 'Cette heure n\'existe pas cette nuit-là (changement d\'heure) — choisis-en une autre.' };
-    if (r.ambigu) return { erreur: 'Cette heure existe deux fois cette nuit-là (changement d\'heure) — choisis-en une autre.' };
-    cur = Math.max(r.ms, maintenant + PLANIF_MIN_MS);
-  }
-  const heures = []; let horsHorizon = 0; let jourCourant = null, nJour = 0, garde = 0;
-  while (heures.length + horsHorizon < n && garde++ < 20000) {
-    if (horsHorizon || cur > maintenant + PLANIF_HORIZON_MS) { horsHorizon++; continue; }
-    const p = partsParis(cur); const min = p.h * 60 + p.mi;
-    if (!jours[p.jour] || min > aMin || (jourCourant === p.date && nJour >= quota)) { cur = ouverture(jourSuivant(p.date)); immediatPossible = false; continue; }
-    if (min < deMin) { cur = ouverture(p.date); immediatPossible = false; continue; }
-    const immediat = immediatPossible && heures.length === 0 && cur === maintenant;
-    if (!immediat && cur < maintenant + PLANIF_MIN_MS) { cur = maintenant + PLANIF_MIN_MS; immediatPossible = false; continue; }
-    if (jourCourant !== p.date) { jourCourant = p.date; nJour = 0; }
-    heures.push({ ms: cur, immediat, date: p.date, heure: p.heure, utc: immediat ? '' : new Date(cur).toISOString() });
-    nJour++; immediatPossible = false;
-    cur += pas * 60000;
-  }
-  return { heures, horsHorizon };
-}
-
-// ── LE RYTHME : un réglage SYNCHRONISÉ, propre à chaque vendeur ───────────────
-// (`vrm_ebay_rythme`, rattrapé par `onCloudReady` seulement s'il est resté au
-// défaut, §5.49). Les préréglages de départ sont modifiables : « Ce soir
-// 20 h » n'est qu'une habitude, pas une mesure.
-const EBAY_ECARTS = [15, 30, 45, 60, 90, 120, 180];
-const EBAY_RYTHME_DEFAUT = {
-  parJour: 3, de: '18:00', a: '21:00', jours: [true, true, true, true, true, true, true], ecart: 30, ordre: 'selection',
-  preregles: [
-    { id: 'maintenant', jour: 'maintenant', heure: '' },
-    { id: 'soir', jour: 'auj', heure: '20:00' },
-    { id: 'demain', jour: 'demain', heure: '12:30' },
-    { id: 'dimanche', jour: 'dow0', heure: '20:00' },
-  ],
-  risqueCompris: false,
-};
-const rythmeEbay = (v) => {
-  const r = { ...EBAY_RYTHME_DEFAUT, ...(v && typeof v === 'object' ? v : {}) };
-  if (!Array.isArray(r.jours) || r.jours.length !== 7) r.jours = EBAY_RYTHME_DEFAUT.jours;
-  if (!Array.isArray(r.preregles) || !r.preregles.length) r.preregles = EBAY_RYTHME_DEFAUT.preregles;
-  return r;
-};
-const libellePreregle = (p) => {
-  if (!p || p.jour === 'maintenant') return 'Maintenant';
-  const h = String(p.heure || '').replace(/^0/, '').replace(':00', ' h').replace(':', ' h ');
-  if (p.jour === 'auj') return (minutesDe(p.heure) >= 17 * 60 ? 'Ce soir ' : 'Aujourd\'hui ') + h;
-  if (p.jour === 'demain') return 'Demain ' + h;
-  const k = /^dow(\d)$/.exec(p.jour || ''); return k ? JOURS_NOM[+k[1]].replace(/^./, (c) => c.toUpperCase()) + ' ' + h : h;
-};
-// Le départ concret d'un préréglage : `'maintenant'` ou `{date, heure}` (Paris).
-function departDePreregle(p, maintenant) {
-  if (!p || p.jour === 'maintenant') return 'maintenant';
-  const auj = partsParis(maintenant).date;
-  if (p.jour === 'auj') return { date: auj, heure: p.heure };
-  if (p.jour === 'demain') return { date: jourSuivant(auj), heure: p.heure };
-  const k = /^dow(\d)$/.exec(p.jour || ''); if (!k) return { date: auj, heure: p.heure };
-  let d = auj;
-  for (let i = 0; i < 8; i++) {
-    const [y, mo, dd] = d.split('-').map(Number);
-    const r = parisVersUtc(d, p.heure);
-    if (new Date(Date.UTC(y, mo - 1, dd)).getUTCDay() === +k[1] && r.ms != null && r.ms > maintenant) return { date: d, heure: p.heure };
-    d = jourSuivant(d);
-  }
-  return { date: auj, heure: p.heure };
-}
-
-// ── LES FRAIS D'eBAY, EN FRANÇAIS ─────────────────────────────────────────────
-// Lus PAR NOM par le serveur (`frais.total` = ListingFee, le total) ; un nom
-// qu'on ne connaît pas s'affiche tel quel plutôt que d'être deviné.
-const NOMS_FRAIS_EBAY = { InsertionFee: 'mise en vente', SchedulingFee: 'programmation', GalleryFee: 'galerie', GalleryPlusFee: 'galerie plus', SubtitleFee: 'sous-titre', BoldFee: 'gras', FeaturedFee: 'mise en avant', InternationalInsertionFee: 'mise en vente internationale', ListingDesignerFee: 'modèle d\'annonce' };
 const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
-// Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
-// montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
-// programmée), la mise en vente, puis tout autre frais non nul.
-function lignesFraisEbay(frais, programmee) {
-  const f = frais || {};
-  const out = [];
-  if (programmee) out.push({ cle: 'programmation', nom: 'programmation', montant: f.programmation == null ? null : f.programmation });
-  out.push({ cle: 'insertion', nom: 'mise en vente', montant: f.insertion == null ? null : f.insertion });
-  for (const l of (f.lignes || [])) if (!/^(InsertionFee|Schedul)/i.test(l.nom)) out.push({ cle: l.nom, nom: NOMS_FRAIS_EBAY[l.nom] || l.nom, montant: l.montant });
-  return out;
-}
-
-// ── LES BROUILLONS eBAY : une ligne DÉDIÉE par vendeur (`ebay_brouillons`) ───
-// Jamais dans `main` (la ligne la plus lue du projet, §4.4). Lue projetée.
-// TROIS états : `null` = pas su (la base n'a pas répondu) · un objet = lu
-// (vide si aucun brouillon). Une modification relit, fusionne, réécrit — et
-// n'écrit RIEN si la lecture a échoué : repartir d'un objet vide effacerait
-// tous ses brouillons (la famille « lecture KO, écriture OK », §5).
-async function lireBrouillonsEbay() {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_brouillons&select=items:data->items`, { headers: sbAuth() });
-    if (!r.ok) return null;
-    const rows = await r.json();
-    if (!Array.isArray(rows)) return null;
-    const it = rows[0] && rows[0].items;
-    const out = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
-    // Un brouillon publié garde l'IDENTITÉ de sa paire (`pairId`) et son annonce.
-    try { for (const b of Object.values(out)) { const iid = b && ((b.programme && b.programme.itemId) || b.itemId); if (b && b.pairId && iid) noterLienEbay(iid, b.pairId, b.numero, 'brouillon'); } } catch (_) {}
-    return out;
-  } catch (_) { return null; }
-}
-async function modifierBrouillonsEbay(changer) {
-  const cur = await lireBrouillonsEbay();
-  if (cur === null) return { ok: false, raison: 'lecture' };
-  let items;
-  try { items = changer({ ...cur }); } catch (_) { return { ok: false, raison: 'erreur' }; }
-  // (6 octobre) `false` : rien à changer (la relecture a montré qu'il ne fallait
-  // pas écrire) — on n'écrit RIEN, pas même la ligne telle qu'on l'a lue.
-  if (items === false) return { ok: true, items: cur, inchange: true };
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-      method: 'POST',
-      headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify([withOwner({ id: 'ebay_brouillons', data: { items, majAt: Date.now() } })]),
-    });
-    return r.ok ? { ok: true, items } : { ok: false, raison: 'ecriture' };
-  } catch (_) { return { ok: false, raison: 'ecriture' }; }
-}
-const idBrouillonEbay = () => { try { if (crypto && crypto.randomUUID) return 'b-' + crypto.randomUUID().slice(0, 13); } catch (_) {} return 'b-' + Date.now().toString(36); };
-// L'identifiant d'ENVOI (32 hex) : eBay refuse un second ajout portant le même
-// (488) — c'est ce qui empêche une coupure réseau de créer deux annonces.
-const uuidEnvoiEbay = () => { try { if (crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').toUpperCase(); } catch (_) {} const h = () => Math.floor(Date.now() * 1000 % 65536).toString(16).padStart(4, '0'); return (Date.now().toString(16) + h() + h() + h() + h() + h()).toUpperCase().slice(0, 32).padEnd(32, '0'); };
-// Un brouillon → l'annonce qui part chez eBay. UNE règle pour le formulaire
-// (« Vérifier », « Publier ») ET la liste des brouillons (§11) : impossible de
-// vérifier autre chose que ce qu'on programme.
-function itemDeBrouillon(d) {
-  if (!d) return { err: 'Brouillon introuvable.' };
-  const cat = d.categorie || {};
-  if (!cat.id) return { err: 'Choisis la catégorie eBay.' };
-  const asp = d.aspects || {};
-  const manquants = (cat.requis || []).filter((n) => !String(asp[n] || '').trim());
-  if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
-  const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
-  if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
-  if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
-  // (19 oct., revue « argent ») « 1.250 » partait en 1,25 €, « 74 € » en NaN :
-  // la MÊME lecture que toute saisie de montant (`montantSaisi`) — le serveur
-  // refuse aussi (`prixLu`), ceci dit pourquoi AVANT d'envoyer.
-  { const px = montantSaisi(typeof d.prix === 'number' ? String(d.prix) : d.prix); if (!(px > 0)) return { err: 'Un prix en euros, par exemple 74 ou 74,50.' }; }
-  // L'IDENTITÉ de la paire part avec l'annonce : le serveur en fait le SKU
-  // `VRM-{n°}` (§5). Un numéro illisible ne part pas : mieux vaut pas de lien
-  // qu'un faux.
-  const numero = d.numero && skuEbayDe(d.numero) ? cleNum(d.numero) : '';
-  // (9 octobre) LA RÈGLE D'OFFRE de la nouvelle annonce : c'est eBay qui
-  // acceptera, au montant fixé. Validée ici (la même règle que la carte et la
-  // route, `valideRegleOffre`) ; sans règle, l'`item` est EXACTEMENT celui
-  // d'avant (même clé de vérification, mêmes corps envoyés).
-  const offreA = String(d.offreAccepte == null ? '' : d.offreAccepte).trim();
-  const offreR = String(d.offreRefuse == null ? '' : d.offreRefuse).trim();
-  let offre;
-  if (offreA || offreR) {
-    const a = montantSaisi(offreA), r = montantSaisi(offreR);      // null (vide) · nombre · NaN (illisible ⇒ refusé par valideRegleOffre)
-    const prix = Number(String(d.prix).replace(',', '.'));
-    const v = valideRegleOffre({ accepte: a, refuse: r, prix });
-    if (!v.ok) return { err: 'Règle d\'offre : ' + v.err };
-    if (v.accepte != null) {
-      const bas = seuilTropBas(v.accepte, prix);
-      if (bas && d.offreSousMoitie !== true) return { err: 'Règle d\'offre : moins de la moitié du prix — coche « je fixe volontairement » dans le brouillon.' };
-      offre = { accepte: v.accepte, refuse: v.refuse == null ? null : v.refuse, ...(bas ? { sousMoitie: true } : {}) };
-    }
-  }
-  return { item: { title: d.titre, categoryId: cat.id, price: String(d.prix).trim().replace(',', '.'), quantity: d.quantite || '1', conditionId: d.etat || '3000', description: descriptionEbayPropre(d.description) || d.titre, photos: urls, aspects: asp, ebayGere: true, ...(numero ? { numero } : {}), ...(offre ? { offre } : {}) } };
-}
-// Ce qui rend une vérification caduque : l'annonce OU l'heure ont changé.
-const cleVerifEbay = (item, utc) => { try { return JSON.stringify([item, utc || '']); } catch (_) { return ''; } };
 // Un appel à la route eBay, qui ne lève jamais : `{ code, j }` — `code` 0 =
 // réseau coupé (la requête a pu arriver), `j` null = réponse illisible (une
 // page d'erreur de Vercel n'est pas du JSON).
@@ -14136,16 +13680,6 @@ function montantSaisi(s) {
   if (!/^\s*\d{1,5}([.,]\d{1,2})?\s*$/.test(t)) return NaN;
   return Number(t.trim().replace(',', '.'));
 }
-// « Une règle pour toutes » : le seuil d'un pourcentage du prix, arrondi au
-// centime SUPÉRIEUR (jamais sous le pourcentage choisi : l'arrondi à l'euro du
-// dessous perdait jusqu'à 3 points sur les petits prix, au profit de
-// l'acheteur). 50 à 99 % ; null si le prix est trop bas pour un seuil.
-function seuilDePourcent(prix, pct) {
-  const C = Math.round(Number(prix) * 100);
-  if (!(C > 0) || !Number.isInteger(pct) || pct < 50 || pct > 99) return null;
-  const X = Math.ceil(C * pct / 100);
-  return (X > 0 && X < C) ? X / 100 : null;
-}
 // L'ÉTAT DE LA RÈGLE D'OFFRE D'UNE ANNONCE eBAY — trois états, jamais deux.
 //   regles : Map(`${ref}:${itemId}` → entrée de `ebay_offres`) ; `illisibles` :
 //   Set des refs de compte dont la ligne n'a pas pu être lue ('*' = toutes).
@@ -14208,7 +13742,6 @@ function etatRegleOffre(it, regles, illisibles, maintenant) {
 // (terminée, vendue, déplacée) — relire rendrait la même chose ; le geste est
 // de relire la LISTE (une synchro), que l'écran lance lui-même.
 const PAS_SU_SANS_RELECTURE = ['illisible', 'devise', 'offres-inconnues', 'pas-sur-ce-compte'];
-const seRelitChezEbay = (e) => !!e && e.etat === 'pas-su' && !PAS_SU_SANS_RELECTURE.includes(e.raison);
 // ── CE QU'UNE RÈGLE ENGAGE (11 octobre, revue — tour 3) ─────────────────────
 // UNE règle (§11) pour tout ce qui doit savoir si eBay PEUT vendre seul : la
 // relecture des ventes eBay à l'ouverture, « ce que ça engage », l'alerte
@@ -14336,15 +13869,6 @@ function messageOffreCreation(offreRep, envoyee) {
   if (res.issue === 'offres-inconnues') return { issue: 'offres-inconnues', ok: false, msg: `Règle d'offre : eBay montre ton seuil (dès ${eurEbay(L.accepte != null ? L.accepte : envoyee.accepte)}), mais pas si les offres y sont activées — regarde l'annonce sur eBay.` + nonNote };
   return { issue: 'non-relu', ok: false, msg: 'Règle d\'offre envoyée avec l\'annonce, pas encore relue chez eBay — « Relire chez eBay » sur sa carte.' };
 }
-// La règle d'offre qu'un brouillon a ENVOYÉE avec sa programmation (eBay ne la
-// relit pas avant le départ) — la liste des programmées ET l'alerte « à
-// annuler » la lisent ici (§11). Un nombre, ou null.
-function offreEnvoyeeProgrammee(brouillons, itemId) {
-  for (const d of Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {})) {
-    if (d && d.programme && String(d.programme.itemId) === String(itemId)) { const a = montantSaisi(d.offreAccepte); return Number.isFinite(a) && a > 0 ? a : null; }
-  }
-  return null;
-}
 // L'état LOCAL qu'une issue laisse sur la carte (la carte ET le geste groupé,
 // §11) : la lecture rendue par la route quand il y en a une ; sinon « posée
 // mais pas relue » ou « incertaine » ; un refus SANS lecture ne change rien.
@@ -14356,16 +13880,6 @@ function localApresRegle(res) {
   if (res && res.issue === 'non-relu') return { entree: { lu: false, raison: 'apres-ecriture', lueA: Date.now() }, prix };
   if (res && res.issue === 'incertain') return { entree: { lu: false, raison: 'incertain', lueA: Date.now() }, prix };
   return { entree: undefined, prix };
-}
-// Le prix d'achat d'une paire PAR SON N° — seulement si UNE seule fiche porte
-// ce N° (ambigu ⇒ absent : rien n'est dit). Le prix d'achat ne se devine
-// jamais : la valeur est un nombre (connu) ou null (paire reliée, pas saisi).
-function achatParNum(fiches, buyByNum) {
-  const n = new Map(), v = new Map();
-  for (const f of Object.values(fiches || {})) { const k = cleNum(f && f.numero); if (!k) continue; n.set(k, (n.get(k) || 0) + 1); v.set(k, prixAchatDe(f, buyByNum)); }
-  const out = new Map();
-  for (const [k, c] of n) if (c === 1) out.set(k, v.get(k));
-  return out;
 }
 // Les règles d'offre lues (une ligne `ebay_offres{_clé}` par compte, projetée,
 // §4.4) : `{ map: Map(`${ref}:${itemId}` → entrée), illisibles: Set(ref) }`.
@@ -14531,88 +14045,6 @@ function jumellesParPhoto(paires, estPris) {
   }
   return out;
 }
-function useEbayPaires(comptes) {
-  const [paires, setPaires] = React.useState([]);
-  const [enLigne, setEnLigne] = React.useState(undefined);
-  // (revue du 8 octobre) TOUS ses comptes ont-ils répondu ? Le retrait
-  // automatique en dépend, et l'écran eBay dit pourquoi une paire n'est pas
-  // partie toute seule : la même lecture que la coque (§11).
-  const [toutesLues, setToutesLues] = React.useState(undefined);
-  // Les fiches N° sont un réglage SYNCHRONISÉ lu au montage : sur le premier
-  // écran d'un appareil neuf, le nuage arrive après (§5.49) — on recalcule.
-  const [nuage, setNuage] = React.useState(0);
-  React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
-  React.useEffect(() => { let stop = false; (async () => {
-    try {
-      const fiches = load('vinted_annonce_numeros', {}) || {};
-      const presents = numsPresents();
-      // ⚠️ NE PROPOSER QUE LES PAIRES EN LIGNE (plainte de Julien : « il y a des
-      // paires déjà vendues »). Aucune annonce lisible ⇒ `online` reste `null` :
-      // on ne filtre pas plutôt que de tout cacher (« rien lu » ≠ « rien »).
-      // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
-      const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
-      const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {}, marqueMap = lu.marque || {}, tailleMap = lu.taille || {};
-      if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
-      if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
-      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
-      let details = {};
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
-        if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
-      } catch (_) { /* réseau : on se contente de la couverture */ }
-      // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
-      // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
-      // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
-      // description. ⚠️ Remesuré le 17 oct. : le dressing PORTE la marque
-      // (`brand`, 372/373) — elle est lue là d'abord, le coffre n'est qu'un
-      // repli (annonce absente du dressing). Projeté en scalaires (§4.4), paginé (§4.5) ; illisible ⇒
-      // on fait sans (rien n'est inventé à la place).
-      let coffre = {};
-      try {
-        const rows = await lireTout('id=like.coffre_*&select=id,brand:data->>brand,etat:data->>etat,size:data->>size,desc:data->>desc');
-        for (const r of (Array.isArray(rows) ? rows : [])) { const m = /^coffre_[^_]+_(.+)$/.exec(String(r.id || '')); if (m) coffre[m[1]] = r; }
-      } catch (_) { coffre = {}; }
-      const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
-      const vus = new Set(), out = [];
-      for (const id in fiches) {
-        const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
-        if (!n || vus.has(n)) continue;
-        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
-        if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
-        vus.add(n);
-        const cover = f.photo || couvMap[String(id)] || null;
-        const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
-        const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
-        const cf = coffre[String(id)] || {};
-        const dsc = String((details[id] && details[id].description) || cf.desc || '').trim();
-        // (17 oct.) « Description » collé devant le texte (le libellé de la page
-        // Vinted, mesuré : « Descriptionautry reelwind gris… ») partait dans la
-        // description eBay. La même règle que Leboncoin (`lbcDescription`, §11).
-        const dscPropre = descriptionEbayPropre(dsc);
-        const desc = (dscPropre && !PUB.test(dscPropre)) ? dscPropre : '';   // sa vraie description Vinted, jamais le texte pub ni le libellé
-        const titreP = String(f.title || titreMap[String(id)] || '').trim();
-        const marque = String(marqueMap[String(id)] || cf.brand || '').trim();
-        const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
-        const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
-        out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
-      }
-      out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
-      if (!stop) setPaires(out);
-    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); setToutesLues(false); } }
-  })(); return () => { stop = true; }; }, [comptes, nuage]);
-  return { paires, enLigne, toutesLues };
-}
-
-// Les raisons d'échec de la connexion eBay, dites en clair (la route renvoie
-// un code ; un code inconnu est montré tel quel plutôt que caché).
-const RAISON_CONNEXION_EBAY = {
-  'identite-illisible': 'je n\'ai pas pu savoir quel compte eBay vient de se connecter — rien n\'a été ajouté, réessaie',
-  'principal-inconnu': 'je n\'ai pas pu relire ton premier compte eBay pour savoir si c\'est le même — rien n\'a été ajouté. Réessaie ; s\'il n\'est plus à toi, déconnecte-le d\'abord',
-  'comptes-pas-su': 'je n\'ai pas pu relire tes comptes eBay (la base n\'a pas répondu) — rien n\'a été rangé, réessaie',
-  'registre-ko': 'le compte est relié, mais je n\'ai pas pu le noter dans la liste de tes comptes — réessaie la connexion',
-  'store-failed': 'je n\'ai pas pu ranger la connexion (la base n\'a pas répondu) — réessaie',
-};
 // EbayConnexion : chargé à la demande (src/ecrans/ebay.jsx).
 const EbayConnexion = paresseux(() => import('./ecrans/ebay.jsx'), 'EbayConnexion');
 
@@ -14700,16 +14132,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
       })}
     </div>
   </>);
-}
-
-// ── eBay → Annonces · PROGRAMMÉES (5 octobre) ────────────────────────────────
-// Ce qu'eBay mettra en ligne, groupé par jour (heure de Paris). La vérité est
-// la liste qu'eBay rend (`ebay_programmees`) ; ce que VRM vient de programmer
-// s'y ajoute en attendant la relecture. Statuts : Programmée · En ligne ·
-// « Pas partie à l'heure » (plus de 30 min après l'heure, eBay la garde
-// toujours en attente) · « à relire » (l'heure est passée depuis la dernière
-// lecture : on ne suppose rien).
-const SELLER_HUB_PROGRAMMEES = 'https://www.ebay.fr/sh/lst/scheduled';   // adresse non mesurée (eBay bloque nos lectures) : un repli, pas une promesse
+}   // adresse non mesurée (eBay bloque nos lectures) : un repli, pas une promesse
 // ── UN BROUILLON « PROGRAMMÉE » N'EST QU'UN REPLI EN ATTENDANT eBAY (6 octobre)
 // Revue contradictoire, prouvée : rien ne faisait sortir un brouillon de l'état
 // « programmee » (sauf « Annuler » de la liste). Annulée depuis l'alerte, dans
@@ -14750,39 +14173,6 @@ function programmeesConnues(P, brouillons, avecLu) {
   }
   return out;
 }
-
-// ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
-// Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
-// elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
-// Aperçu ne les affichait que connexion OUVERTE). Cet onglet lit les annonces
-// captées DIRECTEMENT : « rien lu ≠ rien », on montre ce qu'on a même si la
-// connexion OAuth est momentanément tombée.
-// ⚠️⚠️ 5 octobre — Julien : « pour eBay je ne sais pas pourquoi le site est si
-// peu développé, tu as accès à mon compte et tu ne fais rien de ouf ». Mesuré le
-// jour même : ses 2 annonces eBay n'avaient AUCUN lien à une paire, donc une
-// paire vendue sur Vinted pouvait rester en vente ici sans que VRM le voie.
-// L'écran porte maintenant, dans cet ordre :
-//   1. l'anti double vente (`doublesVenteEbay`, la MÊME règle que le centre de
-//      notifications, §11) : « vendue sur Vinted → retire-la d'eBay » (un clic +
-//      une confirmation, eBay seul : sans retour) et « vendue sur eBay → retire-la
-//      de Vinted » (le lien ; VRM ne touche jamais une annonce Vinted, §3) ;
-//   2. ce qui n'a pas pu être lu, dit UNE fois (§7) — jamais « rien à retirer » ;
-//   3. le publieur, qui pose désormais le SKU `VRM-{n°}` ;
-//   4. l'offre aux observateurs (eBay choisit les destinataires, §3) et les
-//      annonces pas encore reliées, chacune dite une fois au-dessus de la liste.
-// ── « UNE RÈGLE POUR TOUTES » (9 octobre) ───────────────────────────────────
-// Un pourcentage du prix de chaque annonce de la VUE : un aperçu, ligne par
-// ligne, de ce qui partirait — rien ne part avant la confirmation, puis une
-// annonce après l'autre (jamais en parallèle : 4 à 9 appels eBay chacune), et
-// un bilan COMPLET (la somme des issues vaut le total). Le montant est calculé
-// une fois et FIXÉ (eBay ne connaît qu'un montant). Le refus n'est jamais
-// touché par ce geste (le serveur renvoie celui qui existe).
-// Ce qui n'est pas cochable : une paire vendue ou en vente sur deux comptes,
-// une vente pas vérifiée, une règle pas encore lue (« relis-la d'abord » : on
-// ne remplace pas ce qu'on n'a pas vu), un prix trop bas, un refus au-dessus.
-// Ce qui est décoché par défaut : remplacer une règle par une PLUS BASSE, et une
-// annonce reliée à aucune paire (eBay la vendrait sans que VRM sache laquelle).
-const REGLES_LOT_MAX = 25;
 // EbayAnnonces : chargé à la demande (src/ecrans/ebay.jsx).
 const EbayAnnonces = paresseux(() => import('./ecrans/ebay.jsx'), 'EbayAnnonces');
 // (17 oct.) Les achats eBay sont lus (Trading GetMyeBayBuying) : `EbayAchats`
@@ -15222,17 +14612,6 @@ async function buildFacturXBytes(inv, ent){
   }
   return await pdf.save({ useObjectStreams:false });
 }
-async function generateFacturXPdf(inv, ent){
-  try{
-    const out = await buildFacturXBytes(inv, ent);
-    const blob=new Blob([out],{type:'application/pdf'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url; a.download=`facture-${String(inv.number||'').replace(/[^\w-]/g,'_')||'facturx'}.pdf`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }catch(e){ try{toast('Factur-X impossible : '+e.message);}catch(_){} }
-}
 
 /* ── Garage ──────────────────────────────────────────── */
 // Réduit une photo prise sur l'appareil (JPEG, côté le plus long ≤ maxDim).
@@ -15253,20 +14632,6 @@ const compressImage = (file, maxDim = 1400, quality = 0.6) => new Promise((resol
     img.src = url;
   } catch (_) { resolve(null); }
 });
-// (17 oct.) « Mon local en photo » (`LocalPhoto`, la ligne `vrm_local`) n'est
-// plus rendu nulle part depuis que le Stock ne garde que la pièce : retiré.
-// La ligne reste en base (rien n'est effacé) ; `compressImage` sert ailleurs.
-
-// ── « Plan du local » : pièce virtuelle vue de dessus ──────────────────────
-// Personnalise ta pièce (murs), pose des meubles (commode, étagère, table,
-// boîtes, penderie), déplace-les, puis ouvre chaque meuble EN VUE DE FACE pour
-// ranger tes N° dans ses tiroirs/rayons (empilables). La recherche te montre le
-// meuble + la case. Rangé dans une ligne Supabase dédiée (vrm_room).
-const loadRoomPlan = async () => {
-  // Trois états : l'objet lu · null (aucune ligne) · undefined (la base n'a
-  // pas répondu — « pas su », l'assistant de rangement ne propose rien).
-  try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_room&select=data`, { headers: sbAuth() }); if (!res.ok) return undefined; const rows = await res.json(); if (!Array.isArray(rows)) return undefined; return rows[0]?.data || null; } catch (_) { return undefined; }
-};
 // ⚠️ Le garage porte la VERSION de la numérotation (migration 013) : la base
 //    refuse un garage qui ne la porte pas (un écran d'avant la remise à zéro
 //    remettrait les cartons en chiffres). On l'estampille à chaque envoi, et un
@@ -15333,18 +14698,6 @@ const FURN_TYPES = {
   velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#3f4b5b', h3d: 1.0,  build: 'velo',   deco: true },
   etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#8c7a63', h3d: 0.9,  build: 'etabli', deco: true },
 };
-const FURN_COLORS = ['#c8935f','#7aa27a','#6f8fb0','#b0916f','#c9a24b','#9b8ec0','#cf7b7b','#5fb0a3','#8a8f98','#3f3f46','#e0e0e4','#d98a3d'];
-// ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
-// que changer des COULEURS et des INTENSITÉS de lumière (0 risque de casser le
-// rendu), appliquées en direct sur la scène. « Clair » = exactement le rendu
-// d'origine (aucune régression). wall/floor à null = on garde la matière de base.
-const GARAGE_AMBIANCES = [
-  { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#eef1f6', sky:'#fff3e0', ground:'#a6a290', hemi:0.92, ambient:0.20, sun:'#fff1dc', sunI:1.05, fill:'#dfe8ff', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
-  { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#efe6d8', sky:'#ffe4bd', ground:'#8a7a5a', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#e8ddc8', fillI:0.24, wall:'#e8ded0', floor:'#ffe7cf', exposure:1.15 },
-  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#0e1220', sky:'#3a4a80', ground:'#0c0f18', hemi:0.55, ambient:0.16, sun:'#9fb8ff', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#161c2e', floor:'#242a40', exposure:1.28 },
-  { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#171310', sky:'#ffe6b8', ground:'#1c140c', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#fff0d0', fillI:0.30, wall:'#26201b', floor:'#5f4e3a', exposure:1.20 },
-  { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#d6d9dd', sky:'#e2e8ef', ground:'#9a9ea4', hemi:0.90, ambient:0.26, sun:'#f2f5ff', sunI:1.00, fill:'#dfe8ff', fillI:0.32, wall:'#c6cace', floor:'#c2c6ca', exposure:1.08 },
-];
 // VRAIE 3D (Three.js, chargé dynamiquement pour ne pas alourdir le bundle) :
 // pièce avec sol/murs/lumière, meubles en volumes 3D, caméra qu'on tourne au
 // doigt (OrbitControls), tap sur un meuble → on l'ouvre, surlignage rouge du N°
@@ -15397,144 +14750,6 @@ function normalizePlan(p) {
   const only = mk({ id: 'r1', name: 'Ma pièce', room: (p && p.room) || ROOM_DEFAULT, items: (p && p.items) || [] });
   return { rooms: [only], active: only.id };
 }
-
-// ── L'ASSISTANT DE RANGEMENT (vue 2D) — règles pures ───────────────────────
-// Julien : un assistant qui l'aide à RANGER (quelle paire dans quelle case),
-// avec une vue 2D simple. Il lit le MÊME plan que la 3D (`vrm_room`) et la
-// MÊME liste des paires présentes (`numsPresents`, publiée par Annonces, §11).
-// ⚠️ Il ne touche JAMAIS un numéro : il écrit un N° existant dans une case
-//    vide, ou retire d'une case le N° d'une paire qui n'est plus là.
-// Un meuble « à cases » : un rangement (pas un décor), ni pile ni boîte seule
-// (eux portent leur numéro sur le carton, ils n'ont pas de case libre).
-const meubleACases = (it) => { const ft = FURN_TYPES[it && it.type]; return !!ft && !ft.deco && !ft.pile && !ft.box; };
-const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.max(1, (it && it.cols) || 1) });
-const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
-// La physique d'une case (src/stockRegles.js) : 'colonne' (mur de boîtes, la
-// colonne tombe), 'pile' (un plateau tient ses boîtes empilées), 'cintre'.
-const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; return { mode: modeCase(ft), cap: capaciteCase(ft, it, wallH || 3.4) }; };
-// GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
-// trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
-// (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
-// ⚠️ Seulement pour un MUR de boîtes : sur un plateau (étagère, table) rien ne
-//    tombe d'un plateau à l'autre — chaque case garde sa pile.
-const graviteCases = (slots, nr, nc, mode) => {
-  const out = {};
-  if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
-  for (let c = 0; c < nc; c++) {
-    const pleins = [];
-    for (let r = 0; r < nr; r++) { const a = numsCase((slots || {})[r + '_' + c]); if (a.length) pleins.push(a); }
-    let r = nr - 1;
-    for (let i = pleins.length - 1; i >= 0 && r >= 0; i--) { out[r + '_' + c] = pleins[i]; r--; }
-  }
-  return out;
-};
-// Les meubles à cases du plan, dans l'ordre LISIBLE : pièce, puis meuble (ordre
-// de pose), puis colonne de gauche à droite, chaque colonne du bas vers le haut.
-const meublesDuPlan = (plan) => {
-  const out = [];
-  ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
-    if (!meubleACases(it)) return;
-    const { nr, nc } = dimsMeuble(it); const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
-    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode) });
-  }));
-  return out;
-};
-// La position d'une case dite en français (la 3D écrit la même chose).
-const nomCase = (nr, key, mode, it) => {
-  const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r;
-  const ft = FURN_TYPES[it && it.type] || {};
-  if (mode === 'cintre') return `cintre ${c + 1}`;
-  if (mode === 'pile' && ft.build === 'table') return `plateau · place ${c + 1}`;
-  if (mode === 'pile') return `${rang === 1 ? '1ᵉʳ' : rang + 'ᵉ'} plateau depuis le bas · case ${c + 1}`;
-  return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`;
-};
-// La PREMIÈRE case libre : la plus basse case vide de la première colonne qui
-// en a une. Avec la gravité, c'est exactement là qu'une boîte posée atterrit.
-// Sur un plateau : la case la plus basse qui a encore de la place.
-const premiereCaseLibre = (plan) => {
-  for (const m of meublesDuPlan(plan)) {
-    if (m.mode === 'pile' || m.mode === 'cintre') {
-      for (let r = m.nr - 1; r >= 0; r--) for (let c = 0; c < m.nc; c++) {
-        const key = r + '_' + c; if ((m.vue[key] || []).length < m.cap) return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key, m.mode, m.it) };
-      }
-      continue;
-    }
-    for (let c = 0; c < m.nc; c++) {
-      let plein = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) plein++;
-      if (plein < m.nr) { const key = (m.nr - 1 - plein) + '_' + c; return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key) }; }
-    }
-  }
-  return null;
-};
-// Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
-const ouEstNumero = (plan, num) => {
-  const t = cleNum(num); if (!t) return null;
-  for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
-    if (meubleACases(it)) {
-      const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode);
-      for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k, mode, it) };
-    }
-    if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile', pileIdx: it.nums.findIndex(v => cleNum(v) === t) };
-    if (it.num != null && cleNum(it.num) === t) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'boîte seule' };
-  }
-  return null;
-};
-// Ranger UN numéro dans la colonne d'une case : il atterrit sur la plus basse
-// case vide de cette colonne (gravité). Refuse — sans rien écrire — un numéro
-// déjà posé ailleurs (deux cases pour une paire = « dans laquelle est-elle ? »)
-// ou une colonne pleine. Rend { plan, ou } ou { erreur }.
-// Sur un plateau, il s'empile DANS la case choisie (tant qu'elle a la place).
-const rangerNumeroDansPlan = (plan, itemId, key, num) => {
-  const v = String(num == null ? '' : num).trim(); if (!v) return { erreur: 'Aucun numéro.' };
-  const deja = ouEstNumero(plan, v);
-  if (deja) return { erreur: `N°${v} est déjà rangé dans « ${deja.itemName} » — rien n'a été changé.` };
-  let res = null, plein = false;
-  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
-    if (it.id !== itemId || !meubleACases(it)) return it;
-    const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
-    if (!(c >= 0 && c < nc)) return it;
-    const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
-    if (mode === 'pile' || mode === 'cintre') {
-      const slots = empilerDansCase(graviteCases(it.slots, nr, nc, mode), key, v, cap);
-      if (!slots) { plein = true; return it; }
-      res = { itemName: it.name, roomName: rm.name, key, nom: nomCase(nr, key, mode, it) };
-      return { ...it, slots };
-    }
-    const vue = graviteCases(it.slots, nr, nc);
-    let nPleins = 0; for (let r = 0; r < nr; r++) if (vue[r + '_' + c]) nPleins++;
-    if (nPleins >= nr) return it;
-    const k = (nr - 1 - nPleins) + '_' + c;
-    const slots = { ...vue, [k]: [v] };
-    // Grille de boîtes pleine ⇒ une rangée de plus vers le haut (la 3D fait pareil).
-    let grow = {};
-    if ((FURN_TYPES[it.type] || {}).build === 'grille' && Object.keys(slots).length >= nr * nc) {
-      const maxRows = Math.max(1, Math.floor(((rm.room && rm.room.wallH) || 3.4) / (it.cell || 0.5)));
-      if (nr < maxRows) {
-        grow = { rows: nr + 1 };
-        // On décale tout d'une rangée vers le bas des index (la nouvelle rangée est en haut, r=0).
-        const dec = {}; for (const kk in slots) { const p = kk.split('_'); dec[(+p[0] + 1) + '_' + p[1]] = slots[kk]; }
-        res = { itemName: it.name, roomName: rm.name, key: (+k.split('_')[0] + 1) + '_' + c, nom: nomCase(nr + 1, (+k.split('_')[0] + 1) + '_' + c) };
-        return { ...it, ...grow, slots: dec };
-      }
-    }
-    res = { itemName: it.name, roomName: rm.name, key: k, nom: nomCase(nr, k) };
-    return { ...it, slots };
-  }) }));
-  if (!res) return { erreur: plein ? 'Cette case est pleine — choisis une autre case.' : 'Cette colonne est pleine — choisis une autre case.' };
-  return { plan: { ...plan, rooms }, ou: res };
-};
-// Retirer d'une case le numéro d'une paire qui n'est plus là (sur son clic).
-// Ceux du dessus descendent (la colonne d'un mur de boîtes, ou la pile d'un plateau).
-const libererNumeroDuPlan = (plan, itemId, num) => {
-  const t = cleNum(num); let fait = false;
-  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
-    if (it.id !== itemId || !meubleACases(it)) return it;
-    const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const slots = {};
-    for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
-    return fait ? { ...it, slots: graviteCases(slots, nr, nc, mode) } : it;
-  }) }));
-  return fait ? { ...plan, rooms } : null;
-};
 // Le bouton « Où sont-elles ? » de l'onglet Colis : il pose ici les numéros à
 // aller chercher, puis ouvre le Stock. Au niveau MODULE (comme
 // DEMANDE_SAISIE_PRIX) : au moment du clic, le Stock n'est pas monté.
@@ -16377,29 +15592,6 @@ const Inventory = paresseux(() => import('./ecrans/divers.jsx'), 'Inventory');
    l'extension. Rattrapée par `onCloudReady` et seulement si restée VIDE (§5.49),
    sinon une saisie faite pendant le chargement serait écrasée. */
 const COMPTA_DEFAUT = { depenses: [], fixes: [], packs: [], abonnements: [] };
-const COMPTA_CATS = ['Emballage', 'Fournitures', 'Abonnement', 'Frais plateforme', 'Transport', 'Matériel', 'Autre'];
-const DEPENSE_CATS = [
-  { k: 'Emballage', ex: 'cartons, papier bulle, scotch' },
-  { k: 'Fournitures', ex: 'étiquettes, sachets, stylos' },
-  { k: 'Matériel', ex: 'imprimante thermique, lampe photo' },
-  { k: 'Transport', ex: 'essence pour aller au relais' },
-  { k: 'Frais plateforme', ex: 'boost, option de mise en avant' },
-  { k: 'Autre', ex: 'ce que tu as payé' },
-];
-// Les abonnements les plus courants d'un revendeur : un clic remplit le NOM.
-// Le prix n'est rempli que pour VRM (celui des CGV, §11) — les autres, on ne
-// connaît pas son offre : il le tape (jamais un tarif deviné, §2.3).
-const ABONNEMENTS_COURANTS = [
-  { nom: 'VRM', prix: () => (String(PRIX_CGV_LISIBLE).match(/\d+(?:,\d+)?/) || [''])[0] },
-  { nom: 'Canva' },
-  { nom: 'Lightroom' },
-  { nom: 'Photoroom' },
-];
-const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length);
-// Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
-// renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
-const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
 // ── ABONNEMENTS RÉCURRENTS (16 octobre) ──────────────────────────────────────
 // Julien : « VRM 12,99 €/mois, Canva, l'appli photo… » — une dépense qui revient
 // toute seule. Rangés dans `vrm_compta.abonnements` (la ligne de cet écran, déjà
@@ -16473,24 +15665,6 @@ const comptaChargesMois = (data, ym) => {
   const abo = sum(d.abonnements || [], a => chargeAbonnement(a, (m) => m === ym, ym));
   return { abo, total: sum(d.fixes || [], x => x.montant) + sum((d.depenses || []).filter(x => duMois(x.date)), x => x.montant) + sum((d.packs || []).filter(x => duMois(x.date)), x => x.montant) + abo };
 };
-// ── PROFIL FISCAL : le SIREN se vérifie, il ne se bloque pas (16 octobre) ────
-// SIREN = 9 chiffres, SIRET = SIREN + 5 chiffres ; les deux portent une clé de
-// Luhn. On DIT qu'il est invalide (une faute de frappe part sur chaque reçu
-// envoyé au comptable, §5), on n'empêche jamais d'enregistrer : lui seul sait.
-// Exception connue : La Poste (SIREN 356000000) — ses SIRET ne suivent pas Luhn
-// mais une somme de chiffres multiple de 5.
-const luhnOk = (ch) => { let s = 0; for (let i = 0; i < ch.length; i++) { let n = Number(ch[ch.length - 1 - i]); if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; } s += n; } return s % 10 === 0; };
-const verifierSiren = (brut) => {
-  const ch = String(brut || '').replace(/[\s.-]/g, '');
-  if (!ch) return { etat: 'vide' };
-  if (!/^\d+$/.test(ch)) return { etat: 'invalide', raison: 'il ne doit contenir que des chiffres' };
-  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide', raison: `${ch.length} chiffre${ch.length > 1 ? 's' : ''} — un SIREN en a 9, un SIRET 14` };
-  const type = ch.length === 9 ? 'SIREN' : 'SIRET';
-  const siren = ch.slice(0, 9);
-  if (!luhnOk(siren)) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIREN ne correspond pas (faute de frappe ?)' };
-  if (type === 'SIRET' && !(siren === '356000000' ? ch.split('').reduce((s, c) => s + Number(c), 0) % 5 === 0 : luhnOk(ch))) return { etat: 'invalide', type, raison: 'la clé de contrôle du SIRET ne correspond pas (faute de frappe ?)' };
-  return { etat: 'ok', type, siren };
-};
 // ── CA PAR PÉRIODE (16 octobre) : AUCUNE règle de vente n'est écrite ici ─────
 // Les lignes viennent de `ventesFaites` (VENDU) et `ventesDeclarables`
 // (FINALISÉ / REÇU) ; ces fonctions ne font que découper le temps.
@@ -16515,40 +15689,6 @@ const MOIS_COMPTA = ['janvier','février','mars','avril','mai','juin','juillet',
 const libellePeriodeCa = (d, p) => p === 'semaine' ? `sem. du ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
   : p === 'mois' ? `${MOIS_COMPTA[d.getMonth()]} ${d.getFullYear()}`
   : p === 'trimestre' ? `T${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}` : String(d.getFullYear());
-// `series` = { vendu, finalise, recu } — chacune une liste `{ts, eur}` ou `null`
-// (« pas su » ⇒ la colonne vaut `null`, jamais 0).
-const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
-  const s0 = debutPeriode(maintenant, p);
-  const somme = (liste, a, b) => {
-    if (!Array.isArray(liste)) return null;
-    let eur = 0, nb = 0;
-    for (const l of liste) if (l && l.ts >= a && l.ts < b) { eur += Number(l.eur) || 0; nb += 1; }
-    return { eur: Math.round(eur * 100) / 100, n: nb };
-  };
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const d = decalerPeriode(s0, p, -i), f = decalerPeriode(d, p, 1);
-    out.push({ cle: d.toISOString(), libelle: libellePeriodeCa(d, p), enCours: i === 0,
-      vendu: somme(series.vendu, d.getTime(), f.getTime()), finalise: somme(series.finalise, d.getTime(), f.getTime()), recu: somme(series.recu, d.getTime(), f.getTime()) });
-  }
-  return out;
-};
-
-// ── CA PAR PÉRIODE — vendu · finalisé · reçu (versé) ─────────────────────────
-// Julien appelle « encaissé » l'argent versé ; le CA déclaré ne dit jamais
-// « encaissé » (§5 : l'app ne connaît pas les recettes encaissées au sens de
-// l'URSSAF, et Leboncoin n'est pas daté au versement). D'où « reçu (versé) ».
-// AUCUNE règle de vente n'est écrite ici (§11) :
-//   · VENDU    = `ventesFaites` (au jour de la vente, en cours comprises, hors
-//                annulées et hors ventes/comptes cachés — la règle de Ma journée) ;
-//   · FINALISÉ = `ventesDeclarables` (lignes + « à dater »), au jour de la VENTE ;
-//   · REÇU     = `ventesDeclarables`, au jour du VERSEMENT (Vinted), de la vente
-//                (Leboncoin), de la commande (eBay) — `recuDuMois`, la date des
-//                barres de Ma journée, sans le registre des déclarations.
-// Les sources sont celles que la COQUE lit déjà (ventes de tous les comptes,
-// Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
-// Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
-const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
 
 // ── PROFIL FISCAL — l'entité, le régime, le taux, réunis (16 octobre) ────────
 // Rien de neuf n'est stocké : l'entité est la ligne `vrm_pro_facture` (celle que
@@ -16564,38 +15704,7 @@ const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Tr
 // entreprises (`chercherEntreprise`, par son SIREN EXACT — jamais un nom qui
 // ressemble, §5). Le nom reste modifiable : s'il le change à la main, VRM ne le
 // remplace plus (`nomAuto` garde le nom que VRM a posé).
-const _entreprisesLues = new Map();          // chiffres → réponse (une fois par session)
-async function chercherEntreprise(brut) {
-  const ch = String(brut || '').replace(/\D/g, '');
-  if (ch.length !== 9 && ch.length !== 14) return { etat: 'invalide' };
-  if (_entreprisesLues.has(ch)) return _entreprisesLues.get(ch);
-  try {
-    const r = await fetch(`/api/compte?mode=entreprise&siret=${ch}`, { headers: enTeteSession() });
-    const j = await r.json().catch(() => null);
-    if (r.ok && j && (j.etat === 'trouve' || j.etat === 'inconnu')) { _entreprisesLues.set(ch, j); return j; }
-    return { etat: 'passu' };
-  } catch (_) { return { etat: 'passu' }; }
-}
-const PROFIL_CHAMPS = [['siret', 'SIRET (14 chiffres) ou SIREN', '1 1 100%'], ['nom', "Nom de l'entreprise", '1 1 100%'], ['tva', 'N° TVA intracom. (si assujetti)', '1 1 200px'], ['adresse', 'Adresse', '1 1 100%'], ['codePostal', 'Code postal', '0 1 140px'], ['ville', 'Ville', '1 1 160px']];
-
-// ── FACTURATION ÉLECTRONIQUE — Factur-X et récap e-reporting (16 octobre) ────
-// VRM PRÉPARE, le vendeur ENVOIE depuis sa plateforme agréée gratuite : aucune
-// connexion à une plateforme, aucune fonction payante (§2.9). Les règles vivent
-// dans `src/facturationElectronique.js` ; les ventes viennent de
-// `ventesDeclarables` (datées au versement, comme le CA déclaré) — AUCUNE règle
-// de vente n'est écrite ici (§11). Le numéro de facture : une série par année
-// (`FX-AAAA-0001`), rangée dans `vrm_compta.facturx` (synchronisé), donnée UNE
-// fois par vente (regénérer la même vente redonne le même numéro et la même
-// date). ⚠️ Tant que le nuage n'est pas arrivé, on ne numérote pas : un appareil
-// neuf repartirait de 0001 et doublerait un numéro déjà donné.
-const ymListe = (n = 12, maintenant = Date.now()) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
-const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS_COMPTA[Number(m) - 1] || ''} ${a}`; };
-const telechargerFichier = (contenu, nom, type) => {
-  const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
-  const url = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-};
+const _entreprisesLues = new Map();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CE QUE TU DÉCLARES À L'URSSAF — DANS COMPTABILITÉ (17 octobre)
@@ -16619,7 +15728,6 @@ function useLigneUrssaf() {
   }, []);
   return v;
 }
-const MOIS_NOMS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 
 // ══════════════════════════════════════════════════════════════════════════════
 // CE QUI SE VEND — MARQUE, TAILLE, MODÈLE, PAYS, TEMPS DE VENTE (17 octobre)
@@ -16675,59 +15783,6 @@ const lireExtrasRepartition = async () => {
   _repartCache = { at: Date.now(), txn, items: idx, dates };
   return _repartCache;
 };
-const nomPays = (cc) => {
-  try { if (typeof Intl !== 'undefined' && Intl.DisplayNames) { const n = new Intl.DisplayNames(['fr'], { type: 'region' }).of(cc); if (n && n !== cc) return n; } } catch (_) {}
-  return cc;
-};
-// LA RÈGLE, pure (testée par scripts/audit-repartitions.cjs) : des ventes, un
-// index transaction → {item, cc}, un index annonce → {brand, size, createdTs},
-// les dates lues sur la page. Rend des comptes PAR NOTION avec leur couverture.
-const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
-  const garde = (Array.isArray(ventes) ? ventes : []).filter((o) => o && classifyOrderStatus(o.status) !== 'cancelled' && !(typeof ecarte === 'function' && ecarte(o)));
-  const vide = () => ({ par: {}, n: 0 });
-  const R = { total: garde.length, marques: vide(), tailles: vide(), modeles: vide(), pays: txn ? vide() : null, delai: null };
-  const ajoute = (b, k, eur) => { if (!k) return; const e = b.par[k] || (b.par[k] = { k, n: 0, eur: 0 }); e.n += 1; e.eur += eur; b.n += 1; };
-  const jours = [];
-  for (const o of garde) {
-    const eur = montantCommande(o);
-    const tx = String(o.transaction_id || '');
-    const t = (txn && tx && txn[tx]) || null;
-    const it = (t && t.item && items && items[t.item]) || null;
-    ajoute(R.marques, (it && it.brand) || extractBrand(o.title) || '', eur);
-    const taille = String((it && it.size) || extractSize(o.title) || '').replace(/^T(?=\d)/i, '').replace('.', ',').trim();
-    ajoute(R.tailles, taille, eur);
-    ajoute(R.modeles, extractModel(o.title) || '', eur);
-    if (R.pays && t && t.cc) ajoute(R.pays, t.cc, eur);
-    if (it) {
-      const enLigne = dateMiseEnLigneMs(it, dates || null);
-      const vendu = Date.parse(o.date || '');
-      if (enLigne != null && vendu > 0 && vendu >= enLigne) jours.push((vendu - enLigne) / 86400000);
-    }
-  }
-  if (items) {
-    jours.sort((a, b) => a - b);
-    R.delai = jours.length ? {
-      n: jours.length,
-      moyenne: jours.reduce((a, b) => a + b, 0) / jours.length,
-      mediane: jours.length % 2 ? jours[(jours.length - 1) / 2] : (jours[jours.length / 2 - 1] + jours[jours.length / 2]) / 2,
-      rapide: jours.filter((j) => j <= 7).length,
-    } : { n: 0 };
-  }
-  return R;
-};
-// ── TON BÉNÉFICE, BRUT ET NET (19 octobre, Julien : « le bénéfice brut et net ») ─
-// AUCUNE règle de vente ni aucun prix d'achat n'est relu ici (§11) :
-//   · BRUT et NET DES VENTES = la somme des jours publiés par l'écran Ventes
-//     (`vrm_benefice_jours`, `ajouterVenteBenefice`) — le même nombre que ses
-//     cartes « Bénéfice brut / net » sur la même période ;
-//   · CHARGES = `comptaChargesMois` / `comptaChargesAnnee` (celles de cet écran) ;
-//   · COTISATIONS = `aPayerUrssaf` sur la part VINTED du CA déclaré publié
-//     (`vinted_urssaf_mois`) ; depuis la publication `v: 2` (Leboncoin et eBay
-//     reliés par identité), sur le CA déclaré des trois (`caBeneficeDuMois`).
-// Le NET final n'est écrit que si TOUTES les ventes de la période ont leur prix
-// d'achat : sinon un « — », la raison, et la porte (saisie en série). Trois
-// états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
-const PERIODES_BENEF = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
 const lireBeneficeJours = () => { try { const v = load('vrm_benefice_jours', null); return v && v.jours && typeof v.jours === 'object' ? v : null; } catch (_) { return null; } };
 function useLigneSynchro(cle, lire) {
   const [v, setV] = React.useState(lire);
@@ -29762,53 +28817,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   );
 }
 
-/* ── Paramètres (accessible via le rouage en haut à droite) ──────────────── */
-// Écran LEBONCOIN dans l'app : vue d'ensemble du cross-posting (lecture seule),
-// consultable depuis le téléphone. La publication elle-même se fait via
-// l'extension sur leboncoin.fr (assistant 1-clic). Ici on montre : combien
-// publiées / ton offre, ce qu'il reste à publier, et ce qu'il faut retirer
-// (vendu sur Vinted). Tout est lu depuis Supabase (0 appel Vinted/Leboncoin).
-// ── RELIER UNE ANNONCE LEBONCOIN À UNE PAIRE, À LA MAIN (C4, 30 sept.) ─────
-// « Annonce Leboncoin non reliée : afficher la photo + pouvoir la relier à un N°
-// dans l'app. » Le lien est une IDENTITÉ posée par lui (son clic), jamais une
-// ressemblance : il tape le N° qu'il reconnaît sur la photo, ou clique une des
-// paires proposées (4 octobre) — la proposition ne relie rien toute seule. Un
-// N° que VRM ne connaît pas est refusé (sinon le lien ne mènerait à aucune
-// paire, et l'annonce resterait « non reliée » sans le dire).
-// Pose le lien « annonce Leboncoin → N° de paire » (une identité qu'il pose
-// lui-même, §5). Une seule écriture pour les deux chemins (champ N° et clic sur
-// une suggestion) — sinon l'un des deux finirait par ne plus écrire pareil (§11).
-function relierAnnonceLbc(id, n) {
-  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: String(n) };
-  // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
-  //    voyait pas le lien (vu au banc). On pose la copie locale tout de
-  //    suite ; `save` garde la synchro vers le nuage.
-  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
-  save('vrm_lbc_liens', liens);
-}
-// « Je me suis trompé » (16 oct., Julien : « j'ai mal relié une paire, il faut
-// que je puisse enlever ça »). On ne SUPPRIME pas la clé : le nuage la
-// rendrait à la fusion (local par-dessus nuage). On pose une valeur VIDE, que
-// l'app (`clesAnnonceLbc`) et l'extension (`adRefKeys`, `cleNum('')`) ignorent
-// — l'annonce redevient « non reliée » et peut être reliée à la bonne paire.
-function delierAnnonceLbc(id) {
-  if (id == null) return;
-  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: '' };
-  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
-  save('vrm_lbc_liens', liens);
-}
-// « Ce n'est aucune de celles-là » (16 oct., Julien : « ça sert à rien de relier
-// une paire vendue, je n'ai plus de numéro »). Sa réponse, rangée par identité
-// — `tx:{transaction}` pour une vente, `ad:{annonce}` pour une annonce en ligne —
-// jamais déduite. La question ne revient plus pour elle. Même double écriture
-// que le lien (copie locale tout de suite, nuage ensuite).
-function rangerSansJumelleLbc(cle) {
-  if (!cle) return;
-  const m = { ...(load('vrm_lbc_pas_de_paire', {}) || {}), [String(cle)]: new Date().toISOString() };
-  try { localStorage.setItem('vrm_lbc_pas_de_paire', JSON.stringify(m)); } catch (_) {}
-  save('vrm_lbc_pas_de_paire', m);
-}
-
 // ── SUGGESTIONS POUR RELIER UNE ANNONCE — JAMAIS UNE DÉCISION (§5) ──────────
 // Julien, 4 octobre : « quand une paire est vendue sur une plateforme, elle
 // doit disparaître des autres, pour ne pas vendre deux fois la même paire ».
@@ -29910,22 +28918,6 @@ function comptesLbcProuves(ventes, items) {
     if (ad && ad.account) s.add(String(ad.account));
   }
   return s;
-}
-// 5.195 (20 oct.) : un compte dont l'extension a VU la session dans son navigateur
-// (`sessionAt`, posé seulement sur le compteur de messagerie du compte connecté)
-// est le sien aussi — une identité, comme une vente. La MÊME règle vit dans
-// l'extension (`comptesLbcSession`, §11).
-function comptesLbcSession(accounts) {
-  const s = new Set();
-  for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
-  return s;
-}
-// Le compte Leboncoin connecté en DERNIER dans son navigateur (session vue), sinon
-// rien : « le dernier compte vu » n'est pas « le compte connecté ».
-function compteLbcConnecte(accounts) {
-  const l = Object.values(accounts || {}).filter((a) => a && a.sessionAt);
-  l.sort((a, b) => String(b.sessionAt).localeCompare(String(a.sessionAt)));
-  return l[0] || null;
 }
 function annonceLbcALui(ad, prouves) {
   return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
@@ -30231,18 +29223,6 @@ const comptesBloquesVinted = () => { try { const l = load('vinted_accounts_block
 // Les conditions, dites avec les MÊMES bornes que la règle (§5 : la phrase qui
 // explique vient de la même source) — pour la confirmation ET la ligne d'état.
 const CONDITIONS_RETRAIT_AUTO = `la vente Vinted est confirmée par ta liste de ventes relue depuis moins de ${LISTE_VENTES_FRAICHE_MS / 3600000} h (ni remboursée, ni annulée, jamais revenue chez toi, et pas sur un compte que Vinted a bloqué), l'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n'est porté que par une seule paire, et l'annonce eBay a été mise en ligne AVANT la vente`;
-const RAISON_RETRAIT_AUTO = {
-  'pas-su': 'je n\'ai pas pu tout vérifier (une annonce ou une vente Vinted pas lue)',
-  'sku': 'le N° de son annonce eBay ne correspond pas à la paire',
-  'numero-partage': 'ce N° est porté par plusieurs paires dans VRM',
-  'revenue-une-fois': 'cette paire est déjà revenue une fois (remboursée ou retournée)',
-  'vente-non-confirmee': 'la vente n\'est pas encore confirmée par ta liste de ventes Vinted',
-  'compte-bloque': 'la vente est sur un compte que Vinted a bloqué',
-  'liste-perimee': 'ta liste de ventes de ce compte n\'a pas été relue depuis plus de 48 h',
-  'date-pas-sue': 'je ne connais pas la date de mise en ligne de l\'annonce eBay',
-  'ebay-apres-vente': 'l\'annonce eBay a été mise en ligne après la vente',
-  'deja-terminee': 'eBay la dit déjà terminée',
-};
 // ── LE PASSAGE, TEL QUE LA COQUE LE LANCE (revue du 6 octobre) ──────────────
 // Les gardes d'un passage, dans l'ordre, et TOUTES avant le premier appel :
 //   · `nuageAuDepart` : le nuage était là quand le passage a COMMENCÉ — sinon
@@ -30565,41 +29545,8 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
     </div>
   );
 }
-
-const PUSH_CATS = [
-  { id:'vente',    def:true,  titre:'💸 Vendu',            desc:"Une paire vient d'être vendue." },
-  { id:'argent',   def:true,  titre:'💰 Argent viré',       desc:'Vinted a versé ton argent.' },
-  { id:'colis',    def:true,  titre:'📍 Colis à retirer',   desc:'Arrivé au relais, avec le code de retrait.' },
-  { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
-  { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
-  { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
-  { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
-  { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
-  { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
-  { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
-  { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
-  { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
-  { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
-  { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
-];
 // SettingsScreen : chargé à la demande (src/ecrans/reglages.jsx).
 const SettingsScreen = paresseux(() => import('./ecrans/reglages.jsx'), 'SettingsScreen');
-
-// Téléphone (< 768 px) : les panneaux longs passent dans un sous-écran.
-// `matchMedia` qui lève ⇒ « pas su » ⇒ la disposition d'ordinateur, où tout
-// reste déplié (rien n'est caché sur une mesure ratée).
-function useEtroitReglages() {
-  const q = '(max-width: 767px)';
-  const lire = () => { try { return window.matchMedia(q).matches; } catch (_) { return false; } };
-  const [v, setV] = React.useState(lire);
-  React.useEffect(() => {
-    let mq; try { mq = window.matchMedia(q); } catch (_) { return undefined; }
-    const maj = () => setV(mq.matches);
-    try { mq.addEventListener('change', maj); } catch (_) { return undefined; }
-    return () => { try { mq.removeEventListener('change', maj); } catch (_) {} };
-  }, []);
-  return v;
-}
 
 // ── DENSITÉ D'AFFICHAGE ────────────────────────────────────────────────────
 // « Ça fait un peu gros sur iPhone. » On dézoome toute l'app d'un coup avec la
@@ -30610,9 +29557,6 @@ function useEtroitReglages() {
 // ⚠️ Volontairement PAS dans SYNC_KEYS : ça dépend de l'écran, pas du vendeur.
 // Le même compte sur un iPhone et sur un 27 pouces ne veut pas la même densité.
 const ZOOM_KEY = 'vrm_zoom';
-// Julien trouvait encore « trop serré » au minimum : on descend plus bas.
-// 0,65 fait tenir une fois et demie plus de contenu qu'à 100 %.
-const ZOOMS = [['0.65', 'Minus'], ['0.75', 'Petit'], ['0.85', 'Compact'], ['1', 'Normal'], ['1.1', 'Grand']];
 const readZoom = () => { try { return localStorage.getItem(ZOOM_KEY) || '1'; } catch (_) { return '1'; } };
 // ⚠️ `zoom` seul ne suffit PAS : il rétrécit la page sans élargir la mise en
 // page, et il reste une bande vide sur la droite. Il faut lui rendre la largeur
@@ -30683,54 +29627,6 @@ async function ouvrirStripe(mode, extra) {
 // serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
 const PRIX_CGV_LISIBLE = '12,99 € / mois';
 const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
-const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
-
-// MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
-// · `{ factures, carte }` lu. ⚠️ « Pas su » ne s'affiche JAMAIS comme « aucune
-// facture » : quelqu'un qui cherche une facture pour sa compta en conclurait
-// qu'elle n'existe pas.
-async function lireFactures() {
-  try {
-    const r = await fetch('/api/compte?mode=factures', { headers: enTeteSession(), cache: 'no-store' });
-    if (!r.ok) return null;
-    const j = await r.json();
-    return j && j.ok && Array.isArray(j.factures) ? { factures: j.factures, carte: j.carte || null } : null;
-  } catch (_) { return null; }
-}
-// Résilier (à la fin de la période payée) ou annuler la résiliation.
-async function choisirResiliation(reprendre) {
-  try {
-    const r = await fetch(`/api/compte?mode=${reprendre ? 'reprendre' : 'resilier'}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok && j && j.ok) return { ok: true, annuleFinPeriode: !!j.annuleFinPeriode, finPeriode: j.finPeriode || null };
-    return { ok: false, message: (j && j.message) || "Stripe n'a pas répondu. Réessaie dans un instant." };
-  } catch (_) { return { ok: false, message: 'Pas de connexion. Réessaie dans un instant.' }; }
-}
-const montantLisible = (n, devise) => {
-  if (!Number.isFinite(Number(n))) return '—';
-  try { return Number(n).toLocaleString('fr-FR', { style: 'currency', currency: String(devise || 'eur').toUpperCase() }); }
-  catch (_) { return `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`; }
-};
-const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', uncollectible: 'Impayée' };
-// Seuls les liens de Stripe s'ouvrent depuis la liste (le serveur filtre déjà ;
-// on ne fait pas confiance à une seule moitié).
-const lienFacture = (u) => (typeof u === 'string' && /^https:\/\/(pay|invoice|files|invoicedata)\.stripe\.com\//.test(u) ? u : null);
-
-// ── FERMER MON COMPTE (5 octobre) ────────────────────────────────────────────
-// La politique de confidentialité promet l'effacement ; il fallait écrire à une
-// adresse qui n'existe pas encore. Le serveur fait le travail
-// (api/compte.js?mode=fermer) et rend ce qui a été fait ET ce qui ne l'a pas
-// été : l'écran l'affiche tel quel — jamais « compte fermé » sur un échec.
-// Trois états de réponse : `{ ok:true }` fermé · `{ ok:false, message }` dit
-// par le serveur · pas de réponse = PAS SU (on ne prétend ni l'un ni l'autre).
-async function fermerMonCompte(confirmation) {
-  try {
-    const r = await fetch('/api/compte?mode=fermer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation }) });
-    const j = await r.json().catch(() => null);
-    if (j && typeof j.message === 'string') return { ok: r.ok && j.ok === true, message: j.message };
-    return { ok: false, message: "Le serveur n'a pas répondu clairement : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." };
-  } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : je ne sais pas si la fermeture a eu lieu. Reconnecte-toi — si ton compte existe encore, relance-la." }; }
-}
 // ── DOUBLE VÉRIFICATION — le panneau de Réglages → Mon compte → Connexion ──
 // Trois états pour la lecture des facteurs : `undefined` en cours · `null` pas
 // su (GoTrue injoignable : on le dit, « Réessayer ») · l'objet lu.
@@ -31318,44 +30214,6 @@ function phrasePersonne(p) {
 // Le panneau des adresses se fait défiler jusqu'à lui quand on y arrive par le
 // geste de Ma journée (au moment du clic, Réglages n'est pas monté).
 const DEMANDE_ADRESSES = { on: false };
-// La forme acceptée pour une adresse de réception (saisie à la main OU
-// suggérée) : une seule règle.
-const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
-
-// ── LES ADRESSES OÙ ARRIVENT DÉJÀ TES EMAILS ─────────────────────────────────
-// Mesuré le 6 octobre (lecture seule, sa vraie base) : parmi les lignes
-// `email_*`, SEULES `email_inconnu_*` gardent l'adresse de destination — le
-// champ `to` (l'en-tête « À », 1 053 lignes sur 1 053, 17 formes, dont
-// « Hide My Email <…@icloud.com> »). C'est l'un des champs que lit la règle
-// d'arrivée (`adressesDeLivraison`) : la déclarer suffit à ce que les emails
-// suivants lui reviennent. Une IDENTITÉ — l'adresse où ses propres emails sont
-// arrivés —, jamais une ressemblance.
-// ⚠️ SES lignes seulement (session, RLS) : jamais les adresses du tas mis de
-//    côté, qui peuvent être celles d'un autre vendeur.
-// ⚠️ Des suggestions, pas un total : les 1 000 plus récentes suffisent (§4.5
-//    vaut pour un total ; aucun n'est affiché ici). Scalaire `meta->>to` : la
-//    ligne porte jusqu'à 200 Ko d'email brut, jamais rapatrié (§4.4).
-// Rend un tableau `{ adresse, n, dernier }` (le plus fréquent d'abord), ou
-// `null` si la lecture a échoué — rien n'est alors suggéré, rien n'est affirmé.
-async function lireAdressesVues() {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_inconnu_*&select=to:meta->>to,quand:meta->>receivedAt&order=meta->>receivedAt.desc&limit=1000`, { headers: sbAuth() });
-    if (!r.ok) return null;
-    const j = await r.json();
-    if (!Array.isArray(j)) return null;
-    const vues = {};
-    for (const x of j) {
-      for (const brut of String((x && x.to) || '').split(/[,;]/)) {
-        const a = normAdresse(brut);
-        if (!a || !ADRESSE_RECEPTION_OK.test(a)) continue;
-        const v = vues[a] || (vues[a] = { adresse: a, n: 0, dernier: '' });
-        v.n++;
-        if (String((x && x.quand) || '') > v.dernier) v.dernier = String(x.quand || '');
-      }
-    }
-    return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
-  } catch (_) { return null; }
-}
 
 
 // ── ONGLET « MASQUÉS » — VENTES MASQUÉES · ACHATS MASQUÉS ────────────────────
@@ -33786,19 +32644,25 @@ function AppCoeur() {
 }
 
 // Lu par src/ecrans/ebay.jsx (chargé à la demande).
-export { BoutonBordereau, CONDITIONS_RETRAIT_AUTO, EBAY_CONDITIONS, EBAY_ECARTS, EBAY_SKIN, EXT_ATTENDUE, Icon, JOURS_LETTRE, JOURS_NOM, NUM_OK, OFFRE_VEND_LA_PAIRE, PLANIF_HORIZON_MS, PLANIF_MIN_MS, PREUVE_PAR_VISITE, PhotoVente, PhotoVinted, RAISON_CONNEXION_EBAY, RAISON_RETRAIT_AUTO, REGLES_LOT_MAX, SELLER_HUB_PROGRAMMEES, SUPABASE_URL, ScreenHead, aExpedier, achatParNum, ageRegleJ, appelEbay, askConfirm, attenduDe, autoRemplirAttributs, caEbayPayees, centsR, clavierNum, cleNum, cleVerifEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, departDePreregle, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEbayDeVinted, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, fichesPourEbay, heuresDuLot, idBrouillonEbay, isCloudReady, itemDeBrouillon, jourParisTexte, jumellesParPhoto, lbcAnnoncesSession, libellePreregle, lignesFraisEbay, lireBrouillonsEbay, lireEbayParCompte, lireEbayTous, lirePreuvesVenteVinted, lireReglesEbay, load, localApresRegle, marquerEbay, messageOffreCreation, modifierBrouillonsEbay, montantSaisi, nomCompteEbay, noterLienEbay, numDeSkuEbay, numEbayLu, numerosDejaVendus, offreEnvoyeeProgrammee, onCloudReady, onVmrExt, ouVenduesTexte, parisVersUtc, partsParis, prixAchatDe, prixCompatibleRegle, programmeesConnues, quandParisTexte, raisonExtGlobale, regleEngage, regleVieille, reglesEngagees, resultatRegleOffre, resultatReviseEbay, retraitsEbayAutoPermis, rythmeEbay, save, sbAuth, seRelitChezEbay, seuilDePourcent, seuilTropBas, signalerComptesEbay, skuEbayDe, skuEbayDouteux, texteOffresDejaFaites, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useSansSouris, uuidEnvoiEbay, valideRegleOffre, vmrCmd, vmrExtPresent };
+export { BoutonBordereau, CONDITIONS_RETRAIT_AUTO, EBAY_SKIN, EXT_ATTENDUE, Icon, NUM_OK, OFFRE_VEND_LA_PAIRE, PLANIF_HORIZON_MS, PLANIF_MIN_MS, PREUVE_PAR_VISITE, PhotoVente, PhotoVinted, SUPABASE_URL, ScreenHead, aExpedier, ageRegleJ, appelEbay, askConfirm, attenduDe, caEbayPayees, centsR, clavierNum, cleNum, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, fichesPourEbay, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lireEbayParCompte, lireEbayTous, lirePreuvesVenteVinted, lireReglesEbay, load, localApresRegle, marquerEbay, messageOffreCreation, montantSaisi, nomCompteEbay, noterLienEbay, numDeSkuEbay, numEbayLu, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, partsParis, prixAchatDe, prixCompatibleRegle, programmeesConnues, raisonExtGlobale, regleEngage, regleVieille, reglesEngagees, resultatRegleOffre, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, skuEbayDe, skuEbayDouteux, texteOffresDejaFaites, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useSansSouris, valideRegleOffre, vmrCmd, vmrExtPresent };
 
 // Lu par src/ecrans/leboncoin.jsx (chargé à la demande).
-export { BordPlacer, C, Card, ETAPES_FICHE_LBC, EXT_CAPACITES, INV_STATUS, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, MAIN_LEBONCOIN, QrColis, RAISON_ABANDON, RANG_PROGRES_LBC, SheetShell, __vmrJobs, __vmrNotifier, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, b64ToBytes, bordereauFormatKey, categorieLbcDe, clesAnnonceLbc, compteLbcConnecte, comptesLbcProuves, comptesLbcSession, defautsFicheLbc, delierAnnonceLbc, doublesVenteLbc, ilYaCourt, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcTitre, libelleRelais, libererOngletPdf, lireLignesEnLigne, mpChoisi, numDeTitreLbc, rangerSansJumelleLbc, readPdfFirstPageSize, refLbcPresente, relaisVivant, relierAnnonceLbc, smartDefaultBordPos, suggestionsPaires, texteCroitVendue, useExtVivante, useVoixExt, valideAnnonceLbc, vmrExtVersion, vmrPdfLbc };
+export { BordPlacer, C, Card, EXT_CAPACITES, INV_STATUS, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, MAIN_LEBONCOIN, QrColis, SheetShell, __vmrJobs, __vmrNotifier, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, b64ToBytes, bordereauFormatKey, categorieLbcDe, clesAnnonceLbc, comptesLbcProuves, doublesVenteLbc, ilYaCourt, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcTitre, libelleRelais, libererOngletPdf, lireLignesEnLigne, mpChoisi, numDeTitreLbc, readPdfFirstPageSize, refLbcPresente, relaisVivant, smartDefaultBordPos, suggestionsPaires, useExtVivante, useVoixExt, valideAnnonceLbc, vmrExtVersion };
 
 // Lu par src/ecrans/stock.jsx (chargé à la demande).
-export { Btn, COL_H, DEMANDE_STOCK_CHERCHE, FURN_COLORS, FURN_TYPES, GARAGE_AMBIANCES, Input, LAYOUT, ROOM_DEFAULT, Room3D, Segmente, askText, casesDe, dimsMeuble, libererNumeroDuPlan, loadRoomPlan, meubleACases, meublesDuPlan, nomCase, normTitle, normalizePlan, numsCase, numsPresents, ouEstNumero, premiereCaseLibre, rangerNumeroDansPlan, saveRoomPlan };
+export { Btn, COL_H, DEMANDE_STOCK_CHERCHE, FURN_TYPES, Input, LAYOUT, ROOM_DEFAULT, Room3D, Segmente, askText, normTitle, normalizePlan, numsPresents, saveRoomPlan };
 
 // Lu par src/ecrans/compta.jsx (chargé à la demande).
-export { ABONNEMENTS_COURANTS, COMPTA_CATS, COMPTA_DEFAUT, DEMANDE_SAISIE_PRIX, DEPENSE_CATS, FermeAuRetour, IconeReglage, MOIS_NOMS_FR, PERIODES_BENEF, PERIODES_CA, PROFIL_CHAMPS, REGLAGE_PAS_LU, SB_CONFLICT, TAUX_URSSAF_DEFAUT, aPayerUrssaf, caParPeriodes, chercherEntreprise, comptaChargesAnnee, comptaChargesMois, comptaVide, compteEcarte, couvertureBenefice, echeancesAbonnement, entForInvoice, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, generateFacturXPdf, generatePDF, libelleYm, lireReglage, netApresUrssafDe, nextUrssafDeadline, ouvrirDocumentImprimable, parseMontant, rCompId, setProInvoiceStatus, tauxUrssaf, telechargerFichier, tod, tsCommande, useBeneficeCalcul, useLigneUrssaf, useVentesCoque, ventesDeclarables, ventesFaites, verifierSiren, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ymListe };
+export { COMPTA_DEFAUT, DEMANDE_SAISIE_PRIX, FermeAuRetour, IconeReglage, REGLAGE_PAS_LU, SB_CONFLICT, TAUX_URSSAF_DEFAUT, aPayerUrssaf, comptaChargesAnnee, comptaChargesMois, compteEcarte, couvertureBenefice, echeancesAbonnement, entForInvoice, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, generatePDF, lireReglage, netApresUrssafDe, nextUrssafDeadline, ouvrirDocumentImprimable, setProInvoiceStatus, tauxUrssaf, tod, tsCommande, useBeneficeCalcul, useLigneUrssaf, useVentesCoque, ventesDeclarables, ventesFaites, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs };
 
 // Lu par src/ecrans/reglages.jsx (chargé à la demande).
-export { ADRESSE_RECEPTION_OK, APERCU_MAX, AUTH, BUILD_ID, BlocComptesMuets, BrandMark, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, IMPR_MODES, MM_PT, MULTI_USER, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PUSH_CATS, RETOUR_ABONNEMENT, RETOUR_VUE, STATUT_FACTURE, SUPABASE_KEY, TYPES_BORDEREAU, ZOOMS, ZOOM_KEY, _reglagesEcoute, _reglagesRates, actionEquipe, applyZoom, archiveNumeros, authSetEmail, authSetPassword, authSignOut, choisirResiliation, choisirVueEquipe, codePerime, dateLisible, deleteVintedAccount, dessinerPdf, estCorpsErreurVinted, extEnRetard, fermerMonCompte, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, lienFacture, ligneDeSaSession, lireAbonnement, lireAdressesVues, lireEquipe, lireFactures, lireMisDeCote, lirePdfLigne, lireTout, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, montantLisible, nomTypeBordereau, oauthStart, ouvrirStripe, phrasePersonne, poserBordereau, poserStream, prefixeNumeros, prixLisible, providerEnabled, qrEnSrc, readZoom, sondeLectureSansCompte, supprimerDonneesCompte, textePerime, typeBordereau, typeCompteVinted, useBeneficeJournee, useEtatEmailsComptes, useEtroitReglages, useMisDeCote, useStream, vmrAuthEtat, writeSession, zoneEtiquette };
+export { AUTH, BUILD_ID, BlocComptesMuets, BrandMark, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, IMPR_MODES, MM_PT, MULTI_USER, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, RETOUR_ABONNEMENT, RETOUR_VUE, SUPABASE_KEY, TYPES_BORDEREAU, ZOOM_KEY, _reglagesEcoute, _reglagesRates, actionEquipe, applyZoom, archiveNumeros, authSetEmail, authSetPassword, authSignOut, choisirVueEquipe, codePerime, deleteVintedAccount, estCorpsErreurVinted, extEnRetard, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, ligneDeSaSession, lireAbonnement, lireEquipe, lireMisDeCote, lirePdfLigne, lireTout, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, oauthStart, ouvrirStripe, phrasePersonne, poserBordereau, poserStream, prefixeNumeros, prixLisible, providerEnabled, qrEnSrc, readZoom, sondeLectureSansCompte, textePerime, typeBordereau, typeCompteVinted, useBeneficeJournee, useEtatEmailsComptes, useMisDeCote, useStream, vmrAuthEtat, writeSession, zoneEtiquette };
 
 // Lu par src/ecrans/divers.jsx (chargé à la demande).
-export { DayWeekNote, ENTREPRISE_VIDE, FraicheurAnnonces, StatBox, TOTAL_SLOTS, caParPlateforme, classifyOrderStatus, extractPairNumber, fetchHarvest, fetchVintedListings, fetchVintedOrders, fmtN, getISOWeekKey, lireExtrasRepartition, nomPays, orderPhoto, repartitionsVentes, texteEnLigne, uid };
+export { DayWeekNote, ENTREPRISE_VIDE, FraicheurAnnonces, StatBox, TOTAL_SLOTS, caParPlateforme, classifyOrderStatus, fetchHarvest, fetchVintedListings, fetchVintedOrders, lireExtrasRepartition, orderPhoto, texteEnLigne, uid };
+
+// Lu par src/ecrans (aides déplacées).
+export { MOIS_COMPTA, PAS_SU_SANS_RELECTURE, VMR_GRACE_VIDE_MS, __vmrExtReady, _entreprisesLues, buildFacturXBytes, chargerPdfjs, dateMiseEnLigneMs, debutPeriode, decalerPeriode, descriptionLbcDe, extractModel, familiesDeCompte, libellePeriodeCa, lireAnnoncesVintedEnLigne, montantCommande, pontOrphelin };
+
+// Lu par src/ecrans (aides déplacées).
+

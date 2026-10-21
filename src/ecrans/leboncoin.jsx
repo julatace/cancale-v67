@@ -3,8 +3,167 @@
 // vient de l'import ci-dessous (liaisons vivantes : le thème `C` reste à jour).
 import React, { useState, useEffect } from "react";
 import { photoArticle } from "../photosArticles.js";
-import { BordPlacer, C, Card, ETAPES_FICHE_LBC, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, MAIN_LEBONCOIN, NUM_OK, PhotoVente, PhotoVinted, QrColis, RAISON_ABANDON, RANG_PROGRES_LBC, SUPABASE_URL, ScreenHead, SheetShell, __vmrJobs, __vmrNotifier, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, compteLbcConnecte, comptesLbcProuves, comptesLbcSession, defautsFicheLbc, delierAnnonceLbc, doublesVenteLbc, extSait, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcTitre, libelleRelais, libererOngletPdf, lireLignesEnLigne, lirePreuvesVenteVinted, load, mpChoisi, numDeTitreLbc, raisonExtGlobale, rangerSansJumelleLbc, readPdfFirstPageSize, refLbcPresente, relaisVivant, relierAnnonceLbc, save, sbAuth, smartDefaultBordPos, suggestionsPaires, texteCroitVendue, toast, triNum, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, vmrCmd, vmrExtVersion, vmrPdfLbc } from "../App.jsx";
+import { BordPlacer, C, Card, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, MAIN_LEBONCOIN, NUM_OK, PhotoVente, PhotoVinted, QrColis, SUPABASE_URL, ScreenHead, SheetShell, VMR_GRACE_VIDE_MS, __vmrExtReady, __vmrJobs, __vmrNotifier, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, descriptionLbcDe, doublesVenteLbc, extSait, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcTitre, libelleRelais, libererOngletPdf, lireLignesEnLigne, lirePreuvesVenteVinted, load, mpChoisi, numDeTitreLbc, pontOrphelin, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, sbAuth, smartDefaultBordPos, suggestionsPaires, toast, triNum, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, vmrCmd, vmrExtVersion } from "../App.jsx";
 
+
+// Le PDF d'un bordereau Leboncoin, lu par l'extension (5.136) : il est derrière
+// SA session Leboncoin, la page ne peut pas le lire. `{dataUrl}` ou `{error}`.
+function vmrPdfLbc(url, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !__vmrExtReady || !url) { resolve({ error: 'extension absente' }); return; }
+    const reqId = 'l' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    let done = false, grace = null, dernier = null;
+    const fin = (v) => { if (done) return; done = true; clearTimeout(grace); window.removeEventListener('message', onMsg); resolve(v); };
+    // Une erreur de PONT (« Extension context invalidated », « pont ») vient d'un
+    // bridge orphelin (voir `vmrDemande`) : on attend encore le pont vivant.
+    const onMsg = (e) => {
+      if (!(e.source === window && e.data && e.data.__vmr === 'pdfLbc:result' && e.data.reqId === reqId)) return;
+      const v = { dataUrl: e.data.dataUrl || null, error: e.data.error || '' };
+      if (v.dataUrl || !pontOrphelin(v.error)) { fin(v); return; }
+      dernier = v;
+      if (!grace) grace = setTimeout(() => fin(dernier), VMR_GRACE_VIDE_MS);
+    };
+    window.addEventListener('message', onMsg);
+    setTimeout(() => fin({ error: 'pas de réponse' }), timeoutMs);
+    try { window.postMessage({ __vmr: 'pdfLbc', reqId, url }, '*'); } catch (_) { fin({ error: 'pont' }); }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PUBLIER DEPUIS L'APP (5.130) — « c'est l'application qui contrôle l'extension »
+// ══════════════════════════════════════════════════════════════════════════════
+// Les panneaux sur leboncoin.fr et ebay.fr sont retirés : le geste vit ici. L'app
+// n'envoie qu'un IDENTIFIANT ; l'extension relit la paire dans SA file (vendue,
+// décochée ou preuve illisible → refusée), ouvre le dépôt et remplit — et sur
+// Leboncoin publie sans booster (décision du 20 septembre).
+// GRISÉ et jamais caché quand l'extension ne peut pas (§ BoutonBordereau) ; la
+// raison commune est dite UNE fois au-dessus de la liste (`RaisonPublication`).
+// `croitVendue` (revue du 11 octobre, défaut 12) : VRM sait la paire REVENUE
+// (vente remboursée ensuite), mais une extension antérieure à la règle de
+// l'instantané (`EXT_CAPACITES.preuves`) la croit encore vendue et refuserait
+// de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
+// UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
+const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sait pas qu'une vente remboursée fait revenir la paire) et refuserait de la publier : mets-la à jour (${EXT_ATTENDUE}).`;
+// ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
+//    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
+//    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
+//    « Publication en cours… » 15 minutes, et un clic ne faisait RIEN, sans un
+//    mot (`if (… enCours) return;`). Désormais :
+//      · un clic refusé DIT pourquoi, toujours (grisé, déjà publiée, en cours) ;
+//      · « en cours » renvoie la commande : l'extension remet l'onglet du dépôt
+//        devant s'il est ouvert, ou relance s'il a été fermé ;
+//      · un dépôt arrêté ou fermé passe à « Le dépôt n'a pas abouti —
+//        Réessayer » (l'extension le dit, `depotArrete` / onglet fermé) ;
+//      · le bouton annonce les photos CAPTÉES sur le total de l'annonce — le
+//        dépôt part avec ce qui est capté, jamais plus.
+// ⚠️⚠️ Revue du 11 octobre : « LE DÉPÔT N'A PAS ABOUTI » ÉTAIT UNE AFFIRMATION
+//    SUR UNE MESURE QUI N'A PAS EU LIEU. L'arrêt à 90 s arrive justement quand
+//    un champ obligatoire ne se devine pas (Univers*), c'est-à-dire quand il
+//    FINIT À LA MAIN — et VRM ne voit pas la page de fin. « Réessayer » ouvrait
+//    alors un second dépôt qui PUBLIE TOUT SEUL (prouvé : 2 onglets de dépôt,
+//    `publier: true`) : la paire en ligne deux fois. L'arrêt veut dire « pas
+//    su », pas « échec » : on le dit, on nomme « Déjà publiée », et relancer
+//    demande une confirmation (l'extension l'exige aussi, `confirme`).
+const RAISON_ABANDON = { 'onglet-ferme': "l'onglet Leboncoin a été fermé avant que VRM voie la fin", 'onglet-quitte': "l'onglet du dépôt est parti sur une autre page avant que VRM voie la fin", arret: "le remplissage s'est arrêté avant la fin (Leboncoin a peut-être demandé autre chose)", 'bandeau-ferme': 'tu as fermé le bandeau VRM sur Leboncoin avant la fin' };
+// ══════════════════════════════════════════════════════════════════════════════
+// LA FICHE « PUBLIER SUR LEBONCOIN » (5.182, 16 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux que le poste d'annonce sur leboncoin se fasse comme pour
+// eBay, pour tout gérer depuis VRM ». Leboncoin n'a pas d'API : c'est
+// l'extension qui remplit le dépôt dans son Chrome. La fiche lui montre AVANT
+// ce qui partira — titre (50 car.), description avec sa référence VRM-{n°},
+// prix, état, les photos captées (choisies et ordonnées), la catégorie et le
+// compte — et le laisse corriger. Puis UN bouton : l'app envoie l'annonce
+// corrigée, l'extension la REVÉRIFIE (`valideAnnonceLbc`, la même règle des
+// deux côtés, §11), ouvre le dépôt, remplit, publie sans option payante, et
+// raconte l'avancement que la fiche affiche en direct.
+// ⚠️ Ce qui ne bouge pas : une paire vendue, décochée ou déjà publiée est
+//    refusée par l'extension (elle relit SA file) ; un dépôt en cours n'est pas
+//    relancé ; un dépôt dont VRM n'a pas vu la fin ne repart qu'avec sa
+//    confirmation (il a pu le finir à la main) ; jamais un bouton payant.
+// ⚠️ Une extension plus ancienne que la 5.182 ne sait pas recevoir la fiche :
+//    publier « tel quel » reste possible (elle publie SA version, comme avant),
+//    mais une fiche CORRIGÉE ne part pas — le bouton le dit, il ne promet rien.
+const ETAPES_FICHE_LBC = [
+  ['ouverture', 'Dépôt ouvert sur Leboncoin'],
+  ['remplissage', 'Titre, description, prix'],
+  ['photos', 'Photos'],
+  ['publication', 'Publication, sans option payante'],
+];
+const RANG_PROGRES_LBC = { ouverture: 0, remplissage: 1, 'champ-manquant': 1, photos: 2, etapes: 2, publication: 3, 'publication-refusee': 3 };
+function defautsFicheLbc(q) {
+  const etat = String(q.etat || '').trim();
+  return {
+    title: q.title || '',
+    price: q.prix != null && isFinite(Number(q.prix)) ? Number(q.prix).toFixed(2).replace('.', ',') : '',
+    etat,
+    description: descriptionLbcDe({ ref: 'VRM-' + q.numero, texte: q.texte, base: q.base || q.vinted, marque: q.marque, taille: q.taille, etat, couleur: q.couleur }),
+    photos: Array.isArray(q.photosAll) ? q.photosAll.slice(0, LBC_PHOTOS_MAX) : [],
+  };
+}
+
+/* ── Paramètres (accessible via le rouage en haut à droite) ──────────────── */
+// Écran LEBONCOIN dans l'app : vue d'ensemble du cross-posting (lecture seule),
+// consultable depuis le téléphone. La publication elle-même se fait via
+// l'extension sur leboncoin.fr (assistant 1-clic). Ici on montre : combien
+// publiées / ton offre, ce qu'il reste à publier, et ce qu'il faut retirer
+// (vendu sur Vinted). Tout est lu depuis Supabase (0 appel Vinted/Leboncoin).
+// ── RELIER UNE ANNONCE LEBONCOIN À UNE PAIRE, À LA MAIN (C4, 30 sept.) ─────
+// « Annonce Leboncoin non reliée : afficher la photo + pouvoir la relier à un N°
+// dans l'app. » Le lien est une IDENTITÉ posée par lui (son clic), jamais une
+// ressemblance : il tape le N° qu'il reconnaît sur la photo, ou clique une des
+// paires proposées (4 octobre) — la proposition ne relie rien toute seule. Un
+// N° que VRM ne connaît pas est refusé (sinon le lien ne mènerait à aucune
+// paire, et l'annonce resterait « non reliée » sans le dire).
+// Pose le lien « annonce Leboncoin → N° de paire » (une identité qu'il pose
+// lui-même, §5). Une seule écriture pour les deux chemins (champ N° et clic sur
+// une suggestion) — sinon l'un des deux finirait par ne plus écrire pareil (§11).
+function relierAnnonceLbc(id, n) {
+  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: String(n) };
+  // ⚠️ `save` écrit 500 ms plus tard : l'écran se rechargeait AVANT et ne
+  //    voyait pas le lien (vu au banc). On pose la copie locale tout de
+  //    suite ; `save` garde la synchro vers le nuage.
+  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
+  save('vrm_lbc_liens', liens);
+}
+// « Je me suis trompé » (16 oct., Julien : « j'ai mal relié une paire, il faut
+// que je puisse enlever ça »). On ne SUPPRIME pas la clé : le nuage la
+// rendrait à la fusion (local par-dessus nuage). On pose une valeur VIDE, que
+// l'app (`clesAnnonceLbc`) et l'extension (`adRefKeys`, `cleNum('')`) ignorent
+// — l'annonce redevient « non reliée » et peut être reliée à la bonne paire.
+function delierAnnonceLbc(id) {
+  if (id == null) return;
+  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: '' };
+  try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
+  save('vrm_lbc_liens', liens);
+}
+// « Ce n'est aucune de celles-là » (16 oct., Julien : « ça sert à rien de relier
+// une paire vendue, je n'ai plus de numéro »). Sa réponse, rangée par identité
+// — `tx:{transaction}` pour une vente, `ad:{annonce}` pour une annonce en ligne —
+// jamais déduite. La question ne revient plus pour elle. Même double écriture
+// que le lien (copie locale tout de suite, nuage ensuite).
+function rangerSansJumelleLbc(cle) {
+  if (!cle) return;
+  const m = { ...(load('vrm_lbc_pas_de_paire', {}) || {}), [String(cle)]: new Date().toISOString() };
+  try { localStorage.setItem('vrm_lbc_pas_de_paire', JSON.stringify(m)); } catch (_) {}
+  save('vrm_lbc_pas_de_paire', m);
+}
+// 5.195 (20 oct.) : un compte dont l'extension a VU la session dans son navigateur
+// (`sessionAt`, posé seulement sur le compteur de messagerie du compte connecté)
+// est le sien aussi — une identité, comme une vente. La MÊME règle vit dans
+// l'extension (`comptesLbcSession`, §11).
+function comptesLbcSession(accounts) {
+  const s = new Set();
+  for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
+  return s;
+}
+// Le compte Leboncoin connecté en DERNIER dans son navigateur (session vue), sinon
+// rien : « le dernier compte vu » n'est pas « le compte connecté ».
+function compteLbcConnecte(accounts) {
+  const l = Object.values(accounts || {}).filter((a) => a && a.sessionAt);
+  l.sort((a, b) => String(b.sessionAt).localeCompare(String(a.sessionAt)));
+  return l[0] || null;
+}
 function BoutonPublier({ place, id, croitVendue, photos = null, total = null, onFiche = null }) {
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
