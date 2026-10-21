@@ -105,10 +105,10 @@ async function brancher(ctx, st) {
     if (aalDe(route.request().headers().authorization)) st.rest.push(u.replace(/^.*\/rest\/v1\//, '').slice(0, 80));
     const json = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return json([]);
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([{...COMPTE,owner:USER.id}]);
     return json([]);
   });
-  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(r.request().url().includes('mode=confidentialite')?{ok:true,uid:USER.id}:{}) }));
   await ctx.route('**://*.vinted.net/**', (r) => r.abort());
 }
 
@@ -172,6 +172,7 @@ async function scenarios(nav, taille) {
       await pg.click('[data-mfa-activer]').catch(() => {});
       const qr = await attendre(pg, 'img[data-mfa-qr]', 6000);
       dit(qr, 'le code QR est affiché');
+      await pg.locator('[data-mfa-cle-manuelle] summary').click();
       const cle = await pg.evaluate(() => (document.querySelector('[data-mfa-cle]') || {}).innerText || '');
       dit(/JBSW\s?Y3DP/.test(cle), 'la clé à recopier est affichée', cle);
       dit((await panneau(pg)) === 'inactive', 'pas encore « activée » avant le premier code', String(await panneau(pg)));

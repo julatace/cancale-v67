@@ -581,3 +581,21 @@ aveugle) : les autres gros écrans restent dans App.jsx — ils closurent beauco
 d'état/d'helpers, donc chaque extraction demande le même scan d'identifiants
 libres + un banc de rendu. Le Stock 3D était le plus isolé (tout en props),
 d'où le premier choix.
+
+## 21 octobre — Codex : isolation et configuration MFA
+
+Renforcement demandé après la fuite de comptes sur l’appareil d’un ami. Suppression des replis partagés sur les routes Vinted, filtrage explicite et vérification du propriétaire dans l’app et l’extension 5.205, protection des sauvegardes différées et changement d’onglet, caches de l’extension rattachés à la session. Code d’accès obsolète retiré. Le contrôle de confidentialité se renouvelle au retour dans l’app.
+
+Modification minimale dans le domaine eBay : uniquement `portee` dans `api/_lib/ebay.js`, suppression du repli partagé et impossibilité pour le corps d’imposer un autre owner. Aucune fonctionnalité commerciale eBay modifiée.
+
+QR MFA généré localement depuis l’URI native, clé manuelle repliée, remplacement d’un facteur non vérifié. La clé montrée en capture n’est pas automatiquement révoquée : l’utilisateur doit recommencer la configuration depuis sa session.
+
+**Base réelle : migration 021 toujours NON exécutée par Codex, faute d’accès d’administration Supabase. Ne pas déclarer l’incident définitivement résolu.**
+
+## Suite sécurité — réception et push (sans modification MFA)
+
+Le vendeur a reporté la double vérification et refusé les SMS payants : la branche codex/mfa-sms ne doit pas être fusionnée. Travail présent repart de main/PR635 ; aucun code SMS repris.
+
+Réception publique : clé obligatoire pour tous les formats, pas seulement Gmail partagé. Contexte vendeur obligatoire pour les lectures/écritures métier, conflit owner,id. Plus de repli attribuant un email inconnu au propriétaire d'installation : quarantaine privée neutre et reprise après association. Push : authentification obligatoire sur la route et contexte obligatoire côté serveur, même si la sonde dit ancien schéma. Tests synthétiques actualisés pour enregistrer explicitement les adresses et le contexte des notifications.
+
+Limites encore ouvertes : SQL021 non appliquée faute d'accès administrateur ; attribution historique non auditée ; possession des adresses supplémentaires déclarées à prouver (ne pas confondre déclaration et preuve de propriété). Aucun email ou push réel envoyé par les tests.

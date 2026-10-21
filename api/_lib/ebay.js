@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { sbCle } from './cle.js';
 // Base cloisonnée : sans propriétaire ni cible (owner,id), l'écriture est refusée.
-import { withOwnerAll, conflictTarget } from './owner.js';
 // La base sait-elle séparer les vendeurs ? (trois états, voir session.js)
 import { baseCloisonnee } from './session.js';
 // api/_lib/ebay.js — la logique OAuth eBay, en UN seul endroit (§11).
@@ -86,8 +85,8 @@ async function appToken() {
 // ⇒ Le vendeur est passé EXPLICITEMENT à chaque fonction (jamais une variable
 //   de module : deux requêtes se traitent en parallèle dans la même instance).
 //   Base cloisonnée : on lit `owner=eq.{vendeur}` et on écrit `owner` = lui,
-//   cible `(owner,id)`. Base pas encore cloisonnée : EXACTEMENT comme avant
-//   (un seul jeu de données, `withOwnerAll` / `conflictTarget`).
+//   cible `(owner,id)`. Même sur un schéma ancien, aucun repli partagé :
+//   la requête échoue plutôt que de lire les jetons de l’installation.
 // ⚠️ Rétrocompatible : la ligne `ebay_tokens` de Julien porte déjà
 //   owner = VRM_OWNER_UID = son identifiant — elle reste la sienne, sans rien
 //   refaire.
@@ -95,13 +94,10 @@ async function appToken() {
 // formé) : on ne lit ni n'écrit rien — jamais « au hasard ».
 const UUID_VENDEUR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function portee(owner) {
-  const cloison = await baseCloisonnee();
-  if (cloison) {
-    if (!owner || !UUID_VENDEUR.test(String(owner))) return null;
-    const o = String(owner);
-    return { filtre: `&owner=eq.${encodeURIComponent(o)}`, lignes: (rows) => rows.map((r) => ({ owner: o, ...r })), conflit: 'owner,id' };
-  }
-  return { filtre: '', lignes: withOwnerAll, conflit: conflictTarget('id') };
+  // Une base ancienne ou indisponible ne permet jamais un accès partagé.
+  if (!owner || !UUID_VENDEUR.test(String(owner))) return null;
+  const o = String(owner);
+  return { filtre: `&owner=eq.${encodeURIComponent(o)}`, lignes: (rows) => rows.map((r) => ({ ...r, owner: o })), conflit: 'owner,id' };
 }
 
 // Écrit (fusion par id) des lignes AU NOM du vendeur. true seulement si

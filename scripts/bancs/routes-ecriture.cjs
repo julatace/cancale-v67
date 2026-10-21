@@ -64,7 +64,7 @@ function poserFetch({ vintedRefuse }) {
         // Un compte dont l'access_token est EXPIRÉ (exp dans le passé) mais qui a
         // un refresh_token : vinted-refresh va donc tenter un refresh.
         const vieux = jwtExpire(-3600);
-        return J([{ vinted_user_id: '42', access_token: vieux, refresh_token: 'REF_BON', domain: 'www.vinted.fr' }]);
+        return J([{ owner: VENDEUR, vinted_user_id: '42', access_token: vieux, refresh_token: 'REF_BON', domain: 'www.vinted.fr' }]);
       }
       // PATCH (refresh) ou POST (connect) : on note ce qui est écrit.
       let body = {};

@@ -1,9 +1,13 @@
+import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import {achatDuColis,suivisAchat} from './liensColis.js';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
+import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
+import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
@@ -77,7 +81,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.204.0';
+const EXT_ATTENDUE = '5.206.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -584,7 +588,13 @@ const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const writeSession = (s) => {
-  if (!s || (s.user?.id && s.user.id !== readSession()?.user?.id)) vuesSession.clear();
+  if (AUTH.user?.id !== s?.user?.id) {
+    vuesSession.clear(); _prechargeComptes=null;
+    _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
+    Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
+    try { window.__vrmLecturesPartagees?.invalider(); } catch (_) {}
+  }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
@@ -667,7 +677,7 @@ const sbAuth = (extra) => {
   // à CLOISONNE faisait lire en anonyme dès que la sonde de schéma échouait —
   // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
   const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
-  const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
+  const tok = useUser ? AUTH.session.access_token : (MULTI_USER ? 'session-vrm-requise' : SUPABASE_KEY);
   // Jeton qui expire dans la minute : on lance le renouvellement (partagé) sans
   // attendre — la lecture suivante partira avec le jeton frais.
   if (useUser && AUTH.session.refresh_token && !(AUTH.session.expires_at > Date.now() + 60000)) {
@@ -687,11 +697,29 @@ const sbAuth = (extra) => {
 // Une valeur déjà posée par l'appelant gagne (elle est plus précise que la nôtre).
 const withOwner = (row) => {
   const base = Object.assign({ updated_at: new Date().toISOString() }, row);
-  return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
+  return (CLOISONNE && AUTH.user) ? Object.assign({}, base, { owner: AUTH.user.id }) : base;
 };
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
 // la même session, le même propriétaire, la même clé de conflit que le reste (§11).
+async function lireBordereauxAuto(owner) {
+  if (!owner || owner !== AUTH.user?.id) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_bordereaux_auto&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth() });
+  if (!r.ok) throw Error('Lecture impossible');
+  const rows = await r.json();
+  return rows.length === 1 && rows[0]?.data?.active === true;
+}
+async function sauverBordereauxAuto(owner, active) {
+  if (!owner || owner !== AUTH.user?.id || !CLOISONNE) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    method: 'POST', headers: sbAuth({'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation'}),
+    body: JSON.stringify({id:'vrm_bordereaux_auto',owner,data:{active:active === true},updated_at:new Date().toISOString()})
+  });
+  if (!r.ok) throw Error('Enregistrement impossible');
+  const rows = await r.json();
+  if (rows.length !== 1 || rows[0]?.data?.active !== active) throw Error('Enregistrement non confirmé');
+}
+
 const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
 // ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
@@ -1876,13 +1904,15 @@ let _pendingBordPrint = false;
 // j'y envoie les données de ce navigateur » — un appareil périmé pouvait donc
 // RÉÉCRIRE le nuage sur un simple 502. Rien lu ne vaut pas rien.
 const cloudLoad = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return undefined;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data`, {
       headers: sbAuth(),
     });
     if (!res.ok) return undefined;
     const rows = await res.json();
-    if (!Array.isArray(rows)) return undefined;
+    if (!Array.isArray(rows) || rows.length>1 || rows.some(r=>r.owner!==owner) || AUTH.user?.id!==owner) return undefined;
     if (rows[0] && rows[0].data) return rows[0].data;
     return null;
   } catch (_) { return undefined; }
@@ -1924,11 +1954,14 @@ const ALLEGER_AVANT_CLOUD = {
 let _pushBloque = false;
 let _prefixeRetente = false;
 const cloudPush = () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token || !CLOISONNE) return;
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_pushBloque) { _emitSync('refus'); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
+    if (AUTH.user?.id !== owner || readSession()?.user?.id !== owner) return;
     try {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
@@ -1970,8 +2003,10 @@ onCloudReady(() => { if (_pushPending) { _pushPending = false; cloudPush(); } })
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
 const save = (k,v) => {
+  const owner = AUTH.user?.id;
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   _saveTimers[k] = setTimeout(() => {
+    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; return; }
     try { localStorage.setItem(k,JSON.stringify(v)); } catch {}
     delete _saveTimers[k];
     // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
@@ -1980,6 +2015,20 @@ const save = (k,v) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
+
+// localStorage est partagé entre les onglets : le changement de vendeur
+// doit fermer l'ancien écran avant toute autre sauvegarde différée.
+window.addEventListener('storage', e => {
+  if (e.key !== SESSION_KEY && e.key !== null) return;
+  const prochaine=readSession();
+  if (AUTH.user?.id !== prochaine?.user?.id) {
+    vuesSession.clear(); _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
+    Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
+    AUTH={...AUTH,session:prochaine,user:prochaine?.user||null,ready:true};
+    _emitAuth(); location.reload();
+  }
+});
 
 // ============ COMPTES VINTED CONNECTES DIRECTEMENT (API interne) ============
 // Un compte Vinted est capture par l'extension Chrome "Shop Cancale35 - Vinted
@@ -2026,14 +2075,17 @@ const sondeLectureSansCompte = async () => {
 };
 
 const fetchVintedAccounts = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return null;
+  const filtre = `&owner=eq.${encodeURIComponent(owner)}`;
   try {
     const [res, blk] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, { headers: sbAuth() }),
-      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data${filtre}`, { headers: sbAuth() }),
     ]);
     if (!res.ok) return null;                 // la base a répondu autre chose qu'une liste
     let list = await res.json();
-    if (!Array.isArray(list)) return null;     // 522 Cloudflare : c'est du HTML, pas du JSON
+    if (!Array.isArray(list) || list.some(a=>a.owner!==owner) || AUTH.user?.id!==owner) return null; // 522 Cloudflare : c'est du HTML, pas du JSON
     // ⚠️ COMPTES SUPPRIMÉS DÉFINITIVEMENT (liste vrm_blocked_accounts) : ils ne
     // doivent JAMAIS réapparaître, même si l'extension les re-capte tant qu'ils
     // sont connectés dans Chrome (cas shop_cancale, qui « revenait tout le
@@ -2044,7 +2096,7 @@ const fetchVintedAccounts = async () => {
     if (blocked.size) {
       const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
-      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
+      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}${filtre}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
     return list;
   } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
@@ -3036,11 +3088,10 @@ const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinatai
 // était bien arrivé au point relais. On le rétablit ici depuis le SUJET.
 const TRACK_AVAILABLE_RE = /disponible|à\s*retirer|arriv[ée]\s+(?:dans|en|au)\s+point|pr[êe]t.*retrait|vous\s+attend/i;
 const reclassifyTrack = (d) => {
-  if (!d || d.status === 'delivered') return d;
-  const s = `${d.subject || ''} ${d.statusLabel || ''}`;
-  if (TRACK_DELIVERED_RE.test(s)) return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
-  // Colis « disponible » mal classé « en transit » (avec n° de suivi) → à retirer.
-  if (d.status !== 'available' && (d.suivi || '').trim() && TRACK_AVAILABLE_RE.test(s)) return { ...d, status: 'available', statusLabel: 'Arrivé au point de retrait' };
+  if(!d)return d;
+  const etat=etatColisDepuisTexte(d.subject||d.sujet||'',d.statusLabel||'');
+  if(etat==='delivered')return {...d,status:'delivered',statusLabel:'Livré / retiré'};
+  if(etat==='available'&&d.status!=='delivered'&&normaliserSuivi(d.suivi))return {...d,status:'available',statusLabel:'Arrivé au point de retrait'};
   return d;
 };
 // ⚠️ LES EMAILS QUE L'APP N'A PAS SU LIRE (posé le 23 août 2026).
@@ -11423,12 +11474,6 @@ const BrandMark = ({ id }) => id === 'google' ? (
   </svg>
 );
 
-// Empreinte SHA-256 du code d'accès de secours. ⚠️ Le CODE lui-même n'est nulle
-// part dans le dépôt : une empreinte ne se remonte pas. Il a été remis au
-// propriétaire en main propre. Pour le changer : recalculer l'empreinte avec
-// `echo -n "<nouveau code>" | shasum -a 256` et remplacer la ligne ci-dessous.
-const CODE_ACCES_HASH = 'abe463733a572f979547b38c378eadd7f35c273d81acee0b7f35cca551e7e426';
-
 // Les documents légaux (public/legal/*.html) : liens discrets, sur l'écran de
 // connexion (accessibles SANS compte, comme la loi l'exige) et dans Réglages.
 const DOCS_LEGAUX = [
@@ -11578,8 +11623,6 @@ function AuthScreen() {
     (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
     return () => { stop = true; };
   }, []);
-  const [codeAcces, setCodeAcces] = React.useState('');
-  const [codeErr, setCodeErr] = React.useState('');
   // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
@@ -11869,51 +11912,6 @@ function AuthScreen() {
           </div>
         </form>
         <LiensLegaux/>
-        {/* ⚠️⚠️ CETTE PORTE ÉTAIT GRANDE OUVERTE SUR INTERNET.
-            Elle existait pour une bonne raison (§12) : personne ne doit se
-            retrouver enfermé hors de son propre outil parce qu'un email de
-            confirmation n'arrive pas. Mais c'était un bouton « Entrer sans
-            compte », visible de TOUT LE MONDE, sur une adresse publique — et
-            comme la base n'est pas encore cloisonnée, un clic donnait accès à
-            l'intégralité de la boutique : ventes, achats, noms d'acheteurs,
-            codes de retrait, comptes Vinted reliés.
-            Elle demande maintenant un CODE. L'empreinte du code est dans le
-            code source, le code lui-même n'y est pas : une empreinte SHA-256
-            ne se remonte pas. Les appareils qui sont DÉJÀ entrés gardent leur
-            accès (le drapeau vit dans leur navigateur) — donc personne n'est
-            enfermé dehors, et un inconnu n'entre plus.
-            ⚠️ Ceci reste un pansement : le vrai correctif est la migration RLS
-            (SECURITE.md). Cette porte disparaît d'elle-même le jour où elle
-            passe. */}
-        {!CLOISONNE && (
-          <details style={{marginTop:12}}>
-            <summary style={{listStyle:'none',cursor:'pointer',fontSize:12,color:C.muted,textAlign:'center'}}>
-              Entrer avec un code d'accès
-            </summary>
-            <form onSubmit={async (e)=>{
-              e.preventDefault();
-              const saisi = String(codeAcces||'').trim().toLowerCase();
-              if(!saisi) return;
-              try {
-                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(saisi));
-                const hex = [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-                if (hex === CODE_ACCES_HASH) { localStorage.setItem('vrm_acces_direct','1'); location.reload(); }
-                else setCodeErr('Code incorrect.');
-              } catch(_) { setCodeErr("Ce navigateur ne sait pas vérifier le code."); }
-            }} style={{marginTop:8}}>
-              <input value={codeAcces} onChange={e=>{setCodeAcces(e.target.value);setCodeErr('');}}
-                placeholder="code d'accès" autoComplete="off" spellCheck={false}
-                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,background:C.bg,
-                  color:C.text,borderRadius:10,padding:'11px 12px',fontSize:13,fontFamily:'inherit'}}/>
-              {codeErr && <div style={{color:C.danger,fontSize:11.5,marginTop:6}}>{codeErr}</div>}
-              <button type="submit"
-                style={{width:'100%',marginTop:8,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
-                  borderRadius:10,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                Entrer
-              </button>
-            </form>
-          </details>
-        )}
         {/* ⚠️⚠️ CETTE PHRASE AFFIRMAIT UNE PROTECTION QUE `CLOISONNE` NE MESURE
             PAS. `CLOISONNE` dit seulement que la colonne `owner` EXISTE — et la
             migration autorise explicitement de s'arrêter là (« garde RLS
@@ -25636,11 +25634,11 @@ const isColisRetirable = (t, collected, envoyes) => isColisActive(t, collected, 
 const suivisRetires = (tracking) => {
   const s = new Set();
   for (const t of (tracking || [])) {
-    if (t && t.status === 'delivered' && t.suivi) s.add(String(t.suivi).trim().toUpperCase());
+    if (t && t.status === 'delivered' && t.suivi) s.add(normaliserSuivi(t.suivi));
   }
   return s;
 };
-const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(String(t.suivi).trim().toUpperCase()));
+const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(normaliserSuivi(t.suivi)));
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
@@ -29477,6 +29475,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la lecture a échoué — la photo hors ligne (src/journeeHorsLigne.js) attend
   // une lecture réussie.
   const [colisRelaisLu, setColisRelaisLu] = useState(false);
+  const [indexSuivisAchats,setIndexSuivisAchats]=useState({});
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -29594,7 +29593,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // trop se voit au comptoir, un colis caché est un colis perdu.
     const normCode = (c) => codeRetrait(String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''));
     const codesEmail = new Set(emailList.map(t => normCode(t.code)).filter(Boolean));
-    const extra = vintedToPickup.filter(o => { const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
+    const extra = vintedToPickup.filter(o => { if(suivisAchat(o,indexSuivisAchats).some(s=>retires.has(s)))return false; const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
     // ── « JE L'AI RETIRÉ » : GRISÉ, PAS DISPARU ───────────────────────────────
     // Idée de Julien, et c'est la bonne : cocher ✓ faisait disparaître le colis
     // d'un coup, alors que Vinted, lui, dit encore « déposé en point relais ».
@@ -29694,7 +29693,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
+  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats]);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -32484,6 +32483,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(()=>{
+    if(!['achats','journee'].includes(curSub)||!buysBase.length)return;
+    let stop=false;
+    (async()=>{
+      const demandes=[...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))];
+      const resultat={};
+      for(let i=0;i<demandes.length;i+=100){
+        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,suivi:data->payload->transaction->shipment->>tracking_code,suivi2:data->payload->transaction->shipment->>tracking_number,suivi3:data->payload->transaction->>tracking_code,photo:data->payload->transaction->item_photo`,{strict:true});
+        if(rows===null||stop)return;
+        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={...r,photo:photoArticle({photo:r.photo})};}
+      }
+      if(!stop)setIndexSuivisAchats(resultat);
+    })();return()=>{stop=true;};
+  },[curSub,buysBase]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -35840,6 +35853,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
+        <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
         <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
@@ -36839,8 +36853,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Photo de la paire par titre : les achats moissonnés portent la vraie
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
           // paire on va chercher / si on l'a déjà retirée).
-          const photoByTitle = {};
-          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
+          const photoColis=t=>{const achat=achatDuColis(t,buysBase,indexSuivisAchats);if(!achat)return t.photo||null;return orderPhoto(achat)||indexSuivisAchats[String(achat.transaction_id)]?.photo||null;};
           // ⚠️ MÊME RÈGLE QUE LE QR : une photo morte ne laisse pas un carré cassé.
           // Les photos viennent du CDN Vinted et leurs liens expirent ; l'icône
           // « image brisée » du navigateur au milieu d'une carte de colis, c'est
@@ -36860,7 +36873,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
                     return (
                     <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
-                      {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
+                      {thumb(orderPhoto(o)||(rel&&rel.photo))}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <LigneArrivee arr={arriveeColisVinted(rel)}/>
@@ -37114,7 +37127,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const jours = joursAvant(t.limite);
                     return (
                       <div className="vrm-pickup-card" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                        {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
+                        {thumb(photoColis(t))}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
                               relecture : « Colis n°08448878300059 » en titre, puis
@@ -37325,7 +37338,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const qi = qrImage(t), cd = codeRetrait(t.code), id2 = codeRetrait(t.code2);
                     return (
                     <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}</span>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(photoColis(t))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
@@ -37367,7 +37380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const qi = qrImage(tk), cd = codeRetrait(tk&&tk.code), id2 = codeRetrait(tk&&tk.code2);
                     return (
                     <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}</span>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
@@ -43638,23 +43651,6 @@ async function fermerMonCompte(confirmation) {
 // « Activée » ne s'écrit qu'APRÈS une vérification réussie d'un premier code.
 // Désactiver demande une confirmation ET un code (la session repasse en aal2,
 // ce que GoTrue exige pour supprimer un facteur vérifié).
-const qrEnSrc = (q) => {
-  const t = String(q || '').trim();
-  if (/^data:image\/svg\+xml/i.test(t)) {
-    // GoTrue rend « data:image/svg+xml;utf-8,<svg … » NON encodé : un « # » ou un
-    // guillemet y casse l'image. On réencode le SVG (base64 laissée telle quelle).
-    if (/;base64,/i.test(t)) return t;
-    let corps = t.slice(t.indexOf(',') + 1);
-    try { if (!/<svg/i.test(corps)) corps = decodeURIComponent(corps); } catch (_) {}
-    const j = corps.search(/<svg[\s>]/i);
-    return j >= 0 ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(corps.slice(j)) : '';
-  }
-  // Le service peut rendre le SVG précédé d'un prologue XML (<?xml …?>) : on
-  // garde tout à partir de <svg, jamais autre chose qu'un SVG.
-  const i = t.search(/<svg[\s>]/i);
-  if (i >= 0 && /<\/svg>\s*$/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t.slice(i));
-  return '';
-};
 function DoubleVerification({ onEtat } = {}) {
   const [f, setF] = React.useState(undefined);
   const [essai, setEssai] = React.useState(0);
@@ -43690,12 +43686,20 @@ function DoubleVerification({ onEtat } = {}) {
       else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
       return;
     }
-    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrEnSrc(t.qr_code), secret: String(t.secret || '') });
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrMfa(t), secret: String(t.secret || '') });
   };
   const annulerActivation = async () => {
     const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
     if (id) await mfaAppel('DELETE', `factors/${encodeURIComponent(id)}`);
     relire();
+  };
+  const recommencerActivation = async () => {
+    if (busy || !cours?.id) return;
+    setBusy(true); setMsg(null);
+    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(cours.id)}`);
+    if (!d.ok) { setBusy(false); setMsg({t:"L’ancienne configuration n’a pas pu être annulée. Réessaie avant de créer un nouveau code QR.",ton:'err'}); return; }
+    setCours(null); setCode(''); setBusy(false);
+    await activer();
   };
   const confirmerActivation = async () => {
     if (busy || !cours) return;
@@ -43759,8 +43763,11 @@ function DoubleVerification({ onEtat } = {}) {
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
-        <div style={txt}>Pas de code à l'écran, ou tu es sur ce téléphone ? Dans l'app, choisis « saisir une clé » et recopie :</div>
-        <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,margin:'6px 0 12px',wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        <details data-mfa-cle-manuelle="" style={{...txt,margin:'8px 0 12px'}}><summary style={{cursor:'pointer'}}>Configurer sans scanner le QR</summary>
+          <p>Dans ton app d’authentification, choisis « saisir une clé ». Garde cette clé privée : ne la partage pas et ne l’envoie pas en capture.</p>
+          <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        </details>
+        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} style={{...btn(false,busy),marginBottom:10}}>Remplacer cette configuration</button>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
