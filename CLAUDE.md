@@ -10766,6 +10766,13 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
   seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
   faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
 
+### L'extension prête pour le captcha Turnstile (21 octobre, 5.202)
+Le jour où Julien allume Turnstile dans Supabase, GoTrue refuse `grant_type=password` sans jeton (400, `captcha_failed`, « captcha protection: request disallowed ») — et une page d'extension MV3 ne peut pas charger le script distant de Turnstile.
+- **Fenêtre de l'extension et carte du logo** : le geste principal reste « Se connecter avec VRM ». Le repli « avec mon mot de passe VRM » reste tant que le captcha est éteint ; un refus captcha (`authLogin` rend `captcha: true` + la phrase ; la fenêtre reconnaît aussi le refus BRUT d'un service worker d'avant) devient « La connexion par mot de passe n'est plus possible depuis l'extension : utilise « Se connecter avec VRM ». », les champs se replient et le bouton est proposé là (`captchaLierBtn`, `data-captcha="refus"`). Aucune session rangée. Un mauvais mot de passe reste « incorrect ».
+- **Pas touchés par le captcha** (lu dans le code, vérifié par l'audit) : le renouvellement (`grant_type=refresh_token`), la session fabriquée par le serveur (`admin/generate_link` clé de service, puis `verify`) — donc « Se connecter avec VRM » (5.169+), la session adressée et la voie `page` des 5.164/5.170.
+- Preuves : `audit-extension-captcha.cjs` (vrai `background.js` dans `_fond-vm`, 11 contrôles, 4 rouges sur la 5.201) ; banc `popup.cjs` +18 contrôles (fenêtre et carte, refus brut et traduit, le bouton lance la liaison, l'autre sens) : **13 rouges sur la 5.201**, 90 verts après. Aucune entrée d'`EXT_CAPACITES` (l'app ne promet rien de neuf). Extension **5.202.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ Une extension ANCIENNE (≤ 5.201) restera, captcha allumé, sur le message brut de GoTrue dans sa fenêtre : sa reconnexion par l'app (voie `page`, session adressée) marche toujours.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
