@@ -30,7 +30,7 @@ import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, rec
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
-import { normAdresse } from "../api/_lib/proprietaire-email.js";
+import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
@@ -45059,6 +45059,7 @@ function EmailsSetting() {
     let n = 0;
     for (const a of liste) {
       const adr = normAdresse(a);
+      if(estAdresseCollectrice(adr)){toast('Ajoute ton adresse personnelle de réception, pas la boîte collective VRM.');continue;}
       if (!adr || !ADRESSE_RECEPTION_OK.test(adr) || Object.keys(nouv).some((k) => normAdresse(k) === adr)) continue;
       nouv[adr] = { owner: uid || '', label: '', at: new Date().toISOString() };
       n++;
@@ -45066,7 +45067,7 @@ function EmailsSetting() {
     if (n) await ecrire(nouv);
   };
   const ajouter = async () => {
-    const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
+    const a = await askText({ desc: "Ton adresse personnelle.\n\nIndique l’adresse où Vinted t’envoie tes emails, avant leur transfert vers VRM. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
     const adr = normAdresse(a);
     if (!adr) return;
     if (!ADRESSE_RECEPTION_OK.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
@@ -45172,13 +45173,17 @@ function EmailsSetting() {
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
           <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
         </div>
+        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} style={{font:'inherit',color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:7,padding:'7px 10px',cursor:'pointer'}}>Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
           <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
-            <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
+            <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
+            <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
+            <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
+            <li>Crée une règle pour <b>les emails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes emails personnels n’est pas nécessaire.</li>
+            <li>Après le prochain email, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par email ne crée pas une commande synchronisée.</li>
             <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
-            <li>Ajoute ici l'adresse sur laquelle Vinted t'écrit — une par compte Vinted si elles sont différentes.</li>
           </ol>
           <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:8}}>
             Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.

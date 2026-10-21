@@ -58,6 +58,7 @@ export function adressesDeLivraison(body, mailNormalise) {
     b.deliveredTo, b['delivered-to'], b['Delivered-To'],
     b.cc, b.Cc, b.CC,
     b.headers && (b.headers['delivered-to'] || b.headers['Delivered-To'] || b.headers['x-forwarded-to'] || b.headers['X-Forwarded-To']),
+    b.headers && (b.headers['x-original-to'] || b.headers['X-Original-To']),
     Array.isArray(b.ToFull) ? b.ToFull.map(x => x && x.Email).join(',') : '',
     Array.isArray(b.CcFull) ? b.CcFull.map(x => x && x.Email).join(',') : '',
   ];
@@ -150,9 +151,19 @@ export function repliInstallation(registre, defaut) {
   return !Object.keys(reg).some((a) => reg[a] && reg[a] !== dft);
 }
 
+export const ADRESSE_COLLECTRICE = 'vrm.vinted35@gmail.com';
+export function estAdresseCollectrice(adresse) {
+  const a=normAdresse(adresse),i=a.lastIndexOf('@');
+  if(i<0)return false;
+  const domaine=a.slice(i+1),local=a.slice(0,i).split('+')[0].replace(/\./g,'');
+  return ['gmail.com','googlemail.com'].includes(domaine)&&local==='vrmvinted35';
+}
+
 export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   const reg = regNormalise(registre);
-  const liste = (adresses || []).map(normAdresse).filter(Boolean);
+  const destinations = (adresses || []).map(normAdresse).filter(Boolean);
+  const partagee = destinations.some(estAdresseCollectrice);
+  const liste = destinations.filter(a=>!estAdresseCollectrice(a));
 
   // 0. Une adresse revendiquée par deux vendeurs : personne ne tranche à leur
   //    place, et surtout pas le repli « installation » plus bas.
@@ -178,6 +189,9 @@ export function resoudreProprietaire(adresses, registre, defaut, conflits) {
   for (const a of liste) { const b = sansEtiquette(a); if (reg[b] && !bases.includes(reg[b])) bases.push(reg[b]); }
   if (bases.length === 1) return { owner: bases[0], via: 'adresse-base', adresse: liste.find(a => reg[sansEtiquette(a)]) };
   if (bases.length > 1) return { owner: '', via: 'quarantaine', cause: 'plusieurs', raison: 'plusieurs vendeurs destinataires' };
+
+  // Une boîte collective ne prouve jamais à quel utilisateur appartient le mail.
+  if(partagee)return {owner:'',via:'quarantaine',cause:'boite-partagee',raison:'adresse personnelle de réception absente ou non reconnue dans le transfert vers la boîte collective'};
 
   // 3. Installation à UN SEUL vendeur : tout lui appartient, c'est explicite et
   //    réglé par lui (VRM_OWNER_UID). Ce n'est PAS une devinette.

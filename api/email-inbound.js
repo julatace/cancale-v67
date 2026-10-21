@@ -1,3 +1,4 @@
+import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
 // PIPELINE EMAIL UNIVERSEL (remplace l'Apps Script Gmail, marche pour TOUS les
@@ -130,7 +131,8 @@ function repondre(res, code, corps) {
     });
     return;
   }
-  res.status(code).json(corps);
+  const accuse = code>=200&&code<300 ? accuseEmail(contexteVendeur.getStore()?.messageId,corps,contexteVendeur.getStore()?.empreinteEmail) : null;
+  res.status(code).json(accuse?{...corps,reception:accuse}:corps);
 }
 
 async function supabaseUpsert(rows) {
@@ -588,7 +590,8 @@ async function logEmail(entry) {
     const cur = lu.data || { entries: [] };
     // 200 et non 30 : le 23 août, une rafale d'emails « offre » avait chassé du
     // journal la seule ligne qui expliquait un colis manquant.
-    const entries = [{ ...entry, at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
+    const contexte = contexteVendeur.getStore() || {};
+    const entries = [{ ...entry, ...(contexte.messageId ? {messageId:contexte.messageId,empreinte:contexte.empreinteEmail} : {}), at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
     await supabaseUpsert([{ id: 'email_journal', data: { entries } }]);
   } catch (_) {}
 }
@@ -1384,7 +1387,7 @@ export function bodyNotifColis(track, carrier) {
 // laisse deviner la clé caractère par caractère).
 function cleValide(req) {
   const secret = process.env.EMAIL_INBOUND_SECRET || '';
-  const key = String((req.query && req.query.key) || '');
+  const key = String(req.headers?.['x-vrm-email-key'] || (req.query && req.query.key) || '');
   if (!secret) return null;                       // pas de clé posée sur le serveur
   const a = crypto.createHash('sha256').update(key).digest();
   const b = crypto.createHash('sha256').update(secret).digest();
@@ -1416,12 +1419,17 @@ export async function modeScript(mode, req, res) {
     // Le signe que le script Gmail a été mis à jour (il envoie une clé) alors
     // que le serveur n'en a pas encore : c'est le moment de poser la variable.
     // Jamais la clé elle-même dans le journal.
-    if (req.query && req.query.key) console.log('[email-inbound] script Gmail à jour (clé fournie) — EMAIL_INBOUND_SECRET pas encore posée');
+    if (req.headers?.['x-vrm-email-key'] || (req.query && req.query.key)) console.log('[email-inbound] script Gmail à jour (clé fournie) — EMAIL_INBOUND_SECRET pas encore posée');
     res.status(503).json({ ok: false, error: 'cle-non-configuree', message: "La clé EMAIL_INBOUND_SECRET n'est pas posée sur le serveur." }); return;
   }
   if (!ok) { res.status(401).json({ ok: false, error: 'clé invalide' }); return; }
   const cloisonneeScript = await baseCloisonnee();
   if (cloisonneeScript === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+  if(mode === 'reception-diagnostic' && req.method === 'GET'){
+    const registre = await lireRegistreEmails(cloisonneeScript);
+    if(registre===null){res.status(503).json({ok:false,error:'registre-illisible'});return;}
+    res.status(200).json({ok:true,accuses:2,classement:'par-message',boitePartagee:cloisonneeScript===true});return;
+  }
   if (!proprietaireCourant() && cloisonneeScript) { res.status(503).json({ ok: false, error: 'vendeur-inconnu', message: "VRM_OWNER_UID n'est pas réglé : je ne sais pas à quelle boutique appartient cette boîte." }); return; }
 
   if (mode === 'config' && req.method === 'GET') {
@@ -1484,7 +1492,9 @@ export async function traiterEmail(req, res) {
   let mail, corpsBrut;
   try {
     corpsBrut = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    if(!req.__ownerForce && ['gmail-shared','gmail-v2'].includes(corpsBrut?.source) && cleValide(req)===null){res.status(503).json({ok:false,error:'cle-non-configuree',message:'Configure la même clé de réception dans VRM et le script Gmail collectif.'});return;}
     mail = normalizeInbound(corpsBrut);
+    const contexte = contexteVendeur.getStore();if(contexte){contexte.messageId=mail.messageId || '';contexte.empreinteEmail=empreinteEmail(corpsBrut);}
   }
   catch (_) {
     // Même un corps illisible est conservé : c'est la seule façon de savoir
@@ -1508,6 +1518,7 @@ export async function traiterEmail(req, res) {
     repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu savoir à quelle boutique appartient cet email : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
     return;
   }
+  if(corpsBrut?.source==='gmail-shared' && cloisonnee!==true){res.status(503).json({ok:false,error:'cloisonnement-requis',message:'La réception collective exige des données séparées par utilisateur.'});return;}
   const lu = req.__ownerForce ? { registre: {}, conflits: [] } : await lireRegistreEmails(cloisonnee);
   if (lu === null && cloisonnee) {
     console.log('[email-inbound] registre des adresses illisible — email à renvoyer');
