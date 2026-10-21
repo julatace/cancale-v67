@@ -66,7 +66,7 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
   let suiviPanne=false;
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
-    if(u.includes('mode=confidentialite'))return r.fulfill({status:confidentialite===true?200:503,contentType:'application/json',body:JSON.stringify(confidentialite===true?{ok:true,uid:SESSION.user.id}:{ok:false,raison:confidentialite===false?'separation-non-confirmee':'verification-indisponible'})});
+    if(u.includes('mode=confidentialite')){const verdict=typeof confidentialite==='object'?confidentialite.valeur:confidentialite;return r.fulfill({status:verdict===true?200:503,contentType:'application/json',body:JSON.stringify(verdict===true?{ok:true,uid:SESSION.user.id}:{ok:false,raison:verdict===false?'separation-non-confirmee':'verification-indisponible'})});}
     if (u.includes('mode=reception')) return r.fulfill({status:suiviPanne?503:200,contentType:'application/json',body:JSON.stringify(suiviPanne?{ok:false}:SUIVI)});
     if (/\/api\/email-rattacher/.test(u)) {
       const m = r.request().method();
@@ -96,4 +96,12 @@ const SUIVI={ok:true,emails:[],adresses:[],collecteur:{}};
 try{for(const viewport of [{width:390,height:844},{width:1512,height:950}]){for(const etat of [false,'panne',true])await essaie('protection '+etat+' '+viewport.width,async()=>{
 const {ctx,pg,lecturesPrivees,erreurs}=await ouvrir(nav,{liste:[],viewport,confidentialite:etat});
 if(etat===true){dit(await pg.locator('[data-confidentialite]').count()===0,'contrôle validé : l’espace peut s’ouvrir');dit(await pg.locator('[data-reception-emails]').isVisible(),'écran utilisateur disponible après contrôle');}else{const garde=pg.locator('[data-confidentialite]');dit(await garde.getAttribute('data-confidentialite')===(etat===false?'protection':'indisponible'),'refus et panne distingués');dit(lecturesPrivees.length===0,'aucune lecture de boutique avant la validation',lecturesPrivees.join(' '));dit(await pg.locator('[data-reception-emails]').count()===0,'le cœur de l’application n’est pas monté');}
-dit(erreurs.length===0,'aucune erreur JavaScript',erreurs.join(' '));await ctx.close();});}}finally{await nav.close();srv.close();}console.log({ok,ko});process.exit(ko?1:0);})();
+dit(erreurs.length===0,'aucune erreur JavaScript',erreurs.join(' '));await ctx.close();});
+await essaie('revalidation au retour '+viewport.width,async()=>{
+ const verdict={valeur:true};const {ctx,pg}=await ouvrir(nav,{liste:[],viewport,confidentialite:verdict});
+ dit(await pg.locator('[data-reception-emails]').isVisible(),'espace initialement ouvert');
+ verdict.valeur=false;
+ await pg.evaluate(()=>{const ancien=Date.now;Date.now=()=>ancien()+61000;window.dispatchEvent(new Event('focus'));});
+ await pg.locator('[data-confidentialite="protection"]').waitFor({timeout:5000});
+ dit(await pg.locator('[data-reception-emails]').count()===0,'un refus ultérieur démonte l’espace privé');await ctx.close();
+});}}finally{await nav.close();srv.close();}console.log({ok,ko});process.exit(ko?1:0);})();

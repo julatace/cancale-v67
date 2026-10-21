@@ -54,3 +54,23 @@ test('proxy et renouvellement refusent une ligne étrangère même si la base ne
   }
  }finally{global.fetch=original;}
 });
+test('extension : l’upsert exige une session même si le schéma manque ; le corps ne peut pas imposer un autre propriétaire',async()=>{
+ const source=fs.readFileSync('vinted-sync-extension/background.js','utf8');
+ const code=extraire(source,'async function supabaseUpsert(table, rows, onConflict)','// --- Capture des comptes');
+ for(const session of [null,{user_id:A,access_token:'token-a'}]){
+  let appels=0;
+  const c=vm.createContext({authToken:async()=>session,isCloisonne:async()=>false,SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',RE_LIGNE_CAPTURE:/^harvest_/,noterDiag(){},familleEcriture:()=>'',fetch:async(url,opts)=>{appels++;assert.equal(new URL(url).searchParams.get('on_conflict'),'owner,vinted_user_id');assert.equal(opts.headers.Authorization,'Bearer token-a');assert.equal(JSON.parse(opts.body)[0].owner,A);return {ok:true};}});
+  vm.runInContext(code,c);assert.equal(await c.supabaseUpsert('vinted_accounts',[{vinted_user_id:'42',owner:B}],'vinted_user_id'),!!session);assert.equal(appels,session?1:0);
+ }
+});
+test('eBay : aucun repli vers les jetons de l’installation, un owner du corps ne remplace pas la session',async()=>{
+ const source=fs.readFileSync('api/_lib/ebay.js','utf8');const code=extraire(source,'const UUID_VENDEUR =','// Écrit (fusion par id)');
+ const c=vm.createContext({encodeURIComponent});vm.runInContext(code,c);
+ assert.equal(await c.portee(''),null);const p=await c.portee(A);assert.equal(p.filtre,'&owner=eq.'+A);assert.equal(p.conflit,'owner,id');assert.equal(p.lignes([{owner:B}])[0].owner,A);
+});
+test('le cache de visite de l’extension ne mélange pas deux vendeurs pour une même requête',async()=>{
+ const source=fs.readFileSync('vinted-sync-extension/background.js','utf8');const code=extraire(source,'const VISITE_MEMO_MS =','function viderMemoVisite');let owner=A,lectures=0;
+ const c=vm.createContext({authToken:async()=>({user_id:owner}),loadSession:async()=>({user_id:owner}),sbGet:async()=>{lectures++;return [{owner}];},sbGetTout:async()=>[],Date});vm.runInContext(code,c);
+ assert.equal((await c.sbGetMemo('app_data?id=eq.main'))[0].owner,A);assert.equal((await c.sbGetMemo('app_data?id=eq.main'))[0].owner,A);assert.equal(lectures,1);
+ owner=B;assert.equal((await c.sbGetMemo('app_data?id=eq.main'))[0].owner,B);assert.equal(lectures,2);
+});

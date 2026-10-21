@@ -672,7 +672,7 @@ const sbAuth = (extra) => {
   // à CLOISONNE faisait lire en anonyme dès que la sonde de schéma échouait —
   // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
   const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
-  const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
+  const tok = useUser ? AUTH.session.access_token : (MULTI_USER ? 'session-vrm-requise' : SUPABASE_KEY);
   // Jeton qui expire dans la minute : on lance le renouvellement (partagé) sans
   // attendre — la lecture suivante partira avec le jeton frais.
   if (useUser && AUTH.session.refresh_token && !(AUTH.session.expires_at > Date.now() + 60000)) {
@@ -692,7 +692,7 @@ const sbAuth = (extra) => {
 // Une valeur déjà posée par l'appelant gagne (elle est plus précise que la nôtre).
 const withOwner = (row) => {
   const base = Object.assign({ updated_at: new Date().toISOString() }, row);
-  return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
+  return (CLOISONNE && AUTH.user) ? Object.assign({}, base, { owner: AUTH.user.id }) : base;
 };
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :

@@ -208,7 +208,8 @@ async function scenarios(nav, taille) {
     const pg = await ctx.newPage();
     await seConnecter(pg);
     if (await attendre(pg, '[data-porte-mfa="code"]', 6000)) { await pg.fill('[data-mfa-code]', CODE_JUSTE); await pg.click('[data-mfa-valider]'); }
-    await pg.waitForTimeout(4500);
+    for(let i=0;i<80 && st.abo===0;i++)await pg.waitForTimeout(100);
+    if(!st.abo)console.log('Écran après code : '+(await pg.locator('body').innerText()).slice(0,600));
     dit(st.abo > 0 && !(await invite(pg)) && await coeurMonte(pg), 'code passé : aucun écran proposé', 'abo ' + st.abo);
     await ctx.close();
   }

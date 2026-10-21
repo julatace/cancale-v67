@@ -141,6 +141,10 @@ async function saveSession(sess) {
     s = Object.assign({}, s, { mort: true, mortAt: avant.mortAt || Date.now(), mortRaison: avant.mortRaison || '' });
   }
   VRM_SESSION = s;
+  if (avant?.user_id !== s?.user_id) {
+    try { _memoVisite.clear(); } catch (_) {}
+    try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit']); } catch (_) {}
+  }
   try {
     if (s) await chrome.storage.local.set({ [SESSION_STORE]: s });
     else await chrome.storage.local.remove(SESSION_STORE);
@@ -695,29 +699,21 @@ async function cloisonneConnu(attenteMs) {
   return await avecDelai(enVol, attenteMs, null);
 }
 
-// En-tetes Supabase : jeton du vendeur UNIQUEMENT si la base sait s'en servir.
-// Avant la migration on garde la cle publique — c'est le fonctionnement
-// d'aujourd'hui, qui marche.
+// Aucune lecture/écriture métier anonyme, même si la sonde de schéma échoue.
+// Les sondes de structure utilisent leurs propres en-têtes publics.
 async function sbHeaders(extra) {
-  const cl = await isCloisonne();
-  const s = cl ? await authToken() : null;
-  return Object.assign({
+  const s = await authToken();
+  return Object.assign({}, extra || {}, {
     apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`,
-  }, extra || {});
+    Authorization: `Bearer ${(s && s.access_token) || 'session-vrm-requise'}`,
+  });
 }
-// Ajoute le proprietaire a une ligne a ecrire (sans effet avant la migration).
 async function withOwner(row) {
-  if (!(await isCloisonne())) return row;
   const s = await authToken();
-  return (s && s.user_id) ? Object.assign({ owner: s.user_id }, row) : row;
+  if (!s?.user_id || !s.access_token) throw new Error('Session VRM requise');
+  return Object.assign({}, row, { owner: s.user_id });
 }
-// Cible d'upsert sur app_data : la cle devient (owner, id) une fois migre.
-async function appDataConflict() {
-  if (!(await isCloisonne())) return 'id';
-  const s = await authToken();
-  return (s && s.user_id) ? 'owner,id' : 'id';
-}
+async function appDataConflict() { return 'owner,id'; }
 
 // Dernier csrf-token vu par domaine (fourni par inject.js).
 const lastCsrfByDomain = {};
@@ -829,15 +825,14 @@ async function supabaseUpsert(table, rows, onConflict) {
   //    session était relue pour CHAQUE ligne puis pour l'en-tête : un
   //    renouvellement en route envoyait `owner` d'un côté et la clé publique de
   //    l'autre. Une seule lecture ⇒ une seule identité pour tout l'envoi.
-  //    `null` (cloisonnement pas su) garde le comportement d'avant.
+  //    Une session est désormais obligatoire, même si le schéma est inconnu.
   const envoyer = async () => {
-    const cl = await isCloisonne();
-    const s = cl ? await authToken() : null;
-    if (cl === true && !(s && s.access_token && s.user_id)) return 'sans_session';
-    const owned = list.map((r) => ((cl && s) ? Object.assign({ owner: s.user_id }, r) : r));
+    const s = await authToken();
+    if (!(s && s.access_token && s.user_id)) return 'sans_session';
+    const owned = list.map((r) => Object.assign({}, r, { owner: s.user_id }));
     let target = onConflict;
-    if (cl && s && table === 'app_data' && onConflict === 'id') target = 'owner,id';
-    if (cl && s && table === 'vinted_accounts' && onConflict === 'vinted_user_id') target = 'owner,vinted_user_id';
+    if (table === 'app_data' && onConflict === 'id') target = 'owner,id';
+    if (table === 'vinted_accounts' && onConflict === 'vinted_user_id') target = 'owner,vinted_user_id';
     return fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${target}`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${(s && s.access_token) || SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -5114,7 +5109,6 @@ async function runActive() {
 //    session porte un `user_id`) : « pas de propriétaire » ⇔ « refusé ».
 async function sansSessionPourEcrire() {
   try {
-    if (!(await isCloisonne())) return false;
     const s = await authToken();
     return !(s && s.access_token && s.user_id);
   } catch (_) { return true; }
@@ -6016,14 +6010,18 @@ async function notifierApp(evt) {
 //    presque jamais : on rend le mémo même ancien et on le rafraîchit EN FOND
 //    (un seul en vol). On n'attend la base que si ce compte n'est pas connu du
 //    tout, et au plus `attendreMs`.
-let _loginsEnVol = null;
-function rafraichirLogins() {
-  if (_loginsEnVol) return _loginsEnVol;
+let _loginsEnVol = null, _loginsOwner='';
+async function rafraichirLogins() {
+  const owner=(await loadSession())?.user_id;
+  if(!owner)return null;
+  if (_loginsEnVol && _loginsOwner===owner) return _loginsEnVol;
+  _loginsOwner=owner;
   _loginsEnVol = (async () => {
     const accts = await avecDelai(getStoredAccounts(), 15000, null);
     if (!Array.isArray(accts) || !accts.length) return null;   // rien lu ⇒ on garde l'ancien mémo
+    if((await loadSession())?.user_id!==owner||accts.some(a=>a.owner!==owner))return null;
     const map = {}; for (const a of accts) map[String(a.vinted_user_id)] = a.login || '';
-    try { await chrome.storage.local.set({ vrmLogins: { at: Date.now(), map } }); } catch (_) {}
+    try { await chrome.storage.local.set({ vrmLogins: { owner, at: Date.now(), map } }); } catch (_) {}
     return map;
   })().catch(() => null).finally(() => { _loginsEnVol = null; });
   return _loginsEnVol;
@@ -6032,7 +6030,9 @@ async function loginDe(uid, opts) {
   if (!uid) return '';
   const attendreMs = opts && typeof opts.attendreMs === 'number' ? opts.attendreMs : 1500;
   try {
-    const memo = (await chrome.storage.local.get('vrmLogins')).vrmLogins || {};
+    const owner=(await loadSession())?.user_id;
+    const brut = (await chrome.storage.local.get('vrmLogins')).vrmLogins || {};
+    const memo=owner && brut.owner===owner?brut:{};
     const connu = !!(memo.map && Object.prototype.hasOwnProperty.call(memo.map, uid));
     const frais = !!(memo.at && Date.now() - memo.at < 300000 && memo.map);
     if (frais) return (memo.map && memo.map[uid]) || '';
@@ -6040,6 +6040,7 @@ async function loginDe(uid, opts) {
     if (connu) return memo.map[uid] || '';
     if (!attendreMs) return '';
     const map = await avecDelai(enVol, attendreMs, null);
+    if((await loadSession())?.user_id!==owner)return '';
     return (map && map[uid]) || '';
   } catch (_) { return ''; }
 }
@@ -8111,9 +8112,13 @@ const VRM_APP_API = 'https://vrm.center';
 
 async function sbGet(query) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, { headers: await sbHeaders() });
+    const session=await authToken();
+    if(!session?.user_id||!session.access_token)return null;
+    const filtre=`${query.includes('?')?'&':'?'}owner=eq.${encodeURIComponent(session.user_id)}`;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, { headers: {apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`} });
     if (!res.ok) return null;
-    return await res.json();
+    const rows=await res.json();
+    return (await loadSession())?.user_id===session.user_id?rows:null;
   } catch (_) { return null; }
 }
 
@@ -8172,17 +8177,20 @@ async function lireMain(cles) {
 //    d'une réponse.
 const SB_PAGE = 1000;
 async function sbGetTout(query) {
+  const session=await authToken();
+  if(!session?.user_id||!session.access_token)return null;
+  const filtre=`${query.includes('?')?'&':'?'}owner=eq.${encodeURIComponent(session.user_id)}`;
   const out = [];
   for (let de = 0; ; de += SB_PAGE) {
     let page = null;
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {
-        headers: { ...(await sbHeaders()), Range: `${de}-${de + SB_PAGE - 1}`, 'Range-Unit': 'items' },
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}${filtre}`, {
+        headers: { apikey:SUPABASE_KEY,Authorization:`Bearer ${session.access_token}`, Range: `${de}-${de + SB_PAGE - 1}`, 'Range-Unit': 'items' },
       });
       if (!res.ok) return null;
       page = await res.json();
     } catch (_) { return null; }
-    if (!Array.isArray(page)) return null;
+    if (!Array.isArray(page) || (await loadSession())?.user_id!==session.user_id) return null;
     out.push(...page);
     if (page.length < SB_PAGE) return out;
     if (de > 100000) return out;                  // garde-fou : jamais de boucle sans fin
@@ -8210,9 +8218,12 @@ async function sbGetTout(query) {
 const VISITE_MEMO_MS = 20 * 1000;
 const _memoVisite = new Map();          // requête → { at, p }
 
-function sbGetMemo(query) {
-  const e = _memoVisite.get(query);
-  if (e && Date.now() - e.at < VISITE_MEMO_MS) return e.p;
+async function sbGetMemo(query) {
+  const session=await authToken();
+  if(!session?.user_id)return null;
+  const cle=JSON.stringify([session.user_id,query]);
+  const e = _memoVisite.get(cle);
+  if (e && Date.now() - e.at < VISITE_MEMO_MS) {const resultat=await e.p;return (await loadSession())?.user_id===session.user_id?resultat:null;}
   // §4.5 : un BALAYAGE de famille (`id=like.`) passe par la pagination — Supabase
   // coupe une réponse à 1 000 lignes sans le dire. Vu le 5 octobre par
   // audit-lectures (enfin capable de lire tout le fichier) : les transactions
@@ -8220,8 +8231,8 @@ function sbGetMemo(query) {
   // à Vinted un bordereau qui existe déjà. `sbGetTout` rend `null` si une page
   // échoue, comme `sbGet` sur un échec.
   const p = /[?&]id=like\./.test(query) ? sbGetTout(query) : sbGet(query);
-  _memoVisite.set(query, { at: Date.now(), p });
-  return p;
+  _memoVisite.set(cle, { at: Date.now(), p });
+  const resultat=await p;return (await loadSession())?.user_id===session.user_id?resultat:null;
 }
 
 function viderMemoVisite(uid) {
