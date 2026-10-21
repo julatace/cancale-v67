@@ -12,7 +12,7 @@
  .vrm-main .vrm-market-space>.vrm-platform-summary[open]{grid-column:1 / -1;}
  .vrm-main .vrm-market-space>.vrm-platform-summary[open]>div{background:var(--studio-paper);padding:12px!important;border-radius:12px;}
  .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]){grid-column:1;grid-row:1;padding:9px 12px!important;background:#2b4548;align-self:stretch;}
- .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]) [data-fraicheur-ventes]{font-size:9px!important;color:#d0dfd8!important;white-space:nowrap;}
+ .vrm-main .vrm-market-space>div:has(>[data-fraicheur-ventes]) [data-fraicheur-ventes]{font-size:11px!important;color:#d0dfd8!important;white-space:nowrap;}
  .vrm-main .vrm-market-space>.vrm-seg-cadre{grid-row:2;background:#2b4548!important;border-radius:0 0 18px 18px;box-shadow:0 7px 12px #21343e0c;overflow:hidden;}
  .vrm-main .vrm-market-space .vrm-platform-tabs{padding:0 15px 7px;gap:20px;}
  .vrm-main .vrm-market-space .vrm-platform-tabs>button{font-size:12px!important;min-height:38px!important;}
@@ -50,7 +50,7 @@
  .vrm-app-shell .vrm-tabbar>.vrm-tab{min-height:49px;border-radius:11px;}
  .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]{background:#ffffff13;box-shadow:inset 0 1px #ffffff12;}
  .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]::before{display:none;}
- .vrm-app-shell .vrm-tabbar .vrm-nav-label{font-size:9px;}
+ .vrm-app-shell .vrm-tabbar .vrm-nav-label{font-size:11px;letter-spacing:-.01em;}
  /* Accueil : le bilan forme une carte horizontale, puis vient la courbe. */
  .vrm-day-layout .vrm-day-top{grid-template-columns:minmax(0,1fr)!important;gap:10px;}
  .vrm-day-layout .vrm-day-money{grid-column:1!important;grid-row:1!important;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;padding:16px!important;background:linear-gradient(120deg,#2b4548,#34544f)!important;border:1px solid #ffffff25!important;color:#fff;border-radius:17px;box-shadow:0 6px 14px #21343e15;}
@@ -61,7 +61,7 @@
  .vrm-day-money .vrm-day-meta b,.vrm-day-money [data-vendu-jour],.vrm-day-money .vrm-day-lien{color:#d4e6c8!important;}
  .vrm-day-money .vrm-day-recu{grid-column:2;grid-row:2 / span 2;border-top:0!important;border-left:1px solid #ffffff25!important;margin:0!important;padding:0 0 0 12px!important;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;max-width:112px;}
  .vrm-day-money .vrm-day-recu-n{color:#f1f7ef!important;font-size:22px!important;}
- .vrm-day-money .vrm-day-note{font-size:9px;}
+ .vrm-day-money .vrm-day-note{font-size:11px;}
  .vrm-day-layout .vrm-day-wallet{grid-column:1!important;grid-row:2!important;display:flex!important;gap:12px;padding:12px 15px!important;align-items:center;background:#e1e8dd!important;border:1px solid #d4decf!important;border-radius:12px;box-shadow:none;}
  .vrm-day-layout .vrm-day-wallet>div{flex:1;min-width:0;}
  .vrm-day-layout .vrm-day-week{grid-column:1!important;grid-row:3!important;padding:15px!important;border-radius:17px;background:#fffefa!important;border-color:#fff!important;}
