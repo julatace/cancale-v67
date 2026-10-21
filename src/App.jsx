@@ -19,7 +19,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
+import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
@@ -28,6 +28,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
+import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
@@ -1391,7 +1392,7 @@ const SYNC_KEYS = [
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
-  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
@@ -4071,6 +4072,11 @@ const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:me
 // tranche. Rempli par toute lecture de la famille (partagée, §vitesse) ;
 // vide = « pas su » = rien n'est caché de plus qu'avant.
 const TXN_ETATS = new Map();
+// (21 oct.) Les états ont-ils été LUS ? `undefined` pas encore · `true` lus ·
+// `false` la lecture a échoué (« pas su » — le suivi des retours le dit).
+let TXN_ETATS_LU;
+// Les retours eBay lus sur Colis (10 min, une fois pour toutes les ouvertures).
+const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') }); };
 const lireEtatsTxn = async () => { try { const rows = await lireTout(TXN_META_SELECT); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
@@ -4089,8 +4095,8 @@ const fetchTxnItemIds = async () => {
     // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
     const rows = await lireTout(TXN_META_SELECT);
-    if (rows === null) return {};
-    noterEtatsTxn(rows);
+    if (rows === null) { TXN_ETATS_LU = false; return {}; }
+    noterEtatsTxn(rows); TXN_ETATS_LU = true;
     const map = {};
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     return map;
@@ -7436,7 +7442,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -27789,6 +27795,80 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 //   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
 const ACCT_COLORS = ['#9b51e0','#27ae60','#00b8a9','#e056fd','#9acd32','#17a9c9','#6c5ce7','#e8529a'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
+// ── « RETOURS EN COURS » (Colis, 21 octobre) ─────────────────────────────────
+// Rend la sortie de `retoursEnCours` (src/retoursStock.js) — aucune règle ici.
+// Trois états : lecture en cours (une ligne) · pas su (une ligne, ce qui
+// manque nommé) · lu. Une ligne n'a qu'UN geste principal selon son étape :
+// « Reçu chez moi » (son clic), puis « Remise en stock » (son clic). Le geste
+// commun est dit une fois en tête (§7). Aucune couleur d'alerte : un retour
+// n'est pas une erreur.
+function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
+  const [ouvrirAnciens, setOuvrirAnciens] = React.useState(false);
+  if (!res) return null;
+  if (res.etat === 'encours') return null;
+  if (res.etat === 'passu') return (
+    <div data-retours-encours="passu" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 13px',marginBottom:12,fontSize:12.5,color:C.muted}}>
+      Retours en cours : je n'ai pas pu lire tes ventes — je ne peux pas dire s'il y en a. Rouvre Colis dans un moment.
+    </div>);
+  const { lignes, remises, manques } = res;
+  if (!lignes.length && !remises.length) {
+    return manques.length ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{fontSize:11.5,color:C.muted,margin:'0 0 12px'}}>Retours en cours : aucun vu — mais je n'ai pas pu lire {manques.join(', ')}.</div> : null;
+  }
+  const recents = lignes.filter(l => !l.ancien), anciens = lignes.filter(l => l.ancien);
+  const lien = (l) => l.plateforme === 'ebay'
+    ? `https://www.ebay.fr/rt/ReturnDetails?returnId=${encodeURIComponent(l.returnId)}`
+    : (l.vente && l.vente.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(l.vente.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(l.tx)}`);
+  const btn = { minHeight:44, border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:8, padding:'0 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' };
+  const Ligne = ({ l, remise }) => {
+    const ph = l.vente ? orderPhoto(l.vente) : null;
+    const compte = l.plateforme === 'ebay' ? (l.compte && l.compte !== 'principal' ? `eBay · ${l.compte.slice(0,6)}` : 'eBay') : (plusieursComptes && l.compte ? nomCompte(l.compte) : '');
+    const etape = remise ? 'remis' : l.etape;
+    return (
+      <div data-retour={l.cle} data-retour-etape={etape} data-retour-num={l.num || ''} data-retour-recu={l.recu ? '1' : '0'} data-retour-plateforme={l.plateforme}
+        style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,minWidth:0}}>
+        <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:C.card2||C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12.5,fontWeight:700,padding:'0 6px'}}>{l.num ? `N°${l.num}` : '—'}</div>
+        {ph && <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}><PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/></div>}
+        <div style={{flex:'1 1 170px',minWidth:0}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.titre || (l.plateforme === 'ebay' ? 'Retour eBay' : 'Vente')}</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:7,flexWrap:'wrap'}}>
+            <span data-retour-libelle style={{color:C.text,fontWeight:600}}>{remise ? 'Remise en stock — à republier' : LIBELLE_ETAPE[l.etape]}</span>
+            {!remise && l.recu && l.etape === 'rembourse' && <span>reçue chez toi</span>}
+            {!remise && l.livreeSelonVinted && !l.recu && <span>{l.plateforme === 'ebay' ? 'eBay' : 'Vinted'} dit livrée — confirme quand tu l'as</span>}
+            {l.origine === 'non-reclamee' && <span>non réclamée par l'acheteur</span>}
+            {!l.num && <span data-retour-sans-num>paire pas reliée à un N°</span>}
+            {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par une autre paire</span>}
+            {remise && l.remis && l.remis.archive && <span>ancien N° : numéro neuf à la republication</span>}
+            {compte && <span>· {compte}</span>}
+          </div>
+        </div>
+        <a href={lien(l)} target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>{l.plateforme === 'ebay' ? 'Sur eBay ↗' : 'Sur Vinted ↗'}</a>
+        {remise ? <>
+          <a data-geste="republier" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Republier ↗</a>
+          <button type="button" data-geste="annuler-remise" onClick={()=>onAnnulerRemise(l.cle)} style={{...btn,color:C.muted}}>Annuler la remise</button>
+        </> : <>
+          <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu chez moi' : 'Reçu chez moi ?'}</button>
+          {l.recu && l.num && <button type="button" data-geste="remise-en-stock" onClick={()=>onRemettre(l)} style={{...btn,background:C.text,color:C.bg,border:`1px solid ${C.text}`}}>Remise en stock</button>}
+          <button type="button" className="vrm-icon-control" data-geste="masquer-retour" onClick={()=>onMasquer(l.cle)} title="Masquer cette ligne (déjà réglé)" aria-label="Masquer" style={{...btn,minWidth:44,padding:0,color:C.muted}}><Icon name="close" size={15}/></button>
+        </>}
+      </div>);
+  };
+  return (
+    <div data-retours-encours={lignes.length} data-retours-remises={remises.length} data-retours-manques={manques.length} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
+      <div style={{display:'flex',gap:9,alignItems:'flex-start'}}>
+        <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : la paire garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+        </div>
+      </div>
+      <div style={{display:'grid',gap:6,marginTop:9}}>
+        {recents.map(l => <Ligne key={l.cle} l={l}/>)}
+        {anciens.length > 0 && <button type="button" data-retours-anciens={anciens.length} onClick={()=>setOuvrirAnciens(v=>!v)} style={{...btn,justifySelf:'start',color:C.muted}}>{ouvrirAnciens ? 'Masquer' : `${anciens.length} remboursé${anciens.length>1?'s':''} il y a plus de 45 j`}</button>}
+        {ouvrirAnciens && anciens.map(l => <Ligne key={l.cle} l={l}/>)}
+        {remises.map(l => <Ligne key={l.cle} l={l} remise/>)}
+      </div>
+    </div>);
+}
 function AcctTag({ acc, name }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
   // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
@@ -29156,7 +29236,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // avec les autres bandeaux, repoussait la PREMIÈRE ANNONCE à 1146 px du haut
   // — il fallait défiler un écran et demi pour voir son stock. C'est une liste
   // de travail, pas une alerte : le compte suffit tant qu'on ne l'ouvre pas.
-  const [retoursOpen, setRetoursOpen] = useState(false);
   // Section « Analyse » de l'onglet Ventes : repliée par défaut pour que l'écran
   // aille droit à la liste des ventes. Le choix est mémorisé sur l'appareil.
   const [analyseOpen, setAnalyseOpen] = useState(() => !!load('vinted_analyse_open', false));
@@ -30899,19 +30978,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas de façon fiable que le colis t'est revenu). Sert à séparer « en route »
   // de « en main, à republier ».
   const [retoursRecus, setRetoursRecus] = useState(() => load('vinted_retours_recus', {}));
-  const isRetourRecu = (o) => !!(o && retoursRecus[String(o.transaction_id)]);
-  const toggleRetourRecu = (o) => {
-    const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
-    setRetoursRecus(prev => { const u = { ...prev }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vinted_retours_recus', u); return u; });
-  };
   // Paires écartées à la main du panneau « qui reviennent » : quand tu as déjà
   // republié (avec un nouveau numéro par ex.) ou que la ligne est en trop, tu la
   // masques. Synchronisé entre appareils (vinted_retours_dismissed).
   const [retoursDismissed, setRetoursDismissed] = useState(() => load('vinted_retours_dismissed', {}));
-  const dismissRetour = (o) => {
-    const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
-    setRetoursDismissed(prev => { const u = { ...prev, [k]: Date.now() }; save('vinted_retours_dismissed', u); return u; });
-  };
+
 
   // ── RETOURS ATTENDUS : les paires qui te reviennent, avec LEUR numéro ─────
   // Quand une vente part en retour / litige, la paire revient (ou pas) mais tu
@@ -30957,6 +31028,119 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed, txnItem, onlineAnnonceIds]);
 
+  // ── RETOUR → STOCK (21 octobre, fonction retenue le 11 octobre) ──────────
+  // Un retour acheteur suivi jusqu'à sa remise en stock. La règle est PURE
+  // (`retoursEnCours`, src/retoursStock.js) : identité seulement (correction
+  // posée sur la vente, sinon transaction → annonce → fiche N°), jamais le
+  // titre. « Reçu chez toi » et « Remise en stock » sont SES clics : rien ne
+  // change tout seul. Le bloc vit dans Colis (une seule voix, §7).
+  const [retoursRemis, setRetoursRemis] = useState(() => load('vinted_retours_remis', {}));
+  const basculerRetourRecu = (cle) => {
+    const k = cle ? String(cle) : ''; if (!k) return;
+    setRetoursRecus(prev => { const u = { ...prev }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vinted_retours_recus', u); return u; });
+  };
+  const masquerRetour = (cle) => {
+    const k = cle ? String(cle) : ''; if (!k) return;
+    setRetoursDismissed(prev => { const u = { ...prev, [k]: Date.now() }; save('vinted_retours_dismissed', u); return u; });
+  };
+  // Les retours eBay : lus chez eBay (Post-Order, la route existante), seulement
+  // sur Colis, une fois par 10 min. TROIS états : `undefined` en cours · `null`
+  // pas su · la liste `{ retour, compte, num }` (N° par le SKU de la ligne de
+  // commande, `numLigneEbay` — jamais le titre). Sans compte eBay relié : `[]`.
+  const [retoursEbayLus, setRetoursEbayLus] = useState(undefined);
+  useEffect(() => {
+    if (only !== 'bordereaux') return;
+    let vivant = true;
+    (async () => {
+      const c = RETOURS_EBAY_CACHE;
+      if (c.v !== undefined && Date.now() - c.at < 10 * 60 * 1000) { if (vivant) setRetoursEbayLus(c.v); return; }
+      let v;
+      try {
+        const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders');
+        if (!r) v = null;
+        else {
+          const relies = (r.lignes || []).filter(l => l && l.ligne);
+          if (!relies.length) v = r.illisibles.length ? null : [];
+          else {
+            const res = await Promise.all(relies.map(l => {
+              const ref = l.compte.ref;
+              return appelerEbay('retours', corpsCompteEbay(ref), enTeteSession).then(j => ({ ref, l: Array.isArray(j && j.retours) ? j.retours : null }), () => ({ ref, l: null }));
+            }));
+            if (res.some(x => x.l === null) || r.illisibles.length) v = null;
+            else {
+              v = [];
+              for (const { ref, l } of res) for (const rt of l) {
+                const o = r.items.find(x => x && x._compte === ref && String(x.orderId || '') === String(rt.orderId || ''));
+                const lis = o && Array.isArray(o.lineItems) ? o.lineItems : [];
+                const li = lis.find(x => String(x.legacyItemId || x.itemId || '') === String(rt.itemId || '')) || (lis.length === 1 ? lis[0] : null);
+                const num = o && li ? numLigneEbay(o, li) : null;
+                v.push({ retour: rt, compte: ref, num: num || null });
+              }
+            }
+          }
+        }
+      } catch (_) { v = null; }
+      RETOURS_EBAY_CACHE.v = v; RETOURS_EBAY_CACHE.at = Date.now();
+      if (vivant) setRetoursEbayLus(v);
+    })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only]);
+  const retoursSuivis = useMemo(() => {
+    const enLigneIds = new Set(), enLignePk = new Set(), enLigneNums = new Set();
+    for (const it of (listings.items || [])) {
+      if (!onlineAnnonceIds.has(String(it.id))) continue;
+      enLigneIds.add(String(it.id)); const pk = photoKey(it.photo); if (pk) enLignePk.add(pk);
+      const e = numeros[it.id]; if (e && e.numero) enLigneNums.add(cleNum(e.numero));
+    }
+    // Republiée : une annonce EN LIGNE porte son N° (s'il se redonne), ou c'est
+    // l'annonce de la vente rouverte (identité), ou sa photo exacte.
+    const republiee = (l) => {
+      if (l.num && numeroReprenable(l.num) && enLigneNums.has(cleNum(l.num))) return true;
+      if (l.itemId && enLigneIds.has(String(l.itemId))) return true;
+      const pk = l.vente ? photoKey(orderPhoto(l.vente)) : null; return !!pk && enLignePk.has(pk);
+    };
+    const ventes = sales.items === null ? undefined : (sales.items || []).filter(o => !isHidden(o));
+    const res = retoursEnCours({
+      ventes, etats: TXN_ETATS_LU === false ? null : etatTxn, txnItem, numeros,
+      numeroVente: (tx) => { const v = saleOv[tx]; return v && String(v.numero || '').trim() ? String(v.numero).trim() : null; },
+      recus: retoursRecus, remis: retoursRemis, masques: retoursDismissed, republiee, ebay: retoursEbayLus,
+    });
+    // Comptes dont les ventes n'ont pas pu être lues (hors comptes exclus) :
+    // nommés — un retour de ce compte peut manquer (« pas su »).
+    const ko = (Array.isArray(sales.failedUids) ? sales.failedUids : []).filter(u => !acctOff(u))
+      .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
+    if (ko.length) res.manques = [...res.manques, ...ko.map(n => `les ventes de ${n}`)];
+    return res;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts]);
+  // « Remise en stock » — SON clic. Le N° est gardé ; s'il est encore porté par
+  // une autre paire présente, on DEMANDE (jamais deviné) ; un ancien numéro
+  // (013) se dit « numéro neuf à la republication ». Rien d'autre ne change :
+  // ni pool, ni fiche, ni numéros présents.
+  const remettreEnStock = async (ligne) => {
+    const r = remiseEnStock(ligne, { numeros, presentes: presentesAnnonceIds, cleNum, estArchive: (n) => !numeroReprenable(n) });
+    if (!r.ok) {
+      if (r.raison === 'pas-recu') toast('Note d’abord que le colis est arrivé chez toi (« Reçu chez moi »).');
+      else toast('Cette paire n’est reliée à aucun N° (ni par la vente, ni par son annonce) : rien à remettre en stock. Pose son N° à la main d’abord.');
+      return;
+    }
+    let num = r.num;
+    if (r.conflit) {
+      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Une autre paire présente porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
+      if (!ok) return;
+      num = null;
+    } else {
+      const ok = await askConfirm({ title: `Remettre en stock ${r.archive ? 'cette paire' : `la N°${r.num}`} ?`, desc: r.archive ? `Elle portait l’ancien N°${r.num} : un ancien numéro ne se redonne pas, elle prendra un numéro NEUF à sa republication — écris-le sur son étiquette.` : `Elle garde son N°${r.num} : retape-le dans le champ N° de la nouvelle annonce.\n\nRien d’autre ne change (ni la vente, ni ta compta).`, ok: 'Remettre en stock', cancel: 'Annuler' });
+      if (!ok) return;
+    }
+    const k = String(ligne.cle);
+    setRetoursRemis(prev => { const u = { ...prev, [k]: { at: new Date().toISOString(), num, archive: r.archive, conflit: r.conflit ? r.conflit.id : null } }; save('vinted_retours_remis', u); return u; });
+  };
+  const annulerRemise = (cle) => {
+    const k = String(cle || ''); if (!k) return;
+    setRetoursRemis(prev => { const u = { ...prev }; delete u[k]; save('vinted_retours_remis', u); return u; });
+  };
   const RETOUR_LABEL = { retour: { txt: '↩️ Retour en cours', col: () => INV_STATUS.online.color }, rembourse: { txt: '💸 Remboursé', col: () => C.warn }, suspendue: { txt: '⏸ Suspendue', col: () => C.muted } };
 
   // ── REPRISE DE NUMÉRO (paire republiée avec de NOUVELLES photos) ──────────
@@ -32083,6 +32267,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setPairsLost(n => vide(n) ? load('vinted_pairs_lost', {}) : n);
     setRetoursRecus(n => vide(n) ? load('vinted_retours_recus', {}) : n);
     setRetoursDismissed(n => vide(n) ? load('vinted_retours_dismissed', {}) : n);
+    setRetoursRemis(n => vide(n) ? load('vinted_retours_remis', {}) : n);
     setAchatNotes(n => vide(n) ? load('vinted_achat_notes', {}) : n);
     setOffBuys(n => vide(n) ? load('vinted_offvinted_buys', []) : n);
   }), []);
@@ -37373,7 +37558,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               + ((annStats.n>0 && annStats.datesKnown===0)?1:0)
               + (repriceList.length>0?1:0)
               + nAutresSignalements
-              + (retoursAttendus.length>0?1:0);
+              + ((retoursSuivis.etat==='lu'&&retoursSuivis.lignes.length>0)?1:0);
             if (!n) return null;
             return (
               <button type="button" onClick={()=>setTipsOpen(v=>!v)}
@@ -37388,51 +37573,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {tipsOpen && (<>
           {/* Les paires qui reviennent (retour, litige) : une liste de
               travail, donc ici et pas au-dessus du stock. */}
-          {retoursAttendus.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'10px 12px'}}>
-              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (
-                <button type="button" onClick={()=>setRetoursOpen(v=>!v)}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                  <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:700,color:C.warn}}>{retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</span>
-                  <span style={{fontSize:11.5,color:C.muted,fontWeight:600,flexShrink:0}}>{retoursOpen?'Masquer':'Voir'}</span>
-                </button>
-              ); })()}
-              {retoursOpen && (
-              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier.
-                {/* (relecture du 11 octobre) « Retape son numéro » s'affichait à côté
-                    de numéros d'ARCHIVE (B…), que l'app refuse ensuite : la consigne
-                    suit le numéro, une phrase par cas présent (§7). */}
-                {retoursAttendus.some(r=>r.num&&numeroReprenable(r.num)) && <> <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</>}
-                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur son étiquette. Elle sortira de cette liste toute seule.</span>}
-              </div>)}
-              {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
-                  const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
-                  const col = lab.col();
-                  const recu = isRetourRecu(r.o);
-                  return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'7px 9px'}}>
-                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
-                      <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {orderPhoto(r.o)?<PhotoVinted src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                      </div>
-                      <div style={{flex:'1 1 120px',minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
-                        <div style={{fontSize:11,fontWeight:500,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
-                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'Reçue — à republier':lab.txt}</span>
-                          <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
-                          {r.cell && <span style={{color:C.blue||C.accent,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>{garageCellLabel(r.cell)}</span>}
-                          {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
-                        </div>
-                      </div>
-                      {r.num && numeroReprenable(r.num) && <button className="vrm-icon-control" type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
-                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
-                      <button className="vrm-icon-control" type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
-                    </div>
-                  );
-                })}
-              </div>)}
-            </div>
+          {/* (21 octobre) Les retours se suivent dans Colis → « Retours en cours »
+              (une seule voix, §7) : ici, une ligne qui y mène. */}
+          {retoursSuivis.etat==='lu' && retoursSuivis.lignes.length > 0 && (
+            <button type="button" data-retours-renvoi={retoursSuivis.lignes.length} onClick={()=>onNav&&onNav('cat_bord')}
+              style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:8,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'8px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} paire{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivies dans Colis</span>
+              <span style={{fontSize:13,color:C.muted}}>›</span>
+            </button>
           )}
           {/* Les signalements (compte muet, annonces disparues, comptes
               refusés) vivent ici : un seul panneau à ouvrir. */}
@@ -38342,6 +38490,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             la ligne ne garde que ce qui la distingue (depuis quand, la date
             limite, le compte). « ↺ Pas encore posté » la remet dans « à
             envoyer » avec son bordereau, si le carton est encore là. */}
+        {/* Retours en cours (21 octobre) : la seule voix des retours (§7). */}
+        <RetoursEnCoursBloc res={retoursSuivis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
         {cochesNonPartis.length>0 && (()=>{
           const nb = cochesNonPartis.length, pl = nb>1?'s':'';
           const plusieursComptes = (accounts || []).length > 1;
