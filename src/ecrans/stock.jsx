@@ -3,8 +3,7 @@
 // vient de l'import ci-dessous (liaisons vivantes : le thème `C` reste à jour).
 import React, { useState, useMemo, useEffect } from "react";
 import { polyDe, estRectangle, normaliserPoly, rectDans, empreinte, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, FORMES, caler } from "../stockRegles.js";
-import { Btn, C, COL_H, Card, DEMANDE_STOCK_CHERCHE, FURN_TYPES, INV_STATUS, Icon, Input, LAYOUT, PhotoVinted, ROOM_DEFAULT, Room3D, SUPABASE_URL, ScreenHead, Segmente, SheetShell, askConfirm, askText, clavierNum, cleNum, extractSize, load, normTitle, normalizePlan, numsPresents, save, saveRoomPlan, sbAuth, toast, triNum } from "../App.jsx";
-import { numsCase, meubleACases, dimsMeuble, casesDe, graviteCases, nomCase, meublesDuPlan, ouEstNumero, loadRoomPlan } from "../App.jsx";
+import { Btn, C, COL_H, Card, DEMANDE_STOCK_CHERCHE, FURN_TYPES, INV_STATUS, Icon, Input, LAYOUT, PhotoVinted, ROOM_DEFAULT, Room3D, SUPABASE_URL, ScreenHead, Segmente, SheetShell, askConfirm, askText, casesDe, clavierNum, cleNum, dimsMeuble, extractSize, graviteCases, load, loadRoomPlan, meubleACases, meublesDuPlan, nomCase, normTitle, normalizePlan, numsCase, numsPresents, ouEstNumero, save, saveRoomPlan, sbAuth, toast, triNum } from "../App.jsx";
 
 // (17 oct.) « Mon local en photo » (`LocalPhoto`, la ligne `vrm_local`) n'est
 // plus rendu nulle part depuis que le Stock ne garde que la pièce : retiré.

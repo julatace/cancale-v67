@@ -83,8 +83,11 @@ async function ouvrir(b) {
   // qu'une durée à l'horloge à la charge de la machine des bancs.
   let script = null; try { const m = (await cdp.send('Performance.getMetrics')).metrics; script = Math.round(1000 * (m.find((x) => x.name === 'ScriptDuration') || {}).value); } catch (_) {}
   // Le calme : plus rien ne passe pendant 4 s (le préchargement au repos compris).
+  // ⚠️ Le préchargement part 5 s après la lecture des comptes, puis au repos : un
+  // calme de 4 s peut tomber AVANT lui (vu sous charge : « morceaux après : — »).
+  // On attend donc au moins 12 s après le héros avant de juger le calme.
   let dernier = Date.now();
-  for (let i = 0; i < 120; i++) { const n = journal.length + lectures; await attendre(500); if (journal.length + lectures !== n) dernier = Date.now(); else if (Date.now() - dernier > 4000) break; }
+  for (let i = 0; i < 120; i++) { const n = journal.length + lectures; await attendre(500); if (journal.length + lectures !== n) dernier = Date.now(); else if (Date.now() - dernier > 4000 && (!heros || Date.now() - heros > 12000)) break; }
   const tombe = await pg.evaluate(() => /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText));
   await ctx.close();
   const js = journal.filter((x) => /\.js$/.test(x.f));
