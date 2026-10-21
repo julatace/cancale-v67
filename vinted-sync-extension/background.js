@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.203.0';
+const CODE_VERSION = '5.204.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -392,6 +392,10 @@ async function authToken() {
 // ⚠️ Le mot de passe n'est JAMAIS gardé : il part une fois chez Supabase, qui
 // renvoie deux jetons. Seuls les jetons sont stockés (`chrome.storage.local`,
 // zone locale de l'extension — un site web ne peut pas la lire).
+const MSG_MDP_CAPTCHA = 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».';
+function estRefusCaptcha(j, brut) {
+  return !!((j && /captcha/i.test(String(j.error_code || j.code || ''))) || /captcha/i.test(String(brut || '')));
+}
 async function authLogin(email, password) {
   const mail = String(email || '').trim().toLowerCase();
   if (!mail || !password) return { ok: false, error: 'Email et mot de passe requis.' };
@@ -406,6 +410,15 @@ async function authLogin(email, password) {
       // On traduit : « invalid_grant » n'aide personne à se connecter.
       const brut = String(j.error_description || j.msg || j.error || '');
       let msg = brut || 'Connexion refusée.';
+      // ⚠️ CAPTCHA (21 oct.) : le jour où Julien allume Turnstile dans Supabase,
+      //    GoTrue refuse `grant_type=password` sans jeton captcha (400,
+      //    `captcha_failed`, « captcha protection: request disallowed »). Une page
+      //    d'extension MV3 ne peut pas charger le script distant de Turnstile :
+      //    ce chemin est fermé pour de bon, le geste est « Se connecter avec VRM »
+      //    (session fabriquée par le serveur, exemptée du captcha).
+      if (estRefusCaptcha(j, brut)) {
+        return { ok: false, captcha: true, error: MSG_MDP_CAPTCHA };
+      }
       if (/invalid login|invalid_grant|credentials/i.test(brut)) msg = 'Email ou mot de passe incorrect.';
       else if (/not confirmed/i.test(brut)) msg = "Cette adresse n'est pas encore confirmée. Ouvre l'email de confirmation, ou confirme le compte depuis l'app.";
       else if (/rate limit|too many/i.test(brut)) msg = 'Trop de tentatives. Réessaie dans quelques minutes.';
@@ -1724,7 +1737,7 @@ async function storeHarvest(domain, type, id, body) {
   // pour Vinted Go (aucun email ne les porte).
   if (type === 'conversation') {
     try { const r = retraitDeConversation(parsed); if (r) await noterRetrait(r, uid); } catch (_) {}
-    // 5.203 : une conversation captée en passant dit aussi si une confirmation
+    // 5.204 : une conversation captée en passant dit aussi si une confirmation
     // (« Tout est OK ») attend — ou si elle est réglée (l'entrée sort).
     try { const c = confirmationDeConversation(parsed); if (c) await noterConfirmation(c, uid); } catch (_) {}
   }
@@ -4476,7 +4489,7 @@ function retraitDeConversation(conv) {
       const brut = titre + ' ' + sous;
       if (CONV_SORTANT.test(brut)) continue;   // un colis qui PART, jamais à retirer
       if (!CONV_ARRIVE.test(brut)) continue;
-      // 5.203 : la VRAIE date d'arrivée = l'heure du PREMIER message d'arrivée
+      // 5.204 : la VRAIE date d'arrivée = l'heure du PREMIER message d'arrivée
       // (`created_at_ts`, mesuré le 21 oct. : ISO avec décalage, « 2026-10-13T
       // 10:08:35+02:00 »). Un rappel plus tardif ne la repousse pas. Illisible ⇒
       // rien (l'app retombe sur « au plus tard », jamais une date inventée).
@@ -4544,7 +4557,7 @@ function retraitDeConversation(conv) {
     };
   } catch (_) { return null; }
 }
-// L'heure d'un message de conversation (5.203). Vinted l'écrit en ISO avec
+// L'heure d'un message de conversation (5.204). Vinted l'écrit en ISO avec
 // décalage (mesuré) ; une forme en secondes ou millisecondes est lue aussi.
 // Rend des millisecondes, ou `null` (illisible, ou absurde : avant 2020 ou plus
 // d'un jour dans le futur) — jamais une date devinée.
@@ -4584,14 +4597,14 @@ async function noterRetrait(r, uid) {
     const avant = cur[r.tx];
     // Un message plus récent qui ne NOMME pas le transporteur ne l'efface pas.
     if (!r.transporteur && avant && avant.transporteur) r = { ...r, transporteur: avant.transporteur };
-    // 5.203 : la date d'arrivée déjà rangée est la PREMIÈRE vue — un rappel
+    // 5.204 : la date d'arrivée déjà rangée est la PREMIÈRE vue — un rappel
     // relu plus tard ne la repousse pas, une relecture sans elle ne l'efface pas.
     if (avant && avant.arriveLe && !isNaN(Date.parse(avant.arriveLe))
         && (!r.arriveLe || Date.parse(avant.arriveLe) <= Date.parse(r.arriveLe))) r = { ...r, arriveLe: avant.arriveLe };
     // Rien de neuf → aucune écriture (égress, §34).
     if (avant && avant.code === r.code && avant.lieu === r.lieu && avant.qr === r.qr && (avant.transporteur || '') === (r.transporteur || '')
         && (avant.arriveLe || '') === (r.arriveLe || '')) return false;
-    // 5.203 : un CODE NEUF (aucun avant, ou un autre) appelle « 📍 Colis à
+    // 5.204 : un CODE NEUF (aucun avant, ou un autre) appelle « 📍 Colis à
     // retirer » — la voie email était seule à sonner. Seulement un vrai code
     // (des chiffres, `CODE_APRES`) ; un lieu sans code ne sonne pas.
     const codeNeuf = !!(r.code && /\d/.test(String(r.code)) && (!avant || avant.code !== r.code));
@@ -4608,7 +4621,7 @@ async function noterRetrait(r, uid) {
   } catch (_) { return null; }
 }
 
-// ── « 📍 COLIS À RETIRER » QUAND L'EXTENSION RANGE UN CODE NEUF (5.203) ─────
+// ── « 📍 COLIS À RETIRER » QUAND L'EXTENSION RANGE UN CODE NEUF (5.204) ─────
 // Seul le serveur sait envoyer une notification (clé VAPID). On lui dit QUELLE
 // transaction (jamais le code ni le lieu : il relit SA ligne `panel_colis_relais`
 // avec la session du vendeur, et décide). L'anti-doublon vit chez lui
@@ -4655,7 +4668,7 @@ async function envoyerNotifsRetrait() {
   } catch (_) { return 0; }
 }
 
-// ══ À CONFIRMER AVANT LA DATE LIMITE (5.203, 21 octobre) ═════════════════════
+// ══ À CONFIRMER AVANT LA DATE LIMITE (5.204, 21 octobre) ═════════════════════
 // MESURÉ en lecture seule sur sa base (21 oct.) : le seul message qui porte une
 // date limite de confirmation est l'action « Confirmation nécessaire » —
 // `event_type: delivered`, actions `all_is_good` (« Tout est OK ») et
@@ -5753,7 +5766,7 @@ async function visiteVinted() {
     //    sur eBay). La moisson de 20:34 l'aurait prouvée dans la minute.
     await capterPreuvesVente(uid);
     await capterRetraits(uid);
-    // 5.203 : les notifications « colis à retirer » restées en file (envoi raté)
+    // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
     await capterConfirmations(uid);

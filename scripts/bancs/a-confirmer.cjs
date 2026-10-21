@@ -1,4 +1,4 @@
-// ── BANC : À CONFIRMER AVANT LA DATE LIMITE + LA VRAIE DATE D'ARRIVÉE (21 oct., 5.203)
+// ── BANC : À CONFIRMER AVANT LA DATE LIMITE + LA VRAIE DATE D'ARRIVÉE (21 oct., 5.204)
 // L'extension range dans `panel_a_confirmer` le « Confirmation nécessaire »
 // (« Tout est OK ») lu dans une conversation Vinted, avec sa date limite ; et
 // dans `panel_colis_relais` l'heure du MESSAGE d'arrivée (`arriveLe`).

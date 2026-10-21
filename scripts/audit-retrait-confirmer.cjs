@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT — 5.203 : LA VRAIE DATE D'ARRIVÉE, LA NOTIFICATION D'UN CODE NEUF, ET
+//  AUDIT — 5.204 : LA VRAIE DATE D'ARRIVÉE, LA NOTIFICATION D'UN CODE NEUF, ET
 //  LES COLIS À CONFIRMER AVANT LA DATE LIMITE (node scripts/audit-retrait-confirmer.cjs)
 //
 //  Le VRAI `background.js` dans un `vm` (`_fond-vm.cjs` : base à état, faux

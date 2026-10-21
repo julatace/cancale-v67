@@ -2,7 +2,7 @@
 // BANC : « 📍 COLIS À RETIRER » QUAND L'EXTENSION RANGE UN CODE NEUF LU DANS
 //        UNE CONVERSATION VINTED (node scripts/bancs/retrait-conv-push.cjs)
 // ═══════════════════════════════════════════════════════════════════════════
-// 21 octobre (extension 5.203). Avant, seule la voie EMAIL sonnait : un code
+// 21 octobre (extension 5.204). Avant, seule la voie EMAIL sonnait : un code
 // Vinted Go lu dans la conversation (aucun email ne le porte) restait muet.
 // L'extension appelle `api/push` { action: 'retrait', tx } ; la route relit la
 // ligne `panel_colis_relais` du vendeur (jamais ce que dirait l'extension) et

@@ -68,7 +68,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.203.0';
+const EXT_ATTENDUE = '5.204.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -363,7 +363,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.203.0', retraitnotif: '5.203.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.204.0', retraitnotif: '5.204.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -8882,7 +8882,7 @@ function askNotifPermission(){
 function pushNotif(title, body){
   try{
     if(typeof Notification!=='undefined' && Notification.permission==='granted'){
-      new Notification(title, { body, icon:'/vrm-icon-v3-192.png', badge:'/vrm-icon-v3-192.png' });
+      new Notification(title, { body, icon:'/vrm-icon-v4-192.png', badge:'/vrm-icon-v4-192.png' });
       return true;
     }
   }catch(_){/* ignore */}
@@ -10140,7 +10140,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
 let _logoSeq = 0;
 // Identité officielle : logo VRM angulaire choisi par Julien (piste 02).
 function VrmLogo({ size = 40, style, anim = false }) {
-  return <img src="/vrm-logo-v3-192.png" srcSet="/vrm-logo-v3-96.png 96w, /vrm-logo-v3-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
+  return <img src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes={`${size}px`} alt="VRM" width={size} height={size} className={anim ? 'vrm-logo vrm-brand-asset vrm-logo-anim' : 'vrm-logo vrm-brand-asset'}
     style={{ width: size, height: size, borderRadius: 0, objectFit: 'contain', display: 'block', ...(style || {}) }}/>;
 }
 // Le sigle à plat, pour poser à côté du médaillon dans l'en-tête.
@@ -10148,7 +10148,7 @@ function VrmWord({ height = 22, color, style }) {
   return <span role="img" aria-label="VRM" style={{ display: 'inline-block', width: height * 4, height, flexShrink: 0, backgroundColor: color || C.text, mask: 'url(/vrm-wordmark-v3.png) center / contain no-repeat', WebkitMask: 'url(/vrm-wordmark-v3.png) center / contain no-repeat', ...style }}/>;
 }
 
-const LOGO_CANCALE = "data:image/png;base64,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";
+const LOGO_CANCALE = "data:image/png;base64,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";
 
 // Barre de navigation du bas (façon Vinted) : un onglet dédié par catégorie.
 // Défilable horizontalement (plus de 5 entrées).
@@ -11658,7 +11658,7 @@ function AuthScreen() {
       <aside className="vrm-cx-marque">
         <div className="vrm-cx-haut">
           <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
-            <img src="/vrm-logo-v3-192.png" alt="" width="36" height="36"/><b>VRM</b>
+            <img src="/vrm-logo-v4-192.png" alt="" width="36" height="36"/><b>VRM</b>
           </a>
           {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
               pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
@@ -13845,7 +13845,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
     </div></ResumePlateforme>
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
         ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
-    <div style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={siAJour}/></div>
+    <div className="vrm-fraicheur-plat" style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={siAJour}/></div>
     </>
   );
 }
@@ -14131,11 +14131,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
       <ScreenHead icon="box" title="Colis Leboncoin" desc="Génère tes bordereaux, poste tes colis — comme sur Vinted" />
       {colis.length === 0 ? (
         // (20 oct., revue) Jamais lu n'est pas « aucun colis » : Ventes dit « — »
-        // tant que « Mes transactions » n'a pas été relue, Colis disait « Aucun
+        // tant que « Mes transactions » n'a pas été relue, Colis disait « Aucun
         // colis » sur la même absence de lecture (« rien lu » ne vaut pas « rien »).
         <Card><div data-lbc-colis-vide={lbcVentes.maj ? 'lu' : 'jamais'} style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{lbcVentes.maj
           ? <>Aucun colis Leboncoin à envoyer dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}). Dès qu'une vente Leboncoin est captée, elle apparaît ici — avec son bordereau, son QR et son numéro.</>
-          : <>Tes colis Leboncoin arrivent avec tes ventes, quand l’extension passe sur leboncoin.fr (« Mes transactions ») — pas encore lu pour l’instant.</>}</div></Card>
+          : <>Tes colis Leboncoin arrivent avec tes ventes, quand l’extension passe sur leboncoin.fr (« Mes transactions ») — pas encore lu pour l’instant.</>}</div></Card>
       ) : (<>
         {/* ── À GÉNÉRER : vendu, mais le bordereau n'existe pas encore ──────────
             Générer un bordereau Leboncoin est une action SUR leboncoin.fr (API de
@@ -14343,7 +14343,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
         <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>Achats Leboncoin</div>
         {lu
           ? <>Aucun achat Leboncoin dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}).</>
-          : <>Tes achats Leboncoin arrivent quand l’extension passe sur leboncoin.fr (« Mes transactions »). Seules les transactions où tu es l’acheteur sont rangées ici.</>}
+          : <>Tes achats Leboncoin arrivent quand l’extension passe sur leboncoin.fr (« Mes transactions »). Seules les transactions où tu es l’acheteur sont rangées ici.</>}
       </div>
     );
   }
@@ -14996,6 +14996,30 @@ async function lireEbayTous(base, select, champ, comptesDonnes) {
   }
   return { comptes: r.comptes, items, illisibles, lignes: r.lignes };
 }
+// (21 octobre) Les messages eBay sans réponse de TOUS ses comptes actifs, tels
+// que la route les a rangés (`ebay_messages{suffixe}`). Rend `null` (pas su :
+// registre ou une ligne illisible — les comptes illisibles sont nommés dans
+// `illisibles` quand le registre, lui, est lu), sinon `{ total, auMoins,
+// comptes: [{ ref, nom, n }], aucune }`. `aucune` : aucun compte n'a encore de
+// résumé rangé ⇒ on ne dit rien (jamais « 0 » inventé).
+function etatMessagesEbay(r) {
+  if (!r || !Array.isArray(r.lignes)) return null;
+  const comptes = [], illisibles = [];
+  let total = 0, auMoins = false, lus = 0;
+  for (const { compte, ligne } of r.lignes) {
+    if (ligne === undefined) { illisibles.push(nomCompteEbay(compte)); continue; }
+    if (!ligne || ligne.n == null || ligne.n === '') continue;
+    const n = Number(ligne.n);
+    if (!Number.isFinite(n) || n < 0) { illisibles.push(nomCompteEbay(compte)); continue; }
+    lus++;
+    total += n;
+    if (String(ligne.complet) === 'false') auMoins = true;
+    comptes.push({ ref: compte.ref, nom: nomCompteEbay(compte), n });
+  }
+  return { total, auMoins, comptes, illisibles, aucune: lus === 0 && illisibles.length === 0, plusieurs: r.lignes.length > 1 };
+}
+// Le compte eBay à ouvrir en arrivant sur eBay → Messages depuis Ma journée.
+const DEMANDE_EBAY_MSG = { compte: null, at: 0 };
 // Les commandes eBay de TOUS ses comptes, pour l'argent (CA déclaré, bilan,
 // « ventes payées ») : un seul compte illisible ⇒ `null` (« pas su ») — jamais
 // un total partiel présenté comme complet (§5).
@@ -15750,7 +15774,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Publiée depuis un brouillon : il sort de la liste des brouillons.
       if (brouillonId) { const id = brouillonId; modifierBrouillonsEbay((items) => { if (items[id]) items[id] = { ...items[id], etatBrouillon: 'en-ligne', programme: { itemId: j.itemId, debut: null, demande: null, at: Date.now() } }; return items; }).then((w) => { if (w.ok && onBrouillon) onBrouillon(w.items); }); }
     }
-    else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRes({ err: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie. Rafraîchis depuis eBay (onglet « Compte eBay ») avant de recommencer.' });
+    else if (code === 0 || !j || code === 504 || (j && j.reason === 'incertain')) setRes({ err: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie. Rafraîchis depuis eBay (section « Compte ») avant de recommencer.' });
     else setRes({ err: (j && j.error) || 'eBay a refusé la publication.' });
     setBusy(false);
   };
@@ -17272,7 +17296,7 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
             style={{ ...btn, flex: '1 1 160px', maxWidth: 320, padding: '11px 14px', border: 'none', background: E.accent, color: '#fff', opacity: (busy || !coches.length || connected !== true) ? 0.5 : 1 }}>{`Programmer la sélection${coches.length ? ` (${coches.length})` : ''}`}</button>
         </div>
       )}
-      {liste.length > 0 && connected !== true && <div style={{ fontSize: 11.5, color: E.muted, marginTop: 6 }}>{connected === false ? 'Relie ton compte eBay (onglet « Compte eBay ») pour vérifier et programmer.' : connected === null ? 'Je n\'ai pas pu savoir si ton compte eBay est relié — rouvre l\'écran dans un moment.' : ''}</div>}
+      {liste.length > 0 && connected !== true && <div style={{ fontSize: 11.5, color: E.muted, marginTop: 6 }}>{connected === false ? 'Relie ton compte eBay (section « Compte ») pour vérifier et programmer.' : connected === null ? 'Je n\'ai pas pu savoir si ton compte eBay est relié — rouvre l\'écran dans un moment.' : ''}</div>}
       {msg && <div style={{ fontSize: 12, color: E.warn, marginTop: 8, lineHeight: 1.45 }}>{msg}</div>}
     </div>
   );
@@ -19026,7 +19050,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (onglet « Compte eBay ») et synchronise.'}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (section « Compte ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -24721,7 +24745,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                   </div>
                 </div>
                 <details data-gerer-compte="" style={{flex:'1 1 100%'}}>
-                  <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.muted,padding:'2px 0'}}>Gérer ce compte</summary>
+                  <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.muted,padding:'2px 0',display:'flex',alignItems:'center'}}>Gérer ce compte</summary>
                   <div style={{paddingTop:8}}>
                     <input
                       value={acctEmails[String(acc.vinted_user_id)] || ''}
@@ -26817,7 +26841,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
             {moisCourantCA!=null && <div>On additionne les ventes <b>finalisées</b> (argent versé) en {moisCourant.nom}, <b>toutes plateformes</b>, ventes masquées comprises{nA > 0 && <> — {nA>1?'les ventes versées':'la vente versée'} ce mois-ci mais déjà dans ta déclaration{ou ? <> de {ou}</> : null} {nA>1?'ne sont pas recomptées':'n\'est pas recomptée'} ici</>}. C'est la somme à verser à la fin du mois (versement libératoire).</div>}
             {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>Ventes Vinted sans date de versement : {extSait('versement')==='ok' ? <>l'extension va chercher leur date à tes prochaines visites sur Vinted (compte par compte)</> : <>c'est l'extension, sur ton ordinateur, qui va chercher ces dates</>}.</div>}
-            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
+            {moisCourantCA!=null && adL && adL.n > 0 && <div>Ventes Leboncoin sans date : {extSait('lbcdate')==='ok' ? <>ouvre « Mes transactions » sur leboncoin.fr, l'extension la relève au passage</> : extSait('lbcdate')==='retard' ? <>une fois l'extension à jour, ouvre « Mes transactions » sur leboncoin.fr</> : <>depuis l'ordinateur où l'extension est installée, ouvre « Mes transactions » sur leboncoin.fr</>}.</div>}
             {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>Leboncoin : daté au jour de la vente (sa date de versement n'est pas encore captée).</div>}
             <div>Ces ventes sont datées au jour où la plateforme t'a <b>versé l'argent</b> (la commande finalisée par l'acheteur), pas au jour de la vente. Vérifie ton taux et ton chiffre sur autoentrepreneur.urssaf.fr — je ne suis pas comptable.</div>
           </div>
@@ -27248,7 +27272,7 @@ function BeneficeCompta({ compta, onNav }) {
       data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
         <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
-        <Segmente label="Période du bénéfice" value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
+        <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
@@ -27268,7 +27292,7 @@ function BeneficeCompta({ compta, onNav }) {
             sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA ${B.toutes ? 'déclaré (Vinted, Leboncoin, eBay)' : 'Vinted'} versé sur la période (${fmt(B.caDecl)})`}
             data={{ 'data-benef-ligne': 'cotis' }} />
           <Ligne lib="Bénéfice net" fort val={B.netFinal}
-            sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas — {lienSaisie}</>
+            sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas{(B.n > 0 && B.nCout !== B.n) ? '' : <> — {lienSaisie}</>}</>
               : B.raison === 'frais' ? 'des frais eBay ne sont pas connus : sans eux, le net ne se calcule pas'
               : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
               : 'brut − frais − charges − cotisations'}
@@ -27599,7 +27623,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   {/* (17 oct., revue) La carte URSSAF, juste en dessous sur le même écran,
                       écrit déjà « N ventes sans date de versement (X €) » avec le
                       geste : ici on y renvoie, sans redire les mêmes nombres (§7). */}
-                  {couvertureCa.aDater && <div>Des ventes finalisées n'ont pas encore de date de versement : elles ne sont dans aucun mois pour l'instant (le détail est dans « Ta déclaration URSSAF »).</div>}
+                  {couvertureCa.aDater && <div>Des ventes finalisées n'ont pas encore de date de versement : elles ne sont dans aucun mois pour l'instant (le détail est dans « Ta déclaration URSSAF »).</div>}
                 </div>
               )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
@@ -27618,7 +27642,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted }}>Tes charges</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           {[
-            { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun de déclaré' },
+            { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun déclaré' },
             { k: 'mois', l: 'Charges ce mois', v: chargesMois, s: 'abonnements + dépenses + packs' },
             { k: 'annee', l: `Total charges ${annee}`, v: chargesAnnee, s: 'depuis janvier' },
           ].map((x) => (
@@ -27646,7 +27670,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         {/* ABONNEMENTS RÉCURRENTS */}
         <Section data="abonnements" titre="Abonnements" note="Logiciels et services qui reviennent tout seuls : comptés à chaque échéance (une échéance compte dès le début de son mois), jamais dans ton CA."
           total={abonnements.length ? charges.aboTotal : null} totalSub={abonnements.length ? `en ${annee}` : null}>
-          {abonnements.length === 0 && ouvert !== 'abo' ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois — il sera compté à chaque échéance.') : null}
+          {abonnements.length === 0 && ouvert !== 'abo' ? vide('Ton abonnement VRM, Canva, une appli de retouche ? Ajoute-le une fois.') : null}
           {abonnements.length > 0 && listeBox(abonnements.map((a) => {
               const ech = echeancesAbonnement(a, moisCle);
               const cumul = ech.length * (Number(a.montant) || 0);
@@ -28117,6 +28141,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Trois états pour le CA déclaré : `undefined` en cours · `null` pas su · lu.
   const [lbcLu, setLbcLu] = useState(undefined);
   const [ebayCmd, setEbayCmd] = useState(undefined);
+  const [ebayMsg, setEbayMsg] = useState(undefined);   // messages eBay sans réponse (Ma journée) — voir `etatMessagesEbay`
   const [ebayLuA, setEbayLuA] = useState(null);       // la plus ancienne capture des commandes eBay (ms)
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
@@ -28149,7 +28174,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (19 oct.) La même lecture porte aussi la date de capture de chaque compte :
     // Colis dit quand les commandes eBay ont été lues (une liste figée ne voit
     // ni une nouvelle vente, ni un colis déjà parti).
-    const r = await lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders');
+    // (21 oct.) Sur Ma journée, les résumés des messages eBay partent EN MÊME
+    // TEMPS et sont posés dans le même rendu (un rendu de plus au démarrage
+    // coûtait au téléphone — banc `vitesse.cjs`).
+    const [r, rm] = await Promise.all([
+      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders'),
+      only === 'journee' ? lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt') : Promise.resolve(undefined),
+    ]);
+    if (only === 'journee') setEbayMsg(etatMessagesEbay(rm));
     setEbayCmd((!r || r.illisibles.length) ? null : r.items);
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
@@ -28161,6 +28193,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    le rappel du matin (§11). Trois états : undefined en cours · null pas su ·
   //    { aPoster, nePasPoster, horsEnvoi }.
   const colisEb = useMemo(() => ebayCmd === undefined ? undefined : colisEbay(ebayCmd), [ebayCmd]);
+  // ── LES MESSAGES eBAY SANS RÉPONSE, POUR MA JOURNÉE (21 octobre) ─────────
+  //    Lus dans le RÉSUMÉ rangé par la route (`ebay_messages{suffixe}`, écrit à
+  //    chaque relecture ~10 min et à l'ouverture d'eBay → Messages) : AUCUN
+  //    appel à eBay ici (§4.4). Trois états : undefined en cours · null pas su
+  //    (registre ou une ligne illisible) · objet. `aucune` = aucune ligne rangée
+  //    nulle part (jamais lu, ou pas d'eBay) ⇒ Ma journée se tait.
+  //    (lus avec les commandes eBay, plus haut — un seul rendu).
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
@@ -29128,7 +29167,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
   };
   useEffect(() => { relireColisRelais(); /* eslint-disable-next-line */ }, []);
-  // ── À CONFIRMER AVANT LA DATE LIMITE (21 oct., extension 5.203) ───────────
+  // ── À CONFIRMER AVANT LA DATE LIMITE (21 oct., extension 5.204) ───────────
   // `panel_a_confirmer` : le « Confirmation nécessaire » (« Tout est OK ») lu
   // par l'extension dans une conversation Vinted, avec sa date limite. Trois
   // états (`src/aConfirmer.js`) : `undefined` en cours · `null` pas su · objet.
@@ -32176,7 +32215,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
-      // 5.203 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
+      // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
       // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
       // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.
@@ -34885,7 +34924,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
-        // (21 oct., 5.203) « Tout est OK » à confirmer sur Vinted avant la date
+        // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
         //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
         if (aConfirmer.etat==='lu' && aConfirmer.liste.length) {
@@ -34898,6 +34937,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tab:'cat_achats',prio:proche?0.15:0.7});
         }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
+        // (21 octobre) LES MESSAGES eBAY SANS RÉPONSE, à côté de ceux de Vinted —
+        // de TOUS ses comptes eBay actifs (le résumé rangé par la route, aucun
+        // appel à eBay ici). Pas su ⇒ jamais « 0 » : la case le dit, et une ligne
+        // sous la barre (une fois). Aucun résumé rangé nulle part ⇒ rien.
+        if (ebayMsg && !ebayMsg.aucune && !ebayMsg.illisibles.length) {
+          const nE = ebayMsg.total, avecMsg = ebayMsg.comptes.filter(c => c.n > 0);
+          const ou = ebayMsg.plusieurs && avecMsg.length ? ` (${avecMsg.map(c => `${c.nom} ${c.n}`).join(', ')})` : '';
+          const ditE = nE ? `${ebayMsg.auMoins ? 'au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse${ou}` : 'aucun message eBay sans réponse';
+          tuiles.messages = { n: unread + nE, sub: `${unread ? tuiles.messages.sub : 'Aucun message Vinted récent non lu'} · ${ditE}`, ebay: nE, versEbay: !unread && nE > 0 };
+          if (nE > 0) {
+            // Un seul compte eBay a des messages ⇒ eBay → Messages s'ouvre sur LUI.
+            const seul = avecMsg.length === 1 ? avecMsg[0].ref : null;
+            jobs.push({ id:'messages-ebay', n:nE, icon:'chat', color:C.text,
+              title:`${ebayMsg.auMoins ? 'Au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse`,
+              sub: ebayMsg.plusieurs && avecMsg.length ? `Sur ${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay → Messages` : 'Réponds dans eBay → Messages',
+              tab:'ebay_messages', avant:()=>{ DEMANDE_EBAY_MSG.compte = seul; DEMANDE_EBAY_MSG.at = Date.now(); }, prio:2 });
+          }
+        } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
+          tuiles.messages = { ...tuiles.messages, ebay: null, sub: `${tuiles.messages.sub} · messages eBay pas lus` };
+        }
         tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
@@ -34994,7 +35053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const T = [
                 { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
                 { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
-                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:'cat_msg', pasSu: loading || convs.items == null },
+                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
               ];
               return (
@@ -35003,7 +35062,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const n = x.t ? x.t.n : 0;
                     const vif = !x.pasSu && n > 0;
                     return (
-                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={x.id === 'envoyer' && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
                         style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
                         <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
                         <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
@@ -35014,6 +35073,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               );
             })()}
+            {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
+                sans chiffre — la case « Messages » ne compte alors que Vinted. */}
+            {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
+              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay : je n'ai pas pu les lire — rien n'est perdu, la case « Messages » ne compte pour l'instant que Vinted.</div>
+            )}
 
             {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
                 Empilées, chacune traversait 900 px pour porter trois mots et
@@ -36175,7 +36239,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Il a sa place en tête des onglets du quotidien — sans revenir dans
             le compte « En route » (il n'arrive pas, il repart). Sous « Tous »,
             sa carte porte déjà le lien : pas deux fois. */}
-        {/* (21 oct., 5.203) À CONFIRMER AVANT LA DATE LIMITE — « Tout est OK »
+        {/* (21 oct., 5.204) À CONFIRMER AVANT LA DATE LIMITE — « Tout est OK »
             sur Vinted. Une ligne, le compte nommé une fois quand il est le même
             (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
             « rien à confirmer ». */}
@@ -36414,7 +36478,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                     </div>
                     );
           };
@@ -38497,7 +38561,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // c'est le même ensemble que le bandeau du haut, qui le dit déjà.
           if (!total || total >= nAPoster()) return null;
           return (
-            <div style={{border:`1px solid ${danger?C.danger:C.warn}66`,background:`${danger?C.danger:C.warn}12`,borderRadius:10,padding:'10px 13px',marginBottom:10}}>
+            <div data-colis-urgence={danger?'danger':'presse'} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:10,padding:'10px 13px',marginBottom:10}}>
               {/* ⚠️ CE BANDEAU NE COMPTE QUE L'URGENT (en retard / aujourd'hui /
                   demain), pas tous les colis. Il disait « N colis à expédier »,
                   exactement les mêmes mots que le compteur du haut qui, lui,
@@ -38505,7 +38569,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   « 1 colis à expédier » sur le même écran. On nomme ce qu'on
                   compte au lieu de laisser croire à une contradiction. */}
               <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
-                <span style={{fontSize:17,fontWeight:700,color:danger?C.danger:C.warn,letterSpacing:-0.3}}>{total}</span>
+                <span style={{fontSize:17,fontWeight:700,color:C.warn,letterSpacing:-0.3}}>{total}</span>
                 <span style={{fontSize:13,fontWeight:600,color:C.text}}>à poster en priorité{overdue?' — du retard':''}</span>
               </div>
               <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
@@ -43152,7 +43216,7 @@ const qrEnSrc = (q) => {
   if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
   return '';
 };
-function DoubleVerification() {
+function DoubleVerification({ onEtat } = {}) {
   const [f, setF] = React.useState(undefined);
   const [essai, setEssai] = React.useState(0);
   // { etape: 'qr', id, qr, secret } · { etape: 'off' } (confirmation de désactivation)
@@ -43237,6 +43301,7 @@ function DoubleVerification() {
       border: `1px solid ${msg.ton === 'passu' ? C.warn + '44' : msg.ton === 'err' ? C.danger + '33' : C.border}`}}>{msg.t}</div>
   );
   const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (actif ? 'active' : 'inactive');
+  React.useEffect(() => { if (onEtat) onEtat(etatDit); }, [etatDit]);
   return (
     <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
@@ -43600,8 +43665,54 @@ function PorteAbonnement({ uid, children }) {
     });
     return () => { mort = true; };
   }, [uid]);
-  if (!bloque) return children;
+  if (!bloque) return <>{children}{info && info.proprietaire === true && <InviteMfaProprio uid={uid}/>}</>;
   return <AbonnementRequis info={info}/>;
+}
+// ── DOUBLE VÉRIFICATION PROPOSÉE AU COMPTE PROPRIÉTAIRE (21 octobre) ─────────
+// Julien : « double vérification renforcée pour le compte propriétaire ». Le
+// compte propriétaire de l'installation (`proprietaire`, dit par la BASE via
+// `vrm_acces` — la même source que « gratuit, aucun abonnement », §11) porte
+// tout : ses comptes Vinted, eBay, la clé de service n'y est pas mais ses
+// données si. Sans facteur TOTP VÉRIFIÉ, un écran au démarrage lui propose de
+// l'activer, avec le panneau de Réglages (`DoubleVerification`, une seule
+// forme). ⚠️ AUCUN blocage : il pourrait s'enfermer dehors (téléphone perdu,
+// GoTrue muet). « Plus tard » ne revient pas avant 7 jours (rangé sur
+// l'APPAREIL — une commodité, pas une règle). Facteurs illisibles (« pas su »)
+// ⇒ rien n'est proposé. Les autres vendeurs : rien ne change.
+const MFA_PLUS_TARD_MS = 7 * 86400000;
+const cleMfaPlusTard = (uid) => 'vrm_mfa_plus_tard_' + String(uid || '');
+function InviteMfaProprio({ uid }) {
+  const [montre, setMontre] = React.useState(false);
+  const [etat, setEtat] = React.useState('');
+  React.useEffect(() => {
+    let mort = false;
+    let t = 0; try { t = Number(localStorage.getItem(cleMfaPlusTard(uid))) || 0; } catch (_) {}
+    if (t && Date.now() - t < MFA_PLUS_TARD_MS) return;
+    mfaLireFacteurs().then((f) => { if (!mort && f && Array.isArray(f.verifies) && !f.verifies.length) setMontre(true); });
+    return () => { mort = true; };
+  }, [uid]);
+  if (!montre) return null;
+  const active = etat === 'active';
+  const plusTard = () => { try { localStorage.setItem(cleMfaPlusTard(uid), String(Date.now())); } catch (_) {} setMontre(false); };
+  const fermer = () => setMontre(false);
+  return (
+    <div data-invite-mfa={active ? 'active' : 'propose'} role="dialog" aria-modal="true" aria-label="Protéger ton compte propriétaire"
+      style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <FermeAuRetour fermer={fermer}/>
+      <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
+        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Ton compte est protégé' : 'Protège ton compte propriétaire'}</div>
+        {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
+          C'est le compte propriétaire de VRM : il voit toutes tes boutiques. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
+        </div>}
+        <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
+          {active
+            ? <button type="button" data-invite-mfa-fermer="" onClick={fermer} style={{ border:'none', background:C.accent, color:C.onAccent || '#fff', borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Fermer</button>
+            : <button type="button" data-invite-mfa-plus-tard="" onClick={plusTard} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Plus tard</button>}
+        </div>
+      </div>
+    </div>
+  );
 }
 function AbonnementRequis({ info }) {
   const [occupe, setOccupe] = React.useState(false);
@@ -43631,7 +43742,7 @@ function AbonnementRequis({ info }) {
   return (
     <div data-abonnement-requis="" style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 420, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '26px 22px', boxShadow: C.shadowLg || 'none' }}>
-        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v3-192.png" srcSet="/vrm-logo-v3-96.png 96w, /vrm-logo-v3-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
+        <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="44px" alt="VRM" width="44" height="44" style={{ borderRadius: 10, display: 'block' }}/>
         <div style={{ fontSize: 22, fontWeight: 700, color: C.text, marginTop: 16, letterSpacing: -0.4 }}>Ton abonnement VRM</div>
         <div style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.55 }} data-impaye={impaye ? '' : undefined} data-paiement-ferme={paiementFerme ? '' : undefined}>
           {impaye
@@ -43770,7 +43881,7 @@ const boiteEquipe = () => ({ maxWidth: 760, margin: '0 auto' });
 function TeteEquipe({ titre, sous, onPropre }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v3-192.png" srcSet="/vrm-logo-v3-96.png 96w, /vrm-logo-v3-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 8, display: 'block' }}/>
+      <img className="vrm-brand-asset vrm-brand-auth" src="/vrm-logo-v4-192.png" srcSet="/vrm-logo-v4-96.png 96w, /vrm-logo-v4-192.png 192w" sizes="44px" alt="VRM" width="36" height="36" style={{ borderRadius: 8, display: 'block' }}/>
       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: -0.3 }}>{titre}</div>
         {sous && <div style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{sous}</div>}
@@ -45961,6 +46072,9 @@ function AppCoeur() {
   // (19 oct.) Colis mène à eBay → Ventes (la commande à poster) et à eBay → À
   // traiter (une annulation demandée).
   React.useEffect(()=>{ if(tab==='ebay_agent'){ subVoulue.current='agent'; setTab('plat_ebay'); } },[tab]);
+  // (21 oct.) Ma journée mène à eBay → Messages (sur le compte qui a des messages
+  // quand il n'y en a qu'un).
+  React.useEffect(()=>{ if(tab!=='ebay_messages')return; const d=DEMANDE_EBAY_MSG; if(d.compte && Date.now()-d.at<30000) setEbayVue(d.compte); d.compte=null; subVoulue.current='messages'; setTab('plat_ebay'); },[tab]);
   // « Compléter les prix d'achat » (Réglages, Statistiques) mène à Vinted →
   // Annonces, la même porte que le rail — plus l'ancien écran `cat_annonces`.
   React.useEffect(()=>{ if(tab==='vinted_annonces'){ subVoulue.current='annonces'; setTab('plat_vinted'); } },[tab]);
@@ -45993,7 +46107,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','vinted_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -46327,7 +46441,7 @@ function AppCoeur() {
       // ACHATS = `isSeller === false` (jamais déduit, §5) — mêmes champs que les
       // ventes (photo, titre, prix, statut). Avant, ils étaient simplement jetés.
       // `maj` = la dernière fois qu'une transaction Leboncoin a été captée.
-      // L'extension ne rafraîchit les ventes QUE sur « Mes transactions » :
+      // L'extension ne rafraîchit les ventes QUE sur « Mes transactions » :
       // visiter Leboncoin en général ne suffit pas. On montre donc l'âge des
       // montants (§7 : un chiffre qu'on ne peut pas dater n'est pas fiable).
       const maj = arr.reduce((m, o) => { const t = Date.parse((o && o.at) || '') || 0; return t > m ? t : m; }, 0);
@@ -47981,7 +48095,7 @@ function AppCoeur() {
               (jamais lu ≠ lu et vide), il ne reste jamais blanc. */}
           {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
             const note = (ar.actives && lbcVentes.maj)
-              ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
+              ? `Montants à jour de ta dernière lecture Leboncoin (${ilYaCourt(lbcVentes.maj)}). Pour les rafraîchir, ouvre « Mes transactions » sur leboncoin.fr avec l'extension à jour.`
               : null;
             // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
             // du haut se tait (le même nombre deux fois sur un écran, §7).
@@ -47993,13 +48107,13 @@ function AppCoeur() {
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
             {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
-              // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
+              // Jamais lu (aucune visite de « Mes transactions ») : « — », pas 0.
               const v = (n) => (vide && !lu) ? null : n;
               return <KpiVentes plateforme="leboncoin" tuiles={[
                 { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
                 { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
                 { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
-              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? `Lu sur Leboncoin ${ilYaCourt(lbcVentes.maj)} — ouvre « Mes transactions » avec l'extension pour rafraîchir.` : null)}/>; })()}
+              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? `Lu sur Leboncoin ${ilYaCourt(lbcVentes.maj)} — ouvre « Mes transactions » avec l'extension pour rafraîchir.` : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
@@ -48045,7 +48159,7 @@ function AppCoeur() {
           {platSub==='achats'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayAchats key={'ac-'+ref} headers={enTeteSession} theme={C} compte={ref}/><Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} initialSection="veilles" contexteEbay/></Suspense></>}</EbayActionCompte></div>}
           {platSub==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>setPlatSub('annonces')}/>}</EbayActionCompte></div>}
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
-          {platSub==='compte'&&<div style={{ background: EBAY_SKIN.bg, padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
+          {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
         {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}

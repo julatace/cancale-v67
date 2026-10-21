@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// À CONFIRMER AVANT LA DATE LIMITE (21 octobre, extension 5.203) — une règle
+// À CONFIRMER AVANT LA DATE LIMITE (21 octobre, extension 5.204) — une règle
 // pure pour Ma journée ET Achats (§11). Aucune lecture ici.
 //
 // La donnée : `panel_a_confirmer` (ligne dédiée écrite par l'extension, indexée
