@@ -97,7 +97,7 @@ function espionPosts(f) {
     // b) l'autre sens : avec une session, l'écriture part, avec owner, son jeton, la bonne cible.
     const g = faireFond({ src: SRC });
     g.ctx.isCloisonne = async () => true;
-    g.ctx.authToken = async () => ({ access_token: 'jeton_A', user_id: 'vendeur_A', expires_at: Date.now() + 3600e3 });
+    g.ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton_A', user_id: 'vendeur_A', expires_at: Date.now() + 3600e3 });
     const pg = espionPosts(g);
     const r3 = await g.ctx.supabaseUpsert('app_data', [{ id: 'harvest_111_profile', data: { x: 1 } }, { id: 'harvest_111_inbox', data: {} }], 'id');
     const p = pg[0] || { rows: [], url: '', auth: '' };

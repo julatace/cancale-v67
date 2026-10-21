@@ -64,6 +64,9 @@ function filtreOk(row, u) {
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
   connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
+  // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
+  if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 864e5 };
+
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
   const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [] };
@@ -91,7 +94,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: (fn, ms) => { j.minuteries.push(ms); return 0; }, clearInterval,
-    URL, TextDecoder, TextEncoder, Buffer, crypto: require('crypto').webcrypto,
+    URL, TextDecoder, TextEncoder, Buffer, AbortController, Intl, crypto: require('crypto').webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome: {
       runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } },

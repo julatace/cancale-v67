@@ -408,7 +408,9 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
       'une ANCIENNE annonce vendue après la coupure garde son N° d\'identité (B7) : seule la PHOTO est écartée, jamais ce que dit Vinted');
     dit(/if \(emptyNum && emptyBuy && emptyMp && !\(etaitNumerotee && archiveNumeros\(\)\)\) delete u\[item\.id\];/.test(A), 'effacer un N° à la main GARDE la fiche (la base refuse qu\'une fiche numérotée disparaisse)');
     dit(/const arch = !numeroReprenable\(num\);/.test(A) && /↩️ revient → numéro neuf/.test(A) && /🔁 renvoi → numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
-    dit(/\{r\.num && numeroReprenable\(r\.num\) && <button/.test(A) && /retoursAttendus\.some\(r=>r\.num&&numeroReprenable\(r\.num\)\) && <> <b>Retape son numéro<\/b>/.test(A), '« Retape son numéro » et le bouton ⧉ seulement pour un numéro qui se redonne');
+    // (21 octobre) Les retours se suivent dans Colis (« Retours en cours ») : la remise en
+    // stock dit « retape-le » pour un N° qui se redonne, « numéro NEUF » pour un ancien.
+    dit(/estArchive: \(n\) => !numeroReprenable\(n\)/.test(A) && /desc: r\.archive \? `Elle portait l’ancien N°\$\{r\.num\} : un ancien numéro ne se redonne pas/.test(A) && /: `Elle garde son N°\$\{r\.num\} : retape-le/.test(A), '« retape son numéro » seulement pour un numéro qui se redonne (remise en stock)');
     dit(/if \(num && !numeroReprenable\(num\) && republiee\(o\)\) continue;/.test(A), 'une paire revenue à l\'ancien N° sort de la liste quand elle est republiée (identité ou photo), pas par le numéro');
     { const ae = corps('async function appelEbay(corps) {', '\n}\n');
       dit(/const avecVersion = corps && \(corps\.action === 'publish' \|\| corps\.action === 'programmer'\);/.test(ae) && /avecVersion \? \{ \.\.\.corps, numerotation: versionNumerotation\(\) \}/.test(ae),
