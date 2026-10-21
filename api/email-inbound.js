@@ -29,6 +29,7 @@ import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
 import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
+import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1555,8 +1556,13 @@ export async function traiterEmail(req, res) {
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
-      if (!qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
+      // (21 oct.) La ligne d'avant est relue aussi pour un colis « disponible » :
+      // sa DATE D'ARRIVÉE (`arriveLe`) ne doit pas être remplacée par celle d'un
+      // rappel (« Libère de la place… », « Le temps file… »).
+      let prevLigne = null;
+      if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
         const prev = await supabaseGetRow(rowId);
+        prevLigne = prev || null;
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
           if (!qr.qrUrl && prev.qrUrl) qr.qrUrl = prev.qrUrl;
@@ -1571,6 +1577,7 @@ export async function traiterEmail(req, res) {
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject, receivedAt: now,
+        ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
