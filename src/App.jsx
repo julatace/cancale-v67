@@ -1,9 +1,12 @@
+import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import {achatDuColis,suivisAchat} from './liensColis.js';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
+import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
@@ -74,7 +77,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.203.0';
+const EXT_ATTENDUE = '5.204.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -687,6 +690,24 @@ const withOwner = (row) => {
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
 // la même session, le même propriétaire, la même clé de conflit que le reste (§11).
+async function lireBordereauxAuto(owner) {
+  if (!owner || owner !== AUTH.user?.id) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_bordereaux_auto&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth() });
+  if (!r.ok) throw Error('Lecture impossible');
+  const rows = await r.json();
+  return rows.length === 1 && rows[0]?.data?.active === true;
+}
+async function sauverBordereauxAuto(owner, active) {
+  if (!owner || owner !== AUTH.user?.id || !CLOISONNE) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    method: 'POST', headers: sbAuth({'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation'}),
+    body: JSON.stringify({id:'vrm_bordereaux_auto',owner,data:{active:active === true},updated_at:new Date().toISOString()})
+  });
+  if (!r.ok) throw Error('Enregistrement impossible');
+  const rows = await r.json();
+  if (rows.length !== 1 || rows[0]?.data?.active !== active) throw Error('Enregistrement non confirmé');
+}
+
 const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
 // ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
@@ -3029,11 +3050,10 @@ const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinatai
 // était bien arrivé au point relais. On le rétablit ici depuis le SUJET.
 const TRACK_AVAILABLE_RE = /disponible|à\s*retirer|arriv[ée]\s+(?:dans|en|au)\s+point|pr[êe]t.*retrait|vous\s+attend/i;
 const reclassifyTrack = (d) => {
-  if (!d || d.status === 'delivered') return d;
-  const s = `${d.subject || ''} ${d.statusLabel || ''}`;
-  if (TRACK_DELIVERED_RE.test(s)) return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
-  // Colis « disponible » mal classé « en transit » (avec n° de suivi) → à retirer.
-  if (d.status !== 'available' && (d.suivi || '').trim() && TRACK_AVAILABLE_RE.test(s)) return { ...d, status: 'available', statusLabel: 'Arrivé au point de retrait' };
+  if(!d)return d;
+  const etat=etatColisDepuisTexte(d.subject||d.sujet||'',d.statusLabel||'');
+  if(etat==='delivered')return {...d,status:'delivered',statusLabel:'Livré / retiré'};
+  if(etat==='available'&&d.status!=='delivered'&&normaliserSuivi(d.suivi))return {...d,status:'available',statusLabel:'Arrivé au point de retrait'};
   return d;
 };
 // ⚠️ LES EMAILS QUE L'APP N'A PAS SU LIRE (posé le 23 août 2026).
@@ -25474,11 +25494,11 @@ const isColisRetirable = (t, collected, envoyes) => isColisActive(t, collected, 
 const suivisRetires = (tracking) => {
   const s = new Set();
   for (const t of (tracking || [])) {
-    if (t && t.status === 'delivered' && t.suivi) s.add(String(t.suivi).trim().toUpperCase());
+    if (t && t.status === 'delivered' && t.suivi) s.add(normaliserSuivi(t.suivi));
   }
   return s;
 };
-const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(String(t.suivi).trim().toUpperCase()));
+const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(normaliserSuivi(t.suivi)));
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
@@ -29237,6 +29257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // par n° de TRANSACTION : une identité, jamais un rapprochement par titre.
   // ⚠️ Une seule ligne lue, quelques Ko (§34).
   const [colisRelais, setColisRelais] = useState({});
+  const [indexSuivisAchats,setIndexSuivisAchats]=useState({});
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -29330,7 +29351,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // trop se voit au comptoir, un colis caché est un colis perdu.
     const normCode = (c) => codeRetrait(String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''));
     const codesEmail = new Set(emailList.map(t => normCode(t.code)).filter(Boolean));
-    const extra = vintedToPickup.filter(o => { const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
+    const extra = vintedToPickup.filter(o => { if(suivisAchat(o,indexSuivisAchats).some(s=>retires.has(s)))return false; const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
     // ── « JE L'AI RETIRÉ » : GRISÉ, PAS DISPARU ───────────────────────────────
     // Idée de Julien, et c'est la bonne : cocher ✓ faisait disparaître le colis
     // d'un coup, alors que Vinted, lui, dit encore « déposé en point relais ».
@@ -29430,7 +29451,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
+  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats]);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -32115,6 +32136,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(()=>{
+    if(!['achats','journee'].includes(curSub)||!buysBase.length)return;
+    let stop=false;
+    (async()=>{
+      const demandes=[...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))];
+      const resultat={};
+      for(let i=0;i<demandes.length;i+=100){
+        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,suivi:data->payload->transaction->shipment->>tracking_code,suivi2:data->payload->transaction->shipment->>tracking_number,suivi3:data->payload->transaction->>tracking_code,photo:data->payload->transaction->item_photo`,{strict:true});
+        if(rows===null||stop)return;
+        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={...r,photo:photoArticle({photo:r.photo})};}
+      }
+      if(!stop)setIndexSuivisAchats(resultat);
+    })();return()=>{stop=true;};
+  },[curSub,buysBase]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -35427,6 +35462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
+        <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
         <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
@@ -36398,8 +36434,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Photo de la paire par titre : les achats moissonnés portent la vraie
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
           // paire on va chercher / si on l'a déjà retirée).
-          const photoByTitle = {};
-          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
+          const photoColis=t=>{const achat=achatDuColis(t,buysBase,indexSuivisAchats);if(!achat)return t.photo||null;return orderPhoto(achat)||indexSuivisAchats[String(achat.transaction_id)]?.photo||null;};
           // ⚠️ MÊME RÈGLE QUE LE QR : une photo morte ne laisse pas un carré cassé.
           // Les photos viennent du CDN Vinted et leurs liens expirent ; l'icône
           // « image brisée » du navigateur au milieu d'une carte de colis, c'est
@@ -36419,7 +36454,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
                     return (
                     <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
-                      {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
+                      {thumb(orderPhoto(o)||(rel&&rel.photo))}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <LigneArrivee arr={arriveeColisVinted(rel)}/>
@@ -36673,7 +36708,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const jours = joursAvant(t.limite);
                     return (
                       <div className="vrm-pickup-card" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                        {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
+                        {thumb(photoColis(t))}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
                               relecture : « Colis n°08448878300059 » en titre, puis
@@ -36884,7 +36919,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const qi = qrImage(t), cd = codeRetrait(t.code), id2 = codeRetrait(t.code2);
                     return (
                     <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}</span>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(photoColis(t))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
@@ -36926,7 +36961,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const qi = qrImage(tk), cd = codeRetrait(tk&&tk.code), id2 = codeRetrait(tk&&tk.code2);
                     return (
                     <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}</span>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>

@@ -1,3 +1,4 @@
+import {etatColisDepuisTexte,conserverRetrait} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
@@ -808,36 +809,10 @@ export function parseCarrierEmail(mail, carrier) {
   // (« venez récupérer votre colis », « à retirer avec ce code »…) qui font
   // matcher les motifs de « déjà retiré ».
   // Le SUJET, lui, dit l'état COURANT — c'est pour ça que le transporteur l'écrit.
-  const t = all.toLowerCase();
-  const suj = String(mail.subject || '').toLowerCase();
-  let status = 'info', label = 'Mise à jour';
-  // ⚠️⚠️ UNE CONFIRMATION DE DÉPÔT N'EST PAS UN COLIS QUI T'ATTEND.
-  // Mesuré le 31 août : le Mondial Relay `74950536` (« Votre colis est entre de
-  // bonnes mains 📦 », c'est-à-dire SA preuve de dépôt) était rangé en
-  // `available` — donc affiché comme un colis à aller chercher, puis promu en
-  // « colis jamais retiré, va le réclamer ». Cause : le sujet ne matchait rien,
-  // on retombait sur le CORPS, et le corps d'un email de dépôt contient
-  // « disponible » / « prêt » (le §5.43 en petit).
-  // Sur 128 lignes de suivi, **76 sont des colis sortants** : c'est la moitié du
-  // bruit de l'onglet Achats.
-  // ⚠️ On ne tranche que sur du CERTAIN (§24) : une confirmation de dépôt ne
-  // peut pas vouloir dire autre chose. Le reste garde le comportement d'avant.
-  const SUJ_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/;
-  const sortant = !!(suj && SUJ_SORTANT.test(suj));
-  const SUJ_RETIRE = /a\s+[ée]t[ée]\s+(?:retir[ée]|livr[ée]|remis)|colis\s+retir[ée]|livraison\s+de\s+votre\s+colis|bien\s+re[çc]u/;
-  const SUJ_DISPO  = /disponible|à\s+retirer|a\s+retirer|arriv[ée]\s+(?:en|au|dans)|vous\s+attend|pr[êe]t/;
-  if (sortant)                          { status = 'transit';  label = 'Colis déposé (ta vente)'; }
-  else if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
-  else if (suj && SUJ_DISPO.test(suj))  { status = 'available'; label = 'Arrivé au point de retrait'; }
-  else
-  // Priorité STRICTE : livré/retiré > disponible > en transit. Les trois sont
-  // mutuellement exclusifs — sinon un email « colis retiré » qui contient aussi
-  // l'historique du trajet (« déposé », « pris en charge », « acheminement »)
-  // était rétrogradé à « en transit » et le colis restait à retirer pour
-  // toujours (bug réel : confirmations de retrait Chronopost bloquées en transit).
-  if (/livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinataire|en\s+mains?)|vous\s+a\s+[ée]t[ée]\s+(?:remis|livr[ée])|(?:colis\s+)?a\s+(?:bien\s+)?[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|colis\s+retir[ée]|(?:vous\s+)?avez\s+(?:bien\s+)?retir[ée]|merci\s+d[e']?\s*avoir\s+(?:bien\s+)?(?:retir[ée]|r[ée]cup[ée]r[ée])|(?:vous\s+)?avez\s+(?:bien\s+)?r[ée]cup[ée]r[ée]|bien\s+r[ée]cup[ée]r[ée]|r[ée]cup[ée]r[ée]\s+(?:le|votre|avec)|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
-  else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
-  else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
+  const SUJ_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/i;
+  const sortant=SUJ_SORTANT.test(String(mail.subject||''))&&!/point|relais|consigne/i.test(String(mail.subject||''));
+  const lu=etatColisDepuisTexte(mail.subject,txt);
+  let status=lu||'info',label=({delivered:'Livré / retiré',available:'Arrivé au point de retrait',transit:'En transit'})[lu]||'Mise à jour';
   // Anti-faux-colis : un vrai « colis disponible » a TOUJOURS un n° de suivi.
   // Sans suivi (emails pub « ton compte évolue », newsletters…), on ne compte
   // PAS comme un colis à retirer.
@@ -1612,9 +1587,11 @@ export async function traiterEmail(req, res) {
       // (21 oct.) La ligne d'avant est relue aussi pour un colis « disponible » :
       // sa DATE D'ARRIVÉE (`arriveLe`) ne doit pas être remplacée par celle d'un
       // rappel (« Libère de la place… », « Le temps file… »).
-      let prevLigne = null;
+      const lecturePrecedente=await supabaseLireRow(rowId);
+      if(!lecturePrecedente.lu){marquerEcritureRatee();await repondre(res,503,{ok:false,erreur:'base-injoignable'});return;}
+      let prevLigne = lecturePrecedente.data || null;
       if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
-        const prev = await supabaseGetRow(rowId);
+        const prev = prevLigne;
         prevLigne = prev || null;
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
@@ -1627,9 +1604,11 @@ export async function traiterEmail(req, res) {
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
         }
       }
+      Object.assign(track,conserverRetrait(prevLigne,track));
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
-        statusLabel: track.label, subject, receivedAt: now,
+        statusLabel: track.label, subject:prevLigne?.status==='delivered'?prevLigne.subject||subject:subject, receivedAt: now,
+        ...(track.status==='delivered'?{retireLe:prevLigne?.status==='delivered'?(prevLigne.retireLe||prevLigne.receivedAt||now):now}:{}),
         ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,

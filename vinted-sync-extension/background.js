@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.203.0';
+const CODE_VERSION = '5.204.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -5478,12 +5478,8 @@ async function visiteVinted() {
     //  pas relues — elles ne pourraient pas être rangées.)
     const marqueVentes = (await reculBase()) ? null : await prendreGardeVentes(uid);
     if (marqueVentes !== null) await rafraichirVentesGarde(uid, marqueVentes);
-    // ⚠️ LA VISITE GÉNÈRE, TOUTE SEULE (Julien, 27 août puis 3 septembre :
-    // « que ça envoie direct dans l'app sans me demander »). Cohérent avec
-    // §5.29 : générer un bordereau n'engage AUCUN argent et ne décide de rien
-    // — la vente est faite, le colis doit partir. Tous les garde-fous restent :
-    // compte connecté uniquement, 20 actions/h, plafond par visite, pas de
-    // nouvel essai avant 6 h.
+    // Génération uniquement sur activation explicite dans VRM → Ventes.
+    // Les PDF déjà émis continuent à être récupérés quand le réglage est coupé.
     if (await pauseVinted()) { await purgeBordereaux(); await purgeBordereauxAnnules(); return; }
     const genes = await avecVinted(() => genererBordereauxEnAttente(uid));
     // Ce qui vient de partir : l'APP l'annonce (5.130 — plus de fenêtre sur
@@ -7198,6 +7194,7 @@ async function genererBordereau(uid, tx, opts = {}) {
   // compte ni à dépasser le plafond horaire (§48).
   const adr = await adresseVendeur(uid, acc);
   if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
+  if (opts.automatique && !(await bordereauxAutoActifs())) return { ok: false, error: 'Génération automatique désactivée dans VRM' };
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
     { seller_address_id: adr, drop_off_type: null, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
@@ -7947,6 +7944,20 @@ async function recupererLabelInsiste(acc, uid, tx) {
   return dernier;
 }
 
+// Pas de cache : une coupure dans VRM doit arrêter la prochaine génération.
+async function bordereauxAutoActifs() {
+  try {
+    const session = await authToken();
+    if (!session?.access_token || !session.user_id) return false;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_bordereaux_auto&owner=eq.${encodeURIComponent(session.user_id)}&select=data`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` },
+    });
+    if (!r.ok) return false;
+    const rows = await r.json();
+    return rows.length === 1 && rows[0]?.data?.active === true;
+  } catch (_) { return false; }
+}
+
 async function genererBordereauxEnAttente(uid, opts = {}) {
   try {
     if (!uid) return 0;
@@ -7997,13 +8008,13 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     } catch (_) { /* sans cette lecture on retombe sur le statut Vinted, qui suffit */ }
     const memo = (await chrome.storage.local.get('vrmBordFaits')).vrmBordFaits || {};
     let faits = 0;
-    for (const o of (opts.lectureSeule ? [] : candidates)) {
+    for (const o of (opts.lectureSeule || !(await bordereauxAutoActifs()) ? [] : candidates)) {
       if (faits >= BORD_MAX_PAR_VISITE) break;
       if (await pauseVinted()) break;                            // 5.162 : Vinted a freiné
       const tx = String(o.transaction_id);
       if (dejaMail.has(tx)) continue;
       if (memo[tx] && Date.now() - Number(memo[tx].t || 0) < BORD_RETRY_MS) continue;
-      const r = await genererBordereau(uid, tx);
+      const r = await genererBordereau(uid, tx, { automatique: true });
       // ⚠️ « Déjà commandé » (409) compte comme un SUCCÈS pour la suite : le
       //    bordereau existe, c'est le PDF qu'on veut. Et on ne bloque pas la
       //    vente 6 h sur un « c'est déjà fait ».

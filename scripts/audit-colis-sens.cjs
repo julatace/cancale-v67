@@ -28,7 +28,7 @@ const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); 
 // 2) elles tranchent PAREIL — sur les sujets réellement relevés en base
 const mot = s => s.match(/\/(.*)\/[a-z]*;/);
 const reApp = new RegExp((app.match(/const SUJET_SORTANT = \/(.+?)\/i;/)||[])[1] || 'ZZZ', 'i');
-const reSrv = new RegExp((srv.match(/const SUJ_SORTANT = \/(.+?)\/;/)||[])[1] || 'ZZZ', 'i');
+const reSrv = new RegExp((srv.match(/const SUJ_SORTANT = \/(.+?)\/[a-z]*;/)||[])[1] || 'ZZZ', 'i');
 const SORTANTS = [
   'Votre colis est entre de bonnes mains 📦',
   'Confirmation du dépôt de votre colis',
@@ -57,10 +57,10 @@ f ? nok(f + ' colis à retirer classés « sortant » par erreur')
   : nok('le panneau « jamais retirés » écarte aussi les sortants',
         'sinon la fausse alerte est juste déplacée d\'un bloc');
 
-// 4) le serveur ne doit jamais poser « available » sur un dépôt
-/if \(sortant\)\s*\{ status = 'transit'/.test(srv)
-  ? ok('le serveur classe un dépôt en « transit », jamais « à retirer »')
-  : nok("le serveur ne classe pas un dépôt en « à retirer »");
-
-console.log(ko ? '\n' + ko + ' contrôle(s) en échec.' : '\nUn colis sortant ne peut plus être présenté comme un colis à retirer.');
-process.exit(ko ? 1 : 0);
+// 4) La vraie fonction, sans imposer une écriture particulière de son code.
+(async()=>{
+ const {parseCarrierEmail}=await import('../api/email-inbound.js');
+ for(const subject of SORTANTS){const t=parseCarrierEmail({subject,text:'Numéro de suivi : 12345678. Votre code de retrait est 123456',html:''},'mondialrelay');t.status==='transit'&&t.sens==='sortant'?ok('dépôt conservé côté expéditeur : '+subject):nok('un dépôt ne devient pas un retrait',JSON.stringify(t));}
+ for(const subject of JAMAIS){const t=parseCarrierEmail({subject,text:'Numéro de suivi : 12345678. Votre code de retrait est 123456',html:''},'mondialrelay');t.status==='available'?ok('colis entrant toujours à retirer : '+subject):nok('disponibilité non reconnue',JSON.stringify(t));}
+ console.log(ko?'\n'+ko+' contrôle(s) en échec.':'\nUn colis sortant ne peut plus être présenté comme un colis à retirer.');process.exit(ko?1:0);
+})().catch(e=>{console.error(e.message);process.exit(1);});
