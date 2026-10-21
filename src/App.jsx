@@ -1,3 +1,5 @@
+import {conflitAdresseCompte} from './receptionEmail.js';
+import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
@@ -24302,6 +24304,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
   const [typesProfil, setTypesProfil] = useState({}); // { uid: true (pro) | false (particulier) } — lu dans le profil capté
   const setAcctEmail = (uid, val) => {
+    const conflit=conflitAdresseCompte(acctEmails,uid,val);
+    if(conflit){const autre=accounts.find(a=>String(a.vinted_user_id)===conflit);toast(`Cette adresse est déjà associée à ${autre?.login||'un autre compte Vinted'}. Chaque compte doit avoir son adresse.`);return;}
     const u = { ...acctEmails, [String(uid)]: val.trim() };
     if (!u[String(uid)]) delete u[String(uid)];
     setAcctEmails(u); save('vinted_account_emails', u);
@@ -24340,7 +24344,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         rows.forEach(r => {
           const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
           const email = r.data && r.data.payload && r.data.payload.user && r.data.payload.user.email;
-          if (uid && email && !u[uid]) { u[uid] = email; changed = true; }
+          if (uid && email && !u[uid] && !conflitAdresseCompte(u,uid,email)) { u[uid] = email; changed = true; }
         });
         if (changed) save('vinted_account_emails', u);
         return changed ? u : prev;
@@ -42754,7 +42758,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     { id:'comptes', titre:'Comptes Vinted', items:[
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', titreInterne:true, el:<ConnexionsSetting/> },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'Adresses de réception', titreInterne:true, el:<EmailsSetting/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
@@ -44993,7 +44997,7 @@ async function lireAdressesVues() {
     return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
   } catch (_) { return null; }
 }
-function EmailsSetting() {
+function EmailsSetting({onComptes}) {
   // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
   //    Sans ce troisième état, une lecture ratée affichait « Aucune adresse
   //    déclarée » — une AFFIRMATION sur l'attribution de ses emails, faite sur
@@ -45006,6 +45010,8 @@ function EmailsSetting() {
   // Les adresses où arrivent déjà SES emails (suggestions) : `null` = pas lu.
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
+  const [versionReception,setVersionReception]=useState(0);
+  const [suiviAdresses,setSuiviAdresses]=useState(null);
   const uid = (AUTH.user && AUTH.user.id) || '';
   const racine = useRef(null);
   useEffect(() => {
@@ -45049,6 +45055,7 @@ function EmailsSetting() {
       ok = !!(r && r.ok);
     } catch (_) { ok = false; }
     if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return; }
+    setVersionReception(v=>v+1);
     // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
     // on relit, sans attendre la prochaine ouverture de l'écran.
     lireMisDeCote();
@@ -45067,12 +45074,13 @@ function EmailsSetting() {
     if (n) await ecrire(nouv);
   };
   const ajouter = async () => {
-    const a = await askText({ desc: "Ton adresse personnelle.\n\nIndique l’adresse où Vinted t’envoie tes emails, avant leur transfert vers VRM. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
-    const adr = normAdresse(a);
-    if (!adr) return;
-    if (!ADRESSE_RECEPTION_OK.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
-    if (reg && Object.keys(reg).some((k) => normAdresse(k) === adr)) { toast('Cette adresse est déjà à toi.'); return; }
-    await ajouterAdresses([adr]);
+    const a = await askText({ desc: "Tes adresses personnelles.\n\nIndique les adresses où Vinted t’écrit, avant leur transfert vers VRM. Tu peux en ajouter plusieurs, séparées par des virgules. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
+    const adresses=[...new Set(String(a||'').split(/[,;\n]+/).map(normAdresse).filter(Boolean))];
+    if(!adresses.length)return;
+    if(adresses.some(adr=>!ADRESSE_RECEPTION_OK.test(adr))){toast('Une adresse est incorrecte — vérifie la liste avant de l’ajouter.');return;}
+    if(adresses.some(estAdresseCollectrice)){toast('Ajoute tes adresses personnelles, pas la boîte collective VRM.');return;}
+    if(adresses.every(adr=>Object.keys(reg||{}).some(k=>normAdresse(k)===adr))){toast('Ces adresses sont déjà dans ta liste.');return;}
+    await ajouterAdresses(adresses);
   };
   const retirer = async (adr) => {
     const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les emails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
@@ -45144,8 +45152,8 @@ function EmailsSetting() {
       // dessous, c'est lui qui le porte.
       ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un email arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
     : misDeCote
-      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: true }
-      : { t: "Aucune adresse déclarée. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: false };
+      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
+      : { t: "Aucune adresse déclarée. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: false };
   // Les suggestions : SES adresses déjà vues, pas encore déclarées.
   const declarees = new Set(liste.map(normAdresse));
   const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
@@ -45158,6 +45166,8 @@ function EmailsSetting() {
     if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
   };
   return (
+    <>
+      <SuiviReceptionEmails key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} quarantaine={quarantaine} onVerifier={()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'})}/>
     <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       {/* ⚠️ (16 octobre) Julien : « je ne comprends pas à quoi ça sert ». Le
@@ -45198,7 +45208,10 @@ function EmailsSetting() {
         </div>
       ) : liste.map(adr => (
         <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-          <span style={{flex:'1 1 140px',minWidth:0,fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{adr}</span>
+          <span style={{flex:'1 1 140px',minWidth:0,fontSize:12,color:C.text,overflowWrap:'anywhere'}}>
+            <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:10,color:C.danger,background:`${C.danger}0d`,borderRadius:4,padding:'1px 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
+            <span style={{fontSize:11.5,color:C.muted}}>{adr}</span>
+          </span>
           <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
             style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
@@ -45261,7 +45274,7 @@ function EmailsSetting() {
         </div>
       )}
       {enAttente.length > 0 && (
-        <div style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+        <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
           <button type="button" disabled={!!lot} onClick={toutRejouer}
@@ -45282,6 +45295,7 @@ function EmailsSetting() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

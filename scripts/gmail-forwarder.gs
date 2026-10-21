@@ -59,8 +59,8 @@ const LABEL_PREUVE = 'vrm-confirme-v2'; // Accusé nominatif de VRM, obligatoire
 
 // ── MÉNAGE DE LA BOÎTE ───────────────────────────────────────────────
 // Julien, 4 oct. : « supprimer les mails si l'app conserve les données ».
-// On ne touche QU'AUX emails labellisés `vrm-traite` — donc confirmés rangés
-// dans VRM — et plus vieux que N jours. Jamais un email sans label.
+// Archivage uniquement avec preuve `vrm-confirme-v2`, hors erreurs et
+// vérifications, après N jours. Le label historique seul ne suffit jamais.
 //   'archive'  (défaut, SÛR) → sortis de la boîte mais GARDÉS sous le label,
 //              récupérables : le filet de re-lecture reste intact (ex. l'email
 //              Vinted Go re-traité le 4 oct. parce qu'on l'avait encore).
@@ -97,13 +97,20 @@ function confirmationTransfertVRM(){
  messages.forEach(m=>classerMessageVRM(m.id,[label],[]));
  // Aucun lien de validation n'est ouvert automatiquement.
 }
+// Télémétrie sans sujet, contenu, adresse personnelle ni compteur collectif.
+function signalerPassageVRM(etat){
+ try{const r=appVRM('reception-passage','post',{etat:etat});if(!r.ok)Logger.log('VRM : suivi du collecteur indisponible ('+r.code+'), transfert conservé.');}
+ catch(_){Logger.log('VRM : suivi du collecteur indisponible, transfert conservé.');}
+}
 function forwardVintedEmails() {
  const verrou=LockService.getScriptLock();
  if(!verrou.tryLock(1000)){Logger.log('VRM : un passage est déjà en cours.');return;}
+ let compteVerifie=false;
  const debut=Date.now(),bilan={debut:new Date().toISOString(),confirmes:0,aVerifier:0,aReessayer:0,classementEchoue:0};
  try{
   if(!secretVRM())throw Error('Renseigne EMAIL_INBOUND_SECRET dans les propriétés du script.');
   if(BOITE_PARTAGEE && String(gmailVRM('profile').emailAddress||'').toLowerCase()!=='vrm.vinted35@gmail.com')throw Error('Ce script collectif doit être installé dans vrm.vinted35@gmail.com.');
+  compteVerifie=true;signalerPassageVRM('debut');
   const traite=labelVRM(LABEL),preuve=labelVRM(LABEL_PREUVE),erreur=labelVRM('vrm-a-reessayer');
   confirmationTransfertVRM();
   const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -in:spam -in:trash after:'+getStartDate();
@@ -148,13 +155,15 @@ function forwardVintedEmails() {
   sendQueuedInvoices();
   if(Date.now()-debut<230000)nettoyerTraites();
  }catch(e){bilan.erreur=String(e.message||e);Logger.log('VRM : '+bilan.erreur);}
- finally{bilan.fin=new Date().toISOString();try{PropertiesService.getScriptProperties().setProperty('VRM_DERNIER_PASSAGE',JSON.stringify(bilan));}finally{verrou.releaseLock();}}
+ finally{if(compteVerifie)signalerPassageVRM(bilan.erreur||bilan.aReessayer||bilan.classementEchoue?'erreur':'succes');bilan.fin=new Date().toISOString();try{PropertiesService.getScriptProperties().setProperty('VRM_DERNIER_PASSAGE',JSON.stringify(bilan));}finally{verrou.releaseLock();}}
 }
 
 function nettoyerTraites() {
+ // Aucun effacement tant que l’archivage complet des documents n’est pas certifié.
+ if(CLEANUP_MODE==='corbeille'){Logger.log('VRM : suppression désactivée — conservation des documents non certifiée.');return;}
  const corbeille=CLEANUP_MODE==='corbeille',age=corbeille?Math.max(90,CLEANUP_MIN_AGE_DAYS):CLEANUP_MIN_AGE_DAYS;
  const avant=new Date(Date.now()-age*86400000),y=avant.getFullYear()+'/'+('0'+(avant.getMonth()+1)).slice(-2)+'/'+('0'+avant.getDate()).slice(-2);
- const q='label:'+LABEL_PREUVE+(corbeille?' -in:trash':' in:inbox')+' before:'+y;
+ const q='label:'+LABEL_PREUVE+' -label:vrm-a-verifier -label:vrm-a-reessayer'+(corbeille?' -in:trash':' in:inbox')+' before:'+y;
  // On déplace seulement les messages confirmés. Jamais toute la conversation,
  // qui pourrait contenir un nouveau message encore non enregistré dans VRM.
  const lot=messagesVRM(q,100);

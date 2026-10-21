@@ -108,6 +108,15 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
   const enTete = faireRes();await route.default({method:'GET',query:{mode:'reception-diagnostic'},headers:{'x-vrm-email-key':'cle-de-banc-123'}},enTete);
   dit(enTete.code===200&&enTete.corps.accuses===2,'diagnostic : accepte la clé dans l’en-tête, sans secret dans l’URL');
 
+  ecrites.length=0;
+  r=await appel({mode:'reception-passage'},'POST',{etat:'succes'});
+  dit(r.code===401&&ecrites.length===0,'suivi collecteur : aucune écriture sans la clé');
+  r=await appel({mode:'reception-passage',key:'cle-de-banc-123'},'POST',{etat:'succes',subject:'ne doit pas être conservé'});
+  dit(r.code===200&&ecrites.length===1&&ecrites[0].owner==='00000000-0000-0000-0000-000000000000'&&Object.keys(ecrites[0].data).sort().join(',')==='at,etat,version','suivi collecteur : seule la projection technique est conservée sous le propriétaire neutre');
+  const nSuivi=ecrites.length;
+  r=await appel({mode:'reception-passage',key:'cle-de-banc-123'},'POST',{etat:'invente'});
+  dit(r.code===400&&ecrites.length===nSuivi,'suivi collecteur : état inconnu refusé sans écriture');
+
   // ── 5. LE SCRIPT GMAIL (dépôt PUBLIC) ──────────────────────────────────────
   const gs = fs.readFileSync(path.join(RACINE, 'scripts', 'gmail-forwarder.gs'), 'utf8');
   dit(!/\/rest\/v1\//.test(gs) && !/SUPA_KEY/.test(gs), 'le script Gmail ne lit plus la base directement (il passe par la route)');
