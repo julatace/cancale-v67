@@ -5,7 +5,7 @@ export default function ConfigurerTransfert({adresses,onComptes,onDeclarer}){
  const [choix,setChoix]=useState(''),[service,setService]=useState('gmail'),[copie,setCopie]=useState(''),[busy,setBusy]=useState(false);
  const a=adresses.find(a=>a.adresse===choix),unique=a?.comptes?.length===1,associe=unique&&a.declaree,observe=associe&&a.derniereReception;
  const s=services[service];
- return <details className="vrm-reception-parcours"><summary>Configurer un transfert <span aria-hidden="true">→</span></summary><div className="vrm-reception-parcours-corps">
+ return <details className="vrm-reception-parcours"><summary>Configurer un transfert</summary><div className="vrm-reception-parcours-corps">
  <p>À faire pour chaque adresse personnelle. Tous tes comptes peuvent transférer vers la même boîte VRM.</p>
  <label>Adresse à configurer<select value={choix} onChange={e=>{setChoix(e.target.value);setCopie('');}}><option value="">Choisir mon adresse</option>{adresses.map(a=><option key={a.adresse} value={a.adresse}>{a.comptes?.length===1?a.comptes[0].nom+' · ':''}{a.adresse}</option>)}</select></label>
  <ol><li data-fait={!!unique}><strong>Associer le compte Vinted</strong>{unique?<p>{a.comptes[0].nom} · {a.adresse}</p>:<><p>{a?.comptes?.length>1?'Cette adresse est associée à plusieurs comptes. Corrige le doublon pour continuer.':'Dans Comptes liés, indique l’adresse où Vinted écrit à ce compte. Une adresse ne peut être liée qu’à un compte Vinted.'}</p><button type="button" onClick={onComptes}>Ouvrir mes comptes Vinted</button></>}</li>
