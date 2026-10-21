@@ -10674,6 +10674,51 @@ Julien : « sur téléphone on ne peut pas se connecter à Discord », « l'accu
 - **Accueil** : « VR / M » coupé dans la colonne VRM/Toi corrigé, plateformes en pastilles de couleur (plus de faux boutons), textes plus lisibles. `accueil.cjs` 171 verts.
 - **Sécurité** : `Referrer-Policy`, `Permissions-Policy` (caméra, micro, position : le site seul ; paiement, USB… coupés), `Cross-Origin-Opener-Policy: same-origin-allow-popups`, HSTS. Conseillers Supabase : rien d'anormal (tables fermées et fonctions « ma donnée seulement » voulues). Erreurs de production : aucune depuis le 20 oct. midi.
 
+### Colis au point relais et rappel de la veille au soir (21 octobre)
+Julien : « fait tout » — deux notifications.
+- **Colis acheté arrivé au point relais** : la notification existait déjà
+  (`api/email-inbound.js`, catégorie **`colis`**, activée par défaut, « 📍 Colis
+  à retirer ») avec le lieu et le code (`bodyNotifColis` : `codeNotif` écarte
+  « suivant » et tout code sans chiffre ; le QR n'entre jamais dans le texte).
+  **Aucune préférence nouvelle** : en créer une seconde pour la même chose serait
+  deux règles pour une notion (§11). ⚠️⚠️ **Défaut trouvé et corrigé** : toutes
+  les étapes d'un colis partageaient la clé anti-doublon `track-{suivi}` ; Julien
+  a activé « Suivi du colis » (`suivi: true`, mesuré le 11 oct.), donc le premier
+  « en transit » consommait la clé et **« arrivé au point de retrait » ne sonnait
+  jamais**. `cleNotifColis` : « à retirer » a sa clé `relais-{suivi}-code|sans`
+  (une fois par n° de suivi, et une seconde seulement si un email plus tardif
+  apporte le code qui manquait) ; les autres étapes gardent la clé d'avant à
+  l'identique. Ouvre `?tab=cat_achats`. ⚠️ Au déploiement, un colis déjà notifié
+  « à retirer » peut re-sonner UNE fois sur un rappel du transporteur (l'ancienne
+  clé n'est pas reprise en alias : elle aurait gardé le défaut).
+- **Rappel de la veille au soir** : second cron `vercel.json`
+  `/api/ship-reminders?moment=soir` à **18:00 UTC** (20 h à Paris l'été, 19 h
+  l'hiver ; le plan Hobby décale d'au plus une heure). Même route (12 fonctions),
+  même garde `CRON_SECRET`, boucle par vendeur, eBay relu d'abord. « Demain : N
+  colis à poster — dont X déjà en retard, Y avec la date limite demain ». N =
+  **la règle du widget et du bilan** (`txsAExpedier` : résumé de l'extension ou
+  `aExpedier`, cochés « posté » et masqués exclus, eBay par `colisEbay`) ; le
+  « dont » lit les dates limites des bordereaux de CES ventes et d'eBay (limite
+  aujourd'hui ou avant = en retard demain). Préférence nouvelle **`soir`**
+  (« 🌙 Colis de demain »), activée par défaut, la même dans `PUSH_CATS` et
+  `PUSH_DEFAUT`. Rien ne part : rien à poster, ventes Vinted illisibles, mémo
+  `soir_reminder_dedup` illisible / non écrit (écrit AVANT l'envoi, une fois par
+  jour de Paris), préférence coupée, abonnement coupé. eBay illisible ⇒ « au
+  moins N », eBay nommé. Le passage du soir n'envoie ni le rappel du matin, ni
+  l'URSSAF, ni le bilan. « Avant midi » n'est pas dit : aucune heure limite n'est
+  captée (les dates limites sont des jours).
+- Preuves : bancs `colis-relais-push.cjs` (vraie route des emails, 14 contrôles ;
+  3 rouges sur le code d'avant ; mutation « clé commune » 3 rouges) et
+  `rappel-soir.cjs` (vraie route, deux vendeurs, widget comparé, 17 contrôles ;
+  10 rouges sur le code d'avant ; mutations « sans mémo du jour » 2 rouges,
+  « eBay illisible dit complet » 1 rouge).
+- ⚠️ **Non mesuré** : que Vercel accepte un `path` de cron avec `?moment=soir`
+  (documenté, jamais vu passer ici) et le second cron sur ce plan — **si le
+  déploiement refuse `vercel.json`, retirer ce cron** (un cron refusé bloque tous
+  les déploiements) ; l'heure réelle d'exécution ; aucune notification réelle
+  envoyée. Le code de retrait lu par l'extension dans une conversation Vinted
+  (`panel_colis_relais`) ne déclenche aucune notification (extension non touchée).
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

@@ -11,6 +11,8 @@
 // Il porte aussi, faute d'un second cron : le rappel URSSAF du 1er du mois, et
 // le BILAN DE LA SEMAINE du lundi matin (api/_lib/bilan-semaine.js dit pourquoi
 // le lundi et pas le dimanche soir).
+// Et, appelé par le SECOND cron (`?moment=soir`, 18:00 UTC), le RAPPEL DE LA
+// VEILLE AU SOIR (« Demain : N colis à poster ») — et rien d'autre.
 //
 // ⚠ N'appelle JAMAIS l'API Vinted (aucun risque de blocage) : il ne lit que
 //   Supabase et envoie une notification. Déclenché par le cron Vercel (vercel.json).
@@ -209,6 +211,14 @@ async function lireDonneesBilan() {
 // ventes, moins ce qu'il a coché « posté » ou masqué. Le banc
 // `bancs/bilan-semaine.cjs` exécute les DEUX routes et exige le même nombre.
 function colisAExpedier(d) {
+  const t = txsAExpedier(d);
+  if (!t) return null;
+  return t.vinted.size + (t.ebay ? t.ebay.total : 0);
+}
+// Les transactions Vinted à expédier (un Set) et le résumé eBay (`null` =
+// illisible) — la composition du widget, partagée par le bilan du lundi et le
+// rappel du soir (§11 : une règle, deux lecteurs). `null` = pas su.
+function txsAExpedier(d) {
   if (!d.commandes || !d.main || !Array.isArray(d.comptes)) return null;
   const vivants = new Set(d.comptes.map((c) => c.uid));
   const shipDone = objet(d.main.vinted_ship_done), bordsShipped = objet(d.main.vinted_bords_shipped);
@@ -226,7 +236,7 @@ function colisAExpedier(d) {
   // widget et l'app (`colisEbay`, §11). eBay illisible ⇒ le nombre Vinted seul,
   // dit « au moins » par l'appelant (jamais un total partiel présenté complet).
   const eb = resumeColisEbay(colisEbay(d.ebay));
-  return new Set(txs.map(String).filter(pasPartie)).size + (eb ? eb.total : 0);
+  return { vinted: new Set(txs.map(String).filter(pasPartie)), ebay: eb };
 }
 
 async function bilanDeLaSemaine(maintenant = Date.now()) {
@@ -429,6 +439,85 @@ async function traiterVendeurApresRelecture() {
     return { urssaf, bilan, overdue, dueToday, dueTomorrow, total, ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
 
+// ── LE RAPPEL DE LA VEILLE AU SOIR (retenu par Julien le 11 octobre) ────────
+// « Demain : N colis à poster ». Second cron (vercel.json, 18:00 UTC = 20 h à
+// Paris l'été, 19 h l'hiver — le plan Hobby décale d'au plus une heure), MÊME
+// route (`?moment=soir`, plafond de 12 fonctions), même garde CRON_SECRET.
+// Le nombre est CELUI du widget et du bilan (`txsAExpedier` : `aExpedier` ou le
+// résumé de l'extension, colis cochés « posté » et masqués exclus, eBay par
+// `colisEbay`, §11). Le « dont » vient des dates limites des bordereaux de CES
+// ventes, et de celles d'eBay — jamais un chiffre de plus que N.
+// Rien ne part : s'il n'y a rien à poster, si une lecture Vinted a échoué (pas
+// su), si la préférence « soir » est coupée, ou s'il est déjà parti ce jour-là
+// (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
+// ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
+const MAIN_SOIR = ['vinted_sales_hidden', 'vinted_ship_done', 'vinted_bords_shipped'];
+async function lireDonneesSoir() {
+  const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction';
+  const [comptesL, m, lignes, ebay, bords] = await Promise.all([
+    fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
+    getRowProjete('main', MAIN_SOIR),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
+    lireCommandesEbay(),
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
+  ]);
+  const comptes = Array.isArray(comptesL) ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || '') })).filter((c) => c.uid) : null;
+  let commandes = null;
+  if (Array.isArray(lignes)) {
+    commandes = {};
+    for (const l of lignes) {
+      const um = String((l && l.id) || '').match(/^harvest_(.+?)_orders_sold$/);
+      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null };
+    }
+  }
+  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords };
+}
+// Le texte : une fonction pure (le banc la juge par la sortie de la route).
+export function texteSoir({ n, auMoins, retard, demain }) {
+  const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
+  const parts = [];
+  if (retard) parts.push(`${retard} déjà en retard`);
+  if (demain) parts.push(`${demain} avec la date limite demain`);
+  return {
+    title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
+    body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? "Les ventes eBay n'ont pas pu être relues : il peut y en avoir plus. " : ''}Prépare-les ce soir.`,
+  };
+}
+async function rappelDuSoir() {
+  const today = parisDate(0), tomorrow = parisDate(1);
+  const deja = await getRow('soir_reminder_dedup');
+  if (deja === undefined) return { soir: 'mémo illisible — rien envoyé' };
+  if (deja && deja.date === today) return { soir: 'déjà envoyé' };
+  if (!(await pushCategorieActive('soir'))) return { soir: 'désactivé par le vendeur' };
+  const d = await lireDonneesSoir();
+  const t = txsAExpedier(d);
+  if (!t) return { soir: 'lecture ratée — rien envoyé' };
+  const auMoins = !t.ebay;
+  const n = t.vinted.size + (t.ebay ? t.ebay.total : 0);
+  if (!n) return { soir: 'rien à poster', n: 0 };
+  // Le « dont » : seulement les bordereaux de CES ventes (sous-ensemble de N).
+  let retard = 0, demain = 0;
+  const vus = new Set();
+  for (const b of (Array.isArray(d.bords) ? d.bords : [])) {
+    const tx = b && b.transaction ? String(b.transaction) : '';
+    if (!tx || !t.vinted.has(tx) || vus.has(tx)) continue;
+    const iso = frToIso(b.dateLimite); if (!iso) continue;
+    vus.add(tx);
+    if (iso <= today) retard += 1;                       // limite aujourd'hui ou avant : demain, c'est en retard
+    else if (iso === tomorrow) demain += 1;
+  }
+  if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
+  if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
+  const txt = texteSoir({ n, auMoins, retard, demain });
+  const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: '/?tab=cat_bord' });
+  return { soir: 'envoyé', n, retard, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+}
+async function traiterVendeurSoir() {
+  const relu = await relireEbayDuVendeur();
+  const out = await rappelDuSoir();
+  return { ...out, ebayRelu: resumeRelecture(relu) };
+}
+
 export default async function handler(req, res) {
   // Sécurité optionnelle : si CRON_SECRET est défini sur Vercel, on l'exige
   // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
@@ -439,6 +528,10 @@ export default async function handler(req, res) {
     if (auth !== `Bearer ${secret}` && qk !== secret) { res.status(401).json({ error: 'clé invalide' }); return; }
   }
 
+  // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
+  // (ni URSSAF, ni bilan, ni rappel du matin).
+  const soir = String((req.query && req.query.moment) || '') === 'soir';
+  const traiter = soir ? traiterVendeurSoir : traiterVendeur;
   try {
     const cl = await cloisonnee();
     // Pas su : on ne devine pas (ni passe globale, ni passe par vendeur). 503 =
@@ -447,8 +540,8 @@ export default async function handler(req, res) {
     // ── Base NON cloisonnée (comportement d'aujourd'hui, à l'identique) ───────
     //    Un seul jeu de données, aucune colonne `owner` : une passe, sans filtre.
     if (!cl) {
-      const out = await traiterVendeur();
-      res.status(200).json({ ok: true, ...out });
+      const out = await traiter();
+      res.status(200).json({ ok: true, ...(soir ? { moment: 'soir' } : {}), ...out });
       return;
     }
     // ── Base cloisonnée : UNE passe PAR vendeur, chacun dans son contexte ─────
@@ -471,13 +564,13 @@ export default async function handler(req, res) {
       while (suivant < owners.length) {
         const i = suivant++; const o = owners[i];
         try {
-          const out = await contexteVendeur.run({ owner: o }, () => traiterVendeur());
+          const out = await contexteVendeur.run({ owner: o }, () => traiter());
           bilans[i] = { owner: o, ...out };
         } catch (e) { echecs++; bilans[i] = { owner: o, erreur: String((e && e.message) || e).slice(0, 200) }; }
       }
     };
     await Promise.all(Array.from({ length: Math.min(VENDEURS_EN_PARALLELE, owners.length) }, ouvrier));
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, vendeurs: owners.length, echecs, bilans });
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : {}), vendeurs: owners.length, echecs, bilans });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
