@@ -10768,6 +10768,35 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
 
 ---
 
+### App plus rapide : les écrans découpés en morceaux chargés plus tard (21 octobre)
+Fonction retenue le 11 octobre. Le morceau `App` (chargé avant le premier écran)
+pesait **587 Ko compressés** ; il en pèse **366 Ko (−38 %)**. JS téléchargé avant
+Ma journée (banc `ouverture-4g.cjs`, 4G simulée) : **643 → 426 Ko** ; `App` reçu
+~1,2 s → ~1,05 s ; lectures de la base inchangées. Aucun texte rendu ne change
+(24 écrans × 2 tailles comparés au build d'origin/main : identiques, hors
+horodatage de version et compteur animé).
+- **Où vit chaque écran** (`src/ecrans/`, chargés par `paresseux()` — React.lazy,
+  repli « Chargement… » le temps du morceau, puis `prechargerEcrans()` les charge
+  tous ~5 s après les comptes, au repos) : `plateformes.jsx` (PrixMarche,
+  VentesLeboncoin, AchatsLeboncoin, EbayVentes, Plateforme, BackupModal,
+  MessagesLeboncoin, ColisEquipe, EcranMasques) · `leboncoin.jsx` (LeboncoinColis,
+  LeboncoinScreen) · `ebay.jsx` (EbayConnexion, EbayAnnonces) · `divers.jsx`
+  (Dashboard, Catalog, Sales, StockVinted, Inventory) · `compta.jsx` (Invoices,
+  ComptaPro) · `stock.jsx` (Garage) · `reglages.jsx` (SettingsScreen,
+  VintedAccounts). Ma journée, Ventes, Colis, Annonces, Achats, Messages restent
+  dans `App.jsx` (premier écran).
+- **Règles pour la suite** : le code d'un écran se modifie dans SON fichier
+  `src/ecrans/` ; une règle lue par App.jsx ou par un audit reste dans App.jsx et
+  y est exportée (ex. règles du Stock lues par la recherche par numéro) — App.jsx
+  n'importe JAMAIS un fichier d'écran (il serait rechargé d'office) ; UNE seule
+  ligne `import {…} from "../App.jsx"` par fichier d'écran. Les audits lisent
+  `scripts/_source-app.cjs` (App + écrans recollés) ; `audit-ecrans-decoupes.cjs`
+  et `audit-variables.cjs` couvrent `src/ecrans`. Outils du découpage :
+  `scripts/decouper-app*.cjs`.
+- Preuves : build ; 130 audits verts (hors audits Postgres) ; `ouverture-4g.cjs`
+  (aucun morceau d'écran avant le héros, tous préchargés après) ; bancs des
+  écrans déplacés relancés un par un.
+
 ## 6. Comment on vérifie (et pourquoi ça compte)
 
 **La méthode : mesurer la vraie base AVANT de coder.** La moitié des « bugs »
