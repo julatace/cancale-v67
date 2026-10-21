@@ -13,7 +13,8 @@ export default function ReceptionEmails({owner,headers,quarantaine,onVerifier,th
   try{const r=await fetch('/api/email-rattacher?mode=reception',{headers:auth.current(),cache:'no-store'});if(!r.ok)throw Error();const j=await r.json();if(!j.ok||!Array.isArray(j.emails))throw Error();if(g===generation.current){setDonnees({...j,owner});retourAdresses.current?.({owner,adresses:j.adresses||[]});}}
   catch(_){if(g===generation.current)setErreur(true);}finally{if(g===generation.current){setLecture(false);setMaintenant(Date.now());}}
  },[owner]);
- useEffect(()=>{setDonnees(undefined);setFiltre('tous');setRecherche('');setAdresse('toutes');setMax(10);charger();const retour=()=>{if(document.visibilityState==='visible')charger();};document.addEventListener('visibilitychange',retour);const timer=setInterval(()=>{setMaintenant(Date.now());if(document.visibilityState==='visible')charger();},60000);return()=>{generation.current++;clearInterval(timer);document.removeEventListener('visibilitychange',retour);};},[charger,version]);
+ useEffect(()=>{setDonnees(undefined);setFiltre('tous');setRecherche('');setAdresse('toutes');setMax(10);charger();const retour=()=>{if(document.visibilityState==='visible')charger();};document.addEventListener('visibilitychange',retour);const timer=setInterval(()=>{setMaintenant(Date.now());if(document.visibilityState==='visible')charger();},60000);return()=>{generation.current++;clearInterval(timer);document.removeEventListener('visibilitychange',retour);};},[charger]);
+ useEffect(()=>{if(version)charger();},[version,charger]);
  const d=donnees?.owner===owner?donnees:undefined;
  const statut=etatCollecteur(d?.collecteur,maintenant),emails=d?.emails||[],q=recherche.trim().toLocaleLowerCase('fr');
  const parAdresse=emails.filter(e=>adresse==='toutes'||e.adresses?.includes(adresse));

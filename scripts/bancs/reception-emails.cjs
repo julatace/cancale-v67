@@ -95,7 +95,7 @@ SUIVI.emails.forEach((e,i)=>{e.adresses=[i?'deux@example.test':'un@example.test'
  await new Promise(r=>srv.listen(PORT,r));const nav=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
  try{for(const viewport of [{width:320,height:720},{width:390,height:844},{width:1512,height:950}]){
   await essaie('réception '+viewport.width,async()=>{
-   const {ctx,pg,erreurs,panne,retablir,etat}=await ouvrir(nav,{liste:EMAILS,viewport});
+   const {ctx,pg,erreurs,panne,retablir,etat}=await ouvrir(nav,{liste:EMAILS,viewport,registre:{'vendeuse@exemple.test':{owner:SESSION.user.id},'un@example.test':{owner:SESSION.user.id},'deux@example.test':{owner:SESSION.user.id}}});
    const panel=pg.locator('[data-reception-emails]');await panel.waitFor();
    dit(await panel.locator('.vrm-reception-liste > li').count()===3,'les trois états sont rendus '+viewport.width);
    dit((await panel.innerText()).includes('Collecteur actif'),'passage récent confirmé');
