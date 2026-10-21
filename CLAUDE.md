@@ -10674,6 +10674,16 @@ Julien : « sur téléphone on ne peut pas se connecter à Discord », « l'accu
 - **Accueil** : « VR / M » coupé dans la colonne VRM/Toi corrigé, plateformes en pastilles de couleur (plus de faux boutons), textes plus lisibles. `accueil.cjs` 171 verts.
 - **Sécurité** : `Referrer-Policy`, `Permissions-Policy` (caméra, micro, position : le site seul ; paiement, USB… coupés), `Cross-Origin-Opener-Policy: same-origin-allow-popups`, HSTS. Conseillers Supabase : rien d'anormal (tables fermées et fonctions « ma donnée seulement » voulues). Erreurs de production : aucune depuis le 20 oct. midi.
 
+### Revue visuelle de tous les écrans (21 octobre)
+Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), captures regardées. Banc `revue-21oct.cjs` (port 8811 ou `BANC_PORT`, `EXPLORE=dossier` pour les captures) : **21 rouges sur le build d'avant, 0 après**. Corrigé :
+- Achats → À retirer : le « i » d'un point relais n'était qu'une lettre nue ⇒ cerclé et centré ; sur une carte sans code, « J'ai retiré » restait seul à gauche ⇒ poussé à droite (`data-pickup-sans-code`).
+- Colis : la mention d'urgence (« à poster aujourd'hui ») était ROUGE ⇒ ambre (§7 : le rouge, c'est deux paires sous un même N°), `data-colis-urgence`.
+- « Mes transactions », « Ta déclaration URSSAF » se coupaient en fin de ligne, loin de leurs guillemets ⇒ espaces insécables.
+- eBay : « l'onglet « Compte eBay » » renvoyait à un onglet qui n'existe pas ⇒ « la section « Compte » » ; la section Compte peignait une bande opaque sous la barre de sections, en sombre ⇒ retirée ; « Actualiser » d'À traiter n'avait pas de titre visible ⇒ « Tâches à traiter ».
+- Compta : le lien de saisie des prix d'achat était redit sous le bénéfice net ; le segment « Période » laissait un vide à droite (`plein`) ; la liste vide d'abonnements redisait sa phrase.
+- Communauté : « Réessayer » collé au paragraphe ; Comptes liés : « Gérer ce compte » décentré ; Annonces : la ligne de fraîcheur collée à la grille.
+- **Laissés** : eBay « Réponse eBay incomplète » et les programmées vides (le banc sert `{pret:true}`) ; Compta à 0,00 € (limite des fixtures, déjà noté le 19 oct.) ; le lien en ligne « Statistiques » de 16 px (lien dans une phrase) ; le champ couleur du Garage ; le logo eBay en sombre (choix de design). `ventes-colis-premium` sort 2 rouges (« somme des prix rendus 0 € ») déjà sur le build d'avant.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

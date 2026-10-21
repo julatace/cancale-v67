@@ -176,7 +176,7 @@ export function EbayAgent({compte='principal',headers,theme:C,onSection}){
  const matchingTasks=(data?.tasks || []).filter(t=>`${t.title || ''} ${t.ref} ${t.label}`.toLowerCase().includes(search.toLowerCase()));
  const tasks=matchingTasks.filter(t=>sectionFilter==='all' || t.section===sectionFilter);
  const history=data?.journal || [],incertains=history.filter(j=>['incertain','en_cours'].includes(j.etat)),autres=history.filter(j=>!['incertain','en_cours'].includes(j.etat));
- return <section className="vrm-ebay-tasks"><div className="vrm-ebay-heading" style={{display:'flex',gap:8,alignItems:'center'}}><h2 className="vrm-ebay-titre-onglet" style={{fontSize:22,margin:0}}>À traiter sur eBay</h2><button type="button" disabled={busy} onClick={charger} style={{...S.button,marginLeft:'auto'}}>{busy?'Lecture…':'Actualiser'}</button></div><Erreur message={error}/>
+ return <section className="vrm-ebay-tasks"><div className="vrm-ebay-heading" style={{display:'flex',gap:8,alignItems:'center'}}><h3 data-ebay-titre-taches="" style={{fontSize:15,margin:0,color:C.text}}>Tâches à traiter</h3><button type="button" disabled={busy} onClick={charger} style={{...S.button,marginLeft:'auto'}}>{busy?'Lecture…':'Actualiser'}</button></div><Erreur message={error}/>
  {data && <>
  {(data.sources || []).some(s=>!s.ok || s.ancien) && <p role="status" style={{fontSize:12,color:C.muted}}>Certaines données sont anciennes ou indisponibles. Actualise les commandes dans Compte ; les tâches affichées peuvent être incomplètes.</p>}
  <input type="search" aria-label="Rechercher une tâche eBay" placeholder="Rechercher un article ou une commande…" value={search} onChange={e=>setSearch(e.target.value)} style={{...S.input,marginTop:12}}/>
@@ -291,7 +291,7 @@ export function EbayPromotion({compte='principal',headers,confirm,theme:C}){
   catch(x){setMessage(x.reason==='incertain'?'Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.':x.message);setBusy(false);}}
  const promues=new Map((data?.promues||[]).map(p=>[p.listingId,p]));
  const lignes=data?(Array.isArray(data.annonces)?data.annonces:[...promues.keys()].map(id=>({itemId:id,titre:''}))):[];
- const FRAIS='Un frais prélevé par eBay UNIQUEMENT si la paire se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.';
+ const FRAIS='Des frais prélevés par eBay UNIQUEMENT si la paire se vend par la promotion : ce pourcentage du prix de vente, en plus des frais habituels.';
  return <section data-ebay-promotion={data===undefined?'en-cours':data===null?'pas-su':promues.size}>
   <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px'}}><h3 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:15,color:C.text}}>Promotion des annonces</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   <p style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.5}}>{FRAIS}</p>
