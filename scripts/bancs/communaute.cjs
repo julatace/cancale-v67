@@ -30,6 +30,7 @@
 //  le faux réaffaiblit une règle ⇒ ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (21 oct.)
 const { execFileSync } = require('child_process');
 const RACINE = path.join(__dirname, '..', '..');
 let chromium;
@@ -272,6 +273,7 @@ let compte = null, LEAFLET = null;
 async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false, fragment = '' }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: sansLeaflet ? 'block' : 'allow', permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
+  await cspBanc(ctx, `http://localhost:${PORT}`, `communauté ${largeur}${sombre ? ' sombre' : ''}${sansLeaflet ? ' sans leaflet' : ''}`);
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   // Un morceau qui ne charge pas fait relire la page UNE fois (main.jsx) : on le marque déjà fait.
@@ -608,6 +610,7 @@ async function partie019(nav) {
     await nav.close(); srv.close();
   }
   console.log(`\n${ok} vert(s), ${ko} rouge(s).`);
+  ko += bilanCsp();
   process.exit(ko ? 1 : 0);
 })();
 

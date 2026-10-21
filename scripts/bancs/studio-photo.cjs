@@ -19,6 +19,7 @@
 // locale à la place de cdn.jsdelivr.net (déterminisme) : BANC_ORT_DIR, sinon
 // téléchargé une fois dans le dossier temporaire du système (curl).
 const path = require('path');
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (21 oct.)
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), os = require('os');
@@ -146,6 +147,7 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px — caméra accordée`);
       const ctx = await b.newContext({ viewport: vp, permissions: ['camera'], ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      await cspBanc(ctx, `http://localhost:${PORT}`, 'studio '+vp.width);
       const rows = departRows(), journal = [];
       try {
         const { pg, errs } = await preparer(ctx, rows, ort, journal);
@@ -207,6 +209,7 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
 
       console.log(`── ${vp.width} px — caméra REFUSÉE`);
       const ctx2 = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      await cspBanc(ctx2, `http://localhost:${PORT}`, 'studio refusé '+vp.width);
       const rows2 = departRows(), journal2 = [];
       try {
         const { pg, errs } = await preparer(ctx2, rows2, ort, journal2);
@@ -238,6 +241,7 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
     // photo du moment) — et l'écran le dit.
     console.log('── 390 px — la ligne de la paire ne se lit pas (522)');
     const ctx3 = await b.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'], isMobile: true, hasTouch: true });
+    await cspBanc(ctx3, `http://localhost:${PORT}`, 'studio 522');
     const rows3 = departRows(); rows3.set('studio_photos_42', { numero: '42', photos: [{ id: 'ancienne', img: 'data:image/jpeg;base64,AAAA' }] });
     try {
       const { pg } = await preparer(ctx3, rows3, ort, [], { studioKO: true });
@@ -258,5 +262,6 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
   } catch (e) { dit(false, 'le banc a levé', String(e && e.stack || e).slice(0, 300)); }
   finally { if (b) await b.close(); srv.close(); }
   console.log(ko ? `\n${ko} échec(s)` : '\nTout est vert.');
+  ko += bilanCsp();
   process.exit(ko ? 1 : 0);
 })();

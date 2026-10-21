@@ -2,10 +2,14 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
-import { ecouterPlantages, noterPlantage } from './plantages.js';
+import { ecouterPlantages, ecouterViolationsCsp, noterPlantage } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
 ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
+  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
+// Et les violations de la politique de sécurité du contenu (Report-Only) : le
+// même journal, pour savoir sur SES appareils si elle peut passer en vigueur.
+ecouterViolationsCsp(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
   version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
 // ⚠️ APRÈS UN DÉPLOIEMENT, UN ONGLET RESTÉ OUVERT DEMANDE DES MORCEAUX QUI
 // N'EXISTENT PLUS (mesuré le 15 octobre dans le journal des plantages : « Unable

@@ -5991,11 +5991,10 @@ pouvait lire sa session. Mesuré au banc sur le code d'avant : **18 exécutions*
 - Le **reçu d'achat** (`openReceipt`) échappait déjà ses valeurs, et il garde
   ses boutons en ligne. Il n'est pas touché.
 - **Ajouté** : `X-Content-Type-Options: nosniff` (`vercel.json`).
-- ⚠️ **Pas fait, et pourquoi** : une vraie politique `script-src` sur toute
-  l'app. `index.html` a deux scripts en ligne, et la fenêtre du reçu hérite
-  de la politique de l'app (ses `onclick` casseraient). Surtout, les bancs
-  servent `dist/` **sans les en-têtes de Vercel** : rien ne verrait la casse.
-  Il faut d'abord un banc qui sert les vrais en-têtes.
+- ✅ **Fait le 21 octobre** : une politique sur toute l'app (section « La
+  politique de sécurité du contenu », avant le §6) — scripts en ligne sortis
+  d'`index.html`, boutons du reçu branchés depuis l'app, banc qui sert les
+  vrais en-têtes de `vercel.json`.
 
 ### ⚠️⚠️ « JE NE PEUX PAS APPUYER SUR LE BORDEREAU, ÇA MET QUE L'EXTENSION NE RÉPOND PAS » (5 octobre, 5.160)
 Une vente à expédier, l'extension allumée, et le bouton grisé. **Trois causes,
@@ -10766,6 +10765,44 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
   seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
   faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
 
+### La politique de sécurité du contenu (CSP) sur toute l'app (21 octobre)
+Suite de l'audit du 4-5 octobre (« Pas fait : une vraie politique `script-src` »).
+- **`vercel.json`, deux en-têtes** : EN VIGUEUR, les directives structurelles
+  (`frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`,
+  + `X-Frame-Options: DENY`) ; en **Report-Only**, la politique complète :
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://lgonxzrzjcqthjtbdpzo.supabase.co wss://lgonxzrzjcqthjtbdpzo.supabase.co https://cdn.jsdelivr.net https://*.vinted.net https://api-adresse.data.gouv.fr https://nominatim.openstreetmap.org data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com chrome-extension: moz-extension:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+  **Pourquoi Report-Only** : le vrai Turnstile, le vrai jsdelivr et Safari iOS ne
+  sont pas joignables d'ici ; une violation non vue en vigueur casserait un écran
+  sans rien dire. Les violations sont **notées** dans le journal des plantages
+  (`ecouterViolationsCsp`, `plantage_*` origine `csp`, sources d'extensions
+  écartées) : après quelques jours sans violation chez lui, **renommer l'en-tête
+  en `Content-Security-Policy`** — le banc en mode `BANC_CSP_EN_VIGUEUR=1` prouve
+  déjà que ça tient.
+- **Aucun `'unsafe-inline'` pour les scripts** : les deux scripts en ligne
+  d'`index.html` sont devenus `public/demarrage-theme.js` (dans `<head>`, avant
+  le premier rendu) et `public/demarrage-densite.js`. `style-src 'unsafe-inline'`
+  est accepté exprès (styles en ligne partout, React).
+- **Le reçu d'achat** (`openReceipt`, fenêtre `about:blank` qui HÉRITE de la
+  politique) n'a plus d'`onclick` : ses boutons portent un id et l'app y attache
+  les gestes après `document.close()`. La facture imprimable garde sa propre
+  `default-src 'none'`. pdf.js : `isEvalSupported: false` (sa sonde `eval`
+  était une violation). ORT (studio photo) : `'wasm-unsafe-eval'` + jsdelivr.
+  Le pont de l'extension ouvre `popup.html?mode=reparer` en iframe ⇒
+  `frame-src chrome-extension: moz-extension:`. Leaflet et les tuiles : `img-src https:`.
+- ⚠️ **Toute nouvelle origine appelée par le navigateur** (un CDN, une API) doit
+  entrer dans `connect-src`/`script-src`, sinon elle sera refusée le jour du
+  basculement — `csp.cjs` et `audit-csp.cjs` le voient.
+- Preuves : `scripts/bancs/_vercel.cjs` (sert `dist/` avec les `headers` et
+  `rewrites` LUS dans `vercel.json`) ; banc `csp.cjs` (24 écrans × 390/1512, pages
+  publiques, reçu, facture, bordereau blob:, contrôle positif) : **0 violation**
+  dans les deux modes, **9 rouges sur le build d'avant** (b25ed61) ; mutations
+  `BANC_CSP_MUTATION=supabase` ⇒ 8 rouges, jsdelivr retiré ⇒ studio photo
+  12 violations. `audit-csp.cjs` (statique) : 19 rouges sur l'avant. Bilan CSP
+  branché dans `studio-photo`, `communaute`, `imprimante`, `captcha`.
+- **Non mesuré** : la vraie production (en-têtes réels après déploiement), Safari
+  iOS, le vrai Turnstile, Discord/Stripe (redirections pleine page, hors
+  `connect-src`). L'extension n'a pas été touchée.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -10780,8 +10817,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **97 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **88 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **98 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **89 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -11102,8 +11139,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 97 audits
-scripts/bancs/                  les 88 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 98 audits
+scripts/bancs/                  les 89 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
