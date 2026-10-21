@@ -47,7 +47,7 @@ import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
 import { routeCommunaute, effacerCommunaute } from './_lib/communaute.js';
-import { debutDiscord, retourDiscord } from './_lib/discord.js';
+import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 
 export const config = { api: { bodyParser: false } };
@@ -924,6 +924,13 @@ async function discordDebut(req, res) {
   return debutDiscord(req, res, utilisateur, corps || {});
 }
 
+async function discordAttente(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  const corps = await lireCorpsJson(req);
+  return attenteDiscord(req, res, utilisateur, corps || {});
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -957,6 +964,7 @@ export default async function handler(req, res) {
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'discord-debut') return m === 'POST' ? discordDebut(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'discord-attente') return m === 'POST' ? discordAttente(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'discord') return m === 'GET' ? retourDiscord(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });

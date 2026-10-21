@@ -176,7 +176,7 @@ const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const e = document.queryS
           dit(o.appels.some((x) => x === 'debut:{"ou":"compte"}'), 'le retour est demandé vers Mon compte (`ou: compte`)', o.appels.filter((x) => x.startsWith('debut')).join(' '));
           // Le state signé désigne Mon compte : la route renverra là.
           const st = d ? new URL(d).searchParams.get('state') : '';
-          dit(/\.c\.[0-9a-f]{40}$/.test(String(st)), 'le state signé porte « Mon compte »', st);
+          dit(/\.c\.(?:[0-9a-f]{32}\.)?[0-9a-f]{40}$/.test(String(st)), 'le state signé porte « Mon compte »', st);
         }
         await o.ctx.close();
 

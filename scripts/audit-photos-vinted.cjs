@@ -142,6 +142,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Plateau :: "/vrm-logo-v3-192.png"': 'logo de l’app v3 (fichier du site, logo officiel)',
       'TeteEquipe :: "/vrm-logo-v3-192.png"': 'logo de l’app v3 (fichier du site, logo officiel)',
       'VrmLogo :: "/vrm-logo-v3-192.png"': 'logo de l’app v3 (fichier du site, logo officiel)',
+      'AuthScreen :: "/vrm-logo-v3-192.png"': 'logo de l’app v3 sur l’écran de connexion (fichier du site)',
       'Accueil :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
       'CarteJourEcran :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
       'Plateau :: "/vrm-logo-192.png"': 'logo de l’app (fichier du site, logo officiel)',
