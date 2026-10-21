@@ -17,10 +17,14 @@
 //      sur ta base » ; panne ⇒ « pas pu lire », jamais « personne » ;
 //    · aucun email, aucun identifiant de compte, aucun compte Vinted d'autrui
 //      dans le DOM ni dans les réponses ;
-//    · la carte Leaflet (chargée à l'ouverture de l'écran) se dessine sur le
-//      fond OpenFreeMap (style servi PAR LE BANC : liberty en clair, dark en
-//      sombre), sans AUCUNE requête vers CARTO ni tile.openstreetmap.org ;
-//      Leaflet, MapLibre ou le style injoignables ⇒ la même communauté en liste.
+//    · la carte MapLibre (chargée à l'ouverture de l'écran) se dessine sur le
+//      fond VersaTiles (style fabriqué par la vraie @versatiles/style, tuiles
+//      vectorielles fabriquées par le banc : _carte-fond.cjs) — « muted » en
+//      clair, « muted-dark » en sombre — sans AUCUNE requête vers CARTO,
+//      tile.openstreetmap.org ni le secours ; VersaTiles injoignable ⇒ le
+//      secours OpenFreeMap (positron / dark) ; les deux, ou MapLibre
+//      injoignables ⇒ la même communauté en liste ; ni rotation ni boussole ;
+//      contrôles de zoom 44 px ; « Ma ville » recentre.
 //  Le faux PostgREST applique les RÈGLES de la 018 (§6.3). Le VRAI api/compte.js
 //  est exécuté pour `?mode=communaute`. Aucune fixture : tout est inventé ici.
 //  019 : le pseudo Discord (facultatif, validé, montré aux membres visibles) et
@@ -44,17 +48,10 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + String(d).slice(0, 200) : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n')[0].slice(0, 180)); } };
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n')[0].slice(0, 180)); if (process.env.BANC_TRACE) console.log(String(e && e.message).slice(0, 1500)); } };
 
-// ── Leaflet (le banc le sert à la place de cdnjs) ────────────────────────────
-function dossierLeaflet() {
-  const cands = [process.env.BANC_LEAFLET_DIR, path.join(RACINE, 'node_modules', 'leaflet', 'dist'), path.join(os.tmpdir(), 'vrm-leaflet-1.9.4', 'package', 'dist')].filter(Boolean);
-  for (const d of cands) if (fs.existsSync(path.join(d, 'leaflet.js'))) return d;
-  const dir = path.join(os.tmpdir(), 'vrm-leaflet-1.9.4');
-  try { fs.mkdirSync(dir, { recursive: true }); execFileSync('npm', ['pack', 'leaflet@1.9.4'], { cwd: dir, stdio: 'ignore' }); execFileSync('tar', ['xzf', 'leaflet-1.9.4.tgz'], { cwd: dir }); } catch (_) {}
-  const d = path.join(dir, 'package', 'dist');
-  return fs.existsSync(path.join(d, 'leaflet.js')) ? d : null;
-}
+const { fixtureCarte } = require('./_carte-fond.cjs');
+let FIX = null;
 
 // ── Les personnes (inventées) ────────────────────────────────────────────────
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -270,21 +267,17 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
 });
 
-let compte = null, LEAFLET = null;
-// Le fond OpenFreeMap, servi par le banc (jamais le réseau réel). Un style
-// minimal mais réel : un fond, une source vectorielle (tuiles vides), une couche.
-const OFM = { styles: [], tuiles: 0, interdit: [] };
-const styleOfm = (nom) => JSON.stringify({ version: 8, name: nom,
-  sources: { openmaptiles: { type: 'vector', tiles: ['https://tiles.openfreemap.org/planet/test/{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: 14 } },
-  layers: [{ id: 'background', type: 'background', paint: { 'background-color': nom === 'dark' ? '#0e0e0e' : '#f8f4f0' } },
-    { id: 'water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water', paint: { 'fill-color': '#9ec8ff' } }] });
-async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false, sansFond = false, fragment = '' }) {
+let compte = null;
+// Le fond, servi par le banc (jamais le réseau réel) : _carte-fond.cjs.
+const OFM = { styles: [], vt: [], tuiles: 0, tuilesVt: 0, interdit: [] };
+const CORS = { 'access-control-allow-origin': '*' };
+async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansMoteur = false, sansVersatiles = false, sansFond = false, reduit = false, fragment = '' }) {
   const mobile = largeur < 600;
-  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: sansLeaflet ? 'block' : 'allow', permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
+  const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: sansMoteur ? 'block' : 'allow', reducedMotion: reduit ? 'reduce' : 'no-preference', permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   // Un morceau qui ne charge pas fait relire la page UNE fois (main.jsx) : on le marque déjà fait.
-  if (sansLeaflet) await pg.addInitScript(() => { try { sessionStorage.setItem('vrm_recharge_morceau', String(Date.now())); } catch (_) {} });
+  if (sansMoteur) await pg.addInitScript(() => { try { sessionStorage.setItem('vrm_recharge_morceau', String(Date.now())); } catch (_) {} });
   await pg.addInitScript(({ s, sombre }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {}
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
@@ -296,23 +289,27 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
       return r.fulfill({ status: x.status, headers: x.headers, body: x.body });
     }
     if (/cartocdn\.com|tile\.openstreetmap\.org/.test(u)) { OFM.interdit.push(u); return r.abort(); }
+    if (/tiles\.versatiles\.org\//.test(u)) {
+      if (sansFond || sansVersatiles) return r.abort();
+      const m = u.match(/\/assets\/styles\/([a-z-]+)\/style\.json/);
+      if (m) { OFM.vt.push(m[1]); return r.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify(FIX.style('versatiles', /-dark$/.test(m[1]))) }); }
+      const t = u.match(/\/tiles\/osm\/(\d+)\/(\d+)\/(\d+)/);
+      if (t) { OFM.tuilesVt++; return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: CORS, body: FIX.tuile('sb', +t[1], +t[2], +t[3]) || Buffer.alloc(0) }); }
+      return r.fulfill({ status: 404, headers: CORS, body: '' }); // polices, icônes : non servies au banc
+    }
     if (/tiles\.openfreemap\.org\//.test(u)) {
       if (sansFond) return r.abort();
       const m = u.match(/\/styles\/([a-z]+)/);
-      if (m) { OFM.styles.push(m[1]); return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: styleOfm(m[1]) }); }
-      OFM.tuiles++;
-      return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: { 'access-control-allow-origin': '*' }, body: Buffer.alloc(0) });
-    }
-    if (/cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\/1\.9\.4\//.test(u)) {
-      if (sansLeaflet || !LEAFLET) return r.abort();
-      const f = u.endsWith('.css') ? 'leaflet.css' : 'leaflet.js';
-      return r.fulfill({ status: 200, contentType: f.endsWith('.css') ? 'text/css' : 'text/javascript', body: fs.readFileSync(path.join(LEAFLET, f)) });
+      if (m) { OFM.styles.push(m[1]); return r.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: JSON.stringify(FIX.style('openfreemap', m[1] === 'dark')) }); }
+      const t = u.match(/\/(\d+)\/(\d+)\/(\d+)\.pbf/);
+      if (t) { OFM.tuiles++; return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: CORS, body: FIX.tuile('omt', +t[1], +t[2], +t[3]) || Buffer.alloc(0) }); }
+      return r.fulfill({ status: 404, headers: CORS, body: '' });
     }
     return ['image', 'media', 'font'].includes(rq.resourceType()) ? r.abort() : r.fulfill({ status: 404, body: '' });
   });
-  // Leaflet est embarqué (morceau /assets/leaflet-…) : « injoignable » = ce morceau refusé.
+  // MapLibre est embarqué (morceau /assets/maplibre-gl-…) : « injoignable » = ce morceau refusé.
   // (le service worker de VRM, qui sert /assets/ lui-même, est coupé pour ce cas)
-  if (sansLeaflet) await ctx.route(/\/assets\/leaflet[^/]*\.js/, (r) => r.fulfill({ status: 404, body: '' }));
+  if (sansMoteur) await ctx.route(/\/assets\/maplibre-gl[^/]*\.js/, (r) => r.fulfill({ status: 404, body: '' }));
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
@@ -442,13 +439,13 @@ async function partie019(nav) {
 }
 
 (async () => {
-  LEAFLET = dossierLeaflet();
+  FIX = await fixtureCarte();
   try { compte = (await import('file://' + path.join(RACINE, 'api', 'compte.js'))).default; }
   catch (e) { console.log('❌ api/compte.js ne se charge pas : ' + e.message); process.exit(1); }
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   if (MUTATION) console.log(`(mutation « ${MUTATION} »)`);
-  if (!LEAFLET) console.log('⚠️  Leaflet introuvable (BANC_LEAFLET_DIR) : la carte ne peut pas se dessiner au banc.');
+  if (!FIX.pret) console.log('⚠️  @versatiles/style introuvable (npm hors ligne ?) : le fond du banc est un style minimal.');
   try {
     reset();
     console.log('\n── 1512 px · Alice, zéro inscrit');
@@ -461,11 +458,20 @@ async function partie019(nav) {
       dit(!!(await pg.$('[data-cm-vide]')) && /Personne n’est encore sur la carte/.test(await texte(pg)), 'zéro inscrit : la carte le dit et invite à être le premier');
       dit(!(await pg.$('[data-cm-chiffre]')), 'aucun chiffre affiché quand il n’y a personne');
       await pg.waitForSelector('[data-cm-carte="prete"]', { timeout: 15000 }).catch(() => {});
-      dit(await attr(pg, '[data-cm-carte]', 'data-cm-carte') === 'prete', 'la carte (Leaflet) se dessine, chargée à l’ouverture de l’écran');
-      await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 15000 }).catch(() => {});
-      dit(/OpenStreetMap/.test(await texte(pg)) && /OpenFreeMap/.test(await texte(pg)) && /OpenMapTiles/.test(await texte(pg)), 'l’attribution exigée est affichée (OpenFreeMap · OpenMapTiles · OpenStreetMap)');
-      dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap' && OFM.styles.includes('liberty'), 'le fond OpenFreeMap « liberty » est demandé et dessiné (clair)', JSON.stringify(OFM.styles));
-      dit(!!(await pg.$('.vrm-cm-carte .maplibregl-canvas, .vrm-cm-carte canvas')), 'le fond vectoriel est dessiné (MapLibre, un canvas dans la carte)');
+      dit(await attr(pg, '[data-cm-carte]', 'data-cm-carte') === 'prete', 'la carte (MapLibre) se dessine, chargée à l’ouverture de l’écran');
+      await pg.waitForSelector('[data-cm-fond="versatiles"]', { timeout: 20000 }).catch(() => {});
+      dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'versatiles' && OFM.vt.includes('muted') && OFM.tuilesVt > 0, 'le fond VersaTiles « muted » est demandé et dessiné (clair, tuiles vectorielles)', JSON.stringify({ vt: OFM.vt, tuiles: OFM.tuilesVt }));
+      const attrib = await pg.evaluate(() => { const e = document.querySelector('.vrm-cm-carte .maplibregl-ctrl-attrib'); return e ? e.textContent : ''; });
+      dit(/VersaTiles/.test(attrib) && /OpenStreetMap/.test(attrib), 'l’attribution exigée est affichée (VersaTiles · © OpenStreetMap)', attrib);
+      dit(OFM.styles.length === 0 && OFM.tuiles === 0, 'le secours (OpenFreeMap) n’est pas appelé quand VersaTiles répond', JSON.stringify(OFM.styles));
+      dit(!(await pg.$('.vrm-cm-carte .leaflet-container')) && !!(await pg.$('.vrm-cm-carte canvas.maplibregl-canvas')), 'MapLibre natif : un canvas, plus de Leaflet');
+      dit(!(await pg.$('.vrm-cm-carte .maplibregl-ctrl-compass')), 'aucune boussole (la rotation est coupée)');
+      const ctrl = await pg.$$eval('[data-cm-zoom]', (e) => e.map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); }));
+      dit(ctrl.length === 2 && ctrl.every((x) => x >= 44), 'les contrôles de zoom font 44 px', JSON.stringify(ctrl));
+      await pg.waitForTimeout(800);
+      const img = await pg.locator('.vrm-cm-carte-fond').screenshot();
+      dit(img.length > 12000, 'la carte porte un dessin (eau, terres, frontières) — pas une carte grise unie', img.length + ' octets');
+      if (process.env.BANC_DEBUG) await pg.screenshot({ path: process.env.BANC_DEBUG + '/carte1512-clair.png' });
       dit(OFM.interdit.length === 0, 'aucune requête vers CARTO ni tile.openstreetmap.org', OFM.interdit.slice(0, 2).join(' '));
       dit((await pg.$$('[data-cm-pin]')).length === 0, 'aucune épingle sur une carte vide (aucun faux utilisateur)');
     });
@@ -483,6 +489,8 @@ async function partie019(nav) {
       await pg.waitForSelector('[data-cm-pin]', { timeout: 8000 }).catch(() => {});
       const pins = await pg.$$eval('[data-cm-pin]', (e) => e.map((x) => x.className));
       dit(pins.length === 1 && /moi/.test(pins[0]), 'une épingle : la sienne', JSON.stringify(pins));
+      const rc = await pg.$eval('[data-cm-recentrer]', (b) => { const r = b.getBoundingClientRect(); return { h: Math.round(r.height), t: b.getAttribute('aria-label') }; }).catch(() => null);
+      dit(rc && rc.h >= 44 && /Cancale/.test(rc.t), '« Ma ville » recentre sur sa ville (44 px)', JSON.stringify(rc));
       if (process.env.BANC_DEBUG) await pg.screenshot({ path: process.env.BANC_DEBUG + '/a1512.png', fullPage: true });
       await A1.ctx.close();
     });
@@ -504,13 +512,18 @@ async function partie019(nav) {
       const largeur = await pg.evaluate(() => document.documentElement.scrollWidth);
       dit(largeur <= 390, 'aucun débordement horizontal à 390 px', String(largeur));
       await pg.waitForSelector('[data-cm-pin]', { timeout: 15000 });
-      const geo = await pg.evaluate(() => { const c = document.querySelector('[data-cm-carte]'); const r = c.getBoundingClientRect(); const t = document.querySelector('.leaflet-tile');
-        return { zoom: getComputedStyle(c).zoom, haut: Math.round(r.top), vh: innerHeight, tuile: t ? Math.round(t.getBoundingClientRect().width) : null }; });
-      dit(geo.zoom === '1' || geo.zoom === 'normal', 'téléphone : aucun zoom CSS posé sur le conteneur de Leaflet (il ne sait pas le compter, Safari surtout)', JSON.stringify(geo));
+      const geo = await pg.evaluate(() => { const c = document.querySelector('[data-cm-carte]'); const r = c.getBoundingClientRect(); const cv = c.querySelector('canvas');
+        return { zoom: getComputedStyle(c).zoom, haut: Math.round(r.top), vh: innerHeight, l: Math.round(r.width), cv: cv ? Math.round(cv.getBoundingClientRect().width) : null }; });
+      dit(geo.zoom === '1' || geo.zoom === 'normal', 'téléphone : aucun zoom CSS posé sur le conteneur de la carte (MapLibre ne le compte pas, Safari surtout)', JSON.stringify(geo));
       dit(geo.haut < geo.vh * 0.6, 'téléphone : la carte est dans le premier écran, pas sous la barre du bas', JSON.stringify(geo));
-      dit(geo.tuile == null || geo.tuile === 256, 'téléphone : une tuile fait 256 px affichés (carte pas grossie)', JSON.stringify(geo));
-      await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 15000 }).catch(() => {});
-      dit(OFM.styles.includes('dark'), 'sombre : le style OpenFreeMap « dark » est demandé', JSON.stringify(OFM.styles));
+      dit(geo.cv != null && Math.abs(geo.cv - (geo.l - 2)) <= 2, 'téléphone : le dessin remplit la carte (pas grossi, pas de bande grise)', JSON.stringify(geo));
+      await pg.waitForSelector('[data-cm-fond="versatiles"]', { timeout: 20000 }).catch(() => {});
+      dit(OFM.vt.includes('muted-dark') && await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'versatiles', 'sombre : le style VersaTiles « muted-dark » (sombre complet) est demandé et dessiné', JSON.stringify(OFM.vt));
+      const pin = await pg.$eval('[data-cm-pin]', (b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); });
+      dit(pin >= 44, 'téléphone : une épingle fait 44 px au doigt', String(pin));
+      const nAttr = await pg.$$eval('.vrm-cm-carte .maplibregl-ctrl-attrib', (e) => e.length);
+      dit(nAttr === 1, 'une seule attribution (jamais deux mentions empilées)', String(nAttr));
+      if (process.env.BANC_DEBUG) await pg.screenshot({ path: process.env.BANC_DEBUG + '/carte390-sombre.png' });
       dit(OFM.interdit.length === 0, 'sombre : aucune requête vers CARTO ni tile.openstreetmap.org', OFM.interdit.slice(0, 2).join(' '));
       if (process.env.BANC_DEBUG) { console.log(await pg.evaluate(() => { const b = document.querySelector('[data-cm-pin]').getBoundingClientRect(); const e = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return JSON.stringify(b) + ' ' + (e && e.outerHTML.slice(0, 200)); })); await pg.screenshot({ path: process.env.BANC_DEBUG + '/b390.png', fullPage: true }); }
       await pg.click('[data-cm-pin]');
@@ -617,21 +630,35 @@ async function partie019(nav) {
       });
     }
 
-    console.log('\n── 1512 px · la carte injoignable ⇒ la même communauté en liste');
-    await essaie('sans leaflet', async () => {
+    console.log('\n── 1512 px · VersaTiles injoignable ⇒ le secours OpenFreeMap');
+    await essaie('secours', async () => {
       reset();
       B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
-      const { ctx, pg } = await ouvrir(nav, { qui: A, sansLeaflet: true });
+      OFM.styles = []; OFM.tuiles = 0;
+      const { ctx, pg } = await ouvrir(nav, { qui: A, sansVersatiles: true });
+      await pg.waitForSelector('[data-cm-fond="openfreemap"], [data-cm-liste-secours]', { timeout: 30000 }).catch(() => {});
+      dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap' && OFM.styles.includes('positron') && OFM.tuiles > 0, 'VersaTiles injoignable : la carte se dessine sur le secours OpenFreeMap « positron »', JSON.stringify({ fond: await attr(pg, '[data-cm-carte]', 'data-cm-fond'), styles: OFM.styles }));
+      const attrib = await pg.evaluate(() => { const e = document.querySelector('.vrm-cm-carte .maplibregl-ctrl-attrib'); return e ? e.textContent : ''; });
+      dit(/OpenFreeMap/.test(attrib) && /OpenStreetMap/.test(attrib) && !/VersaTiles/.test(attrib), 'l’attribution suit le fournisseur retenu (OpenFreeMap · OpenStreetMap)', attrib);
+      dit((await pg.$$('[data-cm-pin]')).length === 1 && !(await pg.$('[data-cm-liste-secours]')), 'les épingles restent, pas de repli liste');
+      if (process.env.BANC_DEBUG) await pg.screenshot({ path: process.env.BANC_DEBUG + '/secours1512.png' });
+      await ctx.close();
+    });
+    console.log('\n── 1512 px · la carte injoignable ⇒ la même communauté en liste');
+    await essaie('sans moteur', async () => {
+      reset();
+      B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
+      const { ctx, pg } = await ouvrir(nav, { qui: A, sansMoteur: true });
       await pg.waitForSelector('[data-cm-liste-secours]', { timeout: 20000 }).catch(() => {});
-      dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'Leaflet injoignable : la communauté est listée, rien n’est caché');
+      dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'MapLibre injoignable : la communauté est listée, rien n’est caché');
       await ctx.close();
     });
     await essaie('sans fond', async () => {
       reset();
       B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
       const { ctx, pg } = await ouvrir(nav, { qui: A, sansFond: true });
-      await pg.waitForSelector('[data-cm-liste-secours]', { timeout: 25000 }).catch(() => {});
-      dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'fond OpenFreeMap injoignable : la communauté est listée (jamais une carte grise)');
+      await pg.waitForSelector('[data-cm-liste-secours]', { timeout: 40000 }).catch(() => {});
+      dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'VersaTiles ET OpenFreeMap injoignables : la communauté est listée (jamais une carte grise)');
       await ctx.close();
     });
     dit(OFM.interdit.length === 0, 'sur tout le banc : aucune requête vers CARTO ni tile.openstreetmap.org', OFM.interdit.slice(0, 2).join(' '));
