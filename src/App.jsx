@@ -29,7 +29,7 @@ import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
-import { noterTicketDiscord, ecouterDiscord } from "./communaute/discordAttente.js";
+import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -45517,6 +45517,49 @@ export default function App() {
     : coeur;
 }
 
+// ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
+// Discord lancé depuis le téléphone, retour arrivé dans un AUTRE navigateur : la
+// page montre un code à 6 chiffres, et la preuve ne sort que si on le retape ICI.
+// Sans ce code, quelqu'un qui envoyait SON lien à une autre personne prenait le
+// pseudo Discord vérifié de celle-ci. Une feuille UNE fois, sur la coque.
+function DemandeCodeDiscord() {
+  const [e, setE] = React.useState(etatCodeDiscord());
+  const [code, setCode] = React.useState('');
+  const [envoi, setEnvoi] = React.useState(false);
+  React.useEffect(() => suivreCodeDiscord(setE), []);
+  if (!e.attend && !e.fin) return null;
+  const fermer = () => { oublierTicketDiscord(); setCode(''); };
+  const chiffres = code.replace(/\D/g, '');
+  const valider = async () => {
+    if (chiffres.length !== 6 || envoi) return;
+    setEnvoi(true);
+    try { await reprendreDiscord(enTeteSession, chiffres); } finally { setEnvoi(false); }
+  };
+  return (
+    <div data-discord-demande-code="" role="dialog" aria-modal="true" aria-label="Code Discord" style={{ position:'fixed', inset:0, zIndex:9998, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:16 }}>
+      <FermeAuRetour fermer={fermer}/>
+      <div style={{ width:'100%', maxWidth:420, background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:12, padding:'20px 18px', marginBottom:'env(safe-area-inset-bottom)' }}>
+        {e.fin ? (<>
+          <div style={{ fontWeight:700, fontSize:17, marginBottom:8 }}>Discord n'est pas relié</div>
+          <div style={{ fontSize:15, marginBottom:16 }}>{e.fin}</div>
+          <button type="button" onClick={fermer} style={{ minHeight:44, width:'100%', borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Fermer</button>
+        </>) : (<>
+          <div style={{ fontWeight:700, fontSize:17, marginBottom:6 }}>Tape le code Discord</div>
+          <div style={{ fontSize:15, marginBottom:14 }}>Le navigateur qui s'est ouvert après Discord affiche un code à 6 chiffres. Tape-le ici pour relier ton compte Discord à VRM.</div>
+          <input data-discord-code-saisie="" value={code} onChange={ev => setCode(ev.target.value.replace(/[^\d ]/g, '').slice(0, 7))} onKeyDown={ev => { if (ev.key === 'Enter') valider(); }}
+            inputMode="numeric" autoComplete="one-time-code" aria-label="Code à 6 chiffres" placeholder="123 456"
+            style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:22, letterSpacing:4, textAlign:'center', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
+          {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:14, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
+          <div style={{ display:'flex', gap:8 }}>
+            <button type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
+            <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:8, border:'none', background:C.accent, color:'#fff', fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
+          </div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
 function AppCoeur() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
@@ -47479,6 +47522,7 @@ function AppCoeur() {
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
+        <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
