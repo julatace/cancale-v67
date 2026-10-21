@@ -68,7 +68,7 @@ const convConfirm = (tx, msgs, side = 'seller') => ({ conversation: { id: 700000
         return { ok: statut < 400, status: statut, json: async () => ({}) }; }
       return f0(u, o);
     };
-    f.ctx.authToken = async () => ({ access_token: 'jeton.banc.x', expires_at: Date.now() + 3600000 });
+    f.ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton.banc.x', expires_at: Date.now() + 3600000 });
     const base = { tx: '30000000001', item: '1', titre: 'Baskets banc', lieu: 'Consigne Banc', code: 'C65735', qr: '', transporteur: 'vinted', conv: '900001', url: 'u', at: new Date().toISOString() };
     const e1 = await f.ctx.noterRetrait({ ...base, arriveLe: '2026-10-13T08:08:35.000Z' }, '111');
     const l = (lignes.panel_colis_relais || {})['30000000001'] || {};
