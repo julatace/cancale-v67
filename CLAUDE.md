@@ -1,5 +1,9 @@
 # VRM — dossier de passation
 
+> ⚠️⚠️ **PASSATION DU 21 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-21.md`** : ce qui est
+> en ligne, `claude/lot-21oct` (hors ligne, retours, 5.204, carte OpenFreeMap), les branches
+> non déployées (`csp-app`, `app-rapide`, et INACHEVÉES `carte-pro`, `journee-widgets`), les gestes de Julien.
+
 > ⚠️⚠️ **PASSATION DU 12 OCTOBRE — DEUX AGENTS — LIS D'ABORD `docs/passation/README.md`,
 > section « 🔴 LIRE D'ABORD » puis « RÉPARTITION ».** Agent 1 : mettre en ligne
 > la 5.175 (avec le second correctif photos), migration 014, règle d'offre eBay,
