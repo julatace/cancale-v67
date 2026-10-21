@@ -24,6 +24,13 @@ export async function utilisateurDe(req) {
     const j = await r.json();
     const id = String((j && j.id) || '');
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+    // /user a vérifié la signature du jeton ; son niveau doit correspondre
+    // aux facteurs réellement vérifiés du compte, jamais au cache du client.
+    const facteurVerifie=(j.factors||[]).some(f=>f?.status==='verified'&&['phone','totp'].includes(f.factor_type));
+    if(facteurVerifie){
+      let aal='';try{aal=JSON.parse(Buffer.from(jeton.split('.')[1],'base64url').toString('utf8')).aal;}catch(_){return null;}
+      if(aal!=='aal2')return null;
+    }
     return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at) };
   } catch (_) { return null; }
 }

@@ -2,6 +2,8 @@ import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email
 import {achatDuColis,suivisAchat} from './liensColis.js';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {qrMfa} from './qrMfa.js';
+import {facteursMfa,demanderSms} from './mfaSms.js';
+import VerificationSms from './VerificationSms.jsx';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
@@ -806,6 +808,7 @@ const sessionFrom = (j) => ({
   // quand il n'y en a aucun). Sans `user` dans la réponse, on garde ce qu'on
   // savait. `undefined` = jamais lu (session d'avant cette fonction) : la porte
   // le relit avant de laisser entrer (`etatMfa`).
+  mfa: j.user ? facteursMfa(j.user) : AUTH.session?.mfa,
   totp: j.user ? totpVerifies(j.user) : (AUTH.session ? AUTH.session.totp : undefined),
 });
 // ══════════════════════════════════════════════════════════════════════════
@@ -839,7 +842,8 @@ const aalDuJeton = (tok) => {
 const etatMfa = (s) => {
   if (!s || !s.access_token) return 'ok';
   if (aalDuJeton(s.access_token) === 'aal2') return 'ok';
-  if (Array.isArray(s.totp)) return s.totp.length ? 'code' : 'ok';
+  if (Array.isArray(s.mfa)) return s.mfa.length ? 'code' : 'ok';
+  if (s.totp?.length) return 'code';
   return 'verifier';
 };
 const mfaPasse = () => etatMfa(AUTH.session) === 'ok';
@@ -870,26 +874,28 @@ const mfaLireFacteurs = async () => {
   const r = await mfaAppel('GET', 'user');
   if (!r.ok) return null;
   const tous = Array.isArray(r.json.factors) ? r.json.factors : [];
-  return { verifies: tous.filter((f) => f && f.factor_type === 'totp' && f.status === 'verified'), enAttente: tous.filter((f) => f && f.factor_type === 'totp' && f.status !== 'verified'), user: r.json };
+  return { verifies: tous.filter((f) => f && ['totp','phone'].includes(f.factor_type) && f.status === 'verified'), enAttente: tous.filter((f) => f && ['totp','phone'].includes(f.factor_type) && f.status !== 'verified'), user: r.json };
 };
 // Défi + vérification d'un code. Rend { ok } · { ok:false, faux:true } (code
 // refusé) · { ok:false, passu:true } (injoignable). Réussi : la session passe en
 // `aal2` (GoTrue rend de nouveaux jetons) et elle est rangée.
-const mfaVerifierCode = async (factorId, code) => {
+const mfaVerifierCode = async (factorId, code, options={}) => {
   const c = String(code || '').replace(/\D/g, '');
   if (c.length !== 6) return { ok: false, faux: true, message: 'Le code fait 6 chiffres.' };
-  const d = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/challenge`, {});
+  if(options.sms&&!options.challengeId)return {ok:false,message:'Demande d’abord un code par SMS.'};
+  const d = options.challengeId?{ok:true,json:{id:options.challengeId}}:await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/challenge`, {});
   if (!d.ok || !d.json.id) return mfaInjoignable(d) ? { ok: false, passu: true } : { ok: false, faux: false, message: d.json.msg || d.json.message || `Erreur ${d.status}` };
   const v = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/verify`, { challenge_id: d.json.id, code: c });
   if (!v.ok) {
     if (mfaInjoignable(v)) return { ok: false, passu: true };
-    return { ok: false, faux: true, message: 'Ce code ne correspond pas. Tape celui affiché MAINTENANT dans ton app (il change toutes les 30 secondes) ; si ça persiste, vérifie que l’heure de ton téléphone est automatique.' };
+    return { ok: false, faux: true, message: options.sms?'Code SMS incorrect ou expiré. Réessaie ou demande un nouveau code.':'Ce code ne correspond pas. Tape celui affiché MAINTENANT dans ton app (il change toutes les 30 secondes) ; si ça persiste, vérifie que l’heure de ton téléphone est automatique.' };
   }
   if (!v.json.access_token) return { ok: false, passu: true };
   // Le facteur qu'on vient de vérifier EST vérifié, même si la fiche rendue
   // par GoTrue l'a lue juste avant (première activation).
   const s2 = sessionFrom(v.json);
-  s2.totp = Array.from(new Set([...(Array.isArray(s2.totp) ? s2.totp : []), String(factorId)]));
+  if(options.sms){s2.mfa=[...(s2.mfa||[]).filter(f=>f.id!==String(factorId)),{id:String(factorId),type:'phone'}];}
+  else{s2.totp=Array.from(new Set([...(s2.totp||[]),String(factorId)]));s2.mfa=[...(s2.mfa||[]).filter(f=>f.id!==String(factorId)),{id:String(factorId),type:'totp'}];}
   writeSession(s2);
   return { ok: true };
 };
@@ -1111,7 +1117,7 @@ const consumeAuthRedirect = async () => {
     cleanAuthUrl();
     AUTH = { ...AUTH, session: sess };
     const me = await fetchMe(at);                        // qui es-tu ?
-    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp } : {}) });
+    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, mfa:me._mfa } : {}) });
     if (type === 'recovery') RECOVERY_PENDING = true;
     return { ok: true, recovery: type === 'recovery' };
   }
@@ -1126,7 +1132,7 @@ const fetchMe = async (token) => {
     const j = await res.json();
     // `_totp` : les facteurs TOTP vérifiés (double vérification), rangés à part
     // dans la session par l'appelant — jamais dans `user`.
-    return { id: j.id, email: j.email, _totp: totpVerifies(j) };
+    return { id: j.id, email: j.email, _totp: totpVerifies(j),_mfa:facteursMfa(j) };
   } catch (_) { return null; }
 };
 
@@ -11477,6 +11483,12 @@ function PorteMfa({ session }) {
   const [code, setCode] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
+  const [facteurId,setFacteurId]=React.useState('');
+  const facteur=session.mfa?.find(f=>f.id===facteurId)||session.mfa?.find(f=>f.type==='phone')||session.mfa?.[0]||{id:session.totp?.[0],type:'totp'};
+  const sms=facteur.type==='phone';
+  const [challenge,setChallenge]=React.useState(null),[attendre,setAttendre]=React.useState(0);
+  React.useEffect(()=>{if(!attendre)return;const t=setTimeout(()=>setAttendre(attendre-1),1000);return()=>clearTimeout(t);},[attendre]);
+  const recevoir=async()=>{setBusy(true);setErr('');try{const r=await demanderSms(mfaAppel,facteur.id);if(r.ok){setChallenge(r.id);setAttendre(60);setCode('');}else setErr(r.message);}finally{setBusy(false);}};
   const [essai, setEssai] = React.useState(0);
   // 'verifier' : relire les facteurs, puis ranger la réponse dans la session.
   React.useEffect(() => {
@@ -11489,7 +11501,7 @@ function PorteMfa({ session }) {
       if (!f) { setPassu(true); return; }
       const cur = AUTH.session;
       if (!cur || cur.access_token !== session.access_token) return;
-      writeSession({ ...cur, totp: f.verifies.map((x) => String(x.id)) });
+      writeSession({ ...cur, totp: f.verifies.filter(x=>x.factor_type==='totp').map(x=>String(x.id)),mfa:facteursMfa(f.user) });
     })();
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -11504,10 +11516,10 @@ function PorteMfa({ session }) {
     e && e.preventDefault();
     if (busy) return;
     setErr(''); setPassu(false);
-    const id = Array.isArray(session.totp) ? session.totp[0] : '';
+    const id = facteur.id;
     if (!id) { setEssai((n) => n + 1); return; }
     setBusy(true);
-    const r = await mfaVerifierCode(id, code);
+    const r = await mfaVerifierCode(id, code, {sms,challengeId:sms?challenge:undefined});
     setBusy(false);
     if (r.ok) return;            // la session passe en aal2 : `App` monte le cœur
     if (r.passu) { setPassu(true); return; }
@@ -11531,15 +11543,17 @@ function PorteMfa({ session }) {
             </div>
             {passu && <button type="button" data-mfa-reessayer="" onClick={() => setEssai((n) => n + 1)} style={{marginTop:14,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>}
           </>) : (<>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>Code de ton app d'authentification</div>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>{sms?'Code reçu par SMS':"Code de ton app d’authentification"}</div>
             <div style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>
-              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.
+              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. {sms?'Demande un SMS puis saisis les 6 chiffres reçus sur ton téléphone.':'Ouvre ton app d’authentification et tape le code à 6 chiffres affiché pour VRM.'}
             </div>
+            {session.mfa?.length>1&&<label>Méthode de vérification<select aria-label="Méthode de vérification" value={facteur.id} onChange={e=>{setFacteurId(e.target.value);setChallenge(null);setCode('');setErr('');setPassu(false);}} style={{width:'100%',padding:10,marginBottom:10}}>{session.mfa.map(f=><option key={f.id} value={f.id}>{f.type==='phone'?'SMS':'Application d’authentification'}</option>)}</select></label>}
+            {sms&&<button type="button" data-mfa-sms-envoyer="" disabled={busy||attendre>0} onClick={recevoir} style={{...lien,color:C.accent}}>{attendre?`Renvoyer dans ${attendre} s`:challenge?'Renvoyer un code SMS':'Recevoir un code par SMS'}</button>}
             <input data-mfa-code="" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus placeholder="000000"
               value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}/>
             {err && <div data-mfa-erreur="" style={{fontSize:12.5,color:C.danger,marginTop:10,lineHeight:1.45}}>{err}</div>}
             {passu && <div data-mfa-injoignable="" style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginTop:10,lineHeight:1.45}}>Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. Tu n'es pas déconnecté — réessaie dans un instant.</div>}
-            <button type="submit" data-mfa-valider="" disabled={busy || code.length !== 6}
+            <button type="submit" data-mfa-valider="" disabled={busy || code.length !== 6 || (sms&&!challenge)}
               style={{marginTop:12,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:busy||code.length!==6?'default':'pointer',opacity:busy||code.length!==6?0.55:1,fontFamily:'inherit'}}>
               {busy ? 'Vérification…' : passu ? 'Réessayer' : 'Valider'}
             </button>
@@ -42980,7 +42994,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
-      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
+      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.mfa) ? (AUTH.session.mfa.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
@@ -43258,7 +43272,7 @@ function DoubleVerification({ onEtat } = {}) {
     mfaLireFacteurs().then((x) => { if (!mort) setF(x); });
     return () => { mort = true; };
   }, [essai]);
-  const actif = f && f.verifies.length ? f.verifies[0] : null;
+  const actif = f && f.verifies.find(x=>x.factor_type==='totp') ? f.verifies.find(x=>x.factor_type==='totp') : null;
   const relire = () => setEssai((n) => n + 1);
   const btn = (primaire, off) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
     borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor: off ? 'default' : 'pointer', opacity: off ? 0.55 : 1, fontFamily:'inherit' });
@@ -43271,7 +43285,7 @@ function DoubleVerification({ onEtat } = {}) {
     setBusy(true); setMsg(null);
     // Un essai d'activation laissé en plan (facteur non vérifié) bloquerait le
     // suivant : on le retire d'abord (un facteur non vérifié ne protège rien).
-    for (const x of (f && f.enAttente) || []) { await mfaAppel('DELETE', `factors/${encodeURIComponent(x.id)}`); }
+    for (const x of (f && f.enAttente?.filter(x=>x.factor_type==='totp')) || []) { await mfaAppel('DELETE', `factors/${encodeURIComponent(x.id)}`); }
     const r = await mfaAppel('POST', 'factors', { factor_type: 'totp', friendly_name: 'VRM ' + new Date().toISOString().slice(0, 16), issuer: 'VRM' });
     setBusy(false);
     const t = r.json && r.json.totp;
@@ -43320,7 +43334,7 @@ function DoubleVerification({ onEtat } = {}) {
     setBusy(false); setCode('');
     if (d.ok) {
       const cur = AUTH.session;
-      if (cur) writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== String(actif.id)) });
+      if (cur) writeSession({ ...cur, mfa:cur.mfa?.filter(f=>f.id!==String(actif.id)), totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== String(actif.id)) });
       setCours(null);
       setMsg({ t: 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.', ton: 'ok' });
     } else if (mfaInjoignable(d)) {
@@ -43337,10 +43351,11 @@ function DoubleVerification({ onEtat } = {}) {
       background: msg.ton === 'passu' ? `${C.warn}12` : msg.ton === 'err' ? `${C.danger}0f` : `${C.text}0a`,
       border: `1px solid ${msg.ton === 'passu' ? C.warn + '44' : msg.ton === 'err' ? C.danger + '33' : C.border}`}}>{msg.t}</div>
   );
-  const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (actif ? 'active' : 'inactive');
+  const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (f.verifies.length ? 'active' : 'inactive');
   React.useEffect(() => { if (onEtat) onEtat(etatDit); }, [etatDit]);
   return (
-    <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
+    <><VerificationSms lire={mfaLireFacteurs} appeler={mfaAppel} verifier={mfaVerifierCode} actualiser={relire} oublier={id=>{const cur=AUTH.session;if(cur)writeSession({...cur,mfa:cur.mfa?.filter(f=>f.id!==id)});}} theme={C}/>
+    <details open={!!actif||!!cours}><summary style={{fontSize:13,cursor:'pointer',marginBottom:12}}>Application d’authentification · autre méthode</summary><div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
       {f === null && (<>
         <div style={txt}>Je n'ai pas pu lire l'état de ta double vérification : le service de connexion ne répond pas. Rien n'a changé.</div>
@@ -43385,7 +43400,7 @@ function DoubleVerification({ onEtat } = {}) {
         </div>
       </>)}
       {bandeau}
-    </div>
+    </div></details></>
   );
 }
 
@@ -43742,7 +43757,7 @@ function InviteMfaProprio({ uid }) {
       <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
         <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Double vérification activée' : 'Sécurise ta connexion VRM'}</div>
         {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
-          Cette vérification protège la connexion à ton compte VRM et aux boutiques qui lui sont rattachées. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
+          Cette vérification protège la connexion à ton compte VRM et aux boutiques qui lui sont rattachées. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi un code reçu par SMS ou fourni par ton application d’authentification. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
         </div>}
         <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
