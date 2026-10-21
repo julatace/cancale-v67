@@ -29,6 +29,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
@@ -1173,6 +1174,8 @@ const wipeLocalData = () => {
     }
     doomed.forEach(k => localStorage.removeItem(k));
   } catch (_) {}
+  // La réserve des QR de Ma journée hors ligne part avec les photos (`vrm_hl_photo_*`).
+  try { if (typeof caches !== 'undefined') caches.delete(CACHE_QR).catch(() => {}); } catch (_) {}
 };
 // Mémorise à qui appartiennent les données présentes dans ce navigateur.
 const OWNER_MARK = 'vrm_local_owner';
@@ -12045,6 +12048,22 @@ function BandeauLiaison() {
   );
 }
 
+// Les QR hébergés de la photo hors ligne mis en réserve (src/journeeHorsLigne.js) :
+// le service worker les sert depuis cette réserve quand le réseau manque
+// (`/hl-qr?u=…`). Une image refusée ne casse rien : la vue dit d'utiliser le code.
+const rechaufferQr = async (photo) => {
+  try {
+    if (typeof caches === 'undefined' || !photo) return;
+    const c = await caches.open(CACHE_QR);
+    for (const r of photo.retirer) {
+      const u = r && r.qr;
+      if (!/^https:\/\//i.test(String(u || ''))) continue;
+      const k = adresseQrLocale(u);
+      if (await c.match(k)) continue;
+      try { const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' }); await c.put(k, res); } catch (_) {}
+    }
+  } catch (_) {}
+};
 // Les codes de retrait gardés en local (G9) : lisibles même quand la base ne
 // répond pas (au point relais, réseau faible). Une liste non vide, ou null.
 const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
@@ -12149,6 +12168,126 @@ function BaseInjoignable() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  MA JOURNÉE HORS LIGNE (21 octobre) — la photo, en lecture seule
+// ══════════════════════════════════════════════════════════════════════════
+// Hors ligne MESURÉ (`navigator.onLine === false`) : pas une base qui hoquette
+// (celle-là a `BaseInjoignable`). La photo est celle de la dernière lecture
+// COMPLÈTE de CE vendeur (src/journeeHorsLigne.js) ; on dit de quand elle date,
+// UNE fois, et qu'aucun geste ne peut partir (les boutons sont grisés, sans
+// redire pourquoi sur chacun). « Pas su » ≠ « rien » : sans photo, on le dit —
+// jamais « tout est à jour ».
+function useHorsLigne() {
+  const [h, setH] = React.useState(() => { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (_) { return false; } });
+  React.useEffect(() => {
+    const on = () => setH(false), off = () => setH(true);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  return h;
+}
+function LigneHorsLigne({ children, date }) {
+  return (
+    <div role="status" data-hors-ligne-ligne="" data-hors-ligne-date={date || undefined}
+      style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',marginBottom:14}}>
+      <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="cloudOff" size={18}/></span>
+      <span style={{fontSize:13.5,fontWeight:600,color:C.text,lineHeight:1.4}}>{children}</span>
+    </div>
+  );
+}
+function QrHorsLigne({ qr, code }) {
+  const [etat, setEtat] = React.useState('charge');
+  if (!qr) return null;
+  const src = /^data:image\//i.test(qr) ? qr : adresseQrLocale(qr);
+  if (etat === 'ko') return <div data-hl-qr="ko" style={{flexShrink:0,width:92,fontSize:11,color:C.muted,lineHeight:1.35,textAlign:'center'}}>{code ? 'QR pas gardé ici — donne le code' : 'QR pas gardé sur cet appareil'}</div>;
+  return <img data-hl-qr={etat} src={src} alt="QR de retrait" width={92} height={92} onLoad={() => setEtat('ok')} onError={() => setEtat('ko')}
+    style={{flexShrink:0,width:92,height:92,borderRadius:10,background:'#fff',border:`1px solid ${C.border}`,objectFit:'contain'}}/>;
+}
+function JourneeHorsLigne({ uid, tab }) {
+  const [, tic] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
+  const photo = React.useMemo(() => { try { return lirePhoto(uid, localStorage); } catch (_) { return null; } }, [uid]);
+  // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
+  // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
+  const titre = tab === 'journee' ? null : <h2 style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>Ma journée</h2>;
+  if (!photo) return (
+    <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
+      {titre}
+      <LigneHorsLigne>Hors ligne — aucune copie de ta journée n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
+    </div>
+  );
+  const maintenant = Date.now();
+  const quand = heurePhoto(photo.at, maintenant);
+  const soir = listeDuSoir(photo, maintenant);
+  const grise = { border:`1px solid ${C.border}`, background:C.bg, color:C.muted, borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, minHeight:44, cursor:'not-allowed', fontFamily:'inherit', flexShrink:0, opacity:0.7 };
+  const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'6px 14px', marginBottom:14 };
+  const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
+  const limiteTxt = (e) => {
+    const j = joursAvantJour(e.limite, maintenant);
+    if (j == null) return '';
+    if (j < 0) return 'date limite passée';
+    if (j === 0) return "à poster aujourd'hui";
+    if (j === 1) return 'à poster demain au plus tard';
+    return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+  };
+  return (
+    <div data-hors-ligne="photo" style={{padding:'16px 14px 40px'}}>
+      {titre}
+      <LigneHorsLigne date={new Date(photo.at).toISOString()}>Hors ligne — ce que tu vois date de {quand} ; rien ne peut être envoyé.</LigneHorsLigne>
+      {soir && soir.n > 0 && (
+        <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>La liste du soir</div>
+          <div style={{fontSize:14,color:C.text,lineHeight:1.45}}>
+            Demain : <b>{soir.n} colis</b> à poster{soir.enRetard || soir.demain ? ' — ' : ''}
+            {soir.enRetard ? `${soir.enRetard} déjà en retard` : ''}{soir.enRetard && soir.demain ? ', ' : ''}
+            {soir.demain ? `${soir.demain} avec la date limite demain` : ''}.
+          </div>
+        </div>
+      )}
+      {photo.nePasPoster > 0 && (
+        <div data-hl-ne-pas-poster={photo.nePasPoster} style={{...carte,padding:'12px 14px',borderColor:`${C.warn}88`}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.text}}>Ne poste pas {photo.nePasPoster > 1 ? `ces ${photo.nePasPoster} colis eBay` : 'ce colis eBay'}</div>
+          <div style={{fontSize:12.5,color:C.muted,marginTop:2}}>L'acheteur a demandé l'annulation (à trancher dans eBay quand le réseau revient).</div>
+        </div>
+      )}
+      {tete('À envoyer', photo.nEnvoyer)}
+      <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
+        {photo.envoyer.length === 0
+          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
+          : photo.envoyer.map((e, i) => (
+            <div key={i} data-hl-colis="" style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
+              </div>
+              <button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Colis fait</button>
+            </div>
+          ))}
+        {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
+      </div>
+      {tete('À retirer', photo.nRetirer)}
+      <div data-hl-retirer={photo.nRetirer} style={carte}>
+        {photo.retirer.length === 0
+          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à retirer à {quand}.</div>
+          : photo.retirer.map((r, i) => (
+            <div key={i} data-hl-retrait="" style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || r.lieu || r.transporteur || 'Colis'}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[r.titre ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte].filter(Boolean).join(' · ')}{r.horsDelai ? ' · hors délai' : ''}</div>
+                {r.code
+                  ? <div data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:19,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px'}}>{r.code}</div>
+                  : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas encore reçu à {quand}.</div>}
+                <div style={{marginTop:8}}><button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Je l'ai retiré</button></div>
+              </div>
+              <QrHorsLigne qr={r.qr} code={r.code}/>
+            </div>
+          ))}
+        {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
+      </div>
     </div>
   );
 }
@@ -29111,6 +29250,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // par n° de TRANSACTION : une identité, jamais un rapprochement par titre.
   // ⚠️ Une seule ligne lue, quelques Ko (§34).
   const [colisRelais, setColisRelais] = useState({});
+  // A-t-elle été LUE (réponse de la base) ? `{}` ne dit pas « aucun code » si
+  // la lecture a échoué — la photo hors ligne (src/journeeHorsLigne.js) attend
+  // une lecture réussie.
+  const [colisRelaisLu, setColisRelaisLu] = useState(false);
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -29120,8 +29263,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
       if (!res.ok) return;
       const rows = await res.json();
+      if (!Array.isArray(rows)) return;
       const data = (rows && rows[0] && rows[0].data) || {};
       if (Object.keys(data).length) setColisRelais(data);
+      setColisRelaisLu(true);
     } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
   };
   useEffect(() => { relireColisRelais(); /* eslint-disable-next-line */ }, []);
@@ -33232,6 +33377,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     } catch (_) {}
   }, [toShip, sales.items, emailBords, colisEb]);
+  // ── MA JOURNÉE HORS LIGNE : LA PHOTO, APRÈS UNE LECTURE COMPLÈTE (21 oct.) ──
+  // Ce que Ma journée montre — colis à expédier, colis à retirer avec leurs
+  // codes et QR — rangé SUR L'APPAREIL, au nom de CE vendeur
+  // (src/journeeHorsLigne.js). Seulement quand TOUTES les sources ont répondu :
+  // une lecture partielle relue plus tard comme « ta journée » cacherait un
+  // colis (§5). Les QR hébergés sont mis en réserve pour le service worker.
+  useEffect(() => {
+    const uid = (AUTH.user && AUTH.user.id) || (MULTI_USER ? '' : 'local');
+    if (!uid) return;
+    if (!lectureComplete({ baseKO, accountsReady, cleComptes, ventes: sales, achats: buys, tracking, emailBords, colisRelaisLu, colisEb })) return;
+    try {
+      const envoyer = toShip.map((t) => {
+        const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
+        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted' };
+      }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
+      const horsDelai = new Set(pickupUnion.horsDelai);
+      const retirer = pickupUnion.emailList.map((t) => ({
+        titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: codeRetrait(t.code), qr: qrImage(t) || '',
+        transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', horsDelai: horsDelai.has(t),
+      })).concat(pickupUnion.extra.map((o) => {
+        const r = relaisDe(o);
+        return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '' };
+      }));
+      const photo = construirePhoto({ uid, at: Date.now(), envoyer, retirer, nePasPoster: colisEb.nePasPoster.length });
+      if (photo && ecrirePhoto(uid, photo, localStorage)) rechaufferQr(photo);
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseKO, accountsReady, cleComptes, sales, buys, tracking, emailBords, colisRelaisLu, colisEb, toShip, pickupUnion]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -46197,6 +46370,17 @@ function AppCoeur() {
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
   //    rien » — et c'est le seul cas où l'app peut le tromper gravement.
   const [baseKO,setBaseKO]=useState(false);
+  // Hors ligne MESURÉ (`navigator.onLine`, évènements online/offline) : la coque
+  // montre la photo de Ma journée (src/journeeHorsLigne.js). Au retour du réseau,
+  // si rien n'a pu être lu pendant la coupure (`baseKO`), on relit tout
+  // (rechargement) — sinon les écrans relisent eux-mêmes en se remontant.
+  const horsLigne = useHorsLigne();
+  const baseKORef = React.useRef(false); baseKORef.current = baseKO;
+  const etaitHorsLigne = React.useRef(horsLigne);
+  React.useEffect(() => {
+    if (etaitHorsLigne.current && !horsLigne && baseKORef.current) { try { window.location.reload(); } catch (_) {} }
+    etaitHorsLigne.current = horsLigne;
+  }, [horsLigne]);
   // ⚠️ §11 : « c'est son premier jour » est UNE notion. Trois écrans s'en
   //    servent (Ma journée, le tableau de bord, l'onboarding) — elle se décide
   //    ICI, une fois. Et elle exige les TROIS états : la lecture est revenue
@@ -47680,6 +47864,10 @@ function AppCoeur() {
             ceux qui n'existent pas encore. Les écrans gardent en plus leur
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
+        {/* HORS LIGNE (21 oct.) : Ma journée telle qu'à la dernière ouverture
+            réussie, en lecture seule — à la place de TOUS les écrans (aucun geste
+            qui envoie n'y existe). Le réseau revient : les écrans relisent. */}
+        {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
         <DemandeCodeDiscord/>
@@ -48000,6 +48188,7 @@ function AppCoeur() {
         {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
+        </>)}
         </EcranGardeFou>
       </main>
       <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
