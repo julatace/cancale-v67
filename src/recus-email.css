@@ -1,0 +1,17 @@
+.vrm-recus-email{border:1px solid var(--gestion-border,#87959855);border-radius:10px;padding:10px 12px;margin:0 0 12px;color:inherit;min-width:0;}
+.vrm-recus-email>summary{font-size:12px;font-weight:600;cursor:pointer;line-height:1.5;}
+.vrm-recus-email[open]>summary{margin-bottom:10px;}
+.vrm-recus-email p{font-size:12px;line-height:1.5;opacity:.8;margin:8px 0;}
+.vrm-recus-email input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #87959877;background:transparent;color:inherit;font:inherit;border-radius:8px;}
+.vrm-recus-email ul{list-style:none;margin:8px 0;padding:0;}
+.vrm-recus-email li+li{border-top:1px solid #87959833;}
+.vrm-recus-email button{background:transparent;color:inherit;font:inherit;font-size:12px;border:1px solid #87959855;border-radius:7px;padding:8px 10px;cursor:pointer;}
+.vrm-recus-email li>button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;border-radius:0;text-align:left;padding:10px 0;min-height:44px;}
+.vrm-recus-email li>button>span:first-child{min-width:0;flex:1;}
+.vrm-recus-email strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;}
+.vrm-recus-email small{display:block;font-size:11px;line-height:1.5;margin-top:4px;opacity:.75;overflow-wrap:anywhere;}
+.vrm-recus-email li>button>span:last-child{white-space:nowrap;}
+.vrm-recus-email [role=status]{font-size:12px;line-height:1.5;}
+.vrm-recus-email [role=status]>button{margin-left:8px;}
+@media(max-width:767px){.vrm-recus-email input{font-size:16px;}}
+.vrm-recus-email input{margin-top:10px;}
