@@ -1,3 +1,4 @@
+import './_lib/sans-bruit.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
@@ -18,7 +19,6 @@ import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // contentType, content(base64)}] } — ce que renvoie un Worker Cloudflare.
 // ────────────────────────────────────────────────────────────────────────────
 
-import './_lib/sans-bruit.js';
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';

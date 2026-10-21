@@ -1,3 +1,4 @@
+import './_lib/sans-bruit.js';
 import {lireReceptionEmail} from './_lib/reception-email.js';
 // ── /api/email-rattacher ──────────────────────────────────────────────────────
 // Rejoue un email mis en QUARANTAINE (adresse de réception inconnue, ou
@@ -27,7 +28,6 @@ import {lireReceptionEmail} from './_lib/reception-email.js';
 // restent à lui.
 // ⚠️ « Pas su » n'est jamais « rien » ni « déjà rattaché » : toute lecture
 // ratée (ligne, registre, liste) répond 503.
-import './_lib/sans-bruit.js';
 import { traiterEmail, lireRegistreEmails } from './email-inbound.js';
 import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation } from './_lib/proprietaire-email.js';
