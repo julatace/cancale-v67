@@ -33,21 +33,40 @@ const lireCookie = (req) => {
 const mac = (quoi, ...parts) => crypto.createHmac('sha256', 'vrm-discord|' + quoi + '|' + SECRET()).update(parts.map(String).join('|')).digest('hex').slice(0, 40);
 const egal = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
-// Où revenir après Discord (20 oct.) : la carte (défaut, forme d'avant à trois
-// morceaux) ou « Mon compte » (`.c.` signé avec le reste : on ne le change pas
-// en route).
+// Où revenir après Discord (20 oct.) : la carte (défaut) ou « Mon compte » (`.c.`).
+// 21 oct. — LE TÉLÉPHONE : sur iPhone, l'app ajoutée à l'écran d'accueil n'a PAS
+// les cookies de Safari, et l'app Discord renvoie le retour dans le navigateur
+// par défaut. Le nonce en cookie manquait donc toujours : « lien invalide », et
+// personne ne pouvait relier Discord depuis son téléphone. Le `state` porte
+// maintenant le ticket lui-même (signé : il ne se change pas en route) :
+//   · même navigateur (cookie = ticket) → comme avant, la preuve dans le fragment ;
+//   · autre navigateur → la preuve est rangée côté serveur pour CE compte VRM,
+//     sous l'empreinte du ticket ; l'app qui a lancé le geste (elle seule connaît
+//     le ticket, et elle a la session du compte) la reprend (`discord-attente`).
+// La preuve reste liée au compte VRM : un autre compte ne peut pas s'en servir.
 export function signerEtat(owner, nonce, maintenant = Date.now(), ou = 'carte') {
-  const o = String(owner).toLowerCase(), ts = maintenant.toString(36);
-  return ou === 'compte' ? ts + '.' + o + '.c.' + mac('etat', o, ts, nonce, 'compte') : ts + '.' + o + '.' + mac('etat', o, ts, nonce);
+  const o = String(owner).toLowerCase(), ts = maintenant.toString(36), c = ou === 'compte' ? 'c' : 'p';
+  return ts + '.' + o + '.' + c + '.' + nonce + '.' + mac('etat2', o, ts, nonce, c);
 }
 export function lireEtatComplet(state, nonce, maintenant = Date.now()) {
+  if (!SECRET()) return null;
+  const s = String(state || '');
+  const n2 = /^([0-9a-z]{6,12})\.([0-9a-f-]{36})\.([cp])\.([0-9a-f]{32})\.([0-9a-f]{40})$/.exec(s);
+  if (n2) {
+    if (!UUID_RE.test(n2[2])) return null;
+    const age = maintenant - parseInt(n2[1], 36);
+    if (!(age >= -60000 && age <= VALIDITE_MS)) return null;
+    if (!egal(mac('etat2', n2[2], n2[1], n2[4], n2[3]), n2[5])) return null;
+    return { owner: n2[2], ou: n2[3] === 'c' ? 'compte' : 'carte', ticket: n2[4], memeNavigateur: NONCE_RE.test(String(nonce || '')) && egal(nonce, n2[4]) };
+  }
+  // Forme d'avant (liens partis avant le déploiement) : le cookie reste exigé.
   if (!NONCE_RE.test(String(nonce || ''))) return null;
-  const m = /^([0-9a-z]{6,12})\.([0-9a-f-]{36})\.(?:(c)\.)?([0-9a-f]{40})$/.exec(String(state || ''));
-  if (!m || !UUID_RE.test(m[2]) || !SECRET()) return null;
+  const m = /^([0-9a-z]{6,12})\.([0-9a-f-]{36})\.(?:(c)\.)?([0-9a-f]{40})$/.exec(s);
+  if (!m || !UUID_RE.test(m[2])) return null;
   const age = maintenant - parseInt(m[1], 36);
   if (!(age >= -60000 && age <= VALIDITE_MS)) return null;
   const attendu = m[3] ? mac('etat', m[2], m[1], nonce, 'compte') : mac('etat', m[2], m[1], nonce);
-  return egal(attendu, m[4]) ? { owner: m[2], ou: m[3] ? 'compte' : 'carte' } : null;
+  return egal(attendu, m[4]) ? { owner: m[2], ou: m[3] ? 'compte' : 'carte', ticket: nonce, memeNavigateur: true } : null;
 }
 export function lireEtat(state, nonce, maintenant = Date.now()) {
   const e = lireEtatComplet(state, nonce, maintenant);
@@ -80,7 +99,7 @@ export async function debutDiscord(req, res, utilisateur, corps) {
   res.setHeader('Set-Cookie', cookie(nonce, Math.round(VALIDITE_MS / 1000)));
   const url = 'https://discord.com/oauth2/authorize?' + new URLSearchParams({ client_id: ID(), response_type: 'code', scope: 'identify',
     redirect_uri: DISCORD_REDIRECT, state, prompt: 'consent' }).toString();
-  return res.status(200).json({ ok: true, url });
+  return res.status(200).json({ ok: true, url, ticket: nonce });
 }
 
 // Retour là où le geste a été lancé : la carte, ou Paramètres → Mon compte.
@@ -94,7 +113,7 @@ export async function retourDiscord(req, res, f = fetch) {
   const nonce = lireCookie(req);
   res.setHeader('Set-Cookie', cookie('', 0));            // une seule fois, quoi qu'il arrive
   const q = req.query || {};
-  const ouVu = /\.c\.[0-9a-f]{40}$/.test(String(q.state || '')) ? 'compte' : 'carte';   // seulement pour savoir OÙ dire l'erreur
+  const ouVu = /\.c\.(?:[0-9a-f]{32}\.)?[0-9a-f]{40}$/.test(String(q.state || '')) ? 'compte' : 'carte';   // seulement pour savoir OÙ dire l'erreur
   if (q.error) return versApp(res, 'discord-erreur=annule', ouVu);
   if (!discordConfigure()) return versApp(res, 'discord-erreur=non-configure', ouVu);
   const etat = lireEtatComplet(q.state, nonce);
@@ -112,6 +131,72 @@ export async function retourDiscord(req, res, f = fetch) {
     if (!u.ok || !ju) return versApp(res, 'discord-erreur=discord', ou);
     const pseudo = pseudoDiscordDe(ju);
     if (!pseudo) return versApp(res, 'discord-erreur=ancien', ou);
-    return versApp(res, 'discord=' + encodeURIComponent(pseudo) + '&preuve=' + encodeURIComponent(signerPreuve(owner, pseudo)), ou);
+    const frag = 'discord=' + encodeURIComponent(pseudo) + '&preuve=' + encodeURIComponent(signerPreuve(owner, pseudo));
+    if (etat.memeNavigateur) return versApp(res, frag, ou);
+    // Autre navigateur (téléphone : app Discord → Safari) : rangé pour l'app qui a lancé.
+    const range = await rangerAttente(owner, etat.ticket, pseudo, ou, f);
+    return pageAilleurs(res, range, frag, ou);
   } catch (_) { return versApp(res, 'discord-erreur=discord', ou); }
+}
+
+// ── La preuve en attente (retour arrivé dans un AUTRE navigateur) ─────────────
+const SB_URL = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const SERVICE = () => String(process.env.SUPABASE_SERVICE_KEY || '');
+export const DISCORD_ATTENTE_ID = 'discord_attente';
+const empreinte = (t) => crypto.createHash('sha256').update('vrm-discord-ticket|' + String(t)).digest('hex');
+const enTetesService = () => { const k = SERVICE(); return k.startsWith('eyJ') ? { apikey: k, Authorization: 'Bearer ' + k } : { apikey: k }; };
+
+export async function rangerAttente(owner, ticket, pseudo, ou, f = fetch) {
+  if (!SERVICE() || !UUID_RE.test(String(owner)) || !NONCE_RE.test(String(ticket))) return false;
+  try {
+    const r = await f(SB_URL() + '/rest/v1/app_data?on_conflict=owner,id', {
+      method: 'POST',
+      headers: { ...enTetesService(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner, id: DISCORD_ATTENTE_ID, data: { v: 1, h: empreinte(ticket), discord: pseudo, preuve: signerPreuve(owner, pseudo), ou, at: new Date().toISOString() } }]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
+
+// POST /api/compte?mode=discord-attente { ticket } (session) : l'app qui a lancé
+// le geste reprend la preuve. Trois états : prête · pas encore · pas su (503).
+export async function attenteDiscord(req, res, utilisateur, corps, f = fetch, maintenant = Date.now()) {
+  const ticket = String((corps && corps.ticket) || '');
+  if (!NONCE_RE.test(ticket)) return res.status(400).json({ ok: false, erreur: 'ticket' });
+  if (!SERVICE()) return res.status(503).json({ ok: false, erreur: 'pas-su' });
+  const owner = String(utilisateur.id).toLowerCase();
+  if (!UUID_RE.test(owner)) return res.status(400).json({ ok: false, erreur: 'session' });
+  let rows;
+  try {
+    const r = await f(SB_URL() + '/rest/v1/app_data?id=eq.' + DISCORD_ATTENTE_ID + '&owner=eq.' + owner + '&select=data', { headers: enTetesService() });
+    if (!r || !r.ok) return res.status(503).json({ ok: false, erreur: 'pas-su' });
+    rows = await r.json();
+  } catch (_) { return res.status(503).json({ ok: false, erreur: 'pas-su' }); }
+  const d = Array.isArray(rows) && rows[0] && rows[0].data;
+  const age = d ? maintenant - Date.parse(d.at || '') : NaN;
+  if (!d || !egal(String(d.h || ''), empreinte(ticket)) || !(age >= -60000 && age <= VALIDITE_MS)) return res.status(200).json({ ok: true, pret: false });
+  try { await f(SB_URL() + '/rest/v1/app_data?id=eq.' + DISCORD_ATTENTE_ID + '&owner=eq.' + owner, { method: 'DELETE', headers: { ...enTetesService(), Prefer: 'return=minimal' } }); } catch (_) {}
+  return res.status(200).json({ ok: true, pret: true, discord: String(d.discord || ''), preuve: String(d.preuve || ''), ou: d.ou === 'compte' ? 'compte' : 'carte' });
+}
+
+// La page vue dans l'AUTRE navigateur : elle dit de revenir dans VRM. Si ce
+// navigateur a, lui aussi, une session VRM du même compte, « Ouvrir ici » finit
+// le geste (la preuve est liée au compte). Aucun script, une politique stricte.
+function pageAilleurs(res, range, frag, ou) {
+  const lien = (ou === 'compte' ? '/?tab=settings&vue=compte#' + frag + '&ou=compte' : '/?tab=communaute#' + frag).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const titre = range ? 'Discord est relié — retourne dans VRM' : 'Presque fini';
+  const texte = range
+    ? 'Ton compte Discord est vérifié. Reviens dans l’application VRM (l’écran d’accueil de ton téléphone) : il y apparaît tout seul dans quelques secondes.'
+    : 'VRM n’a pas pu le noter pour ton application. Ouvre le lien ci-dessous ; si ça ne marche pas, relance « Se connecter avec Discord » depuis VRM.';
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'");
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.end('<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VRM · Discord</title>'
+    + '<style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#F4F6FA;color:#10151B;font:16px/1.5 -apple-system,system-ui,sans-serif;padding:16px}'
+    + '@media (prefers-color-scheme:dark){body{background:#07090D;color:#E8ECF2}.c{background:#10141B;border-color:#1E2430}}'
+    + '.c{max-width:420px;background:#fff;border:1px solid #E3E7EE;border-radius:12px;padding:28px 24px;box-shadow:0 1px 2px rgba(0,0,0,.06),0 12px 32px rgba(0,0,0,.08)}'
+    + 'h1{font-size:20px;margin:0 0 10px}p{margin:0 0 20px;opacity:.85}a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:8px;background:#2458E6;color:#fff;text-decoration:none;font-weight:600}</style></head>'
+    + '<body><div class="c" data-discord-ailleurs="' + (range ? 'range' : 'pas-range') + '"><h1>' + titre + '</h1><p>' + texte + '</p><a href="' + lien + '">Ouvrir VRM ici</a></div></body></html>');
+  return res;
 }

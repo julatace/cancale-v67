@@ -21,6 +21,7 @@ ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(locat
 // nettoyée aussitôt (la preuve ne reste ni dans la barre ni dans l'historique).
 if (typeof window !== 'undefined' && /(^|[#&])discord(-erreur)?=/.test(String(window.location.hash || ''))) {
   try { sessionStorage.setItem('vrm_discord_retour', String(window.location.hash).replace(/^#/, '')); } catch (_) {}
+  try { localStorage.removeItem('vrm_discord_ticket'); } catch (_) {}   // le retour est arrivé ICI : plus rien à reprendre
   try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search); } catch (_) {}
 }
 if (typeof window !== 'undefined') {

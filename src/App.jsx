@@ -29,6 +29,7 @@ import { normAdresse } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
+import { noterTicketDiscord, ecouterDiscord } from "./communaute/discordAttente.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -43789,7 +43790,7 @@ function DiscordCompte() {
     try {
       const r = await fetch('/api/compte?mode=discord-debut', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ ou: 'compte' }) });
       const j = await r.json().catch(() => null);
-      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { window.location.href = j.url; return; }
+      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { noterTicketDiscord(j.ticket, 'compte'); window.location.href = j.url; return; }
       setMsg((j && j.message) || DISCORD_ERREURS.discord);
     } catch (_) { setMsg(DISCORD_ERREURS.discord); }
     setOccupe(false);
@@ -45461,6 +45462,9 @@ function AppCoeur() {
   // Ordinateur ou téléphone : décide la NAVIGATION et la largeur de lecture.
   const ordi = useOrdinateur();
   React.useEffect(()=>onAuthChange(setAuthState),[]);
+  // Discord lancé sur le téléphone : le retour arrive dans un autre navigateur ;
+  // l'app reprend la preuve rangée par le serveur (src/communaute/discordAttente.js).
+  React.useEffect(()=>ecouterDiscord(enTeteSession),[]);
   // ── LE JOURNAL DES PLANTAGES PART DANS SA BASE (src/plantages.js) ──────────
   // AppCoeur ne monte qu'avec une session : c'est ici seulement qu'on peut
   // écrire AU NOM du vendeur (RLS). Une écriture non confirmée reste en file et

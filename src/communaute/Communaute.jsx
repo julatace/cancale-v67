@@ -518,6 +518,7 @@ function DiscordDe({ pseudo }) {
     <button type="button" className="vrm-cm-lien" onClick={copier} data-cm-discord-copier>{copie || 'Copier'}</button></span>;
 }
 
+import { noterTicketDiscord } from './discordAttente.js';
 export { DISCORD_ERREURS };
 function MonDiscord({ api, headers, oauth, actuel, compte = '', onFait }) {
   const [ouvert, setOuvert] = useState(false), [v, setV] = useState(actuel), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
@@ -526,7 +527,7 @@ function MonDiscord({ api, headers, oauth, actuel, compte = '', onFait }) {
     try {
       const r = await fetch('/api/compte?mode=discord-debut', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: '{}' });
       const j = await r.json().catch(() => null);
-      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { window.location.href = j.url; return; }
+      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { noterTicketDiscord(j.ticket, 'carte'); window.location.href = j.url; return; }
       setMsg((j && j.message) || DISCORD_ERREURS.discord);
     } catch (_) { setMsg(DISCORD_ERREURS.discord); }
     setOccupe(false);
