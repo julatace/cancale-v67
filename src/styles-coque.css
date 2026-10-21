@@ -390,3 +390,7 @@
   /* Au défilement, le titre de l'écran prend le centre : le nom s'efface. */
   .vrm-app-header.is-defile .vrm-hdr-entreprise { opacity: 0; }
 }
+
+/* (21 oct.) Le bandeau « données plus à jour » d'une plateforme touchait la rangée
+   des sections (ordinateur) et la carte « Compte » (téléphone) : un espace après lui. */
+.vrm-fraicheur-plat:has(> *) { padding-bottom: 10px !important; }

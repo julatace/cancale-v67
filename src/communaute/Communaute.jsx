@@ -402,7 +402,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     <div className="vrm-cm-carton">
       {etat === 'non-installe' ? <><b>La carte de la communauté n’est pas encore activée sur ta base.</b><p>Elle s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est perdu, rien n’est partagé d’ici là.</p></>
         : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>La carte de la communauté est réservée aux abonnés : tu n’es pas montré aux autres tant qu’il n’est pas réglé.</p></>
-        : <><b>{PAS_SU}</b><p>Ce n’est pas que personne n’est sur la carte : je n’ai simplement pas pu la lire.</p><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
+        : <><b>{PAS_SU}</b><p>Ça ne veut pas dire que personne n’y est. Réessaie dans un instant.</p><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
     </div></section>;
 
   const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
