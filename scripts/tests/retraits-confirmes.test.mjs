@@ -24,3 +24,6 @@ test('la vraie réception conserve la confirmation et refuse d’écraser un sui
   panne=true;const ko=await appel('Votre colis est disponible');assert.equal(ko.code,503);assert.equal(ko.body.reception,undefined);assert.ok(!ecrites.some(x=>x.id.startsWith('email_track_')));
  }finally{global.fetch=original;delete process.env.EMAIL_INBOUND_SECRET;delete process.env.VRM_OWNER_UID;}
 });
+test('prise en charge et livraison future ne confirment pas le retrait',()=>{
+ for(const sujet of ['Votre colis sera livré demain','Nous avons bien reçu votre colis','Colis réceptionné par le transporteur'])assert.equal(etatColisDepuisTexte(sujet),'transit');
+});

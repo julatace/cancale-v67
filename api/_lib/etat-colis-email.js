@@ -9,6 +9,7 @@ function lire(texte){
  if(retrait&&!negatif)return 'delivered';
  const point=/\b(?:livre|arrive|depose)\s+(?:dans\s+(?:le|la)|au|en|chez|a\s+(?:la|une|un))\s+(?:point|relais|consigne|casier|locker|bureau)/.test(t);
  if(point||/disponible|a\s+retirer|(?:vous|t')\s*attend|pret\s+(?:pour\s+le\s+retrait|a\s+etre\s+retire)/.test(t)||negatif)return 'available';
+ if(/(?:sera|va etre|doit etre|pret a etre)\s+livre|(?:nous avons|nous avons bien|transporteur a)\s+(?:bien\s+)?recu|receptionne\s+(?:par le transporteur|dans notre)/.test(t))return 'transit';
  if(/\blivre\b|bien\s+recu|receptionne|livraison\s+(?:effectuee|reussie)/.test(t))return 'delivered';
  if(/acheminement|en\s+transit|expedie|pris\s+en\s+charge|en\s+cours\s+de\s+livraison/.test(t))return 'transit';
  return null;
