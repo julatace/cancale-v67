@@ -10766,6 +10766,36 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
   seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
   faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
 
+### « Le boost est-il rentable ? » (Statistiques, 21 octobre)
+Fonction retenue le 11 octobre. Carte `BoostRentable` sous « Ce qui se vend »
+(une seule voix, §7), règle pure `src/boostRentable.js`.
+- **Mesuré (lecture seule)** : `promoted` = 0 `true` sur 380 annonces captées (347
+  `false`, 33 sans le champ) ; « Boost payé » (`vinted_annonce_numeros[id].fees`)
+  saisi sur 0 fiche sur 478 ; `boost_forme` n'a vu que `bumps`
+  (`minimum_price.has_free_bumps`, 41 fois) ; `invoice_lines` des porte-monnaie :
+  aucune ligne de boost. ⇒ Aujourd'hui la carte dit « pas assez de ventes pour
+  juger » — c'est juste.
+- **Règle** : vente → annonce par la transaction (`txn[tx].item`), jamais par le
+  titre ; boostée = `promoted === true` OU « Boost payé » > 0 ; non boostée =
+  `promoted === false` sans montant ; absent = pas compté (dit). Comparaison
+  limitée aux tranches de prix (< 30, 30-60, 60-100, ≥ 100 €) où il y a des deux
+  côtés ; moins de 5 de chaque côté ⇒ aucun chiffre ; chaque mesure (délai
+  médian, vues, favoris, marge médiane boost déduit) exige 5 valeurs connues de
+  chaque côté, sinon « — ». La marge d'une boostée exige son montant saisi
+  (sinon coût inconnu) et son prix d'achat (`prixAchatDe`). Annulées et comptes
+  écartés exclus. Transactions, annonces ou fiches illisibles ⇒ « pas pu lire ».
+  Mêmes lectures que « Ce qui se vend » (`lireExtrasRepartition`, qui garde
+  maintenant `promoted`, `views`, `favourites`). Un repère : n'entre dans aucun
+  total. Aucune couleur verte/rouge.
+- ⚠️ Vinted ne dit « boostée » que PENDANT le boost : une paire boostée puis
+  vendue après la fin compte parmi « les autres » si le montant n'est pas saisi
+  (la carte le dit).
+- Preuves : `audit-boost-rentable.cjs` (18 contrôles ; `--prouve` 7/7 mutations :
+  seuil, absent = non boostée, sans tranche, boost non déduit, marge sans
+  montant, « pas su » lu vide, rapprochement par titre) ; banc
+  `bancs/boost-rentable.cjs` (`BANC_PORT`, 1512 + 390 tactile, données
+  inventées) 32 contrôles, rouge sur le build d'origin/main, rouge sous mutation.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

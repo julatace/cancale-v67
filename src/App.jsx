@@ -5,6 +5,7 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
+import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
@@ -20158,6 +20159,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
       <RepartitionsVentes panelOff={panelOff}/>
 
+      {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
+      <BoostRentable panelOff={panelOff}/>
+
       {/* Graphique du CA par date de vente (cliquable) */}
       {caHistoryVente.length>0&&(()=>{
         const maxCA=Math.max(...caHistoryVente.map(h=>h.ca),1);
@@ -26986,7 +26990,7 @@ const lireExtrasRepartition = async () => {
     for (const r of items) for (const it of ((r && Array.isArray(r.items)) ? r.items : [])) {
       if (!it || it.id == null) continue;
       const w = mapWardrobeItem(it);
-      idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id };
+      idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id, promoted: w.promoted, views: w.views, favourites: w.favourites };
     }
   }
   _repartCache = { at: Date.now(), txn, items: idx, dates };
@@ -27106,6 +27110,77 @@ function RepartitionsVentes({ panelOff }) {
           Sur {bloc.n} vente{bloc.n > 1 ? 's' : ''} dont {mode === 'pays' ? 'le pays du client' : mode === 'marques' ? 'la marque' : mode === 'tailles' ? 'la taille' : 'le modèle'} est connu{mode === 'marques' || mode === 'tailles' ? 'e' : ''} (sur {R.total}){mode === 'pays' ? ' · lu dans le détail de la transaction' : mode === 'modeles' ? ' · lu dans le titre' : ' · lue sur l’annonce, sinon dans le titre'}.
         </div>}
         {manque > 0 && <div style={{...sNote,fontSize:11,marginTop:4}}>Sans {manque} compte{manque > 1 ? 's' : ''} dont les ventes n'ont pas pu être lues.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LE BOOST EST-IL RENTABLE ? (21 octobre, fonction retenue le 11 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// La règle vit dans src/boostRentable.js (pure, exécutée par
+// scripts/audit-boost-rentable.cjs). Ici on lui donne les MÊMES lectures que
+// « Ce qui se vend » (ventes de la coque, transaction → annonce, dressing,
+// dates de mise en ligne) et les fiches N° (montant « Boost payé » saisi, prix
+// d'achat). Un repère, jamais de la compta : rien n'entre dans un total.
+// Aucune couleur d'alerte ni de réussite (§7) : un repère se lit, il ne juge pas.
+function BoostRentable({ panelOff }) {
+  const { ventes } = useVentesCoque();
+  const [extras, setExtras] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
+  const [nuage, setNuage] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => setNuage(true)), []);
+  const R = React.useMemo(() => {
+    if (!Array.isArray(ventes) || !extras || !nuage) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    let fiches = null, buyByNum = {};
+    try { fiches = load('vinted_annonce_numeros', {}) || {}; buyByNum = load('vinted_buyprice_by_num', {}) || {}; } catch (_) { fiches = null; }
+    return boostRentable({
+      ventes, txn: extras.txn, items: extras.items, fiches,
+      estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
+      ecarte: (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOff || {}),
+      montantVente: montantCommande,
+      dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
+      prixAchat: (f) => prixAchatDe(f, buyByNum),
+    });
+  }, [ventes, extras, nuage, panelOff]);
+  const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
+  const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
+  const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Le boost est-il rentable ?</div>;
+  if (ventes === undefined || extras === undefined || !nuage) return <div data-stats-carte="boost" data-boost-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes et tes annonces…</div></div>;
+  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes ou tes annonces n'ont pas pu être lues : rien n'est comparé plutôt qu'une comparaison fausse. Rouvre l'écran dans un moment.</div></div>;
+  const jFmt = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${Math.round(j)} j`);
+  const nFmt = (v) => (v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ','));
+  const eFmt = (v) => (v == null ? '—' : fmt(v));
+  const lignes = [
+    { k: 'delai', lib: 'Délai de vente (médiane)', m: R.delai, f: jFmt },
+    { k: 'vues', lib: 'Vues (moyenne)', m: R.vues, f: nFmt },
+    { k: 'favoris', lib: 'Favoris (moyenne)', m: R.favoris, f: nFmt },
+    { k: 'marge', lib: 'Marge, boost déduit (médiane)', m: R.marge, f: eFmt },
+  ];
+  const s = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  return (
+    <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
+      {titre}
+      <div data-boost-couverture="" style={{...sNote,fontSize:11,marginTop:6}}>
+        Sur {s(R.boostees, 'paire')} boostée{R.boostees > 1 ? 's' : ''} vendue{R.boostees > 1 ? 's' : ''} dont {R.avecMontant} avec montant saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''} · comparées dans une même tranche de prix : {R.comparables.b} contre {R.comparables.nb}.
+        {(R.inconnues > 0 || R.sansAnnonce > 0) ? <> Pas comptées : {[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(' · ')}.</> : null}
+      </div>
+      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger : il en faut au moins {SEUIL_BOOST} boostées et {SEUIL_BOOST} non boostées dans une même tranche de prix.</div>}
+      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
+        <span/>
+        <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Boostées</span>
+        <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Les autres</span>
+        {lignes.map((l) => (
+          <React.Fragment key={l.k}>
+            <span style={{fontSize:13,color:C.text,minWidth:0}}>{l.lib}</span>
+            <span data-boost-val={`${l.k}-b`} className="vrm-display" style={{fontSize:15,fontWeight:600,color:l.m.b == null ? C.muted : C.text,textAlign:'right',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{l.f(l.m.b)}</span>
+            <span data-boost-val={`${l.k}-nb`} className="vrm-display" style={{fontSize:15,fontWeight:600,color:l.m.nonb == null ? C.muted : C.text,textAlign:'right',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{l.f(l.m.nonb)}</span>
+          </React.Fragment>
+        ))}
+      </div>
+      <div style={{...sNote,fontSize:11,marginTop:10}}>
+        Un repère, pas de la comptabilité : rien ici n'entre dans un total. Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son « Boost payé » (Annonces → Gérer l’annonce). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.
       </div>
     </div>
   );
