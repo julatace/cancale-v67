@@ -10674,6 +10674,14 @@ Julien : « sur téléphone on ne peut pas se connecter à Discord », « l'accu
 - **Accueil** : « VR / M » coupé dans la colonne VRM/Toi corrigé, plateformes en pastilles de couleur (plus de faux boutons), textes plus lisibles. `accueil.cjs` 171 verts.
 - **Sécurité** : `Referrer-Policy`, `Permissions-Policy` (caméra, micro, position : le site seul ; paiement, USB… coupés), `Cross-Origin-Opener-Policy: same-origin-allow-popups`, HSTS. Conseillers Supabase : rien d'anormal (tables fermées et fonctions « ma donnée seulement » voulues). Erreurs de production : aucune depuis le 20 oct. midi.
 
+### La date d'arrivée de chaque colis à retirer (21 octobre)
+Julien : « Améliore les colis, je veux que l'on voie la date à laquelle il est arrivé. »
+- **Une règle** (`api/_lib/arrivee-colis.js`, importée par l'app ET `api/email-inbound`, §11) ; une ligne `LigneArrivee` sous le titre de chaque carte d'Achats → À retirer (email, colis vu par Vinted, retirés en attente, jamais retirés) : « Arrivé le 18 oct. · il y a 3 j », neutre ; `data-arrive-le="AAAA-MM-JJ"` (ou `inconnue`) et `data-arrive-sur="oui|borne"`. Elle était cachée dans « Détails du colis » et FAUSSE une fois sur cinq.
+- ⚠️⚠️ **Mesuré (lecture seule)** : `email_track_*.receivedAt` est la date du DERNIER email — les rappels (« Le temps file… », « Libère de la place dans la consigne… ») réécrivent la ligne : **6 des 30** colis « disponibles » portaient la date d'un rappel. Email d'arrivée (« … est disponible », « … est arrivé en relais ») ⇒ date sûre ; rappel, « TR : », sujet inconnu ⇒ « **Arrivé au plus tard le** » ; le serveur garde désormais `arriveLe` (premier email d'arrivée, relu sur la ligne d'avant) — les lignes déjà rangées n'en ont pas.
+- **Colis vu seulement par Vinted** : aucune date d'arrivée en base (la commande porte la date d'ACHAT, la transaction celle du paiement — mesuré sur ses 3 colis ; leurs conversations ne sont pas rangées). `panel_colis_relais.at` = heure de LECTURE par l'extension ⇒ « au plus tard » ; rien ⇒ « Date d'arrivée inconnue ». Jamais l'heure de capture présentée comme l'arrivée.
+- Preuves : banc `colis-arrivee.cjs` (390 tactile + 1512, données inventées) **16 rouges sur le build d'avant**, rouge sous la mutation « rappel daté comme l'arrivée » (4) ; `audit-arrivee-colis.cjs` (la vraie route : « disponible » le 16 puis rappel le 20 ⇒ `arriveLe` le 16) 2 rouges sur l'avant, rouge si la ligne d'avant n'est pas passée.
+- Non fait : Colis (à expédier) — rien ne date l'arrivée chez l'acheteur ; l'extension pourrait ranger l'heure du MESSAGE d'arrivée de la conversation (`created_at_ts`) — chantier extension.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

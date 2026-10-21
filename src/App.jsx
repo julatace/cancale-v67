@@ -16,6 +16,7 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
+import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -13803,6 +13804,17 @@ function PhotoArticleAgrandissable({src,titre,children}) {
   </>;
 }
 
+// (21 oct.) LA DATE D'ARRIVÉE D'UN COLIS À RETIRER — une ligne, la même sur
+// chaque carte (§11 : la règle vit dans api/_lib/arrivee-colis.js, partagée
+// avec le serveur). « Arrivé le 18 oct. · il y a 3 j » ; une date qui n'est
+// qu'une borne (rappel, lecture de la conversation) dit « au plus tard » ;
+// inconnue ⇒ « Date d'arrivée inconnue », jamais une date inventée. Neutre
+// (§7) : l'urgence, c'est la date limite, déjà dite à part.
+function LigneArrivee({arr, style}) {
+  return <div className="vrm-arrive" data-arrive-le={arr ? jourLocal(arr.ms) : 'inconnue'} data-arrive-sur={arr ? arr.sur : ''}
+    title={arr && arr.sur==='borne' ? 'Le colis était déjà au point relais ce jour-là ; la date exacte de son arrivée n’est pas connue.' : undefined}
+    style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.3,...(style||{})}}>{texteArrivee(arr)}</div>;
+}
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
   React.useEffect(()=>setEtat(''),[code]);
@@ -36152,6 +36164,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
+                        <LigneArrivee arr={arriveeColisVinted(rel)}/>
                         {/* ⚠️ « Il manque des infos utiles » (Julien). Le prix et
                             la date SONT portés par la commande Vinted (§5 retrait :
                             transaction_id, date, titre, prix, statut) — la MÊME
@@ -36412,6 +36425,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               qu'on SAIT — le transporteur — et le n° reste sur sa
                               ligne, une seule fois. */}
                           <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.artTitle||carrierName(t.carrier)}</div>
+                          <LigneArrivee arr={arriveeColisEmail(t)}/>
                           {/* ⚠️ NI LE LIEU NI LE GESTE ICI : ils sont écrits une
                               fois, en tête de la destination. Les répéter sur
                               chaque ligne, c'était trois fois la même phrase sur
@@ -36425,16 +36439,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               depuis quand le colis attend, c'est ce qui dit s'il faut y
                               aller aujourd'hui. La date vient de l'email lui-même — et
                               un email rejoué garde SA date d'origine (api/email-rattacher). */}
-                          <details className="vrm-pickup-details"><summary>Détails du colis</summary>{(t.suivi || t.receivedAt) && (()=>{
-                            const d = t.receivedAt ? new Date(t.receivedAt) : null;
-                            const ok = d && !isNaN(d);
-                            const j = ok ? Math.round((Date.now() - d.getTime()) / 86400000) : null;
-                            return <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                              {t.suivi && <span style={{fontFamily:'monospace',letterSpacing:.5}}>n° {t.suivi}</span>}
-                              {t.suivi && ok && ' · '}
-                              {ok && <span>arrivé le {d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}{j>0?` · il y a ${j} j`:j===0?" · aujourd'hui":''}</span>}
-                            </div>;
-                          })()}{jours!=null && <div style={{fontSize:11,color:C.muted}}>Date limite : {new Date(t.limite).toLocaleDateString('fr-FR')}</div>}</details>
+                          {/* (21 oct.) La date d'arrivée est sortie de ce repli (ligne
+                              visible au-dessus) : `receivedAt` était la date du DERNIER
+                              email, souvent un rappel. */}
+                          <details className="vrm-pickup-details"><summary>Détails du colis</summary>{t.suivi && (
+                            <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              <span style={{fontFamily:'monospace',letterSpacing:.5}}>n° {t.suivi}</span>
+                            </div>)}{jours!=null && <div style={{fontSize:11,color:C.muted}}>Date limite : {new Date(t.limite).toLocaleDateString('fr-FR')}</div>}</details>
                           {/* DATE LIMITE : passé cette date le colis repart chez
                               l'expéditeur. Captée dans l'email, jamais déduite. */}
                           {jours!=null && (
@@ -36619,6 +36630,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
+                        <LigneArrivee arr={arriveeColisEmail(t)}/>
                         {t.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {t.suivi}</div>}
                       </div>
                       {qi && (
@@ -36660,6 +36672,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
+                        <LigneArrivee arr={tk ? arriveeColisEmail(tk) : arriveeColisVinted(relaisDe(o))}/>
                         {tk&&tk.suivi&&<div style={{fontSize:11,color:C.muted,fontFamily:'monospace',letterSpacing:.5,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>n° {tk.suivi}</div>}
                       </div>
                       {qi && (
@@ -36710,9 +36723,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.oublies.map((t,i)=>{
                 const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
-                const j=Math.floor((Date.now()-new Date(t.receivedAt||0).getTime())/86400000);
+                const arr=arriveeColisEmail(t);
                 return (
-                  <div key={colisKey(t)||i} data-oublie="" style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
+                  <div key={colisKey(t)||i} data-oublie="" data-arrive-le={arr?jourLocal(arr.ms):'inconnue'} data-arrive-sur={arr?arr.sur:''} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
                     <CarrierBadge carrier={t.carrier} size={20}/>
                     <div style={{flex:'1 1 150px',minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -36721,7 +36734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* (revue du 19 oct.) L'âge est ce qui compte ici : la ligne
                           passe à la ligne au lieu d'être coupée (« il y a… » à 390 px). */}
                       <div data-oublie-info="" style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
-                        n° {t.suivi||'?'} · arrivé le {new Date(t.receivedAt||0).toLocaleDateString('fr-FR')} · <b style={{color:C.warn,whiteSpace:'nowrap'}}>il y a {isFinite(j)?j:'?'} j</b>
+                        n° {t.suivi||'?'} · <b style={{color:C.warn,fontWeight:600}}>{texteArrivee(arr)}</b>
                       </div>
                     </div>
                     {/* Les gestes forment UN groupe, poussé à droite : « Je l'ai eu »
