@@ -72,7 +72,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
             : msg.action === 'freshness' ? { ok: true, fresh: [] }
             : msg.action === 'codeVersion' ? (faux.codeMuet ? undefined : { ok: true, code: faux.code || null })
             // Une connexion qui met 300 ms : de quoi cliquer plusieurs fois.
-            : msg.action === 'authLogin' ? { ok: true, __lent: 300 }
+            : msg.action === 'authLogin' ? (faux.loginRep || { ok: true, __lent: 300 })
             : { ok: true };
           if (faux.codeMuet && msg.action === 'codeVersion') return;   // ne répond jamais
           setTimeout(() => cb && cb(r), (r && r.__lent) || 0);
@@ -193,6 +193,37 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     } });
     const n = r.envoyes.filter((a) => a === 'authLogin').length;
     dit(n === 1, 'un clic et deux Entrée pendant la connexion : UNE seule connexion envoyée', `${n} envois`);
+  });
+
+  // ⚠️⚠️ CAPTCHA (21 oct.) : le jour où Turnstile est allumé dans Supabase,
+  //    GoTrue refuse `grant_type=password` sans jeton (400 « captcha
+  //    protection: request disallowed »). La fenêtre ne peut pas afficher
+  //    Turnstile : elle doit le DIRE en français et donner le geste qui marche.
+  //    Deux formes servies : le refus brut (ce que relaie un service worker
+  //    d'avant la 5.202) et le refus traduit (`captcha: true`, 5.202).
+  const tape = async (pg) => { await ouvrirMdp(pg); await pg.fill('#mail', 'sophie@exemple.fr'); await pg.fill('#pw', 'motdepasse-vrm'); await pg.click('#inBtn'); };
+  const BRUT = { ok: false, error: 'captcha protection: request disallowed (no captcha response (captcha_token) found in request)' };
+  const TRADUIT = { ok: false, captcha: true, error: 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».' };
+  for (const [nom, rep] of [['refus brut', BRUT], ['refus traduit', TRADUIT]]) {
+    for (const carte of [false, true]) {
+      await essaie('captcha ' + nom + (carte ? ' (carte)' : ''), async () => {
+        const r = await rendre(nav, { ok: true, connecte: false }, { carte, geste: tape, faux: { loginRep: rep } });
+        const lieu = carte ? ' (carte)' : '';
+        dit(/plus possible depuis l.extension/i.test(r.txt) && /Se connecter avec VRM/.test(r.txt), `GoTrue refuse pour captcha (${nom})${lieu} : la phrase claire, en français`, r.txt.replace(/\n/g, ' · ').slice(0, 260));
+        dit(!/captcha protection|request disallowed/i.test(r.txt), `et pas le message brut de GoTrue${lieu}`);
+        dit(r.boutons.includes('captchaLierBtn'), `et le bouton « Se connecter avec VRM » est proposé juste là${lieu}`, JSON.stringify(r.boutons));
+        dit(!r.champs.some((c) => c.id === 'pw' && c.visible), `et le champ mot de passe ne réclame plus rien${lieu}`, JSON.stringify(r.champs));
+      });
+    }
+  }
+  await essaie('captcha : le bouton ouvre VRM', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: async (pg) => { await tape(pg); await pg.waitForTimeout(150); await pg.click('#captchaLierBtn'); }, faux: { loginRep: TRADUIT } });
+    dit(r.envoyes.includes('lierAvecVRM'), 'le bouton du refus captcha lance « Se connecter avec VRM »', JSON.stringify(r.envoyes));
+  });
+  // L'autre sens : un mauvais mot de passe n'est PAS un refus captcha.
+  await essaie('mauvais mot de passe', async () => {
+    const r = await rendre(nav, { ok: true, connecte: false }, { geste: tape, faux: { loginRep: { ok: false, error: 'Email ou mot de passe incorrect.' } } });
+    dit(/Email ou mot de passe incorrect/.test(r.txt) && !r.boutons.includes('captchaLierBtn') && !/plus possible depuis/.test(r.txt), 'un mauvais mot de passe reste un mauvais mot de passe (pas de phrase captcha)', r.txt.replace(/\n/g, ' · ').slice(0, 200));
   });
 
   // ── 2. CONNECTÉ — on ne redemande rien ───────────────────────────────────

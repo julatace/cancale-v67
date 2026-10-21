@@ -484,6 +484,10 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-pickup-method { position:absolute; right:8px; top:5px; z-index:4; border:0 !important; }
 .vrm-pickup-method > summary { display:grid; place-items:center; width:40px; min-height:40px; padding:0; border-radius:8px; font-size:16px; cursor:pointer; list-style:none; }
 .vrm-pickup-method > summary::-webkit-details-marker { display:none; }
+/* (21 oct.) Un « i » nu se lisait comme une lettre égarée au bout du titre :
+   il porte maintenant son cercle, centré dans sa zone de 44 px. */
+.vrm-pickup-method > summary { position:relative; color:var(--vrm-muted); }
+.vrm-pickup-method > summary::before { content:''; position:absolute; inset:0; margin:auto; width:20px; height:20px; box-sizing:border-box; border:1.5px solid currentColor; border-radius:50%; pointer-events:none; }
 .vrm-pickup-method > div { position:absolute; right:0; top:44px; width:min(280px,calc(100vw - 64px)); padding:12px !important; border:1px solid var(--vrm-line) !important; border-radius:10px; background:var(--vrm-surface); box-shadow:0 4px 16px #0002; }
 .vrm-pickup-location-label { display:none; }
 .vrm-pickup-card { position:relative; border:0 !important; border-radius:0 !important; margin-bottom:0 !important; padding:12px !important; }
@@ -833,8 +837,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-pickup-dest > div { flex:1 1 auto !important; }
 .vrm-pickup-dest > div > div:nth-child(2) { font-size:16px !important; letter-spacing:-.01em; }
 .vrm-achats .vrm-pickup-point > div:first-child { padding-right:60px !important; }
-.vrm-achats .vrm-pickup-method { top:8px; right:8px; }
-.vrm-achats .vrm-pickup-method > summary { width:44px; min-height:44px; border-radius:10px; font-weight:600; font-size:15px; }
+.vrm-achats .vrm-pickup-method { top:0; right:6px; }
+.vrm-achats .vrm-pickup-method > summary { width:44px; min-height:44px; border-radius:10px; font-weight:700; font-size:12px; }
 .vrm-achats .vrm-pickup-method > div { top:48px; }
 .vrm-achats .vrm-pickup-point > div:last-child { padding:0 !important; gap:0 !important; }
 .vrm-achats .vrm-pickup-card { display:flex !important; flex-wrap:wrap; align-items:flex-start !important; gap:12px !important; padding:14px 16px !important; background:transparent !important; }

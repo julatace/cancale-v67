@@ -95,6 +95,23 @@ const projette = (row, sel) => {
 let modePdf = 'ok', tamponOctets = 0;
 const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toString('base64');
 
+// (21 oct., refonte d5cc962) Le détail d'une vente vit dans un TIROIR — un
+// portail caché tant qu'il est fermé. On ouvre la ligne qui le commande
+// (aria-controls), comme une personne, puis on attend l'ÉTAT : le bouton
+// réellement visible. Jamais un délai fixe.
+async function ouvrirVente(pg, tx) {
+  const sel = `[data-bouton-bord][data-tx="${tx}"]`;
+  const ouverte = await pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return null;
+    const tiroir = b.closest('.vrm-ledger-drawer');
+    if (tiroir) { const host = tiroir.closest('.vrm-ledger-drawer-host'); if (host && !host.hidden) return true;
+      const t = document.querySelector(`.vrm-ledger-sale-toggle[aria-controls="${tiroir.id}"]`); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }
+    const ligne = b.closest('[data-ligne-ouverte]'); if (!ligne || ligne.getAttribute('data-ligne-ouverte') === 'true') return true;
+    const t = ligne.querySelector('.vrm-ledger-sale-toggle'); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }, sel);
+  if (ouverte === null) return false;
+  if (!ouverte) await pg.click('[data-banc-ouvrir="1"]').catch(() => {});
+  return pg.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; }), sel, { timeout: 5000 }).then(() => true, () => false);
+}
+
 (async () => {
   let b; const pdfDemandes = [];
   try {
@@ -144,8 +161,8 @@ const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toStr
       pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
       const avant = pdfDemandes.length;
       // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
-      await pg.evaluate(() => { const bt = document.querySelector('[data-bouton-bord="pdf"][data-tx="9001"]'); const row = bt && bt.closest('[data-ligne-ouverte="false"]'); if (row) row.querySelector('.vrm-ledger-sale-toggle').click(); }); await pg.waitForTimeout(300); 
-      try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
+      await ouvrirVente(pg, '9001'); 
+      try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
       await pg.waitForTimeout(2500);
       const urls = onglets.map((p) => p.url());
       dit(onglets.length === 1 && /^blob:/.test(urls[0] || ''), 'un clic OUVRE le bordereau dans un onglet (pas un fichier téléchargé)', JSON.stringify(urls));
@@ -195,8 +212,8 @@ const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toStr
       await pg.waitForTimeout(3500);
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
       // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
-      await pg.evaluate(() => { const bt = document.querySelector('[data-bouton-bord="pdf"][data-tx="9001"]'); const row = bt && bt.closest('[data-ligne-ouverte="false"]'); if (row) row.querySelector('.vrm-ledger-sale-toggle').click(); }); await pg.waitForTimeout(300); 
-      try { await pg.click('[data-bouton-bord="pdf"][data-tx="9001"]', { timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }
+      await ouvrirVente(pg, '9001'); 
+      try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }
       let txt = '';
       for (let i = 0; i < 20; i++) { await pg.waitForTimeout(150); txt = await pg.evaluate(() => document.body.innerText); if (attendu.test(txt) || interdit.test(txt)) break; }
       dit(attendu.test(txt) && !interdit.test(txt), nom, (txt.match(/[^\n]*(répondu|PDF|illisible|Erreur)[^\n]*/i) || [''])[0].slice(0, 120));
