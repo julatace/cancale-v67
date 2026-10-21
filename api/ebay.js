@@ -3,6 +3,7 @@ import {creerLectureCommandesEbay} from './_lib/ebay-commandes-pages.js';
 import {fusionCommandesEbay} from './_lib/ebay-synchronisation.js';
 import {preparerAgentEbay,executerAvecJournal} from './_lib/ebay-agent.js';
 import {relireCommandesCompte} from './_lib/ebay-relecture.js';
+import {resumeMessagesEbay,retirerMessageRepondu} from './_lib/ebay-messages-nonlus.js';
 // api/ebay.js — TOUTES les routes eBay en UNE seule fonction serverless.
 //
 // ⚠️ POURQUOI TOUT EN UN FICHIER : le plan Vercel Hobby limite à 12 fonctions
@@ -1605,14 +1606,30 @@ async function handleSync(ctx) {
 // caractéristiques) déjà rangé est GARDÉ par itemId ; les règles d'offre et le
 // stock ne sont pas touchés (la synchro complète, sur clic ou aux 6 h, s'en
 // occupe). Une source qui n'a pas répondu garde sa dernière capture.
+// (21 octobre) Le résumé des messages SANS RÉPONSE d'un compte (Ma journée le
+// lit, sans appeler eBay). Rangé seulement sur une page 1 LUE ; « pas su » ⇒
+// rien n'est écrit, le résumé d'avant reste.
+async function rangerResumeMessages(ctx, r) {
+  const b = r && r.body;
+  if (!b || b.ok === false || !Array.isArray(b.messages)) return false;
+  const res = resumeMessagesEbay(b.messages, b.totalPages);
+  if (!res) return false;
+  try { return await storeData(ligneDe('ebay_messages', ctx), res, ctx.owner) === true; } catch (_) { return false; }
+}
+
 async function handleRelire(ctx) {
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const token = at.token;
-  const [cmd, liste] = await Promise.all([
+  // (21 octobre) + la page 1 des messages : la relecture tourne déjà au plus
+  // toutes les ~10 min par compte (`relireEbaySiVieux`) — c'est CE rythme qui
+  // borne la lecture des messages, aucun appel de plus à l'ouverture.
+  const [cmd, liste, msgs] = await Promise.all([
     relireCommandesCompte({ owner: ctx.owner, compte: ctx.compte, token }),
     listeVendeur(token),
+    gestionEbay.messages({ page: 1 }, ctx).catch(() => null),
   ]);
+  const messagesRange = await rangerResumeMessages(ctx, msgs);
   let annoncesRange = false, programmeesRange = false;
   if (liste.ok) {
     const avant = await lireDonnee(ligneDe('ebay_listings', ctx), ctx.owner);
@@ -1633,7 +1650,7 @@ async function handleRelire(ctx) {
   const ok = cmd.ok === true;
   return { status: ok ? 200 : (cmd.status || 502), body: {
     ok, reason: ok ? undefined : cmd.reason,
-    lu: { commandes: cmd.range === true, annonces: annoncesRange, programmees: programmeesRange },
+    lu: { commandes: cmd.range === true, annonces: annoncesRange, programmees: programmeesRange, messages: messagesRange },
     commandes: { lues: cmd.lues == null ? null : cmd.lues },
     ...(ok ? {} : { error: cmd.reason === 'base' ? 'La base n\'a pas répondu — la dernière capture reste.' : 'eBay n\'a pas rendu tes commandes — la dernière capture reste.' }),
   } };
@@ -1881,10 +1898,11 @@ async function handleApp(req, res) {
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),
       messageacheteur:(ctx)=>gestionEbay.contacterAcheteur(b,ctx),
-      messages:(ctx)=>gestionEbay.messages(b,ctx),
+      messages:async(ctx)=>{const r=await gestionEbay.messages(b,ctx);if(b.page==null||Number(b.page)===1)await rangerResumeMessages(ctx,r);return r;},
       message:(ctx)=>gestionEbay.message(b,ctx),
       offredetail:(ctx)=>gestionEbay.offre(b,ctx),
-      repondre:(ctx)=>gestionEbay.repondre(b,ctx),
+      // (21 octobre) Une réponse acceptée sort l'échange du compte de Ma journée.
+      repondre:async(ctx)=>{const r=await gestionEbay.repondre(b,ctx);if(r&&r.body&&r.body.ok){try{await modifierDonnee(ligneDe('ebay_messages',ctx),ctx.owner,(d)=>retirerMessageRepondu(d,b.messageId));}catch(_){}}return r;},
       offresrecues:(ctx)=>gestionEbay.offres(b,ctx),
       // (17 octobre) Évaluations à laisser aux acheteurs : la liste (lecture), et
       // l'évaluation positive (sur clic + confirmation, journalisée).

@@ -14877,6 +14877,30 @@ async function lireEbayTous(base, select, champ, comptesDonnes) {
   }
   return { comptes: r.comptes, items, illisibles, lignes: r.lignes };
 }
+// (21 octobre) Les messages eBay sans réponse de TOUS ses comptes actifs, tels
+// que la route les a rangés (`ebay_messages{suffixe}`). Rend `null` (pas su :
+// registre ou une ligne illisible — les comptes illisibles sont nommés dans
+// `illisibles` quand le registre, lui, est lu), sinon `{ total, auMoins,
+// comptes: [{ ref, nom, n }], aucune }`. `aucune` : aucun compte n'a encore de
+// résumé rangé ⇒ on ne dit rien (jamais « 0 » inventé).
+function etatMessagesEbay(r) {
+  if (!r || !Array.isArray(r.lignes)) return null;
+  const comptes = [], illisibles = [];
+  let total = 0, auMoins = false, lus = 0;
+  for (const { compte, ligne } of r.lignes) {
+    if (ligne === undefined) { illisibles.push(nomCompteEbay(compte)); continue; }
+    if (!ligne || ligne.n == null || ligne.n === '') continue;
+    const n = Number(ligne.n);
+    if (!Number.isFinite(n) || n < 0) { illisibles.push(nomCompteEbay(compte)); continue; }
+    lus++;
+    total += n;
+    if (String(ligne.complet) === 'false') auMoins = true;
+    comptes.push({ ref: compte.ref, nom: nomCompteEbay(compte), n });
+  }
+  return { total, auMoins, comptes, illisibles, aucune: lus === 0 && illisibles.length === 0, plusieurs: r.lignes.length > 1 };
+}
+// Le compte eBay à ouvrir en arrivant sur eBay → Messages depuis Ma journée.
+const DEMANDE_EBAY_MSG = { compte: null, at: 0 };
 // Les commandes eBay de TOUS ses comptes, pour l'argent (CA déclaré, bilan,
 // « ventes payées ») : un seul compte illisible ⇒ `null` (« pas su ») — jamais
 // un total partiel présenté comme complet (§5).
@@ -28042,6 +28066,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    le rappel du matin (§11). Trois états : undefined en cours · null pas su ·
   //    { aPoster, nePasPoster, horsEnvoi }.
   const colisEb = useMemo(() => ebayCmd === undefined ? undefined : colisEbay(ebayCmd), [ebayCmd]);
+  // ── LES MESSAGES eBAY SANS RÉPONSE, POUR MA JOURNÉE (21 octobre) ─────────
+  //    Lus dans le RÉSUMÉ rangé par la route (`ebay_messages{suffixe}`, écrit à
+  //    chaque relecture ~10 min et à l'ouverture d'eBay → Messages) : AUCUN
+  //    appel à eBay ici (§4.4). Trois états : undefined en cours · null pas su
+  //    (registre ou une ligne illisible) · objet. `aucune` = aucune ligne rangée
+  //    nulle part (jamais lu, ou pas d'eBay) ⇒ Ma journée se tait.
+  const [ebayMsg, setEbayMsg] = useState(undefined);
+  useEffect(() => { if (only !== 'journee') return; let mort = false; (async () => {
+    const r = await lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt');
+    if (mort) return;
+    setEbayMsg(etatMessagesEbay(r));
+  })(); return () => { mort = true; }; }, [ebayTick, only]);
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
@@ -34742,6 +34778,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
+        // (21 octobre) LES MESSAGES eBAY SANS RÉPONSE, à côté de ceux de Vinted —
+        // de TOUS ses comptes eBay actifs (le résumé rangé par la route, aucun
+        // appel à eBay ici). Pas su ⇒ jamais « 0 » : la case le dit, et une ligne
+        // sous la barre (une fois). Aucun résumé rangé nulle part ⇒ rien.
+        if (ebayMsg && !ebayMsg.aucune && !ebayMsg.illisibles.length) {
+          const nE = ebayMsg.total, avecMsg = ebayMsg.comptes.filter(c => c.n > 0);
+          const ou = ebayMsg.plusieurs && avecMsg.length ? ` (${avecMsg.map(c => `${c.nom} ${c.n}`).join(', ')})` : '';
+          const ditE = nE ? `${ebayMsg.auMoins ? 'au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse${ou}` : 'aucun message eBay sans réponse';
+          tuiles.messages = { n: unread + nE, sub: `${unread ? tuiles.messages.sub : 'Aucun message Vinted récent non lu'} · ${ditE}`, ebay: nE, versEbay: !unread && nE > 0 };
+          if (nE > 0) {
+            // Un seul compte eBay a des messages ⇒ eBay → Messages s'ouvre sur LUI.
+            const seul = avecMsg.length === 1 ? avecMsg[0].ref : null;
+            jobs.push({ id:'messages-ebay', n:nE, icon:'chat', color:C.text,
+              title:`${ebayMsg.auMoins ? 'Au moins ' : ''}${nE} message${nE>1?'s':''} eBay sans réponse`,
+              sub: ebayMsg.plusieurs && avecMsg.length ? `Sur ${avecMsg.map(c => `${c.nom} (${c.n})`).join(', ')} — réponds dans eBay → Messages` : 'Réponds dans eBay → Messages',
+              tab:'ebay_messages', avant:()=>{ DEMANDE_EBAY_MSG.compte = seul; DEMANDE_EBAY_MSG.at = Date.now(); }, prio:2 });
+          }
+        } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
+          tuiles.messages = { ...tuiles.messages, ebay: null, sub: `${tuiles.messages.sub} · messages eBay pas lus` };
+        }
         tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
@@ -34838,7 +34894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const T = [
                 { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
                 { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
-                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:'cat_msg', pasSu: loading || convs.items == null },
+                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
               ];
               return (
@@ -34847,7 +34903,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const n = x.t ? x.t.n : 0;
                     const vif = !x.pasSu && n > 0;
                     return (
-                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={x.id === 'envoyer' && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
                         style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
                         <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
                         <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
@@ -34858,6 +34914,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
               );
             })()}
+            {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
+                sans chiffre — la case « Messages » ne compte alors que Vinted. */}
+            {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
+              <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay : je n'ai pas pu les lire — rien n'est perdu, la case « Messages » ne compte pour l'instant que Vinted.</div>
+            )}
 
             {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
                 Empilées, chacune traversait 900 px pour porter trois mots et
@@ -42966,7 +43027,7 @@ const qrEnSrc = (q) => {
   if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
   return '';
 };
-function DoubleVerification() {
+function DoubleVerification({ onEtat } = {}) {
   const [f, setF] = React.useState(undefined);
   const [essai, setEssai] = React.useState(0);
   // { etape: 'qr', id, qr, secret } · { etape: 'off' } (confirmation de désactivation)
@@ -43051,6 +43112,7 @@ function DoubleVerification() {
       border: `1px solid ${msg.ton === 'passu' ? C.warn + '44' : msg.ton === 'err' ? C.danger + '33' : C.border}`}}>{msg.t}</div>
   );
   const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (actif ? 'active' : 'inactive');
+  React.useEffect(() => { if (onEtat) onEtat(etatDit); }, [etatDit]);
   return (
     <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
@@ -43414,8 +43476,54 @@ function PorteAbonnement({ uid, children }) {
     });
     return () => { mort = true; };
   }, [uid]);
-  if (!bloque) return children;
+  if (!bloque) return <>{children}{info && info.proprietaire === true && <InviteMfaProprio uid={uid}/>}</>;
   return <AbonnementRequis info={info}/>;
+}
+// ── DOUBLE VÉRIFICATION PROPOSÉE AU COMPTE PROPRIÉTAIRE (21 octobre) ─────────
+// Julien : « double vérification renforcée pour le compte propriétaire ». Le
+// compte propriétaire de l'installation (`proprietaire`, dit par la BASE via
+// `vrm_acces` — la même source que « gratuit, aucun abonnement », §11) porte
+// tout : ses comptes Vinted, eBay, la clé de service n'y est pas mais ses
+// données si. Sans facteur TOTP VÉRIFIÉ, un écran au démarrage lui propose de
+// l'activer, avec le panneau de Réglages (`DoubleVerification`, une seule
+// forme). ⚠️ AUCUN blocage : il pourrait s'enfermer dehors (téléphone perdu,
+// GoTrue muet). « Plus tard » ne revient pas avant 7 jours (rangé sur
+// l'APPAREIL — une commodité, pas une règle). Facteurs illisibles (« pas su »)
+// ⇒ rien n'est proposé. Les autres vendeurs : rien ne change.
+const MFA_PLUS_TARD_MS = 7 * 86400000;
+const cleMfaPlusTard = (uid) => 'vrm_mfa_plus_tard_' + String(uid || '');
+function InviteMfaProprio({ uid }) {
+  const [montre, setMontre] = React.useState(false);
+  const [etat, setEtat] = React.useState('');
+  React.useEffect(() => {
+    let mort = false;
+    let t = 0; try { t = Number(localStorage.getItem(cleMfaPlusTard(uid))) || 0; } catch (_) {}
+    if (t && Date.now() - t < MFA_PLUS_TARD_MS) return;
+    mfaLireFacteurs().then((f) => { if (!mort && f && Array.isArray(f.verifies) && !f.verifies.length) setMontre(true); });
+    return () => { mort = true; };
+  }, [uid]);
+  if (!montre) return null;
+  const active = etat === 'active';
+  const plusTard = () => { try { localStorage.setItem(cleMfaPlusTard(uid), String(Date.now())); } catch (_) {} setMontre(false); };
+  const fermer = () => setMontre(false);
+  return (
+    <div data-invite-mfa={active ? 'active' : 'propose'} role="dialog" aria-modal="true" aria-label="Protéger ton compte propriétaire"
+      style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <FermeAuRetour fermer={fermer}/>
+      <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
+        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Ton compte est protégé' : 'Protège ton compte propriétaire'}</div>
+        {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
+          C'est le compte propriétaire de VRM : il voit toutes tes boutiques. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
+        </div>}
+        <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
+          {active
+            ? <button type="button" data-invite-mfa-fermer="" onClick={fermer} style={{ border:'none', background:C.accent, color:C.onAccent || '#fff', borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Fermer</button>
+            : <button type="button" data-invite-mfa-plus-tard="" onClick={plusTard} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Plus tard</button>}
+        </div>
+      </div>
+    </div>
+  );
 }
 function AbonnementRequis({ info }) {
   const [occupe, setOccupe] = React.useState(false);
@@ -45732,6 +45840,9 @@ function AppCoeur() {
   // (19 oct.) Colis mène à eBay → Ventes (la commande à poster) et à eBay → À
   // traiter (une annulation demandée).
   React.useEffect(()=>{ if(tab==='ebay_agent'){ subVoulue.current='agent'; setTab('plat_ebay'); } },[tab]);
+  // (21 oct.) Ma journée mène à eBay → Messages (sur le compte qui a des messages
+  // quand il n'y en a qu'un).
+  React.useEffect(()=>{ if(tab!=='ebay_messages')return; const d=DEMANDE_EBAY_MSG; if(d.compte && Date.now()-d.at<30000) setEbayVue(d.compte); d.compte=null; subVoulue.current='messages'; setTab('plat_ebay'); },[tab]);
   // « Compléter les prix d'achat » (Réglages, Statistiques) mène à Vinted →
   // Annonces, la même porte que le rail — plus l'ancien écran `cat_annonces`.
   React.useEffect(()=>{ if(tab==='vinted_annonces'){ subVoulue.current='annonces'; setTab('plat_vinted'); } },[tab]);
@@ -45764,7 +45875,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','vinted_annonces'];
+    const TABS_OK=['journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ setTab(t); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
