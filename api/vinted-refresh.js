@@ -1,6 +1,6 @@
 import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
-import { vendeurExige, baseCloisonnee } from './_lib/session.js';
+import { vendeurExige } from './_lib/session.js';
 // api/vinted-refresh.js
 //
 // ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE, ET ELLE RAFRAÎCHISSAIT TOUS LES COMPTES DE
@@ -103,15 +103,17 @@ async function persist(acc, tokens, filtre) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
   const u = await vendeurExige(req, res);
   if (!u) return;
-  const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(u.id)}` : '';
+  const filtre = `&owner=eq.${encodeURIComponent(u.id)}`;
   try {
     const listRes = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!listRes.ok) { res.status(502).json({ error: 'Lecture Supabase impossible' }); return; }
     const accounts = await listRes.json();
+    if (!Array.isArray(accounts) || accounts.some(a => a.owner !== u.id)) { res.status(503).json({ error: "Propriété des comptes non confirmée. Aucun renouvellement effectué." }); return; }
     const now = Math.floor(Date.now() / 1000);
     const summary = [];
     for (const acc of accounts) {

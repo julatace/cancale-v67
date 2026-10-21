@@ -325,7 +325,7 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
     dit(e !== 'pend' && e && e.vinted && e.vinted.uid === UID, 'e · le compte Vinted du cookie est quand même dit', JSON.stringify(e && e !== 'pend' && e.vinted));
   });
   await essaie('e · tout le réseau muet, session valide', async () => {
-    const b = faireBg({ store: { vrmSession: session(3600e3), vrmCloisonne: true, vrmLogins: { at: Date.now() - 600000, map: { [UID]: 'angeled92' } } }, jeton: JAMAIS, sonde: JAMAIS, autre: JAMAIS });
+    const b = faireBg({ store: { vrmSession: session(3600e3), vrmCloisonne: true, vrmLogins: { owner:'vendeur-1', at: Date.now() - 600000, map: { [UID]: 'angeled92' } } }, jeton: JAMAIS, sonde: JAMAIS, autre: JAMAIS });
     const t0 = Date.now();
     const e = await borne(b.ctx.etatPourApp(), 3000);
     const dt = Date.now() - t0;
@@ -337,7 +337,7 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
   });
   await essaie('e · login inconnu, base qui répond', async () => {
     const b = faireBg({ store: { vrmSession: session(3600e3) } });
-    b.ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'angeled92' }];
+    b.ctx.getStoredAccounts = async () => [{ owner:'vendeur-1', vinted_user_id: UID, login: 'angeled92' }];
     const e = await borne(b.ctx.etatPourApp(), 3000);
     dit(e !== 'pend' && e && e.vinted && e.vinted.login === 'angeled92', 'e · autre sens : sans mémo, une base qui répond donne quand même le login', JSON.stringify(e && e !== 'pend' && e.vinted));
   });

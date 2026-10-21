@@ -1,6 +1,7 @@
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat} from './liensColis.js';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
+import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
@@ -77,7 +78,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.204.0';
+const EXT_ATTENDUE = '5.205.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -582,7 +583,13 @@ const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const writeSession = (s) => {
-  if (!s || (s.user?.id && s.user.id !== readSession()?.user?.id)) vuesSession.clear();
+  if (AUTH.user?.id !== s?.user?.id) {
+    vuesSession.clear(); _prechargeComptes=null;
+    _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
+    Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
+    try { window.__vrmLecturesPartagees?.invalider(); } catch (_) {}
+  }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
@@ -665,7 +672,7 @@ const sbAuth = (extra) => {
   // à CLOISONNE faisait lire en anonyme dès que la sonde de schéma échouait —
   // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
   const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
-  const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
+  const tok = useUser ? AUTH.session.access_token : (MULTI_USER ? 'session-vrm-requise' : SUPABASE_KEY);
   // Jeton qui expire dans la minute : on lance le renouvellement (partagé) sans
   // attendre — la lecture suivante partira avec le jeton frais.
   if (useUser && AUTH.session.refresh_token && !(AUTH.session.expires_at > Date.now() + 60000)) {
@@ -685,7 +692,7 @@ const sbAuth = (extra) => {
 // Une valeur déjà posée par l'appelant gagne (elle est plus précise que la nôtre).
 const withOwner = (row) => {
   const base = Object.assign({ updated_at: new Date().toISOString() }, row);
-  return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
+  return (CLOISONNE && AUTH.user) ? Object.assign({}, base, { owner: AUTH.user.id }) : base;
 };
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
@@ -1890,13 +1897,15 @@ let _pendingBordPrint = false;
 // j'y envoie les données de ce navigateur » — un appareil périmé pouvait donc
 // RÉÉCRIRE le nuage sur un simple 502. Rien lu ne vaut pas rien.
 const cloudLoad = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return undefined;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data`, {
       headers: sbAuth(),
     });
     if (!res.ok) return undefined;
     const rows = await res.json();
-    if (!Array.isArray(rows)) return undefined;
+    if (!Array.isArray(rows) || rows.length>1 || rows.some(r=>r.owner!==owner) || AUTH.user?.id!==owner) return undefined;
     if (rows[0] && rows[0].data) return rows[0].data;
     return null;
   } catch (_) { return undefined; }
@@ -1938,11 +1947,14 @@ const ALLEGER_AVANT_CLOUD = {
 let _pushBloque = false;
 let _prefixeRetente = false;
 const cloudPush = () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token || !CLOISONNE) return;
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_pushBloque) { _emitSync('refus'); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
+    if (AUTH.user?.id !== owner || readSession()?.user?.id !== owner) return;
     try {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
@@ -1984,8 +1996,10 @@ onCloudReady(() => { if (_pushPending) { _pushPending = false; cloudPush(); } })
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
 const save = (k,v) => {
+  const owner = AUTH.user?.id;
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   _saveTimers[k] = setTimeout(() => {
+    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; return; }
     try { localStorage.setItem(k,JSON.stringify(v)); } catch {}
     delete _saveTimers[k];
     // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
@@ -1994,6 +2008,20 @@ const save = (k,v) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
+
+// localStorage est partagé entre les onglets : le changement de vendeur
+// doit fermer l'ancien écran avant toute autre sauvegarde différée.
+window.addEventListener('storage', e => {
+  if (e.key !== SESSION_KEY && e.key !== null) return;
+  const prochaine=readSession();
+  if (AUTH.user?.id !== prochaine?.user?.id) {
+    vuesSession.clear(); _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
+    Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
+    AUTH={...AUTH,session:prochaine,user:prochaine?.user||null,ready:true};
+    _emitAuth(); location.reload();
+  }
+});
 
 // ============ COMPTES VINTED CONNECTES DIRECTEMENT (API interne) ============
 // Un compte Vinted est capture par l'extension Chrome "Shop Cancale35 - Vinted
@@ -2040,14 +2068,17 @@ const sondeLectureSansCompte = async () => {
 };
 
 const fetchVintedAccounts = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return null;
+  const filtre = `&owner=eq.${encodeURIComponent(owner)}`;
   try {
     const [res, blk] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, { headers: sbAuth() }),
-      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data${filtre}`, { headers: sbAuth() }),
     ]);
     if (!res.ok) return null;                 // la base a répondu autre chose qu'une liste
     let list = await res.json();
-    if (!Array.isArray(list)) return null;     // 522 Cloudflare : c'est du HTML, pas du JSON
+    if (!Array.isArray(list) || list.some(a=>a.owner!==owner) || AUTH.user?.id!==owner) return null; // 522 Cloudflare : c'est du HTML, pas du JSON
     // ⚠️ COMPTES SUPPRIMÉS DÉFINITIVEMENT (liste vrm_blocked_accounts) : ils ne
     // doivent JAMAIS réapparaître, même si l'extension les re-capte tant qu'ils
     // sont connectés dans Chrome (cas shop_cancale, qui « revenait tout le
@@ -2058,7 +2089,7 @@ const fetchVintedAccounts = async () => {
     if (blocked.size) {
       const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
-      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
+      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}${filtre}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
     return list;
   } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
@@ -11417,12 +11448,6 @@ const BrandMark = ({ id }) => id === 'google' ? (
   </svg>
 );
 
-// Empreinte SHA-256 du code d'accès de secours. ⚠️ Le CODE lui-même n'est nulle
-// part dans le dépôt : une empreinte ne se remonte pas. Il a été remis au
-// propriétaire en main propre. Pour le changer : recalculer l'empreinte avec
-// `echo -n "<nouveau code>" | shasum -a 256` et remplacer la ligne ci-dessous.
-const CODE_ACCES_HASH = 'abe463733a572f979547b38c378eadd7f35c273d81acee0b7f35cca551e7e426';
-
 // Les documents légaux (public/legal/*.html) : liens discrets, sur l'écran de
 // connexion (accessibles SANS compte, comme la loi l'exige) et dans Réglages.
 const DOCS_LEGAUX = [
@@ -11572,8 +11597,6 @@ function AuthScreen() {
     (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
     return () => { stop = true; };
   }, []);
-  const [codeAcces, setCodeAcces] = React.useState('');
-  const [codeErr, setCodeErr] = React.useState('');
   // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
@@ -11863,51 +11886,6 @@ function AuthScreen() {
           </div>
         </form>
         <LiensLegaux/>
-        {/* ⚠️⚠️ CETTE PORTE ÉTAIT GRANDE OUVERTE SUR INTERNET.
-            Elle existait pour une bonne raison (§12) : personne ne doit se
-            retrouver enfermé hors de son propre outil parce qu'un email de
-            confirmation n'arrive pas. Mais c'était un bouton « Entrer sans
-            compte », visible de TOUT LE MONDE, sur une adresse publique — et
-            comme la base n'est pas encore cloisonnée, un clic donnait accès à
-            l'intégralité de la boutique : ventes, achats, noms d'acheteurs,
-            codes de retrait, comptes Vinted reliés.
-            Elle demande maintenant un CODE. L'empreinte du code est dans le
-            code source, le code lui-même n'y est pas : une empreinte SHA-256
-            ne se remonte pas. Les appareils qui sont DÉJÀ entrés gardent leur
-            accès (le drapeau vit dans leur navigateur) — donc personne n'est
-            enfermé dehors, et un inconnu n'entre plus.
-            ⚠️ Ceci reste un pansement : le vrai correctif est la migration RLS
-            (SECURITE.md). Cette porte disparaît d'elle-même le jour où elle
-            passe. */}
-        {!CLOISONNE && (
-          <details style={{marginTop:12}}>
-            <summary style={{listStyle:'none',cursor:'pointer',fontSize:12,color:C.muted,textAlign:'center'}}>
-              Entrer avec un code d'accès
-            </summary>
-            <form onSubmit={async (e)=>{
-              e.preventDefault();
-              const saisi = String(codeAcces||'').trim().toLowerCase();
-              if(!saisi) return;
-              try {
-                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(saisi));
-                const hex = [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-                if (hex === CODE_ACCES_HASH) { localStorage.setItem('vrm_acces_direct','1'); location.reload(); }
-                else setCodeErr('Code incorrect.');
-              } catch(_) { setCodeErr("Ce navigateur ne sait pas vérifier le code."); }
-            }} style={{marginTop:8}}>
-              <input value={codeAcces} onChange={e=>{setCodeAcces(e.target.value);setCodeErr('');}}
-                placeholder="code d'accès" autoComplete="off" spellCheck={false}
-                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,background:C.bg,
-                  color:C.text,borderRadius:10,padding:'11px 12px',fontSize:13,fontFamily:'inherit'}}/>
-              {codeErr && <div style={{color:C.danger,fontSize:11.5,marginTop:6}}>{codeErr}</div>}
-              <button type="submit"
-                style={{width:'100%',marginTop:8,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
-                  borderRadius:10,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                Entrer
-              </button>
-            </form>
-          </details>
-        )}
         {/* ⚠️⚠️ CETTE PHRASE AFFIRMAIT UNE PROTECTION QUE `CLOISONNE` NE MESURE
             PAS. `CLOISONNE` dit seulement que la colonne `owner` EXISTE — et la
             migration autorise explicitement de s'arrêter là (« garde RLS
@@ -43267,12 +43245,6 @@ async function fermerMonCompte(confirmation) {
 // « Activée » ne s'écrit qu'APRÈS une vérification réussie d'un premier code.
 // Désactiver demande une confirmation ET un code (la session repasse en aal2,
 // ce que GoTrue exige pour supprimer un facteur vérifié).
-const qrEnSrc = (q) => {
-  const t = String(q || '').trim();
-  if (/^data:image\/svg\+xml/i.test(t)) return t;
-  if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
-  return '';
-};
 function DoubleVerification({ onEtat } = {}) {
   const [f, setF] = React.useState(undefined);
   const [essai, setEssai] = React.useState(0);
@@ -43308,12 +43280,20 @@ function DoubleVerification({ onEtat } = {}) {
       else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
       return;
     }
-    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrEnSrc(t.qr_code), secret: String(t.secret || '') });
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrMfa(t), secret: String(t.secret || '') });
   };
   const annulerActivation = async () => {
     const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
     if (id) await mfaAppel('DELETE', `factors/${encodeURIComponent(id)}`);
     relire();
+  };
+  const recommencerActivation = async () => {
+    if (busy || !cours?.id) return;
+    setBusy(true); setMsg(null);
+    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(cours.id)}`);
+    if (!d.ok) { setBusy(false); setMsg({t:"L’ancienne configuration n’a pas pu être annulée. Réessaie avant de créer un nouveau code QR.",ton:'err'}); return; }
+    setCours(null); setCode(''); setBusy(false);
+    await activer();
   };
   const confirmerActivation = async () => {
     if (busy || !cours) return;
@@ -43377,8 +43357,11 @@ function DoubleVerification({ onEtat } = {}) {
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
-        <div style={txt}>Tu es sur ce téléphone et ne peux pas scanner ? Choisis « saisir une clé » dans l'app et recopie :</div>
-        <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,margin:'6px 0 12px',wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        <details data-mfa-cle-manuelle="" style={{...txt,margin:'8px 0 12px'}}><summary style={{cursor:'pointer'}}>Configurer sans scanner le QR</summary>
+          <p>Dans ton app d’authentification, choisis « saisir une clé ». Garde cette clé privée : ne la partage pas et ne l’envoie pas en capture.</p>
+          <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        </details>
+        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} style={{...btn(false,busy),marginBottom:10}}>Remplacer cette configuration</button>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
@@ -43757,9 +43740,9 @@ function InviteMfaProprio({ uid }) {
       style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
       <FermeAuRetour fermer={fermer}/>
       <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
-        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Ton compte est protégé' : 'Protège ton compte propriétaire'}</div>
+        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Double vérification activée' : 'Sécurise ta connexion VRM'}</div>
         {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
-          C'est le compte propriétaire de VRM : il voit toutes tes boutiques. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
+          Cette vérification protège la connexion à ton compte VRM et aux boutiques qui lui sont rattachées. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
         </div>}
         <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
