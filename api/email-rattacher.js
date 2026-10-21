@@ -1,3 +1,4 @@
+import {lireReceptionEmail} from './_lib/reception-email.js';
 // ── /api/email-rattacher ──────────────────────────────────────────────────────
 // Rejoue un email mis en QUARANTAINE (adresse de réception inconnue, ou
 // plusieurs vendeurs destinataires) au profit du vendeur qui le réclame.
@@ -282,6 +283,14 @@ async function ligneReclamable(id, owner) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || '');
+  if (req.method === 'GET' && mode === 'reception') {
+    const owner = await vendeurDuJeton(jetonDe(req));
+    if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
+    // Pas de repli sans filtre : cet écran est réservé à la base cloisonnée.
+    if (await sondeCloisonnee() !== true) {indispo(res);return;}
+    try {res.status(200).json(await lireReceptionEmail({owner,url:SUPABASE_URL,headers:HEADERS}));}
+    catch (_) {indispo(res);}return;
+  }
   if (req.method === 'GET' && mode === 'liste') return lister(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 

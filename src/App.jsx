@@ -1,3 +1,8 @@
+import {conflitAdresseCompte} from './receptionEmail.js';
+import SuiviReceptionEmails from './ReceptionEmails.jsx';
+import RecusEmail from "./RecusEmail.jsx";
+import { cheminMonotone } from "./courbeMonotone.js";
+import VuesVentes from "./VuesVentes.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
@@ -28,7 +33,7 @@ import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, rec
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
-import { normAdresse } from "../api/_lib/proprietaire-email.js";
+import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
@@ -3492,12 +3497,12 @@ function FactureSousVente({ factures, compte }) {
 const fetchEmailAchats = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_achat_*&select=id,data`, {
-      headers: sbAuth(),
+      headers: sbAuth(), cache: 'no-store',
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const rows = await res.json();
-    return rows.map(r => r.data).filter(Boolean);
-  } catch (_) { return []; }
+    return Array.isArray(rows) ? rows.filter(r=>r?.data).map(r=>({...r.data,_emailId:r.id})) : null;
+  } catch (_) { return null; }
 };
 // (Offres reçues par email, `email_offer_*` : leur lecture est retirée le
 //  3 octobre — Ma journée et Messages rapatriaient 573 offres / 142 Ko à chaque
@@ -9770,7 +9775,8 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
     return () => ro.disconnect();
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
-  const H = compact ? 120 : W > 560 ? Math.max(hauteur, 216) : hauteur, gx = 18, gd = 18, gy = 26, bas = 38;
+  const H = compact ? 136 : hauteur, gx = 14, gd = 46, gy = 24, bas = 36;
+  const trait = "#5d948b";
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
@@ -9781,7 +9787,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
   const base = H - bas;
   const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
   const points = (cle) => jours.map((j, i) => (j.futur || (cle === 'recu' && !j.recu)) ? null : [X(i), Y(cle === 'recu' ? j.recu.eur : j.vendu.eur)]).filter(Boolean);
-  const chemin = (pts) => pts.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const chemin = cheminMonotone;
   const pv = points('vendu');
   const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
   const avecRecu = jours.every(j => j.recu);
@@ -9790,25 +9796,25 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
   const pic=jours.reduce((best,j,i)=>!j.futur&&j.vendu.eur>(jours[best]?.vendu.eur||0)?i:best,0);
   return (
     <div ref={ref} style={{width:'100%'}}>
-      <svg data-courbe-semaine="" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
+      <svg data-courbe-semaine="" data-style-courbe="monotone" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Semaine en cours : ${eur(totV)} vendus`} style={{display:'block',overflow:'visible'}}>
         <defs>
           <linearGradient id={`csg${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={C.accent} stopOpacity="0.16"/>
-            <stop offset="100%" stopColor={C.accent} stopOpacity="0"/>
+            <stop offset="0%" stopColor={trait} stopOpacity="0.22"/>
+            <stop offset="100%" stopColor={trait} stopOpacity="0"/>
           </linearGradient>
         </defs>
-        {iAuj >= 0 && <rect x={X(iAuj) - bande / 2} y={4} width={bande} height={H - 4} rx="10" fill={C.bg}/>}
-        {[0.5, 1].map(f => <line key={f} x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeDasharray="3 4"/>)}
+        {iAuj >= 0 && <rect x={X(iAuj) - bande / 2} y={gy - 10} width={bande} height={base - gy + 16} rx="10" fill={C.bg}/>}
+        {[0, 0.5, 1].map(f => <g key={f}><text x={W-1} y={Y(haut*f)+3} textAnchor="end" fontSize="10" fill={C.muted} style={{fontVariantNumeric:"tabular-nums"}}>{eur(haut*f)}</text><line x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeOpacity=".65" strokeDasharray="2 5"/></g>)}
         <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1"/>
         {pv.length > 1 && <path d={`${chemin(pv)} L${pv[pv.length - 1][0].toFixed(1)},${base} L${pv[0][0].toFixed(1)},${base} Z`} fill={`url(#csg${uid})`}/>}
-        {avecRecu && <path d={chemin(points('recu'))} fill="none" stroke={C.muted} strokeWidth="1.6" strokeDasharray="4 4" strokeLinecap="round"/>}
-        <path d={chemin(pv)} fill="none" stroke={C.accent} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round"/>
+        {avecRecu && <path d={chemin(points('recu'))} fill="none" stroke={C.muted} strokeWidth="1.5" strokeOpacity=".8" strokeDasharray="4 5" strokeLinecap="round"/>}
+        <path d={chemin(pv)} fill="none" stroke={trait} strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round"/>
         {jours.map((j, i) => (
           <g key={j.cle} data-jour={j.cle} data-vendu={j.futur ? '' : Math.round(j.vendu.eur * 100)} data-recu={j.futur || !j.recu ? '' : Math.round(j.recu.eur * 100)}>
             {!j.futur && <>
               <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
               {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.8" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
-              <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.6 : 3.4} fill={j.auj ? C.accent : C.card} stroke={C.accent} strokeWidth="2"/>
+              <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.3 : 2.8} fill={j.auj ? trait : C.card} stroke={trait} strokeWidth="1.8"/>
               {i===pic && j.vendu.eur > 0 && <text x={Math.max(42,Math.min(W-42,X(i)))} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
             </>}
             <text x={X(i)} y={H - 20} textAnchor="middle" fontSize="10" fontWeight="500" fill={C.muted} opacity={j.futur ? 0.55 : 1}>{j.jour.toLowerCase()}</text>
@@ -13943,9 +13949,10 @@ function PhotoVente({ src, size = 64, portrait = false }) {
   if (url && !ko) return <PhotoVinted src={url} alt="" loading="lazy" decoding="async" onError={()=>setKo(true)} style={{...box,objectFit:'cover'}}/>;
   return <span style={box} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
 }
-function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées', count }) {
+function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées', count, plateforme }) {
   const tabs=[['all','Toutes'],['pending','À expédier'],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
+    {plateforme && <VuesVentes owner={AUTH.user?.id} plateforme={plateforme} valeur={{filtre:value,recherche:search}} onAppliquer={v=>{onChange(v.filtre);onSearch(v.recherche);}}/>}
     <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,marginBottom:10}}/>
     <div className="vrm-rangee vrm-sales-filters vrm-filtres" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
     {(search || value!=='all') && <div className="vrm-filter-recap"><span role="status">{count==null?'Filtres actifs':`${count} résultat${count===1?'':'s'}`}</span><button type="button" onClick={()=>{onSearch('');onChange('all');}}>Réinitialiser</button></div>}
@@ -14317,7 +14324,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
     && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o))));
   return <div>
     <ScreenHead icon="cash" title="Ventes"/>
-    <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
+    <FiltresVentes plateforme="leboncoin" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o}/>)}</div>
     {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
     {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
@@ -16649,7 +16656,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
     {illisibles.length>0 && cible && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande owner={AUTH.user?.id || 'installation'} key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
-    {!cible && <FiltresVentes value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} doneLabel="Expédiées"/>}
+    {!cible && <FiltresVentes plateforme="ebay" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} doneLabel="Expédiées"/>}
     {!cible && <div className="vrm-ebay-results" role="status">{visibles.length} commande{visibles.length>1?'s':''} affichée{visibles.length>1?'s':''}{(recherche || filtre!=='all') && <button type="button" onClick={()=>{setRecherche('');setFiltre('all');}}>Effacer les filtres</button>}</div>}
     {!cible && !visibles.length && <div className="vrm-ebay-empty"><b>Aucune commande dans cette sélection</b><p>Essaie un titre, un acheteur, une référence ou un numéro de commande.</p></div>}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
@@ -24325,6 +24332,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
   const [typesProfil, setTypesProfil] = useState({}); // { uid: true (pro) | false (particulier) } — lu dans le profil capté
   const setAcctEmail = (uid, val) => {
+    const conflit=conflitAdresseCompte(acctEmails,uid,val);
+    if(conflit){const autre=accounts.find(a=>String(a.vinted_user_id)===conflit);toast(`Cette adresse est déjà associée à ${autre?.login||'un autre compte Vinted'}. Chaque compte doit avoir son adresse.`);return;}
     const u = { ...acctEmails, [String(uid)]: val.trim() };
     if (!u[String(uid)]) delete u[String(uid)];
     setAcctEmails(u); save('vinted_account_emails', u);
@@ -24363,7 +24372,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         rows.forEach(r => {
           const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
           const email = r.data && r.data.payload && r.data.payload.user && r.data.payload.user.email;
-          if (uid && email && !u[uid]) { u[uid] = email; changed = true; }
+          if (uid && email && !u[uid] && !conflitAdresseCompte(u,uid,email)) { u[uid] = email; changed = true; }
         });
         if (changed) save('vinted_account_emails', u);
         return changed ? u : prev;
@@ -27442,13 +27451,13 @@ function BeneficeJournee({ onNav, place }) {
     </div>
   );
   return (
-    <div className="vrm-day-card" data-journee-benef="" data-journee-benef-etat={etat}
+    <div className={place === "integre" ? "vrm-day-benef-inline" : "vrm-day-card"} data-journee-benef="" data-journee-benef-etat={etat}
       data-journee-benef-n={B ? String(B.n) : ''} data-journee-benef-ncout={B ? String(B.nCout) : ''}
       data-journee-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-journee-benef-net={B ? e2(B.netFinal) : ''}
       data-journee-benef-raison={B ? B.raison : ''} data-journee-benef-couverture={B ? couvertureBenefice(B) : ''}
       data-journee-benef-jour-n={J ? String(J.n) : ''} data-journee-benef-jour-brut={J && J.nCout > 0 ? e2(J.brut) : ''}
       data-journee-benef-jour-net={J && J.nCout > 0 ? e2(J.net) : ''}
-      style={{ border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
+      style={place === 'integre' ? {borderTop:`1px solid ${C.border}`} : { border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
       <div className="vrm-day-head">
         <span className="vrm-day-k" style={{ color: C.muted }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</span>
         <a href="?tab=compta" className="vrm-day-lien" data-journee-benef-detail="" onClick={allerCompta} style={{ color: C.accent, textDecoration: 'none' }}>Détail ›</a>
@@ -28547,7 +28556,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return null;
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
-  const [achEmails, setAchEmails] = useState(null); // reçus d'achat archivés (emails)
+  const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
@@ -32156,7 +32165,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);
-  useEffect(() => { if (curSub==='achats' && achEmails===null) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if (curSub==='achats' && achEmails===undefined) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='ventes' && boostsDetected===null) fetchHarvestBoosts().then(setBoostsDetected); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if (curSub==='achats' && vintedPoints===null) fetchHarvestPickupPoints().then(setVintedPoints); /* eslint-disable-next-line */ }, [sub]);
   // ── LES RÉGLAGES QUI N'ARRIVAIENT JAMAIS JUSQU'À L'ÉCRAN ──────────────────
@@ -35203,6 +35212,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
                 </div>
+                <BeneficeJournee onNav={onNav} place="integre"/>
               </div>
             )}
 
@@ -35227,7 +35237,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-day-head">
                   <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
                   <span className="vrm-day-legende" style={{color:C.muted}}>
-                    <span><i aria-hidden="true" style={{background:C.accent}}/>Vendu</span>
+                    <span><i aria-hidden="true" style={{background:"#5d948b"}}/>Vendu</span>
                     <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
                   </span>
                 </div>
@@ -35268,7 +35278,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               );
             })()}
 
-            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte"/>}
+            {!baseKO && !premierJour && (loading || !sales.items) && <BeneficeJournee onNav={onNav} place="carte"/>}
 
             </div>
 
@@ -35414,6 +35424,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
+        <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
             <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
@@ -36235,6 +36246,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='achats' && (<div className="vrm-achats">
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
+        <RecusEmail recus={achEmails} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -39483,7 +39495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setReceiptView(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} ref={el=>el?.focus()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setReceiptView(null);}}} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <button className="vrm-icon-control" type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
               <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>Reçu d'achat</div>
@@ -42885,7 +42897,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     { id:'comptes', titre:'Comptes Vinted', items:[
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', titreInterne:true, el:<ConnexionsSetting/> },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'Adresses de réception', titreInterne:true, el:<EmailsSetting/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
@@ -45171,7 +45183,7 @@ async function lireAdressesVues() {
     return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
   } catch (_) { return null; }
 }
-function EmailsSetting() {
+function EmailsSetting({onComptes}) {
   // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
   //    Sans ce troisième état, une lecture ratée affichait « Aucune adresse
   //    déclarée » — une AFFIRMATION sur l'attribution de ses emails, faite sur
@@ -45184,6 +45196,8 @@ function EmailsSetting() {
   // Les adresses où arrivent déjà SES emails (suggestions) : `null` = pas lu.
   const [vues, setVues] = useState(null);
   const [busy, setBusy] = useState('');
+  const [versionReception,setVersionReception]=useState(0);
+  const [suiviAdresses,setSuiviAdresses]=useState(null);
   const uid = (AUTH.user && AUTH.user.id) || '';
   const racine = useRef(null);
   useEffect(() => {
@@ -45227,6 +45241,7 @@ function EmailsSetting() {
       ok = !!(r && r.ok);
     } catch (_) { ok = false; }
     if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return; }
+    setVersionReception(v=>v+1);
     // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
     // on relit, sans attendre la prochaine ouverture de l'écran.
     lireMisDeCote();
@@ -45237,6 +45252,7 @@ function EmailsSetting() {
     let n = 0;
     for (const a of liste) {
       const adr = normAdresse(a);
+      if(estAdresseCollectrice(adr)){toast('Ajoute ton adresse personnelle de réception, pas la boîte collective VRM.');continue;}
       if (!adr || !ADRESSE_RECEPTION_OK.test(adr) || Object.keys(nouv).some((k) => normAdresse(k) === adr)) continue;
       nouv[adr] = { owner: uid || '', label: '', at: new Date().toISOString() };
       n++;
@@ -45244,12 +45260,13 @@ function EmailsSetting() {
     if (n) await ecrire(nouv);
   };
   const ajouter = async () => {
-    const a = await askText({ desc: "Ton adresse de réception.\n\nC'est l'adresse vers laquelle tu fais suivre tes emails Vinted (bordereaux, ventes, colis). Tout ce qui arrive dessus sera à toi.", value: '', ok: 'Ajouter' });
-    const adr = normAdresse(a);
-    if (!adr) return;
-    if (!ADRESSE_RECEPTION_OK.test(adr)) { toast("Cette adresse ne ressemble pas à une adresse email."); return; }
-    if (reg && Object.keys(reg).some((k) => normAdresse(k) === adr)) { toast('Cette adresse est déjà à toi.'); return; }
-    await ajouterAdresses([adr]);
+    const a = await askText({ desc: "Tes adresses personnelles.\n\nIndique les adresses où Vinted t’écrit, avant leur transfert vers VRM. Tu peux en ajouter plusieurs, séparées par des virgules. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
+    const adresses=[...new Set(String(a||'').split(/[,;\n]+/).map(normAdresse).filter(Boolean))];
+    if(!adresses.length)return;
+    if(adresses.some(adr=>!ADRESSE_RECEPTION_OK.test(adr))){toast('Une adresse est incorrecte — vérifie la liste avant de l’ajouter.');return;}
+    if(adresses.some(estAdresseCollectrice)){toast('Ajoute tes adresses personnelles, pas la boîte collective VRM.');return;}
+    if(adresses.every(adr=>Object.keys(reg||{}).some(k=>normAdresse(k)===adr))){toast('Ces adresses sont déjà dans ta liste.');return;}
+    await ajouterAdresses(adresses);
   };
   const retirer = async (adr) => {
     const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les emails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
@@ -45321,8 +45338,8 @@ function EmailsSetting() {
       // dessous, c'est lui qui le porte.
       ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un email arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
     : misDeCote
-      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: true }
-      : { t: "Aucune adresse déclarée. Ajoute l'adresse vers laquelle tu fais suivre tes emails Vinted.", alerte: false };
+      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
+      : { t: "Aucune adresse déclarée. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: false };
   // Les suggestions : SES adresses déjà vues, pas encore déclarées.
   const declarees = new Set(liste.map(normAdresse));
   const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
@@ -45335,6 +45352,8 @@ function EmailsSetting() {
     if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
   };
   return (
+    <>
+      <SuiviReceptionEmails key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} quarantaine={quarantaine} onVerifier={()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'})}/>
     <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       {/* ⚠️ (16 octobre) Julien : « je ne comprends pas à quoi ça sert ». Le
@@ -45350,13 +45369,17 @@ function EmailsSetting() {
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
           <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
         </div>
+        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} style={{font:'inherit',color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:7,padding:'7px 10px',cursor:'pointer'}}>Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
           <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
-            <li>Dans ta boîte mail, fais suivre les emails de Vinted vers la boîte reliée à VRM (une règle de transfert, ou le script Gmail installé avec VRM).</li>
+            <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
+            <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
+            <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
+            <li>Crée une règle pour <b>les emails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes emails personnels n’est pas nécessaire.</li>
+            <li>Après le prochain email, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par email ne crée pas une commande synchronisée.</li>
             <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
-            <li>Ajoute ici l'adresse sur laquelle Vinted t'écrit — une par compte Vinted si elles sont différentes.</li>
           </ol>
           <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:8}}>
             Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
@@ -45371,7 +45394,10 @@ function EmailsSetting() {
         </div>
       ) : liste.map(adr => (
         <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-          <span style={{flex:'1 1 140px',minWidth:0,fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{adr}</span>
+          <span style={{flex:'1 1 140px',minWidth:0,fontSize:12,color:C.text,overflowWrap:'anywhere'}}>
+            <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:10,color:C.danger,background:`${C.danger}0d`,borderRadius:4,padding:'1px 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
+            <span style={{fontSize:11.5,color:C.muted}}>{adr}</span>
+          </span>
           <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
             style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
@@ -45434,7 +45460,7 @@ function EmailsSetting() {
         </div>
       )}
       {enAttente.length > 0 && (
-        <div style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+        <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:12.5,fontWeight:600,color:C.warn,marginBottom:6}}>📥 {enAttente.length} email{enAttente.length>1?'s':''} en attente d'un propriétaire</div>
           <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45}}>Arrivés avant que leur adresse soit déclarée. Ils sont conservés entiers — rien n'est perdu.</div>
           <button type="button" disabled={!!lot} onClick={toutRejouer}
@@ -45455,6 +45481,7 @@ function EmailsSetting() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

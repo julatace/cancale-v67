@@ -1,3 +1,4 @@
+import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
 // PIPELINE EMAIL UNIVERSEL (remplace l'Apps Script Gmail, marche pour TOUS les
@@ -122,7 +123,21 @@ const marquerEcritureRatee = () => { const st = contexteVendeur.getStore(); if (
 const ecritureRatee = () => !!(contexteVendeur.getStore() || {}).ecritureRatee;
 // Répondre « reçu » n'est vrai que si l'email est RANGÉ. Sinon : 503, et le
 // service de réception réessaiera — il le garde pendant des heures.
-function repondre(res, code, corps) {
+async function repondre(res, code, corps) {
+  const contexte = contexteVendeur.getStore() || {};
+  // Une ligne par Message-ID : les reprises mettent à jour le même suivi.
+  // Aucun corps ni document dans cet index, et jamais de propriétaire deviné.
+  if (contexte.reception && proprietaireCourant()) {
+    const incident = code >= 400 || ecritureRatee();
+    const verification = corps.quarantaine || corps.garde || corps.type === "ignoré";
+    await supabaseUpsert([{id: `email_reception_${empreinteEmail(contexte.messageId)}`, data: {
+      ...contexte.reception, at: new Date().toISOString(),
+      etat: incident ? "erreur" : verification ? "a-verifier" : "integre",
+      type: String(corps.type || "information"),
+      raison: incident ? "Le rangement n’a pas été confirmé. Le collecteur doit réessayer." : verification ? "Le contenu est conservé pour vérification, sans intégration métier complète." : "",
+      documentsVerifies: false, suppressionAutorisee: false,
+    }}]);
+  }
   if (code < 400 && ecritureRatee()) {
     res.status(503).json({
       ok: false, erreur: 'base-injoignable',
@@ -130,7 +145,8 @@ function repondre(res, code, corps) {
     });
     return;
   }
-  res.status(code).json(corps);
+  const accuse = code>=200&&code<300 ? accuseEmail(contexteVendeur.getStore()?.messageId,corps,contexteVendeur.getStore()?.empreinteEmail) : null;
+  res.status(code).json(accuse?{...corps,reception:accuse}:corps);
 }
 
 async function supabaseUpsert(rows) {
@@ -588,7 +604,8 @@ async function logEmail(entry) {
     const cur = lu.data || { entries: [] };
     // 200 et non 30 : le 23 août, une rafale d'emails « offre » avait chassé du
     // journal la seule ligne qui expliquait un colis manquant.
-    const entries = [{ ...entry, at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
+    const contexte = contexteVendeur.getStore() || {};
+    const entries = [{ ...entry, ...(contexte.messageId ? {messageId:contexte.messageId,empreinte:contexte.empreinteEmail} : {}), at: new Date().toISOString() }, ...(cur.entries || [])].slice(0, 200);
     await supabaseUpsert([{ id: 'email_journal', data: { entries } }]);
   } catch (_) {}
 }
@@ -1384,7 +1401,7 @@ export function bodyNotifColis(track, carrier) {
 // laisse deviner la clé caractère par caractère).
 function cleValide(req) {
   const secret = process.env.EMAIL_INBOUND_SECRET || '';
-  const key = String((req.query && req.query.key) || '');
+  const key = String(req.headers?.['x-vrm-email-key'] || (req.query && req.query.key) || '');
   if (!secret) return null;                       // pas de clé posée sur le serveur
   const a = crypto.createHash('sha256').update(key).digest();
   const b = crypto.createHash('sha256').update(secret).digest();
@@ -1416,12 +1433,24 @@ export async function modeScript(mode, req, res) {
     // Le signe que le script Gmail a été mis à jour (il envoie une clé) alors
     // que le serveur n'en a pas encore : c'est le moment de poser la variable.
     // Jamais la clé elle-même dans le journal.
-    if (req.query && req.query.key) console.log('[email-inbound] script Gmail à jour (clé fournie) — EMAIL_INBOUND_SECRET pas encore posée');
+    if (req.headers?.['x-vrm-email-key'] || (req.query && req.query.key)) console.log('[email-inbound] script Gmail à jour (clé fournie) — EMAIL_INBOUND_SECRET pas encore posée');
     res.status(503).json({ ok: false, error: 'cle-non-configuree', message: "La clé EMAIL_INBOUND_SECRET n'est pas posée sur le serveur." }); return;
   }
   if (!ok) { res.status(401).json({ ok: false, error: 'clé invalide' }); return; }
   const cloisonneeScript = await baseCloisonnee();
   if (cloisonneeScript === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+  if(mode === 'reception-diagnostic' && req.method === 'GET'){
+    const registre = await lireRegistreEmails(cloisonneeScript);
+    if(registre===null){res.status(503).json({ok:false,error:'registre-illisible'});return;}
+    res.status(200).json({ok:true,accuses:2,suivi:3,classement:'par-message',boitePartagee:cloisonneeScript===true});return;
+  }
+  if (mode === 'reception-passage' && req.method === 'POST') {
+    if (cloisonneeScript !== true) { res.status(503).json({ok:false,error:'cloisonnement-requis'});return; }
+    let b; try { b=typeof req.body==='string'?JSON.parse(req.body):req.body; } catch (_) {}
+    if (!b || !['debut','succes','erreur'].includes(b.etat)) { res.status(400).json({ok:false,error:'passage-invalide'});return; }
+    const result = await contexteVendeur.run({owner:PROPRIETAIRE_NEUTRE}, () => supabaseUpsert([{id:b.etat==='succes'?'vrm_email_collecteur_succes':'vrm_email_collecteur_passage',data:{at:new Date().toISOString(),etat:b.etat,version:3}}]));
+    res.status(result?200:503).json({ok:!!result});return;
+  }
   if (!proprietaireCourant() && cloisonneeScript) { res.status(503).json({ ok: false, error: 'vendeur-inconnu', message: "VRM_OWNER_UID n'est pas réglé : je ne sais pas à quelle boutique appartient cette boîte." }); return; }
 
   if (mode === 'config' && req.method === 'GET') {
@@ -1484,13 +1513,15 @@ export async function traiterEmail(req, res) {
   let mail, corpsBrut;
   try {
     corpsBrut = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    if(!req.__ownerForce && ['gmail-shared','gmail-v2'].includes(corpsBrut?.source) && cleValide(req)===null){res.status(503).json({ok:false,error:'cle-non-configuree',message:'Configure la même clé de réception dans VRM et le script Gmail collectif.'});return;}
     mail = normalizeInbound(corpsBrut);
+    const contexte = contexteVendeur.getStore();if(contexte){contexte.messageId=mail.messageId || '';contexte.empreinteEmail=empreinteEmail(corpsBrut);}
   }
   catch (_) {
     // Même un corps illisible est conservé : c'est la seule façon de savoir
     // ensuite ce qui n'est pas passé.
     await garderInconnu(req.body, null, 'corps illisible');
-    repondre(res, 200, { ok: false, error: 'corps illisible' }); return;
+    await repondre(res, 200, { ok: false, error: 'corps illisible' }); return;
   }
 
   // ── À QUEL VENDEUR CET EMAIL APPARTIENT-IL ? ──────────────────────────────
@@ -1505,13 +1536,14 @@ export async function traiterEmail(req, res) {
   const cloisonnee = req.__ownerForce ? true : await baseCloisonnee();
   if (cloisonnee === null) {
     console.log('[email-inbound] base injoignable (sonde de cloisonnement) — email à renvoyer');
-    repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu savoir à quelle boutique appartient cet email : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
+    await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu savoir à quelle boutique appartient cet email : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
     return;
   }
+  if(corpsBrut?.source==='gmail-shared' && cloisonnee!==true){res.status(503).json({ok:false,error:'cloisonnement-requis',message:'La réception collective exige des données séparées par utilisateur.'});return;}
   const lu = req.__ownerForce ? { registre: {}, conflits: [] } : await lireRegistreEmails(cloisonnee);
   if (lu === null && cloisonnee) {
     console.log('[email-inbound] registre des adresses illisible — email à renvoyer');
-    repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu lire à qui appartient cette adresse de réception : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
+    await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu lire à qui appartient cette adresse de réception : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
     return;
   }
   const registre = (lu && lu.registre) || {};
@@ -1532,12 +1564,16 @@ export async function traiterEmail(req, res) {
   // vendeurs. Tant que la colonne `owner` n'existe pas, il n'y a qu'une seule
   // boutique et une seule ligne `main` : rien à protéger, donc rien à mettre de
   // côté. On traite l'email exactement comme avant §5.16.
+  if (proprio.owner && mail.messageId) {
+    const suivi = contexteVendeur.getStore();
+    suivi.reception = { adresses:adresses.filter(a=>resoudreProprietaire([a],registre,'',(lu&&lu.conflits)||[]).owner===proprio.owner).slice(0,20), messageId:mail.messageId, subject:String(mail.subject || '').slice(0,300), from:String(mail.from || '').slice(0,200), receivedAt: new Date().toISOString(), sourceDate: /^\d{4}-/.test(String(corpsBrut?.sourceDate||'')) && Number.isFinite(Date.parse(corpsBrut.sourceDate)) ? new Date(corpsBrut.sourceDate).toISOString() : null };
+  }
   if (!proprio.owner && await baseCloisonnee()) {
     // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa
     // raison ; l'app le signale et permet de le rattacher. Un email égaré se
     // répare, un email livré au mauvais vendeur non.
     await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué', true);
-    repondre(res, 200, { ok: true, quarantaine: true, raison: proprio.raison, adresses });
+    await repondre(res, 200, { ok: true, quarantaine: true, raison: proprio.raison, adresses });
     return;
   }
 
@@ -1611,7 +1647,7 @@ export async function traiterEmail(req, res) {
         tag: cleNotifColis(track, rowId), url: '/?tab=cat_achats',
       }, track.status === 'available' ? 'colis' : 'suivi'); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
-      repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
+      await repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
     }
 
@@ -1624,7 +1660,7 @@ export async function traiterEmail(req, res) {
       //    en silence. On le garde entier — l'écran des emails non reconnus le
       //    montre, et il sert à recaler l'analyse.
       if (!data) { await garderInconnu(corpsBrut, mail, 'reconnu bordereau, analyse impossible', 'bordereau');
-        repondre(res, 200, { ok: false, type: 'bordereau', error: 'parse échec', garde: true }); return; }
+        await repondre(res, 200, { ok: false, type: 'bordereau', error: 'parse échec', garde: true }); return; }
       const pdf = (mail.attachments || []).find(a => /application\/pdf/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
       // N° absent du titre de l'annonce ? On le retrouve dans les annonces
       // numérotées de l'app (correspondance de titre, jamais si ambigu).
@@ -1656,7 +1692,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
       await notifierDoubleVente(numeroLu, data.modele || data.article);
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
-      repondre(res, 200, { ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
+      await repondre(res, 200, { ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
     }
 
@@ -1689,7 +1725,7 @@ export async function traiterEmail(req, res) {
         _cat: 'argent',
       }); } catch (_) {}
       await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
-      repondre(res, 200, { ok: true, type: 'finalisation', montant, article });
+      await repondre(res, 200, { ok: true, type: 'finalisation', montant, article });
       return;
     }
 
@@ -1741,7 +1777,7 @@ export async function traiterEmail(req, res) {
         _cat: 'achat',
       }); } catch (_) {}
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
-      repondre(res, 200, { ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
+      await repondre(res, 200, { ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
       return;
     }
 
@@ -1754,7 +1790,7 @@ export async function traiterEmail(req, res) {
       //    en silence. On le garde entier — l'écran des emails non reconnus le
       //    montre, et il sert à recaler l'analyse.
       if (!data) { await garderInconnu(corpsBrut, mail, 'reconnu vente, analyse impossible', 'vente');
-        repondre(res, 200, { ok: false, type: 'vente', error: 'parse échec', garde: true }); return; }
+        await repondre(res, 200, { ok: false, type: 'vente', error: 'parse échec', garde: true }); return; }
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       { const jn = await numeroDEmail(data.numero, data.designation);
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
@@ -1785,7 +1821,7 @@ export async function traiterEmail(req, res) {
         }
       } catch (_) {}
       await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
-      repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
+      await repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
       return;
     }
 
@@ -1859,7 +1895,7 @@ export async function traiterEmail(req, res) {
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]); } catch (_) {}
       await logEmail({ type: 'offre', subject, from: mail.from, montant, de: qui, article, net, account: acc.login || '' });
-      repondre(res, 200, { ok: true, type: 'offre', montant, de: qui, article, net });
+      await repondre(res, 200, { ok: true, type: 'offre', montant, de: qui, article, net });
       return;
     }
 
@@ -1906,7 +1942,7 @@ export async function traiterEmail(req, res) {
         _cat: 'message',
       }, null, aliasAncien); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, paire, account: acc.login || '' });
-      repondre(res, 200, { ok: true, type: 'message', de: qui, extrait, paire });
+      await repondre(res, 200, { ok: true, type: 'message', de: qui, extrait, paire });
       return;
     }
 
@@ -1924,7 +1960,7 @@ export async function traiterEmail(req, res) {
         _cat: 'favori',
       }); } catch (_) {}
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
-      repondre(res, 200, { ok: true, type: 'favori', de: qui, article });
+      await repondre(res, 200, { ok: true, type: 'favori', de: qui, article });
       return;
     }
 
@@ -1969,7 +2005,7 @@ export async function traiterEmail(req, res) {
         try { await pushOnce(notif, 'action'); } catch (_) {}
         await garderInconnu(corpsBrut, mail, 'connu, notifié', famille);
         await logEmail({ type: 'action', subject, from: mail.from, famille, account: acc.login || '' });
-        repondre(res, 200, { ok: true, type: 'action', famille });
+        await repondre(res, 200, { ok: true, type: 'action', famille });
         return;
       }
     }
@@ -1983,13 +2019,13 @@ export async function traiterEmail(req, res) {
     const famille = illisible ? '' : familleConnue(subject, mail.from);
     await garderInconnu(corpsBrut, mail, illisible ? 'illisible (aucun champ lu)' : (famille ? 'connu, sans action' : 'aucune règle ne le reconnaît'), famille);
     await logEmail({ type: famille ? 'connu-sans-action' : 'ignoré', subject, from: mail.from, forme, illisible, famille });
-    repondre(res, 200, { ok: true, type: famille ? 'connu-sans-action' : 'ignoré', famille, subject, forme });
+    await repondre(res, 200, { ok: true, type: famille ? 'connu-sans-action' : 'ignoré', famille, subject, forme });
   } catch (e) {
     // ⚠️⚠️ « On répond 200 pour éviter que le service de mail ne rejoue » —
     //    c'était écrit ici, en toutes lettres, comme une précaution. C'en était
     //    l'inverse : rejouer est EXACTEMENT ce qu'on veut quand on n'a pas pu
     //    ranger l'email. Un 200 le fait supprimer chez l'expéditeur ; un 500 le
     //    fait réessayer, et s'il finit par rebondir, au moins quelqu'un le voit.
-    res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
+    await repondre(res, 500, { ok: false, erreur: 'panne', message: 'Le traitement a échoué. Le collecteur doit réessayer.' });
   }
 }

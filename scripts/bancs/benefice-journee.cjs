@@ -176,6 +176,8 @@ const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollI
         const j=await lireJournee(pg);
         console.log(`   Compta ${JSON.stringify(c)}\n   Journée ${JSON.stringify(j)}`);
         dit(!!j,'réglage du nuage ⇒ la carte est dans Ma journée');
+        dit(await pg.locator('.vrm-day-money [data-journee-benef]').count()===1,'CA et bénéfice partagent la même carte');
+        dit(await pg.locator('[data-style-courbe=monotone]').count()===1,'graphique hebdomadaire avec courbes monotones');
         dit(!!c && c.etat==='lu' && !!j && j.etat==='lu','les deux cartes lisent la publication',`${c&&c.etat} / ${j&&j.etat}`);
         dit(!!c && !!j && c.brut!=='' && j.brut===c.brut,'BRUT du mois identique à Comptabilité',`${j&&j.brut} · ${c&&c.brut}`);
         dit(!!c && !!j && c.net!=='' && j.net===c.net,'NET du mois identique à Comptabilité (charges et cotisations comprises)',`${j&&j.net} · ${c&&c.net}`);
@@ -186,7 +188,7 @@ const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollI
         const couleur=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef-ligne="net"] .vrm-display'); return e?getComputedStyle(e).color:''; });
         dit(!/rgb\((2[0-9]{2}), ?([0-9]{1,2}), ?([0-9]{1,2})\)/.test(couleur),'aucun rouge sur le bénéfice',couleur);
         dit(await pg.locator('[data-journee-benef-detail]').count()===1,'un lien vers Comptabilité pour le détail');
-        if(process.env.BANC_CAPTURE) await pg.locator('[data-journee-benef]').screenshot({path:path.join(process.env.BANC_CAPTURE,`journee-benef-${T.nom}.png`)});
+        if(process.env.BANC_CAPTURE) await pg.locator('.vrm-day-top').screenshot({path:path.join(process.env.BANC_CAPTURE,`journee-benef-${T.nom}.png`)});
         const deb=await pg.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
         dit(deb<=1,'aucun débordement horizontal',`${deb}px`);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
