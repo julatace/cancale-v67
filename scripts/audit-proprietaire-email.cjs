@@ -128,7 +128,7 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     const u = decodeURIComponent(String(url));
     if (!u.includes('/rest/v1/')) return rep({});
     if ((opts.method || 'GET') === 'POST') {
-      if(etat.ecritureKO || (etat.ecritureKOOwner && JSON.parse(opts.body||'[]').some(x=>x.owner===etat.ecritureKOOwner)))return rep('<html>503</html>',503);
+      if((etat.suiviKO && JSON.parse(opts.body||'[]').some(x=>x.id.startsWith('email_reception_'))) || etat.ecritureKO || (etat.ecritureKOOwner && JSON.parse(opts.body||'[]').some(x=>x.owner===etat.ecritureKOOwner)))return rep('<html>503</html>',503);
       try { JSON.parse(opts.body || '[]').forEach((x) => ecrites.push({ id: x.id, owner: x.owner || '', data: x.data, url: u })); } catch (_) {}
       return rep('', 201);
     }
@@ -177,6 +177,15 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   await essaie('route : pas d’accusé si le stockage échoue',async()=>{
     const route=await nouvelle('accuse-ecriture-ko'),o=await envoyer(route,'sophie@vrm.center',{ecritureKO:true,lignes:[LIGNE_J,LIGNE_B]});
     dit(o.code===503&&!o.corps.reception,'route : stockage en panne ⇒ aucun accusé positif');
+  });
+  await essaie('route : suivi par message et panne du suivi',async()=>{
+    const route=await nouvelle('suivi-message'),o=await envoyer(route,'sophie@vrm.center',{lignes:[LIGNE_J,LIGNE_B]});
+    const suivis=o.ecrites.filter(x=>x.id.startsWith('email_reception_'));
+    dit(suivis.length===1&&suivis[0].owner===B&&suivis[0].data.etat==='integre'&&!suivis[0].data.suppressionAutorisee,'route : suivi sous le seul propriétaire, sans autoriser la suppression');
+    const p=await envoyer(route,'sophie@vrm.center',{lignes:[LIGNE_J,LIGNE_B]});
+    dit(p.ecrites.find(x=>x.id.startsWith('email_reception_'))?.id===suivis[0].id,'route : une reprise du même Message-ID conserve la même ligne de suivi');
+    const e=await envoyer(route,'sophie@vrm.center',{suiviKO:true,lignes:[LIGNE_J,LIGNE_B]});
+    dit(e.code===503&&!e.corps.reception,'route : suivi non enregistré ⇒ pas de confirmation au collecteur');
   });
   await essaie('route : boîte Gmail collective',async()=>{
     const centrale={owner:J,data:{adresses:{'vrm.vinted35@gmail.com':{owner:J}}}};

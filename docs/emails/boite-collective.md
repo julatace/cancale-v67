@@ -2,7 +2,7 @@
 
 ## État de mise en service
 
-Le nouveau script est préparé et testé localement. Modifier le dépôt et publier VRM ne modifie pas le projet Google Apps Script installé dans Gmail. Aucun accès Google n'est connecté à cette session Codex ; ne transmettre aucun mot de passe ni code de double authentification dans le chat.
+Le script est testé avec une simulation Gmail et les routes VRM. Modifier le dépôt et publier VRM ne modifie pas le projet Google Apps Script installé dans Gmail. L’administrateur doit installer le fichier dans Google ; ne transmettre aucun mot de passe ni code de double authentification dans le chat.
 
 Si le diagnostic répond `cle-non-configuree`, configurer la même clé des deux côtés. Le nouveau protocole `gmail-shared` refuse de confirmer sa réception tant que ce paramètre manque. L'ancien canal reste compatible pendant cette préparation : ne pas annoncer une migration Gmail terminée avant les étapes ci-dessous.
 
@@ -31,7 +31,7 @@ La configuration de la clé doit être coordonnée avec le remplacement du scrip
 - Une réponse illisible, une identité différente, une empreinte différente, un échec de stockage ou de classement laisse le message récupérable. Son identifiant est conservé pour la reprise idempotente.
 - Les confirmations Google de transfert reçoivent le libellé `vrm-configuration` et restent dans la boîte. Aucun lien de validation n'est ouvert automatiquement : l'administrateur vérifie à qui appartient la demande.
 - Les messages confirmés sont classés `vrm-achats`, `vrm-ventes`, `vrm-bordereaux`, `vrm-versements`, `vrm-colis`, `vrm-messages`, `vrm-offres`, `vrm-informations` ou `vrm-a-verifier` ; les échecs reçoivent `vrm-a-reessayer`.
-- Le ménage par défaut **archive** seulement les messages portant le nouveau libellé de preuve `vrm-confirme-v2`, au-delà de six jours. Il ne déplace jamais tout le fil et ne considère pas l'ancien libellé seul comme une nouvelle preuve. Le mode corbeille n'est pas activé.
+- Le ménage par défaut **archive** seulement les messages portant le nouveau libellé de preuve `vrm-confirme-v2`, au-delà de six jours. Il ne déplace jamais tout le fil et ne considère pas l'ancien libellé seul comme une nouvelle preuve. Les messages à vérifier et à réessayer sont exclus de l’archivage. Le mode corbeille est bloqué tant qu’aucun contrôle d’archivage documentaire complet n’est implémenté.
 - La facturation Pro préexistante reste limitée par le serveur au propriétaire de l'installation. Ce chantier ne crée pas d'envoi de facture pour les autres utilisateurs.
 - La propriété privée **VRM_DERNIER_PASSAGE** expose les compteurs de confirmations, à vérifier, échecs, échecs de classement et l'heure de fin. Elle ne contient ni mots de passe, ni corps des emails.
 
@@ -42,3 +42,30 @@ La boîte collective, y compris ses variantes Gmail avec points, `+étiquette` o
 Chaque utilisateur déclare **son adresse personnelle de réception**, puis crée une règle de transfert ciblée pour Vinted et ses transporteurs vers la boîte collective, en gardant une copie. Il n'a pas à installer le script central ni à partager ses identifiants. Google peut demander une validation du transfert dans la boîte collective. Les instructions et l'adresse à copier sont dans Réglages → Adresses de réception.
 
 Les reçus d'achat sont consultables dans Vinted → Achats → Reçus d'achat par email, même sans compte Vinted synchronisé. Les emails ne reconstruisent pas artificiellement les listes de commandes, dont la source reste l'extension.
+
+## Mise à jour du suivi utilisateur (version 3)
+
+Si la version précédente est déjà installée et vérifiée, conserver le projet, la propriété EMAIL_INBOUND_SECRET et son déclencheur existant. Sauvegarder l’ancien code puis remplacer Code.gs avec la nouvelle source complète, enregistrer et lancer verifierInstallationVRM puis forwardVintedEmails. Ne pas générer une nouvelle clé et ne pas créer un deuxième projet ou un deuxième déclencheur. Le script transmet un début et un résultat de passage sans contenu, adresse personnelle ni compteur collectif. Le suivi apparaît dans Réglages → Réception des emails. La version antérieure continue de transférer, mais ne fournit pas ces passages : VRM affiche « suivi à activer » plutôt qu’une panne inventée.
+
+La lecture authentifiée ne rend que les 100 derniers messages suivis de la boutique. La reprise d’un même Message-ID met à jour la même ligne. Une écriture de suivi refusée empêche l’accusé positif. Les données métier historiques ne sont ni supprimées ni recalculées ; les anciens reçus restent dans leurs rubriques. Les adresses déclarées affichent une réception observée sur cet historique, jamais une prétendue validation des paramètres Google personnels.
+
+Un passage absent depuis plus de 20 minutes produit un avertissement dans cet écran, actualisé chaque minute tant qu’il est visible. Il ne s’agit pas d’une notification push hors application. Les emails encore dans Gmail ou refusés avant attribution n’ont pas de compteur par utilisateur fiable : ils ne sont pas affichés à zéro. La date de traitement et, si fournie, celle du mail sont distinguées.
+
+## Travaux distincts à ne pas annoncer comme terminés
+
+- Certifier une archive complète des originaux et documents, avec relecture et intégrité ; aucun effacement activé avant cela.
+- Comparer les montants/statuts email et extension par identifiant de transaction et présenter les écarts sans réconciliation automatique.
+- Reprendre une période historique sur sélection explicite, au-delà du rattachement de quarantaine déjà disponible ; ne jamais utiliser resetLabels pour ce besoin.
+- Envoyer une alerte d’arrêt hors application : l’écran actuel détecte le retard lors de sa consultation, sans nouvel envoi push.
+
+## Plusieurs comptes Vinted et adresses de transfert
+
+Toutes les adresses personnelles peuvent transférer vers la même boîte centrale ; chaque adresse doit être déclarée par son utilisateur. Dans Comptes liés, le champ email de chaque compte Vinted (`vinted_account_emails`) permet d’associer explicitement son adresse au nom du compte. Le suivi utilise ces associations, le login et le dernier état du profil capté par l’extension. Il ne recherche pas un pseudo dans le texte pour nommer les lignes du suivi.
+
+Le filtre « Compte / adresse » isole les emails et compteurs de l’adresse choisie. Les adresses configurées dans Comptes liés mais pas encore déclarées sont indiquées. Une adresse ne doit être liée qu’à un compte Vinted : les saisies manuelles et le remplissage depuis les profils refusent les doublons. Si une ancienne configuration contient déjà un doublon, le suivi demande de corriger l’association, sans supprimer ni déplacer de données. Un email portant plusieurs adresses associées à des comptes différents reste ambigu plutôt que d’être donné arbitrairement à l’un d’eux. Les emails non associés restent visibles sous « Compte à identifier ». Le badge « Bloqué » n’apparaît que pour un état `banni` explicitement capté dans le profil Vinted ; une session expirée ou un compte sans état connu ne suffit pas. Le détail donne la date de l’observation lorsque disponible.
+
+L’ajout d’adresses accepte plusieurs valeurs séparées par virgules, points-virgules ou retours à la ligne. Une valeur invalide ou la boîte centrale annule cet ajout groupé ; les adresses existantes sont conservées. Ces associations d’affichage ne modifient pas les calculs comptables ni les règles métier historiques.
+
+Le parcours « Configurer un transfert » accompagne le vendeur adresse par adresse : association du compte, déclaration dans VRM, instructions adaptées à Gmail/Outlook/iCloud/autre, copie de l’adresse collective, attente de la validation éventuelle puis réception observée. Une étape de réception n’est confirmée qu’après un traitement réellement suivi. Les instructions ne valident pas de lien Google automatiquement et ne marquent jamais la configuration distante comme vérifiée.
+
+L’absence d’accès à Vinted n’interdit pas l’accès aux emails ni aux données VRM. Le badge Bloqué décrit exclusivement le dernier bannissement explicitement observé sur le profil ; aucun badge de bannissement n’est déduit d’une session expirée ou de données absentes.
