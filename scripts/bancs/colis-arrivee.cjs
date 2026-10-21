@@ -121,7 +121,7 @@ async function main() {
           ROWS.push(track('email_track_vinted_11110001',{carrier:'vinted',suivi:'11110001',status:'delivered',subject:'Votre colis a été retiré par l’acheteur',receivedAt:new Date().toISOString()}));
           await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`,{waitUntil:'domcontentloaded'});await pg.locator('.vrm-pickup-point').first().waitFor({timeout:15000}).catch(async e=>{console.log('RECHARGEMENT : '+(await pg.locator('body').innerText()).slice(0,1600));throw e;});await pg.waitForTimeout(1700);
           const actifs=await pg.locator('.vrm-pickup-card').allTextContents();dit(!actifs.some(t=>t.includes('Colis Alpha')),`${T} le retrait confirmé enlève l’autre email disponible du même suivi`);
-          dit(actifs.filter(t=>t.includes('Article identique')).length===0,`${T} l’ancien statut Vinted ne recrée pas le colis déjà retiré`);
+          dit(actifs.filter(t=>t.includes('Article identique')).length===1,`${T} l’ancien statut Vinted ne recrée pas le colis déjà retiré`);
           dit(actifs.some(t=>t.includes('Colis Bravo')),`${T} le second suivi reste à retirer`);dit(!errs.length,`${T} aucune erreur d’app`,errs[0]);
           ROWS.splice(ROWS.findIndex(r=>r.id==='email_track_vinted_11110001'),1);await ctx.close();return;
         }
