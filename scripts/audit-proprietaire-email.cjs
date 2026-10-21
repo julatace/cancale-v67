@@ -128,6 +128,7 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     const u = decodeURIComponent(String(url));
     if (!u.includes('/rest/v1/')) return rep({});
     if ((opts.method || 'GET') === 'POST') {
+      if(etat.ecritureKO || (etat.ecritureKOOwner && JSON.parse(opts.body||'[]').some(x=>x.owner===etat.ecritureKOOwner)))return rep('<html>503</html>',503);
       try { JSON.parse(opts.body || '[]').forEach((x) => ecrites.push({ id: x.id, owner: x.owner || '', data: x.data, url: u })); } catch (_) {}
       return rep('', 201);
     }
@@ -137,7 +138,7 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   };
   const faireRes = () => { const x = { code: null, corps: null }; x.status = (n) => { x.code = n; return x; }; x.json = (o) => { x.corps = o; return x; }; x.setHeader = () => {}; x.end = () => x; return x; };
   const vente = (to) => ({ method: 'POST', query: {}, body: {
-    from: 'no-reply@vinted.fr', to, subject: 'Ton article est vendu !',
+    messageId:'<email-banc-vrm>', from: 'no-reply@vinted.fr', to, subject: 'Ton article est vendu !',
     text: "acheteur-de-banc a acheté [Paire de banc] n°9001 42,00 €\nPrépare ton colis.", html: '<p>vendu</p>', attachments: [] } });
   const envoyer = async (route, to, e) => {
     etat = e; ecrites.length = 0;
@@ -167,6 +168,29 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
       chezB.length ? `${chezB.length} ligne(s) de Julien écrite(s) chez l’autre vendeur` : '');
     dit(quar(o.ecrites).length === 1 && metier(o.ecrites).length === 0, 'route : l’email disputé est mis de côté, entier',
       JSON.stringify(o.ecrites));
+  });
+  await essaie('route : accusé nominatif et empreinte du contenu reçu',async()=>{
+    const route=await nouvelle('accuse-empreinte'),o=await envoyer(route,'sophie@vrm.center',{lignes:[LIGNE_J,LIGNE_B]});
+    const {empreinteEmail}=await import('../api/_lib/accuse-email.js');
+    dit(o.code===200&&o.corps.reception?.stocke===true&&o.corps.reception.messageId==='<email-banc-vrm>'&&o.corps.reception.empreinte===empreinteEmail(vente('sophie@vrm.center').body),'route : accusé lié à l’identité et au contenu exacts du message');
+  });
+  await essaie('route : pas d’accusé si le stockage échoue',async()=>{
+    const route=await nouvelle('accuse-ecriture-ko'),o=await envoyer(route,'sophie@vrm.center',{ecritureKO:true,lignes:[LIGNE_J,LIGNE_B]});
+    dit(o.code===503&&!o.corps.reception,'route : stockage en panne ⇒ aucun accusé positif');
+  });
+  await essaie('route : boîte Gmail collective',async()=>{
+    const centrale={owner:J,data:{adresses:{'vrm.vinted35@gmail.com':{owner:J}}}};
+    const route=await nouvelle('collective-seule'),o=await envoyer(route,'vrm.vinted35@gmail.com',{lignes:[centrale]});
+    dit(o.code===200&&o.corps.quarantaine&&metier(o.ecrites).length===0,'route : la seule adresse collective ne livre aucun contenu à son propriétaire');
+    const route2=await nouvelle('collective-personnelle'),p=await envoyer(route2,'sophie@vrm.center, vrm.vinted35@gmail.com',{lignes:[centrale,LIGNE_B]});
+    dit(metier(p.ecrites).every(x=>x.owner===B)&&metier(p.ecrites).length>0,'route : l’adresse personnelle prime sur la boîte collective');
+  });
+  await essaie('route : deux accusés parallèles restent isolés',async()=>{
+    etat={lignes:[LIGNE_J,LIGNE_B],ecritureKOOwner:J};ecrites.length=0;
+    const route=await nouvelle('accuses-paralleles'),a=vente('recu@vrm.center'),b=vente('sophie@vrm.center');a.body.messageId='<A>';b.body.messageId='<B>';
+    const ra=faireRes(),rb=faireRes();await Promise.all([route.default(a,ra),route.default(b,rb)]);
+    const {empreinteEmail}=await import('../api/_lib/accuse-email.js');
+    dit(ra.code===503&&!ra.corps.reception&&rb.code===200&&rb.corps.reception?.messageId==='<B>'&&rb.corps.reception.empreinte===empreinteEmail(b.body),'route : la panne d’un propriétaire ne confirme pas son email et n’efface pas l’accusé de l’autre');
   });
   await essaie('route : registre illisible', async () => {
     const route = await nouvelle('registreKO');
