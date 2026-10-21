@@ -13860,6 +13860,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, etat, etatNoeud =
       <span className="vrm-ledger-sale-amount">{montant}</span>
       <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
+    {/* « Retour » (geste du téléphone, ← du navigateur) ferme d'abord le tiroir. */}
+    {ouvert && <FermeAuRetour fermer={close}/>}
     {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE · DÉTAILS ET ACTIONS</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>

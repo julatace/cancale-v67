@@ -94,6 +94,7 @@ async function main() {
       // ── API présente : le micro est là, dicter remplit la recherche ─────────
       await essaie(`${T} présent`, async () => {
         const { ctx, pg } = await preparer(b, vp, true);
+        await pg.waitForSelector('[data-mic-dictee]', { timeout: 10000 }).catch(() => {});   // l'état, pas un délai (sous charge)
         const mic = await pg.$('[data-mic-dictee]');
         dit(!!mic, `${T} le micro de dictée est présent quand le navigateur fournit l’API`);
         if (mic) {

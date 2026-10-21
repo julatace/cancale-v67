@@ -278,11 +278,16 @@ const jugerSegment = async (pg, label, ecran) => {
       const m = await pg.evaluate(() => {
         const logo = document.querySelector('.vrm-header-logo > img, img[alt="VRM"]');
         const tg = document.querySelector('[data-tout-generer="grise"]');
-        return { theme: document.documentElement.getAttribute('data-theme'), logo: logo ? getComputedStyle(logo).boxShadow : null,
+        // (21 oct.) Depuis la refonte « gestion », le logo est posé sur une tuile
+        // ardoise (`.vrm-header-logo`, fond opaque) : la tuile le détache aussi.
+        const tuile = logo && logo.closest('.vrm-header-logo');
+        const fondTuile = tuile ? getComputedStyle(tuile).backgroundColor : '';
+        const ombre = logo ? getComputedStyle(logo).boxShadow : null;
+        return { theme: document.documentElement.getAttribute('data-theme'), logo: logo ? (ombre !== 'none' ? ombre : (fondTuile && !/rgba\(0, 0, 0, 0\)|transparent/.test(fondTuile) ? 'tuile ' + fondTuile : 'none')) : null,
           tg: tg ? { op: getComputedStyle(tg).opacity, col: getComputedStyle(tg).color, filtre: getComputedStyle(tg).filter } : null };
       });
       dit(m.theme === 'dark', 'le thème sombre est appliqué', m.theme);
-      dit(!!m.logo && m.logo !== 'none', 'sombre : le logo noir porte un liseré qui le détache', m.logo);
+      dit(!!m.logo && m.logo !== 'none', 'sombre : le logo noir porte un liseré (ou une tuile) qui le détache', m.logo);
       dit(!!m.tg && Number(m.tg.op) >= 0.9 && (lum(m.tg.col) || 0) > 0.12 && m.tg.filtre === 'none', 'sombre : « Tout générer » grisé reste lisible', JSON.stringify(m.tg));
       await ctx.close();
     });

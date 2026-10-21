@@ -153,7 +153,13 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
     await essaie('F ma journée', async () => {
       await aller(pg, 'journee', 6500);
       const j = await pg.evaluate(() => { const e = document.querySelector('[data-job="numeros-en-double"]'); return e ? [e.getAttribute('data-n'), e.innerText] : null; });
-      dit(!!j && j[0] === '1' && /N°7/.test(j[1]), 'F. Ma journée dit le numéro porté par deux paires (N°7)', j ? j.join(' | ').replace(/\n/g, ' ') : 'absent');
+      // (21 oct.) Depuis #623, deux annonces EN LIGNE sous le même N° se règlent
+      // toutes seules : la plus récente reçoit un numéro neuf, à écrire sur son
+      // carton. Ma journée le dit (doublon restant) OU le doublon a été réglé
+      // et le nouveau numéro est à écrire (Colis) — jamais rien.
+      let regle = null;
+      if (!j) { await aller(pg, 'cat_bord', 6500); regle = await pg.evaluate(() => { const e = document.querySelector('[data-numeros-a-ecrire]'); return e ? e.innerText : null; }); }
+      dit((!!j && j[0] === '1' && /N°7/.test(j[1])) || (!!regle && /\b7\b/.test(regle)), 'F. le numéro porté par deux paires (N°7) est dit (Ma journée) ou réglé, avec le nouveau numéro à écrire (Colis)', j ? j.join(' | ').replace(/\n/g, ' ') : (regle ? regle.replace(/\n/g, ' ').slice(0, 160) : 'absent'));
     });
     await ctx.close();
     // ── G. deux comptes en retard : les deux nommés ──────────────────────

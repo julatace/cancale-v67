@@ -89,11 +89,14 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
                 texte:(document.body.innerText||'').slice(0,120).replace(/\n/g,' | ')}; }catch(e){return {err:String(e)};}
     });
     console.log('      diag :', JSON.stringify(diag));
-    const m=/(\d+)\s+num[ée]ros?\s+port[ée]s?\s+par\s+deux\s+paires/.exec(t2);
-    vus[t]=m?+m[1]:0;
+    // (21 oct.) Depuis #623 l'app RÈGLE elle-même deux annonces en ligne sous un
+    // même N° (numéro neuf, « à écrire sur le carton ») : dit OU réglé, jamais rien.
+    const m=/(\d+)\s+num[ée]ros?\s+port[ée]s?\s+par\s+deux\s+paires/.exec(t2)
+      || /(Un|\d+)\s+nouveaux?\s+num[ée]ros?\s+[àa]\s+[ée]crire/.exec(t2);
+    vus[t]=m?(m[1]==='Un'?1:+m[1]):0;
     console.log('   '+t.padEnd(14)+' → '+(m?m[0]:'RIEN'));
   }
-  dit(Object.values(vus).some(v=>v>0), 'l\'app signale les numeros portes par deux paires',
+  dit(Object.values(vus).some(v=>v>0), 'l\'app signale (ou règle, avec le N° neuf à écrire) les numeros portes par deux paires',
     JSON.stringify(vus));
   dit(vus['cat_bord']>0, 'et elle le dit sur COLIS, la ou se ferme le carton',
     vus['cat_bord']+' signale(s) pour '+vivants.length+' construit(s)');
