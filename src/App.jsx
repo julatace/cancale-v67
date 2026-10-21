@@ -34931,7 +34931,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const l=aConfirmer.liste, nb=l.length, prem=l[0];
           const cs=[...new Set(l.map(e=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; }).filter(Boolean))];
           const proche = prem.limiteMs!=null && prem.limiteMs-Date.now() < 24*3600000;
-          jobs.push({id:'a-confirmer',n:nb,icon:'check',color:proche?C.danger:C.warn,urgent:proche,
+          jobs.push({id:'a-confirmer',n:nb,icon:'check',color:C.warn,urgent:proche,  // ambre : le rouge est pour deux paires sous un N° (§7)
+           
             title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
             sub:`Ouvre la conversation sur Vinted et appuie sur « Tout est OK » (ou signale un problème)${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
             tab:'cat_achats',prio:proche?0.15:0.7});
