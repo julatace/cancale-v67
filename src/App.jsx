@@ -35,6 +35,47 @@ import { noterTicketDiscord, ecouterDiscord } from "./communaute/discordAttente.
 // dans une base de production sans le relire.
 import MIGRATION_SQL from "../supabase/migrations/001-multi-utilisateurs.sql?raw";
 
+// ── LES ÉCRANS CHARGÉS À LA DEMANDE (« app plus rapide », 21 octobre) ────────
+// Mesuré (banc `ouverture-4g.cjs`, téléphone 390 px, 4G, processeur ×4) : le
+// morceau App pesait 567 Ko compressés (1,96 Mo de code) et se téléchargeait ET
+// s'exécutait EN ENTIER avant Ma journée. Les écrans rares (eBay, Leboncoin, le
+// Stock, la Compta, les Réglages, le tableau de bord…) vivent maintenant dans
+// `src/ecrans/*.jsx`, découpés par `scripts/decouper-app.cjs` sans changer une
+// ligne de leur code : ils lisent d'App.jsx ce dont ils ont besoin (exports en
+// fin de fichier, liaisons vivantes de l'ESM — le thème `C` reste à jour).
+//   · `paresseux` rend un composant qui s'utilise EXACTEMENT comme avant
+//     (`<Garage …/>`) : React.lazy + un Suspense LOCAL — jamais celui de
+//     main.jsx, qui remplacerait l'app entière par son repli ;
+//   · le repli est une ligne sobre (« Chargement… »), le temps du morceau ;
+//   · `prechargerEcrans` les télécharge AU REPOS, un par un, une fois le
+//     premier écran affiché (`requestIdleCallback`) : l'onglet s'ouvre ensuite
+//     sans attente. Un morceau introuvable (nouveau déploiement) déclenche le
+//     rechargement de `vite:preloadError` (main.jsx), comme la 3D.
+// ⚠️ `paresseux` et `ChargementEcran` sont des DÉCLARATIONS de fonction (hissées) :
+// les `const X = paresseux(…)` plus bas les appellent au chargement du module.
+const _ecransAPrecharger = [];
+function paresseux(charger, nom) {
+  const L = lazy(() => charger().then((m) => ({ default: m[nom] })));
+  _ecransAPrecharger.push(charger);
+  function EcranParesseux(props) {
+    return <Suspense fallback={<ChargementEcran />}><L {...props} /></Suspense>;
+  }
+  EcranParesseux.displayName = nom;
+  return EcranParesseux;
+}
+function ChargementEcran() {
+  return <div role="status" aria-live="polite" data-chargement-ecran style={{ padding: '24px 16px', fontSize: 14, color: C.muted }}>Chargement…</div>;
+}
+let _prechargementLance = false;
+function prechargerEcrans() {
+  if (_prechargementLance || typeof window === 'undefined') return;
+  _prechargementLance = true;
+  const repos = (f) => (window.requestIdleCallback ? window.requestIdleCallback(f, { timeout: 4000 }) : setTimeout(f, 300));
+  const file = [...new Set(_ecransAPrecharger)];
+  const suivant = () => { const c = file.shift(); if (!c) return; repos(() => { Promise.resolve().then(c).catch(() => {}).then(suivant); }); };
+  suivant();
+}
+
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
 // dernière version (« c'est à jour ? », la question qu'il pose après chaque
 // déploiement — et le bouton « Forcer la mise à jour » est juste à côté).
@@ -45995,6 +46036,10 @@ function AppCoeur() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  // Les écrans découpés (src/ecrans) se préchargent au repos, APRÈS les lectures
+  // du premier écran (comptes arrivés + 3 s) : en 4G, les télécharger plus tôt
+  // ferait attendre les ventes de Ma journée derrière eux.
+  React.useEffect(()=>{ if(!accountsLoaded) return; const t=setTimeout(prechargerEcrans,3000); return ()=>clearTimeout(t); },[accountsLoaded]);
   // ⚠️ TROIS ÉTATS, comme partout ailleurs (panneau de sécurité, `extSait`,
   //    `acctHealth`) : on charge · la base a répondu · la base n'a pas répondu.
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
