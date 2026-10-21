@@ -10766,6 +10766,50 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
   seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
   faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
 
+### Ma journée hors ligne : une photo par vendeur, sur l'appareil (21 octobre)
+Ouvrir VRM sans réseau (métro, point relais sans 4G) montre Ma journée telle qu'à
+la dernière ouverture RÉUSSIE : colis à expédier (N°, compte, date limite), colis
+à retirer avec leurs codes et QR, la liste du soir — en lecture seule, sous UNE
+ligne « Hors ligne — ce que tu vois date de {heure} ; rien ne peut être envoyé ».
+- **Règle pure** `src/journeeHorsLigne.js` : `lectureComplete` (comptes lus, base
+  qui répond, ventes ET achats de tous les comptes d'aujourd'hui sans échec,
+  emails de suivi et de bordereau, `panel_colis_relais` LU — nouvel état
+  `colisRelaisLu` —, eBay lu) ; sinon AUCUNE photo. `lirePhoto(uid)` : clé
+  `vrm_hl_photo_{user.id}` ET contenu au même vendeur, sinon rien.
+  `wipeLocalData` (déconnexion, changement de vendeur) efface les photos (`vrm_*`)
+  et la réserve des QR.
+- **Hors ligne = `navigator.onLine === false`** (`useHorsLigne`) : la coque rend
+  `JourneeHorsLigne` À LA PLACE de tous les écrans (aucun geste qui envoie n'y
+  existe ; « Colis fait » / « Je l'ai retiré » grisés, la raison dite une fois
+  dans la ligne). Sans photo : « aucune copie gardée sur cet appareil » — jamais
+  « Tout est à jour ». Retour du réseau : la ligne part ; si rien n'avait pu être
+  lu (`baseKO`), rechargement (relecture normale). Une base qui hoquette EN
+  ligne garde `BaseInjoignable` (et ses codes G9).
+- **Session** : un jeton expiré hors ligne ne déconnecte pas (déjà vrai :
+  `authRefresh` rend `null`). ⚠️ Une session rangée sans `totp` (avant le 16 oct.)
+  passe par `PorteMfa`, qui ne peut pas vérifier hors ligne : pas de photo pour
+  elle tant qu'elle n'est pas renouvelée en ligne (volontaire : on ne contourne
+  pas la double vérification).
+- **QR** : les QR hébergés sont mis en réserve par la page (`fetch` no-cors →
+  cache `vrm-hl-qr`) ; le service worker sert `/hl-qr?u=…` depuis la réserve et
+  la garde à l'activation. Un `data:image` va dans la photo (≤ 60 Ko). Refusé ⇒
+  « QR pas gardé ici — donne le code ».
+- **Service worker** : une adresse AVEC paramètres n'entre plus dans le cache —
+  la vérification de version (`/?_v=<horodatage>`, chaque minute) y laissait une
+  copie de la page à chaque fois. Cache `vrm-shell-v6` inchangé, `/assets/` cache
+  d'abord, le reste réseau d'abord.
+- Preuves : banc `hors-ligne.cjs` (port `BANC_PORT`, 4961 ; données inventées ;
+  `context.setOffline` ; 390 tactile + 1512 ; lecture complète → hors ligne jeton
+  expiré → retour du réseau · lecture partielle · photo d'un autre vendeur) —
+  **28 rouges sur le build d'avant**, 0 après ; mutations « photo d'un autre
+  vendeur servie » ⇒ 4 rouges, « photo écrite sur lecture partielle » ⇒ 6 rouges.
+  `audit-journee-hors-ligne.cjs` (`--prouve` 4/4). `sw-cache.cjs` vert.
+- ⚠️ **Non mesuré** : un vrai iPhone (Safari ne déclare pas toujours
+  `navigator.onLine === false` sur un réseau qui ne passe pas — c'est alors
+  `BaseInjoignable`) ; le CDN réel des QR Pickup (une réponse opaque refusée par
+  CORP ⇒ le code seul) ; la liste du soir est calculée sur les dates limites
+  rangées, pas relue.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -10780,8 +10824,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **97 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **88 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **98 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **89 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -11102,8 +11146,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 97 audits
-scripts/bancs/                  les 88 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 98 audits
+scripts/bancs/                  les 89 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
