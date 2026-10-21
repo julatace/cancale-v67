@@ -1,3 +1,4 @@
+import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
 // ⚠️ POURQUOI UNE SEULE FONCTION : le plan Vercel Hobby plafonne à 12 fonctions
 // serverless et le projet en a 12 (voir api/ebay.js). `api/sante.js` est devenu
@@ -949,6 +950,12 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if(mode==='confidentialite'){
+    if(m!=='GET')return repondre(res,405,{ok:false});
+    const u=await utilisateurDe(req);if(!u)return repondre(res,401,{ok:false,raison:'session'});
+    const resultat=await verifierConfidentialite({url:SUPABASE_URL,anon:ANON,jeton:jetonDe(req),uid:u.id});
+    return repondre(res,resultat.ok?200:503,{...resultat,...(resultat.ok?{uid:u.id}:{})});
+  }
   if (mode === 'operations') return routeOperations(req, res);
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
