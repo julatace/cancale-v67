@@ -91,7 +91,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: (fn, ms) => { j.minuteries.push(ms); return 0; }, clearInterval,
-    URL, TextDecoder, TextEncoder, Buffer, crypto: require('crypto').webcrypto,
+    URL, TextDecoder, TextEncoder, Buffer, AbortController, Intl, crypto: require('crypto').webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome: {
       runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } },

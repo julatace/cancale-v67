@@ -24,6 +24,7 @@ import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
+import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -75,7 +76,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.203.0';
+const EXT_ATTENDUE = '5.204.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -370,7 +371,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.204.0', retraitnotif: '5.204.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -409,6 +410,8 @@ const CAPACITES_DITES = [
   ['lbcmsg', 'relever tes messages Leboncoin'],
   ['lbcpack', 'voir si tu as un pack photo Leboncoin'],
   ['annulee', 'retirer tout seul le bordereau d\'une vente annulée'],
+  ['confirmer', 'relever les colis à confirmer (« Tout est OK ») avant leur date limite'],
+  ['retraitnotif', 'te prévenir quand elle lit un code de retrait dans une conversation'],
   // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
   // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
@@ -29473,6 +29476,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
   };
   useEffect(() => { relireColisRelais(); /* eslint-disable-next-line */ }, []);
+  // ── À CONFIRMER AVANT LA DATE LIMITE (21 oct., extension 5.204) ───────────
+  // `panel_a_confirmer` : le « Confirmation nécessaire » (« Tout est OK ») lu
+  // par l'extension dans une conversation Vinted, avec sa date limite. Trois
+  // états (`src/aConfirmer.js`) : `undefined` en cours · `null` pas su · objet.
+  // Relue quand l'extension prévient (`maj confirmer`). Une lecture ratée ne
+  // vide pas ce qu'on montrait déjà.
+  const [aConfirmerData, setAConfirmerData] = useState(undefined);
+  const relireAConfirmer = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_a_confirmer&select=data`, { headers: sbAuth() });
+      if (!res.ok) { setAConfirmerData(v => (v === undefined ? null : v)); return; }
+      const rows = await res.json();
+      if (!Array.isArray(rows)) { setAConfirmerData(v => (v === undefined ? null : v)); return; }
+      setAConfirmerData((rows[0] && rows[0].data) || {});
+    } catch (_) { setAConfirmerData(v => (v === undefined ? null : v)); }
+  };
+  useEffect(() => { relireAConfirmer(); /* eslint-disable-next-line */ }, []);
+  const aConfirmer = useMemo(() => {
+    const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const uidsOk = accountsReady && Array.isArray(accounts) && accounts.length
+      ? new Set(accounts.map(a => String(a.vinted_user_id)).filter(u => !masques.has(u))) : null;
+    return aConfirmerVisibles(aConfirmerData, { uidsOk });
+  }, [aConfirmerData, accounts, accountsReady]);
   // Le retrait connu pour CETTE commande — par transaction uniquement.
   const relaisDe = (o) => { const k = String((o && o.transaction_id) || ''); return (k && colisRelais[k]) || null; };
   // ── LA PORTE VERS LE CODE DE RETRAIT ──────────────────────────────────────
@@ -32603,6 +32629,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
+      // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
+      else if (ev.quoi === 'confirmer') relireAConfirmer();
       // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
       // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.
       // ⚠️ Revue 5.165 : la MOISSON seulement, regroupée (`signalAnnonces`) —
@@ -35338,6 +35366,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
+        // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
+        //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
+        //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
+        if (aConfirmer.etat==='lu' && aConfirmer.liste.length) {
+          const l=aConfirmer.liste, nb=l.length, prem=l[0];
+          const cs=[...new Set(l.map(e=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; }).filter(Boolean))];
+          const proche = prem.limiteMs!=null && prem.limiteMs-Date.now() < 24*3600000;
+          jobs.push({id:'a-confirmer',n:nb,icon:'check',color:C.warn,urgent:proche,  // ambre : le rouge est pour deux paires sous un N° (§7)
+           
+            title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
+            sub:`Ouvre la conversation sur Vinted et appuie sur « Tout est OK » (ou signale un problème)${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
+            tab:'cat_achats',prio:proche?0.15:0.7});
+        }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
         // (21 octobre) LES MESSAGES eBAY SANS RÉPONSE, à côté de ceux de Vinted —
         // de TOUS ses comptes eBay actifs (le résumé rangé par la route, aucun
@@ -36644,6 +36685,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Il a sa place en tête des onglets du quotidien — sans revenir dans
             le compte « En route » (il n'arrive pas, il repart). Sous « Tous »,
             sa carte porte déjà le lien : pas deux fois. */}
+        {/* (21 oct., 5.204) À CONFIRMER AVANT LA DATE LIMITE — « Tout est OK »
+            sur Vinted. Une ligne, le compte nommé une fois quand il est le même
+            (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
+            « rien à confirmer ». */}
+        {aConfirmer.etat==='passu' && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
+        {aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
+          const l = aConfirmer.liste;
+          const nomDe = (e)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; };
+          const comptes = [...new Set(l.map(nomDe).filter(Boolean))];
+          const unSeul = comptes.length===1;
+          return (
+            <div className="vrm-achats-bloc" data-a-confirmer={l.length} data-a-confirmer-limite={l[0].limite||''} style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>✓</span> {l.length} {motAConfirmer(l)} à confirmer avant le {texteLimite(l[0])}{unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>Vérifie l'article puis appuie sur « Tout est OK » dans la conversation Vinted (ou « J'ai un problème »). Passé la date, Vinted conclut sans toi.</div>
+              {l.map(e=>(
+                <div key={e.tx} data-confirmer-tx={e.tx} data-confirmer-sur={e.limiteMs!=null?'oui':'texte'} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
+                  {e.photo && !imgMortes.has(e.photo) ? <PhotoVinted src={e.photo} alt="" loading="lazy" onError={()=>noterImgMorte(e.photo)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
+                  <div style={{flex:'1 1 160px',minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={e.titre}>{e.titre||'Commande'}</div>
+                    <div style={{fontSize:11.5,color:C.muted}}>{e.quoi==='retour'?'Retour qui te revient':'Achat'} · avant le {texteLimite(e)}{!unSeul && nomDe(e)?` · compte ${nomDe(e)}`:''}</div>
+                  </div>
+                  {e.url ? <a data-confirmer-lien={e.tx} href={e.url} target="_blank" rel="noreferrer"
+                    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>Ouvrir la conversation ↗</a> : null}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {aFilter!=='all' && (()=>{
           const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (!l.length) return null;
