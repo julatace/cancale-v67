@@ -1014,7 +1014,11 @@ const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfi
 const oauthStart = async (provider) => {
   try {
     const verifier = makeVerifier();
-    sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet uniquement
+    sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
+    // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
+    // onglet (sessionStorage vide) — le vérificateur est aussi gardé 10 min sur
+    // l'appareil. Seul, il ne sert à rien : il faut aussi le code du retour.
+    try { localStorage.setItem(PKCE_KEY, JSON.stringify({ v: verifier, at: Date.now() })); } catch (_) {}
     const challenge = await makeChallenge(verifier);
     const url = `${SUPABASE_URL}/auth/v1/authorize?provider=${encodeURIComponent(provider)}`
       + `&redirect_to=${encodeURIComponent(window.location.origin + window.location.pathname)}`
@@ -1043,8 +1047,13 @@ const consumeAuthRedirect = async () => {
 
   const code = q.get('code');
   if (code) {
-    const verifier = sessionStorage.getItem(PKCE_KEY);
+    let verifier = sessionStorage.getItem(PKCE_KEY);
     sessionStorage.removeItem(PKCE_KEY);
+    try {
+      const o = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
+      localStorage.removeItem(PKCE_KEY);
+      if (!verifier && o && typeof o.v === 'string' && Date.now() - Number(o.at) <= 10 * 60 * 1000) verifier = o.v;
+    } catch (_) {}
     cleanAuthUrl();
     if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
     const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
@@ -11495,23 +11504,73 @@ function AuthScreen() {
     } finally { setBusy(false); }
   };
 
+  // 16 px : sous 16 px, Safari iPhone ZOOME la page au toucher d'un champ.
   const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10,
-    padding:'13px 14px', fontSize:15, background:C.card, color:C.text, outline:'none', fontFamily:'inherit' };
+    padding:'0 14px', height:50, fontSize:16, background:C.card, color:C.text, outline:'none', fontFamily:'inherit' };
 
+  // 21 oct. — « l'onglet connexion est nul » : un logo carré au milieu d'un
+  // fond gris, sans dire où l'on est. Deux colonnes sur ordinateur (la marque
+  // à gauche, sur l'ardoise de la page d'accueil ; le formulaire à droite),
+  // un en-tête de marque sur téléphone. La logique ne change pas.
   return (
-    <div style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
-      <div style={{width:'100%',maxWidth:380}}>
-        {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
-            pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
-        <a href="/" data-retour-accueil="" style={{display:'inline-block',fontSize:13,color:C.muted,textDecoration:'none',marginBottom:14}}>← Découvrir VRM</a>
-        <div style={{textAlign:'center',marginBottom:26}}>
-          <VrmLogo size={76} style={{filter:'drop-shadow(0 8px 22px rgba(10,10,12,.22))'}}/>
+    <div className="vrm-cx" data-connexion="">
+      <style>{`
+.vrm-cx{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);background:${C.bg}}
+.vrm-cx-marque{position:relative;overflow:hidden;background:linear-gradient(160deg,#243D43 0%,#192C34 70%,#14242B 100%);color:#F0F5F2;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
+.vrm-cx-marque:before{content:"";position:absolute;right:-30%;top:-40%;width:90%;aspect-ratio:1;border-radius:50%;background:radial-gradient(closest-side,rgba(190,209,201,.18),transparent);pointer-events:none}
+.vrm-cx-haut{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.vrm-cx-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.vrm-cx-logo img{width:36px;height:36px;border-radius:9px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+.vrm-cx-logo b{font-size:20px;letter-spacing:-.04em;font-weight:700}
+.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#C7D6CF;text-decoration:none;font-weight:500}
+.vrm-cx-titre{position:relative;font-size:26px;line-height:1.15;letter-spacing:-.04em;font-weight:700;margin:22px 0 0}
+.vrm-cx-titre span{display:block;color:#B0C5BC}
+.vrm-cx-points{display:none}
+.vrm-cx-main{display:flex;justify-content:center;padding:0 16px 32px}
+.vrm-cx-boite{width:100%;max-width:400px;margin-top:-44px;position:relative}
+.vrm-cx-form{background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:22px 20px;box-shadow:0 1px 2px rgba(18,27,44,.06),0 18px 44px rgba(18,27,44,.12)}
+.vrm-cx-form input:focus{border-color:${C.accent}!important;box-shadow:0 0 0 3px ${C.accent}26}
+.vrm-cx-form button[type=submit]{min-height:50px;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
+.vrm-cx-form button[type=submit]:active{transform:scale(.98)}
+.vrm-cx-liens button{min-height:44px}
+@media (min-width:900px){
+ .vrm-cx{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
+ .vrm-cx-titre{font-size:clamp(34px,3.2vw,46px);margin-top:auto}
+ .vrm-cx-points{display:grid;gap:14px;margin:28px 0 auto;padding:0;list-style:none;max-width:420px;position:relative}
+ .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#D6E3DD}
+ .vrm-cx-points li b{color:#F0F5F2;font-weight:600}
+ .vrm-cx-points i{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F0F5F2}
+ .vrm-cx-pied{position:relative;font-size:13px;color:#9FB5AC}
+ .vrm-cx-main{align-items:center;padding:40px}
+ .vrm-cx-boite{margin-top:0}
+}
+@media (prefers-reduced-motion:reduce){.vrm-cx-form button[type=submit]{transition:none}}
+`}</style>
+      <aside className="vrm-cx-marque">
+        <div className="vrm-cx-haut">
+          <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
+            <img src="/vrm-logo-v3-192.png" alt="" width="36" height="36"/><b>VRM</b>
+          </a>
+          {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
+              pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
+          <a href="/" data-retour-accueil="" className="vrm-cx-retour">← Découvrir VRM</a>
         </div>
-        <form onSubmit={submit} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
-          <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:3}}>
+        <h1 className="vrm-cx-titre">{mode==='up' ? <>Bienvenue sur VRM.<span>Ton espace de revendeur.</span></> : <>Content de te revoir.<span>Ta boutique t'attend.</span></>}</h1>
+        <ul className="vrm-cx-points">
+          <li><i>1</i><span><b>Tes colis du jour</b>, dans le bon ordre, avec leur bordereau.</span></li>
+          <li><i>2</i><span><b>Vendu ici, à retirer ailleurs</b> : Vinted, Leboncoin et eBay au même endroit.</span></li>
+          <li><i>3</i><span><b>Tes chiffres</b>, prêts pour l'URSSAF, mois par mois.</span></li>
+        </ul>
+        <div className="vrm-cx-pied vrm-cx-points">Aucun mot de passe Vinted demandé.</div>
+      </aside>
+      <main className="vrm-cx-main">
+      <div className="vrm-cx-boite">
+        <form onSubmit={submit} className="vrm-cx-form">
+          <div style={{fontSize:19,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>
             {mode==='up' ? 'Créer ton compte' : mode==='reset' ? 'Mot de passe oublié' : mode==='newpw' ? 'Nouveau mot de passe' : 'Se connecter'}
           </div>
-          <div style={{fontSize:12.5,color:C.muted,marginBottom:16,lineHeight:1.45}}>
+          <div style={{fontSize:14,color:C.muted,marginBottom:mode==='in'?14:18,lineHeight:1.5}}>
             {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
                 sans la colonne `owner` (§12), un compte créé ici tombe dans les
                 MÊMES données que le vendeur existant. Le dire avant, pas après. */}
@@ -11520,7 +11579,7 @@ function AuthScreen() {
               : 'Attention : la séparation des données n\'est pas encore activée en base. Un compte créé maintenant ouvre la MÊME boutique — à réserver à toi-même.')
              : mode==='reset' ? 'On t\'envoie un lien pour en choisir un nouveau.'
              : mode==='newpw' ? 'Choisis-en un nouveau, tu resteras connecté.'
-             : 'Retrouve ta boutique, tes numéros et ta compta.'}
+             : null /* « Ta boutique t'attend » est déjà dit au-dessus (§7) */}
           </div>
           {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
               UNE connexion pour les deux : l'app connecte l'extension juste après. */}
@@ -11545,7 +11604,7 @@ function AuthScreen() {
                   style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,
                     border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:10,padding:'12px',
                     fontSize:14,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> Continuer avec {p.label}
+                  <BrandMark id={p.id}/> {mode==='up' ? `Créer mon compte avec ${p.label}` : `Continuer avec ${p.label}`}
                 </button>
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
@@ -11641,28 +11700,28 @@ function AuthScreen() {
             </div>
           )}
 
-          <div style={{display:mode==='newpw'?'none':'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
+          <div className="vrm-cx-liens" style={{display:mode==='newpw'?'none':'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:8,flexWrap:'wrap'}}>
             {/* ⚠️ INSCRIPTIONS FERMÉES tant que la base ne sépare pas les
                 vendeurs. Sinon la première personne qui crée un compte tombe
                 directement dans les données de Julien : son garage, ses ventes,
                 sa comptabilité. Le lien réapparaît seul après la migration. */}
             {(CLOISONNE || mode==='up') ? (
               <button type="button" onClick={()=>{ setMode(mode==='up'?'in':'up'); setErr(''); setInfo(''); }}
-                style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                style={{border:'none',background:'transparent',color:C.accent,fontSize:14,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
               </button>
             ) : (
-              <span style={{fontSize:12,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
+              <span style={{fontSize:14,color:C.muted,fontWeight:500}}>Inscriptions bientôt ouvertes</span>
             )}
             {mode!=='reset' && (
               <button type="button" onClick={()=>{ setMode('reset'); setErr(''); setInfo(''); }}
-                style={{border:'none',background:'transparent',color:C.muted,fontSize:12.5,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                style={{border:'none',background:'transparent',color:C.muted,fontSize:14,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 Mot de passe oublié ?
               </button>
             )}
             {mode==='reset' && (
               <button type="button" onClick={()=>{ setMode('in'); setErr(''); setInfo(''); }}
-                style={{border:'none',background:'transparent',color:C.muted,fontSize:12.5,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                style={{border:'none',background:'transparent',color:C.muted,fontSize:14,fontWeight:500,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 Retour
               </button>
             )}
@@ -11736,6 +11795,7 @@ function AuthScreen() {
             : null /* en cours, ou pas su : on n'affirme rien */}
         </div>
       </div>
+      </main>
     </div>
   );
 }
