@@ -10674,6 +10674,46 @@ Julien : « sur téléphone on ne peut pas se connecter à Discord », « l'accu
 - **Accueil** : « VR / M » coupé dans la colonne VRM/Toi corrigé, plateformes en pastilles de couleur (plus de faux boutons), textes plus lisibles. `accueil.cjs` 171 verts.
 - **Sécurité** : `Referrer-Policy`, `Permissions-Policy` (caméra, micro, position : le site seul ; paiement, USB… coupés), `Cross-Origin-Opener-Policy: same-origin-allow-popups`, HSTS. Conseillers Supabase : rien d'anormal (tables fermées et fonctions « ma donnée seulement » voulues). Erreurs de production : aucune depuis le 20 oct. midi.
 
+### « Tout sur le N° » : la recherche par numéro (21 octobre)
+Julien : « une recherche par numéro, partout ». La loupe de l'en-tête (la
+recherche globale existante, `gsOpen`) : un **numéro** tapé (« 128 », « B128 »,
+« n128 », « N°128 », « #128 », « 007 ») fait passer devant le bloc
+**`ToutSurLeNumero`** — la fiche (en ligne · à confirmer · plus en ligne), ses
+ventes Vinted / Leboncoin / eBay, l'annonce eBay, le bordereau (prêt · imprimé ·
+posté · en attente du PDF), le carton du Stock (meuble + case), le double
+(rouge, §5 — seul rouge du bloc) et la réattribution (`reattribue` : « remplacé
+par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque ligne
+(44 px) mène à son écran ; le Stock s'ouvre sur le carton coloré.
+- **Une règle pure** `toutSurLeNumero(q, données, règles, séries)`
+  (`src/rechercheNumero.js`) : par CLÉ (`cleNum`), jamais par sous-chaîne
+  (« 12 » ≠ 128), jamais par titre. Vente Vinted = correction posée sur la vente
+  (`vinted_sale_overrides.numero`), sinon transaction → annonce (`txnItem`) →
+  fiche. eBay (`numLigneEbay`, `numEbayLu` : lien, SKU + carte 013), Leboncoin
+  (`numeroLbcIdentite`), double (`conflitsDeNumeros`, annonce + vente à poster +
+  vente annulée avant l'envoi + Stock), Stock (`ouEstNumero`) : les règles de
+  l'app, injectées, pas réécrites (§11). « n128 » vaut 128 sauf si « N » est une
+  vraie série (préfixe ou archive).
+- **Archive B (013)** : « 128 » et « B128 » ne se mélangent jamais ; si l'ancien
+  existe, une ligne le dit (« L'ancien N°B128 existe aussi — le voir »).
+- **Trois états** : `trouve` · `rien` (tout lu, jamais servi) · `passu` (rien
+  trouvé et une source illisible — jamais « jamais servi ») ; ce qui n'a pas pu
+  être lu est nommé (`data-tout-manques`). Les sources sont lues UNE fois à
+  l'ouverture de la recherche (`numData`, chaque source `null` sur échec) :
+  dressings + règle « en ligne », ventes, transactions (scalaires,
+  `TXN_META_SELECT`), bordereaux (`meta->>_pdf`), ventes Leboncoin (annonces
+  seulement si une vente n'a pas de lien), commandes et annonces eBay (tous les
+  comptes, un illisible ⇒ pas su), et **le Stock dans sa ligne `vrm_room`** (la
+  copie de l'appareil peut manquer). La paire exacte n'est plus répétée dans la
+  liste « Paires numérotées » en dessous (§7).
+- Preuves : `audit-recherche-numero.cjs` (vraies règles d'App.jsx + module, 34
+  contrôles, deux paires au même titre N°40/N°41 jamais mélangées ; `--prouve`
+  **6/6** : sous-chaîne, titre, archive mélangée, pas su = rien, double ignoré,
+  correction ignorée) ; banc `bancs/recherche-numero.cjs` (port 8431, données
+  inventées, 390 tactile + 1512) — rouge sur le build d'avant, vert après.
+- **Non mesuré** : sa vraie base (données inventées) ; une vente reliée par sa
+  seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
+  faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

@@ -1,4 +1,5 @@
 import {resumerStockJournee} from './stockJournee.js';
+import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -10809,6 +10810,109 @@ function EmptyState({ icon, title, desc, action }) {
 // `icon` accepte soit un nom d'icône au trait (même jeu que la barre du bas —
 // l'écran et son onglet portent alors exactement le même symbole), soit un
 // emoji pour les écrans qui n'ont pas d'onglet dédié.
+// ── « TOUT SUR LE N° » : LE BLOC DE LA RECHERCHE (21 octobre) ──────────────
+// Rend ce que `toutSurLeNumero` (src/rechercheNumero.js) a trouvé PAR IDENTITÉ.
+// Aucune couleur (§7) sauf le rouge des deux paires présentes sous ce N° (§5).
+// Chaque ligne mène à son écran. `numData` absent = lecture en cours.
+function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
+  const lecture = !numData;
+  const nd = numData || {};
+  const numeros = load('vinted_annonce_numeros', {}) || {};
+  const cloud = isCloudReady();
+  const fichesLues = cloud || Object.keys(numeros).length ? numeros : null;
+  const shipDone = load('vinted_ship_done', {}) || {};
+  const liensLbc = load('vrm_lbc_liens', {}) || {};
+  const series = [prefixeNumeros(), archiveNumeros()];
+  const lu = (v) => (v === undefined ? null : v);
+  const rn = toutSurLeNumero(q, {
+    fiches: fichesLues, pool: cloud ? load('vinted_used_numeros', null) : null,
+    enLigne: lu(nd.enLigne), aConfirmer: nd.aConfirmer || null,
+    comptesOk: comptesRecherche(comptes),
+    ventes: lu(nd.ventes), txnItem: lu(nd.txnItem),
+    saleOv: load('vinted_sale_overrides', {}) || {},
+    bordereaux: lu(nd.bordereaux),
+    imprimes: load('vinted_bords_printed', {}) || {}, postes: shipDone,
+    lbcVentes: lu(nd.lbcVentes), ebayCommandes: lu(nd.ebayCommandes), ebayAnnonces: lu(nd.ebayAnnonces),
+    plan: lu(nd.plan),
+    archive: archiveNumeros(),
+  }, {
+    cleNum, conflits: conflitsDeNumeros, ouStock: ouEstNumero,
+    numEbayLigne: numLigneEbay,
+    numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
+    numLbc: (v) => numeroLbcIdentite(v, nd.lbcItems || null, liensLbc),
+    aPoster: (o) => aExpedier(o) && !shipDone[String(o.transaction_id)],
+    // Posté = le colis est parti (transit, relais, livré, finalisé) — la
+    // même étiquette que la carte de la vente (`etapeVente`, §11).
+    expediee: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).step >= 2,
+    revenue: (o) => classifyOrderStatus(o && o.status) === 'cancelled' && !/exp[eé]di|achemin|livr|remis|d[eé]pos/i.test((o && o.status) || ''),
+  }, series);
+  if (rn.etat === 'invalide') return null;
+  const k = rn.cle;
+  const jour = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+  const lien = { minHeight: 44, background: 'transparent', border: 0, padding: 0, color: C.text, textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 };
+  const ligne = (cle, attrs, titre, detail, onClick) => (
+    <button key={cle} type="button" className="vrm-tout-num-ligne" {...attrs} onClick={onClick}
+      style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</span>
+        {detail && <span style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 2 }}>{detail}</span>}
+      </span>
+      <span aria-hidden="true" style={{ fontSize: 17, color: C.muted }}>›</span>
+    </button>
+  );
+  const titreSec = (t) => <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, margin: '12px 2px 2px' }}>{t}</div>;
+  const ETAT_ANN = { 'en-ligne': 'En ligne sur Vinted', 'a-confirmer': 'À confirmer (dernière lecture ancienne)', 'plus-en-ligne': 'Plus en ligne', passu: 'Annonces pas encore lues' };
+  const ETAT_BORD = { pret: 'Prêt à imprimer', imprime: 'Imprimé', poste: 'Posté', attente: 'En attente du PDF' };
+  const { vinted, lbc, ebay } = rn.ventes;
+  const rien = rn.etat === 'rien';
+  const rienDautre = !rn.annonces.length && !vinted.length && !lbc.length && !ebay.length && !rn.annoncesEbay.length && !rn.stock && !rn.reattribues.length;
+  return (
+    <div data-tout-num={k} data-tout-etat={lecture && rn.etat !== 'trouve' ? 'lecture' : rn.etat} data-tout-lecture={lecture ? '1' : '0'} style={{ marginTop: 10, padding: '10px 12px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Tout sur le N°{k}</div>
+      {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}
+      {rn.double && (
+        <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.danger}`, color: C.danger, fontSize: 13, fontWeight: 600 }}>
+          Deux paires présentes portent le N°{k}. Vérifie les cartons avant d'imprimer un bordereau.
+          <button type="button" onClick={() => onNav('cat_annonces')} style={{ ...lien, display: 'block', marginTop: 4, color: C.danger }}>Voir dans Annonces</button>
+        </div>
+      )}
+      {rn.reattribues.map((r) => (
+        <div key={'r' + r.id + r.sens} data-tout-reattribue={r.sens} style={{ marginTop: 8, fontSize: 13, color: C.text }}>
+          {r.sens === 'parti'
+            ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'une paire'} » porte maintenant le <b>N°{r.vers}</b>. </>
+            : <>Ce numéro remplace le N°{r.de} (doublon réglé){r.ecrit ? '.' : ' — pas encore écrit sur le carton.'}</>}
+          {r.sens === 'parti' && <button type="button" onClick={() => onChercher(r.vers)} style={lien}>Voir le N°{r.vers}</button>}
+        </div>
+      ))}
+      {rn.annonces.length > 0 && titreSec('La paire')}
+      {rn.annonces.map((a) => ligne('a' + a.id, { 'data-tout-annonce': a.id, 'data-tout-annonce-etat': a.etat }, a.title || '(sans titre)', ETAT_ANN[a.etat] + (a.price ? ' · ' + prixCourt(String(a.price).replace(',', '.')) : ''), () => onNav('cat_annonces')))}
+      {(vinted.length + lbc.length + ebay.length + rn.annoncesEbay.length) > 0 && titreSec('Ventes et autres plateformes')}
+      {vinted.map((o) => ligne('v' + o._tx, { 'data-tout-vente': 'vinted', 'data-tout-tx': o._tx }, o.title || '(sans titre)', `Vente Vinted · ${etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label}${o.date ? ' · ' + jour(o.date) : ''}`, () => onNav('cat_ventes')))}
+      {lbc.map((v) => ligne('l' + v._id, { 'data-tout-vente': 'leboncoin' }, v.title || '(sans titre)', `Vente Leboncoin · ${lbcAnnulee(v) ? 'annulée' : lbcFinalisee(v) ? 'finalisée' : 'en cours'}${v.price != null ? ' · ' + lbcEuro(v.price) : ''}`, () => onNav('plat_leboncoin')))}
+      {ebay.map((c) => ligne('e' + c.orderId, { 'data-tout-vente': 'ebay' }, ((c.lineItems || [])[0] || {}).title || 'Commande eBay', `Vente eBay · ${commandeEbayEngagee(c) ? 'payée' : 'annulée ou remboursée'}${c.creationDate ? ' · ' + jour(c.creationDate) : ''}`, () => onNav('ebay_ventes')))}
+      {rn.annoncesEbay.map((a) => ligne('ea' + a.itemId, { 'data-tout-annonce-ebay': String(a.itemId) }, a.title || 'Annonce eBay', 'En vente sur eBay', () => onNav('ebay_annonces')))}
+      {rn.bordereaux.length > 0 && titreSec('Bordereau')}
+      {rn.bordereaux.map((b) => ligne('b' + b.tx, { 'data-tout-bord': b.tx, 'data-tout-bord-etat': b.etat }, ETAT_BORD[b.etat], 'Colis de la vente Vinted', () => onNav('cat_bord')))}
+      {(rn.stock || rn.annonces.length > 0) && titreSec('Stock')}
+      {rn.stock
+        ? ligne('s', { 'data-tout-stock': rn.stock.itemName || 'range' }, `Rangé : ${rn.stock.itemName || 'un meuble'}`, [rn.stock.roomName, rn.stock.nom].filter(Boolean).join(' · '), () => onStock(k))
+        : rn.annonces.length > 0 && <div data-tout-stock="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{rn.manques.includes('ton Stock') ? 'Stock pas encore lu.' : 'Pas rangé dans le Stock.'}</div>}
+      {rn.etat === 'trouve' && rienDautre && rn.servi &&
+        <div data-tout-servi="1" style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Ce numéro a déjà servi, mais aucune fiche ne le porte aujourd'hui.</div>}
+      {rien && <div data-tout-rien="1" style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Le N°{k} n'a jamais servi.</div>}
+      {!rien && rn.manques.length > 0 && (
+        <div data-tout-manques={rn.manques.length} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>
+          {lecture ? 'Lecture en cours…' : `Pas pu lire : ${rn.manques.join(', ')}.`}{rn.etat === 'passu' && !lecture ? ' Rien trouvé dans le reste — réessaie dans un instant.' : ''}
+        </div>
+      )}
+      {rn.ancien && (
+        <button type="button" data-tout-ancien={rn.ancien} onClick={() => onChercher(rn.ancien)} style={{ ...lien, display: 'block', marginTop: 4 }}>
+          L'ancien N°{rn.ancien} existe aussi (d'avant la remise à zéro) — le voir
+        </button>
+      )}
+    </div>
+  );
+}
 function ScreenHead({ icon, title, desc, right }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -45859,6 +45963,42 @@ function AppCoeur() {
     const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
     setGsData({online,sold,bought,lbc});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
+  // ── « TOUT SUR LE N° » (21 octobre) : les sources de la recherche par
+  // numéro, lues UNE fois à l'ouverture de la recherche. Chaque source rend
+  // `null` quand la base n'a pas répondu (« pas su » ≠ « rien », §4.1) : la
+  // règle (`toutSurLeNumero`, src/rechercheNumero.js) le dit au lieu d'affirmer
+  // « jamais servi ». Scalaires seulement pour les bordereaux et les
+  // transactions (§4.4), pagination stricte (§4.5).
+  const [numData,setNumData]=useState(null);
+  useEffect(()=>{ if(!gsOpen){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
+    const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
+    // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
+    // manquer (purgée à la remise à zéro, appareil neuf) — on la lit ici.
+    const [lstRows, soldRows, txnItem, bE, bL, lbcRows, cE, planLu]=await Promise.all([
+      sb('app_data?id=like.harvest_*_listings&select=id,data'),
+      sb('app_data?id=like.harvest_*_orders_sold&select=id,data'),
+      (async()=>{ try{ const rows=await lireTout(TXN_META_SELECT,{strict:true}); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); } return m; }catch(_){ return null; } })(),
+      lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
+      lireTout('id=like.harvest_*_label_*&select=id,tx:meta->>tx,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
+      sb('app_data?id=eq.lbc_ventes&select=ventes:data->ventes'),
+      lireComptesEbay().catch(()=>null),
+      loadRoomPlan().catch(()=>undefined),
+    ]);
+    const plan=planLu===undefined?null:normalizePlan(planLu);
+    let enLigne=null, aConfirmer=null;
+    if(lstRows){ try{ const lu=await lireLignesEnLigne(lstRows); enLigne=new Set(); aConfirmer=new Set();
+      for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
+      for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id)); }catch(_){ enLigne=null; aConfirmer=null; } }
+    let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(o); } } } }
+    const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
+    let lbcVentes=null, lbcItems=null;
+    if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
+      const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
+    let ebayCommandes=null, ebayAnnonces=null;
+    if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
+      [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders','orders:data->orders','orders'), tous('ebay_listings','items:data->items','items')]); }
+    if(vivant) setNumData({enLigne,aConfirmer,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
+  })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
   // clavier : une seule règle, sinon les trois finissent par diverger.
@@ -47355,12 +47495,14 @@ function AppCoeur() {
         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
         const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
         let pairs=[], ventes=[], achats=[];
+        const kNumQ = lireNumeroCherche(gsQ, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
         if(q){
           // Paires numérotées (index principal : N°, titre, marque).
           const okUid = comptesRecherche(vintedAccounts);
           pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
             .filter(e=> !okUid || !e.accountId || okUid.has(String(e.accountId)))
             .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
+            .filter(e=> !kNumQ || cleNum(e.numero||'')!==kNumQ)   // la paire exacte est dans « Tout sur le N° »
             .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
             .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
             .slice(0,40);
@@ -47370,6 +47512,9 @@ function AppCoeur() {
         }
         const total = pairs.length+ventes.length+achats.length;
         const go=(tab)=>{ setGsOpen(false); setTab(tab); };
+        // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
+        // N° » passe devant, par identité (src/rechercheNumero.js).
+        const estNumQ = !!kNumQ;
         // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
         // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
         // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
@@ -47391,7 +47536,8 @@ function AppCoeur() {
           </div>
           <div style={{flex:1,overflowY:'auto',padding:'8px 14px 40px',WebkitOverflowScrolling:'touch'}}>
             {!q && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.6}}>Tape un <b>numéro</b>, un <b>modèle</b> ou une <b>marque</b>.<br/><span style={{fontSize:12}}>Cherche partout : annonces en ligne, ventes, achats, garage {gsData?'et Leboncoin':'…'}{!gsData?<> · <span style={{opacity:0.8}}>indexation en cours…</span></>:''}</span></div>}
-            {q && total===0 && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
+            {q && total===0 && !estNumQ && <div style={{padding:'40px 16px',textAlign:'center',color:C.muted,fontSize:13}}>Aucun résultat pour « {gsQ} ».<br/><span style={{fontSize:12}}>{gsData?'Aucune paire, vente ou achat ne correspond.':'Indexation en cours, réessaie dans un instant…'}</span></div>}
+            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
             {pairs.map(p=>(
               <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
