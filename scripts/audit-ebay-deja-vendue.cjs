@@ -27,7 +27,7 @@
 // une preuve (§6.1).
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
-const APP0 = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+const APP0 = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
 
 function extraire(src, nom, dit) {
   const re = new RegExp(`^(?:async )?function ${nom}\\(|^const ${nom} = `, 'm');

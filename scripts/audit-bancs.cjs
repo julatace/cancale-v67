@@ -83,7 +83,7 @@ if (carte) {
 // n'ont AUCUN appelant — deux culs-de-sac, comme le tiroir `Nav` retiré le
 // même jour. Ils ne sont donc pas exigés ici ; les dix autres, si.
 {
-  const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+  const APP = require('./_source-app.cjs')(path.join(RACINE, 'src/App.jsx'));
   const montes  = new Set([...APP.matchAll(/tab===\'([a-z_]+)\'\s*&&/g)].map(m => m[1]));
   const auRail  = new Set([...APP.matchAll(/id:'([a-z_]+)',\s*icon:/g)].map(m => m[1]));
   const appeles = new Set([...APP.matchAll(/setTab\('([a-z_]+)'\)/g)].map(m => m[1]));

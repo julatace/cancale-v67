@@ -30,7 +30,7 @@ const { faireFond } = require('./_fond-vm.cjs');
 const racine = path.join(__dirname, '..');
 const lire = (r) => fs.readFileSync(path.join(racine, r), 'utf8');
 const F = { bg: lire('vinted-sync-extension/background.js'), inject: lire('vinted-sync-extension/inject.js'),
-  content: lire('vinted-sync-extension/content.js'), app: lire('src/App.jsx') };
+  content: lire('vinted-sync-extension/content.js'), app: require('./_source-app.cjs')(path.join(racine, 'src/App.jsx')) };
 
 // ── RÉAFFAIBLIR UNE RÈGLE (§6.1) ────────────────────────────────────────────
 const MUTATIONS = {

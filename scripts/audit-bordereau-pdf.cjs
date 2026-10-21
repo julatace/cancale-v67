@@ -187,7 +187,7 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
   // Un échec de récupération a une porte de sortie (5.130 : le panneau est
   // retiré, c'est l'APP qui la propose) : l'extension pose le rendez-vous quand
   // la commande finit sans PDF, et le bouton de l'app ouvre la vente.
-  const APP = fs.readFileSync(path.join(__dirname,'..','src','App.jsx'),'utf8');
+  const APP = require('./_source-app.cjs')(path.join(__dirname,'..','src','App.jsx'));
   const cmd = SRC.slice(SRC.indexOf('async function executerCommande'));
   const corps = cmd.slice(0, cmd.indexOf('\n}\n'));
   /attendreBordereau\(uid, tx\)[\s\S]{0,200}genere_sans_pdf/.test(corps)

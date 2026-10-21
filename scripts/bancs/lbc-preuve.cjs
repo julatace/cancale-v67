@@ -28,7 +28,7 @@ const path = require('path'), fs = require('fs'), http = require('http');
 // Une extension ≥ CODE_DANS_ETAT (5.171) porte dans son état la version du CODE
 // qui tourne (\`code\`) : sans lui, l'app la dit « périmée » (chantier connexion du
 // 11 octobre). Le seuil est LU dans l'app, jamais recopié (§11).
-const CODE_DANS_ETAT_BANC = (require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8').match(/const CODE_DANS_ETAT = '([0-9.]+)'/) || [])[1] || '5.171.0';
+const CODE_DANS_ETAT_BANC = (require('../_source-app.cjs')(require('path').join(__dirname, '..', '..', 'src', 'App.jsx')).match(/const CODE_DANS_ETAT = '([0-9.]+)'/) || [])[1] || '5.171.0';
 const auMoinsBanc = (v, s) => { const a = String(v || '').split('.').map(Number), b = String(s).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); } return true; };
 const codeEtat = (v) => auMoinsBanc(v, CODE_DANS_ETAT_BANC) ? { code: v, ext: 'banc-ext' } : {};
 const RACINE = path.join(__dirname, '..', '..');
@@ -175,7 +175,7 @@ async function fileApp(b, lignes, vp, pont) {
       dit(!!pub, 'le background.js de la dernière extension publiée sans la règle de l\'instantané se lit dans l\'historique', pub ? pub.version : 'historique illisible — relance avec VRM_GIT=<dépôt>');
       if (!pub) return;
       const extPub = await fileExtension(base('B'), pub.f);
-      const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+      const APP = require('../_source-app.cjs')(path.join(RACINE, 'src/App.jsx'));
       const attendue = (/const EXT_ATTENDUE = '([^']+)'/.exec(APP) || [])[1];
       const seuil = (/preuves: '([^']+)'/.exec(APP) || [])[1];
       const avant = (a, b2) => { const A = a.split('.').map(Number), B = b2.split('.').map(Number); for (let i = 0; i < 3; i++) if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) < (B[i] || 0); return false; };

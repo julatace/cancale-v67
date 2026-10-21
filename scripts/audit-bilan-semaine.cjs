@@ -52,7 +52,7 @@ function declarations(src, plugins) {
   }
   return out;
 }
-const app = lire('src/App.jsx');
+const app = require('./_source-app.cjs')(path.join(R, 'src/App.jsx'));
 const declApp = declarations(app, ['jsx']);
 
 // ── --recopie : refabrique le miroir (le seul moyen de le modifier) ─────────

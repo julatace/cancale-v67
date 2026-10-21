@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 (async()=>{
  const {candidatsVenteSansAnnonce}=await import('../../src/candidatsVente.js');
- const app=fs.readFileSync(path.resolve(__dirname,'../../src/App.jsx'),'utf8');
+ const app=require('../_source-app.cjs')(path.resolve(__dirname,'../../src/App.jsx'));
  const normaliser=app.match(/const cleNum = \(v\) => \{[\s\S]*?\n\};/);
  assert.ok(normaliser,'normalisation réelle des numéros disponible');
  const cle=vm.runInNewContext(normaliser[0]+'\ncleNum');

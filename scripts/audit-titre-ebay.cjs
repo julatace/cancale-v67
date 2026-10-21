@@ -3,7 +3,7 @@
 // « taille 36 » ; ebayTitre doit retirer cette forme avant d'écrire la sienne.
 // Exécute les VRAIES fonctions extraites d'App.jsx.
 const fs = require('fs'), path = require('path');
-const A = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const A = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
 const g = (a, b) => { const i = A.indexOf(a); const j = i >= 0 ? A.indexOf(b, i) : -1; return i >= 0 && j > i ? A.slice(i, j) : ''; };
 let ko = 0; const dit = (ok, m) => { console.log((ok ? '✅ ' : '❌ ') + m); if (!ok) ko++; };
 let ebayTitre = null;

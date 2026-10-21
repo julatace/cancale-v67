@@ -23,7 +23,7 @@ const fs = require('fs'), vm = require('vm'), path = require('path');
 const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
-const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 
 let ko = 0;

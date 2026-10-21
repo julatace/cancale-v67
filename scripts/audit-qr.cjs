@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const R = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
-const API = R('api/email-inbound.js'), APP = R('src/App.jsx');
+const API = R('api/email-inbound.js'), APP = require('./_source-app.cjs')(path.join(__dirname, '..', 'src/App.jsx'));
 const regex = (src, nom) => {
   const m = new RegExp(`^const ${nom} = (/.*/[a-z]*);`, 'm').exec(src);
   if (!m) throw new Error(`${nom} introuvable`);

@@ -19,7 +19,7 @@ const racine = path.join(__dirname, '..');
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : d; };
 const SRC = fs.readFileSync(arg('--src', path.join(racine, 'vinted-sync-extension/background.js')), 'utf8');
 const INJ = fs.readFileSync(arg('--inject', path.join(racine, 'vinted-sync-extension/lbc-inject.js')), 'utf8');
-const APP = fs.readFileSync(arg('--app', path.join(racine, 'src/App.jsx')), 'utf8');
+const APP = require('./_source-app.cjs')(arg('--app', path.join(racine, 'src/App.jsx')));
 const SRV = fs.readFileSync(arg('--serveur', path.join(racine, 'api/_lib/double-vente.js')), 'utf8');
 
 let ko = 0;

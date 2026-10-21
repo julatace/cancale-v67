@@ -92,7 +92,7 @@ for (const f of FICHIERS) {
 // UN lecteur (`lirePdfLigne`), qui ne demande que `pdfB64`.
 console.log('\n── LES LIGNES QUI PORTENT UN PDF NE SONT JAMAIS LUES EN ENTIER (app)');
 {
-  const app = sansCommentaires(fs.readFileSync(path.join(racine, 'src/App.jsx'), 'utf8'));
+  const app = sansCommentaires(require('./_source-app.cjs')(path.join(racine, 'src/App.jsx')));
   const PDF_FAMILLES = /app_data\?id=(?:eq|like)\.[^`&]*(?:_label_|_receipt_latest|email_bord_)[^`&]*&select=(?:id,)?data(?![-,>])/g;
   const blobs = app.match(PDF_FAMILLES) || [];
   dit(blobs.length === 0, 'aucun `select=data` sur une ligne de bordereau ou de reçu', blobs.map((x) => x.slice(0, 70)).join(' | '));

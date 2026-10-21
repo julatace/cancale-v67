@@ -32,7 +32,7 @@ const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } c
 let parser;
 try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); }
 catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); process.exit(1); }
-const app = lire('src/App.jsx') || '';
+const app = require('./_source-app.cjs')(path.join(R, 'src/App.jsx')) || '';
 const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
 
 (async () => {

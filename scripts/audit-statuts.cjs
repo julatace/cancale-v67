@@ -197,7 +197,7 @@ essaie('(f) résumé de l\'extension', () => {
 // (g) Le délai : 7 jours mesurés, et la date limite de l'email d'abord.
 essaie('(g) délai', () => {
   dit(Number(app.DELAI_EXPEDITION_J) >= 7, 'le délai d\'expédition estimé est d\'au moins 7 jours (mesuré : jamais moins sur 176 bordereaux)', String(app.DELAI_EXPEDITION_J));
-  const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+  const src = require('./_source-app.cjs')(path.join(R, 'src/App.jsx'));
   const i = src.indexOf('const toShip = useMemo(');
   const corps = i >= 0 ? src.slice(i, src.indexOf('\n  }, [', i)) : '';
   // ⚠️ 6 octobre : la date limite vit dans `limiteExpedition` (partagée avec
@@ -218,7 +218,7 @@ essaie('(g) délai', () => {
 // par son CODE de retrait (une identité), jamais par son titre (§5). Mesuré :
 // aucun email transporteur ne porte le titre (192/192).
 essaie('(h) dédoublonnage des colis à retirer', () => {
-  const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+  const src = require('./_source-app.cjs')(path.join(R, 'src/App.jsx'));
   const i = src.indexOf('const pickupUnion = useMemo(');
   const corps = i >= 0 ? src.slice(i, src.indexOf('\n  }, [', i)) : '';
   const code = corps.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');

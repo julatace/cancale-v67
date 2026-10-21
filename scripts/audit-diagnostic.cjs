@@ -165,7 +165,7 @@ const attendre = () => new Promise((r) => setTimeout(r, 30));
   // cache » : **lu nulle part**. Le code existait, personne ne l'appelait, et
   // rien ne levait d'erreur (famille du tiroir `Nav`, §4.11).
   {
-    const APP = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+    const APP = require('./_source-app.cjs')(path.join(RACINE, 'src', 'App.jsx'));
     const VITE = fs.readFileSync(path.join(RACINE, 'vite.config.js'), 'utf8');
     /define:\s*\{[^}]*__BUILD__/.test(VITE)
       ? ok('le build injecte son horodatage (`__BUILD__`)')

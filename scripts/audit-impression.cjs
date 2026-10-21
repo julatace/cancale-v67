@@ -28,7 +28,7 @@
 //    n'existait pas avant » n'est pas une preuve (§6.1).
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
-const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
 const PL = require(path.join(racine, 'node_modules', 'pdf-lib', 'cjs', 'index.js'));
 const PROUVE = process.argv.includes('--prouve');
 

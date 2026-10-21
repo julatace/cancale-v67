@@ -111,7 +111,7 @@ verifie('une règle réservée à iOS pose la police des champs', !!bloc && /fon
   // `authSignUp`) : c'est là que parle un inconnu qui s'inscrit. Le panneau
   // « Sécurité des données » de Réglages, lui, s'adresse au propriétaire et a
   // le droit de nommer Supabase (§ « panneau de sécurité »).
-  const src = lire('src/App.jsx');
+  const src = require('./_source-app.cjs')(path.join(RACINE, 'src/App.jsx'));
   const debut = src.indexOf('const authCall');
   const finSignUp = src.indexOf('\n};', src.indexOf('const authSignUp'));
   verifie('le parcours de connexion se retrouve dans App.jsx', debut >= 0 && finSignUp > debut);

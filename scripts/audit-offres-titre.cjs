@@ -21,7 +21,7 @@
 //    écrite. Une reformulation ne peut pas le rendre vert (§6.5).
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
-const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
 
 let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };

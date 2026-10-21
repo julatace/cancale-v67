@@ -190,7 +190,7 @@ const profil = (banni) => ({ status: 200, body: { user: { id: 9001, login: 'comp
   await essaie('meme regle', async () => {
     const corps = (src) => { const i = src.indexOf('function typeCompteVinted('); if (i < 0) return null; const j = src.indexOf('\n}\n', i); return src.slice(i, j + 2); };
     const ext = corps(fs.readFileSync(SRC, 'utf8'));
-    const app = corps(fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8'));
+    const app = corps(require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx')));
     dit(!!ext && !!app && ext === app, '`typeCompteVinted` est le même texte dans l\'app et l\'extension', !ext ? 'absente de l\'extension' : !app ? 'absente de l\'app' : 'les deux textes diffèrent');
   });
 

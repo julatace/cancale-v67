@@ -29,7 +29,7 @@ const SRC_BG = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dir
 const iApp = process.argv.indexOf('--app');
 const SRC_APP = iApp > 0 ? path.resolve(process.argv[iApp + 1]) : path.join(__dirname, '..', 'src', 'App.jsx');
 const src = fs.readFileSync(SRC_BG, 'utf8');
-const app = fs.readFileSync(SRC_APP, 'utf8');
+const app = require('./_source-app.cjs')(SRC_APP);
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 let ko = 0, ok = 0;
 const dit = (bon, quoi, det) => { if (bon) { ok++; console.log(`✅ ${quoi}`); } else { ko++; console.log(`❌ ${quoi}${det ? ' — ' + det : ''}`); } };

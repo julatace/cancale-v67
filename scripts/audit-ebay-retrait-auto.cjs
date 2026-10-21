@@ -28,7 +28,7 @@
 // d'avant, où la fonction existait déjà.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const R = path.join(__dirname, '..');
-const APP0 = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+const APP0 = require('./_source-app.cjs')(path.join(R, 'src', 'App.jsx'));
 let parser = null;
 try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); } catch (_) {}
 

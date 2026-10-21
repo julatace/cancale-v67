@@ -27,7 +27,7 @@
 // « La fonction n'existait pas avant » n'est pas une preuve (§6.1).
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
-let APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+let APP = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
 let EXT = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
 const PROUVE = process.argv.includes('--prouve');
 

@@ -17,7 +17,7 @@ const fs=require('fs'), vm=require('vm'), path=require('path');
 // copié dans un arbre de preuve relisait le dépôt courant — et la preuve
 // « ça échoue sur le code d'avant » était truquée.
 const RACINE=path.join(__dirname,'..');
-const APP=fs.readFileSync(path.join(RACINE,'src/App.jsx'),'utf8');
+const APP=require('./_source-app.cjs')(path.join(RACINE,'src/App.jsx'));
 const BG=fs.readFileSync(path.join(RACINE,'vinted-sync-extension/background.js'),'utf8');
 
 // ⚠️⚠️ CE FICHIER IMPRIMAIT DES ❌ ET SORTAIT TOUJOURS EN 0 (trouvé le

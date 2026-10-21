@@ -43,7 +43,7 @@ const { faireFond } = require('./_fond-vm.cjs');
 const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');
 const F = { bg: fs.readFileSync(path.join(racine, 'vinted-sync-extension/background.js'), 'utf8'),
-  app: fs.readFileSync(path.join(racine, 'src/App.jsx'), 'utf8') };
+  app: require('./_source-app.cjs')(path.join(racine, 'src/App.jsx')) };
 
 // ── RÉAFFAIBLIR UNE RÈGLE (§6.1) : le contrôle correspondant doit passer au rouge ──
 const MUTATIONS = {

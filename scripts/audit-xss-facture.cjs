@@ -75,7 +75,7 @@ function extraire(src, noms, jsx) {
 
   // ── 2 et 3. L'app, dans un vrai navigateur ───────────────────────────────────
   await essaie('app', async () => {
-    const src = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+    const src = require('./_source-app.cjs')(path.join(RACINE, 'src', 'App.jsx'));
     const f = extraire(src, ['generatePDF', 'xmlEsc', 'fmtDate', 'ouvrirDocumentImprimable', 'CSP_DOCUMENT'], true);
     dit(!!f.generatePDF, "l'app construit sa facture dans generatePDF");
     let code = ['const LOGO_CANCALE = "data:image/png;base64,iVBORw0KGgo=";', f.xmlEsc || '', f.fmtDate || 'function fmtDate(d){return String(d||"")}',

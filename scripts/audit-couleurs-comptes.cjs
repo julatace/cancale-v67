@@ -13,7 +13,7 @@
 //   node scripts/audit-couleurs-comptes.cjs [chemin/App.jsx]
 const fs = require('fs'), path = require('path');
 const SRC = process.argv[2] || path.join(__dirname, '..', 'src', 'App.jsx');
-const APP = fs.readFileSync(SRC, 'utf8');
+const APP = require('./_source-app.cjs')(SRC);
 const SEUIL_RES = 70, SEUIL_PAIR = 55;
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };

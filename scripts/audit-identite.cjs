@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const fs = require('fs');
 const path = require('path');
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const SRC = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
 
 const TITRE = 'adidas spezial noir taille 38';
 const N = 50;
@@ -434,7 +434,7 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 // physique et du panneau « à ranger » du Garage — alors qu'elle est là.
 // ⚠️ Une vente annulée APRÈS expédition (remboursement) ne compte pas.
 {
-  const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs')(require('path').join(__dirname, '..', 'src', 'App.jsx'));
   const i = app.indexOf('const porteursNum = useMemo');
   const bloc = i < 0 ? '' : app.slice(i, i + 2200);
   const c1 = /classifyOrderStatus\(o\.status\) === 'cancelled'/.test(bloc) && /venteExpediee\(o\)/.test(bloc)

@@ -90,7 +90,7 @@ const v = normaliserEntrant({ inconnu: 42 });
 {
   const fs2 = require('fs');
   const srvSrc = fs2.readFileSync(path.resolve(__dirname, '../api/email-inbound.js'), 'utf8');
-  const appSrc = fs2.readFileSync(path.resolve(__dirname, '../src/App.jsx'), 'utf8');
+  const appSrc = require('./_source-app.cjs')(path.resolve(__dirname, '../src/App.jsx'));
   const coupe = (src, deb, fin) => { const i = src.indexOf(deb); const j = src.indexOf(fin, i); return i < 0 || j < 0 ? '' : src.slice(i, j + fin.length); };
   const srv = coupe(srvSrc, 'function familleConnue(', "\n}");
   const app = coupe(appSrc, 'const familleEmail = (', "\n};");

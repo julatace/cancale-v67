@@ -24,7 +24,7 @@
 // Lecture seule.
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
-const APP  = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+const APP  = require('./_source-app.cjs')(path.join(RACINE, 'src/App.jsx'));
 const HTML = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
 
 let ko = 0;

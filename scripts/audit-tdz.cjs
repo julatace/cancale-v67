@@ -51,7 +51,9 @@ const estImmediate = (fn) => {
   return METHODES_IMMEDIATES.has(nom) && fn.key === 0;
 };
 
-const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f)).map((f) => 'src/' + f);
+const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f)).map((f) => 'src/' + f)
+  // les écrans découpés d'App.jsx (src/ecrans, « app plus rapide ») aussi
+  .concat((() => { try { return fs.readdirSync(path.join(R, 'src', 'ecrans')).filter((f) => /\.jsx?$/.test(f)).map((f) => 'src/ecrans/' + f); } catch (_) { return []; } })());
 const defauts = [];
 let fonctions = 0;
 for (const f of fichiers) {

@@ -7,7 +7,7 @@
 // estALui) : on recompute les groupes INDÉPENDAMMENT et on exige l'égalité, et
 // on montre que le filtre « >=2 ventes » écarte de vrais groupes (il porte).
 const fs=require('fs'), path=require('path');
-const FULL=fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8');
+const FULL=require('../_source-app.cjs')(path.join(__dirname,'..','..','src','App.jsx'));
 // ⚠️ EXTRACTION PAR NOM, PAS PAR NUMÉRO DE LIGNE (§4.11 : les tranches par ligne
 //    dérivent dès qu'App.jsx grandit — ce banc était rouge, ses tranches pointant
 //    300 lignes trop haut). `grab(name)` isole UNE déclaration (const/function) en

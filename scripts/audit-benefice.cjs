@@ -27,7 +27,7 @@ try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); }
 catch (e) { console.log('❌ l\'analyseur Babel est disponible — ' + e.message); process.exit(1); }
 
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
-let src = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+let src = require('./_source-app.cjs')(path.join(R, 'src', 'App.jsx'));
 const muter = (avant, apres) => { if (!src.includes(avant)) { console.log('❌ mutation impossible : motif absent'); process.exit(2); } src = src.replace(avant, apres); };
 if (MUT === 'duplique') {
   // Un SECOND calcul dans Comptabilité, qui diverge : un achat inconnu y vaut 0 €.

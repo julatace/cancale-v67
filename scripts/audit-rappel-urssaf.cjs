@@ -14,7 +14,7 @@ let parser;
 try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); }
 catch (e) { console.log('❌ l\'analyseur Babel est disponible — ' + e.message); process.exit(1); }
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
-let src = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+let src = require('./_source-app.cjs')(path.join(R, 'src', 'App.jsx'));
 const muter = (avant, apres) => { if (!src.includes(avant)) { console.log('❌ mutation impossible : motif absent'); process.exit(2); } src = src.replace(avant, apres); };
 if (MUT === 'rythme') muter('if (_startOfDay(now) <= _startOfDay(due.periodEnd)) return null;', '');
 else if (MUT === 'declare') muter('yms.every((ym) => moisDeclare(declare, ym))) return null;', 'false) return null;');
@@ -79,7 +79,7 @@ essaie('ventes à dater', () => {
   const x = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...LIGNE, aDater: { n: 2 } } });
   dit(!!(x && x.partiel && /au moins/i.test(x.sub)), 'des ventes sans date de versement : « au moins »', x && x.sub);
 });
-const code = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+const code = require('./_source-app.cjs')(path.join(R, 'src', 'App.jsx'));
 dit(!/Nouveau mois : pense à ta déclaration URSSAF/.test(code), 'l\'ancien rappel fixe du 1er du mois a disparu');
 dit(/rappelUrssaf\(\{\s*freq:/.test(code), 'le centre de notifications appelle `rappelUrssaf`');
 console.log(ko ? `\n❌ audit-rappel-urssaf : ${ko} rouge(s)` : '\n✅ audit-rappel-urssaf : tout vert');

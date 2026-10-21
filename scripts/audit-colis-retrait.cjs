@@ -22,7 +22,7 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 
 function chargeApp(noms) {
   const parser = require(path.join(R, 'node_modules', '@babel', 'parser'));
-  const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+  const src = require('./_source-app.cjs')(path.join(R, 'src/App.jsx'));
   const ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
   const t = {};
   for (const n of ast.program.body) {
@@ -78,7 +78,7 @@ function chargeApp(noms) {
   // L'écran Achats rend un colis vu par Vinted dans le bloc du lieu que l'email
   // nomme (même nom normalisé) — vérifié dans le code de l'écran.
   await essaie('fusion des blocs', () => {
-    const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+    const src = require('./_source-app.cjs')(path.join(R, 'src/App.jsx'));
     dit(/const extraFusion = \{\}/.test(src) && /extraFusion\[normNom\(nom\)\]/.test(src), 'un colis vu par Vinted rejoint le bloc email du même lieu (un endroit = un bloc)');
     dit(!/String\(rel\.lieu\)\.split\(','\)\[0\]/.test(src), 'le nom d\'un lieu vu par Vinted vient de `cleanLieu`, plus d\'un découpage à la virgule (§11)');
   });

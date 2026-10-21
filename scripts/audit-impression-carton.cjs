@@ -6,7 +6,7 @@
 // On EXÉCUTE la vraie fonction (`confirmerNumerosAVerifier`, extraite d'App.jsx)
 // dans un `vm`, et on vérifie que les trois chemins d'impression l'appellent.
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}${d ? ' — ' + d : ''}`); };
 const prend = (re, nom) => { const m = APP.match(re); if (!m) { dit(false, `${nom} trouvé dans App.jsx`); return ''; } return m[0]; };

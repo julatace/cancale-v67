@@ -28,7 +28,8 @@ try{
  out=res();await compte({method:'POST',query:{mode:'photo'},headers:{authorization:'Bearer a.b.c'},body:{url}},out);check(out.code===200 && Buffer.isBuffer(out.body),'route photo authentifiée');check(out.headers.Vary==='Authorization','cache privé par session');
 }finally{globalThis.fetch=originalFetch;}
 // Exécuter le vrai setter sans UI : refus, changement concurrent, mise en file.
-const source=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
+import {createRequire} from 'node:module';
+const source=createRequire(import.meta.url)('../_source-app.cjs')(new URL('../../src/App.jsx',import.meta.url).pathname);
 const setter=source.slice(source.indexOf('const setProInvoiceStatus = async'),source.indexOf('function FactureSousVente'));
 const inv={_id:'email_invoice_test',type:'facture_pro',status:'draft',number:'FA1',buyerEmail:'acheteur@example.test',account:'pro',prix:95,html:'document conservé'};
 async function scenario(status,changed,fresh=inv){let patch=0,body;const ctx={AUTH:{user:{id:'vendeur'}},SUPABASE_URL:'https://example.test',encodeURIComponent,sbAuth:()=>({}),fetch:async(u,o={})=>{if(o.method==='PATCH'){patch++;body=JSON.parse(o.body);check(u.includes('data->>status=eq.draft'),'écriture conditionnelle');return {ok:status===200,json:async()=>changed};}return {ok:true,json:async()=>[{id:inv._id,data:fresh}]};}};vm.createContext(ctx);vm.runInContext(setter+';globalThis.envoyer=setProInvoiceStatus',ctx);const ok=await ctx.envoyer(inv,'queued');return {ok,patch,body};}

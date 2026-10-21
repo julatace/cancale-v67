@@ -145,7 +145,7 @@ global.fetch = async (url, opts = {}) => {
 // ── La règle de l'APP, extraite d'App.jsx (jamais recopiée) ─────────────────
 function regleApp() {
   const parser = require(path.join(RACINE, 'node_modules', '@babel', 'parser'));
-  const src = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+  const src = require('../_source-app.cjs')(path.join(RACINE, 'src', 'App.jsx'));
   const ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
   // (les mêmes noms que le miroir — voir NOMS dans scripts/audit-bilan-semaine.cjs)
   const noms = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesFaites', 'ventesDeclarables'];

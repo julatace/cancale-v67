@@ -43,7 +43,7 @@ const ctl = (c, m, d) => { if (!c) ko++; console.log(`  ${c ? '✅' : '❌'} ${m
   }
 
   console.log('── 2. authCall joint le jeton');
-  const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs')(path.join(R, 'src', 'App.jsx'));
   const ac = app.slice(app.indexOf('const authCall = async'), app.indexOf('const authCall = async') + 1500);
   ctl(/corpsAvecCaptcha\(path, body\)/.test(ac) && /JSON\.stringify\(corps\)/.test(ac), 'authCall envoie le corps passé par corpsAvecCaptcha');
   ctl(/consommerCaptcha\(\)/.test(ac), 'authCall consomme le jeton (usage unique)');

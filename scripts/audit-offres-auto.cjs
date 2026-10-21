@@ -46,7 +46,7 @@ const ligneDe = (txt, idx) => txt.slice(0, idx).split('\n').length;
 let BG = '', APP = '';
 essaie('lecture du code', () => {
   BG = sansCommentaires(lire('vinted-sync-extension/background.js'), false);
-  APP = sansCommentaires(lire('src/App.jsx'), true);
+  APP = sansCommentaires(require('./_source-app.cjs')(path.join(RACINE, 'src/App.jsx')), true);
 });
 
 // ── 1. La route d'acceptation n'existe que dans la liste blanche ────────────
@@ -154,7 +154,7 @@ essaie('eBay', () => {
   const bg = require('fs').readFileSync(require('path').join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
   dit(!/repondreAuxMessages|vinted_repond_auto/.test(bg), "l'extension ne porte plus de moteur de réponse automatique aux messages");
-  const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs')(require('path').join(__dirname, '..', 'src', 'App.jsx'));
   dit(!/function RepondreSetting|<RepondreSetting/.test(app), "l'app ne propose plus d'allumer une réponse automatique");
 }
 

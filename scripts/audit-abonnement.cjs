@@ -278,7 +278,7 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   // Le texte des CGV tel que l'APP l'écrit (PRIX_CGV_LISIBLE) : c'est contre lui
   // que le propriétaire compare le prix de Stripe — on le lit dans le source, on
   // ne le recopie pas (audit-lancement vérifie qu'il est celui des CGV).
-  const PRIX_CGV_APP = (/const PRIX_CGV_LISIBLE\s*=\s*'([^']+)'/.exec(require('fs').readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8')) || [])[1] || '';
+  const PRIX_CGV_APP = (/const PRIX_CGV_LISIBLE\s*=\s*'([^']+)'/.exec(require('./_source-app.cjs')(path.join(RACINE, 'src', 'App.jsx'))) || [])[1] || '';
   const avecWarn = async (f) => {
     const vu = [], av = console.warn;
     console.warn = (...a) => { vu.push(a.map(String).join(' ')); };

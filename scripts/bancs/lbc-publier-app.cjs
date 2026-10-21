@@ -27,7 +27,7 @@ const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), zlib = require('zlib'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = 4931;
-const APP = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8');
+const APP = require('../_source-app.cjs')(path.join(__dirname, '..', '..', 'src', 'App.jsx'));
 const EXT_ATTENDUE = (/const EXT_ATTENDUE = '([^']+)'/.exec(APP) || [])[1];
 const SEUIL_FICHE = (/lbcfiche: '([^']+)'/.exec(APP) || [])[1] || '9.9.9';
 const CODE_DANS_ETAT = (/const CODE_DANS_ETAT = '([0-9.]+)'/.exec(APP) || [])[1] || '5.171.0';

@@ -42,7 +42,9 @@ try {
 } catch (_) { /* pas de config vite : rien à ajouter */ }
 
 const fichiers = process.argv.slice(2).length ? process.argv.slice(2)
-  : ['src/App.jsx', 'src/main.jsx'].map(f => path.join(__dirname, '..', f)).filter(fs.existsSync);
+  : ['src/App.jsx', 'src/main.jsx'].map(f => path.join(__dirname, '..', f)).filter(fs.existsSync)
+    // les écrans découpés d'App.jsx (src/ecrans, « app plus rapide ») : de vrais modules
+    .concat((() => { try { return fs.readdirSync(path.join(__dirname, '..', 'src', 'ecrans')).filter((x) => x.endsWith('.jsx')).map((x) => path.join(__dirname, '..', 'src', 'ecrans', x)); } catch (_) { return []; } })());
 
 let ko = 0;
 for (const f of fichiers) {

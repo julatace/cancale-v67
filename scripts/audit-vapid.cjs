@@ -20,7 +20,8 @@ serveur ? ok('la clé publique du serveur est lisible') : nok('la clé publique 
 
 // Toute clé publique VAPID écrite ailleurs (forme : 87 caractères base64url
 // commençant par « B », un point P-256 non compressé).
-const fichiers = ['src/main.jsx', 'src/App.jsx', 'src/vapid.js', 'public/sw.js'];
+// Les écrans découpés d'App.jsx (src/ecrans, « app plus rapide ») comptent aussi.
+const fichiers = ['src/main.jsx', 'src/App.jsx', 'src/vapid.js', 'public/sw.js', ...(() => { try { return fs.readdirSync(path.join(__dirname, '..', 'src', 'ecrans')).filter((x) => x.endsWith('.jsx')).map((x) => 'src/ecrans/' + x); } catch (_) { return []; } })()];
 const vues = [];
 for (const f of fichiers) {
   const t = lire(f);

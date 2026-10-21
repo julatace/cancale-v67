@@ -14,7 +14,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 const fs = require('fs'), path = require('path');
 const R = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
-const app = R('src/App.jsx'), srv = R('api/email-inbound.js');
+const app = require('./_source-app.cjs')(path.join(__dirname, '..', 'src/App.jsx')), srv = R('api/email-inbound.js');
 let ko = 0;
 const ok  = m => console.log('✅ ' + m);
 const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); };

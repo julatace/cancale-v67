@@ -233,7 +233,7 @@ const CAS = [
   //    lecture autrement ; ici c'est l'ÉCRITURE PARTIE qu'on regarde.
   console.log('\n── ET L\'APP : `vrm_blocked_accounts` (lecture KO, écriture OK)');
   {
-    const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+    const APP = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
     const m = /const deleteVintedAccount = async[\s\S]*?\n\};/.exec(APP);
     dit(!!m, 'la suppression de compte est toujours là', m ? '' : '`deleteVintedAccount` introuvable dans App.jsx');
     if (m) {

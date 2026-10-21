@@ -95,7 +95,7 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
 }
 // 8. L'APP AFFICHE BIEN UN CODE À LETTRE (règle `codeRetrait`).
 {
-  const app = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
   const m = app.match(/const codeRetrait = \(v\) => \{[^\n]*\n?/);
   const ligne = m ? m[0] : '';
   const re = ligne.match(/\/\^([^/]+)\/\.test/);
@@ -128,7 +128,7 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
 //     Deux règles pour « comment on retire ici », c'est la garantie que l'écran
 //     et la modale finissent par ne plus dire la même chose (§11, §28).
 {
-  const app = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+  const app = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
   const i = app.indexOf('const methodeDuPoint');
   const corps = i < 0 ? '' : app.slice(i, i + 1200);
   dit(i > 0 && /retraitMode\(/.test(corps), '`methodeDuPoint` dérive de `retraitMode`', i < 0 ? 'fonction absente' : 'ok');
@@ -162,7 +162,7 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
 //     (casier) et « prêt à être retiré » étaient INVISIBLES.
 {
   const bgRelay = extraireFn(src, /const AT_RELAY = (\(s\) => [^\n]*?);\n/);
-  const appSrc = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+  const appSrc = require('./_source-app.cjs')(path.join(racine, 'src', 'App.jsx'));
   const appRelay = extraireFn(appSrc, /^const isAtRelayStatus = (\(s\) => [^\n]*?);$/m);
   const vrais = ['Colis déposé en point relais', 'Prêt à être retiré', 'Disponible au point relais', 'Déposé en consigne Vinted Go'];
   const faux = ['Livré à ton domicile', 'Commande finalisée', 'En cours d\'acheminement', 'Remboursé'];

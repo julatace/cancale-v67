@@ -11,7 +11,7 @@
 // d'avant, §6.1). Les porteurs servis ont la forme que `porteursNum` produit.
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const src = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
 
 let ok = 0, ko = 0;
 const verifie = (cond, msg, detail) => {

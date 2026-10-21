@@ -29,7 +29,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const UID = '11111111-2222-3333-4444-555555555555';
 const MAIL_VRM = 'vendeur.secret@exemple.fr';
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: UID, email: MAIL_VRM } };
-const SRC = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8');
+const SRC = require('../_source-app.cjs')(path.join(__dirname, '..', '..', 'src', 'App.jsx'));
 const VERSION = ((/const EXT_ATTENDUE\s*=\s*['"]([\d.]+)['"]/.exec(SRC)) || [])[1] || '5.184.0';
 const LOGIN = 'compte_secret_42', LOGIN2 = 'autre_pseudo_77', MAIL_COMPTE = 'boutique.secrete@exemple.fr';
 const NOM = 'LA RÉSERVE DE BANC';

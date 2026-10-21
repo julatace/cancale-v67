@@ -171,7 +171,7 @@ function monter({ store = {}, vinted, lenteLabelMs = 0 } = {}) {
 
   console.log('── §11 : LA BORNE D\'UN CLIC DE L\'APP EST CELLE D\'UNE VISITE');
   await essaie('§11', async () => {
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
     const bg = fs.readFileSync(path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
     const a = (/const BORD_LOT_MAX = (\d+);/.exec(app) || [])[1];
     const b = (/const BORD_MAX_PAR_VISITE = (\d+);/.exec(bg) || [])[1];

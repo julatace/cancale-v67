@@ -429,7 +429,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
   });
 
   // ── F. L'app ───────────────────────────────────────────────────────────────
-  const APP = lire(path.join(RACINE, 'src', 'App.jsx')) || '';
+  const APP = require('./_source-app.cjs')(path.join(RACINE, 'src', 'App.jsx')) || '';
   await essaie('app : identifiants', () => {
     const m = /const ID_EXT = (\/.*\/i);/.exec(APP);
     dit(!!m, 'app : une règle d\'identifiant d\'extension (ID_EXT)');

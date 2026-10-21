@@ -145,7 +145,7 @@ const M = MUTATION ? MUTATIONS[MUTATION] : null;
 if (MUTATION && !M) { console.log('❌ mutation inconnue : ' + MUTATION); process.exit(1); }
 
 // ── LES SOURCES (éventuellement mutées) ─────────────────────────────────────
-let APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+let APP = require('./_source-app.cjs')(path.join(RACINE, 'src/App.jsx'));
 let LIB = fs.readFileSync(path.join(RACINE, 'api/_lib/numerotation.js'), 'utf8');
 let ROUTE = fs.readFileSync(path.join(RACINE, 'api/email-inbound.js'), 'utf8');
 let EXT = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension/background.js'), 'utf8');

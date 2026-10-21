@@ -105,7 +105,7 @@ const resaDe = (f) => f.lignes.panel_num_reserves || null;
   });
   // La règle de l'app : mêmes réservations, mêmes clés.
   await essaie('app', async () => {
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
     const r = /\/\/ <reserves-num-regle>[\s\S]*?\/\/ <\/reserves-num-regle>/.exec(app);
     const cn = /const cleNum = \(v\) => \{[\s\S]*?\n\};/.exec(app);
     if (!r || !cn) { dit(false, 'la règle numerosReserves existe dans l\'app'); return; }

@@ -18,7 +18,7 @@
 // On extrait la VRAIE fonction d'App.jsx (pas une copie) et on la juge.
 
 const fs = require('fs'), path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const src = require('./_source-app.cjs')(path.join(__dirname, '..', 'src', 'App.jsx'));
 
 // Extrait `const familiesDeCompte = (uid, id, scopes) => { … };` entièrement.
 function extrait(nom) {
