@@ -510,8 +510,8 @@ const RA = {};
     await essaie('np propriétaire', async () => {
       const o = await app(JWT_J, { action: 'status' });
       const lec = o.journal.filter((x) => x.ou === 'lecture' && /ebay_tokens/.test(x.u));
-      dit(o.code === 200 && o.corps && o.corps.connected === true && lec.length && lec.every((x) => !/owner=eq/.test(x.u)),
-        'base non cloisonnée : le propriétaire voit son compte eBay, lu SANS filtre de vendeur (comme avant)', `HTTP ${o.code} · ${lec.map((x) => x.u).join(' ')}`);
+      dit(o.code === 200 && o.corps && o.corps.connected === true && lec.length && lec.every((x) => new URL(x.u).searchParams.get('owner') === 'eq.' + J),
+        'schéma ancien : la lecture eBay reste filtrée sur son propriétaire', `HTTP ${o.code} · ${lec.map((x) => x.u).join(' ')}`);
     });
     await essaie('np autre vendeur', async () => {
       for (const action of ['commandessuite','sync', 'status', 'authurl', 'programmer', 'regleoffre', 'regleoffrelire']) {
@@ -2412,7 +2412,7 @@ const RA = {};
     const sortie = String(r.stdout || '');
     process.stdout.write(sortie.split('\n').filter((l) => /^(✅|❌)/.test(l)).map((l) => '   ' + l).join('\n') + '\n');
     const m = /NC ok=(\d+) ko=(\d+)/.exec(sortie);
-    dit(!!m && m[2] === '0' && Number(m[1]) >= 3, 'base non cloisonnée : comportement d\'avant à l\'identique', m ? m[0] : String(r.stderr || '').slice(0, 160));
+    dit(!!m && m[2] === '0' && Number(m[1]) >= 3, 'schéma ancien : aucun repli de lecture sans propriétaire', m ? m[0] : String(r.stderr || '').slice(0, 160));
   });
 
   console.log(ko ? `\n❌ audit-ebay-route : ${ko} rouge(s), ${ok} vert(s)`
