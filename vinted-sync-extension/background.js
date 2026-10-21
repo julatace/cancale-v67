@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.204.0';
+const CODE_VERSION = '5.205.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4774,12 +4774,16 @@ async function fetchAllOrders(acc, type, maxPages = 8, suivi) {
 async function getStoredAccounts(opts) {
   const ko = opts && opts.ouNull ? null : [];
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, {
-      headers: await sbHeaders(),
+    const session = await authToken();
+    if (!session?.user_id || !session.access_token) return ko;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*&owner=eq.${encodeURIComponent(session.user_id)}`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` },
     });
     if (!res.ok) return ko;
     const j = await res.json();
-    return opts && opts.ouNull && !Array.isArray(j) ? null : j;
+    const actuelle = await loadSession();
+    if (!Array.isArray(j) || j.some(a => a.owner !== session.user_id) || actuelle?.user_id !== session.user_id) return ko;
+    return j;
   } catch (_) { return ko; }
 }
 

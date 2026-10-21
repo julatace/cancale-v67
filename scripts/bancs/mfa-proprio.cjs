@@ -98,11 +98,12 @@ async function brancher(ctx, st) {
     if (aalDe(route.request().headers().authorization)) st.rest.push(u.replace(/^.*\/rest\/v1\//, '').slice(0, 80));
     const json = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return json([]);
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([{...COMPTE,owner:USER.id}]);
     return json([]);
   });
   await ctx.route('**/api/**', (r) => {
     const u = r.request().url();
+    if (/mode=confidentialite/.test(u)) return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,uid:USER.id})});
     if (/mode=abonnement/.test(u)) { st.abo++; return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, proprietaire: !!st.proprio, acces: true, obligatoire: false, configure: false }) }); }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
@@ -151,6 +152,12 @@ async function scenarios(nav, taille) {
       dit(bt >= 44, '« Plus tard » se touche au doigt (≥ 44 px)', bt + ' px');
       await pg.click('[data-invite-mfa] [data-mfa-activer]').catch(() => {});
       dit(await attendre(pg, '[data-invite-mfa] img[data-mfa-qr]', 6000), 'le QR est affiché dans l\'écran');
+      dit(await pg.locator('[data-mfa-qr]').evaluate(e=>e.complete && e.naturalWidth>0), 'le QR local est une image réellement lisible');
+      dit(!(await pg.locator('[data-mfa-cle]').isVisible()), 'la clé secrète est masquée par défaut');
+      const ancien=st.factors.find(f=>f.status!=='verified')?.id;
+      await pg.click('[data-mfa-recommencer]');
+      await pg.waitForTimeout(600);
+      dit(!st.factors.some(f=>f.id===ancien) && st.factors.some(f=>f.status!=='verified'), 'remplacer annule l’ancien facteur et en crée un nouveau');
       await pg.fill('[data-mfa-code-activer]', CODE_FAUX); await pg.click('[data-mfa-confirmer]'); await pg.waitForTimeout(900);
       dit((await invite(pg)) === 'propose' && st.factors.filter((f) => f.status === 'verified').length === 0, 'un code faux n\'active rien');
       await pg.fill('[data-mfa-code-activer]', CODE_JUSTE); await pg.click('[data-mfa-confirmer]');

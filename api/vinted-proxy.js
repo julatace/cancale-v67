@@ -24,7 +24,7 @@
 // serait déjà consommé.
 
 import './_lib/sans-bruit.js';
-import { vendeurExige, baseCloisonnee, lireCommeVendeur, modifierCommeVendeur } from './_lib/session.js';
+import { vendeurExige, lireCommeVendeur, modifierCommeVendeur } from './_lib/session.js';
 
 // ⚠️⚠️ 4 OCTOBRE — CE PROXY ÉTAIT UN RELAIS OUVERT. N'importe qui pouvait lui
 // envoyer un jeton Vinted (volé ou non) et n'importe quelle adresse Vinted,
@@ -139,6 +139,7 @@ async function refreshTokens({ siteHost, token, refreshToken, anonId, csrfToken 
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Méthode non supportée, utilise POST' });
     return;
@@ -159,14 +160,14 @@ export default async function handler(req, res) {
     res.status(400).json({ erreur: 'compte', message: 'Compte Vinted manquant.' });
     return;
   }
-  const filtre = (await baseCloisonnee()) ? `&owner=eq.${encodeURIComponent(u.id)}` : '';
-  const lignes = await lireCommeVendeur(req, `vinted_accounts?select=access_token,refresh_token,anon_id,csrf_token,domain&vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&limit=1`);
+  const filtre = `&owner=eq.${encodeURIComponent(u.id)}`;
+  const lignes = await lireCommeVendeur(req, `vinted_accounts?select=owner,access_token,refresh_token,anon_id,csrf_token,domain&vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&limit=1`);
   if (lignes === null) {
     res.status(503).json({ erreur: 'base', message: 'La base ne répond pas — réessaie dans un instant.' });
     return;
   }
   const acc = lignes[0];
-  if (!acc || !acc.access_token) {
+  if (!acc || acc.owner !== u.id || !acc.access_token) {
     res.status(403).json({ erreur: 'compte', message: 'Ce compte Vinted n\'est pas relié à ta boutique.' });
     return;
   }
