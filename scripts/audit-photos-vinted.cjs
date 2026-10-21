@@ -151,6 +151,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'VrmLogo :: "/logo-vrm-192.png"': 'logo de l’app (fichier du site)',
       'EbayAchats :: a.photo': 'photo de l’annonce eBay achetée : https://i.ebayimg.com seulement (filtrée par le serveur, photoAchat)',
       'QrColis :: url': 'QR de retrait (adresse du transporteur, extraite de l’email)',
+      'QrHorsLigne :: src': 'QR de retrait de Ma journée hors ligne : data:image gardé sur l’appareil, ou /hl-qr?u=… servi par la réserve du service worker (src/journeeHorsLigne.js)',
       'LocalPhoto :: cur.img': 'photo de SA pièce, prise sur l’appareil (data:)',
       'AchatsHorsPlateforme :: photoForm': 'photo d’un achat hors plateforme, prise sur l’appareil (data:image, filtrée à la lecture)',
       'AchatsHorsPlateforme :: src': 'photo d’un achat hors plateforme relue de SA ligne (data:image seulement, filtrée à la lecture)',
