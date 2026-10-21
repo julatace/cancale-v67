@@ -28022,6 +28022,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Trois états pour le CA déclaré : `undefined` en cours · `null` pas su · lu.
   const [lbcLu, setLbcLu] = useState(undefined);
   const [ebayCmd, setEbayCmd] = useState(undefined);
+  const [ebayMsg, setEbayMsg] = useState(undefined);   // messages eBay sans réponse (Ma journée) — voir `etatMessagesEbay`
   const [ebayLuA, setEbayLuA] = useState(null);       // la plus ancienne capture des commandes eBay (ms)
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
@@ -28054,7 +28055,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (19 oct.) La même lecture porte aussi la date de capture de chaque compte :
     // Colis dit quand les commandes eBay ont été lues (une liste figée ne voit
     // ni une nouvelle vente, ni un colis déjà parti).
-    const r = await lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders');
+    // (21 oct.) Sur Ma journée, les résumés des messages eBay partent EN MÊME
+    // TEMPS et sont posés dans le même rendu (un rendu de plus au démarrage
+    // coûtait au téléphone — banc `vitesse.cjs`).
+    const [r, rm] = await Promise.all([
+      lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders'),
+      only === 'journee' ? lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt') : Promise.resolve(undefined),
+    ]);
+    if (only === 'journee') setEbayMsg(etatMessagesEbay(rm));
     setEbayCmd((!r || r.illisibles.length) ? null : r.items);
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
@@ -28072,12 +28080,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    appel à eBay ici (§4.4). Trois états : undefined en cours · null pas su
   //    (registre ou une ligne illisible) · objet. `aucune` = aucune ligne rangée
   //    nulle part (jamais lu, ou pas d'eBay) ⇒ Ma journée se tait.
-  const [ebayMsg, setEbayMsg] = useState(undefined);
-  useEffect(() => { if (only !== 'journee') return; let mort = false; (async () => {
-    const r = await lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt');
-    if (mort) return;
-    setEbayMsg(etatMessagesEbay(r));
-  })(); return () => { mort = true; }; }, [ebayTick, only]);
+  //    (lus avec les commandes eBay, plus haut — un seul rendu).
   useEffect(() => { (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
