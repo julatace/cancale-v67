@@ -41,6 +41,11 @@ const ROWS = [
   track('email_track_mondialrelay_11110004', { carrier: 'mondialrelay', suivi: '11110004', subject: 'Votre colis 11110004 est disponible 📦', receivedAt: VIEUX, limite: null, code: '444444', lieu: 'Relais Delta, 4 rue D' }),
 ];
 
+const SESSION={access_token:'session-colis-fictive',refresh_token:'r',totp:[],expires_at:Date.now()+3600000,user:{id:'11111111-1111-4111-8111-111111111111',email:'colis@example.test',totp:[]}};
+if(process.env.BANC_RETRAITS){
+ ACHATS.forEach((a,i)=>{a.title='Article identique';a.photo='data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="${i?'blue':'red'}"/></svg>`);});
+ ACHATS.forEach((a,i)=>ROWS.push({id:`harvest_111_txn_${a.transaction_id}`,data:{payload:{transaction:{id:a.transaction_id,shipment:{tracking_code:i?'11110002':'11110001'},item_photo:{url:a.photo}}}}}));
+}
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 140)); } };
@@ -73,24 +78,26 @@ async function preparer(b, vp, opts = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), permissions: opts.clavierRefuse ? [] : ['clipboard-read', 'clipboard-write'] });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  await pg.addInitScript(s=>{localStorage.setItem('vrm_session',JSON.stringify(s));localStorage.setItem('vrm_local_owner',s.user.id);localStorage.setItem('schema_cloisonne','1');},SESSION);
+  await pg.route('**/auth/v1/**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({access_token:SESSION.access_token,refresh_token:'r',expires_in:3600,user:SESSION.user})}));
   if (opts.clavierRefuse) await pg.addInitScript(() => { try { Object.defineProperty(navigator, 'clipboard', { configurable: true, get: () => ({ writeText: () => Promise.reject(new DOMException('refusé', 'NotAllowedError')) }) }); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    if (/select=owner/.test(u)) return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: new Date(MAINTENANT).toISOString(), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    const ins=/id=in\.\(([^)]*)\)/.exec(u);if(ins){const ids=ins[1].split(',');return j(ROWS.filter(r=>ids.includes(r.id)).map(forme));}
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(r.request().url().includes('mode=confidentialite')?{ok:true,uid:SESSION.user.id}:{ok:true,pret:true,obligatoire:false,acces:true}) }));
   return { ctx, pg, errs };
 }
 
@@ -104,9 +111,20 @@ async function main() {
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point').first().waitFor({ timeout: 15000 });
+        await pg.locator('.vrm-pickup-point').first().waitFor({ timeout: 15000 }).catch(async e=>{console.log('ÉCRAN DE BANC : '+(await pg.locator('body').innerText()).slice(0,1500));console.log('ERREURS : '+errs.join(' | '));throw e;});
         await pg.waitForTimeout(1500);
         // Ce que montre CHAQUE carte : l'attribut et la ligne VISIBLE (pas un repli fermé).
+        if(process.env.BANC_RETRAITS){
+          const alpha=pg.locator('.vrm-pickup-card').filter({hasText:'Colis Alpha'}),bravo=pg.locator('.vrm-pickup-card').filter({hasText:'Colis Bravo'});
+          await alpha.scrollIntoViewIfNeeded();dit(await alpha.locator('img').getAttribute('src')===ACHATS[0].photo,`${T} photo du premier achat reliée par suivi, depuis la transaction captée`);
+          await bravo.scrollIntoViewIfNeeded();dit(await bravo.locator('img').getAttribute('src')===ACHATS[1].photo,`${T} même titre, deuxième suivi : deuxième photo`);
+          ROWS.push(track('email_track_vinted_11110001',{carrier:'vinted',suivi:'11110001',status:'delivered',subject:'Votre colis a été retiré par l’acheteur',receivedAt:new Date().toISOString()}));
+          await pg.reload({waitUntil:'domcontentloaded'});await pg.locator('.vrm-pickup-point').first().waitFor();await pg.waitForTimeout(1700);
+          const actifs=await pg.locator('.vrm-pickup-card').allTextContents();dit(!actifs.some(t=>t.includes('Colis Alpha')),`${T} le retrait confirmé enlève l’autre email disponible du même suivi`);
+          dit(actifs.filter(t=>t.includes('Article identique')).length===0,`${T} l’ancien statut Vinted ne recrée pas le colis déjà retiré`);
+          dit(actifs.some(t=>t.includes('Colis Bravo')),`${T} le second suivi reste à retirer`);dit(!errs.length,`${T} aucune erreur d’app`,errs[0]);
+          ROWS.splice(ROWS.findIndex(r=>r.id==='email_track_vinted_11110001'),1);await ctx.close();return;
+        }
         const cartes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-pickup-card, [data-oublie]')].map((c) => {
           const e = c.matches('[data-arrive-le]') ? c : c.querySelector('[data-arrive-le]');
           const ligne = c.querySelector('.vrm-arrive') || (c.matches('[data-oublie]') ? c.querySelector('[data-oublie-info]') : null);

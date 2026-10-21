@@ -6,6 +6,7 @@ import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
+import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
@@ -76,7 +77,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.203.0';
+const EXT_ATTENDUE = '5.204.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -689,6 +690,24 @@ const withOwner = (row) => {
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
 // la même session, le même propriétaire, la même clé de conflit que le reste (§11).
+async function lireBordereauxAuto(owner) {
+  if (!owner || owner !== AUTH.user?.id) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_bordereaux_auto&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth() });
+  if (!r.ok) throw Error('Lecture impossible');
+  const rows = await r.json();
+  return rows.length === 1 && rows[0]?.data?.active === true;
+}
+async function sauverBordereauxAuto(owner, active) {
+  if (!owner || owner !== AUTH.user?.id || !CLOISONNE) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    method: 'POST', headers: sbAuth({'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation'}),
+    body: JSON.stringify({id:'vrm_bordereaux_auto',owner,data:{active:active === true},updated_at:new Date().toISOString()})
+  });
+  if (!r.ok) throw Error('Enregistrement impossible');
+  const rows = await r.json();
+  if (rows.length !== 1 || rows[0]?.data?.active !== active) throw Error('Enregistrement non confirmé');
+}
+
 const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
 // ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
@@ -35443,6 +35462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
+        <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
         <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
