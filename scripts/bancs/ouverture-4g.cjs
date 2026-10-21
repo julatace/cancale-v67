@@ -60,12 +60,13 @@ async function ouvrir(b) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
-  let lectures = 0;
+  const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); await cdp.send('Performance.enable');
+  let lectures = 0; let premiereLecture = 0;
   await pg.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     if (rq.method() !== 'GET') { await passer(200); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
     lectures++;
+    if (!premiereLecture) premiereLecture = Date.now();
     const h = await rq.allHeaders();
     const rep = repondre(rq.url(), h.range, base);
     const body = JSON.stringify(rep.body);
@@ -78,6 +79,9 @@ async function ouvrir(b) {
   let heros = null;
   try { await pg.waitForFunction(() => !!document.querySelector('[data-vendu-mois]'), null, { timeout: 60000, polling: 50 }); heros = Date.now(); } catch (_) {}
   const lecturesHeros = lectures;
+  // Le temps d'exécution du script jusqu'au héros (processeur ×4) : moins sensible
+  // qu'une durée à l'horloge à la charge de la machine des bancs.
+  let script = null; try { const m = (await cdp.send('Performance.getMetrics')).metrics; script = Math.round(1000 * (m.find((x) => x.name === 'ScriptDuration') || {}).value); } catch (_) {}
   // Le calme : plus rien ne passe pendant 4 s (le préchargement au repos compris).
   let dernier = Date.now();
   for (let i = 0; i < 120; i++) { const n = journal.length + lectures; await attendre(500); if (journal.length + lectures !== n) dernier = Date.now(); else if (Date.now() - dernier > 4000) break; }
@@ -86,7 +90,8 @@ async function ouvrir(b) {
   const js = journal.filter((x) => /\.js$/.test(x.f));
   const avant = heros ? js.filter((x) => x.t <= heros) : js;
   const apres = heros ? js.filter((x) => x.t > heros) : [];
-  return { heros: heros ? heros - t0 : null, jsAvant: avant.reduce((a, x) => a + x.gz, 0), morceauxAvant: avant.map((x) => x.f), morceauxApres: apres.map((x) => x.f), lectures: lecturesHeros, lecturesFin: lectures, errs, tombe };
+  const tApp = (journal.find((x) => /\/assets\/App-/.test(x.f)) || {}).t;
+  return { heros: heros ? heros - t0 : null, script, app: tApp ? tApp - t0 : null, lecture1: premiereLecture ? premiereLecture - t0 : null, jsAvant: avant.reduce((a, x) => a + x.gz, 0), morceauxAvant: avant.map((x) => x.f), morceauxApres: apres.map((x) => x.f), lectures: lecturesHeros, lecturesFin: lectures, errs, tombe };
 }
 
 (async () => {
@@ -98,12 +103,12 @@ async function ouvrir(b) {
   try {
     for (let k = 0; k < 3; k++) {
       const r = await ouvrir(b); rs.push(r);
-      console.log(`  ouverture ${k + 1} : héros à ${r.heros ?? '—'} ms · JS avant le héros ${Math.round(r.jsAvant / 1024)} Ko · ${r.lectures} lectures avant le héros, ${r.lecturesFin} au calme · morceaux après : ${r.morceauxApres.map((f) => f.replace(/^\/assets\//, '')).join(' ') || '—'}`);
+      console.log(`  ouverture ${k + 1} : App reçu à ${r.app} ms · 1re lecture à ${r.lecture1} ms · héros à ${r.heros ?? '—'} ms · script ${r.script ?? '—'} ms · JS avant le héros ${Math.round(r.jsAvant / 1024)} Ko · ${r.lectures} lectures avant le héros, ${r.lecturesFin} au calme · morceaux après : ${r.morceauxApres.map((f) => f.replace(/^\/assets\//, '')).join(' ') || '—'}`);
     }
   } finally { await b.close(); srv.close(); }
   const med = (k) => { const v = rs.map((r) => r[k]).filter((x) => x != null).sort((a, c) => a - c); return v.length === rs.length ? v[1] : null; };
-  const m = { app: tailleApp, heros: med('heros'), jsAvant: med('jsAvant'), lectures: med('lectures'), lecturesFin: med('lecturesFin') };
-  console.log(`\nMÉDIANE : héros ${m.heros} ms · JS avant le héros ${Math.round(m.jsAvant / 1024)} Ko · ${m.lectures} lectures avant le héros, ${m.lecturesFin} au calme`);
+  const m = { app: tailleApp, heros: med('heros'), script: med('script'), jsAvant: med('jsAvant'), lectures: med('lectures'), lecturesFin: med('lecturesFin') };
+  console.log(`\nMÉDIANE : héros ${m.heros} ms · script ${m.script} ms · JS avant le héros ${Math.round(m.jsAvant / 1024)} Ko · ${m.lectures} lectures avant le héros, ${m.lecturesFin} au calme`);
   dit(rs.every((r) => r.heros != null && !r.errs.length && !r.tombe), 'Ma journée s\'affiche, sans erreur, aux trois ouvertures', rs.map((r) => r.errs.join(' | ')).join(' / ').slice(0, 300));
   const ecrans = morceauxEcrans();
   const motif = (f) => ecrans.some((n) => new RegExp('/assets/' + n + '-[^/]+\\.js$').test(f));

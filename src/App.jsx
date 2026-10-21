@@ -30809,9 +30809,9 @@ function AppCoeur() {
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
   // Les écrans découpés (src/ecrans) se préchargent au repos, APRÈS les lectures
-  // du premier écran (comptes arrivés + 3 s) : en 4G, les télécharger plus tôt
+  // du premier écran (comptes arrivés + 5 s) : en 4G, les télécharger plus tôt
   // ferait attendre les ventes de Ma journée derrière eux.
-  React.useEffect(()=>{ if(!accountsLoaded) return; const t=setTimeout(prechargerEcrans,3000); return ()=>clearTimeout(t); },[accountsLoaded]);
+  React.useEffect(()=>{ if(!accountsLoaded) return; const t=setTimeout(prechargerEcrans,5000); return ()=>clearTimeout(t); },[accountsLoaded]);
   // ⚠️ TROIS ÉTATS, comme partout ailleurs (panneau de sécurité, `extSait`,
   //    `acctHealth`) : on charge · la base a répondu · la base n'a pas répondu.
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
