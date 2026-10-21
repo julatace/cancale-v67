@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.202.0';
+const CODE_VERSION = '5.203.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -392,6 +392,10 @@ async function authToken() {
 // ⚠️ Le mot de passe n'est JAMAIS gardé : il part une fois chez Supabase, qui
 // renvoie deux jetons. Seuls les jetons sont stockés (`chrome.storage.local`,
 // zone locale de l'extension — un site web ne peut pas la lire).
+const MSG_MDP_CAPTCHA = 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».';
+function estRefusCaptcha(j, brut) {
+  return !!((j && /captcha/i.test(String(j.error_code || j.code || ''))) || /captcha/i.test(String(brut || '')));
+}
 async function authLogin(email, password) {
   const mail = String(email || '').trim().toLowerCase();
   if (!mail || !password) return { ok: false, error: 'Email et mot de passe requis.' };
@@ -406,6 +410,15 @@ async function authLogin(email, password) {
       // On traduit : « invalid_grant » n'aide personne à se connecter.
       const brut = String(j.error_description || j.msg || j.error || '');
       let msg = brut || 'Connexion refusée.';
+      // ⚠️ CAPTCHA (21 oct.) : le jour où Julien allume Turnstile dans Supabase,
+      //    GoTrue refuse `grant_type=password` sans jeton captcha (400,
+      //    `captcha_failed`, « captcha protection: request disallowed »). Une page
+      //    d'extension MV3 ne peut pas charger le script distant de Turnstile :
+      //    ce chemin est fermé pour de bon, le geste est « Se connecter avec VRM »
+      //    (session fabriquée par le serveur, exemptée du captcha).
+      if (estRefusCaptcha(j, brut)) {
+        return { ok: false, captcha: true, error: MSG_MDP_CAPTCHA };
+      }
       if (/invalid login|invalid_grant|credentials/i.test(brut)) msg = 'Email ou mot de passe incorrect.';
       else if (/not confirmed/i.test(brut)) msg = "Cette adresse n'est pas encore confirmée. Ouvre l'email de confirmation, ou confirme le compte depuis l'app.";
       else if (/rate limit|too many/i.test(brut)) msg = 'Trop de tentatives. Réessaie dans quelques minutes.';

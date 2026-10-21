@@ -164,6 +164,10 @@ function rendreAuth(e) {
       <button class="sec" id="inBtn">Me connecter</button>
       <div class="err" id="authErr" hidden></div>
     </div>
+    <div id="captchaBox" hidden>
+      <div class="err" id="captchaMsg"></div>
+      <button id="captchaLierBtn">Se connecter avec VRM</button>
+    </div>
     <div class="muted">Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`);
   document.getElementById('lierBtn').addEventListener('click', lierAvecVRM);
   document.getElementById('mdpLien').addEventListener('click', (ev) => {
@@ -173,6 +177,19 @@ function rendreAuth(e) {
     if (!f.hidden) { const m = document.getElementById('mail'); if (m && !m.value) m.focus(); else { const p = document.getElementById('pw'); if (p) p.focus(); } }
   });
   const err = document.getElementById('authErr');
+  // ⚠️ CAPTCHA (21 oct.) : Supabase peut exiger une vérification anti-robot
+  //    (Turnstile) que cette fenêtre ne sait pas afficher. Le refus se traduit
+  //    en UN geste qui marche : « Se connecter avec VRM ». On reconnaît aussi
+  //    le refus brut (« captcha protection… ») d'un service worker plus ancien.
+  const refusCaptcha = (r) => !!(r && (r.captcha || /captcha/i.test(String(r.error || ''))));
+  const montrerRefusCaptcha = () => {
+    document.getElementById('mdpForm').hidden = true;
+    const box = document.getElementById('captchaBox');
+    document.getElementById('captchaMsg').textContent = 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».';
+    box.hidden = false;
+    try { document.body.setAttribute('data-captcha', 'refus'); } catch (_) {}
+  };
+  document.getElementById('captchaLierBtn').addEventListener('click', lierAvecVRM);
   // ⚠️ Une connexion à la fois : Entrée répétée (ou clic + Entrée) ouvrait
   //    plusieurs sessions pour une seule connexion (mesuré : 4 × Entrée ⇒ 2 à 3
   //    sessions, dont les autres restent orphelines).
@@ -188,6 +205,7 @@ function rendreAuth(e) {
     chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: CARTE }, (r) => {
       enVol = false; btn.textContent = 'Me connecter'; btn.disabled = false;
       if (r && r.ok) { if (!CARTE) ouvrirVRM(); }
+      else if (refusCaptcha(r)) montrerRefusCaptcha();
       else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
     });
   };

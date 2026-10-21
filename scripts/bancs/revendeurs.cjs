@@ -324,7 +324,7 @@ async function brancher(p){
 
   await p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
-  await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
+  await p.getByRole('heading',{name:'Tâches à traiter',exact:true}).waitFor();
   // La liste des tâches arrive APRÈS l'en-tête (lecture de l'agent) : on attend la ligne (état observé, borné),
   // `isVisible` ne patiente pas.
   await p.getByText('Paire à négocier',{exact:true}).waitFor({timeout:10000}).catch(()=>{});

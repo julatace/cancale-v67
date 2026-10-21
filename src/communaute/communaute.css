@@ -127,3 +127,4 @@ form.vrm-cm-discord-moi { display: block !important; }
 @media (max-width: 767px) {
   .vrm-main .vrm-cm-carte { height: min(50vh, 420px); min-height: 280px; }
 }
+.vrm-cm-carton > p + button { margin-top: 12px; }
