@@ -1,3 +1,4 @@
+import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
@@ -1184,7 +1185,7 @@ const OWNER_MARK = 'vrm_local_owner';
 const ensureLocalOwner = (uid) => {
   try {
     const prev = localStorage.getItem(OWNER_MARK);
-    if (prev && prev !== uid) wipeLocalData();          // ce n'était pas toi → on repart propre
+    if (prev !== uid) wipeLocalData();          // ce n'était pas toi → on repart propre
     if (prev !== uid) localStorage.setItem(OWNER_MARK, uid);
   } catch (_) {}
 };
@@ -1240,10 +1241,12 @@ const authBoot = async () => {
 // Un échec rend `null` comme avant (`fetchVintedAccounts`) : AppCoeur dit la panne,
 // jamais « aucun compte ». Le préchargement n'est repris qu'une fois, par le même
 // vendeur, dans les 30 s ; sinon AppCoeur relit.
+let _confidentialiteUid='';
 let _prechargeComptes = null;   // { at, qui, promesse }
 const prechargerDemarrage = () => {
   try {
     if (typeof window === 'undefined' || _prechargeComptes) return;
+    if(MULTI_USER&&(!AUTH.user?.id||_confidentialiteUid!==AUTH.user.id))return;
     if (MULTI_USER) {
       if (RECOVERY_PENDING) return;
       const session = !!(AUTH.session && AUTH.session.access_token && AUTH.user);
@@ -45648,17 +45651,18 @@ export default function App() {
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
-  const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+  const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
   // Double vérification (16 octobre) : un compte qui l'a activée et une session
   // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
   // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
+  if(MULTI_USER&&!authState.user?.id)return <AuthScreen/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return (MULTI_USER && authState.user)
-    ? <PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe>
+    ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;prechargerDemarrage();}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
     : coeur;
 }
 
@@ -46010,7 +46014,7 @@ function AppCoeur() {
   const [extraCols,setExtraCols]=useState(()=>load('vinted_extracols',{}));
   const [cellColors,setCellColors]=useState(()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useState(()=>load('vinted_invoices',[]));
-  const [vintedAccounts,setVintedAccounts]=useState(()=>load('vinted_accounts',[]));
+  const [vintedAccounts,setVintedAccounts]=useState([]);
   const [accountLabels]=useState(()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
   // §5.49 : inventaire synchronisé lu au montage → froid sur un appareil neuf.
@@ -46375,7 +46379,7 @@ function AppCoeur() {
       if(stop) return;
       setBaseKO(list===null);                  // `null` = pas de réponse, pas « zéro compte »
       noterPanneBase(list===null);             // depuis quand ? (pour dire le bon geste au 3ᵉ jour)
-      if(list && list.length){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
+      if(Array.isArray(list)){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
       setAccountsLoaded(true);
     })();
     return ()=>{ stop=true; };
@@ -47407,7 +47411,7 @@ function AppCoeur() {
   // contournement ne donne accès à rien de plus que la veille — les données
   // sont communes de toute façon. Dès que la migration est passée, `CLOISONNE`
   // devient vrai et la porte se referme toute seule, sans changement de code.
-  const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+  const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
   // Double vérification (16 octobre) : un compte qui l'a activée et une session
   // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
