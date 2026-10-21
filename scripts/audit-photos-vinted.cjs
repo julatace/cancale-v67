@@ -136,6 +136,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
+      'PorteConfidentialite :: "/vrm-icon-v4-192.png"': 'icône de l’app v4 (fichier du site)',
       'AbonnementRequis :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Accueil :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'CarteJourEcran :: "/vrm-logo-v4-96.png"': 'logo de l’app v4 (fichier du site, logo officiel)',

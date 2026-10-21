@@ -43640,8 +43640,19 @@ async function fermerMonCompte(confirmation) {
 // ce que GoTrue exige pour supprimer un facteur vérifié).
 const qrEnSrc = (q) => {
   const t = String(q || '').trim();
-  if (/^data:image\/svg\+xml/i.test(t)) return t;
-  if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
+  if (/^data:image\/svg\+xml/i.test(t)) {
+    // GoTrue rend « data:image/svg+xml;utf-8,<svg … » NON encodé : un « # » ou un
+    // guillemet y casse l'image. On réencode le SVG (base64 laissée telle quelle).
+    if (/;base64,/i.test(t)) return t;
+    let corps = t.slice(t.indexOf(',') + 1);
+    try { if (!/<svg/i.test(corps)) corps = decodeURIComponent(corps); } catch (_) {}
+    const j = corps.search(/<svg[\s>]/i);
+    return j >= 0 ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(corps.slice(j)) : '';
+  }
+  // Le service peut rendre le SVG précédé d'un prologue XML (<?xml …?>) : on
+  // garde tout à partir de <svg, jamais autre chose qu'un SVG.
+  const i = t.search(/<svg[\s>]/i);
+  if (i >= 0 && /<\/svg>\s*$/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t.slice(i));
   return '';
 };
 function DoubleVerification({ onEtat } = {}) {
@@ -43744,11 +43755,11 @@ function DoubleVerification({ onEtat } = {}) {
         <button type="button" data-mfa-activer="" disabled={busy} onClick={activer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
       </>)}
       {cours && cours.etape === 'qr' && (<>
-        <div style={txt}><b style={{color:C.text}}>1.</b> Dans ton app d'authentification, ajoute un compte en scannant ce code :</div>
+        <div style={txt}><b style={{color:C.text}}>1.</b> Sur ton iPhone, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
-        <div style={txt}>Tu es sur ce téléphone et ne peux pas scanner ? Choisis « saisir une clé » dans l'app et recopie :</div>
+        <div style={txt}>Pas de code à l'écran, ou tu es sur ce téléphone ? Dans l'app, choisis « saisir une clé » et recopie :</div>
         <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,margin:'6px 0 12px',wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
@@ -44093,7 +44104,9 @@ function PorteAbonnement({ uid, children }) {
     });
     return () => { mort = true; };
   }, [uid]);
-  if (!bloque) return <>{children}{info && info.proprietaire === true && <InviteMfaProprio uid={uid}/>}</>;
+  // L'invitation ne s'ouvre plus d'elle-même (21 oct. : « je ne comprends rien ») :
+  // la double vérification se propose dans Réglages → Mon compte, sur son geste.
+  if (!bloque) return <>{children}</>;
   return <AbonnementRequis info={info}/>;
 }
 // ── DOUBLE VÉRIFICATION PROPOSÉE AU COMPTE PROPRIÉTAIRE (21 octobre) ─────────
@@ -44109,39 +44122,6 @@ function PorteAbonnement({ uid, children }) {
 // ⇒ rien n'est proposé. Les autres vendeurs : rien ne change.
 const MFA_PLUS_TARD_MS = 7 * 86400000;
 const cleMfaPlusTard = (uid) => 'vrm_mfa_plus_tard_' + String(uid || '');
-function InviteMfaProprio({ uid }) {
-  const [montre, setMontre] = React.useState(false);
-  const [etat, setEtat] = React.useState('');
-  React.useEffect(() => {
-    let mort = false;
-    let t = 0; try { t = Number(localStorage.getItem(cleMfaPlusTard(uid))) || 0; } catch (_) {}
-    if (t && Date.now() - t < MFA_PLUS_TARD_MS) return;
-    mfaLireFacteurs().then((f) => { if (!mort && f && Array.isArray(f.verifies) && !f.verifies.length) setMontre(true); });
-    return () => { mort = true; };
-  }, [uid]);
-  if (!montre) return null;
-  const active = etat === 'active';
-  const plusTard = () => { try { localStorage.setItem(cleMfaPlusTard(uid), String(Date.now())); } catch (_) {} setMontre(false); };
-  const fermer = () => setMontre(false);
-  return (
-    <div data-invite-mfa={active ? 'active' : 'propose'} role="dialog" aria-modal="true" aria-label="Protéger ton compte propriétaire"
-      style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <FermeAuRetour fermer={fermer}/>
-      <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
-        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Ton compte est protégé' : 'Protège ton compte propriétaire'}</div>
-        {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
-          C'est le compte propriétaire de VRM : il voit toutes tes boutiques. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
-        </div>}
-        <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
-        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
-          {active
-            ? <button type="button" data-invite-mfa-fermer="" onClick={fermer} style={{ border:'none', background:C.accent, color:C.onAccent || '#fff', borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Fermer</button>
-            : <button type="button" data-invite-mfa-plus-tard="" onClick={plusTard} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Plus tard</button>}
-        </div>
-      </div>
-    </div>
-  );
-}
 function AbonnementRequis({ info }) {
   const [occupe, setOccupe] = React.useState(false);
   const [msg, setMsg] = React.useState('');
