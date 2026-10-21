@@ -56,8 +56,8 @@ self.addEventListener('push', event => {
   const title = data.title || 'VRM';
   const opts = {
     body: data.body || '',
-    icon: '/vrm-icon-v3-192.png',
-    badge: '/vrm-icon-v3-192.png',
+    icon: '/vrm-icon-v4-192.png',
+    badge: '/vrm-icon-v4-192.png',
     tag: data.tag || 'vrm',
     renotify: true,            // même tag : re-sonne au lieu de rester silencieux
     vibrate: [80, 40, 80],     // petite vibration (Android) pour attirer l'œil
