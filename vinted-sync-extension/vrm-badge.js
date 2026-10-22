@@ -267,6 +267,16 @@
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
 
+    if(e.plateforme==='leboncoin'){
+      const labels={annonces:'Annonces',transactions:'Transactions'};
+      for(const famille of ['annonces','transactions']){
+        const r=e.transport?.receptions?.[famille];
+        if(!r){flux+=`<div class="val gris">${labels[famille]} : nouvelle intégration non confirmée dans cet onglet</div>`;continue;}
+        const bon=r.etat==='enregistre';
+        const texte=r.etat==='liste-vide'?'liste reçue vide, historique conservé':r.etat==='compte-non-confirme'?'compte non confirmé, aucune attribution faite':bon?`${r.nombre} ${r.nombre===1?'enregistrée':'enregistrées'}${famille==='annonces'?` · ${r.photos} avec photo`:''} ${depuis(r.at)}`:r.etat==='aucune-annonce-reconnue'||r.etat==='format-non-reconnu'?'réponse reçue, format non reconnu':r.etat==='partiel'?'réponse trop volumineuse, non intégrée':'enregistrement refusé, données précédentes conservées';
+        flux+=`<div class="val ${bon?'':'alerte'}">${labels[famille]} : ${esc(texte)}</div>`;
+      }
+    }
     const diagnosticLbc=e.plateforme==='leboncoin'&&(e.transport?.erreurCapture||!e.site?.id||e.transport?.capteurVersion!==e.code)?`<div class="pied">${e.transport?.capteur===true&&e.transport?.capteurVersion!==e.code?'Le capteur de cet onglet n’a pas confirmé la dernière version. Recharge cet onglet Leboncoin après la mise à jour.':e.transport?.erreurCapture==='identite'?'VRM n’a pas confirmé l’enregistrement du compte. Les annonces restent bloquées pour éviter une mauvaise attribution.':e.transport?.erreurCapture==='taille'?'La capture dépasse la taille autorisée. Aucun gros message n’a été envoyé.':e.transport?.ambigue===true?'Plusieurs comptes ont répondu dans cet onglet. Aucune session courante n’est choisie. Recharge Leboncoin sur le compte voulu.':e.transport?.capteur===true?'Capteur actif. Ouvre ton espace compte Leboncoin, puis « Mes annonces », pour lire ton identité et tes annonces.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
     let bascule = '';
     if (e.bascule) {

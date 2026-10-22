@@ -56,7 +56,7 @@ test('proxy et renouvellement refusent une ligne étrangère même si la base ne
 });
 test('extension : l’upsert exige une session même si le schéma manque ; le corps ne peut pas imposer un autre propriétaire',async()=>{
  const source=fs.readFileSync('vinted-sync-extension/background.js','utf8');
- const code=extraire(source,'async function supabaseUpsert(table, rows, onConflict)','// --- Capture des comptes');
+ const code=extraire(source,'async function supabaseUpsert(','// --- Capture des comptes');
  for(const session of [null,{user_id:A,access_token:'token-a'}]){
   let appels=0;
   const c=vm.createContext({authToken:async()=>session,isCloisonne:async()=>false,SUPABASE_URL:'https://base.test',SUPABASE_KEY:'anon',RE_LIGNE_CAPTURE:/^harvest_/,noterDiag(){},familleEcriture:()=>'',fetch:async(url,opts)=>{appels++;assert.equal(new URL(url).searchParams.get('on_conflict'),'owner,vinted_user_id');assert.equal(opts.headers.Authorization,'Bearer token-a');assert.equal(JSON.parse(opts.body)[0].owner,A);return {ok:true};}});

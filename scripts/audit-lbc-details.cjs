@@ -50,7 +50,7 @@ const detail = (id) => JSON.stringify({ is_seller: true, item: { id: 9000 + id, 
 
   const visite = async (avecListe) => {
     await pg.goto('https://www.leboncoin.fr/compte/part/mes-transactions');
-    await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC' && d.kind === 'lbcvente') window.__vus.push(d.url); });`);
+    await pg.evaluate(`window.__vus = []; window.addEventListener('message', (e) => { const d = e.data; if (d && d.__tag === 'CANCALE_LBC' && d.kind === 'lbcvente') {window.__vus.push(d.url);window.postMessage({__tag:'CANCALE_LBC_ACCUSE',sequence:d.__vrmSequence,ok:true},'*');} });`);
     await pg.evaluate(INJ);
     if (avecListe) await pg.evaluate(`fetch('https://api.leboncoin.fr/api/consumergoods/proxy/v3/pages/transactions', { credentials: 'include', headers: { 'api_key': 'CLE-DU-SITE', 'Accept': 'application/json' } }).then(r => r.text())`).catch(() => {});
     await pg.waitForTimeout(3000);

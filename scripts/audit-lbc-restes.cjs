@@ -92,13 +92,16 @@ function page(reseau) {
   };
   const win = {
     __vrmLbcInjected: false,
+    addEventListener() {},
     postMessage: (m) => posts.push(JSON.parse(JSON.stringify(m))),
     fetch: async (u) => { const url = typeof u === 'string' ? u : u.url; appels.push(url); await attendre(1); return reponse(url); },
   };
+  win.top=win;
   const ctx = {
-    window: win, location: { origin: 'https://www.leboncoin.fr', hostname: 'www.leboncoin.fr', href: 'https://www.leboncoin.fr/' },
+    document:{readyState:'complete',getElementById:()=>null},
+    window: win, location: { pathname:'/',origin: 'https://www.leboncoin.fr', hostname: 'www.leboncoin.fr', href: 'https://www.leboncoin.fr/' },
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
-    URL, Headers: class {}, FormData: class {}, console: { log() {}, warn() {}, error() {} },
+    URL, TextEncoder, Headers: class {}, FormData: class {}, console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval: (f) => { intervalles.push(f); return intervalles.length; }, clearInterval() {},
   };
   vm.createContext(ctx); vm.runInContext(INJ, ctx, { filename: 'lbc-inject.js' });
