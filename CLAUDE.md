@@ -10936,7 +10936,8 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
 (`basemaps.cartocdn.com`) et les tuiles OSM directes sont retirés partout.
 - **Fond** : OpenFreeMap (instance publique : aucune inscription, aucune clé,
   aucun cookie, usage commercial permis), styles `liberty` (clair) et `dark`
-  (sombre — « pas encore complet » selon ses auteurs). Attribution affichée :
+  (sombre — « pas encore complet » selon ses auteurs) — ⚠️ remplacés le 22 oct.
+  par `positron`/`dark`, MapLibre seul (section suivante). Attribution affichée :
   OpenFreeMap · © OpenMapTiles · © OpenStreetMap. Conditions lues dans les dépôts
   `hyperknot/openfreemap(-styles)` (openfreemap.org bloqué d'ici).
 - **Moteur** : `maplibre-gl` 6.11.2 (BSD-3) + `@maplibre/maplibre-gl-leaflet`
@@ -11184,6 +11185,73 @@ vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
   tout est au Chromium tactile du banc) ; le mode stream ne floute rien de
   Ma journée (aucun `vrm-sensible` dans l'écran, sur main non plus : les comptes
   nommés dans « À faire » restent lisibles — inchangé, à trancher à part).
+### La carte de la communauté « plus professionnelle » (22 octobre) — branche `v22-carte`
+Julien (21 oct.) : « une autre carte, beaucoup plus professionnelle, fiable et de
+qualité ». Une session l'avait commencée (`claude/carte-pro`, b3fe852, « EN COURS,
+non vérifié ») : Leaflet retiré (MapLibre seul), fond **VersaTiles** + secours
+OpenFreeMap. Finie ici, après un VRAI merge de main (avatars Discord de main portés
+sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
+**1 inscrit** sur la carte (1 ville, pseudo Discord renseigné).
+- **Tranché** : **OpenFreeMap seul**, VersaTiles retiré. Raisons : un seul domaine
+  (`tiles.openfreemap.org` : style, TileJSON, tuiles, polices, icônes) — celui que
+  la CSP de `claude/csp-app` prépare et que la politique de confidentialité nomme ;
+  un second fournisseur = un second tiers qui voit l'IP de chaque vendeur, jamais
+  mesuré depuis son téléphone. Le repli reste la LISTE (jamais une carte grise).
+- **Le rendu pro** : styles SOBRES d'OpenFreeMap — `positron` (clair, gris, sans
+  points d'intérêt) et `dark` (Dark Matter). `liberty` (couleurs OSM) est retiré :
+  sur un fond presque sans couleur, la seule couleur de l'écran reste SON épingle
+  (§7). **Noms en français** : `enFrancais` enveloppe chaque étiquette de NOM par
+  `["coalesce", ["get","name:fr"], <expression d'origine>]` (« Allemagne », pas
+  « Germany ») ; sans `name:fr`, le nom d'origine ; les numéros de route intacts.
+  Ni rotation ni inclinaison, zoom 44 px, « Ma ville », attribution dépliée sur
+  ordinateur (repliée en « i » sous 640 px, comme le veut MapLibre).
+- **Quatre défauts de l'état laissé, VUS AU RENDU** (banc, 390 et 1512) :
+  1. ⚠️ l'épingle ÉTAIT le marqueur MapLibre, qui se place par un `transform` en
+     ligne : la `transition: transform .15s` de `.vrm-cm-pin` la faisait TRAÎNER
+     derrière la carte (80 px au lieu de 120 sur un glisser), et à 390 px le
+     toucher manquait l'épingle (coucou, message, blocage : 4 rouges en cascade).
+     ⇒ un PORTEUR (`.vrm-cm-porteur`) est le marqueur, le bouton vit dedans ;
+  2. l'attribution était DOUBLÉE (la mention ajoutée + celle de la TileJSON) ⇒
+     `attributionManquante` n'ajoute que ce que les sources ne portent pas ;
+  3. deux « i » empilés à 390 px : la règle générale des boutons de `.vrm-main`
+     (`min-height: 44px !important`) étirait le `<summary>` de MapLibre et son
+     image se répétait ;
+  4. sa propre épingle n'était plus en accent : la règle `.profil` de main (avatars)
+     la repeignait en blanc (vrai aussi sur main).
+  Et le fond tombait en liste sur UNE tuile en erreur (500) : `poserFond` ne
+  déclare « dessiné » qu'après une tuile ARRIVÉE ; une tuile isolée en erreur ne
+  fait pas tomber la carte ; une source (TileJSON) injoignable si ; une police ou
+  une icône manquante non ; rien du tout ⇒ délai (12 s) ⇒ liste.
+- **Politique de confidentialité** : elle nommait encore **CARTO** (retiré le
+  21 oct.) — la ligne dit OpenFreeMap (IP + zone affichée, aucun compte, aucun
+  cookie, lieu « non précisé par le service ») et le géocodage (BAN, Photon,
+  Nominatim, par le serveur ; BAN depuis le navigateur en repli). Date au 22 oct.
+- **Le banc sert la VRAIE forme** (§6.3) : les vrais styles `positron`/`dark`
+  (`hyperknot/openfreemap-styles` @ 6e53612), une TileJSON qui déclare toutes les
+  couches et porte l'attribution exacte du README, de vraies tuiles OpenMapTiles
+  (Natural Earth : eau, frontières, villes et pays avec `name:fr`), de vrais
+  glyphes Noto Sans (`protomaps/basemaps-assets` @ 028c18f, « Bold » servi par
+  « Medium »), une planche d'icônes valide mais vide. ⚠️ Avec une TileJSON qui ne
+  déclarait que 3 couches, MapLibre criait « Source layer … does not exist » —
+  une erreur que le vrai service ne produit pas : corrigé dans le banc.
+  Téléchargés une fois par `curl` dans `os.tmpdir()/vrm-carte-banc-v2`.
+- **Preuves** : `scripts/bancs/communaute.cjs` (port `BANC_PORT`) **168 verts** ;
+  **16 rouges** sur l'état laissé (b3fe852 + main, build de la copie) ; **15
+  rouges** sur origin/main 4afdcda ; 4 mutations de l'app posées ensemble
+  (bouton = marqueur, accent retiré, « i » sans correctif, une tuile qui tue) ⇒
+  **10 rouges**, chacune attrapée par SON contrôle. `scripts/audit-fond-carte.cjs`
+  (exécute `src/fondCarte.js` : vrais styles évalués par
+  `@maplibre/maplibre-gl-style-spec`, fausse carte aux évènements de MapLibre) :
+  **15 rouges** sur l'état laissé, **15** sur main, vert après, `--prouve` **7/7
+  mutations** attrapées. Les 4 combinaisons 1512/390 × clair/sombre regardées.
+- **CSP** (pour `claude/csp-app`) : la carte ne demande que
+  `https://tiles.openfreemap.org` (`connect-src` : style, TileJSON, tuiles, polices,
+  icônes) ; le worker MapLibre est servi par VRM. ⚠️ Les avatars de main viennent
+  de `https://cdn.discordapp.com` (`img-src`) — pas de ce chantier, à ne pas oublier.
+- **Non mesuré** : la vraie instance depuis son téléphone (bloquée d'ici) ; que les
+  tuiles réelles portent `name:fr` (absent ⇒ le nom d'origine, aucune régression) ;
+  le rendu de Dark Matter sur de vraies données ; WebGL sur un vrai iPhone ; la
+  mini-carte des points relais (injoignable, pas de banc).
 
 ---
 

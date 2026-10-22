@@ -17,8 +17,8 @@
 //  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
 //  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
 //  classement peuvent n'afficher que les membres d'un groupe.
-//  La carte : Leaflet 1.9.4 embarqué, chargé à l'ouverture de l'écran (jamais
-//  au démarrage), fond OpenFreeMap (MapLibre, sans clé) avec son attribution.
+//  La carte : MapLibre (vectoriel), chargée à l'ouverture de l'écran (jamais
+//  au démarrage), fond OpenFreeMap sobre (positron / dark), sans clé d'API.
 //  Injoignable ⇒ la même communauté en liste.
 // ════════════════════════════════════════════════════════════════════════════
 import {avatarProfilPermis,initialesProfil} from './avatarDiscord.js';
@@ -27,25 +27,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
-import { chargerCalqueMaplibre, styleCarte, ATTRIBUTION_CARTE, webglDispo } from '../fondCarte.js';
+import { chargerMaplibre, poserFond, webglDispo, mouvementReduit } from '../fondCarte.js';
 
-// Leaflet est EMBARQUÉ dans VRM (paquet npm leaflet 1.9.4, licence BSD-2), chargé
-// seulement à l'ouverture de la carte : un CDN bloqué (bloqueur de pub, réseau
-// d'entreprise, relais privé d'iCloud) ne peut plus empêcher la carte de s'afficher.
-let promesseLeaflet = null;
-function chargerLeaflet() {
-  if (typeof window !== 'undefined' && window.L && window.L.map) return Promise.resolve(window.L);
-  if (promesseLeaflet) return promesseLeaflet;
-  promesseLeaflet = Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]).then(([m]) => {
-    const L = (m && m.default && m.default.map) ? m.default : m;
-    if (!L || !L.map) throw new Error('vide');
-    window.L = L; return L;
-  }).catch((e) => { promesseLeaflet = null; throw e; });
-  return promesseLeaflet;
-}
-// Le fond : OpenFreeMap (tuiles vectorielles, sans clé ni inscription) dessiné
-// par MapLibre dans un calque Leaflet (src/fondCarte.js). Plus de CARTO (clé
-// exigée), plus d'OpenStreetMap direct (usage applicatif lourd interdit).
+// Le fond : OpenFreeMap (positron / dark), dessiné par MapLibre, chargé
+// seulement à l'ouverture de la carte (src/fondCarte.js). Plus de Leaflet.
 
 const ENDPOINT = '/api/compte?mode=communaute';
 const PAS_SU = "Je n'ai pas pu lire la carte — rien n'est perdu, c'est la lecture qui a échoué.";
@@ -63,102 +48,135 @@ function useApi(headers) {
   }, [headers]);
 }
 
-// ── LA CARTE (Leaflet) ───────────────────────────────────────────────────────
+// ── LES AVATARS (main : Discord vérifié, ou photo partagée signée) ─────────
 function AvatarProfil({profil,grand=false}) {
   const url=avatarProfilPermis(profil?.avatar)?profil.avatar:'';
   const [rate,setRate]=useState('');
   return <span className={'vrm-cm-avatar'+(grand?' grand':'')} aria-hidden="true">{initialesProfil(profil)}{url&&rate!==url&&<img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setRate(url)}/>}</span>;
 }
 
+// ── LA CARTE (MapLibre, vectorielle) ─────────────────────────────────────────
+// Fond OpenFreeMap sobre (src/fondCarte.js : « positron » clair, « dark »
+// sombre, noms en français) ; il ne dessine pas ⇒ la liste. Ni rotation ni
+// inclinaison (une carte de villes, pas un globe à manipuler) ; zoom fluide ;
+// épingles = de vrais boutons HTML de 44 px, regroupées au zoom courant ; la
+// sienne en accent. Mouvement réduit ⇒ aucun vol.
+// ⚠️ L'épingle est DANS un porteur : MapLibre place le marqueur par un
+// `transform` en ligne ; une transition ou un `position` posé sur l'élément
+// marqueur lui-même ferait traîner ou décaler les épingles quand on déplace la
+// carte. Le porteur bouge, le bouton (taille, survol, pouls) vit dedans.
+const CENTRE_FRANCE = [2.4, 46.6];
+const FOND_ATTENTE = { clair: '#F2F3F0', sombre: '#0C0C0C' }; // le fond des styles : pas d'éclair au chargement
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
-  const boite = useRef(null), carte = useRef(null), calque = useRef(null), fond = useRef(null);
-  const [pret, setPret] = useState(false), [fondPret, setFondPret] = useState(false);
+  const boite = useRef(null), carte = useRef(null), ml = useRef(null), marqueurs = useRef([]), attrib = useRef(null);
+  const [pret, setPret] = useState(false), [fond, setFond] = useState('charge');
+  const reduit = useMemo(() => mouvementReduit(), []);
+  // 1. La carte (une fois) — chargée à l'ouverture de l'écran, jamais avant.
   useEffect(() => {
     let vivant = true;
-    // Pas de WebGL : MapLibre ne dessinerait rien — la même communauté en liste.
     if (!webglDispo()) { onEchec(); return () => { vivant = false; }; }
-    Promise.all([chargerLeaflet(), chargerCalqueMaplibre()]).then(([L]) => {
+    chargerMaplibre().then((lib) => {
       if (!vivant || !boite.current || carte.current) return;
-      const m = L.map(boite.current, { zoomControl: true, attributionControl: true, worldCopyJump: true, minZoom: 2, maxZoom: 12 });
+      ml.current = lib;
+      const centre = moi ? [Number(moi.lon), Number(moi.lat)] : CENTRE_FRANCE;
+      const m = new lib.Map({
+        container: boite.current,
+        style: { version: 8, sources: {}, layers: [{ id: 'vrm-fond', type: 'background', paint: { 'background-color': sombre ? FOND_ATTENTE.sombre : FOND_ATTENTE.clair } }] },
+        center: centre, zoom: moi ? 8 : 4.3, minZoom: 1.5, maxZoom: 11.5,
+        dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0,
+        attributionControl: false, renderWorldCopies: true, fadeDuration: reduit ? 0 : 200,
+      });
+      m.touchZoomRotate.disableRotation();
+      if (m.keyboard && m.keyboard.disableRotation) m.keyboard.disableRotation();
       carte.current = m;
-      calque.current = L.layerGroup().addTo(m);
-      if (moi) m.setView([Number(moi.lat), Number(moi.lon)], 9);
-      else m.setView([46.6, 2.4], 5);
-      // La boîte peut changer de taille après l'ouverture (onglet, rotation, coque) :
-      // sans ça Leaflet ne dessine que la zone du premier instant (carte grise).
-      if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(() => m.invalidateSize()); ro.observe(boite.current); m._vrmRo = ro; }
-      setTimeout(() => { if (carte.current) carte.current.invalidateSize(); }, 300);
-      setPret(true);
+      if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(() => m.resize()); ro.observe(boite.current); m._vrmRo = ro; }
+      m.once('load', () => { if (vivant) setPret(true); });
     }).catch(() => { if (vivant) onEchec(); });
-    return () => { vivant = false; if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; } };
+    return () => {
+      vivant = false;
+      for (const k of marqueurs.current) k.remove();
+      marqueurs.current = [];
+      if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; }
+    };
   }, []);
-  // Le fond suit le thème (OpenFreeMap « liberty » / « dark »), avec
-  // l'attribution exigée. Style ou tuiles injoignables avant tout dessin
-  // (ou rien au bout de 12 s) ⇒ la liste, jamais une carte grise.
+  // 2. Le fond suit le thème ; il ne dessine pas ⇒ la liste. L'attribution
+  //    exigée : celle des sources, complétée de ce qui manquerait (jamais deux
+  //    fois). Repliée en « i » sur un écran étroit, dépliée ailleurs.
   useEffect(() => {
     if (!pret) return undefined;
-    const m = carte.current;
-    let fini = false;
-    if (fond.current) { m.removeLayer(fond.current); fond.current = null; }
-    setFondPret(false);
-    chargerCalqueMaplibre().then((maplibreGL) => {
-      if (fini || !carte.current) return;
-      const calqueFond = maplibreGL({ style: styleCarte(sombre), attributionControl: { customAttribution: ATTRIBUTION_CARTE }, interactive: false });
-      calqueFond.addTo(m);
-      fond.current = calqueFond;
-      const gl = calqueFond.getMaplibreMap && calqueFond.getMaplibreMap();
-      let charge = false;
-      const echec = () => { if (!fini && !charge) { fini = true; onEchec(); } };
-      const delai = setTimeout(echec, 12000);
-      if (gl) {
-        gl.once('load', () => { charge = true; clearTimeout(delai); if (!fini) setFondPret(true); });
-        gl.on('error', () => { if (!charge) { clearTimeout(delai); echec(); } });
-      }
-    }).catch(() => { if (!fini) { fini = true; onEchec(); } });
-    return () => { fini = true; };
+    let annule = false;
+    setFond('charge');
+    const m = carte.current, lib = ml.current;
+    poserFond(m, { sombre, annule: () => annule || !carte.current }).then(({ id, attribution }) => {
+      if (annule || !carte.current) return;
+      if (attrib.current) { m.removeControl(attrib.current); attrib.current = null; }
+      attrib.current = new lib.AttributionControl(attribution ? { customAttribution: attribution } : {});
+      m.addControl(attrib.current, 'bottom-right');
+      setFond(id);
+    }).catch((e) => { if (!annule && String(e && e.message) !== 'annule') onEchec(); });
+    return () => { annule = true; };
   }, [pret, sombre]);
-  // Les épingles : regroupées au zoom courant (le nombre de personnes dedans).
+  // 3. Les épingles : regroupées au zoom courant (le nombre de personnes dedans).
   useEffect(() => {
-    if (!pret) return;
-    const L = window.L, m = carte.current;
+    if (!pret) return undefined;
+    const m = carte.current, lib = ml.current;
     const dessiner = () => {
-      calque.current.clearLayers();
-      const groupes = grouperParPixels(cells, (c) => m.project([c.lat, c.lon], m.getZoom()));
+      for (const k of marqueurs.current) k.remove();
+      marqueurs.current = [];
+      const groupes = grouperParPixels(cells, (c) => m.project([c.lon, c.lat]));
       for (const g of groupes) {
-        const cls = 'vrm-cm-pin' + (g.moi ? ' moi' : '') + (g.pres ? ' pres' : '') + (g.cells.length > 1 ? ' groupe' : '');
-        // Seul un NOMBRE entre dans le HTML de l'épingle : jamais un texte saisi.
-        const icone = L.divIcon({ className: '', html: `<button type="button" class="${cls}" data-cm-pin="${g.n}" aria-label="${g.n} revendeur${g.n > 1 ? 's' : ''}">${g.n}</button>`, iconSize: [44, 44], iconAnchor: [22, 22] });
-        const mk = L.marker([g.lat, g.lon], { icon: icone, keyboard: false });
-        mk.addTo(calque.current);
-        // Un vrai bouton, écouté directement : au doigt comme à la souris (et
-        // au clavier), sans dépendre de la détection de « clic » de la carte.
-        const bouton = mk.getElement() && mk.getElement().querySelector('button');
-        if (bouton) {
-          const personnes=g.cells.flatMap(c=>c.personnes);
-          if(g.n===1){
-            const p=personnes[0]||{};bouton.textContent=initialesProfil(p);bouton.classList.add('profil');
-            bouton.setAttribute('aria-label',String(p.pseudo||'Revendeur')+' · '+String(p.ville||''));
-            if(avatarProfilPermis(p.avatar)){const img=document.createElement('img');img.src=p.avatar;img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});bouton.append(img);}
-          }
-          L.DomEvent.disableClickPropagation(bouton);
-          bouton.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (g.cells.length > 1 && m.getZoom() < 11) m.flyToBounds(L.latLngBounds(g.cells.map((c) => [c.lat, c.lon])).pad(0.6), { duration: 0.6, maxZoom: 11 });
-            else onCellules(g.cells);
-          });
+        const porteur = document.createElement('div');
+        porteur.className = 'vrm-cm-porteur';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vrm-cm-pin' + (g.moi ? ' moi' : '') + (g.pres ? ' pres' : '') + (g.cells.length > 1 ? ' groupe' : '');
+        // Seul un NOMBRE entre dans l'épingle : jamais un texte saisi.
+        b.textContent = String(g.n);
+        b.setAttribute('data-cm-pin', String(g.n));
+        b.setAttribute('aria-label', `${g.n} revendeur${g.n > 1 ? 's' : ''}`);
+        if (g.n === 1) {
+          // Une seule personne : ses initiales, et son avatar s'il est PERMIS
+          // (Discord vérifié, ou photo partagée signée par le serveur — jamais
+          // une adresse libre). Une image qui ne charge pas disparaît.
+          const p = (g.cells.flatMap((c) => c.personnes)[0]) || {};
+          b.textContent = initialesProfil(p); b.classList.add('profil');
+          b.setAttribute('aria-label', String(p.pseudo || 'Revendeur') + ' · ' + String(p.ville || ''));
+          if (avatarProfilPermis(p.avatar)) { const img = document.createElement('img'); img.src = p.avatar; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer'; img.addEventListener('error', () => img.remove(), { once: true }); b.append(img); }
         }
+        b.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (g.cells.length > 1 && m.getZoom() < 10.5) {
+            const lons = g.cells.map((c) => c.lon), lats = g.cells.map((c) => c.lat);
+            m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 80, maxZoom: 10.5, duration: reduit ? 0 : 700 });
+          } else onCellules(g.cells);
+        });
+        porteur.append(b);
+        marqueurs.current.push(new lib.Marker({ element: porteur, anchor: 'center' }).setLngLat([g.lon, g.lat]).addTo(m));
       }
     };
     dessiner();
     m.on('zoomend', dessiner);
     return () => { m.off('zoomend', dessiner); };
   }, [pret, cells]);
-  useEffect(() => {
-    if (pret && moi) carte.current.flyTo([Number(moi.lat), Number(moi.lon)], Math.max(carte.current.getZoom(), 8), { duration: 0.6 });
-  }, [pret, moi && moi.lat, moi && moi.lon]);
-  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={fondPret ? 'openfreemap' : 'charge'} role="region" aria-label="Carte de la communauté">
+  // 4. Sa ville choisie ⇒ la carte y va (vol doux ; mouvement réduit ⇒ saut).
+  const recentrer = useCallback(() => {
+    const m = carte.current; if (!m || !moi) return;
+    const cible = { center: [Number(moi.lon), Number(moi.lat)], zoom: Math.max(m.getZoom(), 8) };
+    if (reduit) m.jumpTo(cible); else m.flyTo({ ...cible, speed: 1.4, curve: 1.42 });
+  }, [moi && moi.lat, moi && moi.lon, reduit]);
+  useEffect(() => { if (pret && moi) recentrer(); }, [pret, moi && moi.lat, moi && moi.lon]);
+  const zoom = (d) => { const m = carte.current; if (m) { if (d > 0) m.zoomIn({ duration: reduit ? 0 : 250 }); else m.zoomOut({ duration: reduit ? 0 : 250 }); } };
+  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={fond} role="region" aria-label="Carte de la communauté">
     <div className="vrm-cm-carte-fond" ref={boite} />
     {!pret && <p className="vrm-cm-carte-attente">Chargement de la carte…</p>}
+    {pret && <div className="vrm-cm-ctrl" role="group" aria-label="Zoom de la carte">
+      <button type="button" onClick={() => zoom(1)} aria-label="Zoomer" data-cm-zoom="plus">+</button>
+      <button type="button" onClick={() => zoom(-1)} aria-label="Dézoomer" data-cm-zoom="moins">−</button>
+    </div>}
+    {pret && moi && <button type="button" className="vrm-cm-recentrer" onClick={recentrer} data-cm-recentrer aria-label={`Recentrer sur ${moi.ville || 'ma ville'}`}>
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+      <span>Ma ville</span>
+    </button>}
   </div>;
 }
 
