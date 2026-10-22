@@ -1,15 +1,12 @@
 /* Finition Gestion : mêmes surfaces, repères et rythmes dans les espaces métier.
    Les zones interactives restent à taille réelle, sans zoom de la page. */
 .vrm-app-shell{
- --gestion-surface:#fffefa;--gestion-soft:#edf2ef;--gestion-line:#dce5e1;
- --gestion-ink:#243d43;--gestion-muted:#52636b;--gestion-accent:#2b4548;
- --gestion-on-accent:#fffefa;
+ --gestion-surface:var(--vrm-surface,#FDFEFC);--gestion-soft:var(--vrm-card2,#EAF0EC);
+ --gestion-line:var(--vrm-line,#DCE4DF);--gestion-ink:var(--vrm-ink,#213B41);
+ --gestion-muted:var(--vrm-muted,#53696D);--gestion-accent:var(--vrm-accent,#244E54);
+ --gestion-on-accent:#fff;
 }
-:root[data-theme=dark] .vrm-app-shell{
- --gestion-surface:#243c40;--gestion-soft:#2c4548;--gestion-line:#385155;
- --gestion-ink:#edf5f0;--gestion-muted:#b0c5bc;--gestion-accent:#bad7c9;
- --gestion-on-accent:#21343e;
-}
+:root[data-theme=dark] .vrm-app-shell{--gestion-on-accent:#173A40;}
 /* Les commandes partagées reprennent la palette de navigation : une recherche,
    un compte et un filtre ont le même dessin sur chaque plateforme. Les marques
    et les couleurs de statut conservent leur sens. */
@@ -288,8 +285,7 @@
 .vrm-feuille{box-shadow:0 12px 48px #14282e24;border:1px solid var(--vrm-hair,#dce5e1);}
 .vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#2b4548);outline-offset:2px;}
 /* Les messages éphémères sont rendus hors de la coque par React. */
-.vrm-toasts{--message-surface:#fffefa;--message-ink:#243d43;--message-line:#dce5e1;}
-:root[data-theme=dark] .vrm-toasts{--message-surface:#243c40;--message-ink:#edf5f0;--message-line:#385155;}
+.vrm-toasts{--message-surface:var(--vrm-surface,#FDFEFC);--message-ink:var(--vrm-ink,#213B41);--message-line:var(--vrm-line,#DCE4DF);}
 .vrm-toast{
  min-height:48px;border-radius:10px!important;border-color:var(--message-line)!important;
  background:var(--message-surface)!important;box-shadow:0 4px 20px #14282e1f!important;
@@ -310,3 +306,37 @@
 .vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:10px!important;box-shadow:0 8px 28px #14282e20!important;}
 .vrm-main .vrm-ann-tools-pop button{border-radius:6px;}
 .vrm-main .vrm-ann-tools-pop button:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
+
+/* Perle : fondus limités aux surfaces, jamais aux informations. */
+.vrm-app-shell .vrm-atelier-rail{background-image:var(--vrm-nav-gradient)!important;}
+.vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#91b1a514,transparent 64%)!important;}
+.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#CABDA0;}
+.vrm-main :is(.vrm-surface,.vrm-day-card,.vrm-set-carte,.vrm-kpi-ventes-grille){border-color:var(--gestion-line)!important;}
+.vrm-main .vrm-set-carte{background:var(--gestion-surface);}
+.vrm-main .vrm-notice[data-tone=info]>span:first-child{background:var(--gestion-accent)!important;}
+.vrm-main .vrm-period-panel{border-color:var(--gestion-line);background:var(--gestion-surface);}
+@media(min-width:1024px){
+ .vrm-day-layout .vrm-day-top{grid-template-columns:minmax(230px,.85fr) minmax(0,1.8fr);gap:16px;}
+ .vrm-day-top>.vrm-day-week{grid-column:2;grid-row:1;min-width:0;}
+ .vrm-day-top>.vrm-day-wallet{grid-column:1 / -1;grid-row:2;flex-direction:row;align-items:center;gap:16px;padding-block:12px;}
+}
+:root[data-theme=dark]{--vrm-focus:#B7D6C8;}
+:root[data-theme=light]{--vrm-focus:#244E54;}
+.vrm-repartition-visuel{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;align-items:start;margin-top:12px;}
+.vrm-repartition-visuel>div{min-width:0;margin-top:0!important;}
+.vrm-repartition-visuel:not(:has(figure)){grid-template-columns:1fr;}
+.vrm-repartition-anneau{width:96px;margin:0;}
+.vrm-repartition-anneau svg{display:block;width:100%;height:auto;}
+.vrm-day-performance{min-width:0;}
+.vrm-day-performance h3{font-size:14px;margin:0;}
+.vrm-day-performance .vrm-day-head button{border:0;background:transparent;color:var(--vrm-accent);font:inherit;font-size:12px;min-height:44px;cursor:pointer;}
+.vrm-performance-chiffres{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0 16px;}
+.vrm-performance-chiffres div{min-width:0;}
+.vrm-performance-chiffres span{display:block;font-size:11px;color:var(--vrm-muted);line-height:1.5;}
+.vrm-performance-chiffres b{display:block;font-size:20px;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap;}
+.vrm-day-performance>details>summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;cursor:pointer;border-top:1px solid var(--vrm-line);}
+.vrm-day-performance>details>summary span{font-size:10px;color:var(--vrm-muted);}
+.vrm-day-performance>details>div{border:0!important;padding:12px 0 0!important;box-shadow:none!important;}
+@media(min-width:1024px){.vrm-day-lower>.vrm-day-recent{grid-row:1 / span 2;}.vrm-day-lower>.vrm-day-performance{grid-column:2;grid-row:1;}.vrm-day-lower>.vrm-day-stock{grid-column:2;grid-row:2;}}
+@media(max-width:767px){.vrm-repartition-visuel{grid-template-columns:74px minmax(0,1fr);gap:10px;}.vrm-repartition-anneau{width:74px;}.vrm-repartition-visuel [data-repart-ligne]{grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important;}.vrm-repartition-visuel [data-repart-ligne]>div{display:none;}}
+.vrm-finance-page .vrm-day-help-toggle{font-size:13px;}
