@@ -123,7 +123,7 @@ function faireCtx({ txnKO = false, bordsKO = false, dataKO = null, labelsKO = fa
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx);
-  vm.runInContext(SRC, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  vm.runInContext(SRC, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   ctx.logActivity = async () => {};
   ctx.noterDiag = async () => {};
   ctx.notifierApp = (e) => { journal.evts.push(e); };

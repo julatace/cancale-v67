@@ -1,3 +1,4 @@
+import './_lib/sans-bruit.js';
 import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
 // ⚠️ POURQUOI UNE SEULE FONCTION : le plan Vercel Hobby plafonne à 12 fonctions
@@ -38,7 +39,6 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    vérifiée, dans une table que le vendeur peut lire mais pas écrire
 //    (supabase/migrations/005-abonnements.sql). Sinon on s'abonnerait soi-même
 //    depuis la console du navigateur.
-import './_lib/sans-bruit.js';
 import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { sbCle } from './_lib/cle.js';

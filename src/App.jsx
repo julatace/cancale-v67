@@ -29,8 +29,9 @@ import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
+import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import {ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
+import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
@@ -39,7 +40,9 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
+import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
@@ -78,7 +81,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.205.0';
+const EXT_ATTENDUE = '5.206.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -373,7 +376,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.204.0', retraitnotif: '5.204.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -412,6 +415,8 @@ const CAPACITES_DITES = [
   ['lbcmsg', 'relever tes messages Leboncoin'],
   ['lbcpack', 'voir si tu as un pack photo Leboncoin'],
   ['annulee', 'retirer tout seul le bordereau d\'une vente annulée'],
+  ['confirmer', 'relever les colis à confirmer (« Tout est OK ») avant leur date limite'],
+  ['retraitnotif', 'te prévenir quand elle lit un code de retrait dans une conversation'],
   // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
   // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
@@ -1208,6 +1213,8 @@ const wipeLocalData = () => {
     }
     doomed.forEach(k => localStorage.removeItem(k));
   } catch (_) {}
+  // La réserve des QR de Ma journée hors ligne part avec les photos (`vrm_hl_photo_*`).
+  try { if (typeof caches !== 'undefined') caches.delete(CACHE_QR).catch(() => {}); } catch (_) {}
 };
 // Mémorise à qui appartiennent les données présentes dans ce navigateur.
 const OWNER_MARK = 'vrm_local_owner';
@@ -1428,7 +1435,7 @@ const SYNC_KEYS = [
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
-  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed',
+  'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
   'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
@@ -3887,6 +3894,26 @@ function CarrierBadge({ carrier, size = 22 }) {
   );
 }
 
+// Le fond vectoriel de la mini-carte (MapLibre chargé à la demande).
+function FondMiniCarte({ lat, lon, zoom, sombre }) {
+  const boite = React.useRef(null);
+  const [etat, setEtat] = React.useState('charge');
+  React.useEffect(() => {
+    let vivant = true, carte = null;
+    import('./fondCarte.js').then((f) => {
+      if (!f.webglDispo()) throw new Error('webgl');
+      return f.chargerMaplibre().then((ml) => {
+        if (!vivant || !boite.current) return;
+        carte = new ml.Map({ container: boite.current, style: f.styleCarte(sombre), center: [lon, lat], zoom, interactive: false, attributionControl: false });
+        carte.once('load', () => { if (vivant) setEtat('pret'); });
+        carte.on('error', () => { if (vivant) setEtat((e) => (e === 'pret' ? e : 'ko')); });
+      });
+    }).catch(() => { if (vivant) setEtat('ko'); });
+    return () => { vivant = false; if (carte) carte.remove(); };
+  }, [lat, lon, zoom, sombre]);
+  return <div ref={boite} data-mini-fond={etat} aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />;
+}
+
 function OsmMap({ points, height = 230, selected, onSelect }) {
   const pts = (points || []).filter(p => p && p.lat && p.lon);
   if (!pts.length) return null;
@@ -3905,20 +3932,14 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
   const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
   const c = proj(clat, clon, z);
-  const xi = Math.floor(c.x), yi = Math.floor(c.y);
-  const tiles = [];
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) tiles.push({ dx, dy, x: xi + dx, y: yi + dy });
-  // Fond de carte clair et épuré (CartoDB « Voyager ») — rendu pro, façon Vinted.
-  const tileUrl = (x, y) => `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/${z}/${x}/${y}.png`;
-  const tileUrlHi = (x, y) => `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
-  const px = (2 + (c.x - xi)) * 256, py = (1 + (c.y - yi)) * 256;
+  // Fond : OpenFreeMap (sans clé, src/fondCarte.js), dessiné par MapLibre,
+  // immobile, centré sur le même point et à la même échelle que les épingles
+  // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
+  // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
+  const sombreCarte = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
   return (
-    <div style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: '#eaeef2' }}>
-      <div style={{ position: 'absolute', width: 1280, height: 768, left: `calc(50% - ${px}px)`, top: `calc(50% - ${py}px)` }}>
-        {tiles.map((t, i) => (
-          <img key={i} src={tileUrl(t.x, t.y)} onError={(e)=>{ if(e.target.dataset.f!=='1'){e.target.dataset.f='1'; e.target.src=`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`;} }} alt="" width={256} height={256} loading="lazy" style={{ position: 'absolute', left: (t.dx + 2) * 256, top: (t.dy + 1) * 256 }} />
-        ))}
-      </div>
+    <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1a1f27' : '#eaeef2' }}>
+      <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
       {(() => {
         // Anti-chevauchement : on écarte les épingles trop proches en spirale.
         const placed = [];
@@ -3962,7 +3983,7 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
           </div>
         );
       })}
-      <span style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6b7280', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>© OpenStreetMap · CARTO</span>
+      <span data-mini-carte-attribution style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6b7280', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
     </div>
   );
 }
@@ -4131,6 +4152,11 @@ const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:me
 // tranche. Rempli par toute lecture de la famille (partagée, §vitesse) ;
 // vide = « pas su » = rien n'est caché de plus qu'avant.
 const TXN_ETATS = new Map();
+// (21 oct.) Les états ont-ils été LUS ? `undefined` pas encore · `true` lus ·
+// `false` la lecture a échoué (« pas su » — le suivi des retours le dit).
+let TXN_ETATS_LU;
+// Les retours eBay lus sur Colis (10 min, une fois pour toutes les ouvertures).
+const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') }); };
 const lireEtatsTxn = async () => { try { const rows = await lireTout(TXN_META_SELECT); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
@@ -4149,8 +4175,8 @@ const fetchTxnItemIds = async () => {
     // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
     const rows = await lireTout(TXN_META_SELECT);
-    if (rows === null) return {};
-    noterEtatsTxn(rows);
+    if (rows === null) { TXN_ETATS_LU = false; return {}; }
+    noterEtatsTxn(rows); TXN_ETATS_LU = true;
     const map = {};
     for (const r of rows) { if (r && r.tx && r.item) map[String(r.tx)] = String(r.item); }
     return map;
@@ -7496,7 +7522,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -12053,6 +12079,22 @@ function BandeauLiaison() {
   );
 }
 
+// Les QR hébergés de la photo hors ligne mis en réserve (src/journeeHorsLigne.js) :
+// le service worker les sert depuis cette réserve quand le réseau manque
+// (`/hl-qr?u=…`). Une image refusée ne casse rien : la vue dit d'utiliser le code.
+const rechaufferQr = async (photo) => {
+  try {
+    if (typeof caches === 'undefined' || !photo) return;
+    const c = await caches.open(CACHE_QR);
+    for (const r of photo.retirer) {
+      const u = r && r.qr;
+      if (!/^https:\/\//i.test(String(u || ''))) continue;
+      const k = adresseQrLocale(u);
+      if (await c.match(k)) continue;
+      try { const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' }); await c.put(k, res); } catch (_) {}
+    }
+  } catch (_) {}
+};
 // Les codes de retrait gardés en local (G9) : lisibles même quand la base ne
 // répond pas (au point relais, réseau faible). Une liste non vide, ou null.
 const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
@@ -12157,6 +12199,126 @@ function BaseInjoignable() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  MA JOURNÉE HORS LIGNE (21 octobre) — la photo, en lecture seule
+// ══════════════════════════════════════════════════════════════════════════
+// Hors ligne MESURÉ (`navigator.onLine === false`) : pas une base qui hoquette
+// (celle-là a `BaseInjoignable`). La photo est celle de la dernière lecture
+// COMPLÈTE de CE vendeur (src/journeeHorsLigne.js) ; on dit de quand elle date,
+// UNE fois, et qu'aucun geste ne peut partir (les boutons sont grisés, sans
+// redire pourquoi sur chacun). « Pas su » ≠ « rien » : sans photo, on le dit —
+// jamais « tout est à jour ».
+function useHorsLigne() {
+  const [h, setH] = React.useState(() => { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (_) { return false; } });
+  React.useEffect(() => {
+    const on = () => setH(false), off = () => setH(true);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  return h;
+}
+function LigneHorsLigne({ children, date }) {
+  return (
+    <div role="status" data-hors-ligne-ligne="" data-hors-ligne-date={date || undefined}
+      style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px',marginBottom:14}}>
+      <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="cloudOff" size={18}/></span>
+      <span style={{fontSize:13.5,fontWeight:600,color:C.text,lineHeight:1.4}}>{children}</span>
+    </div>
+  );
+}
+function QrHorsLigne({ qr, code }) {
+  const [etat, setEtat] = React.useState('charge');
+  if (!qr) return null;
+  const src = /^data:image\//i.test(qr) ? qr : adresseQrLocale(qr);
+  if (etat === 'ko') return <div data-hl-qr="ko" style={{flexShrink:0,width:92,fontSize:11,color:C.muted,lineHeight:1.35,textAlign:'center'}}>{code ? 'QR pas gardé ici — donne le code' : 'QR pas gardé sur cet appareil'}</div>;
+  return <img data-hl-qr={etat} src={src} alt="QR de retrait" width={92} height={92} onLoad={() => setEtat('ok')} onError={() => setEtat('ko')}
+    style={{flexShrink:0,width:92,height:92,borderRadius:10,background:'#fff',border:`1px solid ${C.border}`,objectFit:'contain'}}/>;
+}
+function JourneeHorsLigne({ uid, tab }) {
+  const [, tic] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
+  const photo = React.useMemo(() => { try { return lirePhoto(uid, localStorage); } catch (_) { return null; } }, [uid]);
+  // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
+  // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
+  const titre = tab === 'journee' ? null : <h2 style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>Ma journée</h2>;
+  if (!photo) return (
+    <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
+      {titre}
+      <LigneHorsLigne>Hors ligne — aucune copie de ta journée n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
+    </div>
+  );
+  const maintenant = Date.now();
+  const quand = heurePhoto(photo.at, maintenant);
+  const soir = listeDuSoir(photo, maintenant);
+  const grise = { border:`1px solid ${C.border}`, background:C.bg, color:C.muted, borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, minHeight:44, cursor:'not-allowed', fontFamily:'inherit', flexShrink:0, opacity:0.7 };
+  const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'6px 14px', marginBottom:14 };
+  const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
+  const limiteTxt = (e) => {
+    const j = joursAvantJour(e.limite, maintenant);
+    if (j == null) return '';
+    if (j < 0) return 'date limite passée';
+    if (j === 0) return "à poster aujourd'hui";
+    if (j === 1) return 'à poster demain au plus tard';
+    return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+  };
+  return (
+    <div data-hors-ligne="photo" style={{padding:'16px 14px 40px'}}>
+      {titre}
+      <LigneHorsLigne date={new Date(photo.at).toISOString()}>Hors ligne — ce que tu vois date de {quand} ; rien ne peut être envoyé.</LigneHorsLigne>
+      {soir && soir.n > 0 && (
+        <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>La liste du soir</div>
+          <div style={{fontSize:14,color:C.text,lineHeight:1.45}}>
+            Demain : <b>{soir.n} colis</b> à poster{soir.enRetard || soir.demain ? ' — ' : ''}
+            {soir.enRetard ? `${soir.enRetard} déjà en retard` : ''}{soir.enRetard && soir.demain ? ', ' : ''}
+            {soir.demain ? `${soir.demain} avec la date limite demain` : ''}.
+          </div>
+        </div>
+      )}
+      {photo.nePasPoster > 0 && (
+        <div data-hl-ne-pas-poster={photo.nePasPoster} style={{...carte,padding:'12px 14px',borderColor:`${C.warn}88`}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.text}}>Ne poste pas {photo.nePasPoster > 1 ? `ces ${photo.nePasPoster} colis eBay` : 'ce colis eBay'}</div>
+          <div style={{fontSize:12.5,color:C.muted,marginTop:2}}>L'acheteur a demandé l'annulation (à trancher dans eBay quand le réseau revient).</div>
+        </div>
+      )}
+      {tete('À envoyer', photo.nEnvoyer)}
+      <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
+        {photo.envoyer.length === 0
+          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
+          : photo.envoyer.map((e, i) => (
+            <div key={i} data-hl-colis="" style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
+              </div>
+              <button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Colis fait</button>
+            </div>
+          ))}
+        {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
+      </div>
+      {tete('À retirer', photo.nRetirer)}
+      <div data-hl-retirer={photo.nRetirer} style={carte}>
+        {photo.retirer.length === 0
+          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à retirer à {quand}.</div>
+          : photo.retirer.map((r, i) => (
+            <div key={i} data-hl-retrait="" style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || r.lieu || r.transporteur || 'Colis'}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[r.titre ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte].filter(Boolean).join(' · ')}{r.horsDelai ? ' · hors délai' : ''}</div>
+                {r.code
+                  ? <div data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:19,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px'}}>{r.code}</div>
+                  : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas encore reçu à {quand}.</div>}
+                <div style={{marginTop:8}}><button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Je l'ai retiré</button></div>
+              </div>
+              <QrHorsLigne qr={r.qr} code={r.code}/>
+            </div>
+          ))}
+        {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
+      </div>
     </div>
   );
 }
@@ -27898,6 +28060,80 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 //   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
 const ACCT_COLORS = ['#9b51e0','#27ae60','#00b8a9','#e056fd','#9acd32','#17a9c9','#6c5ce7','#e8529a'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
+// ── « RETOURS EN COURS » (Colis, 21 octobre) ─────────────────────────────────
+// Rend la sortie de `retoursEnCours` (src/retoursStock.js) — aucune règle ici.
+// Trois états : lecture en cours (une ligne) · pas su (une ligne, ce qui
+// manque nommé) · lu. Une ligne n'a qu'UN geste principal selon son étape :
+// « Reçu chez moi » (son clic), puis « Remise en stock » (son clic). Le geste
+// commun est dit une fois en tête (§7). Aucune couleur d'alerte : un retour
+// n'est pas une erreur.
+function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemettre, onMasquer, onAnnulerRemise }) {
+  const [ouvrirAnciens, setOuvrirAnciens] = React.useState(false);
+  if (!res) return null;
+  if (res.etat === 'encours') return null;
+  if (res.etat === 'passu') return (
+    <div data-retours-encours="passu" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 13px',marginBottom:12,fontSize:12.5,color:C.muted}}>
+      Retours en cours : je n'ai pas pu lire tes ventes — je ne peux pas dire s'il y en a. Rouvre Colis dans un moment.
+    </div>);
+  const { lignes, remises, manques } = res;
+  if (!lignes.length && !remises.length) {
+    return manques.length ? <div data-retours-encours="0" data-retours-manques={manques.length} style={{fontSize:11.5,color:C.muted,margin:'0 0 12px'}}>Retours en cours : aucun vu — mais je n'ai pas pu lire {manques.join(', ')}.</div> : null;
+  }
+  const recents = lignes.filter(l => !l.ancien), anciens = lignes.filter(l => l.ancien);
+  const lien = (l) => l.plateforme === 'ebay'
+    ? `https://www.ebay.fr/rt/ReturnDetails?returnId=${encodeURIComponent(l.returnId)}`
+    : (l.vente && l.vente.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(l.vente.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(l.tx)}`);
+  const btn = { minHeight:44, border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:8, padding:'0 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' };
+  const Ligne = ({ l, remise }) => {
+    const ph = l.vente ? orderPhoto(l.vente) : null;
+    const compte = l.plateforme === 'ebay' ? (l.compte && l.compte !== 'principal' ? `eBay · ${l.compte.slice(0,6)}` : 'eBay') : (plusieursComptes && l.compte ? nomCompte(l.compte) : '');
+    const etape = remise ? 'remis' : l.etape;
+    return (
+      <div data-retour={l.cle} data-retour-etape={etape} data-retour-num={l.num || ''} data-retour-recu={l.recu ? '1' : '0'} data-retour-plateforme={l.plateforme}
+        style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 10px',border:`1px solid ${C.border}`,borderRadius:8,background:C.card,minWidth:0}}>
+        <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:C.card2||C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12.5,fontWeight:700,padding:'0 6px'}}>{l.num ? `N°${l.num}` : '—'}</div>
+        {ph && <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}><PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/></div>}
+        <div style={{flex:'1 1 170px',minWidth:0}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.titre || (l.plateforme === 'ebay' ? 'Retour eBay' : 'Vente')}</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:7,flexWrap:'wrap'}}>
+            <span data-retour-libelle style={{color:C.text,fontWeight:600}}>{remise ? 'Remise en stock — à republier' : LIBELLE_ETAPE[l.etape]}</span>
+            {!remise && l.recu && l.etape === 'rembourse' && <span>reçue chez toi</span>}
+            {!remise && l.livreeSelonVinted && !l.recu && <span>{l.plateforme === 'ebay' ? 'eBay' : 'Vinted'} dit livrée — confirme quand tu l'as</span>}
+            {l.origine === 'non-reclamee' && <span>non réclamée par l'acheteur</span>}
+            {!l.num && <span data-retour-sans-num>paire pas reliée à un N°</span>}
+            {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par une autre paire</span>}
+            {remise && l.remis && l.remis.archive && <span>ancien N° : numéro neuf à la republication</span>}
+            {compte && <span>· {compte}</span>}
+          </div>
+        </div>
+        <a href={lien(l)} target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>{l.plateforme === 'ebay' ? 'Sur eBay ↗' : 'Sur Vinted ↗'}</a>
+        {remise ? <>
+          <a data-geste="republier" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer" style={{...btn,display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Republier ↗</a>
+          <button type="button" data-geste="annuler-remise" onClick={()=>onAnnulerRemise(l.cle)} style={{...btn,color:C.muted}}>Annuler la remise</button>
+        </> : <>
+          <button type="button" data-geste="recu" aria-pressed={l.recu} onClick={()=>onRecu(l.cle)} style={{...btn,color:l.recu?C.text:C.muted}}>{l.recu ? '✓ Reçu chez moi' : 'Reçu chez moi ?'}</button>
+          {l.recu && l.num && <button type="button" data-geste="remise-en-stock" onClick={()=>onRemettre(l)} style={{...btn,background:C.text,color:C.bg,border:`1px solid ${C.text}`}}>Remise en stock</button>}
+          <button type="button" className="vrm-icon-control" data-geste="masquer-retour" onClick={()=>onMasquer(l.cle)} title="Masquer cette ligne (déjà réglé)" aria-label="Masquer" style={{...btn,minWidth:44,padding:0,color:C.muted}}><Icon name="close" size={15}/></button>
+        </>}
+      </div>);
+  };
+  return (
+    <div data-retours-encours={lignes.length} data-retours-remises={remises.length} data-retours-manques={manques.length} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px',marginBottom:12}}>
+      <div style={{display:'flex',gap:9,alignItems:'flex-start'}}>
+        <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : la paire garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+        </div>
+      </div>
+      <div style={{display:'grid',gap:6,marginTop:9}}>
+        {recents.map(l => <Ligne key={l.cle} l={l}/>)}
+        {anciens.length > 0 && <button type="button" data-retours-anciens={anciens.length} onClick={()=>setOuvrirAnciens(v=>!v)} style={{...btn,justifySelf:'start',color:C.muted}}>{ouvrirAnciens ? 'Masquer' : `${anciens.length} remboursé${anciens.length>1?'s':''} il y a plus de 45 j`}</button>}
+        {ouvrirAnciens && anciens.map(l => <Ligne key={l.cle} l={l}/>)}
+        {remises.map(l => <Ligne key={l.cle} l={l} remise/>)}
+      </div>
+    </div>);
+}
 function AcctTag({ acc, name }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
   // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
@@ -29235,6 +29471,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // par n° de TRANSACTION : une identité, jamais un rapprochement par titre.
   // ⚠️ Une seule ligne lue, quelques Ko (§34).
   const [colisRelais, setColisRelais] = useState({});
+  // A-t-elle été LUE (réponse de la base) ? `{}` ne dit pas « aucun code » si
+  // la lecture a échoué — la photo hors ligne (src/journeeHorsLigne.js) attend
+  // une lecture réussie.
+  const [colisRelaisLu, setColisRelaisLu] = useState(false);
   const [indexSuivisAchats,setIndexSuivisAchats]=useState({});
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
@@ -29245,11 +29485,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
       if (!res.ok) return;
       const rows = await res.json();
+      if (!Array.isArray(rows)) return;
       const data = (rows && rows[0] && rows[0].data) || {};
       if (Object.keys(data).length) setColisRelais(data);
+      setColisRelaisLu(true);
     } catch (_) { /* réseau : on affiche simplement sans le lieu ni le code */ }
   };
   useEffect(() => { relireColisRelais(); /* eslint-disable-next-line */ }, []);
+  // ── À CONFIRMER AVANT LA DATE LIMITE (21 oct., extension 5.204) ───────────
+  // `panel_a_confirmer` : le « Confirmation nécessaire » (« Tout est OK ») lu
+  // par l'extension dans une conversation Vinted, avec sa date limite. Trois
+  // états (`src/aConfirmer.js`) : `undefined` en cours · `null` pas su · objet.
+  // Relue quand l'extension prévient (`maj confirmer`). Une lecture ratée ne
+  // vide pas ce qu'on montrait déjà.
+  const [aConfirmerData, setAConfirmerData] = useState(undefined);
+  const relireAConfirmer = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_a_confirmer&select=data`, { headers: sbAuth() });
+      if (!res.ok) { setAConfirmerData(v => (v === undefined ? null : v)); return; }
+      const rows = await res.json();
+      if (!Array.isArray(rows)) { setAConfirmerData(v => (v === undefined ? null : v)); return; }
+      setAConfirmerData((rows[0] && rows[0].data) || {});
+    } catch (_) { setAConfirmerData(v => (v === undefined ? null : v)); }
+  };
+  useEffect(() => { relireAConfirmer(); /* eslint-disable-next-line */ }, []);
+  const aConfirmer = useMemo(() => {
+    const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const uidsOk = accountsReady && Array.isArray(accounts) && accounts.length
+      ? new Set(accounts.map(a => String(a.vinted_user_id)).filter(u => !masques.has(u))) : null;
+    return aConfirmerVisibles(aConfirmerData, { uidsOk });
+  }, [aConfirmerData, accounts, accountsReady]);
   // Le retrait connu pour CETTE commande — par transaction uniquement.
   const relaisDe = (o) => { const k = String((o && o.transaction_id) || ''); return (k && colisRelais[k]) || null; };
   // ── LA PORTE VERS LE CODE DE RETRAIT ──────────────────────────────────────
@@ -29281,7 +29546,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // avec les autres bandeaux, repoussait la PREMIÈRE ANNONCE à 1146 px du haut
   // — il fallait défiler un écran et demi pour voir son stock. C'est une liste
   // de travail, pas une alerte : le compte suffit tant qu'on ne l'ouvre pas.
-  const [retoursOpen, setRetoursOpen] = useState(false);
   // Section « Analyse » de l'onglet Ventes : repliée par défaut pour que l'écran
   // aille droit à la liste des ventes. Le choix est mémorisé sur l'appareil.
   const [analyseOpen, setAnalyseOpen] = useState(() => !!load('vinted_analyse_open', false));
@@ -31024,19 +31288,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas de façon fiable que le colis t'est revenu). Sert à séparer « en route »
   // de « en main, à republier ».
   const [retoursRecus, setRetoursRecus] = useState(() => load('vinted_retours_recus', {}));
-  const isRetourRecu = (o) => !!(o && retoursRecus[String(o.transaction_id)]);
-  const toggleRetourRecu = (o) => {
-    const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
-    setRetoursRecus(prev => { const u = { ...prev }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vinted_retours_recus', u); return u; });
-  };
   // Paires écartées à la main du panneau « qui reviennent » : quand tu as déjà
   // republié (avec un nouveau numéro par ex.) ou que la ligne est en trop, tu la
   // masques. Synchronisé entre appareils (vinted_retours_dismissed).
   const [retoursDismissed, setRetoursDismissed] = useState(() => load('vinted_retours_dismissed', {}));
-  const dismissRetour = (o) => {
-    const k = o && o.transaction_id != null ? String(o.transaction_id) : null; if (!k) return;
-    setRetoursDismissed(prev => { const u = { ...prev, [k]: Date.now() }; save('vinted_retours_dismissed', u); return u; });
-  };
+
 
   // ── RETOURS ATTENDUS : les paires qui te reviennent, avec LEUR numéro ─────
   // Quand une vente part en retour / litige, la paire revient (ou pas) mais tu
@@ -31082,6 +31338,119 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, pairsLost, garageGrid, listings.items, retoursDismissed, txnItem, onlineAnnonceIds]);
 
+  // ── RETOUR → STOCK (21 octobre, fonction retenue le 11 octobre) ──────────
+  // Un retour acheteur suivi jusqu'à sa remise en stock. La règle est PURE
+  // (`retoursEnCours`, src/retoursStock.js) : identité seulement (correction
+  // posée sur la vente, sinon transaction → annonce → fiche N°), jamais le
+  // titre. « Reçu chez toi » et « Remise en stock » sont SES clics : rien ne
+  // change tout seul. Le bloc vit dans Colis (une seule voix, §7).
+  const [retoursRemis, setRetoursRemis] = useState(() => load('vinted_retours_remis', {}));
+  const basculerRetourRecu = (cle) => {
+    const k = cle ? String(cle) : ''; if (!k) return;
+    setRetoursRecus(prev => { const u = { ...prev }; if (u[k]) delete u[k]; else u[k] = new Date().toISOString(); save('vinted_retours_recus', u); return u; });
+  };
+  const masquerRetour = (cle) => {
+    const k = cle ? String(cle) : ''; if (!k) return;
+    setRetoursDismissed(prev => { const u = { ...prev, [k]: Date.now() }; save('vinted_retours_dismissed', u); return u; });
+  };
+  // Les retours eBay : lus chez eBay (Post-Order, la route existante), seulement
+  // sur Colis, une fois par 10 min. TROIS états : `undefined` en cours · `null`
+  // pas su · la liste `{ retour, compte, num }` (N° par le SKU de la ligne de
+  // commande, `numLigneEbay` — jamais le titre). Sans compte eBay relié : `[]`.
+  const [retoursEbayLus, setRetoursEbayLus] = useState(undefined);
+  useEffect(() => {
+    if (only !== 'bordereaux') return;
+    let vivant = true;
+    (async () => {
+      const c = RETOURS_EBAY_CACHE;
+      if (c.v !== undefined && Date.now() - c.at < 10 * 60 * 1000) { if (vivant) setRetoursEbayLus(c.v); return; }
+      let v;
+      try {
+        const r = await lireEbayTous('ebay_orders', 'orders:data->orders', 'orders');
+        if (!r) v = null;
+        else {
+          const relies = (r.lignes || []).filter(l => l && l.ligne);
+          if (!relies.length) v = r.illisibles.length ? null : [];
+          else {
+            const res = await Promise.all(relies.map(l => {
+              const ref = l.compte.ref;
+              return appelerEbay('retours', corpsCompteEbay(ref), enTeteSession).then(j => ({ ref, l: Array.isArray(j && j.retours) ? j.retours : null }), () => ({ ref, l: null }));
+            }));
+            if (res.some(x => x.l === null) || r.illisibles.length) v = null;
+            else {
+              v = [];
+              for (const { ref, l } of res) for (const rt of l) {
+                const o = r.items.find(x => x && x._compte === ref && String(x.orderId || '') === String(rt.orderId || ''));
+                const lis = o && Array.isArray(o.lineItems) ? o.lineItems : [];
+                const li = lis.find(x => String(x.legacyItemId || x.itemId || '') === String(rt.itemId || '')) || (lis.length === 1 ? lis[0] : null);
+                const num = o && li ? numLigneEbay(o, li) : null;
+                v.push({ retour: rt, compte: ref, num: num || null });
+              }
+            }
+          }
+        }
+      } catch (_) { v = null; }
+      RETOURS_EBAY_CACHE.v = v; RETOURS_EBAY_CACHE.at = Date.now();
+      if (vivant) setRetoursEbayLus(v);
+    })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only]);
+  const retoursSuivis = useMemo(() => {
+    const enLigneIds = new Set(), enLignePk = new Set(), enLigneNums = new Set();
+    for (const it of (listings.items || [])) {
+      if (!onlineAnnonceIds.has(String(it.id))) continue;
+      enLigneIds.add(String(it.id)); const pk = photoKey(it.photo); if (pk) enLignePk.add(pk);
+      const e = numeros[it.id]; if (e && e.numero) enLigneNums.add(cleNum(e.numero));
+    }
+    // Republiée : une annonce EN LIGNE porte son N° (s'il se redonne), ou c'est
+    // l'annonce de la vente rouverte (identité), ou sa photo exacte.
+    const republiee = (l) => {
+      if (l.num && numeroReprenable(l.num) && enLigneNums.has(cleNum(l.num))) return true;
+      if (l.itemId && enLigneIds.has(String(l.itemId))) return true;
+      const pk = l.vente ? photoKey(orderPhoto(l.vente)) : null; return !!pk && enLignePk.has(pk);
+    };
+    const ventes = sales.items === null ? undefined : (sales.items || []).filter(o => !isHidden(o));
+    const res = retoursEnCours({
+      ventes, etats: TXN_ETATS_LU === false ? null : etatTxn, txnItem, numeros,
+      numeroVente: (tx) => { const v = saleOv[tx]; return v && String(v.numero || '').trim() ? String(v.numero).trim() : null; },
+      recus: retoursRecus, remis: retoursRemis, masques: retoursDismissed, republiee, ebay: retoursEbayLus,
+    });
+    // Comptes dont les ventes n'ont pas pu être lues (hors comptes exclus) :
+    // nommés — un retour de ce compte peut manquer (« pas su »).
+    const ko = (Array.isArray(sales.failedUids) ? sales.failedUids : []).filter(u => !acctOff(u))
+      .map(u => { const a = (accounts || []).find(x => String(x.vinted_user_id) === String(u)); return a ? accNameOf(a) : `#${u}`; });
+    if (ko.length) res.manques = [...res.manques, ...ko.map(n => `les ventes de ${n}`)];
+    return res;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts]);
+  // « Remise en stock » — SON clic. Le N° est gardé ; s'il est encore porté par
+  // une autre paire présente, on DEMANDE (jamais deviné) ; un ancien numéro
+  // (013) se dit « numéro neuf à la republication ». Rien d'autre ne change :
+  // ni pool, ni fiche, ni numéros présents.
+  const remettreEnStock = async (ligne) => {
+    const r = remiseEnStock(ligne, { numeros, presentes: presentesAnnonceIds, cleNum, estArchive: (n) => !numeroReprenable(n) });
+    if (!r.ok) {
+      if (r.raison === 'pas-recu') toast('Note d’abord que le colis est arrivé chez toi (« Reçu chez moi »).');
+      else toast('Cette paire n’est reliée à aucun N° (ni par la vente, ni par son annonce) : rien à remettre en stock. Pose son N° à la main d’abord.');
+      return;
+    }
+    let num = r.num;
+    if (r.conflit) {
+      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Une autre paire présente porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
+      if (!ok) return;
+      num = null;
+    } else {
+      const ok = await askConfirm({ title: `Remettre en stock ${r.archive ? 'cette paire' : `la N°${r.num}`} ?`, desc: r.archive ? `Elle portait l’ancien N°${r.num} : un ancien numéro ne se redonne pas, elle prendra un numéro NEUF à sa republication — écris-le sur son étiquette.` : `Elle garde son N°${r.num} : retape-le dans le champ N° de la nouvelle annonce.\n\nRien d’autre ne change (ni la vente, ni ta compta).`, ok: 'Remettre en stock', cancel: 'Annuler' });
+      if (!ok) return;
+    }
+    const k = String(ligne.cle);
+    setRetoursRemis(prev => { const u = { ...prev, [k]: { at: new Date().toISOString(), num, archive: r.archive, conflit: r.conflit ? r.conflit.id : null } }; save('vinted_retours_remis', u); return u; });
+  };
+  const annulerRemise = (cle) => {
+    const k = String(cle || ''); if (!k) return;
+    setRetoursRemis(prev => { const u = { ...prev }; delete u[k]; save('vinted_retours_remis', u); return u; });
+  };
   const RETOUR_LABEL = { retour: { txt: '↩️ Retour en cours', col: () => INV_STATUS.online.color }, rembourse: { txt: '💸 Remboursé', col: () => C.warn }, suspendue: { txt: '⏸ Suspendue', col: () => C.muted } };
 
   // ── REPRISE DE NUMÉRO (paire republiée avec de NOUVELLES photos) ──────────
@@ -32222,6 +32591,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setPairsLost(n => vide(n) ? load('vinted_pairs_lost', {}) : n);
     setRetoursRecus(n => vide(n) ? load('vinted_retours_recus', {}) : n);
     setRetoursDismissed(n => vide(n) ? load('vinted_retours_dismissed', {}) : n);
+    setRetoursRemis(n => vide(n) ? load('vinted_retours_remis', {}) : n);
     setAchatNotes(n => vide(n) ? load('vinted_achat_notes', {}) : n);
     setOffBuys(n => vide(n) ? load('vinted_offvinted_buys', []) : n);
   }), []);
@@ -32289,6 +32659,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
+      // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
+      else if (ev.quoi === 'confirmer') relireAConfirmer();
       // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
       // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.
       // ⚠️ Revue 5.165 : la MOISSON seulement, regroupée (`signalAnnonces`) —
@@ -33371,6 +33743,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     } catch (_) {}
   }, [toShip, sales.items, emailBords, colisEb]);
+  // ── MA JOURNÉE HORS LIGNE : LA PHOTO, APRÈS UNE LECTURE COMPLÈTE (21 oct.) ──
+  // Ce que Ma journée montre — colis à expédier, colis à retirer avec leurs
+  // codes et QR — rangé SUR L'APPAREIL, au nom de CE vendeur
+  // (src/journeeHorsLigne.js). Seulement quand TOUTES les sources ont répondu :
+  // une lecture partielle relue plus tard comme « ta journée » cacherait un
+  // colis (§5). Les QR hébergés sont mis en réserve pour le service worker.
+  useEffect(() => {
+    const uid = (AUTH.user && AUTH.user.id) || (MULTI_USER ? '' : 'local');
+    if (!uid) return;
+    if (!lectureComplete({ baseKO, accountsReady, cleComptes, ventes: sales, achats: buys, tracking, emailBords, colisRelaisLu, colisEb })) return;
+    try {
+      const envoyer = toShip.map((t) => {
+        const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
+        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted' };
+      }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
+      const horsDelai = new Set(pickupUnion.horsDelai);
+      const retirer = pickupUnion.emailList.map((t) => ({
+        titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: codeRetrait(t.code), qr: qrImage(t) || '',
+        transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', horsDelai: horsDelai.has(t),
+      })).concat(pickupUnion.extra.map((o) => {
+        const r = relaisDe(o);
+        return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '' };
+      }));
+      const photo = construirePhoto({ uid, at: Date.now(), envoyer, retirer, nePasPoster: colisEb.nePasPoster.length });
+      if (photo && ecrirePhoto(uid, photo, localStorage)) rechaufferQr(photo);
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseKO, accountsReady, cleComptes, sales, buys, tracking, emailBords, colisRelaisLu, colisEb, toShip, pickupUnion]);
 
   // ── Vérificateur d'achat ───────────────────────────────────────────
   // En friperie : tape un modèle (+ prix demandé) → stats de TES ventes sur ce
@@ -34996,6 +35396,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
             jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
+        // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
+        //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
+        //    (`aConfirmer`, §11). « Pas su » ⇒ aucune ligne (on n'affirme rien).
+        if (aConfirmer.etat==='lu' && aConfirmer.liste.length) {
+          const l=aConfirmer.liste, nb=l.length, prem=l[0];
+          const cs=[...new Set(l.map(e=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; }).filter(Boolean))];
+          const proche = prem.limiteMs!=null && prem.limiteMs-Date.now() < 24*3600000;
+          jobs.push({id:'a-confirmer',n:nb,icon:'check',color:C.warn,urgent:proche,  // ambre : le rouge est pour deux paires sous un N° (§7)
+           
+            title:`${nb} ${motAConfirmer(l)} à confirmer avant le ${texteLimite(prem)}`,
+            sub:`Ouvre la conversation sur Vinted et appuie sur « Tout est OK » (ou signale un problème)${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,
+            tab:'cat_achats',prio:proche?0.15:0.7});
+        }
         tuiles.messages = { n: unread, sub: unread ? `${unread} conversation${unread>1?'s':''} non lue${unread>1?'s':''} de moins de 7 jours` : 'Aucun message récent non lu' };
         // (21 octobre) LES MESSAGES eBAY SANS RÉPONSE, à côté de ceux de Vinted —
         // de TOUS ses comptes eBay actifs (le résumé rangé par la route, aucun
@@ -36303,6 +36716,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Il a sa place en tête des onglets du quotidien — sans revenir dans
             le compte « En route » (il n'arrive pas, il repart). Sous « Tous »,
             sa carte porte déjà le lien : pas deux fois. */}
+        {/* (21 oct., 5.204) À CONFIRMER AVANT LA DATE LIMITE — « Tout est OK »
+            sur Vinted. Une ligne, le compte nommé une fois quand il est le même
+            (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
+            « rien à confirmer ». */}
+        {aConfirmer.etat==='passu' && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
+        {aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
+          const l = aConfirmer.liste;
+          const nomDe = (e)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; };
+          const comptes = [...new Set(l.map(nomDe).filter(Boolean))];
+          const unSeul = comptes.length===1;
+          return (
+            <div className="vrm-achats-bloc" data-a-confirmer={l.length} data-a-confirmer-limite={l[0].limite||''} style={{background:C.card,border:`1px solid ${C.border}`}}>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>✓</span> {l.length} {motAConfirmer(l)} à confirmer avant le {texteLimite(l[0])}{unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>Vérifie l'article puis appuie sur « Tout est OK » dans la conversation Vinted (ou « J'ai un problème »). Passé la date, Vinted conclut sans toi.</div>
+              {l.map(e=>(
+                <div key={e.tx} data-confirmer-tx={e.tx} data-confirmer-sur={e.limiteMs!=null?'oui':'texte'} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
+                  {e.photo && !imgMortes.has(e.photo) ? <PhotoVinted src={e.photo} alt="" loading="lazy" onError={()=>noterImgMorte(e.photo)} style={{width:38,height:38,borderRadius:8,objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/> : null}
+                  <div style={{flex:'1 1 160px',minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={e.titre}>{e.titre||'Commande'}</div>
+                    <div style={{fontSize:11.5,color:C.muted}}>{e.quoi==='retour'?'Retour qui te revient':'Achat'} · avant le {texteLimite(e)}{!unSeul && nomDe(e)?` · compte ${nomDe(e)}`:''}</div>
+                  </div>
+                  {e.url ? <a data-confirmer-lien={e.tx} href={e.url} target="_blank" rel="noreferrer"
+                    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',border:`1.5px solid ${C.warn}`,background:`${C.warn}14`,color:C.warn,borderRadius:8,padding:'7px 12px',fontSize:12.5,fontWeight:700,textDecoration:'none',flexShrink:0}}>Ouvrir la conversation ↗</a> : null}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {aFilter!=='all' && (()=>{
           const l = buysBase.filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (!l.length) return null;
@@ -37540,7 +37981,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               + ((annStats.n>0 && annStats.datesKnown===0)?1:0)
               + (repriceList.length>0?1:0)
               + nAutresSignalements
-              + (retoursAttendus.length>0?1:0);
+              + ((retoursSuivis.etat==='lu'&&retoursSuivis.lignes.length>0)?1:0);
             if (!n) return null;
             return (
               <button type="button" onClick={()=>setTipsOpen(v=>!v)}
@@ -37555,51 +37996,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {tipsOpen && (<>
           {/* Les paires qui reviennent (retour, litige) : une liste de
               travail, donc ici et pas au-dessus du stock. */}
-          {retoursAttendus.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.warn}0e`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'10px 12px'}}>
-              {(()=>{ const rec=retoursAttendus.filter(r=>isRetourRecu(r.o)).length; return (
-                <button type="button" onClick={()=>setRetoursOpen(v=>!v)}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                  <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:700,color:C.warn}}>{retoursAttendus.length} paire{retoursAttendus.length>1?'s':''} qui te revien{retoursAttendus.length>1?'nent':'t'}{rec>0?` · ${rec} déjà reçue${rec>1?'s':''}`:''}</span>
-                  <span style={{fontSize:11.5,color:C.muted,fontWeight:600,flexShrink:0}}>{retoursOpen?'Masquer':'Voir'}</span>
-                </button>
-              ); })()}
-              {retoursOpen && (
-              <div style={{fontSize:11,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Retours et litiges en cours. Coche <b>« ✓ Reçue »</b> quand tu as la paire en main : elle passera en tête, prête à republier.
-                {/* (relecture du 11 octobre) « Retape son numéro » s'affichait à côté
-                    de numéros d'ARCHIVE (B…), que l'app refuse ensuite : la consigne
-                    suit le numéro, une phrase par cas présent (§7). */}
-                {retoursAttendus.some(r=>r.num&&numeroReprenable(r.num)) && <> <b>Retape son numéro</b> dans le champ N° de la nouvelle annonce — celui écrit sur sa boîte.</>}
-                {retoursAttendus.some(r=>r.num&&!numeroReprenable(r.num)) && <span data-retour-archive-consigne> Un <b>ancien numéro</b> (B…) ne se redonne pas : la paire republiée prendra un <b>numéro neuf</b> — écris-le sur son étiquette. Elle sortira de cette liste toute seule.</span>}
-              </div>)}
-              {retoursOpen && (<div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {[...retoursAttendus].sort((a,b)=>(isRetourRecu(b.o)?1:0)-(isRetourRecu(a.o)?1:0)).map((r,i)=>{
-                  const lab = RETOUR_LABEL[r.kind] || RETOUR_LABEL.suspendue;
-                  const col = lab.col();
-                  const recu = isRetourRecu(r.o);
-                  return (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',background:C.card,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,padding:'7px 9px'}}>
-                      <div style={{flexShrink:0,minWidth:44,height:34,borderRadius:8,background:r.num?C.accent:C.border,color:r.num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,padding:'0 6px'}}>{r.num?`N°${r.num}`:'—'}</div>
-                      <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {orderPhoto(r.o)?<PhotoVinted src={orderPhoto(r.o)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                      </div>
-                      <div style={{flex:'1 1 120px',minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={r.title}>{r.title}</div>
-                        <div style={{fontSize:11,fontWeight:500,marginTop:1,display:'flex',gap:7,flexWrap:'wrap'}}>
-                          <span style={{color:recu?INV_STATUS.online.color:col}}>{recu?'Reçue — à republier':lab.txt}</span>
-                          <AcctTag acc={r.o._acc} name={accNameOf(r.o._acc)}/>
-                          {r.cell && <span style={{color:C.blue||C.accent,display:'inline-flex',alignItems:'center',gap:3}}><Icon name="home" size={12}/>{garageCellLabel(r.cell)}</span>}
-                          {!r.num && <span style={{color:C.danger}}>numéro inconnu</span>}
-                        </div>
-                      </div>
-                      {r.num && numeroReprenable(r.num) && <button className="vrm-icon-control" type="button" onClick={()=>{ try{navigator.clipboard.writeText(r.num);}catch(_){}}} title={`Copier ${r.num}`} aria-label="Copier le numéro" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:12,padding:'6px 8px'}}>⧉</button>}
-                      <button type="button" onClick={()=>toggleRetourRecu(r.o)} title={recu?'Annuler : je ne l\'ai pas encore reçue':'J\'ai récupéré cette paire'} aria-label={recu?'Annuler reçue':'Marquer reçue'} style={{flexShrink:0,border:`1px solid ${recu?INV_STATUS.online.color:C.border}`,borderRadius:8,background:recu?INV_STATUS.online.color:'transparent',color:recu?'#fff':C.muted,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>{recu?'✓ Reçue':'✓ Reçue ?'}</button>
-                      <button className="vrm-icon-control" type="button" onClick={()=>dismissRetour(r.o)} title="Déjà republiée / masquer cette ligne" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:600,padding:'6px 8px',fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
-                    </div>
-                  );
-                })}
-              </div>)}
-            </div>
+          {/* (21 octobre) Les retours se suivent dans Colis → « Retours en cours »
+              (une seule voix, §7) : ici, une ligne qui y mène. */}
+          {retoursSuivis.etat==='lu' && retoursSuivis.lignes.length > 0 && (
+            <button type="button" data-retours-renvoi={retoursSuivis.lignes.length} onClick={()=>onNav&&onNav('cat_bord')}
+              style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:8,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'8px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} paire{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivies dans Colis</span>
+              <span style={{fontSize:13,color:C.muted}}>›</span>
+            </button>
           )}
           {/* Les signalements (compte muet, annonces disparues, comptes
               refusés) vivent ici : un seul panneau à ouvrir. */}
@@ -38509,6 +38913,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             la ligne ne garde que ce qui la distingue (depuis quand, la date
             limite, le compte). « ↺ Pas encore posté » la remet dans « à
             envoyer » avec son bordereau, si le carton est encore là. */}
+        {/* Retours en cours (21 octobre) : la seule voix des retours (§7). */}
+        <RetoursEnCoursBloc res={retoursSuivis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
         {cochesNonPartis.length>0 && (()=>{
           const nb = cochesNonPartis.length, pl = nb>1?'s':'';
           const plusieursComptes = (accounts || []).length > 1;
@@ -43353,7 +43759,7 @@ function DoubleVerification({ onEtat } = {}) {
         <button type="button" data-mfa-activer="" disabled={busy} onClick={activer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
       </>)}
       {cours && cours.etape === 'qr' && (<>
-        <div style={txt}><b style={{color:C.text}}>1.</b> Dans ton app d'authentification, ajoute un compte en scannant ce code :</div>
+        <div style={txt}><b style={{color:C.text}}>1.</b> Sur ton iPhone, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
@@ -43705,7 +44111,9 @@ function PorteAbonnement({ uid, children }) {
     });
     return () => { mort = true; };
   }, [uid]);
-  if (!bloque) return <>{children}{info && info.proprietaire === true && <InviteMfaProprio uid={uid}/>}</>;
+  // L'invitation ne s'ouvre plus d'elle-même (21 oct. : « je ne comprends rien ») :
+  // la double vérification se propose dans Réglages → Mon compte, sur son geste.
+  if (!bloque) return <>{children}</>;
   return <AbonnementRequis info={info}/>;
 }
 // ── DOUBLE VÉRIFICATION PROPOSÉE AU COMPTE PROPRIÉTAIRE (21 octobre) ─────────
@@ -43721,39 +44129,6 @@ function PorteAbonnement({ uid, children }) {
 // ⇒ rien n'est proposé. Les autres vendeurs : rien ne change.
 const MFA_PLUS_TARD_MS = 7 * 86400000;
 const cleMfaPlusTard = (uid) => 'vrm_mfa_plus_tard_' + String(uid || '');
-function InviteMfaProprio({ uid }) {
-  const [montre, setMontre] = React.useState(false);
-  const [etat, setEtat] = React.useState('');
-  React.useEffect(() => {
-    let mort = false;
-    let t = 0; try { t = Number(localStorage.getItem(cleMfaPlusTard(uid))) || 0; } catch (_) {}
-    if (t && Date.now() - t < MFA_PLUS_TARD_MS) return;
-    mfaLireFacteurs().then((f) => { if (!mort && f && Array.isArray(f.verifies) && !f.verifies.length) setMontre(true); });
-    return () => { mort = true; };
-  }, [uid]);
-  if (!montre) return null;
-  const active = etat === 'active';
-  const plusTard = () => { try { localStorage.setItem(cleMfaPlusTard(uid), String(Date.now())); } catch (_) {} setMontre(false); };
-  const fermer = () => setMontre(false);
-  return (
-    <div data-invite-mfa={active ? 'active' : 'propose'} role="dialog" aria-modal="true" aria-label="Protéger ton compte propriétaire"
-      style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <FermeAuRetour fermer={fermer}/>
-      <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
-        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Double vérification activée' : 'Sécurise ta connexion VRM'}</div>
-        {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
-          Cette vérification protège la connexion à ton compte VRM et aux boutiques qui lui sont rattachées. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
-        </div>}
-        <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
-        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
-          {active
-            ? <button type="button" data-invite-mfa-fermer="" onClick={fermer} style={{ border:'none', background:C.accent, color:C.onAccent || '#fff', borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Fermer</button>
-            : <button type="button" data-invite-mfa-plus-tard="" onClick={plusTard} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Plus tard</button>}
-        </div>
-      </div>
-    </div>
-  );
-}
 function AbonnementRequis({ info }) {
   const [occupe, setOccupe] = React.useState(false);
   const [msg, setMsg] = React.useState('');
@@ -46435,6 +46810,17 @@ function AppCoeur() {
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
   //    rien » — et c'est le seul cas où l'app peut le tromper gravement.
   const [baseKO,setBaseKO]=useState(false);
+  // Hors ligne MESURÉ (`navigator.onLine`, évènements online/offline) : la coque
+  // montre la photo de Ma journée (src/journeeHorsLigne.js). Au retour du réseau,
+  // si rien n'a pu être lu pendant la coupure (`baseKO`), on relit tout
+  // (rechargement) — sinon les écrans relisent eux-mêmes en se remontant.
+  const horsLigne = useHorsLigne();
+  const baseKORef = React.useRef(false); baseKORef.current = baseKO;
+  const etaitHorsLigne = React.useRef(horsLigne);
+  React.useEffect(() => {
+    if (etaitHorsLigne.current && !horsLigne && baseKORef.current) { try { window.location.reload(); } catch (_) {} }
+    etaitHorsLigne.current = horsLigne;
+  }, [horsLigne]);
   // ⚠️ §11 : « c'est son premier jour » est UNE notion. Trois écrans s'en
   //    servent (Ma journée, le tableau de bord, l'onboarding) — elle se décide
   //    ICI, une fois. Et elle exige les TROIS états : la lecture est revenue
@@ -47918,6 +48304,10 @@ function AppCoeur() {
             ceux qui n'existent pas encore. Les écrans gardent en plus leur
             LIGNE de panne (`LignePanne`) là où leur propre liste vide
             mentirait — le bloc, lui, ne s'affiche qu'une fois. */}
+        {/* HORS LIGNE (21 oct.) : Ma journée telle qu'à la dernière ouverture
+            réussie, en lecture seule — à la place de TOUS les écrans (aucun geste
+            qui envoie n'y existe). Le réseau revient : les écrans relisent. */}
+        {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
         <DemandeCodeDiscord/>
@@ -48238,6 +48628,7 @@ function AppCoeur() {
         {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
         {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
+        </>)}
         </EcranGardeFou>
       </main>
       <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>

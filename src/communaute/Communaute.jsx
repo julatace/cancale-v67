@@ -17,8 +17,8 @@
 //  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
 //  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
 //  classement peuvent n'afficher que les membres d'un groupe.
-//  La carte : Leaflet 1.9.4 depuis cdnjs, chargé à l'ouverture de l'écran
-//  (jamais au démarrage), fond OpenStreetMap / CARTO avec leur attribution.
+//  La carte : Leaflet 1.9.4 embarqué, chargé à l'ouverture de l'écran (jamais
+//  au démarrage), fond OpenFreeMap (MapLibre, sans clé) avec son attribution.
 //  Injoignable ⇒ la même communauté en liste.
 // ════════════════════════════════════════════════════════════════════════════
 import { DISCORD_ERREURS } from './discordErreurs.js';
@@ -26,6 +26,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
+import { chargerCalqueMaplibre, styleCarte, ATTRIBUTION_CARTE, webglDispo } from '../fondCarte.js';
 
 // Leaflet est EMBARQUÉ dans VRM (paquet npm leaflet 1.9.4, licence BSD-2), chargé
 // seulement à l'ouverture de la carte : un CDN bloqué (bloqueur de pub, réseau
@@ -41,14 +42,9 @@ function chargerLeaflet() {
   }).catch((e) => { promesseLeaflet = null; throw e; });
   return promesseLeaflet;
 }
-// Deux fonds de carte : CARTO d'abord, OpenStreetMap si les tuiles CARTO ne
-// chargent pas (aucune tuile reçue et plusieurs refus) — jamais une carte grise.
-const FONDS = {
-  carto: (sombre) => ({ url: `https://{s}.basemaps.cartocdn.com/rastertiles/${sombre ? 'dark_all' : 'voyager'}/{z}/{x}/{y}{r}.png`, opts: { subdomains: 'abcd',
-    attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>' } }),
-  osm: () => ({ url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opts: {
-    attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' } }),
-};
+// Le fond : OpenFreeMap (tuiles vectorielles, sans clé ni inscription) dessiné
+// par MapLibre dans un calque Leaflet (src/fondCarte.js). Plus de CARTO (clé
+// exigée), plus d'OpenStreetMap direct (usage applicatif lourd interdit).
 
 const ENDPOINT = '/api/compte?mode=communaute';
 const PAS_SU = "Je n'ai pas pu lire la carte — rien n'est perdu, c'est la lecture qui a échoué.";
@@ -69,10 +65,12 @@ function useApi(headers) {
 // ── LA CARTE (Leaflet) ───────────────────────────────────────────────────────
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), calque = useRef(null), fond = useRef(null);
-  const [pret, setPret] = useState(false), [source, setSource] = useState('carto');
+  const [pret, setPret] = useState(false), [fondPret, setFondPret] = useState(false);
   useEffect(() => {
     let vivant = true;
-    chargerLeaflet().then((L) => {
+    // Pas de WebGL : MapLibre ne dessinerait rien — la même communauté en liste.
+    if (!webglDispo()) { onEchec(); return () => { vivant = false; }; }
+    Promise.all([chargerLeaflet(), chargerCalqueMaplibre()]).then(([L]) => {
       if (!vivant || !boite.current || carte.current) return;
       const m = L.map(boite.current, { zoomControl: true, attributionControl: true, worldCopyJump: true, minZoom: 2, maxZoom: 12 });
       carte.current = m;
@@ -87,17 +85,31 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
     }).catch(() => { if (vivant) onEchec(); });
     return () => { vivant = false; if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; } };
   }, []);
-  // Le fond suit le thème (clair / sombre), avec l'attribution exigée.
+  // Le fond suit le thème (OpenFreeMap « liberty » / « dark »), avec
+  // l'attribution exigée. Style ou tuiles injoignables avant tout dessin
+  // (ou rien au bout de 12 s) ⇒ la liste, jamais une carte grise.
   useEffect(() => {
-    if (!pret) return;
-    const L = window.L, m = carte.current;
-    if (fond.current) m.removeLayer(fond.current);
-    const f = FONDS[source](sombre);
-    let recues = 0, refus = 0;
-    fond.current = L.tileLayer(f.url, { maxZoom: 19, ...f.opts }).addTo(m);
-    fond.current.on('tileload', () => { recues++; });
-    fond.current.on('tileerror', () => { refus++; if (source === 'carto' && recues === 0 && refus >= 4) setSource('osm'); });
-  }, [pret, sombre, source]);
+    if (!pret) return undefined;
+    const m = carte.current;
+    let fini = false;
+    if (fond.current) { m.removeLayer(fond.current); fond.current = null; }
+    setFondPret(false);
+    chargerCalqueMaplibre().then((maplibreGL) => {
+      if (fini || !carte.current) return;
+      const calqueFond = maplibreGL({ style: styleCarte(sombre), attributionControl: { customAttribution: ATTRIBUTION_CARTE }, interactive: false });
+      calqueFond.addTo(m);
+      fond.current = calqueFond;
+      const gl = calqueFond.getMaplibreMap && calqueFond.getMaplibreMap();
+      let charge = false;
+      const echec = () => { if (!fini && !charge) { fini = true; onEchec(); } };
+      const delai = setTimeout(echec, 12000);
+      if (gl) {
+        gl.once('load', () => { charge = true; clearTimeout(delai); if (!fini) setFondPret(true); });
+        gl.on('error', () => { if (!charge) { clearTimeout(delai); echec(); } });
+      }
+    }).catch(() => { if (!fini) { fini = true; onEchec(); } });
+    return () => { fini = true; };
+  }, [pret, sombre]);
   // Les épingles : regroupées au zoom courant (le nombre de personnes dedans).
   useEffect(() => {
     if (!pret) return;
@@ -131,7 +143,7 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   useEffect(() => {
     if (pret && moi) carte.current.flyTo([Number(moi.lat), Number(moi.lon)], Math.max(carte.current.getZoom(), 8), { duration: 0.6 });
   }, [pret, moi && moi.lat, moi && moi.lon]);
-  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={source} role="region" aria-label="Carte de la communauté">
+  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={fondPret ? 'openfreemap' : 'charge'} role="region" aria-label="Carte de la communauté">
     <div className="vrm-cm-carte-fond" ref={boite} />
     {!pret && <p className="vrm-cm-carte-attente">Chargement de la carte…</p>}
   </div>;
