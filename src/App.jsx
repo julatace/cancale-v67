@@ -821,6 +821,10 @@ const sessionFrom = (j) => ({
   // savait. `undefined` = jamais lu (session d'avant cette fonction) : la porte
   // le relit avant de laisser entrer (`etatMfa`).
   totp: j.user ? totpVerifies(j.user) : (AUTH.session ? AUTH.session.totp : undefined),
+  // Les NOMS de ces appareils (22 octobre, second appareil de secours) : l'écran
+  // du code les dit (« le code de n'importe lequel marche »). Affichage seul —
+  // `totp` reste ce qui décide.
+  totpNoms: j.user ? totpNoms(j.user) : (AUTH.session ? AUTH.session.totpNoms : undefined),
 });
 // ══════════════════════════════════════════════════════════════════════════
 // DOUBLE VÉRIFICATION DE CONNEXION (TOTP) — retenue par Julien le 11 octobre
@@ -839,6 +843,38 @@ const sessionFrom = (j) => ({
 const totpVerifies = (u) => (Array.isArray(u && u.factors) ? u.factors : [])
   .filter((f) => f && f.factor_type === 'totp' && f.status === 'verified' && f.id)
   .map((f) => String(f.id));
+// ── PLUSIEURS APPAREILS (22 octobre) ─────────────────────────────────────────
+// ⛔ Décision de Julien : PAS de SMS (payant : 75 $/mois chez Supabase + chaque
+// SMS, §2.9). La double vérification reste l'app d'authentification (TOTP,
+// gratuite), et le chemin de secours est un SECOND APPAREIL : GoTrue accepte
+// plusieurs facteurs TOTP vérifiés, et le code de N'IMPORTE LEQUEL fait passer
+// la session en aal2. Téléphone perdu ⇒ on entre avec l'autre, puis on retire
+// le perdu dans Réglages.
+// Le nom d'un appareil : celui qu'il a donné (`friendly_name`). Les facteurs
+// créés avant le 22 octobre portent un nom automatique (« VRM 2026-10-16T10:00 »)
+// qui ne dit rien : on écrit « Appareil ajouté le 16/10/2026 » à la place.
+const NOM_AUTO_TOTP = /^VRM \d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+const nomAppareil = (f) => {
+  const n = String((f && f.friendly_name) || '').trim();
+  if (n && !NOM_AUTO_TOTP.test(n)) return n;
+  const d = (f && f.created_at) || (NOM_AUTO_TOTP.test(n) ? n.slice(4, 14) : '');
+  const t = d ? new Date(d) : null;
+  return t && !isNaN(t) ? `Appareil ajouté le ${t.toLocaleDateString('fr-FR')}` : 'Appareil sans nom';
+};
+const totpNoms = (u) => {
+  const o = {};
+  for (const f of (Array.isArray(u && u.factors) ? u.factors : [])) {
+    if (f && f.factor_type === 'totp' && f.status === 'verified' && f.id) o[String(f.id)] = nomAppareil(f);
+  }
+  return o;
+};
+// Un nom déjà pris (GoTrue refuse deux facteurs au même nom pour un compte) :
+// comparé sans casse ni espaces de bord, pour ne pas laisser « iPhone » et
+// « iphone » côte à côte — on ne saurait plus lequel retirer.
+const nomAppareilPris = (nom, verifies) => {
+  const k = String(nom || '').trim().toLowerCase();
+  return !!k && (verifies || []).some((f) => String((f && f.friendly_name) || '').trim().toLowerCase() === k || nomAppareil(f).toLowerCase() === k);
+};
 const aalDuJeton = (tok) => {
   try {
     const p = String(tok || '').split('.')[1];
@@ -887,25 +923,71 @@ const mfaLireFacteurs = async () => {
   return { verifies: tous.filter((f) => f && f.factor_type === 'totp' && f.status === 'verified'), enAttente: tous.filter((f) => f && f.factor_type === 'totp' && f.status !== 'verified'), user: r.json };
 };
 // Défi + vérification d'un code. Rend { ok } · { ok:false, faux:true } (code
-// refusé) · { ok:false, passu:true } (injoignable). Réussi : la session passe en
-// `aal2` (GoTrue rend de nouveaux jetons) et elle est rangée.
-const mfaVerifierCode = async (factorId, code) => {
+// refusé) · { ok:false, passu:true } (injoignable) · { ok:false, trop:true }
+// (429 : trop d'essais d'un coup — une réponse, pas une panne, et pas « faux »)
+// · { ok:false, introuvable:true } (ce facteur n'existe plus chez GoTrue).
+// Réussi : la session passe en `aal2` (GoTrue rend de nouveaux jetons) et elle
+// est rangée. `nom` : le nom de l'appareil qu'on vient de vérifier (première
+// vérification : la fiche rendue par GoTrue peut ne pas le porter encore).
+const MFA_CODE_FAUX = 'Ce code ne correspond pas. Tape celui affiché MAINTENANT dans ton app (il change toutes les 30 secondes) ; si ça persiste, vérifie que l’heure de ton téléphone est automatique.';
+const MFA_TROP = 'Trop d’essais d’un coup : le service de connexion demande d’attendre. Patiente une minute, puis tape le code affiché à ce moment-là.';
+const mfaVerifierCode = async (factorId, code, nom) => {
   const c = String(code || '').replace(/\D/g, '');
   if (c.length !== 6) return { ok: false, faux: true, message: 'Le code fait 6 chiffres.' };
   const d = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/challenge`, {});
-  if (!d.ok || !d.json.id) return mfaInjoignable(d) ? { ok: false, passu: true } : { ok: false, faux: false, message: d.json.msg || d.json.message || `Erreur ${d.status}` };
+  if (!d.ok || !d.json.id) {
+    if (mfaInjoignable(d)) return { ok: false, passu: true };
+    if (d.status === 429) return { ok: false, trop: true, message: MFA_TROP };
+    if (d.status === 404) return { ok: false, introuvable: true, message: 'Cet appareil n’est plus enregistré.' };
+    return { ok: false, faux: false, message: d.json.msg || d.json.message || `Erreur ${d.status}` };
+  }
   const v = await mfaAppel('POST', `factors/${encodeURIComponent(factorId)}/verify`, { challenge_id: d.json.id, code: c });
   if (!v.ok) {
     if (mfaInjoignable(v)) return { ok: false, passu: true };
-    return { ok: false, faux: true, message: 'Ce code ne correspond pas. Tape celui affiché MAINTENANT dans ton app (il change toutes les 30 secondes) ; si ça persiste, vérifie que l’heure de ton téléphone est automatique.' };
+    if (v.status === 429) return { ok: false, trop: true, message: MFA_TROP };
+    if (v.status === 404) return { ok: false, introuvable: true, message: 'Cet appareil n’est plus enregistré.' };
+    return { ok: false, faux: true, message: MFA_CODE_FAUX };
   }
   if (!v.json.access_token) return { ok: false, passu: true };
   // Le facteur qu'on vient de vérifier EST vérifié, même si la fiche rendue
   // par GoTrue l'a lue juste avant (première activation).
   const s2 = sessionFrom(v.json);
   s2.totp = Array.from(new Set([...(Array.isArray(s2.totp) ? s2.totp : []), String(factorId)]));
+  const noms = { ...(s2.totpNoms && typeof s2.totpNoms === 'object' ? s2.totpNoms : {}) };
+  if (!noms[String(factorId)]) noms[String(factorId)] = nom || 'Appareil sans nom';
+  s2.totpNoms = noms;
   writeSession(s2);
-  return { ok: true };
+  return { ok: true, factorId: String(factorId) };
+};
+// Le code d'UN de ses appareils, sans lui demander lequel (22 octobre). Avec
+// deux appareils, défier le seul premier facteur ENFERMAIT DEHORS celui qui n'a
+// plus que le second — exactement le cas pour lequel on l'a ajouté. On essaie
+// donc chaque facteur vérifié, dans l'ordre donné, jusqu'au premier qui
+// accepte. Trois états, jamais deux :
+//  · un succès ⇒ { ok, factorId } ;
+//  · aucun succès et au moins un facteur INJOIGNABLE ⇒ « pas su » (le code
+//    était peut-être le sien) ; un 429 ⇒ « trop d'essais » (on s'arrête : un
+//    essai de plus aggraverait l'attente) ;
+//  · tous les facteurs n'existent plus ⇒ { introuvable } (liste périmée : la
+//    porte relit les facteurs) ; sinon « faux ».
+const mfaVerifierCodeParmi = async (ids, code) => {
+  const liste = Array.from(new Set((Array.isArray(ids) ? ids : []).map(String).filter(Boolean)));
+  const c = String(code || '').replace(/\D/g, '');
+  if (c.length !== 6) return { ok: false, faux: true, message: 'Le code fait 6 chiffres.' };
+  if (!liste.length) return { ok: false, introuvable: true, message: 'Aucun appareil enregistré.' };
+  let passu = false, introuvables = 0, autre = null;
+  for (const id of liste) {
+    const r = await mfaVerifierCode(id, c);
+    if (r.ok) return r;
+    if (r.trop) return r;
+    if (r.passu) { passu = true; continue; }
+    if (r.introuvable) { introuvables++; continue; }
+    if (!r.faux && !autre) autre = r;
+  }
+  if (passu) return { ok: false, passu: true };
+  if (introuvables === liste.length) return { ok: false, introuvable: true, message: 'Ces appareils ne sont plus enregistrés.' };
+  if (autre) return autre;
+  return { ok: false, faux: true, message: MFA_CODE_FAUX };
 };
 
 const authValid = () => !!(AUTH.session && AUTH.session.access_token && AUTH.session.expires_at > Date.now() + 60000);
@@ -1137,7 +1219,7 @@ const consumeAuthRedirect = async () => {
     cleanAuthUrl();
     AUTH = { ...AUTH, session: sess };
     const me = await fetchMe(at);                        // qui es-tu ?
-    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp } : {}) });
+    writeSession({ ...sess, user: me ? { id: me.id, email: me.email } : null, ...(me ? { totp: me._totp, totpNoms: me._totpNoms } : {}) });
     if (type === 'recovery') RECOVERY_PENDING = true;
     return { ok: true, recovery: type === 'recovery' };
   }
@@ -1152,7 +1234,7 @@ const fetchMe = async (token) => {
     const j = await res.json();
     // `_totp` : les facteurs TOTP vérifiés (double vérification), rangés à part
     // dans la session par l'appelant — jamais dans `user`.
-    return { id: j.id, email: j.email, _totp: totpVerifies(j) };
+    return { id: j.id, email: j.email, _totp: totpVerifies(j), _totpNoms: totpNoms(j) };
   } catch (_) { return null; }
 };
 
@@ -11536,7 +11618,7 @@ function PorteMfa({ session }) {
       if (!f) { setPassu(true); return; }
       const cur = AUTH.session;
       if (!cur || cur.access_token !== session.access_token) return;
-      writeSession({ ...cur, totp: f.verifies.map((x) => String(x.id)) });
+      writeSession({ ...cur, totp: f.verifies.map((x) => String(x.id)), totpNoms: totpNoms(f.user) });
     })();
     return () => { mort = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -11551,15 +11633,32 @@ function PorteMfa({ session }) {
     e && e.preventDefault();
     if (busy) return;
     setErr(''); setPassu(false);
-    const id = Array.isArray(session.totp) ? session.totp[0] : '';
-    if (!id) { setEssai((n) => n + 1); return; }
+    const ids = Array.isArray(session.totp) ? session.totp : [];
+    if (!ids.length) { setEssai((n) => n + 1); return; }
     setBusy(true);
-    const r = await mfaVerifierCode(id, code);
+    // Le code de N'IMPORTE LEQUEL de ses appareils (22 octobre) : on ne lui
+    // demande pas lequel, on les essaie tous (`mfaVerifierCodeParmi`).
+    let r = await mfaVerifierCodeParmi(ids, code);
+    // Liste périmée (un appareil retiré depuis un autre écran) : on relit les
+    // facteurs chez GoTrue et on réessaie UNE fois avec le même code — sinon
+    // un code juste serait refusé pour toujours.
+    if (r.introuvable) {
+      const f = await mfaLireFacteurs();
+      if (!f) { setBusy(false); setPassu(true); return; }
+      const cur = AUTH.session;
+      const frais = f.verifies.map((x) => String(x.id));
+      if (cur && cur.access_token === session.access_token) writeSession({ ...cur, totp: frais, totpNoms: totpNoms(f.user) });
+      if (!frais.length) { setBusy(false); return; }   // plus aucun appareil : `etatMfa` laisse entrer
+      r = await mfaVerifierCodeParmi(frais, code);
+    }
     setBusy(false);
     if (r.ok) return;            // la session passe en aal2 : `App` monte le cœur
     if (r.passu) { setPassu(true); return; }
     setErr(r.message || 'Code refusé.'); setCode('');
   };
+  // Les appareils enregistrés, nommés (la session les porte — `totpNoms`).
+  const noms = (Array.isArray(session.totp) ? session.totp : []).map((id) => (session.totpNoms && session.totpNoms[id]) || '').filter(Boolean);
+  const plusieurs = Array.isArray(session.totp) && session.totp.length > 1;
   const contact = contactEmail();
   const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'13px 14px', fontSize:22, letterSpacing:6, textAlign:'center',
     background:C.card, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
@@ -11579,8 +11678,10 @@ function PorteMfa({ session }) {
             {passu && <button type="button" data-mfa-reessayer="" onClick={() => setEssai((n) => n + 1)} style={{marginTop:14,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>}
           </>) : (<>
             <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>Code de ton app d'authentification</div>
-            <div style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>
-              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.
+            <div data-mfa-appareils={Array.isArray(session.totp) ? session.totp.length : ''} style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>
+              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. {plusieurs
+                ? <>Ouvre l'app d'authentification de <b style={{color:C.text}}>l'un</b> de tes appareils{noms.length ? <> ({noms.join(' · ')})</> : null} et tape le code à 6 chiffres affiché pour VRM — celui de n'importe lequel marche.</>
+                : <>Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.</>}
             </div>
             <input data-mfa-code="" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus placeholder="000000"
               value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}/>
@@ -11590,10 +11691,12 @@ function PorteMfa({ session }) {
               style={{marginTop:12,width:'100%',minHeight:46,border:'none',borderRadius:10,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:busy||code.length!==6?'default':'pointer',opacity:busy||code.length!==6?0.55:1,fontFamily:'inherit'}}>
               {busy ? 'Vérification…' : passu ? 'Réessayer' : 'Valider'}
             </button>
-            <div data-mfa-perdu="" style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
-              <b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
-                ? <a href={`mailto:${contact}`} style={{color:C.accent,textDecoration:'none'}}>{contact}</a>
-                : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.
+            <div data-mfa-perdu={plusieurs ? 'autre-appareil' : 'contact'} style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
+              {plusieurs
+                ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec le code d'un AUTRE de tes appareils, puis retire celui qui est perdu dans Réglages → Mon compte → Double vérification.</>
+                : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
+                  ? <a href={`mailto:${contact}`} style={{color:C.accent,textDecoration:'none'}}>{contact}</a>
+                  : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.</>}
             </div>
           </>)}
         </form>
@@ -43411,7 +43514,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
-      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
+      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? `Activée · ${AUTH.session.totp.length} appareils` : AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
@@ -43676,11 +43779,26 @@ async function fermerMonCompte(confirmation) {
 // « Activée » ne s'écrit qu'APRÈS une vérification réussie d'un premier code.
 // Désactiver demande une confirmation ET un code (la session repasse en aal2,
 // ce que GoTrue exige pour supprimer un facteur vérifié).
+// 22 octobre — PLUSIEURS APPAREILS, le chemin de secours GRATUIT (le SMS est
+// payant, Julien l'a refusé) : chaque appareil a un nom qu'il choisit, la liste
+// les montre, « Ajouter un appareil de secours » en enregistre un autre (même
+// QR + premier code juste), et chacun se retire avec le code de N'IMPORTE
+// LEQUEL — un téléphone perdu se retire avec le code de l'autre. Rien n'est
+// imposé : avec un seul appareil, une phrase neutre propose d'en ajouter un.
+const NOM_APPAREIL_MAX = 40;
+const nomParDefaut = (verifies, ajout) => {
+  const base = ajout ? 'Appareil de secours' : 'Téléphone';
+  if (!nomAppareilPris(base, verifies)) return base;
+  for (let i = 2; i < 50; i++) if (!nomAppareilPris(`${base} ${i}`, verifies)) return `${base} ${i}`;
+  return base + ' ' + Date.now().toString(36);
+};
 function DoubleVerification({ onEtat } = {}) {
   const [f, setF] = React.useState(undefined);
   const [essai, setEssai] = React.useState(0);
-  // { etape: 'qr', id, qr, secret } · { etape: 'off' } (confirmation de désactivation)
+  // { etape: 'nom' } (ajout : choisir le nom) · { etape: 'qr', id, qr, secret, nom, ajout }
+  // · { etape: 'off', id, nom } (retirer CET appareil — le dernier = désactiver)
   const [cours, setCours] = React.useState(null);
+  const [nom, setNom] = React.useState('');
   const [code, setCode] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);   // { t, ton: 'ok'|'err'|'passu' }
@@ -43689,29 +43807,43 @@ function DoubleVerification({ onEtat } = {}) {
     mfaLireFacteurs().then((x) => { if (!mort) setF(x); });
     return () => { mort = true; };
   }, [essai]);
-  const actif = f && f.verifies.length ? f.verifies[0] : null;
+  const verifies = (f && f.verifies) || [];
+  const actif = verifies.length ? verifies[0] : null;
+  const seul = verifies.length === 1;
   const relire = () => setEssai((n) => n + 1);
   const btn = (primaire, off) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text,
     borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor: off ? 'default' : 'pointer', opacity: off ? 0.55 : 1, fontFamily:'inherit' });
   const champ = { width:150, boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:18, letterSpacing:4, textAlign:'center', background:C.bg, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
+  const champNom = { width:'100%', maxWidth:260, boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:10, padding:'10px 12px', fontSize:16, background:C.bg, color:C.text, outline:'none', fontFamily:'inherit', minHeight:44 };
   const txt = { fontSize:12.5, color:C.muted, lineHeight:1.55 };
   const PASSU = "Le service de connexion ne répond pas — rien n'a changé. Réessaie dans un instant.";
+  // Le champ « nom » se remplit d'une proposition libre dès qu'on sait ce qui
+  // existe (jamais par-dessus ce qu'il a tapé).
+  React.useEffect(() => { if (f && !nom) setNom(nomParDefaut(f.verifies, f.verifies.length > 0)); }, [f]);
 
-  const activer = async () => {
-    if (busy) return;
+  // Créer le facteur (premier appareil OU appareil de secours) puis montrer le QR.
+  const creer = async () => {
+    if (busy || !f) return;
+    const ajout = verifies.length > 0;
+    const n = String(nom || '').trim().slice(0, NOM_APPAREIL_MAX) || nomParDefaut(verifies, ajout);
+    if (nomAppareilPris(n, verifies)) { setMsg({ t: `Tu as déjà un appareil nommé « ${n} » : choisis un autre nom, pour savoir lequel retirer le jour où il le faudra.`, ton: 'err' }); return; }
     setBusy(true); setMsg(null);
     // Un essai d'activation laissé en plan (facteur non vérifié) bloquerait le
     // suivant : on le retire d'abord (un facteur non vérifié ne protège rien).
     for (const x of (f && f.enAttente) || []) { await mfaAppel('DELETE', `factors/${encodeURIComponent(x.id)}`); }
-    const r = await mfaAppel('POST', 'factors', { factor_type: 'totp', friendly_name: 'VRM ' + new Date().toISOString().slice(0, 16), issuer: 'VRM' });
+    const r = await mfaAppel('POST', 'factors', { factor_type: 'totp', friendly_name: n, issuer: 'VRM' });
     setBusy(false);
     const t = r.json && r.json.totp;
     if (!r.ok || !r.json.id || !t) {
+      const brut = String((r.json && (r.json.code || r.json.error_code)) || '') + ' ' + String((r.json && (r.json.msg || r.json.message)) || '');
       if (mfaInjoignable(r)) setMsg({ t: PASSU, ton: 'passu' });
+      else if (r.status === 429) setMsg({ t: MFA_TROP + " Rien n'a changé.", ton: 'err' });
+      else if (/name_conflict|friendly name/i.test(brut)) setMsg({ t: `Le service de connexion connaît déjà un appareil nommé « ${n} » : choisis un autre nom. Rien n'a changé.`, ton: 'err' });
+      else if (r.status === 403 || /insufficient_aal|aal2/i.test(brut)) setMsg({ t: "Pour ajouter un appareil, VRM doit d'abord revérifier ton code : déconnecte-toi, reconnecte-toi (mot de passe + code), puis réessaie. Rien n'a changé.", ton: 'err' });
       else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
       return;
     }
-    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrMfa(t), secret: String(t.secret || '') });
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrMfa(t), secret: String(t.secret || ''), nom: n, ajout });
   };
   const annulerActivation = async () => {
     const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
@@ -43724,43 +43856,59 @@ function DoubleVerification({ onEtat } = {}) {
     const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(cours.id)}`);
     if (!d.ok) { setBusy(false); setMsg({t:"L’ancienne configuration n’a pas pu être annulée. Réessaie avant de créer un nouveau code QR.",ton:'err'}); return; }
     setCours(null); setCode(''); setBusy(false);
-    await activer();
+    await creer();   // même nom : le champ le garde pendant l'étape du QR
   };
   const confirmerActivation = async () => {
     if (busy || !cours) return;
     setBusy(true); setMsg(null);
-    const r = await mfaVerifierCode(cours.id, code);
+    const ajout = !!cours.ajout, n = cours.nom;
+    const r = await mfaVerifierCode(cours.id, code, n);
     setBusy(false);
-    if (r.passu) { setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. Rien n'est activé pour l'instant — réessaie.", ton: 'passu' }); return; }
-    if (!r.ok) { setMsg({ t: (r.message || 'Code refusé.') + ' Rien n’est activé.', ton: 'err' }); setCode(''); return; }
-    setCours(null); setCode('');
-    setMsg({ t: 'Double vérification activée. À ta prochaine connexion, VRM te demandera le code de ton app après ton mot de passe.', ton: 'ok' });
+    const rien = ajout ? ' Cet appareil n’est pas ajouté.' : ' Rien n’est activé.';
+    if (r.passu) { setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas." + rien + ' Réessaie.', ton: 'passu' }); return; }
+    if (!r.ok) { setMsg({ t: (r.message || 'Code refusé.') + rien, ton: 'err' }); setCode(''); return; }
+    setCours(null); setCode(''); setNom('');
+    setMsg({ t: ajout
+      ? `« ${n} » est ajouté. À la connexion, le code de n'importe lequel de tes ${verifies.length + 1} appareils marche : si l'un est perdu, entre avec l'autre et retire le perdu ici.`
+      : 'Double vérification activée. À ta prochaine connexion, VRM te demandera le code de ton app après ton mot de passe.', ton: 'ok' });
     relire();
   };
-  const desactiver = async () => {
-    if (busy || !actif) return;
+  // Retirer UN appareil. Le code peut venir de N'IMPORTE LEQUEL : on essaie
+  // d'abord les AUTRES (le cas « téléphone perdu »), puis celui qu'on retire.
+  // Le dernier retiré = double vérification désactivée.
+  const retirer = async () => {
+    if (busy || !cours || cours.etape !== 'off') return;
+    const cible = String(cours.id);
+    const dernier = verifies.length <= 1;
     setBusy(true); setMsg(null);
-    const v = await mfaVerifierCode(String(actif.id), code);
+    const ordre = [...verifies.map((x) => String(x.id)).filter((x) => x !== cible), cible];
+    const v = await mfaVerifierCodeParmi(ordre, code);
+    const reste = dernier ? ' La double vérification reste activée.' : ` « ${cours.nom} » reste enregistré.`;
     if (!v.ok) {
       setBusy(false);
-      if (v.passu) setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas. La double vérification reste activée — réessaie.", ton: 'passu' });
-      else { setMsg({ t: (v.message || 'Code refusé.') + ' La double vérification reste activée.', ton: 'err' }); setCode(''); }
+      if (v.passu) setMsg({ t: "Je n'ai pas pu vérifier ce code : le service de connexion ne répond pas." + reste + ' Réessaie.', ton: 'passu' });
+      else if (v.introuvable) { setMsg({ t: 'La liste de tes appareils a changé entre-temps : je la relis.', ton: 'passu' }); setCours(null); relire(); }
+      else { setMsg({ t: (v.message || 'Code refusé.') + reste, ton: 'err' }); setCode(''); }
       return;
     }
-    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(actif.id)}`);
+    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(cible)}`);
     setBusy(false); setCode('');
     if (d.ok) {
       const cur = AUTH.session;
-      if (cur) writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== String(actif.id)) });
+      if (cur) {
+        const noms = { ...(cur.totpNoms && typeof cur.totpNoms === 'object' ? cur.totpNoms : {}) }; delete noms[cible];
+        writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== cible), totpNoms: noms });
+      }
       setCours(null);
-      setMsg({ t: 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.', ton: 'ok' });
+      setMsg({ t: dernier ? 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.' : `« ${cours.nom} » est retiré : son code ne permet plus d'entrer. Tes autres appareils restent actifs.`, ton: 'ok' });
     } else if (mfaInjoignable(d)) {
-      setMsg({ t: "Je ne sais pas si elle a été désactivée : le service de connexion n'a pas répondu. Je relis son état.", ton: 'passu' });
+      setMsg({ t: "Je ne sais pas s'il a été retiré : le service de connexion n'a pas répondu. Je relis la liste.", ton: 'passu' });
     } else {
-      setMsg({ t: `Le service de connexion a refusé la désactivation (erreur ${d.status}). Elle reste activée.`, ton: 'err' });
+      setMsg({ t: `Le service de connexion a refusé (erreur ${d.status}).` + reste, ton: 'err' });
     }
     relire();
   };
+  const ouvrirRetrait = (x) => { setCours({ etape: 'off', id: String(x.id), nom: nomAppareil(x) }); setCode(''); setMsg(null); };
 
   const bandeau = msg && (
     <div data-mfa-message={msg.ton} style={{fontSize:12.5,lineHeight:1.5,marginTop:10,borderRadius:8,padding:'9px 11px',
@@ -43770,8 +43918,14 @@ function DoubleVerification({ onEtat } = {}) {
   );
   const etatDit = f === undefined ? 'lecture' : f === null ? 'passu' : (actif ? 'active' : 'inactive');
   React.useEffect(() => { if (onEtat) onEtat(etatDit); }, [etatDit]);
+  const champDuNom = (
+    <label style={{display:'block',marginTop:10}}>
+      <span style={{...txt,display:'block',marginBottom:4}}>Nom de l'appareil (pour le reconnaître dans la liste)</span>
+      <input data-mfa-nom="" type="text" maxLength={NOM_APPAREIL_MAX} autoComplete="off" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="ex. iPhone, iPad, ancien téléphone" style={champNom}/>
+    </label>
+  );
   return (
-    <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''}>
+    <div data-mfa-panneau={etatDit} data-mfa-cours={cours ? cours.etape : ''} data-mfa-nb={f ? verifies.length : ''}>
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
       {f === null && (<>
         <div style={txt}>Je n'ai pas pu lire l'état de ta double vérification : le service de connexion ne répond pas. Rien n'a changé.</div>
@@ -43779,12 +43933,14 @@ function DoubleVerification({ onEtat } = {}) {
       </>)}
       {f && !actif && !cours && (<>
         <div style={txt}>
-          <b style={{color:C.text}}>Désactivée.</b> Facultatif : une fois activée, VRM te demande, après ton mot de passe, un code à 6 chiffres affiché par une app d'authentification sur ton téléphone (Google Authenticator, Microsoft Authenticator, Authy, ou les mots de passe de l'iPhone). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.
+          <b style={{color:C.text}}>Désactivée.</b> Facultatif et gratuit : une fois activée, VRM te demande, après ton mot de passe, un code à 6 chiffres affiché par une app d'authentification sur ton téléphone (les mots de passe de l'iPhone, Google Authenticator, Microsoft Authenticator, Authy). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.
         </div>
-        <button type="button" data-mfa-activer="" disabled={busy} onClick={activer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
+        {champDuNom}
+        <button type="button" data-mfa-activer="" disabled={busy} onClick={creer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
       </>)}
       {cours && cours.etape === 'qr' && (<>
-        <div style={txt}><b style={{color:C.text}}>1.</b> Sur ton iPhone, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
+        {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} ») — pas celui qui te donne déjà les codes : s'il était perdu, les deux codes partiraient avec lui.</div>}
+        <div style={txt}><b style={{color:C.text}}>1.</b> Sur {cours.ajout ? 'cet appareil' : 'ton iPhone'}, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
@@ -43793,25 +43949,48 @@ function DoubleVerification({ onEtat } = {}) {
           <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
         </details>
         <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} style={{...btn(false,busy),marginBottom:10}}>Remplacer cette configuration</button>
-        <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
+        <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que {cours.ajout ? 'ce nouvel appareil' : "l'app"} affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
           <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} style={btn(true, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Confirmer'}</button>
           <button type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation} style={btn(false, busy)}>Annuler</button>
         </div>
       </>)}
+      {actif && cours && cours.etape === 'nom' && (<>
+        <div style={txt}>Un appareil de secours : un autre téléphone, une tablette, l'ancien téléphone que tu gardes à la maison. Son code fera entrer exactement comme celui de ton appareil actuel.</div>
+        {champDuNom}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
+          <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} style={btn(true, busy)}>{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
+          <button type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }} style={btn(false, busy)}>Annuler</button>
+        </div>
+      </>)}
       {actif && !cours && (<>
         <div style={txt}>
-          <b style={{color:C.text}}>Activée{actif.created_at ? ` depuis le ${new Date(actif.created_at).toLocaleDateString('fr-FR')}` : ''}.</b> À chaque connexion, VRM demande le code de ton app d'authentification après ton mot de passe.
-          {' '}Si tu perds ton téléphone, elle ne se retire pas depuis l'app : désactive-la ici AVANT de changer de téléphone.
+          <b style={{color:C.text}}>Activée.</b> À chaque connexion, VRM demande, après ton mot de passe, le code {seul ? "de ton app d'authentification" : "de l'un de tes appareils — celui de n'importe lequel marche"}.
         </div>
-        <button type="button" data-mfa-desactiver="" onClick={() => { setCours({ etape: 'off' }); setCode(''); setMsg(null); }} style={{...btn(false),marginTop:10}}>Désactiver…</button>
+        <div data-mfa-liste="" style={{marginTop:10,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>
+          {verifies.map((x, i) => (
+            <div key={x.id} data-mfa-appareil={String(x.id)} style={{display:'flex',alignItems:'center',gap:10,justifyContent:'space-between',flexWrap:'wrap',padding:'8px 12px',borderTop: i ? `1px solid ${C.border}` : 'none'}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:13.5,fontWeight:600,color:C.text,overflowWrap:'anywhere'}}>{nomAppareil(x)}</div>
+                {x.created_at && <div style={{fontSize:12,color:C.muted}}>ajouté le {new Date(x.created_at).toLocaleDateString('fr-FR')}</div>}
+              </div>
+              {seul
+                ? <button type="button" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)} style={btn(false)}>Désactiver…</button>
+                : <button type="button" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)} style={btn(false)}>Retirer…</button>}
+            </div>
+          ))}
+        </div>
+        {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : s'il est perdu ou changé, tu ne pourras plus entrer seul. Ajoute un appareil de secours — son code marchera aussi — ou désactive la double vérification AVANT de changer de téléphone.</div>}
+        <button type="button" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }} style={{...btn(false),marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</button>
       </>)}
       {actif && cours && cours.etape === 'off' && (<>
-        <div style={txt}>Pour désactiver la double vérification, tape le code actuel de ton app. Ton mot de passe suffira ensuite pour te connecter.</div>
+        <div style={txt}>{seul
+          ? <>Pour désactiver la double vérification, tape le code actuel de ton app. Ton mot de passe suffira ensuite pour te connecter.</>
+          : <>Pour retirer <b style={{color:C.text}}>« {cours.nom} »</b>, tape le code actuel de <b style={{color:C.text}}>l'un</b> de tes appareils — celui d'un autre si « {cours.nom} » est perdu. Les autres restent actifs.</>}</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={desactiver} style={btn(false, busy || code.length !== 6)}>{busy ? 'Vérification…' : 'Désactiver'}</button>
+          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer} style={btn(false, busy || code.length !== 6)}>{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</button>
           <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} style={btn(false, busy)}>Garder</button>
         </div>
       </>)}
