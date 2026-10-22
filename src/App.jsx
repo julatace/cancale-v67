@@ -3586,9 +3586,10 @@ const fetchEmailAchats = async () => {
     return Array.isArray(rows) ? rows.filter(r=>r?.data).map(r=>({...r.data,_emailId:r.id})) : null;
   } catch (_) { return null; }
 };
-// (Offres reçues par email, `email_offer_*` : leur lecture est retirée le
-//  3 octobre — Ma journée et Messages rapatriaient 573 offres / 142 Ko à chaque
-//  ouverture, et plus rien ne les affichait depuis le 28 septembre.)
+// (Offres reçues par email, `email_offer_*` : leur lecture GLOBALE est retirée
+//  le 3 octobre — Ma journée et Messages rapatriaient 573 offres / 142 Ko à
+//  chaque ouverture. Seul Messages les relit, 14 jours, en scalaires — voir
+//  « LES OFFRES REÇUES, EN TÊTE DE MESSAGES ».)
 // Emails de VENTE (« X a acheté ton article ») : lignes email_sale_* =
 // { designation (titre), prix, account, receivedAt }. Source 24/7 sans appel
 // Vinted → sert à retirer AUTOMATIQUEMENT une annonce vendue.
@@ -4434,7 +4435,9 @@ const fetchResumesConversations = async () => {
 // (§11), sur leurs messages entiers. Map `${uid}_${conv}` → offre ; absente =
 // aucune ; `null` = pas su (lecture refusée ou ratée) ⇒ aucune pastille.
 const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
-const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,msgs:data->payload->conversation->messages';
+// (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
+// `description` d'une conversation de la boîte est le dernier message, pas la paire.
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,titre:data->payload->conversation->transaction->>item_title,msgs:data->payload->conversation->messages';
 const fetchOffresConversations = async () => {
   try {
     const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
@@ -4444,7 +4447,7 @@ const fetchOffresConversations = async () => {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
       if (!m) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
-      if (off) out.set(`${m[1]}_${m[2]}`, off);
+      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '' });
     }
     return out;
   } catch (_) { return null; }
@@ -5726,7 +5729,13 @@ const offreEnAttenteDe = (conversation) => {
       const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
       const prix = Number(String(px == null ? '' : px).replace(',', '.'));
       if (!isFinite(prix) || prix <= 0 || e.transaction_id == null || e.offer_request_id == null) continue;
-      derniere = { prix, tx: String(e.transaction_id), oid: String(e.offer_request_id) };
+      // (22 oct.) L'heure de l'offre, lue comme le fil (`normalizeConversationMessages`) :
+      // sert à reconnaître la même offre arrivée aussi par email (`memeOffre`).
+      // Illisible ⇒ `null` (jamais une heure inventée).
+      const brut = m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at;
+      const nb = Number(brut);
+      const ts = brut == null || brut === '' ? null : (Number.isFinite(nb) ? (nb < 1e12 ? nb * 1000 : nb) : (Date.parse(brut) || null));
+      derniere = { prix, tx: String(e.transaction_id), oid: String(e.offer_request_id), ts: ts != null && Number.isFinite(ts) ? ts : null };
     }
     return derniere;
   } catch (_) { return null; }
@@ -25536,6 +25545,52 @@ const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
   }
   return { gardees, reglees, rangees };
 };
+// ── UNE OFFRE VUE PAR EMAIL ET DANS SA CONVERSATION : UNE SEULE FOIS (22 oct.) ─
+// Messages montre deux sources d'offres : les emails (`email_offer_*`, le bloc
+// « offres à trancher ») et les conversations captées (la pastille « Offre
+// 45 € en attente », `offreEnAttenteDe`). La même offre peut arriver des deux
+// côtés. On ne la cache d'un côté que si on SAIT que c'est la même — par
+// identité, jamais par ressemblance (§5) :
+//   · le MÊME compte vendeur (identifiant Vinted du compte) ;
+//   · le MÊME acheteur — son login, unique sur Vinted (le champ `qui` de l'email) ;
+//   · le MÊME montant, au centime ;
+//   · reçue dans la même fenêtre (`OFFRE_TOLERANCE_H`, le délai de classement
+//     de l'email) ;
+//   · et, si les deux le portent, le même titre — une contrainte EN PLUS, jamais
+//     seule (deux paires au même titre existent, §2.4).
+// Un champ absent d'un côté ⇒ pas la même (on montre les deux). L'asymétrie est
+// décisive : une offre montrée deux fois coûte un regard, une offre cachée à
+// tort fait rater une vente.
+// ⚠️ MESURÉ LE 22 OCTOBRE (lecture seule) : `qui` est VIDE sur les 248 offres
+//    email des 14 derniers jours (et aucune ne porte d'annonce, de transaction
+//    ni de conversation) — cette règle ne réunit donc AUCUNE offre aujourd'hui.
+//    C'est voulu : sans l'acheteur, rien ne prouve que deux offres de 45 € sur
+//    le même compte sont la même. Le jour où l'email porte l'acheteur, elle joue.
+const euroOffre = (m) => { const n = parseFloat(String(m == null ? '' : m).replace(/\s/g, '').replace(',', '.')); return n > 0 ? n : null; };
+const memeOffre = (of, co) => {
+  if (!of || !co) return false;
+  const u = String(of.uid || '').trim();
+  if (!u || u !== String(co.uid || '').trim()) return false;
+  const qui = String(of.qui || '').trim().toLowerCase();
+  if (!qui || qui !== String(co.login || '').trim().toLowerCase()) return false;
+  const m = euroOffre(of.montant);
+  if (m == null || !(Number(co.prix) > 0) || Math.round(m * 100) !== Math.round(Number(co.prix) * 100)) return false;
+  const recue = Date.parse(of.receivedAt || ''), t = Number(co.ts);
+  if (!Number.isFinite(recue) || !Number.isFinite(t) || Math.abs(recue - t) > OFFRE_TOLERANCE_H * 3600000) return false;
+  const a = normTitle(of.article || ''), b = normTitle(co.titre || '');
+  if (a && b && a !== b) return false;
+  return true;
+};
+// Les offres email à MONTRER : celles qu'aucune offre de conversation ne
+// désigne. `convOffres` : `null`/`undefined` (pas su, pas encore lu) ⇒ on ne
+// retire rien. Rend `{ affichees, dansConversation }`.
+const offresEmailHorsConversations = (offres, convOffres) => {
+  const liste = Array.isArray(offres) ? offres : [];
+  if (!Array.isArray(convOffres) || !convOffres.length) return { affichees: liste, dansConversation: [] };
+  const affichees = [], dansConversation = [];
+  for (const of of liste) (convOffres.some((co) => memeOffre(of, co)) ? dansConversation : affichees).push(of);
+  return { affichees, dansConversation };
+};
 // ── LE REPÈRE PAR MODÈLE : UNE RÈGLE, DEUX ÉCRANS (§11, revue du 6 octobre) ──
 // « Tes Samba se revendent X € en moyenne » se calculait DEUX fois : l'écran
 // Ventes (Repère d'achat par modèle) écartait les comptes qu'il a exclus,
@@ -32422,6 +32477,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    serait le rapprochement par ressemblance interdit (§5). Le repère montré
   //    est celui du MODÈLE (prix moyen de revente), dit comme tel.
   // Trois états : `undefined` en cours · `null` pas su · tableau.
+  // ⚠️⚠️ (22 octobre) CE BLOC AVAIT DISPARU LE 13 OCTOBRE (« Simplifier les
+  //    écrans revendeurs », 13f6c89) avec la cloche, et la règle
+  //    `offresAtraiter` n'était plus rendue NULLE PART. Mesuré (lecture seule) :
+  //    248 offres email ces 14 derniers jours, 17 sur le dernier jour, sur
+  //    5 comptes — et 0 offre en attente dans une conversation captée sur la
+  //    même période (3 en tout, la plus récente du 15 septembre). Les offres ne
+  //    s'affichaient donc plus du tout. Rebranché, ici seulement.
+  const [offresEmail, setOffresEmail] = useState(undefined);
+  const [offresToutes, setOffresToutes] = useState(false);
+  const [offresFaites, setOffresFaites] = useState(() => new Set(load('vinted_offers_done', []) || []));
+  // Réglage SYNCHRONISÉ lu au montage : rattrapé à l'arrivée du nuage, et
+  // seulement s'il est resté vide (une offre rangée pendant le chargement
+  // n'est jamais écrasée — §5.49).
+  useEffect(() => onCloudReady(() => setOffresFaites((v) => v.size ? v : new Set(load('vinted_offers_done', []) || []))), []);
+  useEffect(() => {
+    if (curSub !== 'messages') return;
+    let stop = false;
+    const depuis = new Date(Date.now() - OFFRE_FENETRE_J * 86400000).toISOString().slice(0, 10);
+    // SCALAIRES seulement (§4.4) : `extrait` (le morceau brut de l'email) n'est
+    // jamais rapatrié. Une page ratée ⇒ `null` (pas su), jamais une demi-liste.
+    lireTout(`id=like.email_offer_*&meta->>receivedAt=gte.${depuis}&select=id,article:meta->>article,montant:meta->>montant,qui:meta->>qui,uid:meta->>uid,account:meta->>account,receivedAt:meta->>receivedAt`, { strict: true })
+      .then((l) => { if (!stop) setOffresEmail(Array.isArray(l) ? l : null); })
+      .catch(() => { if (!stop) setOffresEmail(null); });
+    return () => { stop = true; };
+  }, [curSub]);
+  // L'identité d'une offre rangée (« c'est fait ») : la ligne email elle-même.
+  // ⚠️ Avant le 13 octobre la clé était `receivedAt|article` : on la relit
+  //    aussi, pour qu'une offre déjà rangée avec l'ancienne clé ne revienne pas.
+  const cleOffre = (of) => String((of && of.id) || '');
+  const offreTraitee = (of) => setOffresFaites((prev) => { const u = new Set(prev); u.add(cleOffre(of)); save('vinted_offers_done', [...u].slice(-500)); return u; });
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
@@ -35775,9 +35860,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 28 sept. : « enlève le nombre d'offres reçues, laisse simplement
                 les notifications »). Les offres restent dans le centre de
                 notifications (la cloche) ; on ne double plus l'info sur l'écran
-                d'accueil. Les offres sont maintenant une entrée du centre de
-                notifications (la cloche), via la MÊME règle `offresAtraiter`
-                (§11) — on répond sur Vinted. */}
+                d'accueil. (22 oct.) La cloche a été retirée le 17 octobre :
+                les offres vivent en tête de Messages, par la MÊME règle
+                `offresAtraiter` (§11) — on répond sur Vinted. */}
 
             {/* ⚠️ L'ACCUEIL S'ARRÊTAIT AU TIERS DE L'ÉCRAN. Sur ordinateur il
                 restait 500 px d'aplat gris sous la dernière carte — ce vide est
@@ -38526,6 +38611,77 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
+        {/* ── LES OFFRES REÇUES PAR EMAIL, EN TÊTE (rebranché le 22 octobre) ──
+            La règle `offresAtraiter` (compte, chronologie, titre non ambigu)
+            écarte celles qu'une vente a réglées et le DIT ; « c'est fait » range
+            une offre (`vinted_offers_done`). Une offre que sa conversation montre
+            déjà (même compte, même acheteur, même montant — `memeOffre`, jamais
+            le titre seul) n'est pas écrite deux fois. */}
+        {(()=>{
+          if (offresEmail === undefined || !Array.isArray(sales.items)) return null;   // on attend de savoir lesquelles sont déjà réglées
+          // La panne de la base se dit UNE fois, par le bloc de la coque (§7).
+          if (offresEmail === null) return baseKO ? null : <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
+          // Un compte écarté (son choix) ou retiré n'a plus rien à lui dire ;
+          // « retiré » ne se juge que sur une liste de comptes LUE, et une offre
+          // sans compte connu reste (pas su ≠ autre compte).
+          const comptesLus = accountsReady && !baseKO;
+          const desComptes = offresEmail.filter((of) => { const u = String((of && of.uid) || ''); if (!u) return true;
+            if (acctOff(u)) return false;
+            return !(comptesLus && !accountUids.has(u)); });
+          // Les offres « c'est fait » rangées avant le 22 octobre portaient la clé
+          // `receivedAt|article` : elles comptent toujours comme rangées.
+          const faites = new Set(offresFaites);
+          for (const of of desComptes) if (offresFaites.has(`${of.receivedAt || ''}|${of.article || ''}`)) faites.add(cleOffre(of));
+          const { gardees, reglees } = offresAtraiter(desComptes, sales.items, faites, cleOffre);
+          // Les offres en attente vues dans une conversation captée (même source
+          // que la pastille de la liste) ; pas su ⇒ on ne retire rien.
+          const convOffres = (offresConv instanceof Map && Array.isArray(convs.items))
+            ? convs.items.flatMap((c) => { const u = String((c._acc && c._acc.vinted_user_id) || ''); const off = offresConv.get(`${u}_${c.id}`); return off ? [{ uid: u, login: (c.opposite_user && c.opposite_user.login) || '', prix: off.prix, ts: off.ts, titre: off.titre || '' }] : []; })
+            : null;
+          const { affichees, dansConversation } = offresEmailHorsConversations(gardees, convOffres);
+          if (!affichees.length) return null;
+          // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
+          const repere = moyennesParModele(sales.items, acctOffOf);
+          const nomModele = (k) => k.replace(/\b\w/g, (c) => c.toUpperCase());
+          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`il y a ${Math.round(h)} h`:`il y a ${Math.round(h/24)} j`; };
+          const tri = [...affichees].sort((a,b)=> (Date.parse(b.receivedAt||0)||0) - (Date.parse(a.receivedAt||0)||0));
+          const comptes = new Set(tri.map((o)=>String(o.uid||o.account||'')));
+          const visibles = offresToutes ? tri : tri.slice(0, 6);
+          const pl = (n, s, p) => (n > 1 ? p : s);
+          return (
+            <div data-offres-messages={tri.length} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:12,overflow:'hidden'}}>
+              <div style={{padding:'10px 12px 6px'}}>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}><span style={{color:C.accent}}>{tri.length}</span> {pl(tri.length,'offre','offres')} à trancher</div>
+                <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>
+                  Reçues par email ces {OFFRE_FENETRE_J} derniers jours{comptes.size===1&&tri[0].account?` · toutes sur ${tri[0].account}`:''}. On y répond sur Vinted, sur le compte nommé.
+                  {reglees.length>0 ? <span data-offres-reglees={reglees.length}>{` ${reglees.length} autre${reglees.length>1?'s':''} déjà réglée${reglees.length>1?'s':''} par une vente, mise${reglees.length>1?'s':''} de côté.`}</span> : null}
+                  {dansConversation.length>0 ? <span data-offres-dans-conversation={dansConversation.length}>{` ${dansConversation.length} ${pl(dansConversation.length,'autre est','autres sont')} sur ${pl(dansConversation.length,'sa conversation','leur conversation')} ci-dessous.`}</span> : null}
+                </div>
+              </div>
+              {visibles.map((of,i)=>{
+                const m = euroOffre(of.montant); const k = extractModel(of.article); const r = k && repere[k];
+                return (
+                  <div key={of.id||i} data-offre-email={of.id} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 12px',borderTop:`1px solid ${C.border}`}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m!=null?<b>{fmtE(m)}</b>:'Une offre'}{of.qui?` · ${of.qui}`:''}</div>
+                      <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{of.article||'—'}</div>
+                      <div style={{fontSize:11,color:C.muted}}>{quand(of.receivedAt)}{comptes.size>1&&of.account?` · ${of.account}`:''}{r && r.n>=REPERE_MIN ? ` · repère : tes ${nomModele(k)} se revendent ${fmtE(r.s/r.n)} en moyenne (${r.n} ventes)` : ''}</div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
+                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center'}}>Répondre sur Vinted</a>
+                      <button type="button" data-offre-traitee={of.id} onClick={()=>offreTraitee(of)} style={{border:'none',background:'transparent',color:C.muted,fontSize:11.5,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline',minHeight:32}}>c'est fait</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {tri.length > visibles.length && (
+                <button type="button" data-offres-voir-tout={tri.length} onClick={()=>setOffresToutes(true)} style={{display:'block',width:'100%',border:'none',borderTop:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'10px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  Voir les {tri.length} offres
+                </button>
+              )}
+            </div>
+          );
+        })()}
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
