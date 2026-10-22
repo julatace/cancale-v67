@@ -36137,9 +36137,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay : je n'ai pas pu les lire — rien n'est perdu, la case « Messages » ne compte pour l'instant que Vinted.</div>
             )}
 
-            {!premierJour && (
-              <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO}/>
-            )}
+            {/* ⚠️ La grille est rendue AUSSI le premier jour : ses widgets s'y
+                taisent d'eux-mêmes (barre, héros, stock…), mais « À faire » peut
+                déjà porter une action — des emails mis de côté, par exemple.
+                La cacher avec le reste les faisait disparaître (vu au banc
+                `emails-mis-de-cote`, 22 oct.). On n'y propose pas « Modifier ». */}
+            <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO && !premierJour}/>
 
             {loading && <Skeleton variant="card" count={4}/>}
 
