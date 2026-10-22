@@ -1,3 +1,5 @@
+import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
+import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
@@ -85,7 +87,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.210.0';
+const EXT_ATTENDUE = '5.211.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -24641,7 +24643,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // L'extension l'a LU dans le profil Vinted : c'est la preuve la plus forte,
     // elle passe avant la liste locale (un refus 403 vu par cet appareil).
     if (evLu && evLu.etat === 'banni') return { etat: 'bad', source: 'extension', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: `Vinted le dit lui-même dans le profil du compte (lu par l'extension${evQuand ? ` le ${evQuand}` : ''}). Rien n'est masqué tout seul : masque-le si tu ne veux plus voir ses annonces.` };
-    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403) : il est bloqué ou fermé. Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
+    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Accès refusé', color: C.warn, hint: 'Vinted a refusé un accès à ce compte. Ce refus ne suffit pas à confirmer un blocage : reconnecte ce compte sur Vinted pour actualiser son état.' };
     // (16 oct.) Julien : « juste s'il est actif ou banni, l'extension doit
     // évaluer l'état du compte ». Deux états sur la pastille ; la fraîcheur de
     // la capture n'est plus une alerte, seulement une ligne grise (`ago`).
@@ -24649,6 +24651,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     const ageH = cap ? (Date.now() - cap) / 3600000 : null;
     const ago = ageH == null ? 'pas encore capté' : ageH < 1 ? 'capté il y a moins d\'une heure' : ageH < 48 ? `capté il y a ${Math.round(ageH)} h` : `capté il y a ${Math.round(ageH / 24)} j`;
     const lu = evLu ? ` · état lu par l'extension${evQuand ? ` le ${evQuand}` : ''}` : '';
+    if (!evLu) return { etat: 'inconnu', source: '', ic: 'info', label: 'État non vérifié', color: C.muted, hint: `Le statut de ce compte n'a pas encore pu être confirmé. Ouvre ce compte sur Vinted avec l'extension connectée pour l'actualiser · ${ago}.`, ago };
     return { etat: 'ok', source: evLu ? 'extension' : '', ic: 'check', label: 'Actif', color: C.text, hint: `Compte actif · ${ago}${lu}.`, ago };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
@@ -28865,11 +28868,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    (registre ou une ligne illisible) · objet. `aucune` = aucune ligne rangée
   //    nulle part (jamais lu, ou pas d'eBay) ⇒ Ma journée se tait.
   //    (lus avec les commandes eBay, plus haut — un seul rendu).
-  useEffect(() => { (async () => {
+  useEffect(()=>{
+    const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!r.ok) { setLbcLu(null); return; }
-      const rows = await r.json();
+      const rows = await lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,sbAuth());
+      if (!estActif()) return;
+      if (!Array.isArray(rows)) { setLbcLu(null); return; }
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       const ventes = arr.filter(o => o && o.isSeller === true);
@@ -28881,8 +28885,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const inconnuesListe = inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
       setLbcVentes({ ventes, inconnues: inc.length, inconnuesListe });
       setLbcLu(true);
-    } catch (_) { setLbcLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
-  })(); }, []);
+    } catch (_) { if (!estActif()) return; setLbcLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
+
+    }});
+    suivi.actualiser();
+    return ()=>suivi.arreter();
+  }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
   // vente/republication). Source de vérité durable : quand tu saisis le prix
@@ -42449,9 +42457,13 @@ function MessagesLeboncoin() {
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const sbGet = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
-  const reload = async () => {
+  const [erreurReception,setErreurReception]=useState(false);
+  const suiviReception=useRef(null);
+  const reload=()=>suiviReception.current?.actualiser();
+  const sbGet = q => lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth());
+  const lireDonnees = async (estActif) => {
     setLoading(true);
+    setErreurReception(false);
     // ⚠️ 197 Ko POUR EN LIRE 133 : cet écran lit `main` lui-même (c'est ce qui
     //    lui donne son propre `echecLecture`), mais il n'en utilise que QUATRE
     //    clés. Mesuré le 15 septembre : `select=data` 197 Ko / 795 ms, la
@@ -42770,16 +42782,15 @@ function LeboncoinScreen() {
     // L'annonce porte son compte dans `account` (capture du fond) ou `lbcUser`
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
+    if (!estActif()) return;
     setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
-  useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
-  // L'extension prévient quand une paire vient d'être publiée (ou marquée) :
-  // la file se relit toute seule.
   useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'lbc') reload(); };
-    window.addEventListener('vrm:ext', f);
-    return () => window.removeEventListener('vrm:ext', f);
+    const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:lireDonnees,onErreur:()=>{setErreurReception(true);setLoading(false);}});
+    suiviReception.current=suivi;
+    suivi.actualiser();
+    return ()=>{suivi.arreter();suiviReception.current=null;};
     /* eslint-disable-next-line */
   }, []);
   const marquer = async (id) => { const r = await vmrCmd({ cmd: 'lbcMarque', id: String(id), etat: 'posted' }); if (r && r.accepte) reload(); };
@@ -42804,6 +42815,7 @@ function LeboncoinScreen() {
         <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
+      {erreurReception && <LignePanne>La relecture de tes données Leboncoin a échoué. Les informations précédentes restent affichées. Réessaie avec Actualiser.</LignePanne>}
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
           une deuxième fois. On le dit avec le N° et le lien ; VRM ne retire pas
@@ -47219,11 +47231,12 @@ function AppCoeur() {
   const [lbcVentes,setLbcVentes]=useState({ ventes:[], inconnues:0 });
   // Trois états : `undefined` pas encore lu · `null` pas su · `true` lu.
   const [lbcCoqueLu,setLbcCoqueLu]=useState(undefined);
-  useEffect(()=>{ (async()=>{
+  useEffect(()=>{
+    const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!r.ok) { setLbcCoqueLu(null); return; }
-      const rows = await r.json();
+      const rows = await lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,sbAuth());
+      if (!estActif()) return;
+      if (!Array.isArray(rows)) { setLbcCoqueLu(null); return; }
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       // Côté pas encore su, ET non annulées (une transaction annulée est morte :
@@ -47239,8 +47252,12 @@ function AppCoeur() {
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
         maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
       setLbcCoqueLu(true);
-    } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
-  })(); }, []);
+    } catch (_) { if (!estActif()) return; setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
+
+    }});
+    suivi.actualiser();
+    return ()=>suivi.arreter();
+  }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
   // PAYÉES captées (`caEbayPayees`, la MÊME règle que la carte « payées » de
   // l'écran eBay, §11). `null` tant qu'aucune vente payée n'est captée — le
@@ -48882,6 +48899,7 @@ function AppCoeur() {
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
+          <div style={{padding:'0 16px'}}><DiagnosticLeboncoin lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
