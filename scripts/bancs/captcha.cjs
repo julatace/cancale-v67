@@ -171,6 +171,9 @@ async function scenarios(nav, taille) {
     await clic(pg, 'form button[type=submit]'); await pg.waitForTimeout(1200);
     const insc = st.appels.find((a) => a.nom.startsWith('signup'));
     dit(!!insc && !insc.a, "l'inscription part comme avant, sans `gotrue_meta_security`", JSON.stringify(insc));
+    dit((await pg.locator('[role=status]').innerText()).includes('Ton compte est créé'), 'la création réussie est annoncée clairement sur le formulaire');
+    dit((await pg.locator('form button[type=submit]').innerText()) === 'Se connecter', 'le formulaire passe directement à la connexion sans quitter la page');
+    dit((await pg.locator('input[type=email]').inputValue()) === 'neuf@exemple.fr', 'l’adresse saisie est conservée après création');
     await pg.goto(`http://localhost:${PORT}/?connexion`, { waitUntil: 'domcontentloaded' });
     await attendre(pg, 'input[type=password]');
     await remplir(pg, USER.email, 'motdepasse42');
