@@ -732,9 +732,12 @@ const authCall = async (path, body) => {
   if (protege && !jetonCaptcha()) return { ok: false, status: 0, captcha: true, error: etatCaptcha().statut === 'erreur' ? MSG_CAPTCHA_ERREUR : MSG_CAPTCHA_ATTENTE };
   const corps = corpsAvecCaptcha(path, body);
   if (protege) consommerCaptcha();
+  const controle = new AbortController();
+  const delai = setTimeout(() => controle.abort(), 20000);
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
       method: 'POST',
+      signal: controle.signal,
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
     });
@@ -746,7 +749,8 @@ const authCall = async (path, body) => {
       return { ok: false, status: res.status, error: brut };
     }
     return { ok: true, status: res.status, json };
-  } catch (e) { return { ok: false, status: 0, error: 'Pas de connexion internet.' }; }
+  } catch (e) { return { ok: false, status: 0, error: e.name === 'AbortError' ? 'Le serveur met trop de temps à répondre. Réessaie dans un instant.' : 'La connexion au serveur a été interrompue. Réessaie.' }; }
+  finally { clearTimeout(delai); }
 };
 
 // ── OÙ RAMÈNENT LES LIENS DES EMAILS DE COMPTE (5 octobre) ─────────────────
@@ -991,6 +995,7 @@ const mapMailError = (err) => {
 const authSignUp  = async (email, password) => {
   const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password });
   if (!r.ok) {
+    if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
     // exceeded » ne veut rien dire pour quelqu'un qui essaie juste de créer un
     // compte, alors que la cause est précise et la solution simple.
@@ -1001,6 +1006,7 @@ const authSignUp  = async (email, password) => {
     else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
     return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un email VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
   }
+  if(!r.json?.access_token && !r.json?.id && !r.json?.user?.id)return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
@@ -11653,6 +11659,7 @@ function AuthScreen() {
 
   const submit = async (e) => {
     e && e.preventDefault();
+    if(busy)return;
     setErr(''); setInfo('');
     if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
     if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
@@ -11822,7 +11829,7 @@ function AuthScreen() {
           )}
           {mode!=='newpw' && (
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-              value={email} onChange={e=>setEmail(e.target.value)} style={{...field, marginBottom:9}}/>
+              value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');}} style={{...field, marginBottom:9}}/>
           )}
           {mode!=='reset' && (
             <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
@@ -11831,8 +11838,8 @@ function AuthScreen() {
           )}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
-          {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
-          {needConfirm && (
+          {err  && <div role="alert" style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
               <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
@@ -11871,7 +11878,7 @@ function AuthScreen() {
               </div>
             </div>
           )}
-          {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
+          {info && <div role="status" aria-live="polite" style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
           {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Le lien ne s’ouvre pas dans Safari ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
           <button type="submit" data-auth-valider="" disabled={busy||attendCaptcha} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
