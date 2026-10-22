@@ -259,3 +259,11 @@ jamais proposé**.
   API `cookies` et Safari < 18).
 - WebKit (Playwright) n'est pas installé dans ce conteneur : les scripts de
   contenu n'ont pas été exécutés dans WebKit.
+
+## Correctif Leboncoin 5.207.0 — 22 octobre 2026
+
+Le capteur MAIN démarrait à `document_start`, son relais isolé seulement à `document_idle`. Une réponse de session reçue entre les deux ne parvenait jamais au background : aucun compte ne pouvait être enregistré sur cette réponse. Le relais est maintenant un fichier dédié lancé à `document_start`. Un échange de disponibilité dans les deux sens couvre les deux ordres d'injection. Le capteur rejoue ses réponses en attente (mémoire seulement, 64 messages / 4 millions de caractères maximum), avec un numéro technique pour éviter les doublons. Les interfaces de dépôt restent démarrées à leur moment habituel.
+
+Le test navigateur `scripts/bancs/lbc-demarrage.cjs` échoue avec l'ancien capteur : identification reçue avant le relais perdue. Il réussit avec le nouveau, capteur avant/après relais, réinjection et accusé répété sans doublon. Aucun appel supplémentaire à Leboncoin, aucune écriture de production, aucune récupération de cookie ajoutés.
+
+Les audits de session, comptes, données restantes, compteurs de messages, détails de transactions, compatibilité navigateurs et liaison VRM sont conservés. Ils ne remplacent pas une vérification sur une vraie session Leboncoin : aucune session utilisateur Leboncoin n'est accessible dans l'environnement de développement. La mise à jour du dossier de l'extension et le rechargement des onglets Leboncoin restent nécessaires : une extension décompressée ne reçoit pas les nouveaux scripts depuis le site.
