@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « ABONNEMENT » — la carte de Réglages et la porte, RENDUES.
 //

@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « COMPTE PRO OU PARTICULIER » — affiché sur chaque compte Vinted lié
 //        node scripts/bancs/type-compte.cjs   (BANC_PORT pour changer de port)

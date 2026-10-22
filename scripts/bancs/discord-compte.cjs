@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « DISCORD DANS MON COMPTE » (20 octobre) — RENDU, 1512 px et 390 px
 //  tactile (sombre).

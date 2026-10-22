@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // Le composant livré, compilé sans ajouter de route de démonstration à l'app.
 const fs=require('fs'),path=require('path'),http=require('http'),assert=require('node:assert/strict');
 const {build}=require('esbuild'),{chromium}=require('playwright');

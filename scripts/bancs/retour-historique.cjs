@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // Banc « le bouton retour revient à l'écran d'avant » (18 octobre). Aucune
 // fixture : la base est vide (toute lecture rend `[]`), on ne juge que la
 // NAVIGATION. Avant, aucun changement d'écran n'entrait dans l'historique : le

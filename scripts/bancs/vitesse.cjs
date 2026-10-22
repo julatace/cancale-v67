@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  VITESSE — ce que coûte l'ouverture de chaque écran, MESURÉ (« app plus
 //  rapide », retenue par Julien le 11 octobre).

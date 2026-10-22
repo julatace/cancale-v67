@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LA CAPTURE DES PHOTOS D'UNE ANNONCE VINTED, EXÉCUTÉE POUR DE VRAI
 //        node scripts/bancs/photos.cjs

@@ -265,7 +265,7 @@ const jugerSegment = async (pg, label, ecran) => {
         }
         await jugerSegment(pg, label, 'Réglages');
       }
-      const vert = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main *')].filter((e) => { const s = getComputedStyle(e); return /rgba?\(15, 138, 106/.test(s.color + ' ' + s.backgroundColor); }).map((e) => e.innerText.trim().slice(0, 40)).slice(0, 5));
+      const vert = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main *')].filter((e) => { const s = getComputedStyle(e); return /rgba?\(15, 138, 106/.test(s.color + ' ' + s.backgroundColor); }).map((e) => (e.innerText ?? ('<' + e.tagName.toLowerCase() + '> ' + (e.closest('[aria-label],[title]')?.getAttribute('aria-label') || e.closest('[title]')?.getAttribute('title') || e.parentElement?.textContent || ''))).trim().slice(0, 60)).slice(0, 5));
       dit(vert.length === 0, 'Réglages : plus de vert de l’ancienne palette (#0F8A6A)', JSON.stringify(vert));
       await ctx.close();
     });
