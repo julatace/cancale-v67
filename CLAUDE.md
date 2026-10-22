@@ -1,5 +1,19 @@
 # VRM — dossier de passation
 
+> ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
+> Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
+> hors plafond de dépenses, **plus** chaque SMS facturé par Twilio/MessageBird. Julien : « si c'est
+> payant ne fais pas, essaie de trouver autre chose ». ⇒ La branche `codex/mfa-sms` **n'est PAS
+> fusionnée** et rien ne propose le SMS. **Le chantier devient « double vérification GRATUITE »** :
+> la vérification par app d'authentification (TOTP, Réglages → Mon compte → Double vérification,
+> déjà sur `main`, gratuite, marche avec l'app « Mots de passe » de l'iPhone) reste LA méthode ; ce
+> qui manque est un **chemin de secours gratuit** quand le téléphone est perdu : permettre
+> d'ajouter **un second appareil** (un second facteur TOTP — Supabase en accepte plusieurs ; c'est
+> la recommandation de sa doc faute de codes de secours), le nommer, le retirer, et le dire sur
+> l'écran du code. Les clés d'accès (WebAuthn/passkey) ne sont qu'**expérimentales** chez Supabase
+> au 22 octobre : ne pas les livrer. Jamais rien de payant, jamais une invitation forcée au
+> démarrage (retirée à sa demande).
+
 > ⚠️⚠️ **PASSATION DU 21 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-21.md`** : ce qui est
 > en ligne, `claude/lot-21oct` (hors ligne, retours, 5.204, carte OpenFreeMap), les branches
 > non déployées (`csp-app`, `app-rapide`, et INACHEVÉE `carte-pro`), les gestes de Julien.
