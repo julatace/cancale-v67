@@ -137,6 +137,13 @@ const texte = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
 const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const e = document.querySelector(s); return e ? e.getAttribute(x) : null; }, [sel, a]);
 // CAPTURES=<dossier> : des captures aux moments qui comptent (§6.2 : regarder le rendu fait partie du test).
 const capture = async (pg, nom) => { if (!process.env.CAPTURES) return; try { const el = (await pg.$('[data-mfa-panneau]')) || (await pg.$('[data-porte-mfa]')); const f = path.join(process.env.CAPTURES, nom + '.png'); if (el) await el.screenshot({ path: f }); else await pg.screenshot({ path: f }); } catch (_) {} };
+// Machine partagée (4 cœurs, d'autres bancs tournent) : on attend des CONDITIONS,
+// jamais un délai fixe — un délai fixe rend un banc rouge sur une machine lente.
+const quand = (pg, fn, arg, ms = 20000) => pg.waitForFunction(fn, arg, { timeout: ms }).then(() => true).catch(() => false);
+const porteFermee = (pg) => quand(pg, () => !document.querySelector('[data-porte-mfa]'));
+const nouveauMessage = async (pg, avant) => { await quand(pg, (a) => { const e = document.querySelector('[data-mfa-message]'); return !!e && (e.getAttribute('data-mfa-message') + e.innerText) !== a; }, avant, 15000); };
+const signature = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-mfa-message]'); return e ? e.getAttribute('data-mfa-message') + e.innerText : ''; });
+const erreurPorte = (pg) => quand(pg, () => !!document.querySelector('[data-mfa-erreur]') || !document.querySelector('[data-porte-mfa]') || !!document.querySelector('[data-mfa-injoignable]'), undefined, 15000);
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
 
 async function seConnecter(pg) {
@@ -148,16 +155,15 @@ async function seConnecter(pg) {
   await pg.waitForTimeout(2500);
 }
 async function passerLeCode(pg, code) {
-  if (!(await attendre(pg, '[data-porte-mfa="code"]', 8000))) return false;
+  if (!(await attendre(pg, '[data-porte-mfa="code"]', 20000))) return false;
   await pg.fill('[data-mfa-code]', code); await pg.click('[data-mfa-valider]');
-  await pg.waitForTimeout(3500);
-  return !(await pg.$('[data-porte-mfa]'));
+  return porteFermee(pg);
 }
 async function ouvrirPanneau(pg, taille) {
   await pg.goto(`http://localhost:${PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(2500);
-  if (taille === 390) { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l) { await l.click(); await pg.waitForTimeout(400); } }
-  return attendre(pg, '[data-mfa-panneau="inactive"], [data-mfa-panneau="active"], [data-mfa-panneau="passu"]', 10000);
+  await attendre(pg, '[data-sous-ouvrir="double"], [data-mfa-panneau]', 20000);
+  if (taille === 390) { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l) { await l.click(); } }
+  return attendre(pg, '[data-mfa-panneau="inactive"], [data-mfa-panneau="active"], [data-mfa-panneau="passu"]', 20000);
 }
 const message = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-mfa-message]'); return e ? e.getAttribute('data-mfa-message') + ' : ' + e.innerText.slice(0, 110) : ''; });
 const nb = (pg) => attr(pg, '[data-mfa-panneau]', 'data-mfa-nb');
@@ -178,7 +184,7 @@ async function scenarios(nav, taille) {
     const st = nouvelEtat([TEL, IPAD]), ctx = garde(await ctxDe(nav, taille)); await brancher(ctx, st);
     const pg = await ctx.newPage();
     await seConnecter(pg);
-    const porte = await attendre(pg, '[data-porte-mfa="code"]', 8000);
+    const porte = await attendre(pg, '[data-porte-mfa="code"]', 20000);
     dit(porte, "l'écran du code s'affiche après le mot de passe");
     const t = await texte(pg, '[data-porte-mfa]');
     dit((await attr(pg, '[data-mfa-appareils]', 'data-mfa-appareils')) === '2' && /iPad/.test(t) && /Appareil ajouté le 16\/10\/2026/.test(t) && !/VRM 2026-10-16T/.test(t),
@@ -190,7 +196,7 @@ async function scenarios(nav, taille) {
     dit(!(await deborde(pg)), "l'écran du code ne déborde pas");
     if (porte) {
       await pg.fill('[data-mfa-code]', CODE_IPAD); await pg.click('[data-mfa-valider]');
-      await pg.waitForTimeout(4000);
+      await erreurPorte(pg); await pg.waitForTimeout(1500);
       const err = await texte(pg, '[data-mfa-erreur]');
       dit(!(await pg.$('[data-porte-mfa]')) && st.rest.length > 0, "le code de l'iPad (second appareil) ouvre l'app", err ? 'refusé : ' + err.slice(0, 80) : st.rest.length + ' lecture(s)');
       const s = await session(pg);
@@ -204,12 +210,12 @@ async function scenarios(nav, taille) {
     await ctx.addInitScript((s) => { try { if (!localStorage.getItem('vrm_session')) { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); } } catch (_) {} },
       { access_token: jwt('aal1'), refresh_token: 'r-aal1', expires_at: Date.now() + 3600e3, user: USER, totp: ['f-tel-retire'] });
     const pg = await ctx.newPage();
-    await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3500);
-    const porte = await attendre(pg, '[data-porte-mfa="code"]', 6000);
+    await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+    const porte = await attendre(pg, '[data-porte-mfa="code"]', 20000);
     dit(porte, "l'écran du code s'affiche (la session croit encore à l'appareil retiré)");
     if (porte) {
       await pg.fill('[data-mfa-code]', CODE_IPAD); await pg.click('[data-mfa-valider]');
-      await pg.waitForTimeout(4500);
+      await erreurPorte(pg);
       const err = await texte(pg, '[data-mfa-erreur]');
       dit(!(await pg.$('[data-porte-mfa]')), "UN envoi du bon code ouvre l'app (la liste est relue)", err ? 'refusé : ' + err.slice(0, 90) : '');
     }
@@ -220,9 +226,9 @@ async function scenarios(nav, taille) {
     const st = nouvelEtat([TEL]), ctx = garde(await ctxDe(nav, taille)); await brancher(ctx, st);
     const pg = await ctx.newPage();
     await seConnecter(pg);
-    if (await attendre(pg, '[data-porte-mfa="code"]', 8000)) {
+    if (await attendre(pg, '[data-porte-mfa="code"]', 20000)) {
       st.limite = 0;
-      await pg.fill('[data-mfa-code]', CODE_TEL); await pg.click('[data-mfa-valider]'); await pg.waitForTimeout(1500);
+      await pg.fill('[data-mfa-code]', CODE_TEL); await pg.click('[data-mfa-valider]'); await erreurPorte(pg);
       const err = await texte(pg, '[data-mfa-erreur]');
       dit(/trop d.essais/i.test(err) && !/ne correspond pas/i.test(err) && !!(await pg.$('[data-porte-mfa]')), "« trop d'essais », la porte reste fermée", err.slice(0, 120));
       dit(!!(await session(pg)), 'toujours connecté (pas renvoyé au mot de passe)');
@@ -242,19 +248,21 @@ async function scenarios(nav, taille) {
     await capture(pg, `reglages-un-appareil-${taille}`);
     dit(!!(await pg.$('[data-mfa-conseil-secours]')) && !!(await pg.$('[data-mfa-ajouter]')), 'un seul appareil : un appareil de secours est proposé (pas imposé)');
     if (vu) {
-      await pg.click('[data-mfa-ajouter]', { timeout: 4000 }); await attendre(pg, '[data-mfa-nom]', 4000);
-      await pg.fill('[data-mfa-nom]', 'téléphone'); await pg.click('[data-mfa-ajouter-continuer]', { timeout: 4000 }); await pg.waitForTimeout(900);
+      await pg.click('[data-mfa-ajouter]', { timeout: 4000 }); await attendre(pg, '[data-mfa-nom]', 8000);
+      let avant = await signature(pg);
+      await pg.fill('[data-mfa-nom]', 'téléphone'); await pg.click('[data-mfa-ajouter-continuer]', { timeout: 4000 }); await nouveauMessage(pg, avant);
       dit(/^err/.test(await message(pg)) && st.enrolls.length === 0, 'un nom déjà pris est refusé, et RIEN n’est créé chez GoTrue', (await message(pg)) + ' · ' + st.enrolls.length + ' création(s)');
       await pg.fill('[data-mfa-nom]', 'iPad'); await pg.click('[data-mfa-ajouter-continuer]', { timeout: 4000 });
-      const qr = await attendre(pg, 'img[data-mfa-qr]', 6000);
+      const qr = await attendre(pg, 'img[data-mfa-qr]', 20000);
       dit(qr && st.enrolls.length === 1 && st.enrolls[0].nom === 'iPad' && st.enrolls[0].aal === 'aal2', "le second appareil est créé sous SON nom, avec un jeton aal2", JSON.stringify(st.enrolls));
       await capture(pg, `reglages-qr-secours-${taille}`);
       dit(!!(await pg.$('[data-mfa-ajout-consigne]')), "la consigne dit de scanner avec l'AUTRE appareil");
       dit((await pg.$$('[data-mfa-appareil]')).length === 0 && st.factors.filter((x) => x.status === 'verified').length === 1, 'pas encore ajouté avant son premier code');
-      await pg.fill('[data-mfa-code-activer]', CODE_TEL); await pg.click('[data-mfa-confirmer]'); await pg.waitForTimeout(1000);
+      avant = await signature(pg);
+      await pg.fill('[data-mfa-code-activer]', CODE_TEL); await pg.click('[data-mfa-confirmer]'); await nouveauMessage(pg, avant);
       dit(/^err/.test(await message(pg)) && st.factors.filter((x) => x.status === 'verified').length === 1, "le code du TÉLÉPHONE n'ajoute pas l'iPad", await message(pg));
       await pg.fill('[data-mfa-code-activer]', CODE_NEUF); await pg.click('[data-mfa-confirmer]');
-      const deux = await pg.waitForFunction(() => { const e = document.querySelector('[data-mfa-panneau]'); return e && e.getAttribute('data-mfa-nb') === '2'; }, null, { timeout: 6000 }).then(() => true).catch(() => false);
+      const deux = await pg.waitForFunction(() => { const e = document.querySelector('[data-mfa-panneau]'); return e && e.getAttribute('data-mfa-nb') === '2'; }, null, { timeout: 20000 }).then(() => true).catch(() => false);
       dit(deux && /^ok/.test(await message(pg)), "le code de l'iPad l'ajoute : deux appareils", await message(pg));
       const s = await session(pg);
       dit(s && Array.isArray(s.totp) && s.totp.length === 2 && Object.values(s.totpNoms || {}).includes('iPad'), 'la session connaît les deux appareils', s ? JSON.stringify(s.totpNoms) : '');
@@ -264,18 +272,19 @@ async function scenarios(nav, taille) {
       console.log('── E. Téléphone perdu : retiré avec le code de l’iPad');
       const idIpad = st.factors.find((x) => x.friendly_name === 'iPad').id;
       await pg.click('[data-mfa-retirer="f-tel"]').catch(() => {});
-      const cf = await attendre(pg, '[data-mfa-code-desactiver]', 4000);
+      const cf = await attendre(pg, '[data-mfa-code-desactiver]', 10000);
       await capture(pg, `reglages-retirer-${taille}`);
       dit(cf && /Téléphone/.test(await texte(pg, '[data-mfa-panneau]')), "la confirmation nomme l'appareil à retirer");
       if (cf) {
-        await pg.fill('[data-mfa-code-desactiver]', CODE_FAUX); await pg.click('[data-mfa-confirmer-off]'); await pg.waitForTimeout(1200);
+        avant = await signature(pg);
+        await pg.fill('[data-mfa-code-desactiver]', CODE_FAUX); await pg.click('[data-mfa-confirmer-off]'); await nouveauMessage(pg, avant);
         dit(st.deletes.length === 0 && /^err/.test(await message(pg)), 'un code faux ne retire rien', await message(pg));
-        const avant = st.verifs.length;
+        const nVerifs = st.verifs.length;
         await pg.fill('[data-mfa-code-desactiver]', CODE_NEUF); await pg.click('[data-mfa-confirmer-off]');
-        const un = await pg.waitForFunction(() => { const e = document.querySelector('[data-mfa-panneau]'); return e && e.getAttribute('data-mfa-nb') === '1' && !e.getAttribute('data-mfa-cours'); }, null, { timeout: 6000 }).then(() => true).catch(() => false);
+        const un = await pg.waitForFunction(() => { const e = document.querySelector('[data-mfa-panneau]'); return e && e.getAttribute('data-mfa-nb') === '1' && !e.getAttribute('data-mfa-cours'); }, null, { timeout: 20000 }).then(() => true).catch(() => false);
         dit(un && st.deletes.length === 1 && st.deletes[0].id === 'f-tel' && st.deletes[0].aal === 'aal2', 'le téléphone est retiré (DELETE en aal2), et lui seul', JSON.stringify(st.deletes));
         dit(st.factors.length === 1 && st.factors[0].id === idIpad, "l'iPad reste enregistré", st.factors.map((x) => x.friendly_name).join(', '));
-        const essais = st.verifs.slice(avant);
+        const essais = st.verifs.slice(nVerifs);
         dit(essais.length && essais[0].id === idIpad && essais[0].ok, "le code est d'abord essayé sur l'appareil qu'on GARDE (cas « perdu »)", JSON.stringify(essais));
         const s2 = await session(pg);
         dit(s2 && JSON.stringify(s2.totp) === JSON.stringify([idIpad]), 'la session ne connaît plus que l’iPad', s2 ? JSON.stringify(s2.totp) : '');
@@ -291,11 +300,12 @@ async function scenarios(nav, taille) {
     await seConnecter(pg);
     await passerLeCode(pg, CODE_TEL);
     if (await ouvrirPanneau(pg, taille)) {
-      await pg.click('[data-mfa-ajouter]', { timeout: 4000 }); await attendre(pg, '[data-mfa-nom]', 4000);
+      await pg.click('[data-mfa-ajouter]', { timeout: 4000 }); await attendre(pg, '[data-mfa-nom]', 8000);
       await pg.fill('[data-mfa-nom]', 'iPad'); await pg.click('[data-mfa-ajouter-continuer]', { timeout: 4000 });
-      await attendre(pg, '[data-mfa-code-activer]', 6000);
+      await attendre(pg, '[data-mfa-code-activer]', 20000);
       st.down = true;
-      await pg.fill('[data-mfa-code-activer]', CODE_NEUF).catch(() => {}); await pg.click('[data-mfa-confirmer]').catch(() => {}); await pg.waitForTimeout(1500);
+      const avant = await signature(pg);
+      await pg.fill('[data-mfa-code-activer]', CODE_NEUF, { timeout: 4000 }).catch(() => {}); await pg.click('[data-mfa-confirmer]', { timeout: 4000 }).catch(() => {}); await nouveauMessage(pg, avant);
       dit(/^passu/.test(await message(pg)) && st.factors.filter((x) => x.status === 'verified').length === 1, "pendant la panne : pas « ajouté », et c'est dit", await message(pg));
       dit(!!(await session(pg)), 'toujours connecté');
     } else dit(false, 'le panneau « Double vérification » est là');
