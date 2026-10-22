@@ -1,3 +1,4 @@
+import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
@@ -42454,7 +42455,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -42538,6 +42539,7 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
+      {data && <AnnoncesLeboncoin annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
@@ -42561,7 +42563,7 @@ function LeboncoinScreen() {
       })()}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
-        <Card className="vrm-lbc-compteur">
+        {(lim || data.plan) && <Card className="vrm-lbc-compteur">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
@@ -42579,7 +42581,7 @@ function LeboncoinScreen() {
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
             <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? 'Limite atteinte' : n >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
           </>) : null}
-        </Card>
+        </Card>}
         {/* À retirer (vendues sur Vinted) */}
         {/* ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
             Ce bloc disait « Vendues sur Vinted → retire-les », en rouge, dès
