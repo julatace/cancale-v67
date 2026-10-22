@@ -436,7 +436,11 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
 {
   const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
   const i = app.indexOf('const porteursNum = useMemo');
-  const bloc = i < 0 ? '' : app.slice(i, i + 2200);
+  // Le CORPS du useMemo, jusqu'à sa liste de dépendances — pas 2 200 caractères
+  // fixes : le 22 octobre une boucle de plus (annonces masquées) poussait la règle
+  // hors de la fenêtre et l'audit criait au loup (§6.5 : la règle, pas la taille).
+  const fin = i < 0 ? -1 : app.indexOf('\n  }, [', i);
+  const bloc = i < 0 ? '' : app.slice(i, fin > i ? fin : i + 2200);
   const c1 = /classifyOrderStatus\(o\.status\) === 'cancelled'/.test(bloc) && /venteExpediee\(o\)/.test(bloc)
     && /if \(!revenue && !needsBordereau\(o\.status\)\) continue;/.test(bloc);
   c1 ? ok("une vente annulée avant l'envoi garde son numéro (porteursNum)")

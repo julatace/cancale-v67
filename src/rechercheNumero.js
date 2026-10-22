@@ -45,6 +45,7 @@ export const lireNumeroCherche = (q, o, series = []) => {
 //   fiches       { [idAnnonce]: { numero, title, photo, accountId, reattribue, … } }
 //   pool         numéros servis (`vinted_used_numeros`)
 //   enLigne      Set d'ids d'annonces en ligne · aConfirmer : Set d'ids « à confirmer »
+//                · masquees : Set d'ids masqués par Vinted (paires présentes, 22 oct.)
 //   comptesOk    Set des comptes que la recherche regarde (null = tous)
 //   ventes       commandes Vinted vendues · txnItem { tx: idAnnonce } · saleOv { tx: { numero } }
 //   bordereaux   [{ tx, pdf }] · imprimes { tx: … } · postes { tx: … }
@@ -74,7 +75,7 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
       if (r && meme(r.de) && !meme(f.numero)) reattribues.push({ sens: 'parti', id: String(id), de: str(r.de), vers: str(f.numero), ecrit: !!r.ecrit, title: f.title || '' });
       if (!meme(f.numero)) continue;
       if (D.comptesOk && f.accountId && !D.comptesOk.has(String(f.accountId))) continue;
-      const etat = D.enLigne == null ? 'passu' : D.enLigne.has(String(id)) ? 'en-ligne' : (D.aConfirmer && D.aConfirmer.has(String(id))) ? 'a-confirmer' : 'plus-en-ligne';
+      const etat = D.enLigne == null ? 'passu' : D.enLigne.has(String(id)) ? 'en-ligne' : (D.aConfirmer && D.aConfirmer.has(String(id))) ? 'a-confirmer' : (D.masquees && D.masquees.has(String(id))) ? 'masquee' : 'plus-en-ligne';
       annonces.push({ id: String(id), title: f.title || '', photo: f.photo || null, price: f.price || null, etat, accountId: f.accountId || null });
       if (r && meme(r.vers)) reattribues.push({ sens: 'arrive', id: String(id), de: str(r.de), vers: str(f.numero), ecrit: !!r.ecrit, title: f.title || '' });
     }
@@ -137,7 +138,9 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
 
   // 6. Deux paires PRÉSENTES sous ce N° : la règle de l'app (`conflitsDeNumeros`).
   const porteurs = [];
-  for (const a of annonces) if (a.etat === 'en-ligne' || a.etat === 'a-confirmer') porteurs.push({ type: 'annonce', titre: a.title, id: a.id, aConfirmer: a.etat === 'a-confirmer' });
+  // Une annonce MASQUÉE par Vinted est une paire sur l'étagère (22 oct., la
+  // règle de `porteursNum`) : elle porte son numéro.
+  for (const a of annonces) if (a.etat === 'en-ligne' || a.etat === 'a-confirmer' || a.etat === 'masquee') porteurs.push({ type: 'annonce', titre: a.title, id: a.id, aConfirmer: a.etat === 'a-confirmer', masquee: a.etat === 'masquee' });
   for (const v of ventesVinted) {
     if (o.aPoster && o.aPoster(v)) porteurs.push({ type: 'vente', titre: v.title || '', id: v._tx });
     // Annulée AVANT l'envoi : la paire n'a jamais quitté l'étagère, elle porte

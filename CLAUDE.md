@@ -219,6 +219,41 @@ qu'aucune règle n'en désigne une.
   20 oct. : N°51, 52, 59, 73 en double (une paire du 14 oct., une renumérotée le
   18) — la seconde de chaque paire reçoit un numéro neuf à la prochaine
   ouverture de VRM.
+  ⚠️⚠️ **22 OCTOBRE — CETTE PROMESSE N'ÉTAIT PAS TENUE : LES ANNONCES MASQUÉES
+  PAR VINTED N'ÉTAIENT PAS DES PAIRES PRÉSENTES.** Mesuré (lecture seule) :
+  seuls 58→91 et 70→92 avaient été réglés. Le dressing de julatace35260
+  (3156028798, lu le 17/10) porte 6 annonces **`is_hidden: true`**
+  (`is_closed: false`, `is_draft: false`, `item_closing_action` vide) ; sa
+  lecture publique du 22/10 est complète et vide. La règle « en ligne » les
+  range parmi les FERMÉES : ni « en ligne », ni « à confirmer » — donc absentes
+  de `porteursNum`. Les N°**51, 52, 59, 73** (masquées, numérotées le 14/10
+  15:47) restaient portés aussi par 4 paires en ligne numérotées le 18/10 08:26,
+  toutes automatiques. ⇒ `<masquees-regle>` (`masqueeSurVinted`,
+  `masqueesDuCompte` : prises dans les fermées rendues par `enLigneDuCompte` —
+  jamais le dressing brut, une démasquée depuis est déjà « en ligne » — ; une
+  suppression vue après la lecture la retire ; « pas su » n'écarte rien) et UNE
+  liste `annoncesPresentes` (en ligne + à confirmer + masquées, une fois chacune)
+  pour `porteursNum`, `numDoublons`, le règlement des doublons,
+  `vinted_nums_physiques`, `presentesAnnonceIds`, les cartons à vérifier et à
+  réécrire, et la recherche « Tout sur le N° » (état `masquee`). La règle du
+  20 octobre est INCHANGÉE : à la prochaine ouverture (ventes et annonces de tous
+  les comptes lues), les 4 paires en ligne du 18/10 reçoivent un numéro neuf,
+  dit dans « nouveaux numéros à écrire sur tes cartons » ; les masquées gardent
+  le leur. Une masquée n'est **pas** « en ligne » (totaux, grille, files
+  Leboncoin/eBay inchangés). L'écran la nomme « masquée par Vinted, toujours chez
+  toi ». Une entrée de cache d'annonces d'avant ce correctif est relue (elle ne
+  sait pas lesquelles sont masquées). Preuves : banc `numeros-doublons.cjs`
+  F/G/H (**6 rouges** sur `main` d198bca, vert après ; sous mutation —
+  suppression ignorée + masquées hors du règlement — **5 rouges**) ;
+  `audit-masquees-numeros.cjs` (13 contrôles, **3 rouges** sur `main`, 3
+  mutations sur 3 attrapées) ; `audit-identite.cjs` lisait 2 200 caractères fixes
+  de `porteursNum` et criait au loup : il lit le corps du `useMemo` (rouge si la
+  règle « annulée avant l'envoi » disparaît, prouvé). **Non mesuré** : le rendu
+  sur sa vraie base (aucune fixture ici) ; une masquée vendue hors Vinted fait
+  renuméroter l'autre pour rien (un carton à réécrire, jamais deux paires sous
+  un N°) — « elle n'est plus là » la règle. Les annonces « disparues » d'une
+  lecture publique (`_vrmAbsente` : supprimées, vendues OU masquées après la
+  lecture du dressing) ne sont PAS comptées : rien ne dit qu'elles sont masquées.
 
 ### Les chiffres
 - **Le chiffre faux est la porte pour le corriger.** « Coût d'achat · 1/184

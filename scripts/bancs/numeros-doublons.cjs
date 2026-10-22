@@ -12,6 +12,15 @@
 //      ne bouge (le bloc rouge reste).
 //   E. l'impression d'un bordereau dont le carton n'a pas encore son nouveau N°
 //      demande d'abord.
+//   F. (22 oct.) une annonce MASQUÉE par Vinted (`is_hidden: true`, la forme
+//      mesurée sur julatace35260) est une paire PRÉSENTE : numérotée la
+//      première, elle GARDE le N° ; l'annonce en ligne numérotée après reçoit un
+//      numéro neuf, dit dans « à écrire sur tes cartons ». La masquée n'est pas
+//      comptée « en ligne » et n'apparaît pas dans la grille.
+//   G. masquée puis SUPPRIMÉE (suppression vue après la lecture) : plus une
+//      paire présente — aucun numéro ne bouge.
+//   H. masquée numérotée APRÈS l'annonce en ligne : c'est ELLE qui change (la
+//      règle est la même, elle n'est pas « en ligne seulement »).
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
@@ -24,8 +33,8 @@ const JETON = 'jeton-de-banc';
 const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.fr' }, totp: [] };
 const UID = '900000001';
 const COMPTE = { vinted_user_id: UID, login: 'compte-de-banc', access_token: 'x', refresh_token: 'x', csrf_token: 'x', updated_at: new Date().toISOString() };
-const item = (id, t) => ({ id, title: t || ('Paire ' + id), price: { amount: '40.0', currency_code: 'EUR' }, is_closed: false, photos: [], brand: 'Nike', size: '42' });
-const LISTINGS = (ids) => ({ id: `harvest_${UID}_listings`, data: { capturedAt: new Date().toISOString(), payload: { items: ids.map((i) => item(i.id, i.t)) } } });
+const item = (id, t, masquee) => ({ id, title: t || ('Paire ' + id), price: { amount: '40.0', currency_code: 'EUR' }, is_closed: false, is_hidden: !!masquee, is_draft: false, item_closing_action: null, photos: [], brand: 'Nike', size: '42' });
+const LISTINGS = (ids) => ({ id: `harvest_${UID}_listings`, data: { capturedAt: new Date().toISOString(), payload: { items: ids.map((i) => item(i.id, i.t, i.masquee)) } } });
 
 let ko = 0;
 const dit = (bon, quoi, detail) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${detail ? ' — ' + detail : ''}`); };
@@ -64,6 +73,7 @@ async function brancher(pg, etat) {
       return json(rows.filter((x) => /like\./.test(u) || u.includes(x.id)).map((x) => ({ ...x, cap: x.data.capturedAt, n: String(x.data.payload.my_orders.length) })));
     }
     if (/_listings/.test(u) && /harvest_/.test(u)) return json([{ ...etat.listings, cap: etat.listings.data.capturedAt }]);
+    if (/_supprimees/.test(u) && /harvest_/.test(u)) return json(etat.supprimees ? [{ id: `harvest_${UID}_supprimees`, ids: etat.supprimees }] : []);
     if (/ebay_brouillons/.test(u)) return json(etat.ebay ? [{ id: 'ebay_brouillons', items: etat.ebay.brouillons }] : []);
     if (/ebay_listings/.test(u)) return json(etat.ebay ? [{ id: 'ebay_listings', items: etat.ebay.listings }] : []);
     return json([]);
@@ -163,6 +173,67 @@ const SERVIS = ['1', '2', '3', '51', '52'];
       await pg.waitForTimeout(9000);
       const loc = await fichesLocales(pg) || {};
       dit(String((loc['7001'] || {}).numero) === '51' && String((loc['7002'] || {}).numero) === '51', 'rien n\'est changé tant que les ventes ne sont pas lues', JSON.stringify({ a: (loc['7001'] || {}).numero, b: (loc['7002'] || {}).numero }));
+      await ctx.close();
+    }
+    for (const taille of [1512, 390]) {
+      console.log(`\n── F. Une annonce MASQUÉE par Vinted porte son numéro (${taille} px)`);
+      const etat = { main: { vinted_annonce_numeros: {
+          '4101': { numero: '51', auto: true, numberedAt: '2026-10-14T15:47:09.775Z', title: 'Patta masquée de banc' },
+          '4102': { numero: '51', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'Samba en ligne de banc' },
+        }, vinted_used_numeros: [1, 2, 3, 51, 52], vinted_accounts_hidden: [] },
+        listings: LISTINGS([{ id: 4101, t: 'Patta masquée de banc', masquee: true }, { id: 4102, t: 'Samba en ligne de banc' }]), ventes: [], ecrits: [], ebay: null, panneEcriture: false, garder: true };
+      const { ctx, pg, erreurs } = await ouvrir(nav, etat, taille, 'cat_annonces');
+      await pg.waitForSelector('[data-numeros-a-ecrire]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(2500);
+      const loc = await fichesLocales(pg) || {}, pool = (await poolLocal(pg) || []).map(String);
+      const n2 = String((loc['4102'] || {}).numero || '');
+      dit(String((loc['4101'] || {}).numero) === '51', 'la paire MASQUÉE, numérotée la première, garde le N°51', String((loc['4101'] || {}).numero));
+      dit(!!n2 && !SERVIS.includes(n2), 'l\'annonce en ligne numérotée après reçoit un numéro JAMAIS servi', `N°${n2 || '—'}`);
+      dit(pool.includes(n2), 'le numéro neuf est brûlé (pool)', pool.join(','));
+      const ligne = await pg.evaluate(() => { const e = document.querySelector('[data-a-ecrire="4102"]'); return e ? [e.getAttribute('data-a-ecrire-de'), e.getAttribute('data-a-ecrire-vers')] : null; });
+      dit(!!ligne && ligne[0] === '51' && ligne[1] === n2, '« à écrire sur tes cartons » dit N°51 → le neuf', JSON.stringify(ligne));
+      // (le résumé vit dans un volet replié : `textContent`, pas `innerText`)
+      const resume = await pg.evaluate(() => { const e = document.querySelector('[data-ann-resume]'); return e ? e.textContent : ''; });
+      dit(/(^|\D)1 en ligne sur Vinted/.test(resume), 'la masquée n\'est PAS comptée « en ligne »', resume.slice(0, 60));
+      const cartes = await pg.evaluate(() => [...document.querySelectorAll('[data-carte-annonce]')].map((e) => e.getAttribute('data-carte-annonce')));
+      dit(cartes.includes('4102') && !cartes.includes('4101'), 'la grille montre l\'annonce en ligne, PAS la masquée', JSON.stringify(cartes));
+      const phys = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vinted_nums_physiques') || 'null') || {}).nums || null; } catch (_) { return null; } });
+      dit(Array.isArray(phys) && phys.includes('51') && phys.includes(n2), 'les numéros physiques portent le N°51 (masquée) ET le neuf', JSON.stringify(phys));
+      const larg = await pg.evaluate(() => document.documentElement.scrollWidth);
+      dit(larg <= taille, 'aucun débordement horizontal', String(larg));
+      dit(erreurs.length === 0, 'aucune erreur d\'app', erreurs.join(' | '));
+      await ctx.close();
+    }
+    {
+      console.log('\n── G. Masquée puis supprimée : plus une paire présente');
+      const etat = { main: { vinted_annonce_numeros: {
+          '4201': { numero: '52', auto: true, numberedAt: '2026-10-14T15:47:09.775Z', title: 'Masquée supprimée de banc' },
+          '4202': { numero: '52', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'En ligne de banc' },
+        }, vinted_used_numeros: [1, 2, 3, 51, 52], vinted_accounts_hidden: [] },
+        listings: LISTINGS([{ id: 4201, t: 'Masquée supprimée de banc', masquee: true }, { id: 4202, t: 'En ligne de banc' }]),
+        supprimees: { '4201': new Date(Date.now() + 60e3).toISOString() }, ventes: [], ecrits: [], ebay: null, panneEcriture: false };
+      const { ctx, pg } = await ouvrir(nav, etat, 1512, 'cat_annonces');
+      await pg.waitForSelector('[data-ann-resume]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(6000);
+      const loc = await fichesLocales(pg) || {};
+      dit(String((loc['4201'] || {}).numero) === '52' && String((loc['4202'] || {}).numero) === '52', 'aucun numéro ne bouge (la masquée a été supprimée)', JSON.stringify({ a: (loc['4201'] || {}).numero, b: (loc['4202'] || {}).numero }));
+      const ecrire = await pg.evaluate(() => !!document.querySelector('[data-numeros-a-ecrire]'));
+      dit(!ecrire, 'rien à réécrire sur un carton', String(ecrire));
+      await ctx.close();
+    }
+    {
+      console.log('\n── H. Masquée numérotée APRÈS : c\'est elle qui change');
+      const etat = { main: { vinted_annonce_numeros: {
+          '4301': { numero: '59', auto: true, numberedAt: '2026-10-14T15:47:09.775Z', title: 'En ligne ancienne de banc' },
+          '4302': { numero: '59', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'Masquée récente de banc' },
+        }, vinted_used_numeros: [1, 2, 3, 51, 52, 59], vinted_accounts_hidden: [] },
+        listings: LISTINGS([{ id: 4301, t: 'En ligne ancienne de banc' }, { id: 4302, t: 'Masquée récente de banc', masquee: true }]), ventes: [], ecrits: [], ebay: null, panneEcriture: false, garder: true };
+      const { ctx, pg } = await ouvrir(nav, etat, 1512, 'cat_annonces');
+      await pg.waitForSelector('[data-numeros-a-ecrire]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(2500);
+      const loc = await fichesLocales(pg) || {};
+      const n = String((loc['4302'] || {}).numero || '');
+      dit(String((loc['4301'] || {}).numero) === '59', 'l\'annonce en ligne numérotée la première garde le N°59', String((loc['4301'] || {}).numero));
+      dit(!!n && n !== '59' && !SERVIS.includes(n), 'la masquée reçoit un numéro jamais servi', `N°${n || '—'}`);
+      const ligne = await pg.evaluate(() => { const e = document.querySelector('[data-a-ecrire="4302"]'); return e ? [e.getAttribute('data-a-ecrire-de'), e.getAttribute('data-a-ecrire-vers')] : null; });
+      dit(!!ligne && ligne[0] === '59' && ligne[1] === n, '« à écrire sur tes cartons » nomme la masquée', JSON.stringify(ligne));
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }
