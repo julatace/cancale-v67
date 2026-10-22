@@ -36723,7 +36723,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sur Vinted. Une ligne, le compte nommé une fois quand il est le même
             (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
             « rien à confirmer ». */}
-        {aConfirmer.etat==='passu' && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
+        {aConfirmer.etat==='passu' && !baseKO && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
         {aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
           const l = aConfirmer.liste;
           const nomDe = (e)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; };

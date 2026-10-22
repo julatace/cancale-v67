@@ -99,6 +99,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') +
 async function couleurs(pg, tx) {
   // Les détails sont désormais dans le panneau désigné par aria-controls.
   const bouton = pg.locator(`.vrm-sale-row[data-tx="${tx}"] > .vrm-ledger-sale-toggle`);
+  // Le détail d'une AUTRE vente encore ouvert (une feuille sur téléphone) couvre
+  // la ligne visée : on le referme comme lui (Échap) avant d'ouvrir celle-ci.
+  if (await pg.locator(`.vrm-sale-row:not([data-tx="${tx}"]) > .vrm-ledger-sale-toggle[aria-expanded="true"]`).count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
   if (await bouton.count() && await bouton.getAttribute('aria-expanded') !== 'true') await bouton.click();
   return pg.evaluate((tx) => {
     const row = document.querySelector(`.vrm-sale-row[data-tx="${tx}"]`); if (!row) return null;
