@@ -48,3 +48,5 @@ export async function routeProfilAvatar(req,res){
   return res.status(503).json({ok:false,message:'La photo a changé au même moment. Réessaie.'});
  }catch(_){return res.status(503).json({ok:false,message:'La photo n’a pas pu être enregistrée. Réessaie dans un moment.'});}
 }
+
+export const lignesPriveesProfil=owner=>[idDe(owner),'quota_v1_'+empreintePrivee(owner+'|profil-avatar'),'discord_attente_'+empreintePrivee(owner)];

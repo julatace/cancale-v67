@@ -155,7 +155,7 @@ export async function retourDiscord(req, res, f = fetch) {
 const SB_URL = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SERVICE = () => String(process.env.SUPABASE_SERVICE_KEY || '');
 export const DISCORD_ATTENTE_ID = 'discord_attente';
-export const idAttenteDiscord=(owner,ticket)=>DISCORD_ATTENTE_ID+'_'+crypto.createHash('sha256').update(String(owner)+'|'+String(ticket)).digest('hex');
+export const idAttenteDiscord=(owner,ticket)=>DISCORD_ATTENTE_ID+'_'+crypto.createHash('sha256').update(String(owner)).digest('hex');
 const empreinte = (t) => crypto.createHash('sha256').update('vrm-discord-ticket|' + String(t)).digest('hex');
 const empreinteCode = (t, c) => crypto.createHash('sha256').update('vrm-discord-code|' + String(t) + '|' + String(c)).digest('hex');
 export const ESSAIS_CODE = 5;

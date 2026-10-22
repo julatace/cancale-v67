@@ -1,13 +1,13 @@
 import React,{useState,useEffect} from 'react';
 const cache=new Map(),enVol=new Map(),abonnes=new Set();
-const publier=(owner,v)=>{cache.set(owner,v);for(const f of abonnes)f(owner,v);};
+const publier=(owner,v)=>{v={...v,luAt:Date.now()};cache.set(owner,v);for(const f of abonnes)f(owner,v);};
 async function charger(owner,headers){
  if(!owner)return null;if(enVol.has(owner))return enVol.get(owner);
  const p=(async()=>{try{const r=await fetch('/api/compte?mode=profil-avatar',{headers:headers(),cache:'no-store',signal:AbortSignal.timeout(20000)});const j=await r.json();if(r.ok&&j.ok){publier(owner,j);return j;}}catch(_){}return null;})();enVol.set(owner,p);try{return await p;}finally{enVol.delete(owner);}
 }
 function usePhoto(owner,headers){
  const[p,setP]=useState(()=>cache.get(owner)||null);
- useEffect(()=>{setP(cache.get(owner)||null);const f=(u,v)=>{if(u===owner)setP(v);};abonnes.add(f);if(!cache.has(owner))charger(owner,headers);return()=>abonnes.delete(f);},[owner]);return p;
+ useEffect(()=>{setP(cache.get(owner)||null);const f=(u,v)=>{if(u===owner)setP(v);};abonnes.add(f);const relire=()=>{if(!cache.has(owner)||Date.now()-(cache.get(owner).luAt||0)>60000)charger(owner,headers);};relire();window.addEventListener('focus',relire);return()=>{abonnes.delete(f);window.removeEventListener('focus',relire);};},[owner]);return p;
 }
 export function AvatarCompte({owner,headers,lettre='V'}){
  const p=usePhoto(owner,headers),[rate,setRate]=useState('');const image=p?.image;

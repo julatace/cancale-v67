@@ -197,8 +197,8 @@ async function lierAvatarAuProfil(owner,qui,moi){
   if(!moi?.pid)return;
   const d=await lireDiscordCompte(owner,qui);
   if(!d||!avatarPublicVerifie(owner,d)||d.discord!==moi.discord||d.pid===moi.pid)return;
-  const data={v:2,...d,pid:moi.pid,signatureAvatar:signerAvatarPublic(owner,d.discord,moi.pid,d.avatar)};
-  try{await fetch(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`,{method:'POST',headers:{...qui,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{owner,id:DISCORD_COMPTE_ID,data}]),signal:AbortSignal.timeout(6000)});}catch(_){}
+  const data={v:2,...d,verifie:true,pid:moi.pid,signatureAvatar:signerAvatarPublic(owner,d.discord,moi.pid,d.avatar)};
+  try{await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&data->>signatureAvatar=eq.${d.signatureAvatar}`,{method:'PATCH',headers:{...qui,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({data}),signal:AbortSignal.timeout(6000)});}catch(_){}
 }
 
 const objet = (v) => (v && typeof v === 'object' ? v : null);
