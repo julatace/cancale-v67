@@ -144,7 +144,10 @@ async function rappel(opts) {
   });
   await essaie('rappel du matin, eBay illisible et pas de résumé', async () => {
     const r = await rappel({ ebay: 'panne', vinted: false });
-    dit(pushes.length === 0 && /resume absent/.test(JSON.stringify(r.corps)), 'rappel : rien de lisible ⇒ aucun envoi (rien inventé)', JSON.stringify(r.corps).slice(0, 200));
+    // (22 oct.) Le rappel lit maintenant la liste du soir (`txsAExpedier`) :
+    // « aucune vente Vinted captée » remplace « resume absent ». La règle jugée
+    // reste la même : rien de lisible ⇒ aucun envoi, et le silence est motivé.
+    dit(pushes.length === 0 && /resume absent|aucune vente Vinted captée/.test(JSON.stringify(r.corps)), 'rappel : rien de lisible ⇒ aucun envoi (rien inventé)', JSON.stringify(r.corps).slice(0, 200));
   });
   await essaie('rappel du matin, aucune vente eBay', async () => {
     const r = await rappel({ ebay: 'aucune', vinted: true });

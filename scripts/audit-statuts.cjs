@@ -80,7 +80,13 @@ const ACHAT_RELAIS = { status: "La livraison n'a pas encore eu lieu - colis dép
 
 const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
 const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'TXN_ETATS', 'noterEtatsTxn', 'etatTxn', 'txnBloqueEnvoi', 'SS_PARTI', 'txnAnnuleeAvantEnvoi', 'COLIS_DEJA_BOUGE', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
-const app = charge('src/App.jsx', APP_NOMS);
+// (22 oct.) La date limite d'envoi vit dans api/_lib/limite-envoi.js, importée
+// par l'app ET le serveur (§11) : l'audit suit la règle jusqu'à sa définition.
+const LIMITE_NOMS = ['DELAI_EXPEDITION_J', 'FUSEAU', 'J', '_fmt', 'partsParis', 'jourParis', 'jourDecale', 'ecartJours', 'instantParis', 'finDuJour', 'lireDateLimite', 'limiteExpedition', 'echeanceLimite'];
+const lim = charge('api/_lib/limite-envoi.js', LIMITE_NOMS, {}, { sourceType: 'module', plugins: [] });
+const app = charge('src/App.jsx', APP_NOMS, lim);
+for (const n of ['DELAI_EXPEDITION_J', 'limiteExpedition']) if (app[n] === undefined && lim[n] !== undefined) app[n] = lim[n];
+app.joursAvantLimiteFr = app.joursAvantLimiteFr || ((s) => { const l = lim.lireDateLimite && lim.lireDateLimite(s); return l ? lim.echeanceLimite(l).jours : null; });
 // Les étiquettes vivent dans un composant : on les charge avec leurs voisins.
 // Depuis le 16 octobre la règle des étiquettes vit au niveau module
 // (`etapeVente`, `etapeAchat`, `phaseAchat`) : on la charge avant ses enveloppes.
@@ -203,14 +209,14 @@ essaie('(g) délai', () => {
   // ⚠️ 6 octobre : la date limite vit dans `limiteExpedition` (partagée avec
   //    l'alerte « coché posté, jamais vu partir », §11). L'audit suit la RÈGLE
   //    jusqu'à sa définition — et l'EXÉCUTE — au lieu d'exiger une orthographe.
-  const d2 = new Date(); d2.setDate(d2.getDate() + 2);
-  const fr2 = `${String(d2.getDate()).padStart(2, '0')}/${String(d2.getMonth() + 1).padStart(2, '0')}/${d2.getFullYear()}`;
+  // Le jour « dans deux jours » À PARIS (la règle compte en jours de Paris).
+  const frParis = (n) => { const [a, m, j] = new Date(Date.now() + n * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).split('-'); return `${j}/${m}/${a}`; };
+  const fr2 = frParis(2);
   const viaHelper = /limiteExpedition\(\s*o\s*,\s*b\s*\)/.test(corps) && typeof app.limiteExpedition === 'function'
     && (() => { const r = app.limiteExpedition({ date: new Date(Date.now() - 20 * 86400000).toISOString() }, { dateLimite: fr2 }); return r && r.daysLeft === 2 && r.limite === 'email'; })();
   dit(/joursAvantLimiteFr\(\s*b\.dateLimite\s*\)/.test(corps) || viaHelper, 'le rappel de Ma journée prend la date limite écrite dans l\'email du bordereau quand il l\'a');
   dit(/aExpedier\(o\)/.test(corps) && /isBordDone\(b\)/.test(corps), 'Ma journée applique la même règle et les mêmes sorties que Colis (bordereau marqué expédié, suivi transporteur)');
-  const d = new Date(); d.setDate(d.getDate() + 2);
-  const fr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  const fr = frParis(2);
   dit(app.joursAvantLimiteFr(fr) === 2, 'une date limite dans deux jours donne 2 jours restants', String(app.joursAvantLimiteFr(fr)));
 });
 

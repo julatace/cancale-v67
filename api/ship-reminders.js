@@ -1,12 +1,13 @@
 // api/ship-reminders.js
 // ────────────────────────────────────────────────────────────────────────────
-// RAPPEL D'EXPÉDITION (cron quotidien).
+// RAPPEL D'EXPÉDITION (cron quotidien, ~7 h à Paris l'été, ~6 h l'hiver).
 //
-// Vinted pénalise les colis expédiés en retard. Ce job lit les bordereaux reçus
-// par email (lignes email_bord_* de Supabase), garde ceux qui NE sont PAS encore
-// marqués « imprimés/expédiés » (vinted_bords_printed) et dont la date limite est
-// aujourd'hui, demain, ou déjà dépassée, puis envoie UNE notification push
-// récapitulative sur tous les appareils abonnés.
+// Vinted pénalise les colis expédiés en retard. Ce job prend les ventes que
+// Vinted dit encore À EXPÉDIER (`txsAExpedier` : la règle du rappel du soir, du
+// widget et de l'app — un bordereau IMPRIMÉ n'est pas un colis parti), leur date
+// limite AVEC SON HEURE (api/_lib/limite-envoi.js : l'email du bordereau, sinon
+// vente + 7 jours, estimée), garde celles en retard, dues aujourd'hui ou demain,
+// et envoie UNE notification récapitulative sur les appareils du vendeur.
 //
 // Il porte aussi, faute d'un second cron : le rappel URSSAF du 1er du mois, et
 // le BILAN DE LA SEMAINE du lundi matin (api/_lib/bilan-semaine.js dit pourquoi
@@ -24,6 +25,8 @@ import { semainePassee, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLi
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
 import { aExpedier } from './widget.js';
+// La date limite d'envoi (avec son heure) : UNE règle, celle de l'app (§11).
+import { bordsParTransaction, compterEcheances, heureCourte } from './_lib/limite-envoi.js';
 
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
@@ -47,11 +50,6 @@ const VENDEURS_EN_PARALLELE = 8;
 function parisDate(offsetDays = 0) {
   const d = new Date(Date.now() + offsetDays * 86400000);
   return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); // 'YYYY-MM-DD'
-}
-// « JJ/MM/AAAA … » → 'YYYY-MM-DD' (ou null si illisible).
-function frToIso(s) {
-  const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 // Trois états, jamais deux : la ligne (objet) · `null` = elle n'existe pas ·
 // `undefined` = la base n'a pas répondu (« rien lu » ne vaut pas « rien »).
@@ -295,33 +293,7 @@ async function traiterVendeur() {
   return { ...out, ebayRelu: resumeRelecture(relu) };
 }
 async function traiterVendeurApresRelecture() {
-    // ⚠️ ÉGRESS : surtout PAS `select=data` — chaque bordereau embarque son PDF
-    // en base64 (deux fois), ~6 Mo au total pour ~50 lignes, alors qu'on ne lit
-    // que la date limite + les clés. On projette donc ces 4 champs scalaires
-    // (même correctif que dans api/widget.js et §23 côté app).
-    const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
-    const rows = (await fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`))) || [];
-    // ⚠️⚠️ CE COMPTE ÉTAIT FAUX, ET LA NOTIFICATION MENTAIT EN GRAND.
-    // Il ne regardait QUE `vinted_bords_printed`. Or depuis §24 imprimer ne
-    // marque plus rien comme fait : cette liste est donc quasi vide, et le cron
-    // annonçait « 51 bordereaux à envoyer » (plainte de Julien) alors que
-    // **3 colis** attendaient réellement — mesuré sur les 72 bordereaux réels :
-    // 68 déjà partis selon Vinted, 1 vente inconnue, 3 en attente.
-    // La seule question qui compte : **cette vente attend-elle encore MON
-    // envoi ?** C'est exactement ce que l'extension écrit à la capture
-    // (`data.resume.txns`, §5.14) — même règle que l'app, lu en scalaire.
     const today = parisDate(0);
-    const mLu = await getRow('main');
-    const panelLu = await getRow('panel_bords_done');
-    const m = mLu || {};
-    const printed = m.vinted_bords_printed || {};
-    const shippedManual = m.vinted_bords_shipped || {};
-    const hidden = m.vinted_bords_hidden || {};
-    const panelDone = panelLu || {};
-    // Colis cochés « posté » dans l'app (par transaction) : ils ne sont plus à
-    // expédier — l'app les sort, la notification les comptait encore (4 oct.).
-    const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
-    const key = (b) => String(b.transaction || b.suivi || b.numero || '');
 
     // RAPPEL URSSAF — le 1er de chaque mois (Julien, 30 sept. : « envoie
     // simplement une notification le premier de chaque mois pour la faire »).
@@ -354,59 +326,42 @@ async function traiterVendeurApresRelecture() {
     let bilan = null;
     try { bilan = await bilanDeLaSemaine(); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
-    // Transactions encore en attente d'expédition, d'après la moisson.
-    let attente = null;
-    // Seuls les comptes encore liés comptent (comme l'app et le widget) : la
-    // moisson d'un compte retiré reste en base. `null` = pas su → on ne filtre pas.
-    let vivants = null;
-    try {
-      const va = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
-      if (va) { const s = new Set(va.map((r) => String(r.vinted_user_id || '')).filter(Boolean)); vivants = s.size ? s : null; } // vide n'est pas une réponse (§4.1)
-    } catch (_) { vivants = null; }
-    try {
-      const lignes = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_sold&select=id,txns:data->resume->txns`));
-      if (lignes) {
-        for (const l of lignes) {
-          const um = String(l.id || '').match(/^harvest_(.+?)_orders_/);
-          if (vivants && um && !vivants.has(um[1])) continue;            // on n'écarte que ce qu'on SAIT retiré
-          if (!Array.isArray(l.txns)) continue;
-          if (!attente) attente = new Set();
-          for (const t of l.txns) attente.add(String(t));
-        }
-      }
-    } catch (_) { attente = null; }
+    // ── LES COLIS DU MATIN : LA RÈGLE DU SOIR, DU WIDGET ET DE L'APP (22 oct.) ──
+    // ⚠️⚠️ CE RAPPEL ANNONÇAIT « RIEN À ENVOYER » À TORT. Mesuré le 22 octobre
+    // sur sa base : `ship_reminder_dedup` = {total 0} le matin, alors que le
+    // rappel de la veille au soir en comptait 3 et qu'UN colis (tomj683, limite
+    // le 23 à 10 h) était dû le lendemain. Deux défauts, deux règles à lui :
+    //   · il sautait un bordereau IMPRIMÉ (`vinted_bords_printed`) comme si le
+    //     colis était parti — l'app a décidé l'inverse (« imprimer ne suffit
+    //     pas ») : le colis de tomj683 faisait partie d'un lot imprimé le 20 ;
+    //   · il ne partait QUE des bordereaux reçus par EMAIL : une vente sans
+    //     email n'existait pas pour lui. Mesuré sur 30 jours : angeled92 0/18,
+    //     tomj606 0/8, arthuror2 1/10 — 36 ventes jamais comptées.
+    // ⇒ La LISTE est celle du soir et du widget (`txsAExpedier`), la DATE
+    //   LIMITE celle de l'app (`limiteExpedition`, avec son heure — l'email du
+    //   bordereau, sinon vente + 7 jours, dite estimée). Une règle, §11.
+    const d = await lireDonneesColis();
+    const t = txsAExpedier(d);
     // (19 octobre) Les ventes eBay à poster : la MÊME règle que l'app et le
     // widget (`colisEbay`, §11), lue indépendamment de Vinted — un vendeur qui
     // ne vend que sur eBay a aussi son rappel. Illisible ⇒ `null`, on n'invente
     // rien pour eBay (ni « 0 », ni un rappel).
     let eb = null;
-    try { eb = resumeColisEbay(colisEbay(await lireCommandesEbay())); } catch (_) { eb = null; }
-    // ⚠️ Aucune ligne ne porte encore de résumé (extension pas rechargée) : on
-    // se TAIT pour Vinted. Une notification fausse est pire que pas de
-    // notification — c'est très exactement le « 51 bordereaux » qu'on corrige ici.
-    // ⚠️ Ses colis cochés « posté », imprimés ou masqués vivent dans `main` et
-    //    `panel_bords_done` : lus en échec, ils compteraient comme « à expédier »
-    //    et la notification annoncerait des colis déjà partis. On se tait (Vinted).
+    try { eb = resumeColisEbay(colisEbay(d.ebay)); } catch (_) { eb = null; }
+    // ⚠️ « Pas su » se tait pour Vinted, jamais « 0 » : ventes, comptes ou
+    //    réglages (colis cochés « posté », masqués) illisibles ; ou les
+    //    bordereaux illisibles (leur heure limite manquerait : une date estimée
+    //    prendrait sa place et pourrait crier « en retard » à tort).
     let vintedSkip = null;
-    if (!attente) vintedSkip = 'resume absent';
-    else if (mLu === undefined || panelLu === undefined) vintedSkip = 'réglages illisibles';
+    if (!t) vintedSkip = 'ventes ou réglages illisibles';
+    else if (!Object.keys(d.commandes).length) vintedSkip = 'aucune vente Vinted captée';
+    else if (!Array.isArray(d.bords)) vintedSkip = 'bordereaux illisibles';
     // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
-    // passage suivant, réglages lus, ne doit pas se croire « déjà notifié »).
-    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, skipped: vintedSkip === 'resume absent' ? 'resume absent — aucune notification envoyee' : 'réglages illisibles — aucune notification envoyée' };
+    // passage suivant, tout lu, ne doit pas se croire « déjà notifié »).
+    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, skipped: vintedSkip + ' — aucune notification envoyée' };
 
-    const tomorrow = parisDate(1);
-    let overdue = 0, dueToday = 0, dueTomorrow = 0;
-    if (!vintedSkip) for (const b of rows) {
-      if (!b) continue;
-      const k = key(b);
-      if (printed[k] || shippedManual[k] || hidden[k] || panelDone[k]) continue;   // déjà traité, ici ou depuis le panneau
-      if (!b.transaction || !attente.has(String(b.transaction))) continue;         // Vinted n'attend plus ce colis
-      if (shipDone[String(b.transaction)]) continue;                               // coché « posté » dans l'app
-      const iso = frToIso(b.dateLimite); if (!iso) continue;
-      if (iso < today) overdue += 1;
-      else if (iso === today) dueToday += 1;
-      else if (iso === tomorrow) dueTomorrow += 1;
-    }
+    const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
+    let overdue = c ? c.retard : 0, dueToday = c ? c.aujourdhui : 0, dueTomorrow = c ? c.demain : 0;
     const ebayDus = eb ? eb.overdue + eb.today + eb.tomorrow : 0;
     if (eb) { overdue += eb.overdue; dueToday += eb.today; dueTomorrow += eb.tomorrow; }
     const total = overdue + dueToday + dueTomorrow;
@@ -417,46 +372,59 @@ async function traiterVendeurApresRelecture() {
     if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
-      const parts = [];
-      if (overdue) parts.push(`${overdue} en retard`);
-      if (dueToday) parts.push(`${dueToday} aujourd'hui`);
-      if (dueTomorrow) parts.push(`${dueTomorrow} demain`);
-      // Le mot suit la donnée : un bordereau Vinted s'imprime depuis VRM, une
-      // étiquette eBay se prend DANS eBay (l'acheteur l'a payée, §2.8).
-      const quoi = !ebayDus ? `${total} bordereau${total > 1 ? 'x' : ''} à envoyer`
-        : ebayDus === total ? `${total} colis eBay à envoyer`
-        : `${total} colis à envoyer, dont ${ebayDus} eBay`;
-      const corps = total > 0 ? `${quoi} (${parts.join(' · ')}).` : '';
-      const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
-      await sendPushToAll({
-        title: nePasPoster && !total ? '✋ Commande eBay : ne poste pas' : overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
-        body: (corps + stop).trim() + (ebayDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les imprimer."),
-        tag: 'ship-reminder',
-        url: '/?tab=cat_bord',
-      });
+      const txt = texteMatin({ overdue, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
+      await sendPushToAll({ ...txt, tag: 'ship-reminder', url: '/?tab=cat_bord' });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total, ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
+    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total,
+      ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
+      ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
 
-// ── LE RAPPEL DE LA VEILLE AU SOIR (retenu par Julien le 11 octobre) ────────
-// « Demain : N colis à poster ». Second cron (vercel.json, 18:00 UTC = 20 h à
-// Paris l'été, 19 h l'hiver — le plan Hobby décale d'au plus une heure), MÊME
-// route (`?moment=soir`, plafond de 12 fonctions), même garde CRON_SECRET.
-// Le nombre est CELUI du widget et du bilan (`txsAExpedier` : `aExpedier` ou le
-// résumé de l'extension, colis cochés « posté » et masqués exclus, eBay par
-// `colisEbay`, §11). Le « dont » vient des dates limites des bordereaux de CES
-// ventes, et de celles d'eBay — jamais un chiffre de plus que N.
-// Rien ne part : s'il n'y a rien à poster, si une lecture Vinted a échoué (pas
-// su), si la préférence « soir » est coupée, ou s'il est déjà parti ce jour-là
-// (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
-// ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
-const MAIN_SOIR = ['vinted_sales_hidden', 'vinted_ship_done', 'vinted_bords_shipped'];
-async function lireDonneesSoir() {
-  const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction';
+// Le texte du matin : une fonction pure (le banc la juge par la sortie de la
+// route). L'HEURE limite est écrite quand l'email la donne (« 1 demain avant
+// 10 h ») ; une date ESTIMÉE (pas de bordereau reçu) est dite estimée. Rien
+// sur ce que fait Vinted après l'heure : on ne l'a pas mesuré.
+export function texteMatin({ overdue, dueToday, dueTomorrow, ebayDus = 0, nePasPoster = 0, vinted = null }) {
+  const total = overdue + dueToday + dueTomorrow;
+  const premier = (vinted && vinted.premier) || {};
+  const avec = (n, mot, p) => {
+    const H = p && p.heure ? heureCourte(p.heure) : '';
+    if (!H) return `${n} ${mot}`;
+    return n === 1 ? `1 ${mot} avant ${H}` : `${n} ${mot}, dont un avant ${H}`;
+  };
+  const parts = [];
+  if (overdue) parts.push(`${overdue} en retard`);
+  if (dueToday) parts.push(avec(dueToday, "aujourd'hui", premier.aujourdhui));
+  if (dueTomorrow) parts.push(avec(dueTomorrow, 'demain', premier.demain));
+  // Le mot suit la donnée : une étiquette eBay se prend DANS eBay (l'acheteur
+  // l'a payée, §2.8). Côté Vinted, ce sont des COLIS : une vente sans
+  // bordereau reçu compte aussi (22 octobre).
+  const quoi = !ebayDus ? `${total} colis à envoyer`
+    : ebayDus === total ? `${total} colis eBay à envoyer`
+    : `${total} colis à envoyer, dont ${ebayDus} eBay`;
+  const corps = total > 0 ? `${quoi} (${parts.join(' · ')}).` : '';
+  const est = vinted && vinted.estimees ? vinted.estimees.retard + vinted.estimees.aujourdhui + vinted.estimees.demain : 0;
+  const estime = est ? ` Date estimée pour ${est} (vente + 7 j : bordereau pas reçu par email).` : '';
+  const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
+  return {
+    title: nePasPoster && !total ? '✋ Commande eBay : ne poste pas' : overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
+    body: (corps + estime + stop).trim() + (ebayDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
+  };
+}
+
+// ── LES DONNÉES DES COLIS — LE MATIN ET LE SOIR LISENT LA MÊME CHOSE ────────
+// La liste « à expédier » (`txsAExpedier`) et la date limite de chaque vente
+// (`limiteExpedition`, api/_lib/limite-envoi.js) : comptes, réglages (`main`
+// projeté, §4.4), ventes moissonnées (liste + résumé), commandes eBay, et les
+// bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
+// vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
+const MAIN_COLIS = ['vinted_sales_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden'];
+async function lireDonneesColis() {
+  const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
   const [comptesL, m, lignes, ebay, bords] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
-    getRowProjete('main', MAIN_SOIR),
+    getRowProjete('main', MAIN_COLIS),
     fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
     lireCommandesEbay(),
     fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
@@ -472,43 +440,76 @@ async function lireDonneesSoir() {
   }
   return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords };
 }
+// Les ventes par transaction (leur DATE sert à la limite estimée), des seuls
+// comptes encore liés — la même portée que `txsAExpedier`.
+function ventesParTx(d) {
+  const out = {};
+  if (!d || !d.commandes) return out;
+  const vivants = new Set((Array.isArray(d.comptes) ? d.comptes : []).map((c) => c.uid));
+  for (const [uid, l] of Object.entries(d.commandes)) {
+    if (vivants.size && !vivants.has(uid)) continue;
+    for (const o of l.orders) if (o && o.transaction_id != null) out[String(o.transaction_id)] = o;
+  }
+  return out;
+}
+// Le bordereau email de chaque transaction — la table de l'écran Colis
+// (`bordsParTransaction`) : un bordereau qu'il a MASQUÉ ne donne pas la date.
+const cleBord = (b) => String((b && (b.transaction || b.suivi || b.numero)) || '');
+function bordsDuVendeur(d) {
+  const cachees = objet(d && d.main && d.main.vinted_bords_hidden);
+  return bordsParTransaction(d && Array.isArray(d.bords) ? d.bords : [], (b) => !!cachees[cleBord(b)]);
+}
+
+// ── LE RAPPEL DE LA VEILLE AU SOIR (retenu par Julien le 11 octobre) ────────
+// « Demain : N colis à poster ». Second cron (vercel.json, 18:00 UTC = 20 h à
+// Paris l'été, 19 h l'hiver — le plan Hobby décale d'au plus une heure), MÊME
+// route (`?moment=soir`, plafond de 12 fonctions), même garde CRON_SECRET.
+// Le nombre est CELUI du widget et du bilan (`txsAExpedier` : `aExpedier` ou le
+// résumé de l'extension, colis cochés « posté » et masqués exclus, eBay par
+// `colisEbay`, §11). Le « dont » vient de la date limite de CES ventes — la
+// règle de l'app (`limiteExpedition`, 22 octobre : l'heure lue dans l'email,
+// sinon vente + 7 jours) — et de celles d'eBay ; jamais un chiffre de plus que N.
+// Rien ne part : s'il n'y a rien à poster, si une lecture Vinted a échoué (pas
+// su), si la préférence « soir » est coupée, ou s'il est déjà parti ce jour-là
+// (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
+// ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
 // Le texte : une fonction pure (le banc la juge par la sortie de la route).
-export function texteSoir({ n, auMoins, retard, demain }) {
+export function texteSoir({ n, auMoins, retard, demain, heureDemain = null }) {
   const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
+  const H = heureDemain ? heureCourte(heureDemain) : '';
   const parts = [];
   if (retard) parts.push(`${retard} déjà en retard`);
-  if (demain) parts.push(`${demain} avec la date limite demain`);
+  if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
   return {
     title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
     body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? "Les ventes eBay n'ont pas pu être relues : il peut y en avoir plus. " : ''}Prépare-les ce soir.`,
   };
 }
 async function rappelDuSoir() {
-  const today = parisDate(0), tomorrow = parisDate(1);
+  const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');
   if (deja === undefined) return { soir: 'mémo illisible — rien envoyé' };
   if (deja && deja.date === today) return { soir: 'déjà envoyé' };
   if (!(await pushCategorieActive('soir'))) return { soir: 'désactivé par le vendeur' };
-  const d = await lireDonneesSoir();
+  const d = await lireDonneesColis();
   const t = txsAExpedier(d);
   if (!t) return { soir: 'lecture ratée — rien envoyé' };
   const auMoins = !t.ebay;
   const n = t.vinted.size + (t.ebay ? t.ebay.total : 0);
   if (!n) return { soir: 'rien à poster', n: 0 };
-  // Le « dont » : seulement les bordereaux de CES ventes (sous-ensemble de N).
-  let retard = 0, demain = 0;
-  const vus = new Set();
-  for (const b of (Array.isArray(d.bords) ? d.bords : [])) {
-    const tx = b && b.transaction ? String(b.transaction) : '';
-    if (!tx || !t.vinted.has(tx) || vus.has(tx)) continue;
-    const iso = frToIso(b.dateLimite); if (!iso) continue;
-    vus.add(tx);
-    if (iso <= today) retard += 1;                       // limite aujourd'hui ou avant : demain, c'est en retard
-    else if (iso === tomorrow) demain += 1;
+  // Le « dont » : seulement CES ventes (sous-ensemble de N). Demain, une limite
+  // d'aujourd'hui (ou d'avant) est déjà passée : elle compte « en retard ».
+  // Bordereaux illisibles ⇒ pas de « dont » Vinted (une date estimée prendrait
+  // la place de l'heure lue, et pourrait dire « en retard » à tort).
+  let retard = 0, demain = 0, heureDemain = null;
+  if (Array.isArray(d.bords)) {
+    const c = compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
+    retard = c.retard + c.aujourdhui; demain = c.demain;
+    heureDemain = c.premier.demain ? c.premier.demain.heure : null;
   }
   if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
   if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
-  const txt = texteSoir({ n, auMoins, retard, demain });
+  const txt = texteSoir({ n, auMoins, retard, demain, heureDemain: t.ebay && t.ebay.tomorrow ? null : heureDemain });
   const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: '/?tab=cat_bord' });
   return { soir: 'envoyé', n, retard, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }

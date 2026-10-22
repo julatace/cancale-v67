@@ -36,6 +36,9 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
+// La date limite d'envoi AVEC son heure (22 octobre) : UNE règle pour Colis, Ma
+// journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
+import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -5554,32 +5557,16 @@ function etapeAchat(o, tk) {
   if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
   return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
 }
-// Délai d'expédition d'une date limite Vinted (« JJ/MM/AAAA ») : jours restants
-// jusqu'à la fin de ce jour-là (négatif = dépassé). Partagé par la carte du
-// bordereau et le rappel de Ma journée (§11).
-const joursAvantLimiteFr = (dateLimite) => {
-  const m = String(dateLimite || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); if (!m) return null;
-  const d = new Date(+m[3], +m[2] - 1, +m[1], 23, 59, 59);
-  return Math.floor((d - new Date()) / 86400000);
-};
-// ⚠️ 7 JOURS, PAS 5. Mesuré sur 176 bordereaux dont la vente est connue :
-// date limite − date de vente = 7 j (123 fois), 8 (24), 9 (26), 10 (3) — JAMAIS
-// moins de 7. Avec 5, Ma journée criait « en retard » deux jours trop tôt. Ce
-// n'est qu'un repli : la date limite écrite dans l'email du bordereau passe
-// devant quand on l'a.
-const DELAI_EXPEDITION_J = 7;
-// La date limite d'envoi d'une vente : celle de l'email du bordereau quand on
-// l'a, sinon vente + `DELAI_EXPEDITION_J`. UNE règle (§11) pour la carte
-// « Expédier N colis » (`toShip`) et l'alerte « coché posté, jamais vu partir ».
-const limiteExpedition = (o, b) => {
-  const dl = b ? joursAvantLimiteFr(b.dateLimite) : null;
-  if (dl != null) return { daysLeft: dl, shipBy: null, limite: 'email' };
-  const d = o && o.date ? new Date(o.date) : null;
-  if (!d || isNaN(d)) return { daysLeft: null, shipBy: null };
-  const shipBy = new Date(d.getTime() + DELAI_EXPEDITION_J * 86400000);
-  const daysLeft = Math.floor((new Date(shipBy.getFullYear(), shipBy.getMonth(), shipBy.getDate(), 23, 59, 59) - Date.now()) / 86400000);
-  return { daysLeft, shipBy, limite: 'estimee' };
-};
+// ── LA DATE LIMITE D'ENVOI : api/_lib/limite-envoi.js (22 octobre) ─────────
+// `limiteExpedition(o, b)` et `DELAI_EXPEDITION_J` (7 jours mesurés, jamais
+// moins sur 202 ventes reliées à leur bordereau) vivent dans ce module, importé
+// ici ET par le serveur (rappels du matin et du soir, widget) : une règle (§11).
+// ⚠️ L'HEURE COMPTE : mesuré le 22 octobre, 204 bordereaux sur 205 donnent une
+// heure limite (90 à « 10 h 00 ») et ce calcul la jetait (fin de journée,
+// 23:59:59) — « avant demain 10 h » s'affichait « demain ». Une limite dépassée
+// le jour même (« avant 10 h », il est 11 h) vaut « en retard ». Heure
+// illisible ⇒ le jour seul, comme avant. L'heure est celle de PARIS.
+
 // ── « COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR (6 octobre) ───────────────────────
 // Cocher « Colis fait » (`vinted_ship_done`) sort la vente de « à envoyer »
 // PARTOUT — c'est voulu, il vient de la déposer. Mais rien ne revenait vérifier
@@ -10792,14 +10779,17 @@ function BlocComptesMuets({ muets }) {
           </div>
         ))}
       </div>
-      {/* ⚠️ REVUE DU 11 OCTOBRE : ce qui est PROUVÉ, pas plus. La règle mesure
-          des ventes sans email de BORDEREAU : le rappel du matin (« 📮 Colis à
-          poster », api/ship-reminders.js) ne compte que ces emails-là — leurs
-          colis n'y sont donc jamais. « Leurs codes de retrait n'arrivent pas »
-          n'était pas prouvé (ils viennent des transporteurs, côté achats), et la
-          phrase parlait au pluriel pour un seul compte. */}
+      {/* ⚠️ REVUE DU 11 OCTOBRE : ce qui est PROUVÉ, pas plus. « Leurs codes de
+          retrait n'arrivent pas » n'était pas prouvé (ils viennent des
+          transporteurs, côté achats), et la phrase parlait au pluriel pour un
+          seul compte.
+          ⚠️ (22 oct.) « Pas de rappel du matin pour leurs colis » est devenu
+          FAUX : le rappel du matin compte maintenant toutes les ventes à
+          expédier (la liste du soir). Ce qui reste vrai et prouvé : sans
+          l'email du bordereau, la date limite de leurs colis est ESTIMÉE (vente
+          + 7 jours, sans l'heure — 90 bordereaux sur 205 disent « avant 10 h »). */}
       <div style={{fontSize:11.5,color:C.muted,marginTop:6,lineHeight:1.45}} data-effet-muets>
-        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par email&nbsp;: <b style={{color:C.text}}>pas de rappel du matin pour {n>1?'leurs':'ses'} colis à poster</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
+        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par email&nbsp;: <b style={{color:C.text}}>la date limite de {n>1?'leurs':'ses'} colis est estimée (vente + 7 jours, sans l’heure)</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
       </div>
       <div style={{fontSize:11.5,color:C.text,marginTop:6,lineHeight:1.5}} data-geste-muets>
         <b>Pour {n>1?'chacun':'ce compte'}&nbsp;:</b> 1. sur Vinted, connecté sur {n>1?'ce compte':muets[0].login}&nbsp;: <b>Paramètres → Notifications</b>, active les e-mails (messages, offres, ventes).
@@ -12528,6 +12518,9 @@ function JourneeHorsLigne({ uid, tab }) {
   const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'6px 14px', marginBottom:14 };
   const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
   const limiteTxt = (e) => {
+    // (22 oct.) Une ligne qui porte sa limite exacte la dit comme Colis (l'heure
+    // lue dans l'email, « en retard » passé l'heure) — `texteLimiteEnvoi`, §11.
+    if (Number.isFinite(e.limiteAt) && e.jour) return texteLimiteEnvoi({ jour: e.jour, heure: e.heure || null, at: e.limiteAt }, maintenant) || '';
     const j = joursAvantJour(e.limite, maintenant);
     if (j == null) return '';
     if (j < 0) return 'date limite passée';
@@ -30523,12 +30516,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   };
   const expeditions = () => {
-    const parTxn = {};
-    for (const b of (emailBords || [])) {
-      if (isBordHidden(b) || b.transaction == null) continue;
-      const k = String(b.transaction);
-      if (!parTxn[k]) parTxn[k] = b;                      // le 1er reçu fait foi
-    }
+    // La table « un bordereau par vente » — la MÊME que `bordsParTxn`, le rappel
+    // du matin, le rappel du soir et le widget (`bordsParTransaction`, §11).
+    const parTxn = bordsParTransaction(emailBords, isBordHidden);
     // 1) Ce que Vinted attend de moi (identité certaine : le n° de transaction).
     // ⚠️ UNE VENTE MASQUÉE À LA MAIN sort, un COMPTE masqué non : masquer un
     // compte range la compta, ça ne fait pas disparaître un carton de
@@ -30552,13 +30542,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    toujours. On ne l'invente plus ; il ressort en signalement (voir
     //    `bordSansVente` plus bas), jamais en carton à préparer.
     // Délai d'expédition : celui du bordereau quand on l'a (Vinted l'écrit dans
-    // l'email), sinon celui calculé sur la vente (`toShip`). Une seule notion.
-    const urg = {}; (toShip || []).forEach(t => { if (t && t.o && t.o.transaction_id != null) urg[String(t.o.transaction_id)] = t; });
+    // l'email, AVEC l'heure), sinon vente + 7 jours. Une seule notion, la règle
+    // `limiteExpedition` (§11) — la ligne porte la limite entière (`lim` : jour,
+    // heure, dépassée), pas seulement un nombre de jours.
     const tout = items.map(e => {
-      let dl = null;
-      if (e.b) { const d = bordDeadline(e.b); if (d && d.days != null) dl = d.days; }
-      if (dl == null && urg[e.txn] && urg[e.txn].daysLeft != null) dl = urg[e.txn].daysLeft;
-      return { ...e, dl };
+      const lim = limiteExpedition(e.o, e.b);
+      return { ...e, lim, dl: lim.daysLeft };
     });
     // ⚠️ CE QU'IL PEUT IMPRIMER MAINTENANT PASSE DEVANT (7 septembre).
     // Vu en capture sur ses vraies données : l'en-tête annonçait « 10 bordereaux
@@ -34366,16 +34355,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Bordereau email par transaction — la même table que `expeditions()`
   // (le premier reçu fait foi, un bordereau masqué ne compte pas). Partagée par
   // `toShip` et `cochesNonPartis` (§11).
-  const bordsParTxn = useMemo(() => {
-    const m = {};
-    for (const b of (emailBords || [])) {
-      if (!b || b.transaction == null || isBordHidden(b)) continue;
-      const k = String(b.transaction);
-      if (!m[k]) m[k] = b;
-    }
-    return m;
+  const bordsParTxn = useMemo(() => bordsParTransaction(emailBords, isBordHidden),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailBords, bordsHidden]);
+  [emailBords, bordsHidden]);
   const toShip = useMemo(() => {
     const out = [];
     const bordParTxn = bordsParTxn;
@@ -34461,7 +34443,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const envoyer = toShip.map((t) => {
         const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
-        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted' };
+        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
       const horsDelai = new Set(pickupUnion.horsDelai);
       const retirer = pickupUnion.emailList.map((t) => ({
@@ -35538,17 +35520,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const parMail = numeroEmailAdmis(b, numeros) ? String((b && b.numero) || '').trim() : '';
     return parTxn && parMail && parTxn !== parMail ? { txn: parTxn, mail: parMail } : null;
   };
-  // Date limite d'expédition d'un bordereau (Vinted pénalise les retards) : on la
-  // met en avant, en rouge si c'est aujourd'hui/demain ou dépassé, orange à 2 j.
-  const bordDeadline = (b) => {
-    const s = String(b.dateLimite || '').trim(); if (!s) return null;
-    const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (!m) return { text: s, level: 'muted', days: null };
-    // Date SEULE (sans l'heure) → texte court qui ne part pas en colonne.
-    const text = `${m[1]}/${m[2]}/${m[3]}`;
-    const days = joursAvantLimiteFr(s);              // même calcul que le rappel de Ma journée (§11)
-    const level = days <= 1 ? 'danger' : days <= 2 ? 'warn' : 'muted';
-    return { text, level, days };
-  };
+  // (22 oct.) `bordDeadline` est retiré : il jetait l'heure de la date limite
+  // (« Date SEULE ») et ses seuls lecteurs passent par `limiteExpedition`.
   // « À la suite » : tamponne TOUS les bordereaux reçus (non encore imprimés) et
   // les regroupe dans UN seul PDF (une page chacun) → une seule impression.
   const [batchBusy, setBatchBusy] = useState(false);
@@ -36035,6 +36008,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sub:`${nb>1?'Les acheteurs ont':"L'acheteur a"} demandé l'annulation — accepte ou refuse dans eBay → À traiter`,
             tab:'cat_bord', prio:0.1 });
         }
+        // ── (22 oct.) L'HEURE LIMITE DU COLIS LE PLUS PRESSÉ, SUR SA LIGNE ──
+        // La tuile « À envoyer » ne dit qu'un nombre. Mesuré le 22 octobre :
+        // 90 bordereaux sur 205 doivent partir AVANT 10 h — « demain » sans
+        // l'heure laissait croire qu'on avait jusqu'au soir. La même limite que
+        // Colis (`toShip` porte `limiteExpedition`, §11) ; seulement les colis en
+        // retard, dus aujourd'hui ou demain. Une date ESTIMÉE (pas de bordereau
+        // reçu par email) est dite estimée. Rien sur ce que fait Vinted après.
+        {
+          const presses = toShip.filter(t => t.at != null && (t.depasse || t.daysLeft <= 1)).sort((a,b) => a.at - b.at);
+          if (presses.length) {
+            const p = presses[0], o = p.o || {};
+            const e = effEntry(o); const num = e && e.numero ? `N°${e.numero} · ` : '';
+            const qui = o._acc ? accNameOf(o._acc) : '';
+            const quand = texteLimiteEnvoi(p);
+            jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:p.depasse?C.danger:C.warn, urgent:!!p.depasse,
+              title: presses.length===1 ? `1 colis ${quand}` : `${presses.length} colis pressés — le plus urgent ${quand}`,
+              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j, pas de bordereau reçu par email)':''}`,
+              tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'' });
+          }
+        }
         // ⚠️ « COCHÉ POSTÉ » MAIS VINTED NE L'A PAS VU PARTIR (6 octobre) : la
         // même liste que l'alerte de Colis (`cochesNonPartis`, §11). Coché, le
         // colis a quitté « Expédier N colis » — sans ça, il ne réapparaissait
@@ -36235,7 +36228,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
         const tache = (j, i) => (
-          <button className="vrm-day-task" key={(j.id||'j')+i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+          <button className="vrm-day-task" key={(j.id||'j')+i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
             {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                 avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
                 empilés, c'est ce qui faisait « application générée ».
@@ -36985,17 +36978,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // ce qu'on lit pour trouver la boîte : on le met devant. Identité
           // certaine (effEntry → id d'annonce Vinted, sinon photo), jamais un
           // rapprochement par titre.
-          const when = (t)=> t.daysLeft==null ? '' : t.daysLeft<0 ? `en retard de ${-t.daysLeft} j` : t.daysLeft===0 ? "à expédier aujourd'hui" : `avant le ${t.shipBy.toLocaleDateString('fr-FR')} (${t.daysLeft} j)`;
+          // (22 oct.) La phrase de la limite est celle de Colis (`texteLimiteEnvoi`,
+          // avec l'heure lue dans l'email) — elle ne s'écrivait QUE pour une
+          // date estimée (`shipBy`), jamais pour celle de l'email.
+          const when = (t)=> t.jour ? texteLimiteEnvoi(t) : '';
           return (
             <Notice
               tone={late>0 ? 'danger' : urgent>0 ? 'warn' : 'ok'}
               icon="truck"
               value={toShip.length}
               title={`colis à expédier${late>0?` · ${late} en retard`:urgent>0?` · ${urgent} pour demain`:''}`}
-              desc={s.shipBy ? (()=>{ const e=effEntry(s.o); const n=e&&e.numero?`N°${e.numero} · `:'';
+              desc={s.jour ? (()=>{ const e=effEntry(s.o); const n=e&&e.numero?`N°${e.numero} · `:'';
                 const t=(s.o&&s.o.title)||''; const q=when(s);
                 return t||n ? `Le plus pressé : ${n}${t}${q?` · ${q}`:''}` : (q?`Le plus pressé : ${q}`:null); })() : null}
-              detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance affichée est une estimation ; le bordereau se génère depuis l'onglet Colis.`}
+              detail={`Vinted laisse environ ${SHIP_DAYS} jours après la vente pour expédier. À temps, ta note vendeur est préservée. L'échéance vient de l'email du bordereau (avec son heure) ; sans lui, elle est estimée. Le bordereau se génère depuis l'onglet Colis.`}
               action={onNav && (
                 <button type="button" onClick={()=>onNav('cat_bord')}
                   style={{flexShrink:0,alignSelf:'center',border:`1px solid ${C.border}`,background:C.surface,color:C.text,
@@ -39996,7 +39992,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const cell = num ? garageCellOf(garageGrid, num) : null;
                 const dl = e.dl;
                 const urgCol = dl==null ? C.muted : dl<0 ? C.danger : dl<=1 ? C.warn : C.muted;
-                const urgTxt = dl==null ? null : dl<0 ? `${-dl} j de retard` : dl===0 ? "à poster aujourd'hui" : dl===1 ? 'à poster demain' : `${dl} j pour poster`;
+                // (22 oct.) L'HEURE limite sur la ligne : « à poster avant demain
+                // 10 h », « en retard — c'était avant 10 h aujourd'hui ». Heure
+                // illisible ⇒ le jour seul. Rien sur ce que fait Vinted après.
+                const urgTxt = texteLimiteEnvoi(e.lim);
                 const inv = b ? invForBord(b) : null;
                 // Deux sources de PDF, l'une comme l'autre certaines (le lien se
                 // fait par le n° de transaction) : l'email reçu, ou le bordereau
@@ -40021,7 +40020,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {sousGrp && <span style={{fontSize:12,color:C.muted,lineHeight:1.45,maxWidth:640}}>{sousGrp}</span>}
                     </div>
                   )}
-                  <div data-bord-card data-groupe-carte={grp} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-bord-card data-groupe-carte={grp} data-tx-colis={e.txn||''} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.danger+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:8,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}

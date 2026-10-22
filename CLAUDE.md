@@ -10846,7 +10846,9 @@ Julien : « fait tout » — deux notifications.
   jour de Paris), préférence coupée, abonnement coupé. eBay illisible ⇒ « au
   moins N », eBay nommé. Le passage du soir n'envoie ni le rappel du matin, ni
   l'URSSAF, ni le bilan. « Avant midi » n'est pas dit : aucune heure limite n'est
-  captée (les dates limites sont des jours).
+  captée (les dates limites sont des jours). ⚠️ **FAUX, corrigé le 22 octobre** :
+  204 bordereaux sur 205 portent leur heure dans `dateLimite` — voir « Tes
+  colis à l'heure » plus bas.
 - Preuves : bancs `colis-relais-push.cjs` (vraie route des emails, 14 contrôles ;
   3 rouges sur le code d'avant ; mutation « clé commune » 3 rouges) et
   `rappel-soir.cjs` (vraie route, deux vendeurs, widget comparé, 17 contrôles ;
@@ -12127,3 +12129,36 @@ vivante ; aucun passage du collecteur partagé enregistré.
   ça aucun lien ne part, et seule l'adresse de connexion d'un vendeur peut être
   prouvée. Pour lui, rien d'autre : ses adresses restent reçues ; « Confirmer »
   est facultatif.
+### Tes colis à l'heure : le rappel du matin, le widget et l'heure limite (22 octobre, propositions 1 et 4)
+- **Mesuré (lecture seule)** : le matin du 22, `ship_reminder_dedup` = {total 0} alors que le soir du 21 en comptait 3. Deux règles à lui : il sautait un
+  bordereau **imprimé** (`vinted_bords_printed`) comme un colis parti — l'app a décidé l'inverse — et ne partait que des bordereaux reçus par **email** (30 jours :
+  angeled92 0/18, tomj606 0/8, arthuror2 1/10). Le widget faisait les deux mêmes erreurs pour son urgence. Et **204 `email_bord_*` sur 205 portent l'heure**
+  (« JJ/MM/AAAA HH h MM », 90 à 10 h 00) : `api/email-inbound.js` la gardait déjà dans `dateLimite`, ce sont TOUS les lecteurs qui la jetaient (`frToIso`,
+  `joursAvantLimiteFr` à 23:59:59, `bordDeadline` « Date SEULE »). Vente → limite : jamais moins de 7 j (202 ventes reliées : 107 à +7 j pile, 89 décalées à
+  10 h 00). Les bordereaux captés par l'extension (`harvest_{uid}_label_{tx}`) ne portent **aucune** date limite (clés : url, uid, tx, item, capturedAt).
+- **Une règle** : `api/_lib/limite-envoi.js` (pur, importé par l'app comme `colisEbay`) — `lireDateLimite` (heure de **Paris**, Intl ; « 10 h 00 », « 10h00 »,
+  « 10:00 » ; heure illisible ou inexistante ⇒ **jour seul**, fin de journée, comme avant), `limiteExpedition(o, b)` (email du bordereau, sinon vente + 7 j
+  **estimée**, jour seul ; une limite dépassée vaut ≤ −1 jour **même le jour même**), `texteLimiteEnvoi` (« à poster avant demain 10 h », « en retard —
+  c'était avant 7 h aujourd'hui »), `bordsParTransaction` (la table de Colis : PDF présent, le plus récent d'abord, masqué écarté), `compterEcheances`.
+- **Le matin** lit la liste du soir (`txsAExpedier`, via `lireDonneesColis` partagé avec le soir) et la limite de l'app ; « imprimé » n'est plus « parti ».
+  Texte : « 1 colis à envoyer (1 demain avant 10 h) », « Date estimée pour N » quand une limite est estimée. **Se tait** (pas su) : ventes, comptes, réglages
+  ou **bordereaux** illisibles (une date estimée ne remplace pas une heure non lue), aucune vente Vinted captée — l'eBay part quand même. **Le soir** et **le
+  widget** comptent avec la même fonction ; le soir écrit « 1 avec la date limite demain à 10 h ». Le widget rend `heureAujourdhui`, `heureDemain`,
+  `sansLimite`, `datesPasSu` ; pour une vente sans email il ne lit QUE la ligne de ventes du compte concerné (`id=in.`, 13 à 50 Ko mesurés), jamais tout.
+- **L'app** : la carte de Colis dit l'heure (`data-limite`, `data-limite-heure`, `data-jours`) ; Ma journée a une ligne `colis-limite` (le plus pressé, son
+  heure, estimée dite) ; la notice des Ventes et Ma journée hors ligne disent la même phrase. `bordDeadline` et `joursAvantLimiteFr` sont retirés.
+  La phrase des comptes muets disait « pas de rappel du matin pour leurs colis » : devenue FAUSSE, elle dit « leur date limite est estimée ».
+- **Le cron du matin passe à 05:00 UTC** (vercel.json, pas de cron de plus) : 7 h–8 h à Paris jusqu'au 25 octobre, 6 h–7 h l'hiver (plan Hobby : ± 1 h). Le
+  rappel URSSAF du 1er et le bilan du lundi arrivent donc plus tôt aussi.
+- **Tranché** : le seuil « 0 5 » plutôt que « 0 6 » (la proposition acceptée disait 7 h l'été, 6 h l'hiver) ; `panel_bords_done` n'entre plus dans le matin
+  (1 clé, figée depuis le 31 août, plus rien ne l'écrit) ; un bordereau email SANS PDF ne donne pas sa date (la règle de l'app, inchangée).
+- **Preuves** : rejeu des VRAIES routes sur la projection de sa base (scratchpad, jamais commitée) — avant : matin **0**, widget 0/0/0 ; après : matin
+  « **1 colis à envoyer (1 demain avant 10 h)** » (tomj683, 23236225358), widget tomorrow 1 · 10:00. `audit-colis-heure.cjs` (routes exécutées, 23
+  contrôles) : **14 rouges sur origin/main** (copie `git archive`, lancé depuis la copie), vert après ; mutations « imprimé resauté » 3 rouges, « jour
+  seul » 6+, « widget email seul » 2, « limite estimée retirée » 5. Banc `colis-heure.cjs` (port 6301, rendu, 390 + 1512 px, horloge fixée au 22 à
+  8 h 10 Paris) : vert après, **12 rouges sur le build d'origin/main**, mutation « heure ignorée » dans l'app 6 rouges ; `comptes-sans-email` 4 rouges sur
+  ce build. Bancs mis à la forme réelle (§6.3, `filename` porté par 204/204 bordereaux) : `rappel-soir`, `ship-multi`, `widget-colis` ;
+  `comptes-sans-email` juge la nouvelle phrase ; `audit-statuts` suit la règle dans le module.
+- ⚠️ **Non mesuré** : ce que fait Vinted après l'heure limite (rien n'est promis) ; l'heure réelle du cron chez Vercel ; la limite eBay garde ses jours
+  calendaires (`colisEbay`, domaine eBay — une limite eBay d'aujourd'hui passée n'est pas encore « en retard ») ; le script iOS du widget (il peut lire
+  `heureDemain`, rien ne l'y oblige).
