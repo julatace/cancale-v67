@@ -17,6 +17,7 @@
 const path = require('path');
 const RACINE = process.env.BANC_RACINE || path.join(__dirname, '..', '..');
 
+process.env.CRON_SECRET = 'cle-banc-cron'; // obligatoire depuis dc4799f
 process.env.EBAY_APP_ID = 'app-banc';
 process.env.EBAY_CERT_ID = 'cert-banc';
 process.env.SUPABASE_SERVICE_KEY = 'service-banc';
@@ -57,7 +58,14 @@ function poser({ ebayKO = new Set() } = {}) {
     if (u.includes('/auth/v1/user')) return J({ id: A, email: 'a@banc.test' });
     if (u.includes('/rpc/vrm_acces_pour')) return J(true);
     if (u.includes('/ws/api.dll')) {
-      appelsTrading.push(String((opts.headers || {})['X-EBAY-API-CALL-NAME'] || ''));
+      const nom = String((opts.headers || {})['X-EBAY-API-CALL-NAME'] || '');
+      appelsTrading.push(nom);
+      // (21 oct.) La page 1 des messages : 1 sans réponse récent, 1 répondu, 1 trop vieux (> 7 j).
+      if (nom === 'GetMemberMessages') {
+        const ex = (id, st, jours, rep) => `<MemberMessageExchange><Item><ItemID>900</ItemID><Title>Paire 900</Title></Item><Question><MessageID>${id}</MessageID><SenderID>acheteur_secret</SenderID><Subject>Dispo ?</Subject><Body>Texte privé</Body></Question>${rep ? '<Response>Oui</Response>' : ''}<MessageStatus>${st}</MessageStatus><CreationDate>${new Date(Date.now() - jours * 86400000).toISOString()}</CreationDate></MemberMessageExchange>`;
+        return new Response(`<GetMemberMessagesResponse><Ack>Success</Ack><MemberMessage>${ex('M1', 'Unanswered', 1)}${ex('M2', 'Answered', 1, true)}${ex('M3', 'Unanswered', 10)}</MemberMessage><PaginationResult><TotalNumberOfPages>1</TotalNumberOfPages></PaginationResult></GetMemberMessagesResponse>`, { status: 200 });
+      }
+      if (nom === 'AddMemberMessageRTQ') return new Response('<AddMemberMessageRTQResponse><Ack>Success</Ack></AddMemberMessageRTQResponse>', { status: 200 });
       return new Response('<GetMyeBaySellingResponse><Ack>Success</Ack><ActiveList><Item><ItemID>900</ItemID><Title>Paire 900</Title><SKU>VRM-1</SKU><SellingStatus><CurrentPrice>50.00</CurrentPrice></SellingStatus></Item><PaginationResult><TotalNumberOfPages>1</TotalNumberOfPages></PaginationResult></ActiveList></GetMyeBaySellingResponse>', { status: 200 });
     }
     if (u.includes('/sell/fulfillment/v1/order')) {
@@ -116,7 +124,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   poser({ ebayKO: new Set([B]) });
   const mod = await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'));
   const r = res();
-  await mod.default({ method: 'GET', headers: {}, query: {} }, r);
+  await mod.default({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r);
   const bil = (o) => ((r.corps && r.corps.bilans) || []).find((b) => b.owner === o) || {};
   const ordA = store.get(A + '|ebay_orders');
   const ordB = store.get(B + '|ebay_orders');
@@ -145,7 +153,28 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   dit(r2.code === 200 && r2.corps && r2.corps.ok === true, 'action relire : 200 ok', 'code=' + r2.code + ' ' + JSON.stringify(r2.corps).slice(0, 160));
   dit(!!(store.get(A + '|ebay_orders') || {}).orders, 'action relire : commandes rangées chez A');
   dit(!!(lst && lst.items && lst.items[0] && lst.items[0].detail && lst.items[0].detail.description === 'desc gardée'), 'action relire : le détail déjà rangé de l\'annonce est gardé');
-  dit(appelsTrading.length === 1 && appelsTrading[0] === 'GetMyeBaySelling', 'action relire : un seul appel Trading (aucune GetItem)', appelsTrading.join(','));
+  dit(appelsTrading.filter((x) => x !== 'GetMemberMessages').join(',') === 'GetMyeBaySelling' && !appelsTrading.includes('GetItem'), 'action relire : GetMyeBaySelling + la page 1 des messages, aucune GetItem', appelsTrading.join(','));
+  // (21 oct.) Le résumé des messages SANS RÉPONSE est rangé chez A — sans
+  // aucune donnée personnelle — pour que Ma journée le lise sans appeler eBay.
+  const msg = store.get(A + '|ebay_messages');
+  dit(appelsTrading.includes('GetMemberMessages') && msg && msg.nonLus === 1 && Array.isArray(msg.ids) && msg.ids.join(',') === 'M1' && msg.complet === true,
+    'action relire : le résumé des messages est rangé (1 sans réponse de moins de 7 j ; le répondu et le vieux ne comptent pas)', JSON.stringify(msg));
+  dit(msg && !/acheteur_secret|Texte privé|Dispo/.test(JSON.stringify(msg)), 'action relire : le résumé ne porte ni nom, ni texte, ni sujet', JSON.stringify(msg));
+  dit(!ecritures.some((e) => e.id === 'ebay_messages' && e.owner !== A), 'action relire : le résumé est rangé chez A seulement');
+  // Une réponse acceptée par eBay sort l'échange du compte, sans relire eBay.
+  const r3 = res();
+  await eb.default({ method: 'POST', headers: { authorization: 'Bearer a.b.c' }, query: {}, body: { action: 'repondre', itemId: '900', messageId: 'M1', body: 'Oui, dispo', confirme: true } }, r3);
+  const msg2 = store.get(A + '|ebay_messages');
+  dit(r3.code === 200 && msg2 && msg2.nonLus === 0 && msg2.ids.length === 0, 'repondre : la réponse acceptée sort l\'échange du résumé (0 sans réponse)', 'code=' + r3.code + ' ' + JSON.stringify(msg2));
+  // Une page 1 ILLISIBLE n'écrit rien : le résumé d'avant reste.
+  poser();
+  store.set(A + '|ebay_messages', { nonLus: 4, ids: ['X1', 'X2', 'X3', 'X4'], complet: true, capturedAt: 1 });
+  const fetchAvant = global.fetch;
+  global.fetch = async (url, opts = {}) => (String(url).includes('/ws/api.dll') && String((opts.headers || {})['X-EBAY-API-CALL-NAME']) === 'GetMemberMessages') ? new Response('<html>503</html>', { status: 503 }) : fetchAvant(url, opts);
+  const r4 = res();
+  await eb.default({ method: 'POST', headers: { authorization: 'Bearer a.b.c' }, query: {}, body: { action: 'relire' } }, r4);
+  const msg3 = store.get(A + '|ebay_messages');
+  dit(r4.code === 200 && msg3 && msg3.nonLus === 4, 'messages illisibles chez eBay : rien n\'est écrit, le résumé d\'avant reste (jamais « 0 »)', JSON.stringify(msg3));
   console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent — le cron relit eBay pour chaque vendeur, avec son jeton, avant le rappel.');
   process.exit(ko ? 1 : 0);
 })();

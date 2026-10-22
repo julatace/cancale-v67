@@ -16,9 +16,8 @@
 // à Vinted, juste à connecter un compte proprement depuis l'app.
 
 import './_lib/sans-bruit.js';
-import { withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
-import { vendeurExige, baseCloisonnee } from './_lib/session.js';
+import { vendeurExige } from './_lib/session.js';
 // ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE ET ÉCRIVAIT CHEZ LE PROPRIÉTAIRE DE
 //    L'INSTALLATION (`withOwnerAll` = VRM_OWNER_UID). N'importe qui pouvait
 //    coller un jeton Vinted et faire apparaître SON compte dans la boutique de
@@ -109,21 +108,21 @@ async function fetchProfile({ host, accessToken, anonId, csrfToken }) {
 async function upsertAccount(row, owner) {
   // Multi-vendeurs : la clé d'unicité devient (owner, vinted_user_id) — deux
   // vendeurs peuvent très bien avoir lié le même compte Vinted.
-  const cloisonnee = await baseCloisonnee();
   const lignes = Array.isArray(row) ? row : [row];
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=${cloisonnee ? 'owner,vinted_user_id' : conflictTarget('vinted_user_id')}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?on_conflict=owner,vinted_user_id`, {
     method: 'POST',
     headers: {
       ...sbCle(SUPABASE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },
-    body: JSON.stringify(cloisonnee ? lignes.map((l) => ({ ...l, owner })) : withOwnerAll(lignes)),
+    body: JSON.stringify(lignes.map((l) => ({ ...l, owner }))),
   });
   return res.ok;
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST uniquement' }); return; }
   const u = await vendeurExige(req, res);
   if (!u) return;

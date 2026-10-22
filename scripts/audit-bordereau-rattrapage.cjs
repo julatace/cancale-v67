@@ -18,7 +18,7 @@ const jours = (n) => new Date(Date.now() - n * 86400000).toISOString();
 function banc({ ventes = [], labels = [], mails = [], commandeRepond = null }) {
   const commandes = [];                      // les PUT « commander le bordereau »
   const demandes = [];                       // les transactions réellement lues chez Vinted
-  const store = {};
+  const store = {vrmSession:{user_id:'vendeur_banc',access_token:'jeton.banc.x',expires_at:Date.now()+3600e3}};
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (f) => f(), clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
@@ -47,7 +47,8 @@ function banc({ ventes = [], labels = [], mails = [], commandeRepond = null }) {
       const tx = /vinted\.fr\/api\/v2\/transactions\/(\d+)/.exec(u);
       if (tx) { demandes.push(tx[1]); return J({ transaction: {} }); }   // pas d'expédition exposée → échec propre
       if (/vinted\.fr\//.test(u)) return J({});
-      // Supabase
+      // Supabase : génération explicitement activée par ce vendeur.
+      if (/id=eq\.vrm_bordereaux_auto/.test(u)) return J([{data:{active:true}}]);
       if (/orders_sold/.test(u)) return J([{ data: { payload: { my_orders: ventes } } }]);
       if (/email_bord_/.test(u)) return J(mails.map(t => ({ tx: t })));
       if (/_label_/.test(u)) return J(labels.map(t => ({ tx: t })));

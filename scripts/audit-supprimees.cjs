@@ -227,6 +227,7 @@ function fileExt({ cap, supp, suppKO }) {
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx); vm.runInContext(F.bg, ctx, { filename: 'background.js' });
+  ctx.authToken = async () => ({user_id:'vendeur_banc',access_token:'jeton.banc.x',expires_at:Date.now()+3600e3}); ctx.loadSession=ctx.authToken;
   return ctx;
 }
 const numsDe = (r) => ((r && r.queue) || []).map((a) => String(a.numero)).sort();

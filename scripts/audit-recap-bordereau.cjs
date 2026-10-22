@@ -82,7 +82,7 @@ function faireCtx({ lignes = {}, vinted = () => ({ status: 404, json: null }) } 
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx);
-  vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   // `vintedGet` est la porte vers Vinted : on la remplace pour COMPTER.
   ctx.vintedGet = async (acc, chemin) => { journal.vinted.push(chemin); return vinted(chemin); };
   ctx.__journal = journal; ctx.__store = store;

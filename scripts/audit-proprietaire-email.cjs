@@ -44,17 +44,17 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   // ── ⚠️⚠️ LE REPLI « INSTALLATION » S'ÉTEINT QUAND ON N'EST PLUS SEUL ──────
   // Tant que Julien est seul, tout lui appartient : c'est explicite, réglé par
   // lui, et c'est ce qui a évité de refaire l'incident du 16 au 22 août.
-  dit(r(['inconnue@vrm.center'], {}, J).via === 'installation',
-    'seul vendeur, registre vide : l’email lui revient (pas de quarantaine inutile)');
-  dit(r(['inconnue@vrm.center'], regJ, J).via === 'installation',
-    'seul vendeur qui a déclaré SES adresses : rien ne change');
+  dit(r(['inconnue@vrm.center'], {}, J).via === 'quarantaine',
+    'registre vide : une adresse inconnue reste en quarantaine');
+  dit(r(['inconnue@vrm.center'], regJ, J).via === 'quarantaine',
+    'un seul vendeur déclaré : une adresse différente ne lui est pas attribuée');
   // Le jour où quelqu'un d'autre est là, ce repli devient une devinette — et
   // celle qui coûte le plus cher : le bordereau d'un vendeur chez un autre.
   const deux = r(['inconnue@vrm.center'], regJB, J);
   dit(deux.via === 'quarantaine' && !deux.owner,
     'DEUX vendeurs, adresse inconnue : quarantaine — le repli ne devine plus',
     JSON.stringify(deux));
-  dit(/plusieurs vendeurs/i.test(deux.raison || ''),
+  dit(/inconnue/i.test(deux.raison || ''),
     'et la raison dit pourquoi, pour que ça se répare', deux.raison);
 
   // Sans propriétaire d'installation réglé, rien ne s'invente non plus.
@@ -120,6 +120,7 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
 
   // ── La VRAIE route, exécutée : chaque écriture est notée avec son vendeur ──
   process.env.VRM_OWNER_UID = J;
+  process.env.EMAIL_INBOUND_SECRET='cle-banc-proprietaire';
   const ecrites = [];
   let etat = {};
   const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps),
@@ -128,6 +129,7 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     const u = decodeURIComponent(String(url));
     if (!u.includes('/rest/v1/')) return rep({});
     if ((opts.method || 'GET') === 'POST') {
+      if((etat.suiviKO && JSON.parse(opts.body||'[]').some(x=>x.id.startsWith('email_reception_'))) || etat.ecritureKO || (etat.ecritureKOOwner && JSON.parse(opts.body||'[]').some(x=>x.owner===etat.ecritureKOOwner)))return rep('<html>503</html>',503);
       try { JSON.parse(opts.body || '[]').forEach((x) => ecrites.push({ id: x.id, owner: x.owner || '', data: x.data, url: u })); } catch (_) {}
       return rep('', 201);
     }
@@ -136,8 +138,8 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     return rep([]);
   };
   const faireRes = () => { const x = { code: null, corps: null }; x.status = (n) => { x.code = n; return x; }; x.json = (o) => { x.corps = o; return x; }; x.setHeader = () => {}; x.end = () => x; return x; };
-  const vente = (to) => ({ method: 'POST', query: {}, body: {
-    from: 'no-reply@vinted.fr', to, subject: 'Ton article est vendu !',
+  const vente = (to) => ({ method: 'POST', query: {}, headers:{'x-vrm-email-key':'cle-banc-proprietaire'}, body: {
+    messageId:'<email-banc-vrm>', from: 'no-reply@vinted.fr', to, subject: 'Ton article est vendu !',
     text: "acheteur-de-banc a acheté [Paire de banc] n°9001 42,00 €\nPrépare ton colis.", html: '<p>vendu</p>', attachments: [] } });
   const envoyer = async (route, to, e) => {
     etat = e; ecrites.length = 0;
@@ -167,6 +169,38 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
       chezB.length ? `${chezB.length} ligne(s) de Julien écrite(s) chez l’autre vendeur` : '');
     dit(quar(o.ecrites).length === 1 && metier(o.ecrites).length === 0, 'route : l’email disputé est mis de côté, entier',
       JSON.stringify(o.ecrites));
+  });
+  await essaie('route : accusé nominatif et empreinte du contenu reçu',async()=>{
+    const route=await nouvelle('accuse-empreinte'),o=await envoyer(route,'sophie@vrm.center',{lignes:[LIGNE_J,LIGNE_B]});
+    const {empreinteEmail}=await import('../api/_lib/accuse-email.js');
+    dit(o.code===200&&o.corps.reception?.stocke===true&&o.corps.reception.messageId==='<email-banc-vrm>'&&o.corps.reception.empreinte===empreinteEmail(vente('sophie@vrm.center').body),'route : accusé lié à l’identité et au contenu exacts du message');
+  });
+  await essaie('route : pas d’accusé si le stockage échoue',async()=>{
+    const route=await nouvelle('accuse-ecriture-ko'),o=await envoyer(route,'sophie@vrm.center',{ecritureKO:true,lignes:[LIGNE_J,LIGNE_B]});
+    dit(o.code===503&&!o.corps.reception,'route : stockage en panne ⇒ aucun accusé positif');
+  });
+  await essaie('route : suivi par message et panne du suivi',async()=>{
+    const route=await nouvelle('suivi-message'),o=await envoyer(route,'sophie@vrm.center',{lignes:[LIGNE_J,LIGNE_B]});
+    const suivis=o.ecrites.filter(x=>x.id.startsWith('email_reception_'));
+    dit(suivis.length===1&&suivis[0].owner===B&&suivis[0].data.etat==='integre'&&!suivis[0].data.suppressionAutorisee,'route : suivi sous le seul propriétaire, sans autoriser la suppression');
+    const p=await envoyer(route,'sophie@vrm.center',{lignes:[LIGNE_J,LIGNE_B]});
+    dit(p.ecrites.find(x=>x.id.startsWith('email_reception_'))?.id===suivis[0].id,'route : une reprise du même Message-ID conserve la même ligne de suivi');
+    const e=await envoyer(route,'sophie@vrm.center',{suiviKO:true,lignes:[LIGNE_J,LIGNE_B]});
+    dit(e.code===503&&!e.corps.reception,'route : suivi non enregistré ⇒ pas de confirmation au collecteur');
+  });
+  await essaie('route : boîte Gmail collective',async()=>{
+    const centrale={owner:J,data:{adresses:{'vrm.vinted35@gmail.com':{owner:J}}}};
+    const route=await nouvelle('collective-seule'),o=await envoyer(route,'vrm.vinted35@gmail.com',{lignes:[centrale]});
+    dit(o.code===200&&o.corps.quarantaine&&metier(o.ecrites).length===0,'route : la seule adresse collective ne livre aucun contenu à son propriétaire');
+    const route2=await nouvelle('collective-personnelle'),p=await envoyer(route2,'sophie@vrm.center, vrm.vinted35@gmail.com',{lignes:[centrale,LIGNE_B]});
+    dit(metier(p.ecrites).every(x=>x.owner===B)&&metier(p.ecrites).length>0,'route : l’adresse personnelle prime sur la boîte collective');
+  });
+  await essaie('route : deux accusés parallèles restent isolés',async()=>{
+    etat={lignes:[LIGNE_J,LIGNE_B],ecritureKOOwner:J};ecrites.length=0;
+    const route=await nouvelle('accuses-paralleles'),a=vente('recu@vrm.center'),b=vente('sophie@vrm.center');a.body.messageId='<A>';b.body.messageId='<B>';
+    const ra=faireRes(),rb=faireRes();await Promise.all([route.default(a,ra),route.default(b,rb)]);
+    const {empreinteEmail}=await import('../api/_lib/accuse-email.js');
+    dit(ra.code===503&&!ra.corps.reception&&rb.code===200&&rb.corps.reception?.messageId==='<B>'&&rb.corps.reception.empreinte===empreinteEmail(b.body),'route : la panne d’un propriétaire ne confirme pas son email et n’efface pas l’accusé de l’autre');
   });
   await essaie('route : registre illisible', async () => {
     const route = await nouvelle('registreKO');
@@ -263,8 +297,8 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
       [pp(['inconnue@vrm.center'], reg, []), pp(['disputee@vrm.center'], reg, ['disputee@vrm.center']), pp(['sophie@vrm.center', 'recu@vrm.center'], reg, []), pp([], reg, [])].join(','));
     // Le repli : allumé tant que personne d'autre n'a déclaré, éteint dès qu'un
     // autre compte déclare UNE adresse — exactement ce que fait l'arrivée.
-    dit(ri({}, J) === true && ri({ 'recu@vrm.center': J }, J) === true && ri({ 'essai@vrm.center': { owner: B } }, J) === false && ri({}, '') === false,
-      'le repli « installation » : allumé seul, éteint dès qu’un autre compte déclare, jamais sans propriétaire réglé');
+    dit(ri({}, J) === false && ri({ 'recu@vrm.center': J }, J) === false && ri({ 'essai@vrm.center': { owner: B } }, J) === false && ri({}, '') === false,
+      'le repli installation reste éteint, quel que soit le nombre de vendeurs déclarés');
     const arrivee = (regX) => r(['inconnue@vrm.center'], regX, J).via === 'installation';
     dit([{}, { 'recu@vrm.center': J }, { 'essai@vrm.center': B }].every((regX) => arrivee(regX) === ri(regX, J)),
       'et c’est LA règle de l’arrivée (§11) — l’écran ne peut pas dire autre chose que ce qui se passe');
@@ -272,15 +306,15 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   await essaie('route : base non cloisonnée', async () => {
     const route = await nouvelle('sansColonne');
     const o = await envoyer(route, 'inconnue@vrm.center', { sansColonne: true, lignes: [{ data: { adresses: { 'sophie@vrm.center': { owner: B } } } }] });
-    dit(o.code === 200 && quar(o.ecrites).length === 0 && !o.ecrites.some((x) => x.owner === NEUTRE) && metier(o.ecrites).length > 0,
-      'l’autre sens : base non cloisonnée (une seule boutique) — pas de quarantaine, rien sous le neutre, l’email est traité comme avant',
+    dit(o.code === 503 && o.ecrites.length === 0,
+      'schéma non cloisonné : aucun traitement ni accusé de réception positif',
       `HTTP ${o.code} · ${JSON.stringify(o.ecrites.map((x) => x.id + '@' + (x.owner === J ? 'J' : x.owner || '-')))}`);
   });
   await essaie('route : seul vendeur', async () => {
     const route = await nouvelle('seul');
     const o = await envoyer(route, 'recu@vrm.center', { lignes: [] });
-    dit(o.code === 200 && metier(o.ecrites).length > 0 && metier(o.ecrites).every((x) => x.owner === J),
-      'l’autre sens : seul vendeur, registre vide — l’email lui revient comme avant (incident du 16 août)',
+    dit(o.code === 200 && quar(o.ecrites).length > 0 && metier(o.ecrites).length === 0,
+      'registre vide : l’email est gardé à part, jamais rangé dans la boutique par défaut',
       `HTTP ${o.code} · ${JSON.stringify(o.ecrites)}`);
   });
 

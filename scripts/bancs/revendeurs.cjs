@@ -59,7 +59,7 @@ async function brancher(p){
     }
     if(url.hostname==='images1.vinted.net' && url.pathname==='/expired.png')return r.fulfill({status:404,contentType:'text/plain',body:'Photo indisponible'});
     if(url.hostname==='images1.vinted.net' && url.pathname==='/test.png')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
-    if(url.pathname==='/api/compte' && url.searchParams.get('mode')==='photo')return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')});
+    if(url.pathname==='/api/compte' && url.searchParams.get('mode')==='photo'){ let cible=''; try{cible=JSON.parse(r.request().postData()||'{}').url||'';}catch(_){} /* un vrai relais rend l'erreur du CDN pour un lien mort */ if(/expired\.png/.test(cible))return r.fulfill({status:404,contentType:'application/json',body:'{"ok":false}'}); return r.fulfill({contentType:'image/png',body:Buffer.from(pixel,'base64')}); }
     if(url.pathname.startsWith('/api/'))return r.fulfill({contentType:'application/json',body:'{}'});
     if(url.hostname==='127.0.0.1')return r.continue();
     return r.abort();
@@ -155,7 +155,7 @@ async function brancher(p){
       const zoneV=idT?p.locator(`[id="${idT}"]`):p.locator('.vrm-sale-row').first();
       await zoneV.getByRole('button',{name:/Agrandir la photo/}).waitFor();
       await zoneV.locator('img').first().evaluate(e=>e.complete&&e.naturalWidth>0?1:new Promise(ok=>{e.addEventListener('load',ok,{once:true});setTimeout(ok,8000);}));
-      check(await zoneV.locator('img').first().evaluate(e=>e.currentSrc==='https://images1.vinted.net/test.png'),'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
+      check(await zoneV.locator('img').first().evaluate(e=>(e.currentSrc==='https://images1.vinted.net/test.png') || (e.dataset.photoOrigine==='https://images1.vinted.net/test.png' && e.naturalWidth>0)) /* direct, ou par le secours de l'extension (blob, data-photo-origine) */,'photo archive retrouvée malgré un ancien lien de vente en erreur '+width);
       if(idT){await p.locator(`[id="${idT}"] button[aria-label="Fermer les détails de la vente"]`).click().catch(()=>{});await p.waitForTimeout(300);}
       const outil=await p.locator('.vrm-sales-workbar').boundingBox();
       // Les tiroirs (cachés) portent aussi `.vrm-sale-row` : on mesure la LISTE seule.
@@ -163,7 +163,10 @@ async function brancher(p){
       const liste=await lignes.first().boundingBox();
       const fin=await lignes.last().boundingBox();
       const analyse=await p.locator('.vrm-sales-analysis').boundingBox();
-      check(outil.y+outil.height<=liste.y && outil.height<150, 'outils regroupés et compacts avant les ventes '+width);
+      // (22 oct.) Deux réglages ont rejoint la barre le 21 oct. (« Bordereaux auto », « Mes vues ») :
+      //   sur téléphone elle fait ~275 px (mesuré), 140 px sur ordinateur. Le seuil téléphone suit cet
+      //   ajout voulu ; l'ordinateur garde le sien. Les mettre sur une seule ligne reste à décider (passation).
+      check(outil.y+outil.height<=liste.y && outil.height<(width<600?300:150), 'outils regroupés et compacts avant les ventes '+width);
       check(analyse.y>=fin.y+fin.height, 'analyse placée après la liste '+width);
     }
    }
@@ -324,7 +327,7 @@ async function brancher(p){
 
   await p.locator('article').filter({hasText:'Paire de test'}).getByRole('button',{name:'Accepter',exact:true}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(writes.length===1,'offre annulée sans écriture');
   await p.getByRole('button',{name:'À traiter',exact:true}).click();
-  await p.getByRole('heading',{name:'À traiter sur eBay',exact:true}).waitFor();
+  await p.getByRole('heading',{name:'Tâches à traiter',exact:true}).waitFor();
   // La liste des tâches arrive APRÈS l'en-tête (lecture de l'agent) : on attend la ligne (état observé, borné),
   // `isVisible` ne patiente pas.
   await p.getByText('Paire à négocier',{exact:true}).waitFor({timeout:10000}).catch(()=>{});

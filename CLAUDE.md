@@ -1,5 +1,9 @@
 # VRM — dossier de passation
 
+> ⚠️⚠️ **PASSATION DU 21 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-21.md`** : ce qui est
+> en ligne, `claude/lot-21oct` (hors ligne, retours, 5.204, carte OpenFreeMap), les branches
+> non déployées (`csp-app`, `app-rapide`, et INACHEVÉES `carte-pro`, `journee-widgets`), les gestes de Julien.
+
 > ⚠️⚠️ **PASSATION DU 12 OCTOBRE — DEUX AGENTS — LIS D'ABORD `docs/passation/README.md`,
 > section « 🔴 LIRE D'ABORD » puis « RÉPARTITION ».** Agent 1 : mettre en ligne
 > la 5.175 (avec le second correctif photos), migration 014, règle d'offre eBay,
@@ -4870,8 +4874,7 @@ ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
   Nominatim (OpenStreetMap, gratuit), session exigée, coordonnées arrondies
   côté serveur aussi.
 - **Carte** : Leaflet **1.9.4** depuis cdnjs, chargé à l'ouverture de l'écran
-  (jamais au démarrage), fond CARTO (voyager / dark_all — sombre suivi) avec
-  l'attribution OpenStreetMap + CARTO. Injoignable ⇒ la même communauté en
+  (jamais au démarrage), fond OpenFreeMap depuis le 21 oct. (voir « La carte sans clé d'API »). Injoignable ⇒ la même communauté en
   liste. Les épingles sont de vrais boutons (44 px) écoutés directement : le
   « clic » de Leaflet ne partait pas au doigt dans la coque zoomée à 80 %.
   Les feuilles (FermeAuRetour) et le toast vivent sur `<body>` (portail) : dans
@@ -9688,6 +9691,8 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 | `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |
 | `lbcfiche` | `appliquerAnnonceLbc` | **5.182.0** (16 oct.) | publier sur Leboncoin l'annonce CORRIGÉE dans la fiche de VRM (titre, prix, état, photos, description) |
+| `confirmer` | `capterConfirmations` | **5.204.0** (21 oct.) | « relever les colis à confirmer (« Tout est OK ») avant leur date limite » |
+| `retraitnotif` | `envoyerNotifsRetrait` | **5.204.0** (21 oct.) | « te prévenir quand elle lit un code de retrait dans une conversation » |
 
 ⚠️ **DEUX SEUILS POUR UNE MÊME NOTION, EXPRÈS.** Les photos s'attachent côté
 Leboncoin depuis la 5.58 et côté eBay depuis la 5.59 : un seul seuil aurait
@@ -10764,6 +10769,193 @@ par N°X » / « remplace N°Y, pas encore écrit sur le carton »). Chaque lign
 - **Non mesuré** : sa vraie base (données inventées) ; une vente reliée par sa
   seule PHOTO (`entryKeyByPhoto`) n'est pas reprise par la recherche (manque, pas
   faux) ; un carton posé dans deux cases n'est signalé qu'une fois.
+
+### L'extension prête pour le captcha Turnstile (21 octobre, 5.202 → 5.203)
+⚠️ **5.203.0** : `main` a publié une autre 5.202.0 (nouvelles icônes VRM, codex #629) sans ce code ; l'ensemble captcha + icônes porte 5.203.0 (deux contenus, deux numéros).
+Le jour où Julien allume Turnstile dans Supabase, GoTrue refuse `grant_type=password` sans jeton (400, `captcha_failed`, « captcha protection: request disallowed ») — et une page d'extension MV3 ne peut pas charger le script distant de Turnstile.
+- **Fenêtre de l'extension et carte du logo** : le geste principal reste « Se connecter avec VRM ». Le repli « avec mon mot de passe VRM » reste tant que le captcha est éteint ; un refus captcha (`authLogin` rend `captcha: true` + la phrase ; la fenêtre reconnaît aussi le refus BRUT d'un service worker d'avant) devient « La connexion par mot de passe n'est plus possible depuis l'extension : utilise « Se connecter avec VRM ». », les champs se replient et le bouton est proposé là (`captchaLierBtn`, `data-captcha="refus"`). Aucune session rangée. Un mauvais mot de passe reste « incorrect ».
+- **Pas touchés par le captcha** (lu dans le code, vérifié par l'audit) : le renouvellement (`grant_type=refresh_token`), la session fabriquée par le serveur (`admin/generate_link` clé de service, puis `verify`) — donc « Se connecter avec VRM » (5.169+), la session adressée et la voie `page` des 5.164/5.170.
+- Preuves : `audit-extension-captcha.cjs` (vrai `background.js` dans `_fond-vm`, 11 contrôles, 4 rouges sur la 5.201) ; banc `popup.cjs` +18 contrôles (fenêtre et carte, refus brut et traduit, le bouton lance la liaison, l'autre sens) : **13 rouges sur la 5.201**, 90 verts après. Aucune entrée d'`EXT_CAPACITES` (l'app ne promet rien de neuf). Extension **5.202.0**, zip régénéré, `EXT_ATTENDUE` suivie.
+- ⚠️ Une extension ANCIENNE (≤ 5.201) restera, captcha allumé, sur le message brut de GoTrue dans sa fenêtre : sa reconnexion par l'app (voie `page`, session adressée) marche toujours.
+
+### Revue visuelle de tous les écrans (21 octobre)
+Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), captures regardées. Banc `revue-21oct.cjs` (port 8811 ou `BANC_PORT`, `EXPLORE=dossier` pour les captures) : **21 rouges sur le build d'avant, 0 après**. Corrigé :
+- Achats → À retirer : le « i » d'un point relais n'était qu'une lettre nue ⇒ cerclé et centré ; sur une carte sans code, « J'ai retiré » restait seul à gauche ⇒ poussé à droite (`data-pickup-sans-code`).
+- Colis : la mention d'urgence (« à poster aujourd'hui ») était ROUGE ⇒ ambre (§7 : le rouge, c'est deux paires sous un même N°), `data-colis-urgence`.
+- « Mes transactions », « Ta déclaration URSSAF » se coupaient en fin de ligne, loin de leurs guillemets ⇒ espaces insécables.
+- eBay : « l'onglet « Compte eBay » » renvoyait à un onglet qui n'existe pas ⇒ « la section « Compte » » ; la section Compte peignait une bande opaque sous la barre de sections, en sombre ⇒ retirée ; « Actualiser » d'À traiter n'avait pas de titre visible ⇒ « Tâches à traiter ».
+- Compta : le lien de saisie des prix d'achat était redit sous le bénéfice net ; le segment « Période » laissait un vide à droite (`plein`) ; la liste vide d'abonnements redisait sa phrase.
+- Communauté : « Réessayer » collé au paragraphe ; Comptes liés : « Gérer ce compte » décentré ; Annonces : la ligne de fraîcheur collée à la grille.
+- **Laissés** : eBay « Réponse eBay incomplète » et les programmées vides (le banc sert `{pret:true}`) ; Compta à 0,00 € (limite des fixtures, déjà noté le 19 oct.) ; le lien en ligne « Statistiques » de 16 px (lien dans une phrase) ; le champ couleur du Garage ; le logo eBay en sombre (choix de design). `ventes-colis-premium` sort 2 rouges (« somme des prix rendus 0 € ») déjà sur le build d'avant.
+
+---
+
+### Messages eBay dans Ma journée, et la double vérification proposée au propriétaire (21 octobre)
+- **Messages eBay sans réponse** : eBay ne dit pas « lu » ; il dit `MessageStatus`. UNE règle, `messageEbayNonLu` (`api/_lib/ebay-messages-nonlus.js`) — Unanswered sans aucune réponse — lue par eBay → Messages (`data-nonlu`) ET par la route (§11). La route range par compte eBay un résumé `ebay_messages{suffixe}` = `{nonLus, ids, complet, capturedAt}` (aucun nom, aucun texte), sur toute page 1 LUE : l'action `relire` (déjà au plus toutes les ~10 min par compte, `relireEbaySiVieux` — c'est elle qui borne la lecture : +1 `GetMemberMessages` par relecture) et l'ouverture d'eBay → Messages ; une réponse acceptée (`repondre`) sort l'échange du résumé ; eBay illisible ⇒ rien n'est écrit. Fenêtre : 7 jours, comme Vinted ; d'autres pages chez eBay ⇒ « au moins ».
+- **Ma journée** (`etatMessagesEbay`) lit ces résumés de TOUS les comptes eBay actifs, en scalaires, **sans aucun appel à eBay**, dans la MÊME lecture que les commandes eBay de Ma journée (un seul rendu : `vitesse.cjs` plafonne Ma journée à 13 rendus au démarrage, mesuré 13/13/11 après, 13/11/13 avant). La case « Messages » = Vinted + eBay (`data-ebay`) et mène à eBay → Messages quand Vinted n'a rien ; une action « N messages eBay sans réponse » nomme les comptes quand il y en a plusieurs et ouvre eBay → Messages (`?tab=ebay_messages`, sur le compte s'il n'y en a qu'un). Résumé illisible ⇒ `data-ebay="passu"` et UNE ligne (`data-ebay-msg-passu`), jamais « 0 » ; aucun résumé rangé ⇒ rien d'eBay. Le premier résumé arrive avec la première relecture après le déploiement (≤ 10 min app ouverte).
+- ⚠️ **Leboncoin n'est PAS compté dans Ma journée** (contrairement à ce que dit la demande) : seul l'écran Leboncoin → Messages lit `lbc_messages`. Pas ajouté ici.
+- ⚠️ **21 oct. (soir) : l'invitation au démarrage est RETIRÉE** — Julien : « je ne comprends rien ». Le QR ne s'affichait pas (GoTrue rend `data:image/svg+xml;utf-8,<svg…` non encodé : `qrEnSrc` le réencode) ; les explications nomment l'app Mots de passe de l'iPhone. La double vérification reste dans Réglages → Mon compte, sur son geste. Ce qui suit décrit l'ancienne invitation.
+- **Double vérification proposée au propriétaire** (`InviteMfaProprio`, rendu par `PorteAbonnement` quand `/api/compte?mode=abonnement` dit `proprietaire: true` — la base, la même source que « gratuit, aucun abonnement ») : sans facteur TOTP vérifié (`mfaLireFacteurs`), un écran au démarrage propose de l'activer avec le panneau de Réglages (`DoubleVerification`, prop `onEtat`). « Plus tard » ⇒ `vrm_mfa_plus_tard_{uid}` sur l'appareil, pas reproposé avant 7 jours. **Aucun blocage** ; facteurs illisibles ⇒ rien ; les autres vendeurs : rien.
+- **Captcha (Turnstile)** : toujours ÉTEINT (`TURNSTILE_SITE_KEY` vide), `audit-anti-bot` et banc `captcha` prêts. Ordre des gestes, sans en sauter un : (0) **d'abord l'extension** — sa fenêtre se connecte encore par mot de passe (`background.js`, `grant_type=password`, sans jeton) : retirer ce repli (ou le remplacer par `vrm.center/?lier-extension=<id>`) et publier cette version, sinon la connexion par mot de passe de l'extension sera refusée ; (1) Cloudflare → Turnstile → widget « Managed » pour `vrm.center` ; (2) clé de SITE dans `VITE_TURNSTILE_SITE_KEY` (Vercel, Production), redéployer, vérifier le widget sur vrm.center/?connexion ; (3) seulement ensuite Supabase → Authentication → Attack Protection → CAPTCHA → Turnstile + clé SECRÈTE (jamais dans le dépôt) ; (4) citer Cloudflare dans la politique de confidentialité. Retour arrière : Supabase d'abord, puis vider la clé.
+- Preuves : banc `ebay-messages-journee.cjs` (port 8621, 390 tactile + 1512, données inventées) ; banc `mfa-proprio.cjs` (port 8611, faux GoTrue de `double-verification.cjs`) ; `ebay-relecture-cron.cjs` étendu (la vraie route `relire` range le résumé, `repondre` le décrémente, eBay illisible n'écrit rien) ; `audit-ebay-messages-nonlus.cjs` (`--mutation=reponses|fenetre|complet|retire` ⇒ rouges).
+- ⚠️ **Non mesuré** : la forme réelle de `GetMemberMessages` sur ses comptes (doc d'eBay) ; le coût en quota d'un `GetMemberMessages` de plus par relecture.
+
+### « Le boost est-il rentable ? » (Statistiques, 21 octobre)
+Fonction retenue le 11 octobre. Carte `BoostRentable` sous « Ce qui se vend »
+(une seule voix, §7), règle pure `src/boostRentable.js`.
+- **Mesuré (lecture seule)** : `promoted` = 0 `true` sur 380 annonces captées (347
+  `false`, 33 sans le champ) ; « Boost payé » (`vinted_annonce_numeros[id].fees`)
+  saisi sur 0 fiche sur 478 ; `boost_forme` n'a vu que `bumps`
+  (`minimum_price.has_free_bumps`, 41 fois) ; `invoice_lines` des porte-monnaie :
+  aucune ligne de boost. ⇒ Aujourd'hui la carte dit « pas assez de ventes pour
+  juger » — c'est juste.
+- **Règle** : vente → annonce par la transaction (`txn[tx].item`), jamais par le
+  titre ; boostée = `promoted === true` OU « Boost payé » > 0 ; non boostée =
+  `promoted === false` sans montant ; absent = pas compté (dit). Comparaison
+  limitée aux tranches de prix (< 30, 30-60, 60-100, ≥ 100 €) où il y a des deux
+  côtés ; moins de 5 de chaque côté ⇒ aucun chiffre ; chaque mesure (délai
+  médian, vues, favoris, marge médiane boost déduit) exige 5 valeurs connues de
+  chaque côté, sinon « — ». La marge d'une boostée exige son montant saisi
+  (sinon coût inconnu) et son prix d'achat (`prixAchatDe`). Annulées et comptes
+  écartés exclus. Transactions, annonces ou fiches illisibles ⇒ « pas pu lire ».
+  Mêmes lectures que « Ce qui se vend » (`lireExtrasRepartition`, qui garde
+  maintenant `promoted`, `views`, `favourites`). Un repère : n'entre dans aucun
+  total. Aucune couleur verte/rouge.
+- ⚠️ Vinted ne dit « boostée » que PENDANT le boost : une paire boostée puis
+  vendue après la fin compte parmi « les autres » si le montant n'est pas saisi
+  (la carte le dit).
+- Preuves : `audit-boost-rentable.cjs` (18 contrôles ; `--prouve` 7/7 mutations :
+  seuil, absent = non boostée, sans tranche, boost non déduit, marge sans
+  montant, « pas su » lu vide, rapprochement par titre) ; banc
+  `bancs/boost-rentable.cjs` (`BANC_PORT`, 1512 + 390 tactile, données
+  inventées) 32 contrôles, rouge sur le build d'origin/main, rouge sous mutation.
+
+### Ma journée hors ligne : une photo par vendeur, sur l'appareil (21 octobre)
+Ouvrir VRM sans réseau (métro, point relais sans 4G) montre Ma journée telle qu'à
+la dernière ouverture RÉUSSIE : colis à expédier (N°, compte, date limite), colis
+à retirer avec leurs codes et QR, la liste du soir — en lecture seule, sous UNE
+ligne « Hors ligne — ce que tu vois date de {heure} ; rien ne peut être envoyé ».
+- **Règle pure** `src/journeeHorsLigne.js` : `lectureComplete` (comptes lus, base
+  qui répond, ventes ET achats de tous les comptes d'aujourd'hui sans échec,
+  emails de suivi et de bordereau, `panel_colis_relais` LU — nouvel état
+  `colisRelaisLu` —, eBay lu) ; sinon AUCUNE photo. `lirePhoto(uid)` : clé
+  `vrm_hl_photo_{user.id}` ET contenu au même vendeur, sinon rien.
+  `wipeLocalData` (déconnexion, changement de vendeur) efface les photos (`vrm_*`)
+  et la réserve des QR.
+- **Hors ligne = `navigator.onLine === false`** (`useHorsLigne`) : la coque rend
+  `JourneeHorsLigne` À LA PLACE de tous les écrans (aucun geste qui envoie n'y
+  existe ; « Colis fait » / « Je l'ai retiré » grisés, la raison dite une fois
+  dans la ligne). Sans photo : « aucune copie gardée sur cet appareil » — jamais
+  « Tout est à jour ». Retour du réseau : la ligne part ; si rien n'avait pu être
+  lu (`baseKO`), rechargement (relecture normale). Une base qui hoquette EN
+  ligne garde `BaseInjoignable` (et ses codes G9).
+- **Session** : un jeton expiré hors ligne ne déconnecte pas (déjà vrai :
+  `authRefresh` rend `null`). ⚠️ Une session rangée sans `totp` (avant le 16 oct.)
+  passe par `PorteMfa`, qui ne peut pas vérifier hors ligne : pas de photo pour
+  elle tant qu'elle n'est pas renouvelée en ligne (volontaire : on ne contourne
+  pas la double vérification).
+- **QR** : les QR hébergés sont mis en réserve par la page (`fetch` no-cors →
+  cache `vrm-hl-qr`) ; le service worker sert `/hl-qr?u=…` depuis la réserve et
+  la garde à l'activation. Un `data:image` va dans la photo (≤ 60 Ko). Refusé ⇒
+  « QR pas gardé ici — donne le code ».
+- **Service worker** : une adresse AVEC paramètres n'entre plus dans le cache —
+  la vérification de version (`/?_v=<horodatage>`, chaque minute) y laissait une
+  copie de la page à chaque fois. Cache `vrm-shell-v6` inchangé, `/assets/` cache
+  d'abord, le reste réseau d'abord.
+- Preuves : banc `hors-ligne.cjs` (port `BANC_PORT`, 4961 ; données inventées ;
+  `context.setOffline` ; 390 tactile + 1512 ; lecture complète → hors ligne jeton
+  expiré → retour du réseau · lecture partielle · photo d'un autre vendeur) —
+  **28 rouges sur le build d'avant**, 0 après ; mutations « photo d'un autre
+  vendeur servie » ⇒ 4 rouges, « photo écrite sur lecture partielle » ⇒ 6 rouges.
+  `audit-journee-hors-ligne.cjs` (`--prouve` 4/4). `sw-cache.cjs` vert.
+- ⚠️ **Non mesuré** : un vrai iPhone (Safari ne déclare pas toujours
+  `navigator.onLine === false` sur un réseau qui ne passe pas — c'est alors
+  `BaseInjoignable`) ; le CDN réel des QR Pickup (une réponse opaque refusée par
+  CORP ⇒ le code seul) ; la liste du soir est calculée sur les dates limites
+  rangées, pas relue.
+
+### Retour → stock : « Retours en cours » dans Colis (21 octobre)
+Fonction retenue le 11 octobre. **Mesuré (lecture seule)** : une VENTE en retour
+a sa transaction à `status` 440 « Retour initié » ; son `ship_status_title` dit
+où en est le colis de retour (vide / « Bordereau envoyé au vendeur » = pas
+parti · « colis déposé… » = en route · « Commande livrée ! » = ambigu, peut être
+la livraison d'origine) ; la liste des ventes passe ensuite à « Remboursement
+effectué » (`failed`), la transaction reste figée à 440. 13 ventes 440 en base,
+dont 1 en cours (oct.), 1 figée sur une vente finalisée (pas un retour), le
+reste remboursé en août-sept. Aucune donnée de retour dans les conversations
+n'a été utilisée.
+- **Une règle pure** `src/retoursStock.js` (`retoursEnCours`, `remiseEnStock`) :
+  la paire par IDENTITÉ (correction de la vente, sinon transaction → annonce →
+  fiche N°), **jamais le titre** ; étapes initié · en route · reçu chez toi ·
+  remboursé ; « reçu » n'est JAMAIS déduit (même « Vinted dit livrée ») : c'est
+  SON clic (`vinted_retours_recus`, existant) ; non réclamée = la paire revient
+  aussi ; remboursé de plus de 45 j et pas noté reçu ⇒ replié, jamais caché.
+  Trois états (ventes pas lues · pas su · lu), ce qui manque nommé (états des
+  transactions, ventes d'un compte, retours eBay).
+- **eBay** : les retours Post-Order (`action: 'retours'`, la route existante),
+  lus seulement sur Colis, une fois par 10 min, pour les comptes eBay RELIÉS
+  (une ligne `ebay_orders`) ; N° par le SKU de la ligne de commande
+  (`numLigneEbay`) ; clos sans remboursement ⇒ rien ne revient. Accepter /
+  rembourser reste dans eBay → À traiter.
+- **Colis → « Retours en cours »** (`RetoursEnCoursBloc`, `data-retours-encours`,
+  `data-retour*`) : N°, étape, compte, lien Vinted/eBay ; « Reçu chez moi ? » ;
+  « Remise en stock » (seulement reçu ET relié) : garde le N° ; porté par une
+  autre paire PRÉSENTE ⇒ la feuille DEMANDE (« Remettre en stock sans N° » ou
+  Annuler, jamais deviné) ; ancien N° (013) ⇒ « numéro neuf à la
+  republication ». Rangé dans `vinted_retours_remis` (synchronisé, rattrapé par
+  `onCloudReady`, rejoué comme geste) ; la ligne passe « à republier » (lien
+  `vinted.fr/items/new`) jusqu'à republication (N° en ligne, annonce rouverte ou
+  photo exacte). **Rien d'autre ne change** : ni pool, ni fiche, ni numéros
+  présents. Le CA n'est pas touché (le remboursement en sort par les règles
+  existantes, §11).
+- **Une voix (§7)** : la liste « qui te reviennent » d'Annonces → Conseils est
+  remplacée par une ligne qui mène à Colis. La carte « litiges » de Statistiques
+  reste (elle compte aussi suspendues et pertes).
+- Preuves : `audit-retours-stock.cjs` (vraie règle, 31 contrôles, `--prouve`
+  **6/6** : relié par titre, livrée = reçu, conflit ignoré, pas su = vide,
+  finalisée gardée, correction ignorée) ; banc `bancs/retours-stock.cjs`
+  (`BANC_PORT`, `BANC_DIST`, 390 tactile + 1512, ventes inventées) — rouge sur
+  le build d'origin/main (**20 rouges**), vert après, **4 rouges** sur un build « relié par titre ».
+- **Non mesuré** : un vrai retour eBay (aucune commande eBay en base) ; le lien
+  `ebay.fr/rt/ReturnDetails` ; « Commande livrée » sous 440 n'est jamais lu
+  comme reçu (le sens sûr).
+
+
+### Colis à retirer : la vraie date d'arrivée, la notification du code lu par l'extension, et les colis à confirmer (21 octobre, 5.204)
+- **Mesuré d'abord (lecture seule)** : `created_at_ts` d'un message de conversation est un ISO avec décalage (« 2026-10-13T10:08:35+02:00 »). « Confirmation nécessaire » (`event_type: delivered`, actions `all_is_good` « Tout est OK » / `i_have_issues`, `interpolation_values.subtitle.return_shipment_date` = « 21 sept. 15:59 », sans année) n'existe que dans **2 conversations, toutes deux côté VENDEUR, `event_group: return_shipment`** : c'est un **RETOUR** qui lui revient (ventes 440), pas un achat. ⚠️ La note du 20 octobre (« current_user_side vaut seller sur des achats ») était fausse : ces conversations sont des VENTES (vérifié par transaction dans `orders_sold`). Côté acheteur (13 achats captés), aucun message de confirmation — « Livrée » puis « Profite de ta commande ! ». La règle est posée sur la FORME (l'action `all_is_good`) : un achat qui la porterait un jour est pris (`quoi: 'achat'`).
+- **Date d'arrivée** : `retraitDeConversation` range `arriveLe` = l'heure du PREMIER message d'arrivée (`msDeTsMessage` : ISO, secondes ou ms ; illisible ou absurde ⇒ rien) ; `noterRetrait` garde la plus ancienne. L'app l'affichait déjà comme date sûre (`arriveeColisVinted`) : rien à changer côté app.
+- **Notification « 📍 Colis à retirer »** : un CODE NEUF rangé par l'extension (et lui seul — pas un lieu sans code, pas le même code relu) part en file `vrmRetraitNotifs` (`chrome.storage.local`) puis `POST /api/push {action:'retrait', tx}` avec la session VRM (rien d'autre : ni code, ni lieu). `api/push.js` (toujours 12 fonctions) appelle `notifierRetraitConversation` (`api/email-inbound.js`) qui relit `panel_colis_relais` AU NOM du vendeur ; sans code ⇒ rien ; rangée il y a plus de 72 h ⇒ rien ; illisible ⇒ 503 (l'extension renvoie, 24 h au plus) ; catégorie `colis`, abonnement, comme l'email. **Anti-doublon** : `relais-{suivi}-code` si la conversation porte un suivi, sinon `relais-tx{tx}-code`, ET `retrait-code-{CODE}` (`cleCodeRetrait`) — écrite aussi par la voie email (`shouldNotify(key, aussi)`) : le **code de retrait est la seule identité commune** email ↔ conversation (§5). Un email SANS code puis la conversation AVEC code sonne deux fois (comme email sans code puis email avec code).
+- **À confirmer avant la date limite** : `confirmationDeConversation` (en attente seulement si la DERNIÈRE action est « Tout est OK » ; une action plus récente ⇒ réglée, l'entrée sort), `limiteDeConfirmation` (année du message ou la suivante, seulement si la limite tombe entre la veille du message et 30 jours après, heure de Paris ; sinon `limiteMs: null`, « pas su »). Ligne dédiée `panel_a_confirmer` (par transaction, lire-fusionner-réécrire GARDÉ, purge à 7 j après la limite / 30 j). Lu en passant (conversation captée) et par `capterConfirmations` à chaque visite : achats « Commande livrée » `needs_action` et ventes « Retour… » non finalisées, 3 par visite, 6 h, `gardeLecture` colis (hors réserve de lecture), file Vinted, la conversation doit porter SA transaction. App (`src/aConfirmer.js`, une règle) : Achats « N retours/achats à confirmer avant le … » (`data-a-confirmer`, lien vers chaque conversation, compte nommé une fois s'il est le même), Ma journée `data-job="a-confirmer"` ; illisible ⇒ Achats « pas pu lire », Ma journée se tait ; délai passé ou sans année lue depuis plus de 3 jours ⇒ écarté ; sans année lue, le texte de Vinted est recopié tel quel. `EXT_CAPACITES.confirmer` / `.retraitnotif` = 5.204.0 (dites dans « ce qui manque » à une extension en retard).
+- Preuves : `audit-retrait-confirmer.cjs` (vrai `background.js`, 33 contrôles ; **12 rouges sur origin/main** ; mutations `date-du-dernier-message`, `sonne-a-chaque-changement`, `lecture-ratee-lue-vide`, `annee-devinee` ⇒ rouges) ; banc `retrait-conv-push.cjs` (vraies routes `push` + `email-inbound`, 15 contrôles ; **9 rouges sur origin/main** ; « email sans clé du code » ⇒ 2 rouges) ; banc `a-confirmer.cjs` (port `BANC_PORT`, 390 tactile + 1512, trois états ; **rouge sur le build d'origin/main** ; mutation « illisible lu vide » ⇒ rouge). `_fond-vm.cjs` fournit `AbortController`.
+- ⚠️ **Non mesuré** : la forme d'un « Confirmation nécessaire » côté ACHETEUR (jamais vu) ; une conversation dont `conversation_id` est un UUID (`orders_*` récents) est-elle lue par `/api/v2/conversations/{uuid}` ? (c'est déjà le cas de `capterRetraits`) ; un vrai push depuis l'extension. Le retour qui revient au point relais côté VENDEUR (« Rends-toi au point relais … », statut 440) n'est toujours pas proposé au retrait (`retraitDeConversation` écarte le côté vendeur) — à trancher.
+- **Geste de Julien** : installer la 5.204 (remplacer le dossier, puis ⟳ dans chaque Chrome).
+
+### La carte sans clé d'API : OpenFreeMap (21 octobre)
+Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CARTO
+(`basemaps.cartocdn.com`) et les tuiles OSM directes sont retirés partout.
+- **Fond** : OpenFreeMap (instance publique : aucune inscription, aucune clé,
+  aucun cookie, usage commercial permis), styles `liberty` (clair) et `dark`
+  (sombre — « pas encore complet » selon ses auteurs). Attribution affichée :
+  OpenFreeMap · © OpenMapTiles · © OpenStreetMap. Conditions lues dans les dépôts
+  `hyperknot/openfreemap(-styles)` (openfreemap.org bloqué d'ici).
+- **Moteur** : `maplibre-gl` 6.11.2 (BSD-3) + `@maplibre/maplibre-gl-leaflet`
+  0.1.4 (ISC), calque sous Leaflet (épingles et regroupement inchangés).
+  `src/fondCarte.js` (une règle : style, attribution, chargement, WebGL).
+  Chargé à l'ouverture de la carte SEULEMENT : 289 Ko compressés + worker 508 Ko
+  + CSS 10 Ko ; aucun morceau d'entrée ne le contient (l'audit le vérifie).
+- **Repli** : WebGL absent, style ou tuiles en erreur, ou rien au bout de 12 s ⇒
+  la communauté en liste (jamais une carte grise). Mini-carte des points relais
+  (`FondMiniCarte`) ⇒ fond uni, épingles gardées — ⚠️ elle est injoignable
+  aujourd'hui (`openRelayPicker` n'a aucun appelant) : pas de banc.
+- **CSP** : `vercel.json` ne pose que `frame-ancestors` ⇒ rien à changer. Si une
+  CSP complète est posée : `connect-src`/`img-src https://tiles.openfreemap.org`,
+  `worker-src 'self' blob:`.
+- Preuves : banc `communaute.cjs` (OpenFreeMap servi par le banc, `liberty` puis
+  `dark` demandés, aucune requête `cartocdn`/`tile.openstreetmap`, fond coupé ⇒
+  liste) 144 verts, **8 rouges sur le build d'avant** ; `audit-fond-carte.cjs`
+  6 contrôles, 3 rouges sur l'avant.
+- **Non mesuré** : la vraie instance OpenFreeMap depuis son téléphone ; WebGL sur
+  un vrai iPhone ; le rendu du style `dark`.
 
 ### La politique de sécurité du contenu (CSP) sur toute l'app (21 octobre)
 Suite de l'audit du 4-5 octobre (« Pas fait : une vraie politique `script-src` »).

@@ -92,11 +92,11 @@ const PONT = ({ chrome, lecture }) => {
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
     if (chrome === 'muette') return;
     // authEtat : la session VRM de l'extension — JAMAIS le compte Vinted.
-    if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: !lecture, expiree: false, email: 'vendeur@exemple.test', user_id: 'u1', cloisonne: false } });
+    if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: !lecture, expiree: false, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */, cloisonne: false } });
     if (d.__vmr === 'etat') {
       const passu = chrome === 'passu';
       const lo = { 111: 'compte_a', 222: 'compte_b', 333: 'compte_c', 999: 'compte_achat' };
-      post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: { ok: true, connecte: !lecture, email: 'vendeur@exemple.test', user_id: 'u1' },
+      post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: { ok: true, connecte: !lecture, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ },
         vinted: !passu && chrome ? { uid: String(chrome), login: lo[chrome] || '' } : null, cmds: {} }, passu ? { vintedPasSu: true } : {}) });
     }
     if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });

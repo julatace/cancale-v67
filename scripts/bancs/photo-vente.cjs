@@ -59,6 +59,7 @@ const rows = [
   txn(9001, 5001), txn(9003, 5003),
   MAIN,
 ];
+if(process.env.BANC_RECUS==='1')rows.push({id:'email_achat_banc',data:{type:'achat',article:'Ordinateur portable de test',account:'email uniquement',transaction:'7654321',receivedAt:auj.toISOString(),texte:'Reçu pour la commande Ordinateur portable de test\nMontant payé : 125,00 EUR\nTransaction : 7654321'}});
 // Une couleur par photo : le banc lit la couleur réellement peinte.
 const COUL = { bonannonce: [20, 160, 40], ficheverrou: [200, 20, 20], commandec: [20, 40, 200], photoachat: [200, 160, 20] };
 const zlib = require('zlib');
@@ -98,6 +99,9 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') +
 async function couleurs(pg, tx) {
   // Les détails sont désormais dans le panneau désigné par aria-controls.
   const bouton = pg.locator(`.vrm-sale-row[data-tx="${tx}"] > .vrm-ledger-sale-toggle`);
+  // Le détail d'une AUTRE vente encore ouvert (une feuille sur téléphone) couvre
+  // la ligne visée : on le referme comme lui (Échap) avant d'ouvrir celle-ci.
+  if (await pg.locator(`.vrm-sale-row:not([data-tx="${tx}"]) > .vrm-ledger-sale-toggle[aria-expanded="true"]`).count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400); }
   if (await bouton.count() && await bouton.getAttribute('aria-expanded') !== 'true') await bouton.click();
   return pg.evaluate((tx) => {
     const row = document.querySelector(`.vrm-sale-row[data-tx="${tx}"]`); if (!row) return null;
@@ -124,6 +128,10 @@ const nomCouleur = (c) => c;
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      if (process.env.BANC_VUES === '1' || process.env.BANC_RECUS === '1') await pg.addInitScript(() => {
+        localStorage.setItem('vrm_session', JSON.stringify({user:{id:'banc-vues-ventes',email:'test@example.invalid'},access_token:'session-fictive-banc',expires_at:Date.now()+3600000}));
+        localStorage.setItem('vrm_local_owner','banc-vues-ventes');
+      });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
         const u = r.request().url();
         if (/images1\.vinted\.net/.test(u)) {
@@ -137,7 +145,7 @@ const nomCouleur = (c) => c;
         const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(process.env.BANC_RECUS==='1'?[]:ACCOUNTS);
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
         const forme = (r) => (sel && !/^id,data/.test(sel) && sel !== 'data,updated_at,cap:data->>capturedAt') ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
         const eq = /id=eq\.([^&]*)/.exec(u);
@@ -149,9 +157,51 @@ const nomCouleur = (c) => c;
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-      await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+      if (process.env.BANC_VUES === '1' || process.env.BANC_RECUS === '1') await pg.route('**/auth/v1/**', r => r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({id:'banc-vues-ventes',email:'test@example.invalid',aud:'authenticated'})}));
+      await pg.goto(`http://localhost:${PORT}/?tab=${process.env.BANC_RECUS==='1'?'cat_achats':'cat_ventes'}`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
+      if(process.env.BANC_RECUS==='1'){
+        const recus=pg.locator('[data-recus-email]');await recus.locator('summary').click();
+        await recus.getByRole('button',{name:/Ordinateur portable de test/}).click();
+        const dialog=pg.getByRole('dialog',{name:"Reçu d'achat",exact:true});await dialog.waitFor();
+        dit(/7654321/.test(await dialog.innerText()),'email seul : le vrai reçu est consultable sans compte Vinted synchronisé');
+        dit(await pg.locator('.vrm-buy-row').count()===0,'email seul : aucun achat inventé dans la liste synchronisée');
+        await dialog.press('Escape');
+        dit(await pg.getByRole('dialog',{name:"Reçu d'achat",exact:true}).count()===0,'email seul : le reçu se ferme au clavier');
+
+        const panneRecus=r=>r.request().url().includes('email_achat_')?r.fulfill({status:503,contentType:'application/json',body:'{}'}):r.fallback();
+        await pg.route('**/rest/v1/**',panneRecus);
+        await recus.getByRole('button',{name:'Actualiser les reçus',exact:true}).click();
+        await recus.getByRole('button',{name:'Réessayer',exact:true}).waitFor();
+        dit(/pas pu être lus/.test(await recus.innerText()),'email seul : un échec de lecture ne devient pas zéro reçu');
+        await pg.unroute('**/rest/v1/**',panneRecus);await recus.getByRole('button',{name:'Réessayer',exact:true}).click();
+        await recus.getByRole('button',{name:/Ordinateur portable de test/}).waitFor();
+        dit(errs.length===0,'email seul : aucune erreur d’app',errs.join(' | '));
+        if(process.env.CAPTURES){fs.mkdirSync(process.env.CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.CAPTURES,`recus-email-${vp.width}.png`)});}
+        await ctx.close();continue;
+      }
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      if (process.env.BANC_VUES === '1') {
+        const vues = pg.locator('[data-vues-plateforme="vinted"]');
+        await pg.getByLabel('Rechercher dans les ventes Vinted',{exact:true}).fill('Salomon');
+        await vues.locator('summary').click();
+        await vues.getByLabel('Enregistrer les filtres actuels').fill('Mes Salomon');
+        await vues.getByRole('button',{name:'Enregistrer',exact:true}).click();
+        dit(/enregistrée/.test(await vues.locator('[role="status"]').textContent()),'vue : la recherche réelle est enregistrée');
+        await pg.reload();await pg.waitForTimeout(3500);
+        // Le démarrage normal revient à Ma journée : on rejoint les ventes.
+        if(!await vues.count()) await pg.locator('.vrm-day-money .vrm-day-lien').click();
+        await vues.locator('summary').click();
+        await vues.getByRole('button',{name:/^Mes Salomon/}).click();
+        dit(await pg.getByLabel('Rechercher dans les ventes Vinted',{exact:true}).inputValue()==='Salomon','vue : la recherche revient après rechargement');
+        await pg.waitForTimeout(600);
+        dit(await pg.locator('.vrm-sale-row[data-tx="9002"]').count()===1 && await pg.locator('.vrm-sale-row[data-tx="9001"]').count()===0,'vue : la liste réelle est filtrée, sans modifier les ventes');
+        await vues.locator('summary').click();
+        const dossier=process.env.CAPTURES;
+        if(dossier){fs.mkdirSync(dossier,{recursive:true});await pg.screenshot({path:path.join(dossier,`ventes-vues-${vp.width}.png`)});}
+        await vues.locator('summary').press('Escape');
+        await pg.getByLabel('Rechercher dans les ventes Vinted',{exact:true}).fill('');await pg.waitForTimeout(600);
+      }
       // On OUVRE chaque vente, comme lui.
       await pg.evaluate(() => { for (const r of document.querySelectorAll('.vrm-sale-row[data-tx]')) { const bt = r.querySelector('.vrm-ledger-sale-toggle'); if (bt && bt.getAttribute('aria-expanded') !== 'true') bt.click(); } });
       // La vignette morte : l'app attend (pas d'extension ici) puis passe à la

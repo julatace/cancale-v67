@@ -5,6 +5,10 @@
 // mesuré +1,1 Mo par déploiement, jamais purgé (13 à 21 déploiements par jour).
 // Changer le nom fait jeter la v4 entière à l'activation, chez tout le monde.
 const CACHE = 'vrm-shell-v6';
+// La réserve des QR de « Ma journée hors ligne » (src/journeeHorsLigne.js) :
+// remplie par la page pendant que le réseau est là, vidée à la déconnexion.
+// ⚠️ PAS une version de la coquille : la purge d'activation la garde.
+const CACHE_QR = 'vrm-hl-qr';
 // Repère de la version servie : le nom du script principal de la page.
 const REPERE = '/__vrm_build';
 const pdfStore = {};
@@ -13,7 +17,7 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil((async () => {
   // Purge les anciens caches de coquille lors d'une mise à jour.
   const keys = await caches.keys();
-  await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+  await Promise.all(keys.filter(k => k !== CACHE && k !== CACHE_QR).map(k => caches.delete(k)));
   await clients.claim();
 })()));
 
@@ -56,8 +60,8 @@ self.addEventListener('push', event => {
   const title = data.title || 'VRM';
   const opts = {
     body: data.body || '',
-    icon: '/vrm-icon-v3-192.png',
-    badge: '/vrm-icon-v3-192.png',
+    icon: '/vrm-icon-v4-192.png',
+    badge: '/vrm-icon-v4-192.png',
     tag: data.tag || 'vrm',
     renotify: true,            // même tag : re-sonne au lieu de rester silencieux
     vibrate: [80, 40, 80],     // petite vibration (Android) pour attirer l'œil
@@ -145,11 +149,30 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // 1 bis) Les QR de Ma journée hors ligne : `/hl-qr?u=<adresse>`. La réserve
+  //    d'abord (c'est hors ligne qu'on les demande) ; sinon le réseau, sans
+  //    cookie ni référent. Rien ⇒ 404 : la page dit « donne le code ».
+  if (url.pathname === '/hl-qr') {
+    event.respondWith((async () => {
+      try {
+        const c = await caches.open(CACHE_QR);
+        const hit = await c.match(req);
+        if (hit) return hit;
+        const u = url.searchParams.get('u') || '';
+        if (/^https:\/\//i.test(u)) return await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+      } catch (_) {}
+      return new Response('', { status: 404 });
+    })());
+    return;
+  }
+
   // ⚠️ JAMAIS DE CACHE SUR /api/. Ces routes répondent à des questions dont la
   // réponse change (la clé IA est-elle configurée ? les chiffres du widget) :
   // mises en cache par la règle 3 ci-dessous — même origine, GET, non-navigation
   // — elles seraient figées pour toujours sur leur première réponse.
   if (url.pathname.startsWith('/api/')) return;
+  // Ne jamais mettre un lien de récupération en cache ni le remplacer par la coque privée.
+  if (url.pathname === '/recuperation.html' || url.pathname.startsWith('/recuperation.')) return;
 
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
@@ -211,7 +234,10 @@ self.addEventListener('fetch', event => {
     if (hit && immuable) return hit;
     try {
       const res = await fetch(req);
-      if (res && res.status === 200 && res.type === 'basic') cache.put(req, res.clone()).catch(() => {});
+      // ⚠️ Une adresse AVEC paramètres n'entre pas dans le cache : la vérification
+      // de version (`/?_v=<horodatage>`, main.jsx, chaque minute) y laissait une
+      // copie de la page à chaque fois, jamais relue ni purgée.
+      if (res && res.status === 200 && res.type === 'basic' && !url.search) cache.put(req, res.clone()).catch(() => {});
       return res;
     } catch (_) {
       return hit || Response.error();

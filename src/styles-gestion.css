@@ -165,3 +165,14 @@
  .vrm-app-shell .vrm-app-header{padding-block:4px!important;}
  .vrm-main .vrm-set-ic{width:28px;height:28px;flex-shrink:0;}
 }
+/* Le CA et le bénéfice partagent le même bilan, avec des libellés distincts. */
+.vrm-day-money>.vrm-day-benef-inline{grid-column:1 / -1;min-width:0;padding-top:12px;margin-top:10px;}
+.vrm-day-benef-inline .vrm-day-head{gap:8px;}
+.vrm-day-benef-inline .vrm-display{font-size:20px!important;}
+.vrm-day-benef-inline .vrm-day-note{overflow-wrap:anywhere;}
+@media(max-width:767px){
+ .vrm-day-money>.vrm-day-benef-inline{border-top-color:#ffffff30!important;padding-top:10px;margin-top:7px;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:#f1f7ef!important;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:#d4e6c8!important;}
+ .vrm-day-benef-inline .vrm-day-k{font-size:10px;letter-spacing:.04em;}
+}

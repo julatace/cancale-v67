@@ -36,7 +36,9 @@ const CIBLES = fichiers.filter(f => DOSSIERS.some(d => f.startsWith(path.join(R,
 const REGLES = [
   ['aucune clé privée VAPID', /VAPID_PRIVATE(_KEY)?\s*=\s*process\.env\.[A-Z_]+\s*\|\|\s*['"][A-Za-z0-9_-]{20,}['"]/,
     'une clé privée en repli dans le code = tout le monde peut notifier les téléphones du vendeur'],
-  ['aucun email personnel', /[a-z0-9._%+-]+@(gmail|icloud|outlook|hotmail|yahoo|orange|free|laposte|wanadoo)\.[a-z]{2,}/i,
+  // Seule exception : la boîte COLLECTIVE du service (vers laquelle les vendeurs font
+  // suivre leurs emails Vinted) — une adresse publique de VRM, pas une personne.
+  ['aucun email personnel', /(?<![a-z0-9._%+-])(?!vrm\.vinted35@gmail\.com)[a-z0-9._%+-]+@(gmail|icloud|outlook|hotmail|yahoo|orange|free|laposte|wanadoo)\.[a-z]{2,}/i,
     'donnée personnelle publiée dans un dépôt ouvert'],
   ['aucun SIRET en dur', /\bsiret\s*:\s*['"]\d{9,}['"]/i,
     "l'identité d'entreprise ne doit pas être une valeur par défaut : un nouveau vendeur la trouverait sur ses factures"],

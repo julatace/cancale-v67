@@ -223,7 +223,7 @@ const PONT = ({ dataUrl, delai, refuse, refusePremieres, lentPremieres, lentMs, 
     if (retard && Date.now() - t0 < retard) return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version, id: 'banc' });
     if (muet) return;
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' }, vinted: null, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ }, vinted: null, cmds: {} } });
     if (d.__vmr === 'photo') {
       const p = window.__pont;
       p.enVol++; p.total++; p.max = Math.max(p.max, p.enVol); p.parUrl[d.url] = (p.parUrl[d.url] || 0) + 1;

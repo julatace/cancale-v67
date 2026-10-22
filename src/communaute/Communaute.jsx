@@ -17,15 +17,17 @@
 //  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
 //  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
 //  classement peuvent n'afficher que les membres d'un groupe.
-//  La carte : Leaflet 1.9.4 depuis cdnjs, chargé à l'ouverture de l'écran
-//  (jamais au démarrage), fond OpenStreetMap / CARTO avec leur attribution.
+//  La carte : Leaflet 1.9.4 embarqué, chargé à l'ouverture de l'écran (jamais
+//  au démarrage), fond OpenFreeMap (MapLibre, sans clé) avec son attribution.
 //  Injoignable ⇒ la même communauté en liste.
 // ════════════════════════════════════════════════════════════════════════════
+import {avatarProfilPermis,initialesProfil} from './avatarDiscord.js';
 import { DISCORD_ERREURS } from './discordErreurs.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
+import { chargerCalqueMaplibre, styleCarte, ATTRIBUTION_CARTE, webglDispo } from '../fondCarte.js';
 
 // Leaflet est EMBARQUÉ dans VRM (paquet npm leaflet 1.9.4, licence BSD-2), chargé
 // seulement à l'ouverture de la carte : un CDN bloqué (bloqueur de pub, réseau
@@ -41,14 +43,9 @@ function chargerLeaflet() {
   }).catch((e) => { promesseLeaflet = null; throw e; });
   return promesseLeaflet;
 }
-// Deux fonds de carte : CARTO d'abord, OpenStreetMap si les tuiles CARTO ne
-// chargent pas (aucune tuile reçue et plusieurs refus) — jamais une carte grise.
-const FONDS = {
-  carto: (sombre) => ({ url: `https://{s}.basemaps.cartocdn.com/rastertiles/${sombre ? 'dark_all' : 'voyager'}/{z}/{x}/{y}{r}.png`, opts: { subdomains: 'abcd',
-    attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>' } }),
-  osm: () => ({ url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', opts: {
-    attribution: '&copy; contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' } }),
-};
+// Le fond : OpenFreeMap (tuiles vectorielles, sans clé ni inscription) dessiné
+// par MapLibre dans un calque Leaflet (src/fondCarte.js). Plus de CARTO (clé
+// exigée), plus d'OpenStreetMap direct (usage applicatif lourd interdit).
 
 const ENDPOINT = '/api/compte?mode=communaute';
 const PAS_SU = "Je n'ai pas pu lire la carte — rien n'est perdu, c'est la lecture qui a échoué.";
@@ -67,12 +64,20 @@ function useApi(headers) {
 }
 
 // ── LA CARTE (Leaflet) ───────────────────────────────────────────────────────
+function AvatarProfil({profil,grand=false}) {
+  const url=avatarProfilPermis(profil?.avatar)?profil.avatar:'';
+  const [rate,setRate]=useState('');
+  return <span className={'vrm-cm-avatar'+(grand?' grand':'')} aria-hidden="true">{initialesProfil(profil)}{url&&rate!==url&&<img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setRate(url)}/>}</span>;
+}
+
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), calque = useRef(null), fond = useRef(null);
-  const [pret, setPret] = useState(false), [source, setSource] = useState('carto');
+  const [pret, setPret] = useState(false), [fondPret, setFondPret] = useState(false);
   useEffect(() => {
     let vivant = true;
-    chargerLeaflet().then((L) => {
+    // Pas de WebGL : MapLibre ne dessinerait rien — la même communauté en liste.
+    if (!webglDispo()) { onEchec(); return () => { vivant = false; }; }
+    Promise.all([chargerLeaflet(), chargerCalqueMaplibre()]).then(([L]) => {
       if (!vivant || !boite.current || carte.current) return;
       const m = L.map(boite.current, { zoomControl: true, attributionControl: true, worldCopyJump: true, minZoom: 2, maxZoom: 12 });
       carte.current = m;
@@ -87,17 +92,31 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
     }).catch(() => { if (vivant) onEchec(); });
     return () => { vivant = false; if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; } };
   }, []);
-  // Le fond suit le thème (clair / sombre), avec l'attribution exigée.
+  // Le fond suit le thème (OpenFreeMap « liberty » / « dark »), avec
+  // l'attribution exigée. Style ou tuiles injoignables avant tout dessin
+  // (ou rien au bout de 12 s) ⇒ la liste, jamais une carte grise.
   useEffect(() => {
-    if (!pret) return;
-    const L = window.L, m = carte.current;
-    if (fond.current) m.removeLayer(fond.current);
-    const f = FONDS[source](sombre);
-    let recues = 0, refus = 0;
-    fond.current = L.tileLayer(f.url, { maxZoom: 19, ...f.opts }).addTo(m);
-    fond.current.on('tileload', () => { recues++; });
-    fond.current.on('tileerror', () => { refus++; if (source === 'carto' && recues === 0 && refus >= 4) setSource('osm'); });
-  }, [pret, sombre, source]);
+    if (!pret) return undefined;
+    const m = carte.current;
+    let fini = false;
+    if (fond.current) { m.removeLayer(fond.current); fond.current = null; }
+    setFondPret(false);
+    chargerCalqueMaplibre().then((maplibreGL) => {
+      if (fini || !carte.current) return;
+      const calqueFond = maplibreGL({ style: styleCarte(sombre), attributionControl: { customAttribution: ATTRIBUTION_CARTE }, interactive: false });
+      calqueFond.addTo(m);
+      fond.current = calqueFond;
+      const gl = calqueFond.getMaplibreMap && calqueFond.getMaplibreMap();
+      let charge = false;
+      const echec = () => { if (!fini && !charge) { fini = true; onEchec(); } };
+      const delai = setTimeout(echec, 12000);
+      if (gl) {
+        gl.once('load', () => { charge = true; clearTimeout(delai); if (!fini) setFondPret(true); });
+        gl.on('error', () => { if (!charge) { clearTimeout(delai); echec(); } });
+      }
+    }).catch(() => { if (!fini) { fini = true; onEchec(); } });
+    return () => { fini = true; };
+  }, [pret, sombre]);
   // Les épingles : regroupées au zoom courant (le nombre de personnes dedans).
   useEffect(() => {
     if (!pret) return;
@@ -115,6 +134,12 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
         // au clavier), sans dépendre de la détection de « clic » de la carte.
         const bouton = mk.getElement() && mk.getElement().querySelector('button');
         if (bouton) {
+          const personnes=g.cells.flatMap(c=>c.personnes);
+          if(g.n===1){
+            const p=personnes[0]||{};bouton.textContent=initialesProfil(p);bouton.classList.add('profil');
+            bouton.setAttribute('aria-label',String(p.pseudo||'Revendeur')+' · '+String(p.ville||''));
+            if(avatarProfilPermis(p.avatar)){const img=document.createElement('img');img.src=p.avatar;img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});bouton.append(img);}
+          }
           L.DomEvent.disableClickPropagation(bouton);
           bouton.addEventListener('click', (e) => {
             e.preventDefault();
@@ -131,7 +156,7 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   useEffect(() => {
     if (pret && moi) carte.current.flyTo([Number(moi.lat), Number(moi.lon)], Math.max(carte.current.getZoom(), 8), { duration: 0.6 });
   }, [pret, moi && moi.lat, moi && moi.lon]);
-  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={source} role="region" aria-label="Carte de la communauté">
+  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={fondPret ? 'openfreemap' : 'charge'} role="region" aria-label="Carte de la communauté">
     <div className="vrm-cm-carte-fond" ref={boite} />
     {!pret && <p className="vrm-cm-carte-attente">Chargement de la carte…</p>}
   </div>;
@@ -402,7 +427,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     <div className="vrm-cm-carton">
       {etat === 'non-installe' ? <><b>La carte de la communauté n’est pas encore activée sur ta base.</b><p>Elle s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est perdu, rien n’est partagé d’ici là.</p></>
         : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>La carte de la communauté est réservée aux abonnés : tu n’es pas montré aux autres tant qu’il n’est pas réglé.</p></>
-        : <><b>{PAS_SU}</b><p>Ce n’est pas que personne n’est sur la carte : je n’ai simplement pas pu la lire.</p><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
+        : <><b>{PAS_SU}</b><p>Ça ne veut pas dire que personne n’y est. Réessaie dans un instant.</p><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
     </div></section>;
 
   const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
@@ -427,6 +452,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     {blocGroupes}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 
+    {(!moi?discordPret:'discord' in moi)&&<div className="vrm-cm-identite-discord"><AvatarProfil profil={moi||{pseudo:prenom}} grand/><MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi?.discord||''} compte={discordCompte} onFait={t=>{setToast(t);lire(true);}}/></div>}
     {/* Ma présence : l'opt-in, toujours visible */}
     <div className="vrm-cm-carton vrm-cm-moi" data-cm-moi={moi ? 'visible' : 'invisible'}>
       {moi ? <>
@@ -435,7 +461,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
           <button type="button" onClick={() => setRejoindre(true)} data-cm-changer>Changer</button>
           <button type="button" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
         </div>
-        {'discord' in moi && <MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi.discord || ''} compte={discordCompte} onFait={(t) => { setToast(t); lire(true); }} />}
+
       </> : <>
         <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit tant que tu ne l’as pas décidé.</span></div>
         <button type="button" className="vrm-cm-primaire" onClick={() => setRejoindre(true)} data-cm-apparaitre>Apparaître sur la carte</button>
@@ -459,7 +485,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
 
     {pres.length > 0 && <div className="vrm-cm-carton" data-cm-pres={pres.length}>
       <h3>Près de toi</h3>
-      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
+      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><AvatarProfil profil={p}/><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
         <div className="vrm-cm-ligne-boutons">
           <button type="button" onClick={() => coucou(p)} disabled={envoye.has(p.pid)}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
           <button type="button" className="vrm-cm-primaire" onClick={() => ouvrirEcrire(p)}>Écrire</button>
@@ -621,12 +647,15 @@ function Classement({ api, moi, groupe }) {
     {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
       : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier : entre dans le classement, les prochains te trouveront en haut.</p></div>
       : <div className="vrm-cm-carton">
-        {c.moi ? <p className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}>Tu es <b>{rangTexte(c.moi.rang)}</b> sur {c.n} · {c.moi.ventes} vente{c.moi.ventes > 1 ? 's' : ''}</p>
-          : <p className="vrm-cm-note">{c.n} membre{c.n > 1 ? 's' : ''} dans le classement.</p>}
+        <div className="vrm-cm-palmares-tete"><div><span className="vrm-cm-sur-titre">LA COMMUNAUTÉ VRM</span><h2>Classement des vendeurs</h2><p>{PERIODES.find(([k])=>k===periode)?.[1]} · {c.n} membre{c.n>1?'s':''}</p></div><span className="vrm-cm-palmares-metrique">Ventes Vinted</span></div>
+        {c.moi ? <div className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}><span>Ta position <b>{rangTexte(c.moi.rang)} <small>/ {c.n}</small></b></span><span><b>{c.moi.ventes}</b> vente{c.moi.ventes>1?'s':''}</span></div>
+          : <p className="vrm-cm-note">Le nombre de ventes est partagé uniquement par les membres inscrits.</p>}
+        {c.lignes.some(l=>l.rang<=3)&&<div className="vrm-cm-podium" aria-label="Les premières places">{c.lignes.filter(l=>l.rang<=3).slice(0,3).map(l=><div className={'vrm-cm-laureat place-'+l.rang} key={l.pid}><span className="vrm-cm-place">{rangTexte(l.rang)}</span><AvatarProfil profil={l} grand/><b title={l.pseudo}>{l.pseudo}{l.moi?' · toi':''}</b><small>{l.ville}</small><span className="vrm-cm-score">{l.ventes}<small> ventes</small></span></div>)}</div>}
+        <div className="vrm-cm-entete-liste"><span>Position et membre</span><span>Ventes</span></div>
         <ol className="vrm-cm-classement">{c.lignes.map((l) => <li key={l.pid} className={l.moi ? 'moi' : ''} data-cm-ligne={l.pid} data-cm-ligne-ventes={l.ventes} data-cm-ligne-moi={l.moi ? 'oui' : 'non'}>
-          <span className="vrm-cm-rang">{l.rang <= 3 ? ['🥇', '🥈', '🥉'][l.rang - 1] + ' ' : ''}{rangTexte(l.rang)}</span>
-          <span className="vrm-cm-qui"><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span>
-          <span className="vrm-cm-ventes"><b>{l.ventes}</b> vente{l.ventes > 1 ? 's' : ''}</span>
+          <span className="vrm-cm-rang">{rangTexte(l.rang)}</span>
+          <span className="vrm-cm-qui"><AvatarProfil profil={l}/><span><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span></span>
+          <span className="vrm-cm-ventes"><b>{l.ventes}</b><small> vente{l.ventes>1?'s':''}</small></span>
         </li>)}</ol>
       </div>}
     {note}

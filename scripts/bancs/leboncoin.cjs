@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE PANNEAU LEBONCOIN, EXÉCUTÉ POUR DE VRAI
 //        node scripts/bancs/leboncoin.cjs

@@ -65,7 +65,7 @@ function projette(row, select) {
 
 // `ecriture(ids, n)` → code HTTP de la n-ième écriture (ou 'jette' = réseau).
 // `cloisonne` : la base sait séparer les vendeurs (sonde `select=owner`).
-function faireCtx({ lignes = {}, ecriture = () => 201, cloisonne = false, session = null, vinted = null, connecte = UID } = {}) {
+function faireCtx({ lignes = {}, ecriture = () => 201, cloisonne = false, session = {access_token:"jeton.banc.x",user_id:"vendeur-1",expires_at:Date.now()+3600000}, vinted = null, connecte = UID } = {}) {
   const store = {}; let ecouteur = null;
   if (session) store.vrmSession = session;
   const j = { evts: [], posts: [], refresh: 0, vinted: [] };
