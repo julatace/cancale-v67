@@ -11010,7 +11010,9 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   `background.js` en vm) **47 contrôles, 28 rouges sur origin/main**, et
   `--prouve` : 11 mutations, chacune rouge. Banc `bancs/lbc-pause.cjs` (port 6331,
   données inventées, 390 et 1512 px, 4 scénarios) **38 contrôles, 28 rouges sur le
-  build d'origin/main** (dont Ma journée « 2 à retirer » au lieu de 1).
+  build d'origin/main** (dont Ma journée « 2 à retirer » au lieu de 1) ; trois
+  builds réaffaiblis, chacun rouge : règle sans `plusVueAt`/`pauseAt` (8),
+  pause sans confirmation (4), « quelle paire ? » sur une annonce périmée (2).
   `audit-double-vente` lit encore `let lbcRemoveCount=0;` (orthographe gardée).
   `double-vente.cjs` (6) et `lbc-relier.cjs` (8) sont rouges À L'IDENTIQUE sur main.
 - **Extension touchée** (`background.js`, `lbc-inject.js`, `lbc-relay.js`), **version
@@ -11022,6 +11024,8 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   déclenche exactement la v2 (l'ordre des chemins désigne la page profil) ; le
   retard de l'index après une pause ; un `account_id` différent de l'`user_id`
   chez un autre vendeur (la pause serait refusée « autre compte » : sens sûr).
+  Limite connue : un script de la page leboncoin.fr peut poster l'ordre de pause
+  au capteur — il pourrait déjà envoyer cette requête lui-même (même session).
   Non fait : la pastille « Aussi sur Leboncoin » (écran Annonces) suit
   `vinted_lbc_posted`, pas les captures — la relier coûterait 235 Ko par
   ouverture (§4.4).
