@@ -1,3 +1,4 @@
+import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
@@ -9039,7 +9040,7 @@ function Cell({value, onChange, align="left", mono=false}) {
 function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
   const tonal = danger ? C.danger : (color || C.accent);
   return (
-    <button className={`vrm-button${outline ? ' vrm-button--secondary' : ''}${small ? ' vrm-button--small' : ''}`} type="button" onClick={onClick} disabled={!!disabled} style={{
+    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} className={`vrm-button${outline ? ' vrm-button--secondary' : ''}${small ? ' vrm-button--small' : ''}`} type="button" onClick={onClick} disabled={!!disabled} style={{
       background:outline ? 'transparent' : tonal,
       color:outline ? (danger || color ? tonal : C.text) : (color || danger ? '#fff' : C.onAccent),
       border:`1px solid ${outline ? C.border : tonal}`,
@@ -9051,7 +9052,7 @@ function Btn({children,onClick,color,small,danger,outline,disabled,style={}}) {
 }
 function Input({label,...p}) {
   return (
-    <label style={{display:'flex',flexDirection:'column',gap:4}}>
+    <label className="vrm-field" style={{display:'flex',flexDirection:'column',gap:4}}>
       {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
       <input {...p} className={['vrm-input',p.className].filter(Boolean).join(' ')} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
         color:C.text,padding:'8px 12px',fontSize:13,fontFamily:'inherit',...(p.style||{})}}
@@ -9492,7 +9493,7 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
        écrase le bloc de texte et le titre s'écrit deux mots par ligne (vu en
        capture sur « 112 ventes sans prix d'achat »). La rangée passe à la ligne,
        le texte ne descend jamais sous 190 px. */
-    <div style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',
+    <div className="vrm-notice" data-tone={tone} style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',
       background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadow,
       padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
       <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
@@ -10907,7 +10908,7 @@ function PeriodePicker({ value, onChange, compact = false }) {
 
 function EmptyState({ icon, title, desc, action }) {
   return (
-    <div style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow||'none'}}>
+    <div className="vrm-empty-state" style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow||'none'}}>
       <div style={{width:56,height:56,margin:'0 auto 12px',borderRadius:8,background:`${C.accent}12`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>{icon}</div>
       <div style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{title}</div>
       {desc && <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.5,maxWidth:340,marginLeft:'auto',marginRight:'auto'}}>{desc}</div>}
@@ -11139,18 +11140,18 @@ function Toaster() {
   React.useEffect(() => onToasts(setList), []);
   if (!list.length) return null;
   return (
-    <div style={{position:'fixed',left:0,right:0,bottom:'calc(92px + env(safe-area-inset-bottom))',zIndex:210,
+    <div className="vrm-toasts" role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,bottom:'calc(92px + env(safe-area-inset-bottom))',zIndex:210,
       display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}>
       {list.map(t => {
         const col = t.type==='err' ? C.danger : t.type==='ok' ? INV_STATUS.online.color : C.text;
         return (
-          <button key={t.id} type="button" onClick={()=>dismissToast(t.id)}
+          <button className="vrm-toast" data-tone={t.type} key={t.id} type="button" title="Fermer ce message" onClick={()=>dismissToast(t.id)}
             style={{pointerEvents:'auto',maxWidth:520,width:'100%',textAlign:'left',cursor:'pointer',fontFamily:'inherit',
               display:'flex',alignItems:'flex-start',gap:9,padding:'11px 14px',borderRadius:10,
               background:C.card,border:`1px solid ${t.type==='info'?C.border:col+'66'}`,
               boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',
               animation:'cancaleToast .26s cubic-bezier(.32,.72,0,1) both'}}>
-            <span style={{fontSize:15,flexShrink:0,lineHeight:1.3}}>{t.type==='err'?'⚠️':t.type==='ok'?'✅':'ℹ️'}</span>
+            <span className="vrm-toast-icon" aria-hidden="true" style={{color:col}}><Icon name={t.type==='err'?'alert':t.type==='ok'?'check':'info'} size={18}/></span>
             <span style={{fontSize:13,fontWeight:500,color:C.text,lineHeight:1.45,whiteSpace:'pre-wrap'}}>{t.text}</span>
           </button>
         );
@@ -21532,7 +21533,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
 
 // Helper pour les champs du formulaire
 function Field({label,children}) {
-  return <label style={{display:'flex',flexDirection:'column',gap:4}}>
+  return <label className="vrm-field" style={{display:'flex',flexDirection:'column',gap:4}}>
     <span style={{fontSize:11,color:C.muted,fontWeight:600}}>{label}</span>
     {children}
   </label>;
@@ -42454,7 +42455,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -42538,6 +42539,7 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
+      {data && <AnnoncesLeboncoin annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
@@ -42561,7 +42563,7 @@ function LeboncoinScreen() {
       })()}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
-        <Card className="vrm-lbc-compteur">
+        {(lim || data.plan) && <Card className="vrm-lbc-compteur">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
@@ -42579,7 +42581,7 @@ function LeboncoinScreen() {
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
             <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? 'Limite atteinte' : n >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
           </>) : null}
-        </Card>
+        </Card>}
         {/* À retirer (vendues sur Vinted) */}
         {/* ⚠️⚠️ « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE.
             Ce bloc disait « Vendues sur Vinted → retire-les », en rouge, dès

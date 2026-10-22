@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {etatAnnonceLeboncoin as etat,lienAnnonceLeboncoin as lien} from '../../src/etatAnnonceLeboncoin.js';
+test('publication active, pause et retrait restent distincts',()=>{assert.equal(etat({status:'active'}).etat,'active');assert.equal(etat({status:{code:'paused',label:'En pause'}}).etat,'pause');assert.equal(etat({status:'deleted'}).etat,'retiree');});
+test('une vente prouvée prime sur un ancien état actif et conserve sa livraison',()=>{const r=etat({id:'12',status:'active'},[{itemId:12,isSeller:true,stepLabel:'Colis en cours de livraison'}]);assert.equal(r.etat,'vendue');assert.equal(r.livraison,'Colis en cours de livraison');});
+test('un achat ou une vente annulée ne ferme pas une annonce',()=>{assert.equal(etat({id:12,status:'active'},[{itemId:12,isSeller:false}]).etat,'active');assert.equal(etat({id:12,status:'paused'},[{itemId:12,isSeller:true,stepStatus:'cancelled'}]).etat,'pause');});
+test('la livraison disponible sur une annonce ne prouve pas sa vente',()=>{assert.equal(etat({status:'Livraison disponible'}).etat,'inconnu');assert.equal(etat({status:null}).label,'État non reçu');});
+test('aucun rapprochement par titre ni autre annonce',()=>{assert.equal(etat({id:12,status:'active',subject:'Même titre'},[{itemId:13,isSeller:true,title:'Même titre'}]).etat,'active');});
+test('les liens refusent domaines tiers et identifiants intégrés',()=>{assert.equal(lien({url:'https://www.leboncoin.fr/ad/1'}),'https://www.leboncoin.fr/ad/1');for(const url of ['javascript:alert(1)','https://leboncoin.fr.evil.test','https://user@leboncoin.fr/ad/1'])assert.equal(lien({url}), '');});
+test('un paiement n’est pas présenté comme une livraison',()=>{const r=etat({id:12},[{itemId:12,isSeller:true,stepLabel:'Paiement effectué'}]);assert.equal(r.livraison,'');assert.equal(r.suivi,'Paiement effectué');});
