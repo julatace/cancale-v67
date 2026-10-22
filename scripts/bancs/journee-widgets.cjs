@@ -262,7 +262,13 @@ const modifierVisible = (pg) => pg.evaluate(() => {
   const e = [...document.querySelectorAll('[data-widgets-modifier]')].find((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(x).display !== 'none'; });
   if (!e) return false; e.scrollIntoView({ block: 'center' }); e.setAttribute('data-banc-cible', '1'); return true;
 });
-const sansRetard = (s) => (s || '').split(',').filter((x) => x).join(',');
+// (22 oct., intégration) `colis-limite` — l'heure limite du colis le plus
+// pressé (chantier « colis à l'heure ») — est une action NOUVELLE : la
+// référence (build de main) ne peut pas l'avoir. On la juge à part (elle vient
+// de son propre banc, colis-heure) ; « rien en double avec la barre » reste
+// jugé sur toutes les autres.
+const NOUVELLES = /^colis-limite=/;
+const sansRetard = (s) => (s || '').split(',').filter((x) => x && !NOUVELLES.test(x)).join(',');
 const egaux = (x, y) => Math.abs(x - y) <= 3;
 
 module.exports = { page, lire, serveur, centre, touchSeq, pas, appuyer, TAILLES, DIST, PORT, chromium };
