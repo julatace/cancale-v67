@@ -7,6 +7,7 @@
 //  dans `data`. Il suit EXACTEMENT la règle SQL (mêmes clés, même `_pdf`),
 //  sinon un banc mesurerait une fiction (§6.3).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_porte-banc.cjs');
 const TXN = new Set(['id', 'item_id', 'status', 'status_title', 'status_updated_at']);
 function metaVersData(u) {
   if (!u || u.indexOf('meta') < 0) return u;

@@ -59,11 +59,11 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + `[$
 
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VRM_OWNER_UID = A;
-delete process.env.EMAIL_INBOUND_SECRET;
+process.env.EMAIL_INBOUND_SECRET='cle-banc-routes';
 delete process.env.VAPID_PRIVATE_KEY;
 delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;
 
-const base = new Map();                     // `${owner}|${id}` → data
+const base = new Map([[`${A}|vrm_email_owners`,{adresses:{'boite@banc.test':{owner:A}}}]]);                     // `${owner}|${id}` → data
 const pannes = new Set();                   // ids dont la LECTURE répond 522
 let sondeKO = 0;                            // nombre de sondes `select=owner&limit=1` qui répondront 522
 const lectures = [];                        // URLs GET app_data
@@ -155,7 +155,7 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       pannes.add('vrm_invoice_counter');
       const inbound = await importer('api/email-inbound.js');
       const res = faireRes();
-      await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(VENTE)) }, res);
+      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res);
       const cpt = base.get(`${A}|vrm_invoice_counter`);
       dit(cpt === 41, 'compteur illisible : le compteur de factures n’est PAS réécrit', `compteur = ${JSON.stringify(cpt)} (était 41)`);
       const f = factures();
@@ -169,19 +169,19 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       pannes.add('vrm_pro_facture');
       const inbound = await importer('api/email-inbound.js');
       const res = faireRes();
-      await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(VENTE)) }, res);
+      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res);
       dit(res.code === 503, 'réglage de facturation illisible : pas de « reçu », la facture n’est pas perdue en silence', `HTTP ${res.code}`);
       // l'autre sens : réglage lisible et coupé ⇒ 200, aucune facture.
       pannes.clear(); base.set(`${A}|vrm_pro_facture`, { actif: false });
       const res2 = faireRes();
-      await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(VENTE)) }, res2);
+      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res2);
       dit(res2.code === 200 && factures().length === 0, 'réglage lu « coupé » : 200 et aucune facture (l’autre sens)', `HTTP ${res2.code} · ${factures().length} facture(s)`);
     }
     if (SC === 'B') {
       base.set(`${A}|vrm_pro_facture`, { actif: true, autoSend: true, prefixe: 'FA' });
       base.set(`${A}|vrm_invoice_counter`, 41);
       const inbound = await importer('api/email-inbound.js');
-      const recoit = async () => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(VENTE)) }, res); return res; };
+      const recoit = async () => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res); return res; };
       await recoit();
       const f1 = factures();
       dit(f1.length === 1 && /-0042$/.test(f1[0].number), 'premier passage : une facture, numéro 0042', f1.map((x) => x.number).join(', '));
@@ -198,7 +198,7 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       base.set(`${A}|vrm_pro_facture`, { actif: true, autoSend: false, prefixe: 'FA' });
       base.set(`${A}|vrm_invoice_counter`, 10);
       const inbound = await importer('api/email-inbound.js');
-      const recoit = async (m) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(m)) }, res); return res; };
+      const recoit = async (m) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(m)) }, res); return res; };
       const rp = await recoit(VENTE_PART);
       dit(rp.code === 200 && factures().length === 0, 'compte PARTICULIER (ni mention Pro, ni coordonnées) : aucune facture, même facturation allumée', `HTTP ${rp.code} · ${factures().length} facture(s)`);
       const p1 = await recoit(VENTE_PRO('23999999001'));
@@ -227,7 +227,7 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       sondeKO = 1000;                      // la sonde ne répond plus du tout
       const inbound = await importer('api/email-inbound.js');
       const res = faireRes();
-      await inbound.traiterEmail({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(VENTE)), __ownerForce: B }, res);
+      await inbound.traiterEmail({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)), __ownerForce: B }, res);
       const sansFiltre = lectures.filter((l) => !/[?&]owner=eq\./.test(l) && !/vrm_email_owners/.test(l));
       dit(sansFiltre.length === 0, 'rejeu chez B, sonde muette : aucune lecture sans filtre de vendeur', sansFiltre.slice(0, 3).map((l) => decodeURIComponent(new URL(l).search)).join(' · '));
       const jB = base.get(`${B}|email_journal`);

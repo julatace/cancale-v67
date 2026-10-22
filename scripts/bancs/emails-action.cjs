@@ -16,7 +16,7 @@ const OWNER = '11111111-2222-3333-4444-555555555555';
 process.env.VRM_OWNER_UID = OWNER;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
-delete process.env.EMAIL_INBOUND_SECRET;
+process.env.EMAIL_INBOUND_SECRET='cle-banc-notifications'; // obligatoire depuis dc4799f
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
@@ -95,7 +95,9 @@ global.fetch = async (url, opts = {}) => {
   const id = decodeURIComponent((u.searchParams.get('id') || '').replace(/^eq\./, ''));
   if (latence[id]) await dort(latence[id]);
   if (pannes.has(id)) return new Response(HTML522, { status: 522, headers: { 'content-type': 'text/html' } });
-  if (id === 'vrm_email_owners') return rep([]);                                 // registre vide (mesuré)
+  // (22 oct.) Le repli « propriétaire de l'installation » est retiré (deba4c7) : une
+  // boîte doit être DÉCLARÉE par son vendeur, sinon l'email part en quarantaine.
+  if (id === 'vrm_email_owners') return rep([{ owner: OWNER, data: { adresses: { 'boite-de-reception@banc.test': { owner: OWNER } } } }]);
   const lignes = filtrer(u);
   if (sel.startsWith('data->')) { const k = sel.slice(6); return rep(lignes.map(([, d]) => ({ [k]: d && d[k] }))); }
   return rep(lignes.map(([cle, d]) => ({ owner: cle.split('|')[0], id: cle.split('|')[1], data: d })));
@@ -126,7 +128,7 @@ const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')
 (async () => {
   const inbound = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js'));
   const libPush = await import('file://' + path.join(RACINE, 'api', '_lib', 'push.js'));
-  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
+  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-notifications'}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
   const reset = (prefs) => {
     base.clear(); pannes = new Set(); latence = {}; ecritures = []; pushes.length = 0; morts.clear();
     if (typeof libPush.oublierPrefsVues === 'function') libPush.oublierPrefsVues();
@@ -141,7 +143,7 @@ const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')
     const res = await recoit(emailAnnul);
     const p = pushes[0] || {};
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(res.code === 200, 'l’email est accepté', `HTTP ${res.code}`);
+    dit(res.code === 200, 'l’email est accepté', `HTTP ${res.code} ${JSON.stringify(res.corps).slice(0,200)}`);
     dit(pushes.length === 1, 'une notification part (catégorie activée par défaut)', `${pushes.length}`);
     dit(/annulation/i.test(p.title || '') && /Paire de banc taille 42/.test(p.title || ''), 'le titre dit « annulation » et nomme l’article lu dans l’email', JSON.stringify(p.title));
     dit(/acheteur_banc/.test(p.body || '') && /trompé de taille/.test(p.body || '') && /accepte ou refuse/i.test(p.body || ''), 'le texte nomme l’acheteur, sa raison, et le geste', JSON.stringify(p.body));

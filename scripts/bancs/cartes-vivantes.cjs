@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « CARTES VIVANTES » — les cartes répondent SOUS LE DOIGT, pas seulement
 //  jolies au repos (le même soin que les boutons, étendu aux cartes).

@@ -21,23 +21,7 @@
   const DANS_UN_CADRE = (() => { try { return window.top !== window; } catch (_) { return true; } })();
   const send = (m) => new Promise((res) => { try { chrome.runtime.sendMessage(Object.assign({ from: 'cancale-lbc' }, m), (r) => res(r || { ok: false })); } catch (_) { res({ ok: false }); } });
 
-  // L'observateur réseau MAIN world (lbc-inject.js) est injecté via le manifest
-  // (content_script world:MAIN) → immunisé à la CSP de Leboncoin. Ici on ne fait
-  // que RELAYER au background ce qu'il capte (window.postMessage).
-  window.addEventListener('message', (event) => {
-    if (event.source !== window) return;
-    const d = event.data; if (!d || d.__tag !== 'CANCALE_LBC') return;
-    if (d.kind === 'lbcraw' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcRaw', url: d.url, body: d.body, session: typeof d.session === 'string' ? d.session.slice(0, 64) : '' }); } catch (_) {} }
-    else if (d.kind === 'lbccatalogue' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcCatalogue', url: d.url, body: d.body, coupe: !!d.coupe }); } catch (_) {} }
-    else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles }); } catch (_) {} }
-    else if (d.kind === 'lbcvente' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcVente', url: d.url, body: d.body, coupe: !!d.coupe }); } catch (_) {} }
-    else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
-    else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
-    // La messagerie : le NOMBRE de non-lus d'un compte, et la liste de ses comptes
-    // liés (sans email). Jamais un texte de message (voir lbc-inject.js).
-    else if (d.kind === 'lbcmsgcompteur' && d.userId) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcMsgCompteur', userId: String(d.userId).slice(0, 64), unread: Number(d.unread) }); } catch (_) {} }
-    else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
-  }, false);
+
 
 
   // ── CAPTURE de TES annonces Leboncoin (passif : on lit ce que la page a déjà

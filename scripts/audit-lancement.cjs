@@ -40,7 +40,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
   await essaie('redirect_to', async () => {
     const noms = ['retourEmail', 'avecRetour', 'authCall', 'MAIL_QUOTA', 'mapMailError', 'authResendConfirm', 'authMagicLink', 'authSignUp', 'authReset', 'authSetEmail'];
     const appels = [];
-    const ctx = vm.createContext({
+    const ctx = vm.createContext({ AbortController, setTimeout, clearTimeout,
       SUPABASE_URL: 'https://base.test', SUPABASE_KEY: 'cle-publique', AUTH: { session: { access_token: 'a.b.c' } },
       writeSession: () => {}, sessionFrom: (x) => x, encodeURIComponent, JSON, String, Promise,
       // src/captcha.js tel qu'il est livré (clé de site vide : rien ne change)
@@ -62,7 +62,13 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       if (typeof ctx[f] !== 'function') { dit(false, `${f} existe`); continue; }
       await ctx[f](...args);
       const a = appels.find((x) => x.url.includes(chemin));
-      dit(!!a && /[?&]redirect_to=https%3A%2F%2Fvrm\.center(&|$)/.test(a.url), `${f} : le lien de l’email ramène sur l’app (redirect_to = l’adresse ouverte)`, a ? a.url.replace('https://base.test', '') : 'aucun appel');
+      // Le retour vise l'ORIGINE ouverte (jamais un autre domaine : « vrm.center.autre » est refusé) ;
+      // une page de cette origine est permise (la récupération du mot de passe ouvre /recuperation.html,
+      // codex #639), et elle doit exister dans public/ — un lien vers un 404 serait un faux retour.
+      const m = a && a.url.match(/[?&]redirect_to=https%3A%2F%2Fvrm\.center((?:%2F[^&]*)?)(?:&|$)/);
+      const page = m ? decodeURIComponent(m[1] || '') : '';
+      const existe = !page || page === '/' || fs.existsSync(path.join(__dirname, '..', 'public', page.replace(/^\//, '').split(/[?#]/)[0]));
+      dit(!!m && existe, `${f} : le lien de l’email ramène sur l’app (redirect_to = l’adresse ouverte${page ? ', page ' + page : ''})`, a ? a.url.replace('https://base.test', '') : 'aucun appel');
     }
     // L'autre sens : la connexion par mot de passe n'envoie aucun email — rien à ajouter.
     dit(!/authCall\(avecRetour\('token/.test(app), 'la connexion par mot de passe n’en a pas besoin (aucun email ne part)');

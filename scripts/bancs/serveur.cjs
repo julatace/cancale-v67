@@ -39,7 +39,14 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
 const ecrites = [];
 // `etat` : 'ok' · 'panne' (tout tombe) · 'lectureKO' (les lectures échouent,
 // les écritures passent — le cas qui EFFACE, voir le contrôle push plus bas).
-function poserFetch(etat) {
+// (22 oct.) La production est cloisonnée : l'email entrant exige sa clé et une
+// boîte DÉCLARÉE (deba4c7, dc4799f), l'abonnement push une session. `cloison`
+// sert cette forme ; le widget garde la sienne (sa clé est jugée par widget-multi).
+const OWNER = '11111111-2222-3333-4444-555555555555';
+process.env.EMAIL_INBOUND_SECRET = 'cle-banc-serveur';
+process.env.VRM_OWNER_UID = OWNER;
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-banc';
+function poserFetch(etat, cloison = false) {
   ecrites.length = 0;
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
@@ -47,7 +54,13 @@ function poserFetch(etat) {
     const lecture = (opts.method || 'GET') === 'GET';
     if (panne || (etat === 'lectureKO' && lecture && u.includes('/rest/v1/')))
       return new Response(HTML522, { status: 522, headers: { 'content-type': 'text/html' } });
+    if (/\/auth\/v1\/user/.test(u)) return new Response(JSON.stringify({ id: OWNER, email: 'v@exemple.test' }), { status: 200, headers: { 'content-type': 'application/json' } });
     if (!u.includes('/rest/v1/')) return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    if (cloison && /select=owner&limit=1/.test(u)) return new Response(JSON.stringify([{ owner: OWNER }]), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (cloison && /id=eq\.vrm_email_owners/.test(u) && !/method/.test('')) return new Response(JSON.stringify([{ owner: OWNER, data: { adresses: { 'recu@exemple.test': { owner: OWNER } } } }]), { status: 200, headers: { 'content-type': 'application/json' } });
+    if (cloison && (opts.method || 'GET') === 'PATCH') {
+      try { const b = JSON.parse(opts.body || '{}'); if (/id=eq\.push_subs/.test(u)) ecrites.push('push_subs'); return new Response(JSON.stringify([{ id: 'push_subs', owner: OWNER, data: b.data }]), { status: 200, headers: { 'content-type': 'application/json' } }); } catch (_) {}
+    }
     if ((opts.method || 'GET') === 'POST') {
       try { JSON.parse(opts.body || '[]').forEach(r => ecrites.push(r.id)); } catch (_) {}
       return new Response('', { status: 201 });
@@ -55,7 +68,7 @@ function poserFetch(etat) {
     // La colonne `owner` n'existe pas chez lui : PostgREST répond 400.
     if (/select=owner/.test(u)) return new Response('{"code":"42703"}', { status: 400, headers: { 'content-type': 'application/json' } });
     let corps = '[]';
-    if (/id=eq\.push_subs/.test(u)) corps = JSON.stringify([{ data: { subs: [{ endpoint: 'https://exemple/aaa' }, { endpoint: 'https://exemple/bbb' }] } }]);
+    if (/id=eq\.push_subs/.test(u)) corps = JSON.stringify([{ owner: OWNER, data: { subs: [{ endpoint: 'https://fcm.googleapis.com/aaa', keys: { p256dh: 'x', auth: 'y' } }, { endpoint: 'https://fcm.googleapis.com/bbb', keys: { p256dh: 'x', auth: 'y' } }] } }]);
     else if (/id=eq\.main/.test(u)) corps = JSON.stringify([{ data: {} }]);
     else if (/id=eq\.widget_stats/.test(u)) corps = JSON.stringify([{ data: { caMois: 143.1, ventesMois: 2, updatedAt: new Date().toISOString() } }]);
     return new Response(corps, { status: 200, headers: { 'content-type': 'application/json' } });
@@ -87,9 +100,9 @@ const EMAIL_VENTE = {
   // ── 1. L'EMAIL ENTRANT ────────────────────────────────────────────────────
   const inbound = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js'));
   for (const panne of [true, false]) {
-    poserFetch(panne ? 'panne' : 'ok');
+    poserFetch(panne ? 'panne' : 'ok', true);
     const res = faireRes();
-    await inbound.default({ method: 'POST', query: {}, body: JSON.parse(JSON.stringify(EMAIL_VENTE)) }, res);
+    await inbound.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-serveur' }, body: JSON.parse(JSON.stringify(EMAIL_VENTE)) }, res);
     if (panne) {
       // LA RÈGLE : tant qu'on n'a pas RANGÉ l'email, on ne dit pas « reçu ».
       dit(res.code >= 500, "email entrant : base injoignable → le service de réception doit RÉESSAYER",
@@ -124,11 +137,12 @@ const EMAIL_VENTE = {
 
   // ── 3. L'ABONNEMENT AUX NOTIFICATIONS ─────────────────────────────────────
   const push = await import('file://' + path.join(RACINE, 'api', 'push.js'));
-  const NOUVEAU = { endpoint: 'https://exemple/ccc', keys: { p256dh: 'x', auth: 'y' } };
+  const NOUVEAU = { endpoint: 'https://fcm.googleapis.com/ccc', keys: { p256dh: 'x', auth: 'y' } };
+  const SESS = { authorization: 'Bearer en.tete.banc' }; // la forme d'un JWT (trois parties), seule acceptée par session.js
   for (const panne of [true, false]) {
-    poserFetch(panne ? 'panne' : 'ok');
+    poserFetch(panne ? 'panne' : 'ok', true);
     const res = faireRes();
-    await push.default({ method: 'POST', query: {}, body: { action: 'subscribe', sub: NOUVEAU } }, res);
+    await push.default({ method: 'POST', query: {}, headers: SESS, body: { action: 'subscribe', sub: NOUVEAU } }, res);
     if (panne) {
       dit(res.code >= 500, "abonnement push : base injoignable → l'app ne doit pas afficher « activé »",
         res.code >= 500 ? `HTTP ${res.code}` : `HTTP ${res.code} ${JSON.stringify(res.corps)}`);
@@ -149,10 +163,10 @@ const EMAIL_VENTE = {
   // la base debout par ailleurs) : `subscribe` lit `[]`, ajoute l'appareil
   // courant, réécrit `push_subs` — et les deux autres téléphones de Julien
   // n'existent plus. Une perte réelle, pas un affichage faux.
-  poserFetch('lectureKO');
+  poserFetch('lectureKO', true);
   {
     const res = faireRes();
-    await push.default({ method: 'POST', query: {}, body: { action: 'subscribe', sub: NOUVEAU } }, res);
+    await push.default({ method: 'POST', query: {}, headers: SESS, body: { action: 'subscribe', sub: NOUVEAU } }, res);
     const ecrase = ecrites.includes('push_subs');
     dit(!ecrase, "abonnement push : lecture ratée → il n'écrase pas la liste des autres appareils",
       ecrase ? 'push_subs réécrite depuis une liste lue vide par erreur' : '');

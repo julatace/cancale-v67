@@ -519,14 +519,14 @@ async function traiterVendeurSoir() {
 }
 
 export default async function handler(req, res) {
-  // Sécurité optionnelle : si CRON_SECRET est défini sur Vercel, on l'exige
+  // CRON_SECRET est obligatoire : un endpoint public ne doit pas déclencher des envois.
   // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.authorization || '';
-    const qk = (req.query && req.query.key) || '';
-    if (auth !== `Bearer ${secret}` && qk !== secret) { res.status(401).json({ error: 'clé invalide' }); return; }
-  }
+  res.setHeader?.('Cache-Control','no-store');
+  if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
+  const auth = req.headers?.authorization || '';
+  if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+
 
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
@@ -537,18 +537,13 @@ export default async function handler(req, res) {
     // Pas su : on ne devine pas (ni passe globale, ni passe par vendeur). 503 =
     // visible dans le tableau de bord des crons ; demain le cron repassera.
     if (cl === null) { res.status(503).json({ ok: false, skipped: 'base injoignable — aucun rappel envoyé' }); return; }
-    // ── Base NON cloisonnée (comportement d'aujourd'hui, à l'identique) ───────
-    //    Un seul jeu de données, aucune colonne `owner` : une passe, sans filtre.
-    if (!cl) {
-      const out = await traiter();
-      res.status(200).json({ ok: true, ...(soir ? { moment: 'soir' } : {}), ...out });
-      return;
-    }
+    // Sans colonne owner, aucun rappel ne peut être attribué avec certitude.
+    if (!cl) {res.status(503).json({ok:false,error:'cloisonnement-requis'});return;}
     // ── Base cloisonnée : UNE passe PAR vendeur, chacun dans son contexte ─────
     //    (ses bordereaux, son dédoublonnage, ses appareils). On ne pousse JAMAIS
     //    hors contexte : si on ne peut pas énumérer, on ne devine pas.
     const owners = await ownersActifs();
-    if (!owners) { res.status(200).json({ ok: true, skipped: 'vendeurs non énumérables (lecture en panne)' }); return; }
+    if (!owners) { res.status(503).json({ ok: false, skipped: 'vendeurs non énumérables (lecture en panne)' }); return; }
     // ⚠️ À L'ÉCHELLE : un vendeur coûte ~6 lectures. À la queue leu leu, mille
     //    vendeurs dépassent les 300 s d'une fonction Vercel et les derniers n'ont
     //    jamais leur rappel. On en traite VENDEURS_EN_PARALLELE à la fois — chacun

@@ -581,3 +581,57 @@ aveugle) : les autres gros écrans restent dans App.jsx — ils closurent beauco
 d'état/d'helpers, donc chaque extraction demande le même scan d'identifiants
 libres + un banc de rendu. Le Stock 3D était le plus isolé (tout en props),
 d'où le premier choix.
+
+## 21 octobre — Codex : isolation et configuration MFA
+
+Renforcement demandé après la fuite de comptes sur l’appareil d’un ami. Suppression des replis partagés sur les routes Vinted, filtrage explicite et vérification du propriétaire dans l’app et l’extension 5.205, protection des sauvegardes différées et changement d’onglet, caches de l’extension rattachés à la session. Code d’accès obsolète retiré. Le contrôle de confidentialité se renouvelle au retour dans l’app.
+
+Modification minimale dans le domaine eBay : uniquement `portee` dans `api/_lib/ebay.js`, suppression du repli partagé et impossibilité pour le corps d’imposer un autre owner. Aucune fonctionnalité commerciale eBay modifiée.
+
+QR MFA généré localement depuis l’URI native, clé manuelle repliée, remplacement d’un facteur non vérifié. La clé montrée en capture n’est pas automatiquement révoquée : l’utilisateur doit recommencer la configuration depuis sa session.
+
+**Base réelle : migration 021 toujours NON exécutée par Codex, faute d’accès d’administration Supabase. Ne pas déclarer l’incident définitivement résolu.**
+
+## Suite sécurité — réception et push (sans modification MFA)
+
+Le vendeur a reporté la double vérification et refusé les SMS payants : la branche codex/mfa-sms ne doit pas être fusionnée. Travail présent repart de main/PR635 ; aucun code SMS repris.
+
+Réception publique : clé obligatoire pour tous les formats, pas seulement Gmail partagé. Contexte vendeur obligatoire pour les lectures/écritures métier, conflit owner,id. Plus de repli attribuant un email inconnu au propriétaire d'installation : quarantaine privée neutre et reprise après association. Push : authentification obligatoire sur la route et contexte obligatoire côté serveur, même si la sonde dit ancien schéma. Tests synthétiques actualisés pour enregistrer explicitement les adresses et le contexte des notifications.
+
+Limites encore ouvertes : SQL021 non appliquée faute d'accès administrateur ; attribution historique non auditée ; possession des adresses supplémentaires déclarées à prouver (ne pas confondre déclaration et preuve de propriété). Aucun email ou push réel envoyé par les tests.
+
+## Revue de fiabilité et préparation des 2 000 utilisateurs — 22 octobre
+
+Branche `codex/audit-fiabilite-2000`, basée sur main PR636 puis fusion réelle de PR637 (b790ed4). Aucun code SMS/MFA de la branche mise de côté n'est repris. Extension 5.206 de main conservée ; seules les capacités annoncées par l'app sont remontées à 5.206 pour les fonctions absentes des 5.204/5.205 déjà publiées.
+
+Corrections : pagination du registre email (plafonds bas, frontières exactes HTTP416, conflits après la millième ligne, regroupement des lectures simultanées sans cache durable), whitelist Web Push + délai, CRON_SECRET obligatoire et sans clé en URL, échec fermé si schéma/énumération impossible, délais session/confidentialité, Vite 6.4.5 corrigé. Les tests synthétiques de l'extension utilisent des sessions cohérentes et n'exigent plus d'écritures anonymes. Les protections de production ne sont pas affaiblies.
+
+**État SQL actualisé** : Julien a lui-même appliqué 021 et fourni le diagnostic structurel sans écart. Les anciennes mentions « SQL à appliquer » décrivent l'état précédent. Cela ne certifie pas les copies historiques ni deux vraies sessions de production. Un nouveau test PostgreSQL jetable exécute réellement 021 : 45 contrôles réussis, y compris une ancienne politique trop large et les cas équipe/abonnement. 120 tests unitaires réussis, compilation réussie, zéro alerte npm connue. Rapport détaillé et limites : `docs/securite/audit-2026-10-22-2000-utilisateurs.md`.
+
+Avant 2 000 utilisateurs : preuve de possession des adresses de réception supplémentaires, attribution historique, deux sessions réelles, quotas et débit Gmail/Vercel/Supabase, sauvegarde/restauration et supervision restent à vérifier. Ne pas transformer une simulation en certification de capacité.
+
+Bilan final local : les 141 scripts d’audit existants sont validés après correction des simulations ; les cinq audits SQL initialement bloqués sont exécutés sur PostgreSQL 17.11 jetable. Le nouveau banc SQL de confidentialité ajoute un 142e audit validé (45 contrôles). Renumérotation historique : 126 contrôles réussis après relance sans la limite initiale de 120 s. Aucun test de production chargé en données n’a été lancé. PR638 ouverte et attachée.
+
+## 22 octobre — profils Discord, photo facultative et classement
+
+PR639 est fusionnée : récupération autonome sur `/recuperation.html` et inscription avec confirmation claire. Le script de configuration Supabase est préparé, mais les réglages distants SMTP/redirects ne sont PAS appliqués faute d'accès administrateur. Ne pas annoncer l'expéditeur personnalisé comme configuré.
+
+Carte : avatars Discord provenant d'une preuve OAuth signée, puis liés au PID renvoyé par la base. Aucune URL arbitraire ni owner navigateur accepté. Les preuves de liaison mobile sont privées, bornées à une par vendeur et expirantes. Le classement affiche une position personnelle, un podium compact et une liste, sans montants financiers.
+
+Photo VRM facultative : recadrage local PNG, limites de taille, stockage privé inaccessible au client SQL, quota atomique partagé entre instances. Publication uniquement sur choix explicite et présence volontaire sur la carte. URL publique signée expirante, cache 60 secondes ; retrait interdit les prochaines lectures mais ne peut reprendre les copies téléchargées. Suppression de compte : effacement des trois enregistrements privés exacts du vendeur avant suppression de sa connexion, échec signalé sans fausse réussite.
+
+Validation locale : 130 tests unitaires, build, OAuth 32 contrôles, fermeture 32 contrôles, parcours Discord navigateur 45 contrôles, audit sans bruit 44 et en-têtes 10 ; ajout/partage/retrait de photo vérifiés dans Chromium 390 px. Aucun envoi de mail ni connexion Discord réelle ni donnée ajoutée en production. Les limites de préparation à 2 000 utilisateurs citées ci-dessus restent ouvertes ; ces tests ne certifient pas la capacité de production.
+
+## Connexions et suite Leboncoin 5.208
+
+L'utilisateur confirme 5.207 et l'absence de compte/données partout sur Leboncoin. Ne pas lui répéter que la 5.207 a tout résolu. Version5.208 corrige XHR JSON/fetch URL, la carte qui exigeait un pseudo, et le marqueur six heures posé même après refus d'écriture. Un diagnostic local par onglet (32 max, aucun contenu personnel) dit si MAIN répond au relais. Tests de reprise après refus et de session sans pseudo ajoutés ; banc démarrage élargi aux XHR JSON et fetch URL. Audits de ventes, comptes, fiches, packs, catalogue, détails, finalisation et restes validés ; les messages complets restent NON implémentés (compteurs seulement), pas d'accès à une vraie session LBC. La demande « tout capter » reste donc ouverte, ne pas certifier exhaustivité.
+
+Mon compte : cartes compactes dans Comptes associés, Google et un seul bouton Discord, groupe placé avant photo. Google utilise une vraie liaison authentifiée PKCE, vérifie l'UID du retour avant écriture de session, refuse une URL fournisseur étrangère. Fournisseur Google ET liaison manuelle Supabase doivent être activés ; aucun réglage admin distant appliqué. Discord garde son flux identify pour profil/avatar et explique les erreurs de vérification émises par Discord. Ni fusion de comptes, ni changement MFA, ni SMS payant.
+
+136 tests unitaires et compilation validés ; OAuth32, navigateur Discord47 (dernière disposition à revérifier avant publication), sessionextension29, sansbruit44/entêtes10, ZIP5.208 validés. Aucun envoi de messages réel ni donnée utilisateur créée pour tester.
+
+## 5.210 — préserver les photos et écarter une ancienne attribution non prouvée
+
+Utilisateur : toujours aucune photo et données non captées. Ne PAS annoncer ce problème réel résolu. Conservation des photos connues lors d'une réponse partielle vide, normalisation des URL HTTPS Leboncoin (chaînes/listes/objets). `lbcUser` seul ne prouve plus l'appartenance : preuve de compte requise, règle alignée app/extension/serveur ; le serveur lit la projection des comptes du vendeur. Références et liens manuels conservent leur traitement antérieur. Aucun historique supprimé/réattribué ni règle de calcul financier modifiée.
+
+140 tests unitaires réussis, build, audits double vente/places/session/comptes/restes/ventes/ZIP/bruit44/entêtes10, notifications double vente28 avec deux vendeurs. Mutation --prouve rejoue bien des échecs après adaptation de sa cible. Nouveau banc natif préparé mais BLOQUÉ : administrateur Chromium interdit Extensions.loadUnpacked, navigateur Playwright téléchargeable refusé403 par politique réseau. Ne pas contourner ces règles, ne pas transformer le banc natif en validation passée. Le compte réel n'a toujours pas été observé. Question compte personnel vs tiers/diagnostic de carte restée sans réponse.

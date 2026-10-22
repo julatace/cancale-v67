@@ -83,11 +83,11 @@ const PONT = ({ chrome, fils }) => {
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
-    if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: true, expiree: false, email: 'vendeur@exemple.test', user_id: 'u1', cloisonne: false } });
+    if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: true, expiree: false, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */, cloisonne: false } });
     if (d.__vmr === 'etat') {
       const passu = chrome === 'passu';
       const lo = { 111: 'compte_a', 222: 'compte_b' };
-      post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' },
+      post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ },
         vinted: !passu && chrome ? { uid: String(chrome), login: lo[chrome] || '' } : null, cmds: {} }, passu ? { vintedPasSu: true } : {}) });
     }
     if (d.__vmr === 'exec') {

@@ -123,6 +123,7 @@ function ctxAvec(numeros, txns, lbcItems, exclus, quiEchoue, bloquesDef) {
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' });
+  ctx.authToken = async () => ({user_id:'vendeur_banc',access_token:'jeton.banc.x',expires_at:Date.now()+3600e3}); ctx.loadSession=ctx.authToken;
   return ctx;
 }
 

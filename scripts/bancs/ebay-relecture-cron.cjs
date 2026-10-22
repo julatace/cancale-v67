@@ -17,6 +17,7 @@
 const path = require('path');
 const RACINE = process.env.BANC_RACINE || path.join(__dirname, '..', '..');
 
+process.env.CRON_SECRET = 'cle-banc-cron'; // obligatoire depuis dc4799f
 process.env.EBAY_APP_ID = 'app-banc';
 process.env.EBAY_CERT_ID = 'cert-banc';
 process.env.SUPABASE_SERVICE_KEY = 'service-banc';
@@ -123,7 +124,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   poser({ ebayKO: new Set([B]) });
   const mod = await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'));
   const r = res();
-  await mod.default({ method: 'GET', headers: {}, query: {} }, r);
+  await mod.default({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r);
   const bil = (o) => ((r.corps && r.corps.bilans) || []).find((b) => b.owner === o) || {};
   const ordA = store.get(A + '|ebay_orders');
   const ordB = store.get(B + '|ebay_orders');

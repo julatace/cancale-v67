@@ -95,7 +95,7 @@ function faireCtx({ ventes = VENTES, txn = TXN, gardeStop = null, srcOverride = 
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx);
-  vm.runInContext(srcOverride || SRC, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  vm.runInContext(srcOverride || SRC, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken; // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'julatace3535', domain: 'www.vinted.fr' }];
   // 5.162 : la lecture des versements passe par `gardeLecture` (budget de
   // LECTURE) — on stubbe les deux gardes, la règle testée est la même : un

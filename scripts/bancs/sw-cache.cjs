@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // Banc : le cache du service worker ne garde QU'UNE version, et ne fige jamais
 // un fichier au nom stable (le zip de l'extension).
 //

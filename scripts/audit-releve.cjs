@@ -82,7 +82,7 @@ function banc({ releves = {}, hist = null, profil = '3166370055', reponses = nul
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
-  vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken; // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   ctx.getStoredAccounts = async () => [{ vinted_user_id: '111', domain: 'www.vinted.fr', access_token: 'x' }];
   ctx.compteConnecte = async () => '111';
   ctx.activeAccountId = async () => '111';

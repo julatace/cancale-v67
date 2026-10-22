@@ -59,7 +59,7 @@ const COMPTES = JSON.stringify({ linked_accounts: [{ user_id: U1, email: 'moi@ex
 
     const cpt = tout.filter((d) => d.kind === 'lbcmsgcompteur');
     dit(cpt.length === 1 && cpt[0].userId === U1 && cpt[0].unread === 4, 'le nombre de non-lus part, avec le compte', JSON.stringify(cpt));
-    dit(cpt.length === 1 && Object.keys(cpt[0]).sort().join(',') === '__tag,kind,unread,userId', 'et rien d\'autre que ce nombre (ni « pollingTime », ni autre champ)', cpt[0] ? Object.keys(cpt[0]).join(',') : '');
+    dit(cpt.length === 1 && Object.keys(cpt[0]).sort().join(',') === '__tag,__vrmSequence,kind,unread,userId' && Number.isSafeInteger(cpt[0].__vrmSequence), 'seul le numéro technique de transport accompagne le compteur (aucun contenu de message)', cpt[0] ? Object.keys(cpt[0]).join(',') : '');
     dit(!/SECRET-MESSAGE/.test(texte), '⚠️ le TEXTE d\'une conversation ne quitte jamais la page', /SECRET-MESSAGE/.test(texte) ? 'un message client est parti' : '');
     dit(!tout.some((d) => d.kind === 'lbcraw' && /messaging/.test(String(d.url || ''))), 'aucune réponse de messagerie n\'est relayée comme « annonce » (lbcraw)');
     dit(!/TOKEN-SECRET/.test(texte), 'le jeton temps réel ne part jamais');

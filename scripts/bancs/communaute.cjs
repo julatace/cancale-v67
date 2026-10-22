@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « COMMUNAUTÉ » — la carte des revendeurs (migration 018), RENDU,
 //  à 1512 px (clair) et 390 px tactile (sombre).
@@ -17,8 +18,10 @@
 //      sur ta base » ; panne ⇒ « pas pu lire », jamais « personne » ;
 //    · aucun email, aucun identifiant de compte, aucun compte Vinted d'autrui
 //      dans le DOM ni dans les réponses ;
-//    · la carte Leaflet (chargée à l'ouverture de l'écran, depuis cdnjs) se
-//      dessine ; injoignable ⇒ la même communauté en liste.
+//    · la carte Leaflet (chargée à l'ouverture de l'écran) se dessine sur le
+//      fond OpenFreeMap (style servi PAR LE BANC : liberty en clair, dark en
+//      sombre), sans AUCUNE requête vers CARTO ni tile.openstreetmap.org ;
+//      Leaflet, MapLibre ou le style injoignables ⇒ la même communauté en liste.
 //  Le faux PostgREST applique les RÈGLES de la 018 (§6.3). Le VRAI api/compte.js
 //  est exécuté pour `?mode=communaute`. Aucune fixture : tout est inventé ici.
 //  019 : le pseudo Discord (facultatif, validé, montré aux membres visibles) et
@@ -234,6 +237,7 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
     }
     return json({ code: 'PGRST202' }, 404);
   }
+  if (cible.startsWith('vinted_accounts') && /owner\.neq\./.test(u))return json([]);
   if (cible.startsWith('vinted_accounts')) return json(uid ? [{ vinted_user_id: '1' + uid.slice(0, 3), login: USERS[uid].login, owner: uid }] : []);
   return json([], 200, { 'content-range': '0-0/0' });
 }
@@ -269,7 +273,14 @@ const srv = http.createServer((q, r) => {
 });
 
 let compte = null, LEAFLET = null;
-async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false, fragment = '' }) {
+// Le fond OpenFreeMap, servi par le banc (jamais le réseau réel). Un style
+// minimal mais réel : un fond, une source vectorielle (tuiles vides), une couche.
+const OFM = { styles: [], tuiles: 0, interdit: [] };
+const styleOfm = (nom) => JSON.stringify({ version: 8, name: nom,
+  sources: { openmaptiles: { type: 'vector', tiles: ['https://tiles.openfreemap.org/planet/test/{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: 14 } },
+  layers: [{ id: 'background', type: 'background', paint: { 'background-color': nom === 'dark' ? '#0e0e0e' : '#f8f4f0' } },
+    { id: 'water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water', paint: { 'fill-color': '#9ec8ff' } }] });
+async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = false, sansFond = false, fragment = '' }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, serviceWorkers: sansLeaflet ? 'block' : 'allow', permissions: ['geolocation'], geolocation: { latitude: 48.6781234, longitude: -1.8523456 } });
   const pg = await ctx.newPage();
@@ -286,6 +297,14 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
       const x = fauxSupabase(u, rq.method(), rq.headers(), { json: (() => { try { return JSON.parse(rq.postData() || '{}'); } catch (_) { return {}; } })() });
       return r.fulfill({ status: x.status, headers: x.headers, body: x.body });
     }
+    if (/cartocdn\.com|tile\.openstreetmap\.org/.test(u)) { OFM.interdit.push(u); return r.abort(); }
+    if (/tiles\.openfreemap\.org\//.test(u)) {
+      if (sansFond) return r.abort();
+      const m = u.match(/\/styles\/([a-z]+)/);
+      if (m) { OFM.styles.push(m[1]); return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: styleOfm(m[1]) }); }
+      OFM.tuiles++;
+      return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: { 'access-control-allow-origin': '*' }, body: Buffer.alloc(0) });
+    }
     if (/cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\/1\.9\.4\//.test(u)) {
       if (sansLeaflet || !LEAFLET) return r.abort();
       const f = u.endsWith('.css') ? 'leaflet.css' : 'leaflet.js';
@@ -299,7 +318,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
-    if (u.pathname === '/api/compte' && (mode === 'communaute' || mode === 'abonnement' || mode === 'discord-debut')) {
+    if (u.pathname === '/api/compte' && (mode === 'communaute' || mode === 'abonnement' || mode === 'discord-debut' || mode === 'confidentialite')) {
       let corps = null; try { corps = rq.postData() ? JSON.parse(rq.postData()) : null; } catch (_) {}
       const res = { code: 200, corps: null, setHeader() {}, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, end() { return this; } };
       const lecteur = corps ? (async function* () { yield Buffer.from(JSON.stringify(corps)); })() : null;
@@ -381,7 +400,7 @@ async function partie019(nav) {
       await pg.waitForSelector('[data-cm-inscrit="oui"]', { timeout: 8000 });
       await classementLu(pg);
       dit(B.profils[A].classement === true, 'elle entre dans le classement sur son geste (confirmé)');
-      dit(await attr(pg, '[data-cm-rang-moi]', 'data-cm-rang-moi') === '2' && /Tu es\s*2ᵉ\s*sur 2/.test(await texte(pg)), '« Tu es 2ᵉ sur 2 » cette semaine');
+      dit(await attr(pg, '[data-cm-rang-moi]', 'data-cm-rang-moi') === '2' && /Ta position\s*2ᵉ\s*\/ 2/.test(await texte(pg)), 'la carte de position affiche 2ᵉ / 2 cette semaine');
       dit(await attr(pg, '[data-cm-ligne-moi="oui"]', 'data-cm-ligne-ventes') === '3', 'sa ligne est mise en avant avec SES ventes (3)');
       await pg.click('[data-cm-periode="mois"]'); await classementLu(pg);
       await pg.waitForFunction(() => document.querySelector('[data-cm-rang-moi]') && document.querySelector('[data-cm-rang-moi]').getAttribute('data-cm-rang-moi') === '1', null, { timeout: 8000 }).catch(() => {});
@@ -445,7 +464,11 @@ async function partie019(nav) {
       dit(!(await pg.$('[data-cm-chiffre]')), 'aucun chiffre affiché quand il n’y a personne');
       await pg.waitForSelector('[data-cm-carte="prete"]', { timeout: 15000 }).catch(() => {});
       dit(await attr(pg, '[data-cm-carte]', 'data-cm-carte') === 'prete', 'la carte (Leaflet) se dessine, chargée à l’ouverture de l’écran');
-      dit(/OpenStreetMap/.test(await texte(pg)), 'l’attribution OpenStreetMap est affichée');
+      await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 15000 }).catch(() => {});
+      dit(/OpenStreetMap/.test(await texte(pg)) && /OpenFreeMap/.test(await texte(pg)) && /OpenMapTiles/.test(await texte(pg)), 'l’attribution exigée est affichée (OpenFreeMap · OpenMapTiles · OpenStreetMap)');
+      dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap' && OFM.styles.includes('liberty'), 'le fond OpenFreeMap « liberty » est demandé et dessiné (clair)', JSON.stringify(OFM.styles));
+      dit(!!(await pg.$('.vrm-cm-carte .maplibregl-canvas, .vrm-cm-carte canvas')), 'le fond vectoriel est dessiné (MapLibre, un canvas dans la carte)');
+      dit(OFM.interdit.length === 0, 'aucune requête vers CARTO ni tile.openstreetmap.org', OFM.interdit.slice(0, 2).join(' '));
       dit((await pg.$$('[data-cm-pin]')).length === 0, 'aucune épingle sur une carte vide (aucun faux utilisateur)');
     });
 
@@ -488,6 +511,9 @@ async function partie019(nav) {
       dit(geo.zoom === '1' || geo.zoom === 'normal', 'téléphone : aucun zoom CSS posé sur le conteneur de Leaflet (il ne sait pas le compter, Safari surtout)', JSON.stringify(geo));
       dit(geo.haut < geo.vh * 0.6, 'téléphone : la carte est dans le premier écran, pas sous la barre du bas', JSON.stringify(geo));
       dit(geo.tuile == null || geo.tuile === 256, 'téléphone : une tuile fait 256 px affichés (carte pas grossie)', JSON.stringify(geo));
+      await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 15000 }).catch(() => {});
+      dit(OFM.styles.includes('dark'), 'sombre : le style OpenFreeMap « dark » est demandé', JSON.stringify(OFM.styles));
+      dit(OFM.interdit.length === 0, 'sombre : aucune requête vers CARTO ni tile.openstreetmap.org', OFM.interdit.slice(0, 2).join(' '));
       if (process.env.BANC_DEBUG) { console.log(await pg.evaluate(() => { const b = document.querySelector('[data-cm-pin]').getBoundingClientRect(); const e = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return JSON.stringify(b) + ' ' + (e && e.outerHTML.slice(0, 200)); })); await pg.screenshot({ path: process.env.BANC_DEBUG + '/b390.png', fullPage: true }); }
       await pg.click('[data-cm-pin]');
       await pg.waitForSelector('[data-cm-personnes]', { timeout: 8000 });
@@ -602,6 +628,15 @@ async function partie019(nav) {
       dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'Leaflet injoignable : la communauté est listée, rien n’est caché');
       await ctx.close();
     });
+    await essaie('sans fond', async () => {
+      reset();
+      B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
+      const { ctx, pg } = await ouvrir(nav, { qui: A, sansFond: true });
+      await pg.waitForSelector('[data-cm-liste-secours]', { timeout: 25000 }).catch(() => {});
+      dit(!!(await pg.$('[data-cm-liste-secours]')) && /Cancale/.test(await pg.$eval('[data-cm-liste-secours]', (e) => e.innerText)), 'fond OpenFreeMap injoignable : la communauté est listée (jamais une carte grise)');
+      await ctx.close();
+    });
+    dit(OFM.interdit.length === 0, 'sur tout le banc : aucune requête vers CARTO ni tile.openstreetmap.org', OFM.interdit.slice(0, 2).join(' '));
     await partie019(nav);
     await partie020(nav);
   } finally {

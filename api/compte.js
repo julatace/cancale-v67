@@ -1,3 +1,7 @@
+import './_lib/sans-bruit.js';
+import {routeProfilAvatar,routeAvatarPublic,lignesPriveesProfil} from './_lib/profil-avatar.js';
+import {configurationAuthPublique} from './_lib/auth-public.js';
+import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
 // ⚠️ POURQUOI UNE SEULE FONCTION : le plan Vercel Hobby plafonne à 12 fonctions
 // serverless et le projet en a 12 (voir api/ebay.js). `api/sante.js` est devenu
@@ -37,7 +41,6 @@
 //    vérifiée, dans une table que le vendeur peut lire mais pas écrire
 //    (supabase/migrations/005-abonnements.sql). Sinon on s'abonnerait soi-même
 //    depuis la console du navigateur.
-import './_lib/sans-bruit.js';
 import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { sbCle } from './_lib/cle.js';
@@ -827,6 +830,10 @@ async function fermerCompte(req, res) {
   //    compte qu'il peut rouvrir pour relancer, jamais des données orphelines.
   etapes.sessions = (await fermerSessions(req)) ? 'fermees' : 'non-fermees';
   const filtre = `owner=eq.${encodeURIComponent(u.id)}`;
+  // Les photos et preuves en attente vivent hors des lignes du navigateur.
+  // Si leur effacement échoue, le compte reste récupérable pour recommencer.
+  etapes.profilPrive=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=in.(${lignesPriveesProfil(u.id).join(',')})`,SERVICE);
+  if(etapes.profilPrive===null)return repondre(res,503,{ok:false,erreur:'profil-non-efface',message:'La photo de profil et les preuves de connexion n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
   etapes.donnees = await effacer(`app_data?${filtre}`, SERVICE);
   etapes.comptesVinted = etapes.donnees === null ? null : await effacer(`vinted_accounts?${filtre}`, SERVICE);
   etapes.compteurs = etapes.comptesVinted === null ? null : await effacer(`detourage_usage?${filtre}`, SERVICE);
@@ -949,6 +956,19 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if(mode==='profil-avatar')return routeProfilAvatar(req,res);
+  if(mode==='avatar-public')return routeAvatarPublic(req,res);
+  if(mode==='configuration-auth'){
+    if(m!=='GET')return repondre(res,405,{ok:false});
+    const cfg=configurationAuthPublique(SUPABASE_URL,ANON);
+    return repondre(res,cfg?200:503,cfg?{ok:true,...cfg}:{ok:false});
+  }
+  if(mode==='confidentialite'){
+    if(m!=='GET')return repondre(res,405,{ok:false});
+    const u=await utilisateurDe(req);if(!u)return repondre(res,401,{ok:false,raison:'session'});
+    const resultat=await verifierConfidentialite({url:SUPABASE_URL,anon:ANON,jeton:jetonDe(req),uid:u.id});
+    return repondre(res,resultat.ok?200:503,{...resultat,...(resultat.ok?{uid:u.id}:{})});
+  }
   if (mode === 'operations') return routeOperations(req, res);
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
