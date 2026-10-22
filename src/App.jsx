@@ -4694,6 +4694,24 @@ const moisPeriodeUrssaf = (due) => {
   }
   return yms;
 };
+// Le montant d'une période d'échéance, lu dans la ligne PUBLIÉE par l'écran
+// Ventes (`vinted_urssaf_mois`) — une règle pour le rappel (Ma journée, la
+// notification du 1er) et la carte « Prochaine déclaration » de Comptabilité.
+// Sans ligne : aucun montant (jamais 0). « Au moins » quand des ventes n'ont pas
+// de date de versement, ET (22 oct.) quand la ligne a été publiée AVANT la fin
+// de la période : elle ne peut pas porter les ventes versées depuis — c'est le
+// cas de la notification du 1er si Ventes n'a pas été rouvert depuis la fin du
+// mois. Date de publication illisible ⇒ pas su ⇒ « au moins » (§5 : jamais un
+// total partiel présenté comme complet).
+const montantPeriodeUrssaf = (due, ligne, taux) => {
+  if (!due || !ligne || !Array.isArray(ligne.mois)) return { ca: null, apayer: null, partiel: false };
+  const yms = moisPeriodeUrssaf(due);
+  const ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
+  const atPub = typeof ligne.at === 'number' ? ligne.at : Date.parse(ligne.at || '');
+  const finPeriode = new Date(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1).getTime();
+  const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !(atPub >= finPeriode);
+  return { ca, apayer: aPayerUrssaf(ca, taux), partiel };
+};
 const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, taux = tauxUrssaf() } = {}) => {
   const due = nextUrssafDeadline(freq, now);
   if (!due) return null;
@@ -4702,12 +4720,7 @@ const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, ta
   if (declare && typeof declare === 'object' && yms.length && yms.every((ym) => moisDeclare(declare, ym))) return null;
   const proche = due.daysLeft <= 7;
   if (!(now.getDate() <= 3 || proche)) return null;
-  let ca = null, apayer = null, partiel = false;
-  if (ligne && Array.isArray(ligne.mois)) {
-    ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
-    apayer = aPayerUrssaf(ca, taux);
-    partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0);
-  }
+  const { ca, apayer, partiel } = montantPeriodeUrssaf(due, ligne, taux);
   const date = due.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   const quand = due.daysLeft <= 0 ? "aujourd'hui" : due.daysLeft === 1 ? 'demain' : `dans ${due.daysLeft} jours`;
   const text = proche
@@ -26978,13 +26991,12 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const registreDecl = regPret ? regLu : null;
   // Le « CA finalisé » de la prochaine échéance : les mois PUBLIÉS qui tombent
   // dans la période ; sans ligne publiée, `null` — un tiret, jamais un zéro.
-  const urssafPeriodCA = (!urssafDue || !urssafMois) ? null : Math.round(urssafMois.reduce((s, m) => {
-    const [y, mo] = m.ym.split('-'); const d = new Date(Number(y), Number(mo) - 1, 1);
-    return (d >= urssafDue.periodStart && d <= urssafDue.periodEnd) ? s + (Number(m.ca) || 0) : s;
-  }, 0) * 100) / 100;
-  // Des ventes finalisées sans date de versement peuvent tomber dans cette
-  // période : le montant de l'échéance est alors un MINIMUM, et il le dit (§5).
-  const echeancePartiel = (urssafInfo && urssafInfo.aDater && Number(urssafInfo.aDater.n)) || 0;
+  // (22 oct.) La MÊME règle que le rappel de Ma journée et la notification du 1er
+  // (`montantPeriodeUrssaf`, §11) : des ventes sans date de versement, ou une
+  // ligne publiée avant la fin de la période ⇒ le montant est un MINIMUM (§5).
+  const montantEcheance = montantPeriodeUrssaf(urssafDue, v, TAUX_URSSAF * 100);
+  const urssafPeriodCA = montantEcheance.ca;
+  const echeancePartiel = montantEcheance.partiel ? 1 : 0;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};

@@ -67,6 +67,16 @@ export const moisPeriodeUrssaf = (due) => {
   return yms;
 };
 
+export const montantPeriodeUrssaf = (due, ligne, taux) => {
+  if (!due || !ligne || !Array.isArray(ligne.mois)) return { ca: null, apayer: null, partiel: false };
+  const yms = moisPeriodeUrssaf(due);
+  const ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
+  const atPub = typeof ligne.at === 'number' ? ligne.at : Date.parse(ligne.at || '');
+  const finPeriode = new Date(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1).getTime();
+  const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !(atPub >= finPeriode);
+  return { ca, apayer: aPayerUrssaf(ca, taux), partiel };
+};
+
 export const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
 
 export const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, taux = tauxUrssaf() } = {}) => {
@@ -77,12 +87,7 @@ export const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = n
   if (declare && typeof declare === 'object' && yms.length && yms.every((ym) => moisDeclare(declare, ym))) return null;
   const proche = due.daysLeft <= 7;
   if (!(now.getDate() <= 3 || proche)) return null;
-  let ca = null, apayer = null, partiel = false;
-  if (ligne && Array.isArray(ligne.mois)) {
-    ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
-    apayer = aPayerUrssaf(ca, taux);
-    partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0);
-  }
+  const { ca, apayer, partiel } = montantPeriodeUrssaf(due, ligne, taux);
   const date = due.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   const quand = due.daysLeft <= 0 ? "aujourd'hui" : due.daysLeft === 1 ? 'demain' : `dans ${due.daysLeft} jours`;
   const text = proche

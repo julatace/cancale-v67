@@ -19,7 +19,7 @@
 //      ce qui part sur le téléphone, et rien quand le mois est noté.
 // `--mutation=…` réaffaiblit une règle : chaque mutation doit faire passer au
 // moins un contrôle au rouge. Aucune donnée réelle : tout est inventé ici.
-//   rythme · declare · zero · fenetre   (la règle de l'app)
+//   rythme · declare · zero · fenetre · date   (la règle de l'app)
 //   serveur-registre · serveur-montant · serveur-passu   (la notification)
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const R = path.join(__dirname, '..');
@@ -31,8 +31,9 @@ let src = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
 const muter = (avant, apres) => { if (!src.includes(avant)) { console.log('❌ mutation impossible : motif absent'); process.exit(2); } src = src.replace(avant, apres); };
 if (MUT === 'rythme') muter('if (_startOfDay(now) <= _startOfDay(due.periodEnd)) return null;', '');
 else if (MUT === 'declare') muter('yms.every((ym) => moisDeclare(declare, ym))) return null;', 'false) return null;');
-else if (MUT === 'zero') muter('if (ligne && Array.isArray(ligne.mois)) {', 'ca = 0; apayer = 0; if (ligne && Array.isArray(ligne.mois)) {');
+else if (MUT === 'zero') muter('return { ca: null, apayer: null, partiel: false };', 'return { ca: 0, apayer: 0, partiel: false };');
 else if (MUT === 'fenetre') muter('const proche = due.daysLeft <= 7;', 'const proche = false;');
+else if (MUT === 'date') muter('|| !(atPub >= finPeriode);', ';');
 else if (MUT && !MUT.startsWith('serveur-')) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 let ko = 0;
@@ -61,7 +62,7 @@ function declarations(code, plugins) {
 }
 const decl = declarations(src, ['jsx']);
 // Ce que le miroir porte (et que le vm de l'app exécute) — l'ordre est celui du fichier.
-const NOMS = ['TAUX_URSSAF_DEFAUT', 'tauxDe', 'aPayerUrssaf', '_startOfDay', 'nextUrssafDeadline', 'moisPeriodeUrssaf', 'moisDeclare', 'rappelUrssaf'];
+const NOMS = ['TAUX_URSSAF_DEFAUT', 'tauxDe', 'aPayerUrssaf', '_startOfDay', 'nextUrssafDeadline', 'moisPeriodeUrssaf', 'montantPeriodeUrssaf', 'moisDeclare', 'rappelUrssaf'];
 const MIROIR = path.join(R, 'api', '_lib', 'urssaf-regle.js');
 
 // ── --recopie : refabrique le miroir (le SEUL moyen de le modifier) ─────────
@@ -129,6 +130,12 @@ if (process.argv.includes('--recopie')) {
     const x = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...LIGNE, aDater: { n: 2 } } });
     dit(!!(x && x.partiel && /au moins/i.test(x.sub)), 'des ventes sans date de versement : « au moins »', x && x.sub);
   });
+  await essaie('ligne publiée avant la fin de la période', () => {
+    const avant = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...LIGNE, at: new Date(2026, 8, 28, 20).getTime() } });
+    dit(!!(avant && avant.partiel && /au moins/i.test(avant.sub)), 'publiée le 28 septembre : le total de septembre est un minimum (« au moins »)', avant && avant.sub);
+    const apres = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...LIGNE, at: new Date(2026, 9, 1, 2).getTime() } });
+    dit(!!(apres && !apres.partiel && !/au moins/i.test(apres.sub)), 'publiée après la fin du mois : le total se dit tel quel', apres && apres.sub);
+  });
   const code = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
   dit(!/Nouveau mois : pense à ta déclaration URSSAF/.test(code), 'l\'ancien rappel fixe du 1er du mois a disparu');
   dit(/rappelUrssaf\(\{\s*freq:/.test(code), 'le centre de notifications appelle `rappelUrssaf`');
@@ -181,13 +188,17 @@ if (process.argv.includes('--recopie')) {
 
   // ── 2. La notification : la règle, le montant publié, « pas su » ──────────
   console.log('\n── 2. La notification du 1er (règle pure, api/_lib/rappel-urssaf.js)');
-  const PUB = { at: 1, mois: [{ ym: '2026-09', ca: 4330.9, n: 89 }, { ym: '2026-10', ca: 999, n: 9 }] };
+  // Publiée le 1er octobre au matin (après la fin de septembre) : un total complet.
+  const PUB = { at: Date.parse('2026-10-01T06:00:00Z'), mois: [{ ym: '2026-09', ca: 4330.9, n: 89 }, { ym: '2026-10', ca: 999, n: 9 }] };
   const N = (main, today = '2026-10-01') => glue.notificationUrssaf({ today, main });
   await essaie('notification : mois à déclarer', () => {
     const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB });
     dit(!!(n && n.envoyer), 'mensuel, 1er octobre, septembre pas noté : la notification part', n && n.raison);
     dit(!!(n && n.montant === 584.67 && /4330,90 €/.test(n.corps) && /584,67 €/.test(n.corps)), 'elle donne le montant de la ligne PUBLIÉE (4 330,90 € reçus, 584,67 € à payer)', n && n.corps);
     dit(!!(n && /31 octobre/.test(n.corps)), 'et l\'échéance (avant le 31 octobre)', n && n.corps);
+    dit(!!(n && !/au moins/i.test(n.corps)), 'ligne publiée après la fin du mois : le montant se dit tel quel', n && n.corps);
+    const p = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: { ...PUB, at: Date.parse('2026-09-27T18:00:00Z') } });
+    dit(!!(p && p.envoyer && /au moins 4330,90 €/i.test(p.corps)), 'ligne publiée le 27 septembre : « au moins » (les ventes versées depuis n\'y sont pas)', p && p.corps);
     const app = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 12), ligne: PUB });
     dit(!!(n && app && n.corps === `${app.text}. ${app.sub}`), 'mot pour mot la phrase de Ma journée (même règle, §11)', n && n.corps);
   });
@@ -198,11 +209,11 @@ if (process.argv.includes('--recopie')) {
   await essaie('notification : rythme', () => {
     const n = N({ vinted_urssaf_mois: PUB }, '2026-11-01');
     dit(!!(n && !n.envoyer), 'trimestriel (le défaut), 1er novembre : T4 pas fini, rien', n && n.raison);
-    const t = N({ vinted_urssaf_freq: 'trimestriel', vinted_urssaf_mois: { mois: [{ ym: '2026-07', ca: 100 }, { ym: '2026-08', ca: 200 }, { ym: '2026-09', ca: 300 }] } });
+    const t = N({ vinted_urssaf_freq: 'trimestriel', vinted_urssaf_mois: { at: PUB.at, mois: [{ ym: '2026-07', ca: 100 }, { ym: '2026-08', ca: 200 }, { ym: '2026-09', ca: 300 }] } });
     dit(!!(t && t.envoyer && t.montant === 81), 'trimestriel, 1er octobre : T3, 600 € reçus → 81 €', t && t.corps);
   });
   await essaie('notification : taux du vendeur', () => {
-    const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_taux: '21,2', vinted_urssaf_mois: { mois: [{ ym: '2026-09', ca: 100 }] } });
+    const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_taux: '21,2', vinted_urssaf_mois: { at: PUB.at, mois: [{ ym: '2026-09', ca: 100 }] } });
     dit(!!(n && n.montant === 21.2), 'son taux réglé (21,2 %) est celui de la notification', n && String(n.montant));
   });
   await essaie('notification : pas su', () => {
