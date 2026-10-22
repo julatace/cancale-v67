@@ -28,6 +28,10 @@ require('./_porte-banc.cjs');
 //      téléphone part, et le code faux ne retire rien ;
 //   F. service injoignable pendant l'ajout : rien d'ajouté, c'est dit ;
 //   G. aucune proposition de SMS (décision de Julien), aucun débordement.
+//   H. retirer un appareil qui n'existe déjà plus (retiré depuis un autre appareil :
+//      404 ; ou retrait fait dont la réponse s'est perdue : 503) : jamais « reste
+//      enregistré », jamais un formulaire « désactiver » pour l'appareil disparu,
+//      la liste relue (l'appareil qui reste) est montrée.
 //  Aucune fixture : tout est inventé, le banc vit dans le dépôt.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
@@ -106,6 +110,9 @@ async function brancher(ctx, st) {
         return json(200, { access_token: jwt('aal2'), refresh_token: 'r-aal2', expires_in: 3600, token_type: 'bearer', user: userJson(st) });
       }
       if (m === 'DELETE') {
+        // « Réponse perdue » : GoTrue retire bien l'appareil, puis la réponse
+        // n'arrive pas (une passerelle répond 503 — les incidents 522 du dossier).
+        if (st.deletePerdu) { st.factors = st.factors.filter((x) => x !== fac); st.deletes.push({ id: fac.id, aal, perdu: true }); return route.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' }); }
         st.deletes.push({ id: fac.id, aal, status: fac.status });
         if (fac.status === 'verified' && aal !== 'aal2') return json(403, { code: 'insufficient_aal', msg: 'AAL2 required to delete verified factor' });
         st.factors = st.factors.filter((x) => x !== fac);
@@ -170,7 +177,11 @@ const nb = (pg) => attr(pg, '[data-mfa-panneau]', 'data-mfa-nb');
 
 // Un banc ne meurt pas, il rapporte (§6) : un bloc qui lève devient UN rouge,
 // et les blocs suivants tournent quand même ; chaque contexte est refermé.
+// SECTIONS=H (ou A,D,H) : ne rejouer que ces scénarios (preuves par mutation,
+// machine partagée). Absent : tout.
 async function bloc(nom, fn) {
+  const voulu = String(process.env.SECTIONS || '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (voulu.length && !nom.split(' ')[0].split('+').some((l) => voulu.includes(l))) return;
   const ouverts = [];
   try { await fn((c) => { ouverts.push(c); return c; }); }
   catch (e) { dit(false, `${nom} a tourné jusqu'au bout`, String(e && e.message).split('\n')[0].slice(0, 160)); }
@@ -310,6 +321,45 @@ async function scenarios(nav, taille) {
       dit(!!(await session(pg)), 'toujours connecté');
     } else dit(false, 'le panneau « Double vérification » est là');
   });
+  // ── H. Retirer un appareil qui n'existe déjà plus chez GoTrue ─────────────
+  // Deux chemins mènent au même état : il a été retiré DEPUIS UN AUTRE APPAREIL
+  // pendant que le formulaire était ouvert (le DELETE répond 404), ou le retrait
+  // a été FAIT mais la réponse s'est perdue (503). Dans les deux cas le panneau
+  // ne doit ni dire « reste enregistré », ni rester sur un formulaire « retirer /
+  // désactiver » qui vise un appareil disparu : la liste relue est montrée.
+  console.log('── H. Retirer un appareil déjà parti (retiré ailleurs · réponse perdue)');
+  for (const cas of ['ailleurs', 'perdu']) {
+    await bloc(`H (${taille} px, ${cas})`, async (garde) => {
+      const st = nouvelEtat([{ ...TEL, friendly_name: 'Téléphone' }, IPAD]), ctx = garde(await ctxDe(nav, taille)); await brancher(ctx, st);
+      const pg = await ctx.newPage();
+      await seConnecter(pg);
+      dit(await passerLeCode(pg, CODE_TEL), `connexion (${cas})`);
+      if (!(await ouvrirPanneau(pg, taille))) { dit(false, `le panneau « Double vérification » est là (${cas})`); return; }
+      await pg.click('[data-mfa-retirer="f-tel"]', { timeout: 4000 });
+      if (!(await attendre(pg, '[data-mfa-code-desactiver]', 10000))) { dit(false, `le formulaire « retirer » s'ouvre (${cas})`); return; }
+      if (cas === 'ailleurs') st.factors = st.factors.filter((x) => x.id !== 'f-tel');   // retiré depuis un autre appareil
+      else st.deletePerdu = true;
+      const avant = await signature(pg);
+      await pg.fill('[data-mfa-code-desactiver]', CODE_IPAD); await pg.click('[data-mfa-confirmer-off]'); await nouveauMessage(pg, avant);
+      // La liste relue (l'iPad seul) arrive ; puis le formulaire doit se refermer.
+      await quand(pg, () => { const e = document.querySelector('[data-mfa-panneau]'); return e && e.getAttribute('data-mfa-nb') === '1'; }, undefined, 15000);
+      await quand(pg, () => { const e = document.querySelector('[data-mfa-panneau]'); return e && e.getAttribute('data-mfa-nb') === '1' && !e.getAttribute('data-mfa-cours'); }, undefined, 6000);
+      const m = await message(pg), panneau = (await texte(pg, '[data-mfa-panneau]')).replace(/\s+/g, ' ');
+      await capture(pg, `reglages-retrait-${cas}-${taille}`);
+      dit(st.factors.length === 1 && st.factors[0].id === 'f-ipad', `l'iPad reste enregistré chez GoTrue (${cas})`, st.factors.map((x) => x.id).join(', '));
+      dit(!/reste enregistr/.test(m), `le message ne dit pas « reste enregistré » d'un appareil qui n'existe plus (${cas})`, m);
+      if (cas === 'ailleurs') dit(/^passu/.test(m) && /déjà plus enregistré/.test(m) && /Téléphone/.test(m), 'il dit que « Téléphone » était déjà retiré (pas une erreur)', m);
+      else dit(/^passu/.test(m) && /ne sais pas/i.test(m), "réponse perdue : « je ne sais pas », puis la liste relue", m);
+      dit(!/Ton mot de passe suffira/.test(panneau) && !(await pg.$('[data-mfa-code-desactiver]')), `aucun formulaire « désactiver » pour un appareil disparu (${cas})`, panneau.slice(0, 160));
+      dit(!!(await pg.$('[data-mfa-appareil="f-ipad"]')) && !(await pg.$('[data-mfa-appareil="f-tel"]')), `la liste relue est montrée : l'iPad, plus le téléphone (${cas})`, ((await texte(pg, '[data-mfa-liste]')) || '(pas de liste)').replace(/\s+/g, ' '));
+      dit(!!(await pg.$('[data-mfa-desactiver]')) && !!(await pg.$('[data-mfa-ajouter]')), `l'appareil restant garde ses gestes : « Désactiver… », « Ajouter un appareil de secours » (${cas})`);
+      if (cas === 'ailleurs') {
+        const s = await session(pg);
+        dit(s && Array.isArray(s.totp) && !s.totp.includes('f-tel') && !(s.totpNoms && s.totpNoms['f-tel']), 'la session ne connaît plus le téléphone', s ? JSON.stringify({ totp: s.totp, noms: s.totpNoms }) : '');
+      }
+      dit(!(await deborde(pg)), `le panneau ne déborde pas (${cas})`);
+    });
+  }
   // ── G. Aucun SMS ─────────────────────────────────────────────────────────
   console.log('── G. Aucune proposition de SMS (décision de Julien : payant)');
   await bloc(`G (${taille} px)`, async (garde) => {

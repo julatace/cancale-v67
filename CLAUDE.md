@@ -10131,6 +10131,32 @@ chemin de secours est un **second appareil**.
 - **Geste de Julien** : aucun obligatoire. S'il la veut : Réglages → Mon compte →
   Double vérification → Activer (iPhone), puis « Ajouter un appareil de
   secours » avec un AUTRE appareil (iPad, ancien téléphone).
+- **Revue du 22 octobre (soir) — deux défauts du retrait, reproduits puis
+  corrigés** (`DoubleVerification`, `retirer`) :
+  1. **Un appareil déjà retiré ailleurs** (le formulaire ouvert sur un autre
+     écran) : le `DELETE` répond **404** et le panneau disait « Le service de
+     connexion a refusé (erreur 404). « Téléphone » reste enregistré. » — faux,
+     GoTrue ne le connaît plus. ⇒ 404 = déjà retiré : même mise à jour de la
+     session qu'un succès, message « n'était déjà plus enregistré (retiré
+     entre-temps)… Je relis la liste » (ton gris, pas une erreur).
+  2. **Formulaire fantôme** : après ce 404, ou un retrait FAIT dont la réponse
+     s'est perdue (503), la liste relue n'a plus qu'un appareil et le formulaire
+     resté ouvert devenait « Pour désactiver la double vérification… Ton mot de
+     passe suffira ensuite » — faux (l'iPad reste actif), liste cachée. ⇒ un
+     effet sur la liste relue referme le formulaire « retirer » quand l'appareil
+     qu'il vise n'y est plus ; la liste et les gestes de l'appareil restant
+     reviennent (proposition de nom refaite, comme après un retrait réussi).
+  - Preuves : banc `double-verification-appareils.cjs` **section H** (faux
+    GoTrue : retiré ailleurs ⇒ 404 ; « réponse perdue » ⇒ retiré puis 503 ;
+    `SECTIONS=H` rejoue la section seule) — **16 rouges sur 34** sur le build
+    de 078823f (worktree), **8 sur 17** sur sa copie `git archive` à 1512 px
+    (§6.1) ; après, **104/104** aux deux tailles. Mutations : 404 non traité ⇒
+    4 rouges (le message), effet retiré ⇒ 6 rouges (le formulaire fantôme).
+    `double-verification.cjs` vert, 138 audits non SQL verts, build OK.
+  - Non mesuré : le statut que le vrai GoTrue rend sur un facteur inconnu au
+    `DELETE` (404 d'après son code, `mfa_factor_not_found`) ; dans le cas 503 la
+    session garde l'appareil disparu dans `totp` jusqu'à sa prochaine relecture
+    (sans effet : la porte relit les facteurs chez GoTrue).
 
 ---
 
