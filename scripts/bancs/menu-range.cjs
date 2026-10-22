@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // BANC — Le menu rangé (17 octobre, Julien) : « en bas à gauche, Détail Vinted
 // avec annonces, ventes et achats, ça figure déjà dans Vinted ; pareil pour
 // Outils ; l'onglet Collectif ne sert à rien, il est déjà représenté dans les

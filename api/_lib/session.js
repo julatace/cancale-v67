@@ -20,12 +20,17 @@ export async function utilisateurDe(req) {
   if (!jeton || jeton.split('.').length !== 3 || jeton.length > 4096) return null;
   try {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal:AbortSignal.timeout(10000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
-    if (!r.ok) return null;
+    // Trois états : un refus (4xx) vaut `null` ; le service de connexion qui ne
+    // répond pas (panne, délai, 5xx, 429) vaut `undefined` — « pas su ». Les deux
+    // restent « pas de session » pour qui teste `!u` ; seules les routes qui le
+    // DISENT (vendeurExige, push) répondent alors 503 « réessaie » au lieu de
+    // « reconnecte-toi » : se reconnecter ne répare pas une panne (banc serveur).
+    if (!r.ok) return (r.status >= 500 || r.status === 429) ? undefined : null;
     const j = await r.json();
     const id = String((j && j.id) || '');
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
     return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at) };
-  } catch (_) { return null; }
+  } catch (_) { return undefined; }
 }
 
 // La base sait-elle séparer les vendeurs ? 200 → oui · 400 (colonne absente) →
@@ -47,6 +52,7 @@ export async function baseCloisonnee() {
 // Rend `{ id, email }`, ou `null` APRÈS avoir répondu 401.
 export async function vendeurExige(req, res) {
   const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ erreur: 'connexion-injoignable', message: 'Le service de connexion ne répond pas — réessaie dans un instant.' }); return null; }
   if (!u) { res.status(401).json({ erreur: 'session', message: 'Connecte-toi à VRM pour faire ça.' }); return null; }
   return u;
 }

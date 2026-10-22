@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // Banc réel de la réception, données synthétiques, aucun accès production.
 const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;

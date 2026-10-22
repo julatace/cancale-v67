@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  VENTES — UNE FRAPPE DANS LA RECHERCHE, SUR TÉLÉPHONE (16 octobre)
 //

@@ -1319,6 +1319,9 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
      `stock-finitions`, rouge depuis le zoom). */
   :root body .vrm-main [data-stock3d] { height:min(65vh, 575px) !important; min-height:400px !important; }
   :root body .vrm-main [role="switch"] { min-height:55px !important; height:55px !important; min-width:57px !important; }
+  /* Un interrupteur ÉCRIT (« Bordereaux automatiques · Désactivés ») passe à la ligne : une hauteur
+     fixe le coupait et son texte sortait du cadre (banc revendeurs, 320 px). */
+  :root body .vrm-main [role="switch"].vrm-switch-texte { height:auto !important; text-align:left; }
   :root body .vrm-main button.vrm-lien-action,
   :root body .vrm-main button:is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {
     margin-block:-16px;

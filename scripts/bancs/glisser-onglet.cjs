@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // BANC — « Je publie sur eBay, j'appuie sur un bouton… et je me retrouve sur
 // Vestiaire Collective » (Julien, 16 octobre).
 //

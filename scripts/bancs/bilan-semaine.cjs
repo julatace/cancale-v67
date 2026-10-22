@@ -25,7 +25,7 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 // ── Faux Web Push : on capture ce qui partirait, rien ne part ───────────────
 process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
 delete process.env.SUPABASE_SERVICE_KEY;      // accesVendeur → « pas su » ne coupe pas
-delete process.env.CRON_SECRET;
+process.env.CRON_SECRET = 'cle-banc-cron'; // obligatoire depuis dc4799f (la route refuse sans elle)
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
 webpush.setVapidDetails = () => {};
@@ -42,7 +42,7 @@ const CAPTE = new Date(LUNDI - 3600000).toISOString();   // lu ce matin : semain
 // ── Deux vendeurs, chacun SES données (montants distincts pour les reconnaître) ─
 const vendeurs = () => ({
   A: {
-    jeton: 'tokA', subs: [{ endpoint: 'https://push.test/A1', keys: {} }], prefs: null,
+    jeton: 'tokA', subs: [{ endpoint: 'https://fcm.googleapis.com/A1', keys: {} }], prefs: null,
     comptes: [{ vinted_user_id: '11', login: 'vendeuse_a' }],
     main: { vinted_sales_hidden: ['105'], vinted_accounts_hidden: [], vinted_ship_done: { 102: true }, vinted_bords_shipped: {}, vrm_paires_dorment: { n: 3, total: 20, datesKnown: 20, at: LUNDI - 2 * J }, vrm_widget_token: 'tokA' },
     ventes: { 11: { cap: CAPTE, txns: ['102', '106'], orders: [
@@ -60,7 +60,7 @@ const vendeurs = () => ({
     ebay: [],
   },
   B: {
-    jeton: 'tokB', subs: [{ endpoint: 'https://push.test/B1', keys: {} }], prefs: null,
+    jeton: 'tokB', subs: [{ endpoint: 'https://fcm.googleapis.com/B1', keys: {} }], prefs: null,
     comptes: [{ vinted_user_id: '22', login: 'vendeur_b' }],
     main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: {}, vinted_bords_shipped: {}, vrm_widget_token: 'tokB' },
     ventes: { 22: { cap: CAPTE, txns: [], orders: [
@@ -161,7 +161,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   let cron, widget;
   try { cron = (await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'))).default; } catch (e) { dit(false, 'api/ship-reminders.js se charge', e.message); }
   try { widget = (await import('file://' + path.join(RACINE, 'api', 'widget.js'))).default; } catch (e) { dit(false, 'api/widget.js se charge', e.message); }
-  const lancer = async (t) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: {}, query: {} }, r); return r; } finally { Date.now = vraiNow; } };
+  const lancer = async (t) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); return r; } finally { Date.now = vraiNow; } };
   const bilansDe = (o) => pushes.filter((p) => /^bilan-/.test(p.tag || '') && p.endpoint.includes('/' + o));
   const ctx = regleApp();
   const attendu = (o) => {

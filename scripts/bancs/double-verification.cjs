@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « DOUBLE VÉRIFICATION » — la connexion en deux temps (TOTP), 16 octobre.
 //
