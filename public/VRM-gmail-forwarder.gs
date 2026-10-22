@@ -113,7 +113,10 @@ function forwardVintedEmails() {
   compteVerifie=true;signalerPassageVRM('debut');
   const traite=labelVRM(LABEL),preuve=labelVRM(LABEL_PREUVE),erreur=labelVRM('vrm-a-reessayer');
   confirmationTransfertVRM();
-  const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -in:spam -in:trash after:'+getStartDate();
+  const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -in:spam -in:trash -in:sent after:'+getStartDate();
+  // (22 oct.) `-in:sent` : ce que CETTE boîte envoie (factures, liens de
+  // confirmation d'adresse — l'expéditeur contient « vinted ») n'est pas un
+  // email reçu, il ne repart pas vers VRM.
   const vus={};let n=0,phase='nouveaux';const proprietes=PropertiesService.getScriptProperties();
   while(n<MAX_PAR_PASSAGE&&Date.now()-debut<BUDGET_TRANSFERT_MS){
    if(phase==='nouveaux'&&n>=80)phase='reprises';
@@ -150,6 +153,8 @@ function forwardVintedEmails() {
    }
    if(phase==='reprises')break;
   }
+  // Les liens de confirmation d'adresse demandés par les vendeurs (22 oct.).
+  envoyerPreuvesAdresse();
   // Conserve le flux Pro existant, limité au propriétaire de l'installation
   // par modeScript. Aucune facture des autres utilisateurs n'est ajoutée ici.
   sendQueuedInvoices();
@@ -212,6 +217,28 @@ function sendQueuedInvoices() {
     } catch (e) {
       Logger.log('Erreur envoi facture : ' + e);
     }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// LIENS DE CONFIRMATION D'ADRESSE (22 octobre)
+// Un vendeur déclare dans VRM l'adresse où Vinted lui écrit ; VRM lui envoie
+// un lien À CETTE ADRESSE, et ce n'est qu'après son clic que ses emails lui
+// sont attribués. VRM écrit le message (le lien est fabriqué par le serveur,
+// sa clé ne quitte jamais Vercel) ; cette boîte l'envoie tel quel, puis le
+// dit à VRM. Un envoi raté est retenté au passage suivant.
+// ════════════════════════════════════════════════════════════════════
+function envoyerPreuvesAdresse() {
+  if (!secretVRM()) return;
+  let r;
+  try { r = appVRM('preuves-a-envoyer'); } catch (e) { Logger.log('Confirmations : VRM injoignable — ' + e); return; }
+  if (!r.ok) { Logger.log('Confirmations : VRM a répondu ' + r.code + ' — rien envoyé.'); return; }
+  (r.data.envois || []).slice(0, 20).forEach(function (e) {
+    try {
+      GmailApp.sendEmail(e.adresse, e.sujet, e.texte, { htmlBody: e.html, name: 'VRM' });
+      const m = appVRM('preuve-envoyee', 'post', { id: e.id });
+      Logger.log('Confirmation envoyée' + (m.ok ? '' : ' — ⚠️ VRM ne l\'a pas notée (' + m.code + '), elle repartira'));
+    } catch (err) { Logger.log('Confirmation non envoyée : ' + err); }
   });
 }
 

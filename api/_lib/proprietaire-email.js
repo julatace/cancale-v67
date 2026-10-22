@@ -95,8 +95,18 @@ export function adressesDeLivraison(body, mailNormalise) {
 // `lignes` : [{ owner?, data }] tels que rendus par PostgREST.
 // `cloisonnee` : la base sait-elle séparer les vendeurs ? Sans colonne
 //   `owner`, il n'y a qu'une boutique : on garde le champ du JSON, comme avant.
-export function fusionnerRegistres(lignes, cloisonnee) {
+// `garde` (22 octobre, base cloisonnée) : `{ retenue(adresse, owner) }` — une
+//   adresse DÉCLARÉE n'est retenue que si elle est PROUVÉE pour ce vendeur (ou
+//   déclarée par le propriétaire de l'installation : `api/_lib/preuve-adresse.js`).
+//   ⚠️ Sans garde, on ne retient RIEN (base cloisonnée) : un appelant qui
+//   l'oublierait mettrait des emails de côté (réparable), jamais ne donnerait
+//   l'adresse d'un autre au premier qui la déclare (irréparable).
+//   Une adresse non retenue ne désigne personne ET ne crée aucun conflit : un
+//   vendeur qui déclare l'adresse d'un autre sans pouvoir la prouver ne bloque
+//   pas son vrai propriétaire.
+export function fusionnerRegistres(lignes, cloisonnee, garde) {
   const registre = {}, conflits = new Set();
+  const retient = cloisonnee ? ((garde && typeof garde.retenue === 'function') ? garde.retenue : () => false) : () => true;
   for (const l of (Array.isArray(lignes) ? lignes : [])) {
     const d = (l && l.data && typeof l.data === 'object') ? l.data : {};
     const adresses = (d.adresses && typeof d.adresses === 'object') ? d.adresses : d;
@@ -109,6 +119,8 @@ export function fusionnerRegistres(lignes, cloisonnee) {
       const declare = String((v && (v.owner || v.uid)) || (typeof v === 'string' ? v : '') || '').trim();
       const owner = cloisonnee ? proprioLigne : declare;
       if (!owner) continue;
+      let garder = false; try { garder = retient(cle, owner) === true; } catch (_) { garder = false; }
+      if (!garder) continue;
       if (registre[cle] && registre[cle] !== owner) { conflits.add(cle); continue; }
       registre[cle] = owner;
     }

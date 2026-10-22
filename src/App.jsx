@@ -3592,9 +3592,10 @@ const fetchEmailAchats = async () => {
     return Array.isArray(rows) ? rows.filter(r=>r?.data).map(r=>({...r.data,_emailId:r.id})) : null;
   } catch (_) { return null; }
 };
-// (Offres reçues par email, `email_offer_*` : leur lecture est retirée le
-//  3 octobre — Ma journée et Messages rapatriaient 573 offres / 142 Ko à chaque
-//  ouverture, et plus rien ne les affichait depuis le 28 septembre.)
+// (Offres reçues par email, `email_offer_*` : leur lecture GLOBALE est retirée
+//  le 3 octobre — Ma journée et Messages rapatriaient 573 offres / 142 Ko à
+//  chaque ouverture. Seul Messages les relit, 14 jours, en scalaires — voir
+//  « LES OFFRES REÇUES, EN TÊTE DE MESSAGES ».)
 // Emails de VENTE (« X a acheté ton article ») : lignes email_sale_* =
 // { designation (titre), prix, account, receivedAt }. Source 24/7 sans appel
 // Vinted → sert à retirer AUTOMATIQUEMENT une annonce vendue.
@@ -4455,7 +4456,9 @@ const fetchResumesConversations = async () => {
 // (§11), sur leurs messages entiers. Map `${uid}_${conv}` → offre ; absente =
 // aucune ; `null` = pas su (lecture refusée ou ratée) ⇒ aucune pastille.
 const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
-const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,msgs:data->payload->conversation->messages';
+// (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
+// `description` d'une conversation de la boîte est le dernier message, pas la paire.
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,titre:data->payload->conversation->transaction->>item_title,msgs:data->payload->conversation->messages';
 const fetchOffresConversations = async () => {
   try {
     const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
@@ -4465,7 +4468,7 @@ const fetchOffresConversations = async () => {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
       if (!m) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
-      if (off) out.set(`${m[1]}_${m[2]}`, off);
+      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '' });
     }
     return out;
   } catch (_) { return null; }
@@ -5747,7 +5750,13 @@ const offreEnAttenteDe = (conversation) => {
       const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
       const prix = Number(String(px == null ? '' : px).replace(',', '.'));
       if (!isFinite(prix) || prix <= 0 || e.transaction_id == null || e.offer_request_id == null) continue;
-      derniere = { prix, tx: String(e.transaction_id), oid: String(e.offer_request_id) };
+      // (22 oct.) L'heure de l'offre, lue comme le fil (`normalizeConversationMessages`) :
+      // sert à reconnaître la même offre arrivée aussi par email (`memeOffre`).
+      // Illisible ⇒ `null` (jamais une heure inventée).
+      const brut = m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at;
+      const nb = Number(brut);
+      const ts = brut == null || brut === '' ? null : (Number.isFinite(nb) ? (nb < 1e12 ? nb * 1000 : nb) : (Date.parse(brut) || null));
+      derniere = { prix, tx: String(e.transaction_id), oid: String(e.offer_request_id), ts: ts != null && Number.isFinite(ts) ? ts : null };
     }
     return derniere;
   } catch (_) { return null; }
@@ -12058,6 +12067,74 @@ function BlocNumerosPerimes() {
           Recharger
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── LE LIEN « CONFIRMER MON ADRESSE DE RÉCEPTION » (22 octobre) ─────────────
+// L'email envoyé À l'adresse déclarée porte `?confirmer-adresse=<empreinte>.<jeton>`.
+// On le garde (30 min, `sessionStorage`) le temps d'une connexion éventuelle —
+// le rechargement qui suit ne doit pas le perdre — et on l'efface de l'adresse.
+// La preuve se range CÔTÉ SERVEUR, et seulement depuis la session du vendeur
+// qui l'a demandée (api/email-rattacher.js, `preuve-confirmer`) : ce bandeau ne
+// fait que transmettre le lien et dire le résultat, UNE fois, sur la coque.
+const CONF_ADR_CLE = 'vrm_confirmer_adresse';
+const CONF_ADR_FORME = /^[0-9a-f]{40}\.[A-Za-z0-9_-]{43}$/;
+let __confAdr = null;   // { lien, at, etat: 'attente'|'encours'|'ok'|'deja'|'perime'|'inconnu'|'refus'|'passu', adresse, message }
+const __confAdrSubs = new Set();
+const poserConfAdr = (v) => { __confAdr = v; try { if (v && (v.etat === 'attente' || v.etat === 'encours' || v.etat === 'passu')) sessionStorage.setItem(CONF_ADR_CLE, JSON.stringify({ lien: v.lien, at: v.at })); else sessionStorage.removeItem(CONF_ADR_CLE); } catch (_) {} __confAdrSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
+if (typeof window !== 'undefined') {
+  try {
+    const q = new URLSearchParams(window.location.search || '');
+    const lien = q.get('confirmer-adresse');
+    if (lien && CONF_ADR_FORME.test(lien)) {
+      __confAdr = { lien, at: Date.now(), etat: 'attente' };
+      try { sessionStorage.setItem(CONF_ADR_CLE, JSON.stringify({ lien, at: Date.now() })); } catch (_) {}
+      try { q.delete('confirmer-adresse'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
+    } else {
+      const g = JSON.parse(sessionStorage.getItem(CONF_ADR_CLE) || 'null');
+      if (g && CONF_ADR_FORME.test(String(g.lien || '')) && Date.now() - Number(g.at || 0) < 30 * 60000) __confAdr = { lien: String(g.lien), at: Number(g.at), etat: 'attente' };
+    }
+  } catch (_) {}
+}
+async function confirmerAdresseParLien() {
+  const c = __confAdr;
+  if (!c || !(c.etat === 'attente' || c.etat === 'passu')) return;
+  if (!AUTH.session || !AUTH.session.access_token) return;
+  poserConfAdr({ ...c, etat: 'encours' });
+  let r = null, j = null;
+  try { r = await fetch('/api/email-rattacher?mode=preuve-confirmer', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ lien: c.lien }) }); j = await r.json().catch(() => null); } catch (_) { r = null; }
+  const etat = r && r.ok && j && j.ok ? (j.deja ? 'deja' : 'ok')
+    : r && r.status === 410 ? 'perime'
+    : r && r.status === 404 ? 'inconnu'
+    : r && (r.status === 409 || r.status === 400) ? 'refus'
+    : 'passu';
+  poserConfAdr({ ...c, etat, adresse: (j && j.adresse) || '', message: (j && j.message) || '' });
+  if (etat === 'ok' || etat === 'deja') { try { lireMisDeCote(); } catch (_) {} }
+}
+function BandeauConfirmationAdresse({ onVoir }) {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { __confAdrSubs.add(force); return () => { __confAdrSubs.delete(force); }; }, []);
+  React.useEffect(() => { confirmerAdresseParLien(); }, []);
+  const c = __confAdr;
+  if (!c) return null;
+  const bon = c.etat === 'ok' || c.etat === 'deja';
+  const voir = onVoir ? <button type="button" data-voir-adresses="" onClick={() => { poserConfAdr(null); onVoir(); }} style={{ marginLeft: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes adresses</button> : null;
+  const texte = c.etat === 'attente' || c.etat === 'encours' ? 'Je confirme ton adresse de réception…'
+    : c.etat === 'ok' ? <>Adresse <b>{c.adresse || 'de réception'}</b> confirmée ✓ — les emails qui y arrivent sont rangés chez toi, et ceux mis de côté te sont proposés.{voir}</>
+    : c.etat === 'deja' ? <>Cette adresse{c.adresse ? <> (<b>{c.adresse}</b>)</> : null} était déjà confirmée ✓ — rien à faire.</>
+    : c.etat === 'perime' ? <>Ce lien a expiré (il vaut 72 heures) : demande-en un nouveau.{voir}</>
+    : c.etat === 'inconnu' ? <>Ce lien ne correspond à aucune demande de ce compte VRM : ouvre-le en étant connecté avec le compte qui a ajouté l'adresse.</>
+    : c.etat === 'refus' ? <>{c.message || "Ce lien n'a pas pu servir."}{voir}</>
+    : <>Je n'ai pas pu confirmer ton adresse pour l'instant (le serveur ne répond pas) — rien n'est perdu. <button type="button" onClick={() => confirmerAdresseParLien()} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0 }}>Réessayer</button></>;
+  const fermable = c.etat !== 'attente' && c.etat !== 'encours';
+  return (
+    <div className="vrm-tete-row">
+    <div data-confirmation-adresse={c.etat} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
+      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : (c.etat === 'attente' || c.etat === 'encours') ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
+      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserConfAdr(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+    </div>
     </div>
   );
 }
@@ -25570,6 +25647,52 @@ const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
   }
   return { gardees, reglees, rangees };
 };
+// ── UNE OFFRE VUE PAR EMAIL ET DANS SA CONVERSATION : UNE SEULE FOIS (22 oct.) ─
+// Messages montre deux sources d'offres : les emails (`email_offer_*`, le bloc
+// « offres à trancher ») et les conversations captées (la pastille « Offre
+// 45 € en attente », `offreEnAttenteDe`). La même offre peut arriver des deux
+// côtés. On ne la cache d'un côté que si on SAIT que c'est la même — par
+// identité, jamais par ressemblance (§5) :
+//   · le MÊME compte vendeur (identifiant Vinted du compte) ;
+//   · le MÊME acheteur — son login, unique sur Vinted (le champ `qui` de l'email) ;
+//   · le MÊME montant, au centime ;
+//   · reçue dans la même fenêtre (`OFFRE_TOLERANCE_H`, le délai de classement
+//     de l'email) ;
+//   · et, si les deux le portent, le même titre — une contrainte EN PLUS, jamais
+//     seule (deux paires au même titre existent, §2.4).
+// Un champ absent d'un côté ⇒ pas la même (on montre les deux). L'asymétrie est
+// décisive : une offre montrée deux fois coûte un regard, une offre cachée à
+// tort fait rater une vente.
+// ⚠️ MESURÉ LE 22 OCTOBRE (lecture seule) : `qui` est VIDE sur les 248 offres
+//    email des 14 derniers jours (et aucune ne porte d'annonce, de transaction
+//    ni de conversation) — cette règle ne réunit donc AUCUNE offre aujourd'hui.
+//    C'est voulu : sans l'acheteur, rien ne prouve que deux offres de 45 € sur
+//    le même compte sont la même. Le jour où l'email porte l'acheteur, elle joue.
+const euroOffre = (m) => { const n = parseFloat(String(m == null ? '' : m).replace(/\s/g, '').replace(',', '.')); return n > 0 ? n : null; };
+const memeOffre = (of, co) => {
+  if (!of || !co) return false;
+  const u = String(of.uid || '').trim();
+  if (!u || u !== String(co.uid || '').trim()) return false;
+  const qui = String(of.qui || '').trim().toLowerCase();
+  if (!qui || qui !== String(co.login || '').trim().toLowerCase()) return false;
+  const m = euroOffre(of.montant);
+  if (m == null || !(Number(co.prix) > 0) || Math.round(m * 100) !== Math.round(Number(co.prix) * 100)) return false;
+  const recue = Date.parse(of.receivedAt || ''), t = Number(co.ts);
+  if (!Number.isFinite(recue) || !Number.isFinite(t) || Math.abs(recue - t) > OFFRE_TOLERANCE_H * 3600000) return false;
+  const a = normTitle(of.article || ''), b = normTitle(co.titre || '');
+  if (a && b && a !== b) return false;
+  return true;
+};
+// Les offres email à MONTRER : celles qu'aucune offre de conversation ne
+// désigne. `convOffres` : `null`/`undefined` (pas su, pas encore lu) ⇒ on ne
+// retire rien. Rend `{ affichees, dansConversation }`.
+const offresEmailHorsConversations = (offres, convOffres) => {
+  const liste = Array.isArray(offres) ? offres : [];
+  if (!Array.isArray(convOffres) || !convOffres.length) return { affichees: liste, dansConversation: [] };
+  const affichees = [], dansConversation = [];
+  for (const of of liste) (convOffres.some((co) => memeOffre(of, co)) ? dansConversation : affichees).push(of);
+  return { affichees, dansConversation };
+};
 // ── LE REPÈRE PAR MODÈLE : UNE RÈGLE, DEUX ÉCRANS (§11, revue du 6 octobre) ──
 // « Tes Samba se revendent X € en moyenne » se calculait DEUX fois : l'écran
 // Ventes (Repère d'achat par modèle) écartait les comptes qu'il a exclus,
@@ -32774,6 +32897,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    serait le rapprochement par ressemblance interdit (§5). Le repère montré
   //    est celui du MODÈLE (prix moyen de revente), dit comme tel.
   // Trois états : `undefined` en cours · `null` pas su · tableau.
+  // ⚠️⚠️ (22 octobre) CE BLOC AVAIT DISPARU LE 13 OCTOBRE (« Simplifier les
+  //    écrans revendeurs », 13f6c89) avec la cloche, et la règle
+  //    `offresAtraiter` n'était plus rendue NULLE PART. Mesuré (lecture seule) :
+  //    248 offres email ces 14 derniers jours, 17 sur le dernier jour, sur
+  //    5 comptes — et 0 offre en attente dans une conversation captée sur la
+  //    même période (3 en tout, la plus récente du 15 septembre). Les offres ne
+  //    s'affichaient donc plus du tout. Rebranché, ici seulement.
+  const [offresEmail, setOffresEmail] = useState(undefined);
+  const [offresToutes, setOffresToutes] = useState(false);
+  const [offresFaites, setOffresFaites] = useState(() => new Set(load('vinted_offers_done', []) || []));
+  // Réglage SYNCHRONISÉ lu au montage : rattrapé à l'arrivée du nuage, et
+  // seulement s'il est resté vide (une offre rangée pendant le chargement
+  // n'est jamais écrasée — §5.49).
+  useEffect(() => onCloudReady(() => setOffresFaites((v) => v.size ? v : new Set(load('vinted_offers_done', []) || []))), []);
+  useEffect(() => {
+    if (curSub !== 'messages') return;
+    let stop = false;
+    const depuis = new Date(Date.now() - OFFRE_FENETRE_J * 86400000).toISOString().slice(0, 10);
+    // SCALAIRES seulement (§4.4) : `extrait` (le morceau brut de l'email) n'est
+    // jamais rapatrié. Une page ratée ⇒ `null` (pas su), jamais une demi-liste.
+    lireTout(`id=like.email_offer_*&meta->>receivedAt=gte.${depuis}&select=id,article:meta->>article,montant:meta->>montant,qui:meta->>qui,uid:meta->>uid,account:meta->>account,receivedAt:meta->>receivedAt`, { strict: true })
+      .then((l) => { if (!stop) setOffresEmail(Array.isArray(l) ? l : null); })
+      .catch(() => { if (!stop) setOffresEmail(null); });
+    return () => { stop = true; };
+  }, [curSub]);
+  // L'identité d'une offre rangée (« c'est fait ») : la ligne email elle-même.
+  // ⚠️ Avant le 13 octobre la clé était `receivedAt|article` : on la relit
+  //    aussi, pour qu'une offre déjà rangée avec l'ancienne clé ne revienne pas.
+  const cleOffre = (of) => String((of && of.id) || '');
+  const offreTraitee = (of) => setOffresFaites((prev) => { const u = new Set(prev); u.add(cleOffre(of)); save('vinted_offers_done', [...u].slice(-500)); return u; });
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
@@ -38883,6 +39036,77 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
+        {/* ── LES OFFRES REÇUES PAR EMAIL, EN TÊTE (rebranché le 22 octobre) ──
+            La règle `offresAtraiter` (compte, chronologie, titre non ambigu)
+            écarte celles qu'une vente a réglées et le DIT ; « c'est fait » range
+            une offre (`vinted_offers_done`). Une offre que sa conversation montre
+            déjà (même compte, même acheteur, même montant — `memeOffre`, jamais
+            le titre seul) n'est pas écrite deux fois. */}
+        {(()=>{
+          if (offresEmail === undefined || !Array.isArray(sales.items)) return null;   // on attend de savoir lesquelles sont déjà réglées
+          // La panne de la base se dit UNE fois, par le bloc de la coque (§7).
+          if (offresEmail === null) return baseKO ? null : <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
+          // Un compte écarté (son choix) ou retiré n'a plus rien à lui dire ;
+          // « retiré » ne se juge que sur une liste de comptes LUE, et une offre
+          // sans compte connu reste (pas su ≠ autre compte).
+          const comptesLus = accountsReady && !baseKO;
+          const desComptes = offresEmail.filter((of) => { const u = String((of && of.uid) || ''); if (!u) return true;
+            if (acctOff(u)) return false;
+            return !(comptesLus && !accountUids.has(u)); });
+          // Les offres « c'est fait » rangées avant le 22 octobre portaient la clé
+          // `receivedAt|article` : elles comptent toujours comme rangées.
+          const faites = new Set(offresFaites);
+          for (const of of desComptes) if (offresFaites.has(`${of.receivedAt || ''}|${of.article || ''}`)) faites.add(cleOffre(of));
+          const { gardees, reglees } = offresAtraiter(desComptes, sales.items, faites, cleOffre);
+          // Les offres en attente vues dans une conversation captée (même source
+          // que la pastille de la liste) ; pas su ⇒ on ne retire rien.
+          const convOffres = (offresConv instanceof Map && Array.isArray(convs.items))
+            ? convs.items.flatMap((c) => { const u = String((c._acc && c._acc.vinted_user_id) || ''); const off = offresConv.get(`${u}_${c.id}`); return off ? [{ uid: u, login: (c.opposite_user && c.opposite_user.login) || '', prix: off.prix, ts: off.ts, titre: off.titre || '' }] : []; })
+            : null;
+          const { affichees, dansConversation } = offresEmailHorsConversations(gardees, convOffres);
+          if (!affichees.length) return null;
+          // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
+          const repere = moyennesParModele(sales.items, acctOffOf);
+          const nomModele = (k) => k.replace(/\b\w/g, (c) => c.toUpperCase());
+          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`il y a ${Math.round(h)} h`:`il y a ${Math.round(h/24)} j`; };
+          const tri = [...affichees].sort((a,b)=> (Date.parse(b.receivedAt||0)||0) - (Date.parse(a.receivedAt||0)||0));
+          const comptes = new Set(tri.map((o)=>String(o.uid||o.account||'')));
+          const visibles = offresToutes ? tri : tri.slice(0, 6);
+          const pl = (n, s, p) => (n > 1 ? p : s);
+          return (
+            <div data-offres-messages={tri.length} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:12,overflow:'hidden'}}>
+              <div style={{padding:'10px 12px 6px'}}>
+                <div style={{fontSize:14,fontWeight:700,color:C.text}}><span style={{color:C.accent}}>{tri.length}</span> {pl(tri.length,'offre','offres')} à trancher</div>
+                <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>
+                  Reçues par email ces {OFFRE_FENETRE_J} derniers jours{comptes.size===1&&tri[0].account?` · toutes sur ${tri[0].account}`:''}. On y répond sur Vinted, sur le compte nommé.
+                  {reglees.length>0 ? <span data-offres-reglees={reglees.length}>{` ${reglees.length} autre${reglees.length>1?'s':''} déjà réglée${reglees.length>1?'s':''} par une vente, mise${reglees.length>1?'s':''} de côté.`}</span> : null}
+                  {dansConversation.length>0 ? <span data-offres-dans-conversation={dansConversation.length}>{` ${dansConversation.length} ${pl(dansConversation.length,'autre est','autres sont')} sur ${pl(dansConversation.length,'sa conversation','leur conversation')} ci-dessous.`}</span> : null}
+                </div>
+              </div>
+              {visibles.map((of,i)=>{
+                const m = euroOffre(of.montant); const k = extractModel(of.article); const r = k && repere[k];
+                return (
+                  <div key={of.id||i} data-offre-email={of.id} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 12px',borderTop:`1px solid ${C.border}`}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m!=null?<b>{fmtE(m)}</b>:'Une offre'}{of.qui?` · ${of.qui}`:''}</div>
+                      <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{of.article||'—'}</div>
+                      <div style={{fontSize:11,color:C.muted}}>{quand(of.receivedAt)}{comptes.size>1&&of.account?` · ${of.account}`:''}{r && r.n>=REPERE_MIN ? ` · repère : tes ${nomModele(k)} se revendent ${fmtE(r.s/r.n)} en moyenne (${r.n} ventes)` : ''}</div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
+                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center'}}>Répondre sur Vinted</a>
+                      <button type="button" data-offre-traitee={of.id} onClick={()=>offreTraitee(of)} style={{border:'none',background:'transparent',color:C.muted,fontSize:11.5,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline',minHeight:32}}>c'est fait</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {tri.length > visibles.length && (
+                <button type="button" data-offres-voir-tout={tri.length} onClick={()=>setOffresToutes(true)} style={{display:'block',width:'100%',border:'none',borderTop:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'10px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                  Voir les {tri.length} offres
+                </button>
+              )}
+            </div>
+          );
+        })()}
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
@@ -45968,6 +46192,43 @@ async function lireAdressesVues() {
     return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
   } catch (_) { return null; }
 }
+// ── LES ADRESSES PROUVÉES (22 octobre) ────────────────────────────────────────
+// Une adresse déclarée ne suffit plus (base cloisonnée) : VRM envoie un lien À
+// CETTE adresse, et c'est le clic, depuis la session du vendeur, qui la prouve
+// (api/_lib/preuve-adresse.js). Le SERVEUR décide l'état de chaque adresse ;
+// l'écran l'écrit tel quel (§11). Trois états de lecture : `undefined` en cours ·
+// `null` pas su · objet lu `{ cloisonnee, installation, adresses, collecteur }`.
+async function lirePreuvesAdresses() {
+  try {
+    const r = await fetch('/api/email-rattacher?mode=preuves', { headers: { ...enTeteSession() }, cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && j.adresses && typeof j.adresses === 'object' ? j : null;
+  } catch (_) { return null; }
+}
+// Demande un lien pour UNE adresse. Rend `{ etat, message }` (etat `null` = pas su).
+async function demanderPreuveAdresse(adresse) {
+  try {
+    const r = await fetch('/api/email-rattacher?mode=preuve-demander', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ adresse }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok) return { etat: j.etat, via: j.via || null, message: '' };
+    if (r.status === 422) return { etat: 'impossible', message: j.message || '' };
+    if (r.status === 429 || r.status === 409) return { etat: 'refus', message: j.message || '' };
+    return { etat: null, message: (j && j.message) || "Le serveur n'a pas répondu — rien n'est perdu, réessaie dans un moment." };
+  } catch (_) { return { etat: null, message: 'Réseau indisponible — réessaie.' }; }
+}
+// Ce qu'une ligne d'adresse dit de son état : le mot, s'il faut agir, et le geste.
+// Une cause, une phrase (§7) : l'explication générale vit UNE fois au-dessus.
+const PREUVE_LIGNE = {
+  prouvee: { t: 'confirmée', alerte: false, geste: '' },
+  transition: { t: 'reçue — à confirmer', alerte: false, geste: 'Confirmer' },
+  envoi: { t: 'lien en préparation', alerte: false, geste: '' },
+  envoyee: { t: 'lien envoyé', alerte: false, geste: 'Renvoyer' },
+  perimee: { t: 'lien expiré', alerte: true, geste: 'Renvoyer' },
+  aucune: { t: 'pas confirmée — ses emails sont mis de côté', alerte: true, geste: 'Confirmer' },
+  impossible: { t: "relais Apple : VRM ne peut pas y envoyer de lien", alerte: true, geste: '' },
+};
+// (`estRelaisApple`, déclarée plus haut, sert aussi ici — une règle, §11.)
 function EmailsSetting({onComptes}) {
   // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
   //    Sans ce troisième état, une lecture ratée affichait « Aucune adresse
@@ -45983,6 +46244,8 @@ function EmailsSetting({onComptes}) {
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
   const [suiviAdresses,setSuiviAdresses]=useState(null);
+  const [preuves, setPreuves] = useState(undefined);
+  const [preuveBusy, setPreuveBusy] = useState('');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const racine = useRef(null);
   useEffect(() => {
@@ -46006,6 +46269,7 @@ function EmailsSetting({onComptes}) {
     //    avait rien à réclamer. « Rien lu » ne vaut pas « rien ».
     lireMisDeCote();
     lireAdressesVues().then(setVues);
+    lirePreuvesAdresses().then(setPreuves);
   }, []);
   useEffect(() => { charger(); }, [charger]);
 
@@ -46025,11 +46289,25 @@ function EmailsSetting({onComptes}) {
       });
       ok = !!(r && r.ok);
     } catch (_) { ok = false; }
-    if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return; }
+    if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return false; }
     setVersionReception(v=>v+1);
     // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
     // on relit, sans attendre la prochaine ouverture de l'écran.
     lireMisDeCote();
+    return true;
+  };
+  // ── LA PREUVE (22 octobre) : un lien part À CETTE ADRESSE ─────────────────
+  const confirmerAdresse = async (adr, silencieux) => {
+    setPreuveBusy(adr);
+    const r = await demanderPreuveAdresse(adr);
+    setPreuveBusy('');
+    if (!silencieux || r.etat === null) {
+      if (r.etat === 'prouvee') toast(r.via === 'compte' ? `${adr} est ton adresse de connexion VRM, déjà confirmée : c'est fait.` : `${adr} est confirmée.`);
+      else if (r.etat === 'envoi') toast(`Un lien de confirmation va partir vers ${adr}. Ouvre-le en étant connecté à VRM.`);
+      else if (r.message) toast(r.message);
+    }
+    const p = await lirePreuvesAdresses(); setPreuves(p);
+    if (r.etat === 'prouvee') lireMisDeCote();
   };
   // Une ou plusieurs adresses d'un coup (saisie à la main, ou suggestion).
   const ajouterAdresses = async (liste) => {
@@ -46042,7 +46320,15 @@ function EmailsSetting({onComptes}) {
       nouv[adr] = { owner: uid || '', label: '', at: new Date().toISOString() };
       n++;
     }
-    if (n) await ecrire(nouv);
+    if (!n) return;
+    const ok = await ecrire(nouv);
+    // Déclarer une adresse envoie son lien de confirmation (base cloisonnée :
+    // sinon aucune preuve n'est nécessaire). Le résultat s'écrit sur sa ligne.
+    if (ok && preuves && preuves.cloisonnee) {
+      const neuves = Object.keys(nouv).filter((k) => !(reg || {})[k]);
+      for (const a of neuves) { if (!estRelaisApple(a)) await demanderPreuveAdresse(a); }
+      setPreuves(await lirePreuvesAdresses());
+    }
   };
   const ajouter = async () => {
     const a = await askText({ desc: "Tes adresses personnelles.\n\nIndique les adresses où Vinted t’écrit, avant leur transfert vers VRM. Tu peux en ajouter plusieurs, séparées par des virgules. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
@@ -46125,6 +46411,19 @@ function EmailsSetting({onComptes}) {
     : misDeCote
       ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
       : { t: "Aucune adresse déclarée. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: false };
+  // ── L'état de preuve de chaque adresse, tel que le SERVEUR le décide ──────
+  const etatsPreuve = preuves && preuves.cloisonnee ? (preuves.adresses || {}) : null;
+  const etatDe = (adr) => (etatsPreuve ? (etatsPreuve[normAdresse(adr)] || null) : null);
+  const aConfirmer = liste.filter((a) => { const e = etatDe(a); return e && e.etat !== 'prouvee'; });
+  const enPreparation = liste.some((a) => (etatDe(a) || {}).etat === 'envoi');
+  const boite = preuves ? preuves.collecteur : null;               // null = pas su
+  const boiteAge = boite && boite.at ? Date.now() - Date.parse(boite.at) : null;
+  const dureeLisible = (ms) => { const h = ms / 3600e3; return h < 1 ? `${Math.max(1, Math.round(ms / 60000))} min` : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} jours`; };
+  const phraseBoite = !enPreparation || !boite ? null
+    : !boite.at ? "La boîte d'envoi de VRM n'a pas encore tourné : le lien partira dès qu'elle sera en marche."
+    : boiteAge > 30 * 60000 ? `La boîte d'envoi de VRM n'a pas tourné depuis ${dureeLisible(boiteAge)} : le lien partira dès qu'elle reprend.`
+    : `Il part de la boîte VRM (${ADRESSE_COLLECTRICE}) dans les prochaines minutes — regarde aussi les indésirables.`;
+  const quandLisible = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; };
   // Les suggestions : SES adresses déjà vues, pas encore déclarées.
   const declarees = new Set(liste.map(normAdresse));
   const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
@@ -46177,16 +46476,48 @@ function EmailsSetting({onComptes}) {
         <div data-adresses-vide={vide.alerte ? 'alerte' : 'info'} style={{fontSize:12,color:vide.alerte?C.warn:C.muted,background:vide.alerte?`${C.warn}12`:C.bg,border:`1px solid ${vide.alerte?`${C.warn}44`:C.border}`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
           {vide.t}
         </div>
-      ) : liste.map(adr => (
-        <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+      ) : (<>
+        {/* (22 oct.) La règle de la preuve, UNE fois au-dessus des lignes (§7) ;
+            sur chaque ligne il ne reste que SON état et SON geste. */}
+        {aConfirmer.length > 0 && (
+          <div data-preuve-explication={preuves && preuves.installation ? 'installation' : 'vendeur'} style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
+            Chaque adresse se confirme une fois : VRM envoie un lien <b style={{color:C.text}}>à cette adresse</b>, et tu l'ouvres en étant connecté à VRM.{' '}
+            {preuves && preuves.installation
+              ? "Les tiennes restent reçues en attendant (tu es le propriétaire de cette installation) ; les confirmer les protège le jour où d'autres vendeurs rejoindront VRM."
+              : "Tant qu'une adresse n'est pas confirmée, ses emails sont mis de côté — rien n'est perdu, ils te sont proposés dès la confirmation."}
+            {phraseBoite ? <span data-preuve-boite={!boite.at ? 'jamais' : boiteAge > 30 * 60000 ? 'arretee' : 'active'}>{' '}{phraseBoite}</span> : null}
+          </div>
+        )}
+        {preuves === null && (
+          <div data-preuves="pas-su" style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
+            Je n'ai pas pu vérifier quelles adresses sont confirmées — rien n'est perdu, rouvre cet écran dans un moment.
+          </div>
+        )}
+        {liste.map(adr => { const ep = etatDe(adr); const lp = ep ? PREUVE_LIGNE[ep.etat] : null;
+          // « Renvoyer » seulement quand le serveur l'accepterait (10 min après la demande).
+          const renvoiPermis = !ep || !ep.demandeLe || Date.now() - Date.parse(ep.demandeLe) > 10 * 60000;
+          const geste = lp && lp.geste && !(ep.etat === 'transition' && estRelaisApple(adr)) && (lp.geste !== 'Renvoyer' || renvoiPermis) ? lp.geste : '';
+          return (
+        <div key={adr} data-adresse={normAdresse(adr)} data-adresse-etat={ep ? ep.etat : (preuves === undefined ? 'lecture' : preuves === null ? 'pas-su' : 'sans-preuve')} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`,flexWrap:'wrap'}}>
           <span style={{flex:'1 1 140px',minWidth:0,fontSize:12,color:C.text,overflowWrap:'anywhere'}}>
             <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:10,color:C.danger,background:`${C.danger}0d`,borderRadius:5,padding:'1px 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
             <span style={{fontSize:11.5,color:C.muted}}>{adr}</span>
+            {lp && (
+              <span data-adresse-preuve={ep.etat} style={{display:'flex',alignItems:'center',gap:5,marginTop:3,fontSize:11.5,lineHeight:1.4,color:lp.alerte?C.warn:C.muted}}>
+                {ep.etat === 'prouvee' && <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="check" size={12}/></span>}
+                <span>{lp.t}{ep.etat === 'prouvee' && ep.via === 'compte' ? ' (ton adresse de connexion VRM)' : ''}{ep.etat === 'envoyee' && ep.envoyeLe ? ` le ${quandLisible(ep.envoyeLe)} — ouvre-le depuis cette boîte` : ''}{ep.etat === 'transition' && estRelaisApple(adr) ? ' (relais Apple : aucun lien ne peut y arriver, elle reste à toi)' : ''}</span>
+              </span>
+            )}
           </span>
+          {geste && (
+            <button type="button" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
+              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:preuveBusy===adr?'default':'pointer',fontFamily:'inherit',opacity:preuveBusy===adr?0.5:1}}>{preuveBusy === adr ? '…' : geste}</button>
+          )}
           <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
             style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
-      ))}
+      ); })}
+      </>)}
       {/* ── CE QUE PERSONNE NE PEUT RÉCUPÉRER (le seul propriétaire le voit) ──
           Le nombre et la cause, jamais le contenu : ce tas peut contenir les
           emails d'un autre vendeur. Placé AVANT les suggestions : on lit le
@@ -48704,6 +49035,7 @@ function AppCoeur() {
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
+        <BandeauConfirmationAdresse onVoir={() => { DEMANDE_ADRESSES.on = true; try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} setTab('settings'); }}/>
         <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}

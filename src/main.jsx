@@ -120,7 +120,9 @@ const veutLApp = () => {
   // `?lier-extension=` : « Se connecter avec VRM » cliqué dans l'extension
   // (11 octobre) — droit dans l'app, qui connecte l'extension (ou demande
   // d'abord la connexion), jamais la page d'accueil.
-  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
+  // `?confirmer-adresse=` (22 oct.) : le lien de confirmation d'une adresse de
+  // réception — droit dans l'app (connexion d'abord s'il le faut), jamais l'accueil.
+  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');

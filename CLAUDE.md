@@ -5846,7 +5846,9 @@ en écriture.
   PROUVÉE (lien de confirmation envoyé à l'adresse déclarée, cliqué depuis la
   session du vendeur, preuve rangée côté serveur) — il faut un envoi d'email
   (SMTP), qui n'existe pas ici. Tant que ce n'est pas fait : **VRM ne s'ouvre
-  qu'à des gens de confiance**. (2) Un email « corps illisible » (`garderInconnu`, avant toute
+  qu'à des gens de confiance**. ✅ **Fait le 22 octobre** (« l'adresse de
+  réception PROUVÉE », fin du dossier) : base cloisonnée, une adresse non
+  prouvée ne donne plus rien. (2) Un email « corps illisible » (`garderInconnu`, avant toute
   attribution) part encore chez le propriétaire de l'installation. (3) Un email
   sans adresse lisible reste au neutre pour toujours : personne ne peut le
   réclamer (mieux vaut un blanc qu'un faux). (4) Le 404 « pas à toi » se
@@ -11908,3 +11910,94 @@ Julien : « qu'elle marche sur Orion sur l'iPhone, pareil que sur Chrome », pui
 - **Au doigt** : le bandeau de dépôt Leboncoin tient à 390 px et ses boutons font 44 px (`pointer: coarse` + `hover: none` seulement — rien ne change à la souris). Banc `leboncoin.cjs` (`BANC_PORT`).
 - Preuves : `audit-extension-navigateurs.cjs` sections G-I (profils `chromium`, `firefox-android`, `safari-ios`, `orion-ios`, `orion-ios-pire` dans `_fond-vm.cjs` — option `retirer`, `storage.onChanged` à état) : **30 rouges sur origin/main** (§6.1) ; `--mutation cookies|alarms|main` ⇒ 1 · 4 · 2 rouges ; parité : sans `scripting` ni `tabs.sendMessage`, exactement les mêmes requêtes Vinted que Chrome.
 - ⚠️ **Non mesuré** : aucun vrai Orion, iPhone, Safari ni Firefox Android ; la liste officielle d'API d'Orion (feuille Google, bloquée) ; si les cookies de session de Vinted sont HttpOnly (déterminant sans API `cookies`) ; WebKit absent du conteneur. **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (kit prêt, section 3), puis essayer Orion sur l'iPhone (section 2) ; Safari : Mac + Xcode + compte Apple 99 $/an (section 4).
+
+### Offres reçues par email rebranchées, et l'adresse de réception PROUVÉE (22 octobre)
+Deux chantiers restés ouverts, repris le 22 octobre (branche `v22-adresse`).
+
+**A. Les offres reçues par email.** **Mesuré** (lecture seule, sa base) :
+**248 offres `email_offer_*` en 14 jours** (17 le dernier jour, 5 comptes) ; dans
+les conversations captées, **3 offres en attente en tout**, la plus récente du
+15 septembre, **0 en 14 jours**. Or la règle `offresAtraiter` n'était plus
+**rendue nulle part** depuis le 13 octobre (bloc de Messages retiré, cloche
+retirée le 17) : ses offres ne s'affichaient plus du tout.
+- **Décidé** : rebrancher, pas retirer. UN bloc « N offres à trancher » en tête
+  de Messages (`data-offres-messages`), sur `offresAtraiter` (compte,
+  chronologie, titre non ambigu) ; lecture des 14 derniers jours en scalaires
+  `meta->>` (`lireTout(…, {strict:true})` : une page ratée vaut « pas su ») ;
+  « c'est fait » → `vinted_offers_done` (synchronisé, rattrapé par
+  `onCloudReady`), clé = l'identifiant de la ligne ; ⚠️ les 88 clés d'avant
+  (`receivedAt|article`) restent reconnues.
+- **Une offre vue par email ET dans sa conversation n'est écrite qu'une fois**
+  (`memeOffre` / `offresEmailHorsConversations`) : même compte, même acheteur
+  (login, sans la casse), même montant au centime, dans la tolérance de
+  classement ; le titre (celui de la TRANSACTION, `OFFRES_CONV_SELECT`) n'est
+  qu'une contrainte EN PLUS. ⚠️ **Mesuré : `qui` est vide sur 248/248 offres** —
+  la règle ne fusionne donc rien aujourd'hui, et c'est voulu : sans acheteur,
+  rien ne prouve que c'est la même (§5, mieux vaut une ligne de trop qu'une
+  offre cachée). Conversations illisibles ⇒ rien n'est retiré.
+- **Prouvé** : `audit-offres-email.cjs` (22 contrôles) **9 rouges sur
+  d198bca** ; mutations `sansqui` 4 et `titreseul` 11 rouges. Bancs
+  `messagerie.cjs` (**6 rouges** sur le build de d198bca) et `filtre-compte.cjs`
+  (**1 rouge**) — tous verts après.
+
+**B. L'adresse de réception PROUVÉE** (le ⛔ « bloquant avant d'ouvrir VRM à des
+inconnus » du 6 octobre). **Mesuré** : `vrm_email_owners` = **une seule ligne,
+celle de Julien, 16 adresses** (11 icloud.com, 3 gmail.com, **2 relais Apple**
+`privaterelay.appleid.com`), aucun autre vendeur ; 0 email en quarantaine
+vivante ; aucun passage du collecteur partagé enregistré.
+- **Décidé — la preuve** (`api/_lib/preuve-adresse.js`, une règle §11) : un lien
+  part **à l'adresse déclarée**, par la boîte Gmail de VRM (le script
+  `gmail-forwarder.gs`, même canal que les factures Pro — aucun SMTP ici) ; le
+  clic, **depuis la session du vendeur qui l'a demandé**, range la preuve **côté
+  serveur**, sous le propriétaire NEUTRE (aucune session ne peut l'écrire ni la
+  lire). Le lien est un HMAC (clé dérivée de la clé de service) sur la ligne et
+  un aléa : lire la base ne suffit pas à le fabriquer ; un autre compte qui
+  l'ouvre ne trouve rien (404, sans dire qu'une demande existe) ; 72 h ; un
+  renvoi toutes les 10 min, 5 par adresse et 10 adresses par vendeur et par
+  jour ; confirmation par écriture CONDITIONNELLE (même aléa, encore en
+  attente). Seconde preuve, sans email : l'adresse est l'adresse de connexion
+  VRM du vendeur, confirmée **par un lien** par Supabase. Un relais Apple ne
+  reçoit que les emails de Vinted : « impossible », dit tel quel.
+- **Décidé — l'attribution** : base cloisonnée, `fusionnerRegistres` ne retient
+  une adresse déclarée que si elle est **prouvée pour CE vendeur** ; sinon
+  l'email part en quarantaine (jamais donné), et `peutReclamer` le rend dès la
+  preuve. Base non cloisonnée : inchangé. Preuves illisibles ⇒ 503 (« renvoie-le »).
+- ⚠️ **Décidé — la transition, et pourquoi sans date** : le **propriétaire de
+  l'installation** garde ses adresses déclarées, prouvées ou non (« à
+  confirmer »). Ses 16 adresses restent reçues, ses 2 relais Apple ne pourraient
+  jamais être prouvés, et l'exiger de lui ne protège personne (il a la clé de
+  service). Une date de fin aurait été un piège à retardement. Une adresse qu'il
+  partage avec un vendeur qui l'a PROUVÉE ne désigne personne (conflit →
+  quarantaine, la règle existante).
+- Routes : `email-rattacher` (`GET preuves`, `POST preuve-demander`,
+  `POST preuve-confirmer`, session exigée) ; `email-inbound` (modes script
+  `preuves-a-envoyer` / `preuve-envoyee`, derrière la clé ; un lien de
+  confirmation transféré dans un email entrant est retiré avant d'être rangé).
+  **Toujours 12 fonctions.** Le script n'aspire plus ses propres envois
+  (`-in:sent`).
+- App : Réglages → Mes adresses de réception dit l'état de chaque adresse
+  (prouvée · à confirmer · lien envoyé · lien périmé · impossible), « Renvoyer »
+  / « Confirmer » (adresse de connexion), l'explication UNE fois au-dessus
+  (§7) ; une adresse ajoutée demande son lien d'elle-même ; au retour du lien
+  (`?confirmer-adresse=`), un bandeau dit le résultat et mène au panneau.
+- **Prouvé** : `audit-preuve-adresse.cjs` exécute les vraies routes contre une
+  base à état — **40 contrôles, 22 rouges sur 28 sur d198bca** ; mutations
+  `sansgarde` 6, `autrecompte` 3, `jetonignore` 2, `pasSu` 3 rouges. Banc
+  `adresses-preuve.cjs` (port `BANC_PORT`, données inventées, 390 et 1512 px) :
+  **45 contrôles, 31 rouges** sur le build de d198bca. Les bancs et tests
+  existants (`audit-proprietaire-email` 61, `audit-email-rattacher` 48,
+  `capacite-securite`, `emails-mis-de-cote` 52, `double-vente-push` 28) servent
+  désormais un monde PROUVÉ — sans quoi le second vendeur de leurs scénarios
+  part, à raison, en quarantaine (deux contrôles ajoutés, aucun retiré).
+- ⚠️ **Non mesuré** : aucun email n'est réellement parti (Apps Script non
+  exécuté d'ici ; quota d'envoi Gmail non mesuré) ; le refus réel d'un relais
+  Apple ; les filtres `data->>etat=eq.attente&data->>nonce=eq.…` sur la vraie
+  base (forme PostgREST seulement). **Vu au passage, laissé tel quel** :
+  `sendQueuedInvoices` du script teste la constante `SECRET` au lieu de
+  `secretVRM()` ; `reglages-premium.cjs` rouge sur `main` (champ photo de
+  profil 230×18 à 390 px), sans lien avec ce chantier.
+- **Geste de Julien** : recoller `scripts/gmail-forwarder.gs` dans la boîte qui
+  fait tourner le script (clé `EMAIL_INBOUND_SECRET` dans ses propriétés) — sans
+  ça aucun lien ne part, et seule l'adresse de connexion d'un vendeur peut être
+  prouvée. Pour lui, rien d'autre : ses adresses restent reçues ; « Confirmer »
+  est facultatif.

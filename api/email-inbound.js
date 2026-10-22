@@ -25,7 +25,8 @@ import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
-import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { retenue, cleLiens, jetonLien, lienConfirmation, emailConfirmation, retirerLiensPreuve, PREFIXE_PREUVE } from './_lib/preuve-adresse.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
@@ -93,7 +94,10 @@ function normalizeInbound(body) {
   // ouvrir un email BRUT (MIME) et les formes emballées — ce que cette fonction
   // ne savait pas faire, d'où un email arrivé le 23 août avec expéditeur et
   // sujet vides, classé « ignoré », et perdu sans laisser de trace.
-  const m = normaliserEntrant(body);
+  const brut = normaliserEntrant(body);
+  // (22 oct.) Un lien de confirmation d'adresse transféré vers la boîte
+  // collective n'est jamais rangé lisible (`retirerLiensPreuve`).
+  const m = brut && typeof brut === 'object' ? { ...brut, text: retirerLiensPreuve(brut.text), html: retirerLiensPreuve(brut.html) } : brut;
   // ⚠️ L'expéditeur réel est écrit DANS `from`, à côté de l'alias iCloud.
   // Tous les tests d'expéditeur sont des tests par sous-chaîne (`/chronopost/`,
   // `/relay\.vinted/`, `/@team\.vinted/`) : leur rendre le vrai domaine lisible
@@ -583,6 +587,9 @@ async function garderInconnu(corpsBrut, mail, raison, famille) {
   try {
     let brut = '';
     try { brut = typeof corpsBrut === 'string' ? corpsBrut : JSON.stringify(corpsBrut); } catch (_) { brut = String(corpsBrut); }
+    // (22 oct.) Le corps BRUT aussi : un lien de confirmation d'adresse n'est
+    // jamais rangé lisible (`retirerLiensPreuve`).
+    brut = retirerLiensPreuve(brut);
     // Une famille reconnue n'a pas besoin d'être conservée en entier : on garde
     // de quoi l'identifier, pas de quoi peser (§34).
     const plafond = famille ? 2000 : 200000;
@@ -1171,6 +1178,29 @@ const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 // Exportée : `api/email-rattacher.js` juge une réclamation avec CE registre-là,
 // lu de la même façon (§11).
 let registreEmailsEnVol=null;
+// ── LES ADRESSES PROUVÉES (22 octobre) ─────────────────────────────────────
+// Lues sous le propriétaire NEUTRE (aucune session ne peut les écrire), toutes
+// pages comprises. Une page ratée ⇒ `null` : « pas su », et l'email est
+// renvoyé (503) plutôt qu'attribué ou mis de côté sur une lecture partielle.
+async function lirePreuvesProuvees() {
+  const preuves = new Map(), taille = 500;
+  for (let debut = 0; debut < 100 * taille; debut += taille) {
+    let r;
+    try {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.prouvee&select=id,owner:data->>owner,adresse:data->>adresse,etat:data->>etat&order=id.asc`, {
+        headers: { ...sbCle(SUPABASE_KEY), Range: `${debut}-${debut + taille - 1}`, 'Range-Unit': 'items' },
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (_) { return null; }
+    if (r.status === 416) return preuves;
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    for (const l of j) if (l && l.id) preuves.set(String(l.id), { owner: String(l.owner || ''), adresse: String(l.adresse || ''), etat: String(l.etat || '') });
+    if (j.length < taille) return preuves;
+  }
+  return null;
+}
 export async function lireRegistreEmails(cloisonnee) {
   if(cloisonnee!==true)return null;
   // Uniquement les lectures simultanées : aucun cache durable d'attribution.
@@ -1179,6 +1209,12 @@ export async function lireRegistreEmails(cloisonnee) {
   try{return await lecture;}finally{if(registreEmailsEnVol===lecture)registreEmailsEnVol=null;}
 }
 async function chargerRegistreEmails() {
+  // (22 oct.) Les preuves d'abord : sans elles, aucune adresse d'un vendeur ne
+  // peut être retenue — on ne décide rien (« pas su »).
+  const preuves=await lirePreuvesProuvees();
+  if(preuves===null)return null;
+  const garde={retenue:(adresse,owner)=>retenue(adresse,owner,{preuves,installation:process.env.VRM_OWNER_UID||''})};
+  const fusionnerRegistres=(l,c)=>fusionnerRegistresLib(l,c,garde);
   const lignes=[],vus=new Set(),taille=500;let debut=0;
   // Ordre stable et pages bornées : une adresse conflictuelle après la
   // millième ligne doit être détectée aussi. Jamais de résultat partiel.
@@ -1514,6 +1550,55 @@ export async function modeScript(mode, req, res) {
     if (!b || !['debut','succes','erreur'].includes(b.etat)) { res.status(400).json({ok:false,error:'passage-invalide'});return; }
     const result = await contexteVendeur.run({owner:PROPRIETAIRE_NEUTRE}, () => supabaseUpsert([{id:b.etat==='succes'?'vrm_email_collecteur_succes':'vrm_email_collecteur_passage',data:{at:new Date().toISOString(),etat:b.etat,version:3}}]));
     res.status(result?200:503).json({ok:!!result});return;
+  }
+  // ── LES LIENS DE CONFIRMATION D'ADRESSE (22 octobre) ──────────────────────
+  // La boîte VRM (script Gmail collectif) envoie les liens que les vendeurs ont
+  // demandés : ces modes valent pour TOUTE l'installation (lignes neutres), pas
+  // pour un vendeur. Le lien est fabriqué ICI (la clé ne quitte jamais le
+  // serveur) ; le script n'écrit rien lui-même, il envoie tel quel.
+  if (mode === 'preuves-a-envoyer' && req.method === 'GET') {
+    const cle = cleLiens(process.env.SUPABASE_SERVICE_KEY || '');
+    if (!cle) { res.status(503).json({ ok: false, error: 'cle-service' }); return; }
+    let lignes = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.attente&data->>envoyeLe=is.null&select=id,data&order=id.asc&limit=20`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
+    } catch (_) { lignes = null; }
+    if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    const maintenant = Date.now();
+    const envois = lignes.filter((l) => l && l.data && l.data.adresse && l.data.nonce && Date.parse(l.data.expire) > maintenant)
+      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien) }; });
+    res.status(200).json({ ok: true, envois });
+    return;
+  }
+  if (mode === 'preuve-envoyee' && req.method === 'POST') {
+    let corps = req.body;
+    try { if (typeof corps === 'string') corps = JSON.parse(corps); } catch (_) { corps = null; }
+    const id = String((corps && corps.id) || '');
+    if (!/^vrm_email_preuve_[0-9a-f]{40}$/.test(id)) { res.status(400).json({ ok: false, error: 'identifiant invalide' }); return; }
+    let lignes = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
+    } catch (_) { lignes = null; }
+    if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    const d = lignes[0] && lignes[0].data;
+    if (!d) { res.status(404).json({ ok: false, error: 'demande introuvable' }); return; }
+    // Prouvée entre-temps : rien à marquer (on ne la remet pas « en attente »).
+    if (d.etat !== 'attente') { res.status(200).json({ ok: true, deja: true }); return; }
+    // ⚠️ Écriture CONDITIONNELLE (`etat=attente` et le même aléa) : un clic sur
+    //    le lien entre la lecture et l'écriture ne doit jamais être défait.
+    let n = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&data->>etat=eq.attente&data->>nonce=eq.${encodeURIComponent(d.nonce || '')}`, {
+        method: 'PATCH', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ data: { ...d, envoyeLe: new Date().toISOString() } }),
+      });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) n = j.length; }
+    } catch (_) { n = null; }
+    if (n === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    res.status(200).json({ ok: true, ...(n ? {} : { deja: true }) });
+    return;
   }
   if (!proprietaireCourant() && cloisonneeScript) { res.status(503).json({ ok: false, error: 'vendeur-inconnu', message: "VRM_OWNER_UID n'est pas réglé : je ne sais pas à quelle boutique appartient cette boîte." }); return; }
 

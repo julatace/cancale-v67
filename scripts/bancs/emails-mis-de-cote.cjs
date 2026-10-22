@@ -97,6 +97,13 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
   const appels = [];
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
+    // (22 oct.) Les preuves d'adresse ont leur propre banc (adresses-preuve.cjs) :
+    // ici, un monde où chaque adresse déclarée est confirmée, et une demande de
+    // lien répond « envoi » — sans entrer dans les rattachements comptés plus bas.
+    if (/\/api\/email-rattacher\?mode=preuves/.test(u)) {
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, cloisonnee: true, installation: false, collecteur: { at: new Date().toISOString() }, adresses: Object.fromEntries(Object.keys(etat.registre).map((a) => [a.toLowerCase(), { etat: 'prouvee', via: 'lien' }])) }) });
+    }
+    if (/\/api\/email-rattacher\?mode=preuve-/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"etat":"envoi"}' });
     if (/\/api\/email-rattacher/.test(u)) {
       const m = r.request().method();
       let corps = null; try { corps = JSON.parse(r.request().postData() || 'null'); } catch (_) {}
