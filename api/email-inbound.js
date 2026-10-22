@@ -1,3 +1,5 @@
+import './_lib/sans-bruit.js';
+import {etatColisDepuisTexte,conserverRetrait} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
@@ -18,12 +20,11 @@ import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // contentType, content(base64)}] } — ce que renvoie un Worker Cloudflare.
 // ────────────────────────────────────────────────────────────────────────────
 
-import './_lib/sans-bruit.js';
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { stampBordereau } from './_lib/stamp.js';
 
-import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
+import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
@@ -151,12 +152,9 @@ async function repondre(res, code, corps) {
 
 async function supabaseUpsert(rows) {
   const owner = proprietaireCourant();
-  rows = owner
-    ? rows.map(r => ({ owner, ...r }))
-    // Sans vendeur résolu : le comportement d'avant (propriétaire de
-    // l'installation s'il est réglé, rien sinon) — voir api/_lib/owner.js.
-    : withOwnerAll(rows);
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${conflictTarget('id')}`, {
+  if (!owner) { marquerEcritureRatee(); return false; }
+  rows = rows.map(r => ({ ...r, owner }));
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
     method: 'POST',
     headers: {
       ...sbCle(SUPABASE_KEY),
@@ -717,12 +715,13 @@ const objetJson = (v) => {
 export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
   if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null };
-  const [mainL, reg, ebayL, lbcL, ventesL] = await Promise.all([
+  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc] = await Promise.all([
     lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
     lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
+    lirePagine('id=eq.lbc_accounts&select=accounts:data->accounts'),
   ]);
   // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
   if (!mainL) return { ebay: null, lbc: null };
@@ -738,10 +737,11 @@ export async function lireAnnoncesAilleurs() {
     if (fiches !== undefined && liensEbay !== undefined) ebay = annoncesEbayParNumero(ebayL, ids, mk, fiches || {}, liensEbay || {});
   }
   let lbc = null;
-  if (lbcL && ventesL && liens !== undefined) {
+  if (lbcL && ventesL && comptesLbc && liens !== undefined) {
     const items = lbcL[0] ? objetJson(lbcL[0].items) : null;
     const ventes = ventesL[0] ? objetJson(ventesL[0].ventes) : null;
-    if (items !== undefined && ventes !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk);
+    const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
+    if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
   }
   return { ebay, lbc };
 }
@@ -814,36 +814,10 @@ export function parseCarrierEmail(mail, carrier) {
   // (« venez récupérer votre colis », « à retirer avec ce code »…) qui font
   // matcher les motifs de « déjà retiré ».
   // Le SUJET, lui, dit l'état COURANT — c'est pour ça que le transporteur l'écrit.
-  const t = all.toLowerCase();
-  const suj = String(mail.subject || '').toLowerCase();
-  let status = 'info', label = 'Mise à jour';
-  // ⚠️⚠️ UNE CONFIRMATION DE DÉPÔT N'EST PAS UN COLIS QUI T'ATTEND.
-  // Mesuré le 31 août : le Mondial Relay `74950536` (« Votre colis est entre de
-  // bonnes mains 📦 », c'est-à-dire SA preuve de dépôt) était rangé en
-  // `available` — donc affiché comme un colis à aller chercher, puis promu en
-  // « colis jamais retiré, va le réclamer ». Cause : le sujet ne matchait rien,
-  // on retombait sur le CORPS, et le corps d'un email de dépôt contient
-  // « disponible » / « prêt » (le §5.43 en petit).
-  // Sur 128 lignes de suivi, **76 sont des colis sortants** : c'est la moitié du
-  // bruit de l'onglet Achats.
-  // ⚠️ On ne tranche que sur du CERTAIN (§24) : une confirmation de dépôt ne
-  // peut pas vouloir dire autre chose. Le reste garde le comportement d'avant.
-  const SUJ_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/;
-  const sortant = !!(suj && SUJ_SORTANT.test(suj));
-  const SUJ_RETIRE = /a\s+[ée]t[ée]\s+(?:retir[ée]|livr[ée]|remis)|colis\s+retir[ée]|livraison\s+de\s+votre\s+colis|bien\s+re[çc]u/;
-  const SUJ_DISPO  = /disponible|à\s+retirer|a\s+retirer|arriv[ée]\s+(?:en|au|dans)|vous\s+attend|pr[êe]t/;
-  if (sortant)                          { status = 'transit';  label = 'Colis déposé (ta vente)'; }
-  else if (suj && SUJ_RETIRE.test(suj))      { status = 'delivered'; label = 'Livré / retiré'; }
-  else if (suj && SUJ_DISPO.test(suj))  { status = 'available'; label = 'Arrivé au point de retrait'; }
-  else
-  // Priorité STRICTE : livré/retiré > disponible > en transit. Les trois sont
-  // mutuellement exclusifs — sinon un email « colis retiré » qui contient aussi
-  // l'historique du trajet (« déposé », « pris en charge », « acheminement »)
-  // était rétrogradé à « en transit » et le colis restait à retirer pour
-  // toujours (bug réel : confirmations de retrait Chronopost bloquées en transit).
-  if (/livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinataire|en\s+mains?)|vous\s+a\s+[ée]t[ée]\s+(?:remis|livr[ée])|(?:colis\s+)?a\s+(?:bien\s+)?[ée]t[ée]\s+retir[ée]|bien\s+retir[ée]|retir[ée]\s+(?:le|avec|par)|colis\s+retir[ée]|(?:vous\s+)?avez\s+(?:bien\s+)?retir[ée]|merci\s+d[e']?\s*avoir\s+(?:bien\s+)?(?:retir[ée]|r[ée]cup[ée]r[ée])|(?:vous\s+)?avez\s+(?:bien\s+)?r[ée]cup[ée]r[ée]|bien\s+r[ée]cup[ée]r[ée]|r[ée]cup[ée]r[ée]\s+(?:le|votre|avec)|r[ée]ceptionn[ée]|livraison\s+(?:effectu[ée]e|r[ée]ussie)/.test(t)) { status = 'delivered'; label = 'Livré / retiré'; }
-  else if (/disponible|à retirer|arriv[ée] (?:dans|en|au) point|pr[êe]t.*retrait/.test(t)) { status = 'available'; label = 'Arrivé au point de retrait'; }
-  else if (/acheminement|en transit|exp[ée]di[ée]|pris en charge|d[ée]pos[ée]|enregistr[ée]|en cours de livraison/.test(t)) { status = 'transit'; label = 'En transit'; }
+  const SUJ_SORTANT = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|d[ée]p[ôo]t de votre colis|colis est d[ée]pos[ée]|bordereau d.envoi/i;
+  const sortant=SUJ_SORTANT.test(String(mail.subject||''))&&!/point|relais|consigne/i.test(String(mail.subject||''));
+  const lu=etatColisDepuisTexte(mail.subject,txt);
+  let status=lu||'info',label=({delivered:'Livré / retiré',available:'Arrivé au point de retrait',transit:'En transit'})[lu]||'Mise à jour';
   // Anti-faux-colis : un vrai « colis disponible » a TOUJOURS un n° de suivi.
   // Sans suivi (emails pub « ton compte évolue », newsletters…), on ne compte
   // PAS comme un colis à retirer.
@@ -1196,16 +1170,51 @@ const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 // « installation ». « Rien lu » ne vaut pas « rien ».
 // Exportée : `api/email-rattacher.js` juge une réclamation avec CE registre-là,
 // lu de la même façon (§11).
+let registreEmailsEnVol=null;
 export async function lireRegistreEmails(cloisonnee) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=${cloisonnee ? 'owner,data' : 'data'}`, {
-      headers: { ...sbCle(SUPABASE_KEY) },
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    if (!Array.isArray(j)) return null;
-    return fusionnerRegistres(j, cloisonnee);
-  } catch (_) { return null; }
+  if(cloisonnee!==true)return null;
+  // Uniquement les lectures simultanées : aucun cache durable d'attribution.
+  if(registreEmailsEnVol)return registreEmailsEnVol;
+  const lecture=chargerRegistreEmails();registreEmailsEnVol=lecture;
+  try{return await lecture;}finally{if(registreEmailsEnVol===lecture)registreEmailsEnVol=null;}
+}
+async function chargerRegistreEmails() {
+  const lignes=[],vus=new Set(),taille=500;let debut=0;
+  // Ordre stable et pages bornées : une adresse conflictuelle après la
+  // millième ligne doit être détectée aussi. Jamais de résultat partiel.
+  for(let page=0;page<100;page++){
+    try {
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
+        headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
+        signal:AbortSignal.timeout(10000),
+      });
+      // À une frontière exacte, PostgREST peut répondre 416 plutôt qu'une
+      // page vide. Seul son total confirmé égal au nombre déjà lu conclut.
+      if(r.status===416){const fin=/^\*\/(\d+)$/.exec(r.headers?.get?.('content-range')||'');return debut>0&&fin&&Number(fin[1])===debut?fusionnerRegistres(lignes,true):null;}
+      if(!r.ok)return null;
+      const j=await r.json();if(!Array.isArray(j))return null;
+      for(const l of j){if(!l.owner||vus.has(l.owner))return null;vus.add(l.owner);lignes.push(l);}
+      // PostgREST peut imposer une limite plus basse que notre page. Son
+      // Content-Range prévaut alors sur la taille demandée ; on avance du
+      // nombre réellement lu, sans sauter les vendeurs suivants.
+      const plage=r.headers?.get?.('content-range');
+      const cr=plage&&/^(\d+)-(\d+)\/(\d+|\*)$/.exec(plage);
+      if(cr){
+        if(Number(cr[1])!==debut||Number(cr[2])-debut+1!==j.length)return null;
+        debut+=j.length;
+        if(cr[3]!=='*'){
+          if(debut>Number(cr[3]))return null;
+          if(debut===Number(cr[3]))return fusionnerRegistres(lignes,true);
+        }
+      }else{
+        if(plage){const fin=/^\*\/(\d+|\*)$/.exec(plage);if(!fin||j.length!==0||(fin[1]!=='*'&&Number(fin[1])!==debut))return null;}
+        if(j.length<taille)return fusionnerRegistres(lignes,true);
+        debut+=j.length;
+      }
+      if(j.length===0)return fusionnerRegistres(lignes,true);
+    }catch(_){return null;}
+  }
+  return null;
 }
 
 // Email non attribuable : on le garde ENTIER, avec la raison et les adresses
@@ -1218,7 +1227,7 @@ export async function lireRegistreEmails(cloisonnee) {
 // déclaré son adresse d'arrivée (`peutReclamer`).
 // Base non cloisonnée (une seule boutique) : on n'arrive jamais ici (voir
 // l'appel), et la forme d'avant reste.
-async function mettreEnQuarantaine(mail, adresses, raison, cloisonnee) {
+async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     // Les adresses aussi en UNE chaîne : la base ne copie dans `meta` que les
@@ -1245,13 +1254,13 @@ async function mettreEnQuarantaine(mail, adresses, raison, cloisonnee) {
         pieces: (mail.attachments || []).map(a => ({ filename: a.filename, contentType: a.contentType })),
       },
     };
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST',
       headers: {
         ...sbCle(SUPABASE_KEY),
         'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify(cloisonnee ? [{ owner: PROPRIETAIRE_NEUTRE, ...ligne }] : withOwnerAll([ligne])),
+      body: JSON.stringify([{ ...ligne, owner: PROPRIETAIRE_NEUTRE }]),
     });
     if (!r || !r.ok) marquerEcritureRatee();
   } catch (_) { marquerEcritureRatee(); }
@@ -1493,7 +1502,7 @@ export async function modeScript(mode, req, res) {
   }
   if (!ok) { res.status(401).json({ ok: false, error: 'clé invalide' }); return; }
   const cloisonneeScript = await baseCloisonnee();
-  if (cloisonneeScript === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+  if (cloisonneeScript !== true) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
   if(mode === 'reception-diagnostic' && req.method === 'GET'){
     const registre = await lireRegistreEmails(cloisonneeScript);
     if(registre===null){res.status(503).json({ok:false,error:'registre-illisible'});return;}
@@ -1546,6 +1555,9 @@ export async function modeScript(mode, req, res) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader?.('Cache-Control','no-store');
+  const preuve=cleValide(req);
+  if(preuve!==true){res.status(preuve===null?503:401).json({ok:false,error:preuve===null?'cle-non-configuree':'clé invalide'});return;}
   const mode = String((req.query && req.query.mode) || '');
   if (mode) return contexteVendeur.run({ owner: process.env.VRM_OWNER_UID || '' }, () => modeScript(mode, req, res));
   return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));
@@ -1563,7 +1575,8 @@ export async function traiterEmail(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
   // Garde-fou : clé secrète partagée avec le service de réception.
-  if (cleValide(req) === false) { res.status(401).json({ error: 'clé invalide' }); return; }
+  const preuve=cleValide(req);
+  if(preuve!==true&&!req.__ownerForce){res.status(preuve===null?503:401).json({ok:false,error:preuve===null?'cle-non-configuree':'clé invalide'});return;}
 
   let mail, corpsBrut;
   try {
@@ -1573,10 +1586,9 @@ export async function traiterEmail(req, res) {
     const contexte = contexteVendeur.getStore();if(contexte){contexte.messageId=mail.messageId || '';contexte.empreinteEmail=empreinteEmail(corpsBrut);}
   }
   catch (_) {
-    // Même un corps illisible est conservé : c'est la seule façon de savoir
-    // ensuite ce qui n'est pas passé.
-    await garderInconnu(req.body, null, 'corps illisible');
-    await repondre(res, 200, { ok: false, error: 'corps illisible' }); return;
+    // Pas de rangement chez le propriétaire de l'installation si l'identité
+    // n'est pas résolue ; le collecteur conserve le message pour réessayer.
+    res.status(400).json({ok:false,error:'corps illisible'});return;
   }
 
   // ── À QUEL VENDEUR CET EMAIL APPARTIENT-IL ? ──────────────────────────────
@@ -1589,7 +1601,7 @@ export async function traiterEmail(req, res) {
   // vendeur non. (Base sans colonne `owner` : une seule boutique, rien à
   // protéger, on garde le comportement d'avant.)
   const cloisonnee = req.__ownerForce ? true : await baseCloisonnee();
-  if (cloisonnee === null) {
+  if (cloisonnee !== true) {
     console.log('[email-inbound] base injoignable (sonde de cloisonnement) — email à renvoyer');
     await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu savoir à quelle boutique appartient cet email : le serveur de données ne répond pas. Ne le supprime pas, renvoie-le." });
     return;
@@ -1607,18 +1619,8 @@ export async function traiterEmail(req, res) {
     ? { owner: String(req.__ownerForce), via: 'rattachement' }
     : resoudreProprietaire(adresses, registre, process.env.VRM_OWNER_UID || '', (lu && lu.conflits) || []);
   { const st = contexteVendeur.getStore(); if (st) st.owner = proprio.owner || ''; }
-  // ⚠️⚠️ INCIDENT DU 16 AU 22 AOÛT — À NE JAMAIS REFAIRE.
-  // La quarantaine (§5.16) a été posée AVANT que la base sache séparer les
-  // vendeurs. `VRM_OWNER_UID` n'étant pas réglé en production, chaque email
-  // tombait à l'étape 4 de `resoudreProprietaire` → quarantaine. Résultat :
-  // **593 emails mis de côté en six jours**, zéro traité — dont « Votre colis
-  // Chronopost est arrivé en consigne Pickup ». Julien n'avait plus ses codes
-  // de retrait, et un colis non retiré repart chez l'expéditeur.
-  //
-  // LA RÈGLE : la quarantaine n'a de sens QUE si la base peut séparer les
-  // vendeurs. Tant que la colonne `owner` n'existe pas, il n'y a qu'une seule
-  // boutique et une seule ligne `main` : rien à protéger, donc rien à mettre de
-  // côté. On traite l'email exactement comme avant §5.16.
+  // Le destinataire inconnu est conservé sous le propriétaire neutre.
+  // Aucune écriture métier ni notification avant résolution de son vendeur.
   if (proprio.owner && mail.messageId) {
     const suivi = contexteVendeur.getStore();
     suivi.reception = { adresses:adresses.filter(a=>resoudreProprietaire([a],registre,'',(lu&&lu.conflits)||[]).owner===proprio.owner).slice(0,20), messageId:mail.messageId, subject:String(mail.subject || '').slice(0,300), from:String(mail.from || '').slice(0,200), receivedAt: new Date().toISOString(), sourceDate: /^\d{4}-/.test(String(corpsBrut?.sourceDate||'')) && Number.isFinite(Date.parse(corpsBrut.sourceDate)) ? new Date(corpsBrut.sourceDate).toISOString() : null };
@@ -1627,7 +1629,7 @@ export async function traiterEmail(req, res) {
     // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa
     // raison ; l'app le signale et permet de le rattacher. Un email égaré se
     // répare, un email livré au mauvais vendeur non.
-    await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué', true);
+    await mettreEnQuarantaine(mail, adresses, proprio.raison || 'non attribué');
     await repondre(res, 200, { ok: true, quarantaine: true, raison: proprio.raison, adresses });
     return;
   }
@@ -1667,9 +1669,11 @@ export async function traiterEmail(req, res) {
       // (21 oct.) La ligne d'avant est relue aussi pour un colis « disponible » :
       // sa DATE D'ARRIVÉE (`arriveLe`) ne doit pas être remplacée par celle d'un
       // rappel (« Libère de la place… », « Le temps file… »).
-      let prevLigne = null;
+      const lecturePrecedente=await supabaseLireRow(rowId);
+      if(!lecturePrecedente.lu){marquerEcritureRatee();await repondre(res,503,{ok:false,erreur:'base-injoignable'});return;}
+      let prevLigne = lecturePrecedente.data || null;
       if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
-        const prev = await supabaseGetRow(rowId);
+        const prev = prevLigne;
         prevLigne = prev || null;
         if (prev) {
           if (!qr.qrB64 && prev.qrB64) { qr.qrB64 = prev.qrB64; qr.qrType = prev.qrType; }
@@ -1682,9 +1686,11 @@ export async function traiterEmail(req, res) {
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
         }
       }
+      Object.assign(track,conserverRetrait(prevLigne,track));
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
-        statusLabel: track.label, subject, receivedAt: now,
+        statusLabel: track.label, subject:prevLigne?.status==='delivered'?prevLigne.subject||subject:subject, receivedAt: now,
+        ...(track.status==='delivered'?{retireLe:prevLigne?.status==='delivered'?(prevLigne.retireLe||prevLigne.receivedAt||now):now}:{}),
         ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,

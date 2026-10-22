@@ -64,7 +64,7 @@ function faireCtx() {
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
-  vm.createContext(ctx); vm.runInContext(BG, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  vm.createContext(ctx); vm.runInContext(BG, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken; // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   return ctx;
 }
 const venteEcrite = () => { const w = ecrits.find((r) => r.id === 'lbc_ventes'); return w ? w.data.ventes : null; };

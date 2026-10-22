@@ -50,7 +50,7 @@ const B = '99999999-8888-7777-6666-555555555555';   // second vendeur
 process.env.VRM_OWNER_UID = A;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
-delete process.env.EMAIL_INBOUND_SECRET;
+process.env.EMAIL_INBOUND_SECRET='cle-banc-notifications';
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
@@ -150,7 +150,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
   const inbound = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js'));
   const libPush = await import('file://' + path.join(RACINE, 'api', '_lib', 'push.js'));
   let libAcces = {}; try { libAcces = await import('file://' + path.join(RACINE, 'api', '_lib', 'abonnement.js')); } catch (_) {}
-  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
+  const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-notifications'}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
   const reset = () => {
     base.clear(); pannes = []; acces = {}; pushes.length = 0;
     if (typeof libPush.oublierPrefsVues === 'function') libPush.oublierPrefsVues();
@@ -158,8 +158,8 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     if (typeof libAcces.oublierAcces === 'function') libAcces.oublierAcces();
     pose(A, 'vrm_email_owners', { adresses: { 'a@vrm.test': { owner: A } } });
     pose(B, 'vrm_email_owners', { adresses: { 'b@vrm.test': { owner: B } } });
-    pose(A, 'push_subs', { subs: [{ endpoint: 'https://push.test/A-iphone' }] });
-    pose(B, 'push_subs', { subs: [{ endpoint: 'https://push.test/B-iphone' }] });
+    pose(A, 'push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/A-iphone' }] });
+    pose(B, 'push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/B-iphone' }] });
     pose(A, 'main', { vinted_annonce_numeros: {} });
     pose(B, 'main', { vinted_annonce_numeros: {} });
   };

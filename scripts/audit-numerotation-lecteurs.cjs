@@ -343,7 +343,7 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     global.fetch = async (url) => {
       const u = decodeURIComponent(String(url)); lus.push(u);
       const rep = (b, s = 200) => ({ ok: s < 400, status: s, json: async () => b, text: async () => JSON.stringify(b) });
-      if (/select=owner&limit=1/.test(u)) return rep({ message: 'column app_data.owner does not exist' }, 400);
+      if (/select=owner&limit=1/.test(u)) return rep([]);
       if (/select=mk:/.test(u)) return BASE.mkKo ? rep({ message: 'boom' }, 500) : rep([{ mk: BASE.mk }]);
       if (/select=f:/.test(u)) return rep([{ f: BASE.f }]);
       if (/select=data->vinted_annonce_numeros/.test(u)) return rep([{ vinted_annonce_numeros: BASE.f }]);
@@ -353,7 +353,8 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     fs.writeFileSync(tmp, ROUTE);
     let route;
     try { route = await import('file://' + tmp); } finally { try { fs.unlinkSync(tmp); } catch (_) {} }
-    const nd = route.numeroDEmail;
+    const {contexteVendeur}=await import('../api/_lib/owner.js');
+    const nd = (...args)=>contexteVendeur.run({owner:'11111111-2222-4333-8444-555555555555'},()=>route.numeroDEmail(...args));
     let r = await nd('230', 'Nike Air n230', { title: 'Nike Air', size: '42' });
     dit(r.numero === '' && r.numeroTitre === '230', 'bordereau d\'une paire republiée sous « … n230 » : rien n\'est tamponné, 230 gardé à part', JSON.stringify(r));
     r = await nd('', 'Puma Suede', { title: 'Puma Suede', size: '' });

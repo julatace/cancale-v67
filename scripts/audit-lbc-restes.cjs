@@ -69,7 +69,7 @@ function fond(seed, local0) {
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx); vm.runInContext(SRC, ctx, { filename: 'background.js' });
-  ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 });
+  ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken;
   const envoyer = (msg) => new Promise((res) => {
     let fini = false; const r = (v) => { if (!fini) { fini = true; res(v); } };
     let async_ = false;
@@ -225,25 +225,18 @@ const DETAIL = { id: 77, updated_at: '2026-10-02T10:00:00.000Z', sent_at: '2026-
   });
 
   console.log('\n── 4. BASCULE DE COMPTE DANS LE MÊME ONGLET : « MES ANNONCES » JAMAIS SOUS L’ANCIEN COMPTE');
-  await essaie('page : compteur de CE document', async () => {
-    const reseau = (u) => (u.includes('/counter') ? { status: 200, body: { userId: 'x', unread: 0, pollingTime: 30 } } : u === MYADS ? { status: 200, body: MYADS_BODY } : null);
-    // Nouveau document : « mes annonces » arrive AVANT le compteur.
-    const p = page(reseau);
-    await p.charge(MYADS);
-    const avant = p.posts.filter((m) => m.kind === 'lbcraw');
-    dit(avant.length === 0, 'avant le compteur de ce document, la liste n’est pas envoyée (elle attend)', avant.length + ' envoi(s)');
-    await p.charge(COMPTEUR(NEW));
-    const apres = p.posts.filter((m) => m.kind === 'lbcraw');
-    dit(apres.length === 1 && apres[0].session === NEW, 'au compteur, elle part avec CE compte', JSON.stringify(apres.map((m) => m.session)));
-    // Compteur puis liste : immédiat.
-    const q = page(reseau);
-    await q.charge(COMPTEUR(NEW)); await q.charge(MYADS);
-    const qq = q.posts.filter((m) => m.kind === 'lbcraw');
-    dit(qq.length === 1 && qq[0].session === NEW, 'compteur déjà relu dans ce document ⇒ elle part tout de suite avec lui');
-    // Deux comptes dans le même document : plus rien n'est attribué.
-    const r = page(reseau);
-    await r.charge(COMPTEUR(OLD)); await r.charge(COMPTEUR(NEW)); await r.charge(MYADS);
-    dit(r.posts.filter((m) => m.kind === 'lbcraw').length === 0, 'deux comptes vus dans le même document ⇒ rien n’est attribué');
+  await essaie('page : identité privée de CE document', async () => {
+    let identite=NEW;
+    const prive=API+'/account/v2/members/me/account';
+    const reseau=u=>u===prive?{status:200,body:{account:{account_id:identite,type:'private'},member:{account_id:identite,nickname:{value:'Mon compte'}}}}:u.includes('/counter')?{status:200,body:{unread:0}}:u===MYADS?{status:200,body:MYADS_BODY}:{status:200,body:{}};
+    const pg=page(reseau);await pg.charge(MYADS);
+    dit(!pg.posts.some(m=>m.kind==='lbcraw'),'sans identité du document : la liste attend');
+    await pg.charge(API+'/messaging/proxy/api/hal/'+NEW+'/counter');
+    dit(!pg.posts.some(m=>m.kind==='lbcraw'),'un compteur ne suffit pas à attribuer les annonces');
+    await pg.charge(prive);
+    dit(pg.posts.some(m=>m.kind==='lbcraw'&&m.session==='lbc-account:'+NEW),'la réponse privée attribue la liste en attente au compte explicite');
+    pg.posts.length=0;identite=OLD;await pg.charge(prive);await pg.charge(MYADS);
+    dit(!pg.posts.some(m=>m.kind==='lbcraw'),'deux identités privées dans le même document : aucune nouvelle attribution');
   });
   await essaie('fond : le compte de la page, jamais le dernier vu', async () => {
     // Le fond croit encore au compte d'AVANT (bascule) ; la liste arrive avec le compte de la page.

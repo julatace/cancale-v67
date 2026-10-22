@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « SESSION AU RÉVEIL » et « MORCEAU PÉRIMÉ » (18 octobre).
 //

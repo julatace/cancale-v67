@@ -35,10 +35,12 @@
 //   · 503 `erreur: 'pas-su'`        — la base n'a pas répondu : rien n'est
 //     affirmé (ni « personne », ni « refusé ») ;
 //   · 4xx `erreur: <raison>`        — un refus RÉEL, dit en clair.
+import {lierPhotoAuProfil,retirerPhotoDeCarte,ajouterPhotosPersonnelles} from './profil-avatar.js';
 import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
 import { discordConfigure, lirePreuve } from './discord.js';
+import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord} from './avatar-discord.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -165,19 +167,21 @@ export const DISCORD_COMPTE_ID = 'vrm_discord';
 const SB_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 async function lireDiscordCompte(owner, qui) {
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&select=discord:data->>discord,at:data->>at`, { headers: qui });
+    const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&select=discord:data->>discord,at:data->>at,avatar:data->>avatar,pid:data->>pid,signatureAvatar:data->>signatureAvatar`, { headers: qui });
     if (!r.ok) return undefined;
     const rows = await r.json();
     if (!Array.isArray(rows)) return undefined;
     const d = rows[0] && String(rows[0].discord || '');
-    return d && discordValide(d) ? { discord: d, at: rows[0].at || null } : null;
+    return d && discordValide(d) ? { discord: d, at: rows[0].at || null,avatar:rows[0].avatar||'',pid:rows[0].pid||'',signatureAvatar:rows[0].signatureAvatar||'' } : null;
   } catch (_) { return undefined; }
 }
-async function rangerDiscordCompte(owner, qui, d) {
+async function rangerDiscordCompte(owner, qui, d, preuve = null) {
+  const identite=lireIdentiteDiscord(preuve,owner,d),avatar=urlAvatarDiscord(identite);
+  const photo=avatar?{avatar,pid:"",signatureAvatar:signerAvatarPublic(owner,d,"",avatar)}:{};
   try {
     const r = await fetch(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...qui, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ owner, id: DISCORD_COMPTE_ID, data: { v: 1, discord: d, verifie: true, at: new Date().toISOString() } }]),
+      body: JSON.stringify([{ owner, id: DISCORD_COMPTE_ID, data: { v: 2, discord: d, verifie: true, ...photo, at: new Date().toISOString() } }]),
     });
     return r.ok;
   } catch (_) { return false; }
@@ -187,6 +191,14 @@ async function effacerDiscordCompte(owner, qui) {
     const r = await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}`, { method: 'DELETE', headers: { ...qui, Prefer: 'return=minimal' } });
     return r.ok;
   } catch (_) { return false; }
+}
+
+async function lierAvatarAuProfil(owner,qui,moi){
+  if(!moi?.pid)return;
+  const d=await lireDiscordCompte(owner,qui);
+  if(!d||!avatarPublicVerifie(owner,d)||d.discord!==moi.discord||d.pid===moi.pid)return;
+  const data={v:2,...d,verifie:true,pid:moi.pid,signatureAvatar:signerAvatarPublic(owner,d.discord,moi.pid,d.avatar)};
+  try{await fetch(`${SB_URL}/rest/v1/app_data?id=eq.${DISCORD_COMPTE_ID}&owner=eq.${encodeURIComponent(owner)}&data->>signatureAvatar=eq.${d.signatureAvatar}`,{method:'PATCH',headers:{...qui,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({data}),signal:AbortSignal.timeout(6000)});}catch(_){}
 }
 
 const objet = (v) => (v && typeof v === 'object' ? v : null);
@@ -208,7 +220,11 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (!carte) return refus('session');
     if (carte.acces === false) return refus('abonnement');
     if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
-    const c2 = { moi: objet(carte.moi), profils: carte.profils };
+    await lierAvatarAuProfil(utilisateur.id,qui,objet(carte.moi));
+    await lierPhotoAuProfil(utilisateur.id,objet(carte.moi)?.pid).catch(()=>{});
+    const profils=await ajouterPhotosPersonnelles(await ajouterAvatars(carte.profils));
+    const moi=objet(carte.moi);
+    const c2 = { moi: moi?{...moi,avatar:profils.find(p=>p.pid===moi.pid)?.avatar||''}:null, profils };
     if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
     return dire(200, { ok: true, carte: c2, conversations: l.data, discordConnexion: discordConfigure() });
   }
@@ -237,6 +253,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   if (action === 'quitter') {
     const d = await appel('vrm_communaute_quitter', {}, (x) => typeof x === 'boolean');
     if (d === undefined) return;
+    if(d)await retirerPhotoDeCarte(utilisateur.id).catch(()=>{});
     return dire(200, { ok: true, retire: d });
   }
   if (action === 'ecrire') {
@@ -282,7 +299,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     const d = String((corps && corps.discord) || '').trim().toLowerCase();
     if (!discordValide(d) || !lirePreuve(corps && corps.preuve, utilisateur.id, d))
       return dire(400, { ok: false, erreur: 'preuve', message: 'Ce lien Discord a expiré ou ne vient pas de toi : reconnecte-toi avec Discord.' });
-    if (!(await rangerDiscordCompte(utilisateur.id, qui, d))) return pasSu();
+    if (!(await rangerDiscordCompte(utilisateur.id, qui, d, corps.preuve))) return pasSu();
     // Déjà sur la carte ? On y met aussi le pseudo (la 019 refuse sinon : « invisible », sans effet).
     const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
     const carte = r.etat === 'ok' && objet(r.data) && r.data.ok === true;
@@ -312,7 +329,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     const r = await rpcEquipe('vrm_communaute_discord', { p_discord: d }, qui);
     if (r.etat === 'absent') return dire(503, { ok: false, erreur: 'non-installe', message: CLASSEMENT_NON_INSTALLE.replace('Le classement', 'Le pseudo Discord') });
     if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
-    if (r.data.ok === true) await rangerDiscordCompte(utilisateur.id, qui, d);   // relié aussi au compte (Mon compte)
+    if (r.data.ok === true) await rangerDiscordCompte(utilisateur.id, qui, d, corps.preuve);   // relié aussi au compte (Mon compte)
     return r.data.ok === true ? dire(200, { ok: true, discord: r.data.discord || null }) : refus(String(r.data.raison || 'inconnue'));
   }
   if (action === 'inscrire') {
@@ -337,8 +354,9 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (c.acces === false) return refus('abonnement');
     if (c.erreur === 'groupe') return refus('groupe', 404);
     if (!Array.isArray(c.lignes) || !Number.isFinite(Number(c.n))) return pasSu();
+    const photos=await ajouterPhotosPersonnelles(await ajouterAvatars([...c.lignes,...(c.moi?[c.moi]:[])]));
     return dire(200, { ok: true, classement: { periode: c.periode, debut: c.debut, fin: c.fin, n: Number(c.n), inscrit: c.inscrit === true,
-      visible: c.visible === true, moi: objet(c.moi), lignes: c.lignes, groupe: c.groupe || null } });
+      visible: c.visible === true, moi: c.moi?photos[photos.length-1]:null, lignes: photos.slice(0,c.lignes.length), groupe: c.groupe || null } });
   }
   if (action.startsWith('groupe-')) {
     const nonInst = () => dire(503, { ok: false, erreur: 'non-installe', message: GROUPES_NON_INSTALLE });

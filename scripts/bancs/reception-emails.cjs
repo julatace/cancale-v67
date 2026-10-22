@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // Banc réel de la réception, données synthétiques, aucun accès production.
 const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;
@@ -29,7 +30,7 @@ const srv = http.createServer((q, r) => {
 //   (le registre que l'app vient d'écrire) — prioritaire sur `liste`.
 // `registre` : les adresses que la lecture RLS de `vrm_email_owners` rend.
 // `vues` : les lignes `email_inconnu_*` (`to`, `quand`) que la session lit.
-async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'settings', viewport = { width: 1512, height: 950 } }) {
+async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'settings', confidentialite = true, viewport = { width: 1512, height: 950 } }) {
   const ctx = await nav.newContext({ viewport });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -65,6 +66,7 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
   let suiviPanne=false;
   await pg.route('**/api/**', (r) => {
     const u = r.request().url();
+    if(u.includes('mode=confidentialite'))return r.fulfill({status:confidentialite===true?200:503,contentType:'application/json',body:JSON.stringify(confidentialite===true?{ok:true,uid:SESSION.user.id}:{ok:false,raison:confidentialite===false?'separation-non-confirmee':'verification-indisponible'})});
     if (u.includes('mode=reception')) return r.fulfill({status:suiviPanne?503:200,contentType:'application/json',body:JSON.stringify(suiviPanne?{ok:false}:SUIVI)});
     if (/\/api\/email-rattacher/.test(u)) {
       const m = r.request().method();

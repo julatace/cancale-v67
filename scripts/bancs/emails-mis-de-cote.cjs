@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LES EMAILS MIS DE CÔTÉ SE LISENT PAR LA ROUTE (6 octobre)
 //        node scripts/bancs/emails-mis-de-cote.cjs

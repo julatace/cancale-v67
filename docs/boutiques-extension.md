@@ -259,3 +259,35 @@ jamais proposé**.
   API `cookies` et Safari < 18).
 - WebKit (Playwright) n'est pas installé dans ce conteneur : les scripts de
   contenu n'ont pas été exécutés dans WebKit.
+
+## Correctif Leboncoin 5.207.0 — 22 octobre 2026
+
+Le capteur MAIN démarrait à `document_start`, son relais isolé seulement à `document_idle`. Une réponse de session reçue entre les deux ne parvenait jamais au background : aucun compte ne pouvait être enregistré sur cette réponse. Le relais est maintenant un fichier dédié lancé à `document_start`. Un échange de disponibilité dans les deux sens couvre les deux ordres d'injection. Le capteur rejoue ses réponses en attente (mémoire seulement, 64 messages / 4 millions de caractères maximum), avec un numéro technique pour éviter les doublons. Les interfaces de dépôt restent démarrées à leur moment habituel.
+
+Le test navigateur `scripts/bancs/lbc-demarrage.cjs` échoue avec l'ancien capteur : identification reçue avant le relais perdue. Il réussit avec le nouveau, capteur avant/après relais, réinjection et accusé répété sans doublon. Aucun appel supplémentaire à Leboncoin, aucune écriture de production, aucune récupération de cookie ajoutés.
+
+Les audits de session, comptes, données restantes, compteurs de messages, détails de transactions, compatibilité navigateurs et liaison VRM sont conservés. Ils ne remplacent pas une vérification sur une vraie session Leboncoin : aucune session utilisateur Leboncoin n'est accessible dans l'environnement de développement. La mise à jour du dossier de l'extension et le rechargement des onglets Leboncoin restent nécessaires : une extension décompressée ne reçoit pas les nouveaux scripts depuis le site.
+
+## Suite 5.208.0 — session reconnue sans pseudo et reprise d'envoi
+
+Retour utilisateur : 5.207 installée mais carte « pas encore reconnu » et « rien envoyé » sur toutes les pages. Trois défauts supplémentaires corrigés : l'état de la carte exigeait un pseudo même quand un identifiant de session était connu ; les XHR `responseType=json` et les appels fetch avec un objet URL n'étaient pas lus ; la session était marquée envoyée pour six heures même après un échec de stockage. Le marqueur est maintenant posé après un succès seulement, et le prochain événement peut reprendre l'envoi.
+
+Un diagnostic local distingue relais présent / capteur MAIN actif sur l'onglet courant, sans compte, email, contenu de message ni jeton. Il propose un geste précis lorsque la session n'est toujours pas lue. Cela ne transforme pas une absence de données en succès.
+
+Périmètre constaté : comptes et annonces/photos, ventes et étapes de transactions déjà prises en charge par leurs parseurs. Le module de messages Leboncoin actuel ne collecte que les compteurs ; la lecture et la réponse aux conversations complètes ne sont pas implémentées. Les formats réels des achats/codes et messages complets doivent être vérifiés sur une session autorisée avant de promettre « tout capté ». Aucune session utilisateur Leboncoin n'est disponible ici. Ne pas annoncer cette version comme une capture exhaustive validée en production.
+
+## 5.209 — priorité à l'attribution correcte, pas à une capture exhaustive
+
+Retour utilisateur : données incorrectes et mauvais compte dans VRM. Régressions reproduites sur 5.208 : le badge reprenait le dernier compte global d'un autre onglet ; deux compteurs différents dans un onglet remplaçaient arbitrairement la session ; `lbcCapture` acceptait un compte extrait du DOM et ses annonces sans preuve de session ; un acheteur avec email sur un endpoint `/users/me/conversations` pouvait être identifié comme compte courant.
+
+La carte lit maintenant le compte relevé dans SON onglet ; plusieurs identités dans le même document rendent l'attribution ambiguë et aucune session courante n'est choisie. Un nouveau document remet ce contexte à zéro. Les captures DOM non confirmées sont refusées ; les listes privées continuent via le canal réseau attribué au compte du même document. La détection d'identité est limitée aux endpoints de session et de comptes liés, pas aux acheteurs des conversations. L'app parle de « dernier compte relevé », pas de compte actuellement connecté.
+
+Le test exécute l'ancien code et reproduit quatre échecs, puis valide les protections et un changement légitime de compte après rechargement. Ces protections ne prouvent PAS que le compte réel de l'utilisateur est désormais lu, ni que les données historiques déjà mal attribuées sont corrigées. Aucune donnée de production n'a été supprimée ou réattribuée. Demande de précision en cours : autre compte personnel Leboncoin ou compte appartenant à un tiers ; le second cas exige de poursuivre l'audit d'isolation VRM comme incident, sans supposer que c'est seulement un cache.
+
+## 5.210 — conservation des photos et anciennes attributions
+
+Les annonces peuvent arriver dans plusieurs réponses partielles : une mise à jour sans image effaçait les photos déjà connues. Le rangement conserve maintenant les anciennes photos quand aucune nouvelle URL valide n'a été lue. Les formats chaîne, listes d'URL et objets d'images Leboncoin sont normalisés ; seules les URL HTTPS Leboncoin sans identifiants sont gardées. Le titre et les autres informations peuvent continuer à être mis à jour.
+
+Une ancienne valeur `lbcUser` n'est plus acceptée seule comme preuve d'appartenance. Son compte doit avoir été confirmé par une session/vente, selon les mêmes règles dans l'app, l'extension et les alertes du serveur. Le serveur lit les comptes confirmés du vendeur concerné ; une lecture impossible ne produit pas de rapprochement. Les liens/références explicites restent traités comme avant. Aucun prix ni calcul de bénéfice modifié, aucune suppression/réattribution de données historiques.
+
+Validation : 140 tests unitaires, build, audits session/comptes/ventes/restes, double vente/places, 28 contrôles de notification double vente avec deux vendeurs, ZIP, sans bruit et en-têtes. Test natif préparé dans `scripts/bancs/extension-leboncoin-installee.cjs` : chargement de l'extension réelle, service worker, scripts isolés, base et pages simulées. Il n'a PAS pu être exécuté ici : Chromium répond « Loading of unpacked extensions is disabled by the administrator » ; le téléchargement d'un navigateur de test est aussi refusé par la politique réseau (403). Aucune politique n'a été contournée. Ne pas annoncer ce test natif comme réussi, ni la capture du compte réel de l'utilisateur comme vérifiée.

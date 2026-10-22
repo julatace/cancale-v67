@@ -7,7 +7,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
-import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, cloisonnee } from './_lib/push.js';
+import {nettoyerAbonnementPush} from './_lib/abonnement-push.js';
+import { loadSubs, modifierSubs, sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
@@ -28,12 +29,11 @@ const PAS_ECRIT = { erreur: 'base-injoignable', message: "Je n'ai pas pu enregis
 const SANS_SESSION = { erreur: 'session', message: "Reconnecte-toi à VRM, puis réactive les notifications sur cet appareil." };
 
 export default async function handler(req, res) {
-  let owner = '';
-  if (await cloisonnee()) {
-    const u = await utilisateurDe(req);
-    if (!u) { res.status(401).json(SANS_SESSION); return; }
-    owner = u.id;
-  }
+  res.setHeader?.('Cache-Control','no-store');
+  const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ erreur: 'connexion-injoignable', message: "Le service de connexion ne répond pas — rien n'est activé, réessaie dans un instant." }); return; }
+  if (!u) { res.status(401).json(SANS_SESSION); return; }
+  const owner = u.id;
   return contexteVendeur.run({ owner }, () => traiter(req, res));
 }
 
@@ -82,7 +82,7 @@ async function traiter(req, res) {
       return;
     }
     if (body.action === 'subscribe') {
-      const sub = body.sub;
+      const sub = nettoyerAbonnementPush(body.sub);
       if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }
       const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub]));
       if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
@@ -113,6 +113,6 @@ async function traiter(req, res) {
 
     res.status(400).json({ error: 'action inconnue' });
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    res.status(500).json({ error: 'Erreur interne. Réessaie dans un instant.' });
   }
 }

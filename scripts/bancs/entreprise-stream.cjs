@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // BANC — SIRET → nom de l'entreprise dans l'en-tête, et le MODE STREAM qui
 // floute partout (17 octobre, Julien).
 //

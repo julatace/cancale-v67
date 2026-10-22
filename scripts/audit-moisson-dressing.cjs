@@ -186,7 +186,7 @@ function monter({ lignes, etat, onglets }) {
   f.ctx.activeUidForDomain = async () => { etat.lectures = (etat.lectures || 0) + 1; const v = etat.cookie; if (etat.bascule && etat.lectures === etat.bascule.apres) etat.cookie = etat.bascule.vers; return v || null; };
   f.ctx.activeAccountId = async () => etat.cookie || null;
   f.ctx.isCloisonne = async () => true;
-  f.ctx.authToken = async () => (etat.session ? { access_token: 'session_vrm', user_id: 'PROPRIO', expires_at: Date.now() + 3600e3 } : null);
+  f.ctx.authToken = async () => (etat.session ? { access_token: 'session_vrm', user_id: 'PROPRIO', expires_at: Date.now() + 3600e3 } : null); f.ctx.loadSession=f.ctx.authToken;
   const dressingDe = (k) => (f.lignes[`harvest_${k}_listings`] || {});
   const lectDressing = (k) => req.filter((x) => x.compte === k && /\/wardrobe\//.test(x.chemin)).length;
   const avance = (ms) => { f.ctx.__decalage += ms; };

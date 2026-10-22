@@ -24,7 +24,22 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const post = (payload) => { try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {} };
+  const CAPTEUR_VERSION='5.211.0';
+  // Le monde MAIN peut précéder le relais isolé, même à document_start.
+  // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
+  let relaisPret=false,sequence=0,octetsAttente=0;
+  const attente=[];
+  const post = (payload) => {
+    const m=Object.assign({__tag:TAG,__vrmSequence:++sequence},payload);
+    if(!relaisPret){const taille=JSON.stringify(m).length;if(taille<=1500000){attente.push({m,taille});octetsAttente+=taille;while(attente.length>64||octetsAttente>4000000)octetsAttente-=attente.shift().taille;}}
+    try{window.postMessage(m,'*');}catch(_){}
+  };
+  try{window.addEventListener('message',event=>{
+    if(event.source!==window||event.data?.__tag!=='CANCALE_LBC_RELAY'||event.data.kind!=='pret')return;
+    if(!relaisPret)try{window.postMessage({__tag:'CANCALE_LBC_CAPTEUR',kind:'actif',version:CAPTEUR_VERSION},'*');}catch(_){}
+    relaisPret=true;for(const {m} of attente.splice(0))try{window.postMessage(m,'*');}catch(_){}octetsAttente=0;
+  });window.postMessage({__tag:'CANCALE_LBC_CAPTEUR',kind:'pret',version:CAPTEUR_VERSION},'*');}catch(_){}
+
 
   // Une réponse « intéressante » = du JSON qui parle d'annonces. On reste large
   // (Leboncoin a plusieurs endpoints) mais on évite le bruit (pub, tracking).
@@ -265,36 +280,48 @@
     } finally { detailEnCours = false; }
   };
 
-  // ── LE COMPTE DE CE DOCUMENT (20 oct., 5.196) ─────────────────────────────
-  // Changer de compte Leboncoin recharge la page : « mes annonces » du nouveau
-  // compte peut arriver AVANT le compteur de messagerie (seule preuve du compte
-  // connecté), et le fond, qui gardait l'ancien compte, la rangeait sous
-  // l'ancien. ⇒ Une liste « à moi » ne part qu'avec le compte du compteur relu
-  // DANS CE DOCUMENT : relu avant elle ⇒ elle part tout de suite avec lui ; pas
-  // encore relu ⇒ elle attend le premier compteur de ce document (90 s au plus,
-  // sinon elle est jetée — la prochaine visite la reprendra) ; deux comptes
-  // différents dans le même document ⇒ plus rien n'est attribué ici.
+  // Attribution des listes : identité privée du compte, dans ce document.
+  // Les compteurs restent lisibles mais ne déclenchent plus l'envoi des annonces.
+  // Les listes attendent jusqu'à 90 secondes ; deux identités privées différentes
+  // dans le même document bloquent toute nouvelle attribution.
   const MOI_LISTE = /(\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list)/i;
   let sessDoc = '', basculeDoc = false;
   const listesEnAttente = [];
   const noterCompteurDoc = (id) => {
+    if(comptePriveDoc)return;
     if (!sessDoc) {
       sessDoc = id;
-      while (listesEnAttente.length) { const x = listesEnAttente.shift(); clearTimeout(x.t); post({ kind: 'lbcraw', url: x.url, body: x.body, session: id }); }
+      // Les listes attendent l'identité privée ; un compteur n'en est pas la preuve.
     } else if (id !== sessDoc && !basculeDoc) {
       basculeDoc = true;
-      while (listesEnAttente.length) clearTimeout(listesEnAttente.shift().t);
+      // On conserve les listes en attente pour une éventuelle identité privée.
     }
   };
   const posterListeMoi = (url, body) => {
-    if (basculeDoc) return;                                   // deux comptes ici : rien d'attribué
-    if (sessDoc) { post({ kind: 'lbcraw', url, body, session: sessDoc }); return; }
+    if (basculeDoc && comptePriveDoc) return;
+    if (comptePriveDoc) { post({ kind: 'lbcraw', url, body, session: sessDoc }); return; }
     if (listesEnAttente.length >= 3) clearTimeout(listesEnAttente.shift().t);
     const x = { url, body, t: 0 };
     x.t = setTimeout(() => { const i = listesEnAttente.indexOf(x); if (i >= 0) listesEnAttente.splice(i, 1); }, 90000);
     listesEnAttente.push(x);
   };
 
+
+  let comptePriveDoc='';
+  const sessionPrivee=(url,text)=>{
+    let u,j;try{u=new URL(url,location.origin);j=JSON.parse(text);}catch(_){return false;}
+    if(u.username||u.password||u.origin!=='https://api.leboncoin.fr'||!/^\/api\/account\/v\d+\/members\/me\/account\/?$/.test(u.pathname))return false;
+    const a=j?.account,m=j?.member,id=String(a?.account_id||''),nom=m?.nickname?.value;
+    if(!['string','number'].includes(typeof a?.account_id)||!['string','number'].includes(typeof m?.account_id)||!/^[a-z0-9_-]{1,64}$/i.test(id)||String(m?.account_id||'')!==id||typeof nom!=='string'||!nom.trim())return false;
+    const cle='lbc-account:'+id;
+    const preuve={account:{account_id:id,type:typeof a.type==='string'?a.type:''},member:{account_id:id,nickname:{value:nom.slice(0,60)}}};
+    post({kind:'lbcsessionprivee',url:u.origin+u.pathname,preuve});
+    if(comptePriveDoc&&comptePriveDoc!==cle){basculeDoc=true;return true;}
+    if(!comptePriveDoc)basculeDoc=false;
+    comptePriveDoc=cle;sessDoc=cle;
+    while(listesEnAttente.length){const x=listesEnAttente.shift();clearTimeout(x.t);if(!basculeDoc)post({kind:'lbcraw',url:x.url,body:x.body,session:cle});}
+    return true;
+  };
   // ── LA DATE DES VENTES (20 oct., 5.196) ────────────────────────────────────
   // La date de VENTE n'est que dans la LISTE des transactions (`created_at`) ;
   // le détail n'en porte aucune. Une vente ouverte directement (un lien, une
@@ -341,14 +368,15 @@
     } finally { relectureListes = false; }
   };
 
-  const handle = (url, text, ctype) => {
+  const handle = (url, text, ctype, statut = 200) => {
     try {
-      if (NOISE.test(url)) return;
+      if (NOISE.test(url)||statut<200||statut>=300) return;
       if (!text || text.length > 1500000) return;
       if (ctype && !/json/i.test(ctype)) return;
       if (!DE_LEBONCOIN(url)) return;                       // ni pub, ni tiers
       // ⚠️ Un jeton de connexion temps réel : rien, nulle part, pas même ses clés.
       if (/\/realtime\/credentials/i.test(url)) return;
+      if(sessionPrivee(url,text))return;
       noteSchema(url, text);                                // la structure, jamais les valeurs
       // ── LA MESSAGERIE (4 octobre) : SEULEMENT LE NOMBRE DE NON-LUS ─────────
       // Julien : « dans Leboncoin, il y ait les messages ». Mesuré : la page
@@ -395,7 +423,7 @@
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
-      const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      const url = (typeof input === 'string') ? input : (input instanceof URL ? input.href : (input && input.url) || '');
       const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
       // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
@@ -413,7 +441,7 @@
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
             noteSeen(url, meth, res.status, ct);
-            res.clone().text().then((t) => handle(url, t, ct)).catch(() => {});
+            res.clone().text().then((t) => handle(url, t, ct, res.status)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -434,8 +462,8 @@
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
-            const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t) handle(url, t, ct);
+            const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
+            if (t) handle(url, t, ct, this.status);
           } catch (_) {}
         });
       } catch (_) {}

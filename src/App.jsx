@@ -1,8 +1,17 @@
+import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
+import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
+import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
+import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import {achatDuColis,suivisAchat} from './liensColis.js';
+import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
+import PorteConfidentialite from './PorteConfidentialite.jsx';
+import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
 import SuiviReceptionEmails from './ReceptionEmails.jsx';
 import RecusEmail from "./RecusEmail.jsx";
 import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
+import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
@@ -76,7 +85,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.204.0';
+const EXT_ATTENDUE = '5.211.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -371,7 +380,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.204.0', retraitnotif: '5.204.0' };
+const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -583,7 +592,13 @@ const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const writeSession = (s) => {
-  if (!s || (s.user?.id && s.user.id !== readSession()?.user?.id)) vuesSession.clear();
+  if (AUTH.user?.id !== s?.user?.id) {
+    vuesSession.clear(); _prechargeComptes=null;
+    _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
+    Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
+    try { window.__vrmLecturesPartagees?.invalider(); } catch (_) {}
+  }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
@@ -666,7 +681,7 @@ const sbAuth = (extra) => {
   // à CLOISONNE faisait lire en anonyme dès que la sonde de schéma échouait —
   // et une base cloisonnée répond alors `[]` sans erreur (boutique « vide »).
   const useUser = MULTI_USER && AUTH.session && AUTH.session.access_token;
-  const tok = useUser ? AUTH.session.access_token : SUPABASE_KEY;
+  const tok = useUser ? AUTH.session.access_token : (MULTI_USER ? 'session-vrm-requise' : SUPABASE_KEY);
   // Jeton qui expire dans la minute : on lance le renouvellement (partagé) sans
   // attendre — la lecture suivante partira avec le jeton frais.
   if (useUser && AUTH.session.refresh_token && !(AUTH.session.expires_at > Date.now() + 60000)) {
@@ -686,11 +701,29 @@ const sbAuth = (extra) => {
 // Une valeur déjà posée par l'appelant gagne (elle est plus précise que la nôtre).
 const withOwner = (row) => {
   const base = Object.assign({ updated_at: new Date().toISOString() }, row);
-  return (CLOISONNE && AUTH.user) ? Object.assign({ owner: AUTH.user.id }, base) : base;
+  return (CLOISONNE && AUTH.user) ? Object.assign({}, base, { owner: AUTH.user.id }) : base;
 };
 
 // Ce que le studio photo reçoit pour lire et écrire SA ligne (`studio_photos_{N°}`) :
 // la même session, le même propriétaire, la même clé de conflit que le reste (§11).
+async function lireBordereauxAuto(owner) {
+  if (!owner || owner !== AUTH.user?.id) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_bordereaux_auto&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth() });
+  if (!r.ok) throw Error('Lecture impossible');
+  const rows = await r.json();
+  return rows.length === 1 && rows[0]?.data?.active === true;
+}
+async function sauverBordereauxAuto(owner, active) {
+  if (!owner || owner !== AUTH.user?.id || !CLOISONNE) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    method: 'POST', headers: sbAuth({'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation'}),
+    body: JSON.stringify({id:'vrm_bordereaux_auto',owner,data:{active:active === true},updated_at:new Date().toISOString()})
+  });
+  if (!r.ok) throw Error('Enregistrement impossible');
+  const rows = await r.json();
+  if (rows.length !== 1 || rows[0]?.data?.active !== active) throw Error('Enregistrement non confirmé');
+}
+
 const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
 // ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
@@ -702,9 +735,12 @@ const authCall = async (path, body) => {
   if (protege && !jetonCaptcha()) return { ok: false, status: 0, captcha: true, error: etatCaptcha().statut === 'erreur' ? MSG_CAPTCHA_ERREUR : MSG_CAPTCHA_ATTENTE };
   const corps = corpsAvecCaptcha(path, body);
   if (protege) consommerCaptcha();
+  const controle = new AbortController();
+  const delai = setTimeout(() => controle.abort(), 20000);
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
       method: 'POST',
+      signal: controle.signal,
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
     });
@@ -716,7 +752,8 @@ const authCall = async (path, body) => {
       return { ok: false, status: res.status, error: brut };
     }
     return { ok: true, status: res.status, json };
-  } catch (e) { return { ok: false, status: 0, error: 'Pas de connexion internet.' }; }
+  } catch (e) { return { ok: false, status: 0, error: e.name === 'AbortError' ? 'Le serveur met trop de temps à répondre. Réessaie dans un instant.' : 'La connexion au serveur a été interrompue. Réessaie.' }; }
+  finally { clearTimeout(delai); }
 };
 
 // ── OÙ RAMÈNENT LES LIENS DES EMAILS DE COMPTE (5 octobre) ─────────────────
@@ -732,7 +769,7 @@ const authCall = async (path, body) => {
 //    d'aujourd'hui, rien ne casse. Régler les deux est un geste de Julien
 //    (tableau de bord Supabase), voir CLAUDE.md.
 const retourEmail = () => { try { const o = window.location.origin; return /^https?:\/\//.test(o) ? o : ''; } catch (_) { return ''; } };
-const avecRetour = (chemin) => { const r = retourEmail(); return r ? `${chemin}${chemin.includes('?') ? '&' : '?'}redirect_to=${encodeURIComponent(r)}` : chemin; };
+const avecRetour = (chemin, page = '') => { const origine = retourEmail(); const r = origine ? origine + page : ''; return r ? `${chemin}${chemin.includes('?') ? '&' : '?'}redirect_to=${encodeURIComponent(r)}` : chemin; };
 
 // Le jeton d'accès expire vite (≈1 h). On le renouvelle en silence avec le
 // jeton de renouvellement — sinon l'app se déconnecterait toute seule en
@@ -961,6 +998,7 @@ const mapMailError = (err) => {
 const authSignUp  = async (email, password) => {
   const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password });
   if (!r.ok) {
+    if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
     // exceeded » ne veut rien dire pour quelqu'un qui essaie juste de créer un
     // compte, alors que la cause est précise et la solution simple.
@@ -969,14 +1007,15 @@ const authSignUp  = async (email, password) => {
     else if (/rate limit/i.test(r.error)) msg = MAIL_QUOTA;
     else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse email est refusée par le serveur.';
     else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
-    return { ok: false, error: msg };
+    return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un email VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
   }
+  if(!r.json?.access_token && !r.json?.id && !r.json?.user?.id)return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
   return { ok: true, needsConfirm: true };
 };
-const authReset   = (email) => authCall(avecRetour('recover'), { email: String(email).trim().toLowerCase() });
+const authReset   = (email) => authCall(avecRetour('recover', '/recuperation.html'), { email: String(email).trim().toLowerCase() });
 
 // ── CONNEXION AVEC GOOGLE / DISCORD (OAuth, méthode PKCE) ─────────────────
 // Comment ça marche : on n'échange JAMAIS de mot de passe. On envoie le vendeur
@@ -1013,7 +1052,7 @@ const OAUTH_PROVIDERS = [
 let AUTH_SETTINGS = null;
 const loadAuthSettings = async () => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY },signal:AbortSignal.timeout(15000) });
     if (r.ok) { AUTH_SETTINGS = await r.json(); _emitAuth(); }  // réveille l'écran de connexion
   } catch (_) {}
   return AUTH_SETTINGS;
@@ -1026,6 +1065,7 @@ const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfi
 
 const oauthStart = async (provider) => {
   try {
+    try{sessionStorage.removeItem('vrm_oauth_liaison');localStorage.removeItem('vrm_oauth_liaison');}catch(_){}
     const verifier = makeVerifier();
     sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
     // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
@@ -1039,6 +1079,13 @@ const oauthStart = async (provider) => {
     window.location.href = url;
     return { ok: true };
   } catch (e) { return { ok: false, error: "Impossible d'ouvrir la connexion " + provider + '.' }; }
+};
+
+const lireConnexionsOAuth = async()=>{
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?j.identities.map(i=>i.provider):null;}catch(_){return null;}
+};
+const oauthRelier = async provider => {
+  try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier)});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
 };
 
 // Au retour du fournisseur. Deux formes possibles :
@@ -1056,11 +1103,12 @@ const consumeAuthRedirect = async () => {
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
+  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
 
   const code = q.get('code');
   if (code) {
-    let verifier = sessionStorage.getItem(PKCE_KEY);
+    const liaison=lireLiaisonOAuth(sessionStorage,localStorage);
+    let verifier = liaison?.verifier || sessionStorage.getItem(PKCE_KEY);
     sessionStorage.removeItem(PKCE_KEY);
     try {
       const o = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
@@ -1071,8 +1119,9 @@ const consumeAuthRedirect = async () => {
     if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
     const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
     if (!r.ok) return { error: r.error };
+    if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
     writeSession(sessionFrom(r.json));
-    return { ok: true };
+    return { ok: true, liaison:liaison?.provider };
   }
 
   const at = hash.get('access_token');
@@ -1192,7 +1241,7 @@ const OWNER_MARK = 'vrm_local_owner';
 const ensureLocalOwner = (uid) => {
   try {
     const prev = localStorage.getItem(OWNER_MARK);
-    if (prev && prev !== uid) wipeLocalData();          // ce n'était pas toi → on repart propre
+    if (prev !== uid) wipeLocalData();          // ce n'était pas toi → on repart propre
     if (prev !== uid) localStorage.setItem(OWNER_MARK, uid);
   } catch (_) {}
 };
@@ -1248,10 +1297,12 @@ const authBoot = async () => {
 // Un échec rend `null` comme avant (`fetchVintedAccounts`) : AppCoeur dit la panne,
 // jamais « aucun compte ». Le préchargement n'est repris qu'une fois, par le même
 // vendeur, dans les 30 s ; sinon AppCoeur relit.
+let _confidentialiteUid='';
 let _prechargeComptes = null;   // { at, qui, promesse }
 const prechargerDemarrage = () => {
   try {
     if (typeof window === 'undefined' || _prechargeComptes) return;
+    if(MULTI_USER&&(!AUTH.user?.id||_confidentialiteUid!==AUTH.user.id))return;
     if (MULTI_USER) {
       if (RECOVERY_PENDING) return;
       const session = !!(AUTH.session && AUTH.session.access_token && AUTH.user);
@@ -1873,13 +1924,15 @@ let _pendingBordPrint = false;
 // j'y envoie les données de ce navigateur » — un appareil périmé pouvait donc
 // RÉÉCRIRE le nuage sur un simple 502. Rien lu ne vaut pas rien.
 const cloudLoad = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return undefined;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&select=data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=owner,data`, {
       headers: sbAuth(),
     });
     if (!res.ok) return undefined;
     const rows = await res.json();
-    if (!Array.isArray(rows)) return undefined;
+    if (!Array.isArray(rows) || rows.length>1 || rows.some(r=>r.owner!==owner) || AUTH.user?.id!==owner) return undefined;
     if (rows[0] && rows[0].data) return rows[0].data;
     return null;
   } catch (_) { return undefined; }
@@ -1921,11 +1974,14 @@ const ALLEGER_AVANT_CLOUD = {
 let _pushBloque = false;
 let _prefixeRetente = false;
 const cloudPush = () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token || !CLOISONNE) return;
   if (!isCloudReady()) { _pushPending = true; return; } // verrou 1 : cloud pas encore chargé
   if (_pushBloque) { _emitSync('refus'); return; }
   if (_cloudTimer) clearTimeout(_cloudTimer);
   _emitSync('saving');
   _cloudTimer = setTimeout(async () => {
+    if (AUTH.user?.id !== owner || readSession()?.user?.id !== owner) return;
     try {
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
@@ -1967,8 +2023,10 @@ onCloudReady(() => { if (_pushPending) { _pushPending = false; cloudPush(); } })
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
 const save = (k,v) => {
+  const owner = AUTH.user?.id;
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   _saveTimers[k] = setTimeout(() => {
+    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; return; }
     try { localStorage.setItem(k,JSON.stringify(v)); } catch {}
     delete _saveTimers[k];
     // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
@@ -1977,6 +2035,20 @@ const save = (k,v) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
+
+// localStorage est partagé entre les onglets : le changement de vendeur
+// doit fermer l'ancien écran avant toute autre sauvegarde différée.
+window.addEventListener('storage', e => {
+  if (e.key !== SESSION_KEY && e.key !== null) return;
+  const prochaine=readSession();
+  if (AUTH.user?.id !== prochaine?.user?.id) {
+    vuesSession.clear(); _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
+    Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
+    AUTH={...AUTH,session:prochaine,user:prochaine?.user||null,ready:true};
+    _emitAuth(); location.reload();
+  }
+});
 
 // ============ COMPTES VINTED CONNECTES DIRECTEMENT (API interne) ============
 // Un compte Vinted est capture par l'extension Chrome "Shop Cancale35 - Vinted
@@ -2023,14 +2095,17 @@ const sondeLectureSansCompte = async () => {
 };
 
 const fetchVintedAccounts = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return null;
+  const filtre = `&owner=eq.${encodeURIComponent(owner)}`;
   try {
     const [res, blk] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*`, { headers: sbAuth() }),
-      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, { headers: sbAuth() }),
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_blocked_accounts&select=data${filtre}`, { headers: sbAuth() }),
     ]);
     if (!res.ok) return null;                 // la base a répondu autre chose qu'une liste
     let list = await res.json();
-    if (!Array.isArray(list)) return null;     // 522 Cloudflare : c'est du HTML, pas du JSON
+    if (!Array.isArray(list) || list.some(a=>a.owner!==owner) || AUTH.user?.id!==owner) return null; // 522 Cloudflare : c'est du HTML, pas du JSON
     // ⚠️ COMPTES SUPPRIMÉS DÉFINITIVEMENT (liste vrm_blocked_accounts) : ils ne
     // doivent JAMAIS réapparaître, même si l'extension les re-capte tant qu'ils
     // sont connectés dans Chrome (cas shop_cancale, qui « revenait tout le
@@ -2041,7 +2116,7 @@ const fetchVintedAccounts = async () => {
     if (blocked.size) {
       const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
-      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
+      reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}${filtre}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
     return list;
   } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
@@ -3033,11 +3108,10 @@ const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinatai
 // était bien arrivé au point relais. On le rétablit ici depuis le SUJET.
 const TRACK_AVAILABLE_RE = /disponible|à\s*retirer|arriv[ée]\s+(?:dans|en|au)\s+point|pr[êe]t.*retrait|vous\s+attend/i;
 const reclassifyTrack = (d) => {
-  if (!d || d.status === 'delivered') return d;
-  const s = `${d.subject || ''} ${d.statusLabel || ''}`;
-  if (TRACK_DELIVERED_RE.test(s)) return { ...d, status: 'delivered', statusLabel: 'Livré / retiré' };
-  // Colis « disponible » mal classé « en transit » (avec n° de suivi) → à retirer.
-  if (d.status !== 'available' && (d.suivi || '').trim() && TRACK_AVAILABLE_RE.test(s)) return { ...d, status: 'available', statusLabel: 'Arrivé au point de retrait' };
+  if(!d)return d;
+  const etat=etatColisDepuisTexte(d.subject||d.sujet||'',d.statusLabel||'');
+  if(etat==='delivered')return {...d,status:'delivered',statusLabel:'Livré / retiré'};
+  if(etat==='available'&&d.status!=='delivered'&&normaliserSuivi(d.suivi))return {...d,status:'available',statusLabel:'Arrivé au point de retrait'};
   return d;
 };
 // ⚠️ LES EMAILS QUE L'APP N'A PAS SU LIRE (posé le 23 août 2026).
@@ -6735,7 +6809,7 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
@@ -11422,12 +11496,6 @@ const BrandMark = ({ id }) => id === 'google' ? (
   </svg>
 );
 
-// Empreinte SHA-256 du code d'accès de secours. ⚠️ Le CODE lui-même n'est nulle
-// part dans le dépôt : une empreinte ne se remonte pas. Il a été remis au
-// propriétaire en main propre. Pour le changer : recalculer l'empreinte avec
-// `echo -n "<nouveau code>" | shasum -a 256` et remplacer la ligne ci-dessous.
-const CODE_ACCES_HASH = 'abe463733a572f979547b38c378eadd7f35c273d81acee0b7f35cca551e7e426';
-
 // Les documents légaux (public/legal/*.html) : liens discrets, sur l'écran de
 // connexion (accessibles SANS compte, comme la loi l'exige) et dans Réglages.
 const DOCS_LEGAUX = [
@@ -11577,8 +11645,6 @@ function AuthScreen() {
     (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
     return () => { stop = true; };
   }, []);
-  const [codeAcces, setCodeAcces] = React.useState('');
-  const [codeErr, setCodeErr] = React.useState('');
   // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
@@ -11608,6 +11674,7 @@ function AuthScreen() {
 
   const submit = async (e) => {
     e && e.preventDefault();
+    if(busy)return;
     setErr(''); setInfo('');
     if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
     if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
@@ -11622,6 +11689,7 @@ function AuthScreen() {
       } else if (mode === 'reset') {
         const rr = await authReset(email);
         if (rr && rr.captcha) { setErr(rr.error); return; }
+        if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un email, utilise le lien le plus récent.');return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
         setInfo("Si un compte existe avec cet email, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
@@ -11631,8 +11699,9 @@ function AuthScreen() {
         // on n'invente pas un prénom vide (§5 : mieux vaut un blanc qu'un faux).
         try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
-        if (!r.ok) setErr(r.error);
-        else if (r.needsConfirm) setInfo("Compte créé ! Ouvre l'email de confirmation qu'on vient de t'envoyer, puis reviens te connecter.");
+        if (!r.ok) { if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
+        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton email, puis connecte-toi ici : inutile de quitter cette page.'); }
+        else location.reload();
       } else {
         const r = await authSignIn(email, pw);
         if (!r.ok) { setErr(r.error); setNeedConfirm(!!r.needsConfirm); }
@@ -11775,7 +11844,7 @@ function AuthScreen() {
           )}
           {mode!=='newpw' && (
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-              value={email} onChange={e=>setEmail(e.target.value)} style={{...field, marginBottom:9}}/>
+              value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');}} style={{...field, marginBottom:9}}/>
           )}
           {mode!=='reset' && (
             <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
@@ -11784,8 +11853,8 @@ function AuthScreen() {
           )}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
-          {err  && <div style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
-          {needConfirm && (
+          {err  && <div role="alert" style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
               <div style={{marginTop:8,fontSize:11.5,color:C.muted,lineHeight:1.5}}>
@@ -11824,8 +11893,9 @@ function AuthScreen() {
               </div>
             </div>
           )}
-          {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
+          {info && <div role="status" aria-live="polite" style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
+          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Le lien ne s’ouvre pas dans Safari ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
           <button type="submit" data-auth-valider="" disabled={busy||attendCaptcha} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:(busy||attendCaptcha)?'default':'pointer',opacity:(busy||attendCaptcha)?0.6:1,fontFamily:'inherit'}}>
             {busy ? '…' : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
@@ -11868,51 +11938,6 @@ function AuthScreen() {
           </div>
         </form>
         <LiensLegaux/>
-        {/* ⚠️⚠️ CETTE PORTE ÉTAIT GRANDE OUVERTE SUR INTERNET.
-            Elle existait pour une bonne raison (§12) : personne ne doit se
-            retrouver enfermé hors de son propre outil parce qu'un email de
-            confirmation n'arrive pas. Mais c'était un bouton « Entrer sans
-            compte », visible de TOUT LE MONDE, sur une adresse publique — et
-            comme la base n'est pas encore cloisonnée, un clic donnait accès à
-            l'intégralité de la boutique : ventes, achats, noms d'acheteurs,
-            codes de retrait, comptes Vinted reliés.
-            Elle demande maintenant un CODE. L'empreinte du code est dans le
-            code source, le code lui-même n'y est pas : une empreinte SHA-256
-            ne se remonte pas. Les appareils qui sont DÉJÀ entrés gardent leur
-            accès (le drapeau vit dans leur navigateur) — donc personne n'est
-            enfermé dehors, et un inconnu n'entre plus.
-            ⚠️ Ceci reste un pansement : le vrai correctif est la migration RLS
-            (SECURITE.md). Cette porte disparaît d'elle-même le jour où elle
-            passe. */}
-        {!CLOISONNE && (
-          <details style={{marginTop:12}}>
-            <summary style={{listStyle:'none',cursor:'pointer',fontSize:12,color:C.muted,textAlign:'center'}}>
-              Entrer avec un code d'accès
-            </summary>
-            <form onSubmit={async (e)=>{
-              e.preventDefault();
-              const saisi = String(codeAcces||'').trim().toLowerCase();
-              if(!saisi) return;
-              try {
-                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(saisi));
-                const hex = [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
-                if (hex === CODE_ACCES_HASH) { localStorage.setItem('vrm_acces_direct','1'); location.reload(); }
-                else setCodeErr('Code incorrect.');
-              } catch(_) { setCodeErr("Ce navigateur ne sait pas vérifier le code."); }
-            }} style={{marginTop:8}}>
-              <input value={codeAcces} onChange={e=>{setCodeAcces(e.target.value);setCodeErr('');}}
-                placeholder="code d'accès" autoComplete="off" spellCheck={false}
-                style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,background:C.bg,
-                  color:C.text,borderRadius:10,padding:'11px 12px',fontSize:13,fontFamily:'inherit'}}/>
-              {codeErr && <div style={{color:C.danger,fontSize:11.5,marginTop:6}}>{codeErr}</div>}
-              <button type="submit"
-                style={{width:'100%',marginTop:8,border:`1px dashed ${C.border}`,background:'transparent',color:C.muted,
-                  borderRadius:10,padding:'11px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                Entrer
-              </button>
-            </form>
-          </details>
-        )}
         {/* ⚠️⚠️ CETTE PHRASE AFFIRMAIT UNE PROTECTION QUE `CLOISONNE` NE MESURE
             PAS. `CLOISONNE` dit seulement que la colonne `owner` EXISTE — et la
             migration autorise explicitement de s'arrêter là (« garde RLS
@@ -24613,7 +24638,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // L'extension l'a LU dans le profil Vinted : c'est la preuve la plus forte,
     // elle passe avant la liste locale (un refus 403 vu par cet appareil).
     if (evLu && evLu.etat === 'banni') return { etat: 'bad', source: 'extension', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: `Vinted le dit lui-même dans le profil du compte (lu par l'extension${evQuand ? ` le ${evQuand}` : ''}). Rien n'est masqué tout seul : masque-le si tu ne veux plus voir ses annonces.` };
-    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403) : il est bloqué ou fermé. Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
+    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Accès refusé', color: C.warn, hint: 'Vinted a refusé un accès à ce compte. Ce refus ne suffit pas à confirmer un blocage : reconnecte ce compte sur Vinted pour actualiser son état.' };
     // (16 oct.) Julien : « juste s'il est actif ou banni, l'extension doit
     // évaluer l'état du compte ». Deux états sur la pastille ; la fraîcheur de
     // la capture n'est plus une alerte, seulement une ligne grise (`ago`).
@@ -24621,6 +24646,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     const ageH = cap ? (Date.now() - cap) / 3600000 : null;
     const ago = ageH == null ? 'pas encore capté' : ageH < 1 ? 'capté il y a moins d\'une heure' : ageH < 48 ? `capté il y a ${Math.round(ageH)} h` : `capté il y a ${Math.round(ageH / 24)} j`;
     const lu = evLu ? ` · état lu par l'extension${evQuand ? ` le ${evQuand}` : ''}` : '';
+    if (!evLu) return { etat: 'inconnu', source: '', ic: 'info', label: 'État non vérifié', color: C.muted, hint: `Le statut de ce compte n'a pas encore pu être confirmé. Ouvre ce compte sur Vinted avec l'extension connectée pour l'actualiser · ${ago}.`, ago };
     return { etat: 'ok', source: evLu ? 'extension' : '', ic: 'check', label: 'Actif', color: C.text, hint: `Compte actif · ${ago}${lu}.`, ago };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).
@@ -25635,11 +25661,11 @@ const isColisRetirable = (t, collected, envoyes) => isColisActive(t, collected, 
 const suivisRetires = (tracking) => {
   const s = new Set();
   for (const t of (tracking || [])) {
-    if (t && t.status === 'delivered' && t.suivi) s.add(String(t.suivi).trim().toUpperCase());
+    if (t && t.status === 'delivered' && t.suivi) s.add(normaliserSuivi(t.suivi));
   }
   return s;
 };
-const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(String(t.suivi).trim().toUpperCase()));
+const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(normaliserSuivi(t.suivi)));
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
@@ -29476,6 +29502,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la lecture a échoué — la photo hors ligne (src/journeeHorsLigne.js) attend
   // une lecture réussie.
   const [colisRelaisLu, setColisRelaisLu] = useState(false);
+  const [indexSuivisAchats,setIndexSuivisAchats]=useState({});
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -29593,7 +29620,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // trop se voit au comptoir, un colis caché est un colis perdu.
     const normCode = (c) => codeRetrait(String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''));
     const codesEmail = new Set(emailList.map(t => normCode(t.code)).filter(Boolean));
-    const extra = vintedToPickup.filter(o => { const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
+    const extra = vintedToPickup.filter(o => { if(suivisAchat(o,indexSuivisAchats).some(s=>retires.has(s)))return false; const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : ''; return !c || !codesEmail.has(c); });
     // ── « JE L'AI RETIRÉ » : GRISÉ, PAS DISPARU ───────────────────────────────
     // Idée de Julien, et c'est la bonne : cocher ✓ faisait disparaître le colis
     // d'un coup, alors que Vinted, lui, dit encore « déposé en point relais ».
@@ -29693,7 +29720,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: emailList.length + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais]);
+  }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats]);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -32483,6 +32510,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(()=>{
+    if(!['achats','journee'].includes(curSub)||!buysBase.length)return;
+    let stop=false;
+    (async()=>{
+      const demandes=[...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))];
+      const resultat={};
+      for(let i=0;i<demandes.length;i+=100){
+        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,suivi:data->payload->transaction->shipment->>tracking_code,suivi2:data->payload->transaction->shipment->>tracking_number,suivi3:data->payload->transaction->>tracking_code,photo:data->payload->transaction->item_photo`,{strict:true});
+        if(rows===null||stop)return;
+        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={...r,photo:photoArticle({photo:r.photo})};}
+      }
+      if(!stop)setIndexSuivisAchats(resultat);
+    })();return()=>{stop=true;};
+  },[curSub,buysBase]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -35839,6 +35880,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
         <div className="vrm-workbar vrm-sales-workbar">
+        <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
         <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
@@ -36705,7 +36747,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sur Vinted. Une ligne, le compte nommé une fois quand il est le même
             (§7), le lien vers SA conversation. « Pas su » se dit, jamais un
             « rien à confirmer ». */}
-        {aConfirmer.etat==='passu' && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
+        {aConfirmer.etat==='passu' && !baseKO && <div data-a-confirmer="passu" style={{fontSize:12.5,color:C.muted,margin:'4px 0 10px'}}>Je n'ai pas pu lire les colis à confirmer sur Vinted — rien n'est perdu, réessaie dans un moment.</div>}
         {aConfirmer.etat==='lu' && aConfirmer.liste.length>0 && (()=>{
           const l = aConfirmer.liste;
           const nomDe = (e)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(e.uid)); return a?accNameOf(a):''; };
@@ -36838,8 +36880,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Photo de la paire par titre : les achats moissonnés portent la vraie
           // photo Vinted → on la montre à côté du code de retrait (savoir quelle
           // paire on va chercher / si on l'a déjà retirée).
-          const photoByTitle = {};
-          buysBase.forEach(o=>{ const n=normTitle(o.title||''); const ph=orderPhoto(o); if(n && ph && !photoByTitle[n]) photoByTitle[n]=ph; });
+          const photoColis=t=>{const achat=achatDuColis(t,buysBase,indexSuivisAchats);if(!achat)return t.photo||null;return orderPhoto(achat)||indexSuivisAchats[String(achat.transaction_id)]?.photo||null;};
           // ⚠️ MÊME RÈGLE QUE LE QR : une photo morte ne laisse pas un carré cassé.
           // Les photos viennent du CDN Vinted et leurs liens expirent ; l'icône
           // « image brisée » du navigateur au milieu d'une carte de colis, c'est
@@ -36859,7 +36900,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const rel = relaisDe(o); const cd = rel ? codeRetrait(rel.code) : '';
                     return (
                     <div className="vrm-pickup-card" key={'x'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${cd?INV_STATUS.online.color+'55':C.border}`,borderRadius:10,padding:'10px 12px'}}>
-                      {thumb(orderPhoto(o)||(rel&&rel.photo)||photoByTitle[normTitle(o.title||'')])}
+                      {thumb(orderPhoto(o)||(rel&&rel.photo))}
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <LigneArrivee arr={arriveeColisVinted(rel)}/>
@@ -37113,7 +37154,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const jours = joursAvant(t.limite);
                     return (
                       <div className="vrm-pickup-card" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                        {thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}
+                        {thumb(photoColis(t))}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
                               relecture : « Colis n°08448878300059 » en titre, puis
@@ -37324,7 +37365,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const qi = qrImage(t), cd = codeRetrait(t.code), id2 = codeRetrait(t.code2);
                     return (
                     <div key={'m'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(t.photo||photoByTitle[normTitle(t.artTitle||t.article||t.modele||'')])}</span>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(photoColis(t))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{t.artTitle||`Colis${t.suivi?' n°'+t.suivi:''}`}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · en attente de confirmation — son QR reste dispo</div>
@@ -37366,7 +37407,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const qi = qrImage(tk), cd = codeRetrait(tk&&tk.code), id2 = codeRetrait(tk&&tk.code2);
                     return (
                     <div key={'w'+i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
-                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o)||photoByTitle[normTitle(o.title||'')])}</span>
+                      <span style={{opacity:.45,display:'flex',flexShrink:0}}>{thumb(orderPhoto(o))}</span>
                       <div style={{flex:'1 1 150px',minWidth:0,opacity:.6}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',textDecoration:'line-through'}}>{o.title||'Colis'}</div>
                         <div style={{fontSize:11,color:C.muted,marginTop:1}}>Tu l'as coché récupéré · Vinted dit encore « déposé » — ça se règle tout seul</div>
@@ -41371,7 +41412,7 @@ function compteLbcConnecte(accounts) {
   return l[0] || null;
 }
 function annonceLbcALui(ad, prouves) {
-  return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
+  return !!(ad && (ad.ref || ad.customRef || (ad.lbcUser && prouves && prouves.has(String(ad.lbcUser))) || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
 
 // <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
@@ -42438,6 +42479,7 @@ function LeboncoinScreen() {
         <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
+      <DiagnosticLeboncoin lire={sbGet} couleurs={C}/>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
           une deuxième fois. On le dit avec le N° et le lien ; VRM ne retire pas
@@ -42902,7 +42944,7 @@ function LeboncoinScreen() {
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span data-compte-lbc-nom={a.id} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || 'nom pas encore lu'}{a.type === 'pro' ? ' · pro' : a.type === 'particulier' ? ' · particulier' : ''}</span>
                   <span data-compte-lbc-annonces={nb} style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                    {data.lbcConnecte && String(data.lbcConnecte.id) === String(a.id) ? 'connecté en dernier · ' : ''}{nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
+                    {data.lbcConnecte && String(data.lbcConnecte.id) === String(a.id) ? 'dernier compte relevé · ' : ''}{nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
                   </span>
                 </span>
               </div>
@@ -43248,23 +43290,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           <span className="vrm-set-lib"><b style={{color:C.text}}>Email et mot de passe</b></span>
           <span className="vrm-set-val" style={{color:C.muted}}>Actif</span>
         </div>
-        {OAUTH_PROVIDERS.map(pr => {
-          const on = providerEnabled(pr.id);
-          return (
-            <div key={pr.id} className="vrm-set-ligne">
-              <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`}}><BrandMark id={pr.id}/></span>
-              <span className="vrm-set-lib"><b style={{color:C.text}}>{pr.label}</b></span>
-              {on
-                ? (AUTH.user
-                    ? <span className="vrm-set-val" style={{color:C.muted}}>Disponible</span>
-                    : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'0 14px',minHeight:36,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
-                : <span className="vrm-set-val" style={{color:C.muted}}>Pas activé</span>}
-            </div>
-          );
-        })}
+
       </div>
       <div className="vrm-set-pied" style={{color:C.muted}}>
-        Google et Discord apparaîtront ici dès que leurs clés seront collées dans Supabase. Tant que ce n'est pas fait, on ne les propose pas : un bouton qui mène à une page d'erreur ne sert à rien.
+        Ton accès par email reste disponible après l’association d’un compte.
       </div>
     </div>
   );
@@ -43357,9 +43386,12 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
     ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
-    AUTH.user && { id:'discord', titre:'Discord', items:[
-      { id:'discord', type:'el', el:<DiscordCompte key="discord"/> },
-    ], pied:'Facultatif. VRM ne lit que ton pseudo Discord (jamais ton email, tes serveurs ni tes messages). Il est proposé quand tu apparais sur la carte de la communauté.' },
+
+    AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
+      {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS.filter(p=>p.id==='google')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
+    ]},
+    AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
     ]},
@@ -43402,7 +43434,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const profil = MULTI_USER && voirCompte && (AUTH.user ? (
     <div className="vrm-set-profil" data-profil-compte="" style={{background:C.card,border:`1px solid ${C.border}`}}>
       <span className="vrm-set-avatar" aria-hidden="true" style={{background:`${C.text}0f`,color:C.text}}>
-        {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
+        <AvatarCompte key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/>
       </span>
       <span>
         <span style={{display:'block',fontSize:16,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'-.01em'}}>{AUTH.user.email}</span>
@@ -43637,12 +43669,6 @@ async function fermerMonCompte(confirmation) {
 // « Activée » ne s'écrit qu'APRÈS une vérification réussie d'un premier code.
 // Désactiver demande une confirmation ET un code (la session repasse en aal2,
 // ce que GoTrue exige pour supprimer un facteur vérifié).
-const qrEnSrc = (q) => {
-  const t = String(q || '').trim();
-  if (/^data:image\/svg\+xml/i.test(t)) return t;
-  if (/^<svg[\s>]/i.test(t)) return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(t);
-  return '';
-};
 function DoubleVerification({ onEtat } = {}) {
   const [f, setF] = React.useState(undefined);
   const [essai, setEssai] = React.useState(0);
@@ -43678,12 +43704,20 @@ function DoubleVerification({ onEtat } = {}) {
       else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
       return;
     }
-    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrEnSrc(t.qr_code), secret: String(t.secret || '') });
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrMfa(t), secret: String(t.secret || '') });
   };
   const annulerActivation = async () => {
     const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
     if (id) await mfaAppel('DELETE', `factors/${encodeURIComponent(id)}`);
     relire();
+  };
+  const recommencerActivation = async () => {
+    if (busy || !cours?.id) return;
+    setBusy(true); setMsg(null);
+    const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(cours.id)}`);
+    if (!d.ok) { setBusy(false); setMsg({t:"L’ancienne configuration n’a pas pu être annulée. Réessaie avant de créer un nouveau code QR.",ton:'err'}); return; }
+    setCours(null); setCode(''); setBusy(false);
+    await activer();
   };
   const confirmerActivation = async () => {
     if (busy || !cours) return;
@@ -43743,12 +43777,15 @@ function DoubleVerification({ onEtat } = {}) {
         <button type="button" data-mfa-activer="" disabled={busy} onClick={activer} style={{...btn(true, busy),marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
       </>)}
       {cours && cours.etape === 'qr' && (<>
-        <div style={txt}><b style={{color:C.text}}>1.</b> Dans ton app d'authentification, ajoute un compte en scannant ce code :</div>
+        <div style={txt}><b style={{color:C.text}}>1.</b> Sur ton iPhone, ouvre l'app <b style={{color:C.text}}>Mots de passe</b> (ou Google Authenticator), touche « + » puis scanne ce code :</div>
         {cours.qr
           ? <img data-mfa-qr="" src={cours.qr} alt="Code QR à scanner dans ton app d'authentification" width={180} height={180} style={{display:'block',margin:'10px 0',background:'#fff',borderRadius:8,padding:6}}/>
           : <div style={{...txt,margin:'8px 0'}}>(le code QR n'a pas pu s'afficher : utilise la clé ci-dessous)</div>}
-        <div style={txt}>Tu es sur ce téléphone et ne peux pas scanner ? Choisis « saisir une clé » dans l'app et recopie :</div>
-        <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,margin:'6px 0 12px',wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        <details data-mfa-cle-manuelle="" style={{...txt,margin:'8px 0 12px'}}><summary style={{cursor:'pointer'}}>Configurer sans scanner le QR</summary>
+          <p>Dans ton app d’authentification, choisis « saisir une clé ». Garde cette clé privée : ne la partage pas et ne l’envoie pas en capture.</p>
+          <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:14,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
+        </details>
+        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} style={{...btn(false,busy),marginBottom:10}}>Remplacer cette configuration</button>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que l'app affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
@@ -44092,7 +44129,9 @@ function PorteAbonnement({ uid, children }) {
     });
     return () => { mort = true; };
   }, [uid]);
-  if (!bloque) return <>{children}{info && info.proprietaire === true && <InviteMfaProprio uid={uid}/>}</>;
+  // L'invitation ne s'ouvre plus d'elle-même (21 oct. : « je ne comprends rien ») :
+  // la double vérification se propose dans Réglages → Mon compte, sur son geste.
+  if (!bloque) return <>{children}</>;
   return <AbonnementRequis info={info}/>;
 }
 // ── DOUBLE VÉRIFICATION PROPOSÉE AU COMPTE PROPRIÉTAIRE (21 octobre) ─────────
@@ -44108,39 +44147,6 @@ function PorteAbonnement({ uid, children }) {
 // ⇒ rien n'est proposé. Les autres vendeurs : rien ne change.
 const MFA_PLUS_TARD_MS = 7 * 86400000;
 const cleMfaPlusTard = (uid) => 'vrm_mfa_plus_tard_' + String(uid || '');
-function InviteMfaProprio({ uid }) {
-  const [montre, setMontre] = React.useState(false);
-  const [etat, setEtat] = React.useState('');
-  React.useEffect(() => {
-    let mort = false;
-    let t = 0; try { t = Number(localStorage.getItem(cleMfaPlusTard(uid))) || 0; } catch (_) {}
-    if (t && Date.now() - t < MFA_PLUS_TARD_MS) return;
-    mfaLireFacteurs().then((f) => { if (!mort && f && Array.isArray(f.verifies) && !f.verifies.length) setMontre(true); });
-    return () => { mort = true; };
-  }, [uid]);
-  if (!montre) return null;
-  const active = etat === 'active';
-  const plusTard = () => { try { localStorage.setItem(cleMfaPlusTard(uid), String(Date.now())); } catch (_) {} setMontre(false); };
-  const fermer = () => setMontre(false);
-  return (
-    <div data-invite-mfa={active ? 'active' : 'propose'} role="dialog" aria-modal="true" aria-label="Protéger ton compte propriétaire"
-      style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <FermeAuRetour fermer={fermer}/>
-      <div style={{ width:'100%', maxWidth:460, maxHeight:'calc(100vh - 32px)', overflowY:'auto', background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'22px 20px', boxShadow:C.shadowLg || 'none', boxSizing:'border-box' }}>
-        <div style={{ fontSize:19, fontWeight:700, color:C.text, letterSpacing:-0.3 }}>{active ? 'Ton compte est protégé' : 'Protège ton compte propriétaire'}</div>
-        {!active && <div style={{ fontSize:13, color:C.muted, marginTop:8, lineHeight:1.55 }}>
-          C'est le compte propriétaire de VRM : il voit toutes tes boutiques. Avec la double vérification, ton mot de passe seul ne suffit plus pour entrer — il faut aussi le code de ton téléphone. Rien n'est obligatoire : tu peux le faire plus tard dans Réglages → Mon compte.
-        </div>}
-        <div style={{ marginTop:14 }}><DoubleVerification onEtat={setEtat}/></div>
-        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
-          {active
-            ? <button type="button" data-invite-mfa-fermer="" onClick={fermer} style={{ border:'none', background:C.accent, color:C.onAccent || '#fff', borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Fermer</button>
-            : <button type="button" data-invite-mfa-plus-tard="" onClick={plusTard} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:10, padding:'0 16px', minHeight:44, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Plus tard</button>}
-        </div>
-      </div>
-    </div>
-  );
-}
 function AbonnementRequis({ info }) {
   const [occupe, setOccupe] = React.useState(false);
   const [msg, setMsg] = React.useState('');
@@ -44300,6 +44306,11 @@ function PorteEquipe({ uid, children }) {
     if (lu && !lu.nonInstalle && lu.invitations.length) return <InvitationsEquipe invitations={lu.invitations} uid={uid} onPropre={propre} onFait={relire}/>;
   }
   if (attente && lu === undefined) return <div data-equipe-attente="" style={{ minHeight: '100vh', background: C.bg }}/>;
+  // Le préchargement des données (comptes, ventes) ne part qu'ICI : la porte
+  // sait maintenant que c'est SA boutique qui s'ouvre. Lancé dès la porte de
+  // confidentialité, il lisait les lignes d'un aide (mode équipe) pour rien
+  // avant qu'il soit envoyé sur les colis du vendeur (banc equipe.cjs).
+  prechargerDemarrage();
   return children;
 }
 
@@ -44590,8 +44601,8 @@ function DiscordCompte() {
     setMsg('Ton Discord est retiré de ton compte.');
     relire();
   };
-  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
-  const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45 }}>{msg}</div>;
+  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? '#5865F2' : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', minHeight: 38, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
+  const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45,flexBasis:'100%' }}>{msg}</div>;
   if (lu === undefined) return <div data-discord-compte="chargement" style={{ fontSize: 13, color: C.muted, padding: '4px 0' }}>Lecture de ton Discord…{note}</div>;
   if (lu === null) return (
     <div data-discord-compte="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5, padding: '4px 0' }}>
@@ -44599,10 +44610,10 @@ function DiscordCompte() {
     </div>
   );
   return (
-    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 14, color: C.text, padding: '4px 0' }}>
-      <div style={{ marginBottom: 8 }}>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : 'Aucun compte Discord relié.'}</div>
+    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
+      <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:8,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Associe ton profil et son avatar à VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} style={bouton(true)}>{occupe ? 'Un instant…' : lu.discord ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>}
+        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} style={bouton(true)}>{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
         {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} style={bouton(false)}>Retirer</button>}
       </div>
       {!lu.connexion && !lu.discord && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>{DISCORD_ERREURS['non-configure']}</div>}
@@ -45379,13 +45390,15 @@ function SecuriteSetting() {
   };
   // Ce qu'on écrit quand la sonde n'a pas répondu : jamais un diagnostic.
   const PAS_SU = "Le sondage n'a pas abouti (réseau, ou base injoignable). Rouvre cet écran pour réessayer.";
+  // Un état « OK » s'écrit à l'encre, sans couleur (§7) : INV_STATUS.online.color est le vert
+  // #0F8A6A de l'ancienne palette menthe (banc formes-communes, 22 oct.).
   const Ligne = ({ t, ok, etat, d, action }) => (
     <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
-      <span style={{flexShrink:0,marginTop:2,display:'inline-flex',color: ok == null ? C.muted : ok ? INV_STATUS.online.color : C.warn}}>
+      <span style={{flexShrink:0,marginTop:2,display:'inline-flex',color: ok == null ? C.muted : ok ? C.text : C.warn}}>
         <Icon name={ok == null ? 'clock' : ok ? 'check' : 'alert'} size={14}/>
       </span>
       <div style={{minWidth:0,flex:'1 1 140px'}}>
-        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok == null ? C.muted : ok ? INV_STATUS.online.color : C.warn}}>· {etat}</span></div>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok == null ? C.muted : ok ? C.text : C.warn}}>· {etat}</span></div>
         <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
         {action}
       </div>
@@ -45406,7 +45419,7 @@ function SecuriteSetting() {
         {/* Le titre du sous-écran (téléphone) le dit déjà : caché là par CSS (§7) ;
             le verdict à côté reste. Sur ordinateur, c'est le seul titre du panneau. */}
         <div className="vrm-titre-panneau" style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
-        <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn,background:(sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
+        <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?C.text:C.warn,background:(sondeInconnue?C.muted:proteges?C.text:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
           {st === null ? 'vérification…' : sondeInconnue ? 'pas encore vérifié' : proteges ? 'cloisonnées' : 'partagées'}
         </span>
       </div>
@@ -46242,17 +46255,18 @@ export default function App() {
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
   if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
-  const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+  const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
   // Double vérification (16 octobre) : un compte qui l'a activée et une session
   // `aal1` (mot de passe seul, lien email, session restaurée) passent par le
   // code AVANT que le cœur ne monte — aucune donnée n'est lue d'ici là.
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
+  if(MULTI_USER&&!authState.user?.id)return <AuthScreen/>;
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return (MULTI_USER && authState.user)
-    ? <PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe>
+    ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
     : coeur;
 }
 
@@ -46607,7 +46621,7 @@ function AppCoeur() {
   const [extraCols,setExtraCols]=useState(()=>load('vinted_extracols',{}));
   const [cellColors,setCellColors]=useState(()=>load('vinted_colors',{}));
   const [invoices,setInvoices]=useState(()=>load('vinted_invoices',[]));
-  const [vintedAccounts,setVintedAccounts]=useState(()=>load('vinted_accounts',[]));
+  const [vintedAccounts,setVintedAccounts]=useState([]);
   const [accountLabels]=useState(()=>load('vinted_account_labels',{}));
   const [inventory,setInventory]=useState(()=>load('vinted_inventory',[]));
   // §5.49 : inventaire synchronisé lu au montage → froid sur un appareil neuf.
@@ -46983,7 +46997,7 @@ function AppCoeur() {
       if(stop) return;
       setBaseKO(list===null);                  // `null` = pas de réponse, pas « zéro compte »
       noterPanneBase(list===null);             // depuis quand ? (pour dire le bon geste au 3ᵉ jour)
-      if(list && list.length){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
+      if(Array.isArray(list)){ setVintedAccounts(list); try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){} }
       setAccountsLoaded(true);
     })();
     return ()=>{ stop=true; };
@@ -48015,7 +48029,7 @@ function AppCoeur() {
   // contournement ne donne accès à rien de plus que la veille — les données
   // sont communes de toute façon. Dès que la migration est passée, `CLOISONNE`
   // devient vrai et la porte se referme toute seule, sans changement de code.
-  const bypass = !CLOISONNE && (() => { try { return localStorage.getItem('vrm_acces_direct') === '1'; } catch (_) { return false; } })();
+  const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
   // Double vérification (16 octobre) : un compte qui l'a activée et une session
   // `aal1` (mot de passe seul, lien email, session restaurée) passent par le

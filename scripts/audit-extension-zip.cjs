@@ -109,6 +109,15 @@ dit(vZip === vSrc, 'le zip livré porte la version du manifeste',
   dit(cSrc === vSrc && cZip === vSrc, '`CODE_VERSION` (background.js) suit le manifeste, dans la source et dans le zip',
     `source ${cSrc || '?'} · zip ${cZip || '?'} · manifeste ${vSrc}`);
 }
+for (const [fichier, expression] of [
+  ['lbc-inject.js', /const CAPTEUR_VERSION\s*=\s*'([^']+)'/],
+  ['lbc-relay.js', /relaisVersion:\s*'([^']+)'/],
+]) {
+  const source = fs.readFileSync(path.join(SRC, fichier), 'utf8');
+  const paquet = entrees[`${racines[0]}/${fichier}`]?.contenu?.toString('utf8') || '';
+  dit(expression.exec(source)?.[1] === vSrc && expression.exec(paquet)?.[1] === vSrc,
+    `la version du transport ${fichier} suit le manifeste dans la source et le zip`, vSrc);
+}
 const mAtt = /EXT_ATTENDUE\s*=\s*'([^']+)'/.exec(APP);
 dit(mAtt && mAtt[1] === vSrc, '`EXT_ATTENDUE` suit la même version',
   `app ${mAtt ? mAtt[1] : '?'} · source ${vSrc}`);

@@ -26,7 +26,7 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 
 process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
 delete process.env.SUPABASE_SERVICE_KEY;
-delete process.env.CRON_SECRET;
+process.env.CRON_SECRET = 'cle-banc-cron'; // obligatoire depuis dc4799f (la route refuse sans elle)
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];
 webpush.setVapidDetails = () => {};
@@ -44,7 +44,7 @@ const ebayCmd = (id, shipBy) => ({
 
 const vendeurs = () => ({
   A: {
-    subs: [{ endpoint: 'https://push.test/A1', keys: {} }], prefs: null,
+    subs: [{ endpoint: 'https://fcm.googleapis.com/A1', keys: {} }], prefs: null,
     comptes: [{ vinted_user_id: '11', login: 'vendeuse_a' }],
     main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: { 102: true }, vinted_bords_shipped: {}, vrm_widget_token: 'tokA' },
     ventes: { 11: { cap: iso(SOIR - 3600000), txns: ['102', '106', '107'], orders: [
@@ -60,7 +60,7 @@ const vendeurs = () => ({
     ebay: [ebayCmd('E1', '2026-10-25T21:00:00Z')],
   },
   B: {
-    subs: [{ endpoint: 'https://push.test/B1', keys: {} }], prefs: null,
+    subs: [{ endpoint: 'https://fcm.googleapis.com/B1', keys: {} }], prefs: null,
     comptes: [{ vinted_user_id: '22', login: 'vendeur_b' }],
     main: { vinted_sales_hidden: [], vinted_accounts_hidden: [], vinted_ship_done: {}, vinted_bords_shipped: {}, vrm_widget_token: 'tokB' },
     ventes: { 22: { cap: iso(SOIR - 3600000), txns: [], orders: [{ transaction_id: 201, status: 'Commande finalisée', date: iso(SOIR - 9 * J), price: { amount: '40' } }] } },
@@ -133,7 +133,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   let cron, widget;
   try { cron = (await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'))).default; } catch (e) { dit(false, 'api/ship-reminders.js se charge', e.message); }
   try { widget = (await import('file://' + path.join(RACINE, 'api', 'widget.js'))).default; } catch (e) { dit(false, 'api/widget.js se charge', e.message); }
-  const lancer = async (t, query = { moment: 'soir' }) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: {}, query }, r); return r; } finally { Date.now = vraiNow; } };
+  const lancer = async (t, query = { moment: 'soir' }) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query }, r); return r; } finally { Date.now = vraiNow; } };
   const soirDe = (o) => pushes.filter((p) => /^soir-/.test(p.tag || '') && p.endpoint.includes('/' + o));
 
   console.log('── Le soir : « Demain : N colis à poster », pour chacun le sien');

@@ -64,6 +64,9 @@ function filtreOk(row, u) {
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
   connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
+  // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
+  if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
+
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
   const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [] };
@@ -190,7 +193,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   if (firefox && firefox.compat) vm.runInContext(firefox.compat, ctx, { filename: 'compat-firefox.js' });
   vm.runInContext(SRC, ctx, { filename: 'background.js' });
   // Les portes du monde extérieur, remplacées pour COMPTER.
-  ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]);
+  ctx.getStoredAccounts = async () => (comptes || [{ vinted_user_id: connecte || '111', login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }]).map(a=>({...a,owner:store.vrmSession?.user_id}));
   ctx.activeAccountId = async () => connecte;
   ctx.activeUidForDomain = async () => connecte;
   ctx.noterDiag = async (k) => { j.diags.push(k); };

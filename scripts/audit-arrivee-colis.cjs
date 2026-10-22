@@ -18,11 +18,11 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m +
 
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VRM_OWNER_UID = A;
-delete process.env.EMAIL_INBOUND_SECRET;
+process.env.EMAIL_INBOUND_SECRET='cle-banc-arrivee';
 delete process.env.VAPID_PRIVATE_KEY;
 delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;
 
-const base = new Map();                     // `${owner}|${id}` → data
+const base = new Map([[`${A}|vrm_email_owners`,{adresses:{'boite@banc.test':{owner:A}}}]]);                     // `${owner}|${id}` → data
 const pannes = new Set();                   // ids dont la LECTURE répond 522
 let sondeKO = 0;                            // nombre de sondes `select=owner&limit=1` qui répondront 522
 const lectures = [];                        // URLs GET app_data
@@ -103,7 +103,7 @@ const importer = (p) => import('file://' + path.join(RACINE, p));
     const inbound = await importer('api/email-inbound.js');
     const mail = (subject) => ({ from: 'noreply@mondialrelay.fr', to: 'boite@banc.test', subject,
       text: `${subject}\nVotre colis 87654321 vous attend au Point Relais.\nCode de retrait : 482913\nNuméro de suivi : 87654321\n`, html: '', attachments: [] });
-    const recoit = async (subject, quand) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {}, __recuLe: quand, body: mail(subject) }, res); return res; };
+    const recoit = async (subject, quand) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-arrivee'}, __recuLe: quand, body: mail(subject) }, res); return res; };
     const r1 = await recoit('Votre colis 87654321 est disponible 📦', '2026-10-16T08:00:00.000Z');
     const r2 = await recoit('Le temps file : votre colis vous attend avec impatience ⏳', '2026-10-20T08:00:00.000Z');
     const lignes = [...base.entries()].filter(([k]) => k.includes('|email_track_')).map(([, d]) => d);
