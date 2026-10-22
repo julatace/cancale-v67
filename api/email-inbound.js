@@ -715,12 +715,13 @@ const objetJson = (v) => {
 export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
   if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null };
-  const [mainL, reg, ebayL, lbcL, ventesL] = await Promise.all([
+  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc] = await Promise.all([
     lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
     lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
+    lirePagine('id=eq.lbc_accounts&select=accounts:data->accounts'),
   ]);
   // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
   if (!mainL) return { ebay: null, lbc: null };
@@ -736,10 +737,11 @@ export async function lireAnnoncesAilleurs() {
     if (fiches !== undefined && liensEbay !== undefined) ebay = annoncesEbayParNumero(ebayL, ids, mk, fiches || {}, liensEbay || {});
   }
   let lbc = null;
-  if (lbcL && ventesL && liens !== undefined) {
+  if (lbcL && ventesL && comptesLbc && liens !== undefined) {
     const items = lbcL[0] ? objetJson(lbcL[0].items) : null;
     const ventes = ventesL[0] ? objetJson(ventesL[0].ventes) : null;
-    if (items !== undefined && ventes !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk);
+    const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
+    if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
   }
   return { ebay, lbc };
 }

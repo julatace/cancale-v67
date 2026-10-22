@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.209.0';
+const CODE_VERSION = '5.210.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8804,7 +8804,7 @@ function comptesLbcSession(accounts) {
   for (const [id, a] of Object.entries(accounts || {})) if (a && a.sessionAt) s.add(String(a.id || id));
   return s;
 }
-function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account))))); }
+function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || (ad.lbcUser && prouves && prouves.has(String(ad.lbcUser))) || (ad.account && prouves && prouves.has(String(ad.account))))); }
 // <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le
 // serveur (§11 ; `audit-lbc-restes.cjs` compare les trois). Une annonce Leboncoin
 // n'est « en vente » que si son état ne la dit pas morte ET qu'aucune vente
@@ -9483,6 +9483,17 @@ async function buildLbcData() {
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
 // fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
 // de ta navigation, sans écraser. Sert au dispatcher LBC→Vinted + synchro inverse.
+function photosAnnonceLbc(node){
+  const images=node?.images;
+  const candidats=[images?.urls,images?.urls_large,images?.thumb_urls,images?.urls_thumb,Array.isArray(images)?images:null,node?.image_urls,node?.ImageSmall];
+  const out=[];
+  for(const valeur of candidats){for(const item of Array.isArray(valeur)?valeur:[valeur]){
+    const brut=typeof item==='string'?item:item?.url||item?.url_large||item?.large||item?.thumbnail;
+    if(typeof brut!=='string')continue;
+    try{const u=new URL(brut);if(u.protocol!=='https:'||u.username||u.password||!/(^|\.)leboncoin\.fr$/i.test(u.hostname))continue;if(!out.includes(u.href))out.push(u.href);}catch(_){}
+    if(out.length>=20)return out;
+  }}return out;
+}
 async function storeLbcListings(url, listings) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
@@ -9494,7 +9505,11 @@ async function storeLbcListings(url, listings) {
     if (prevRows === null) return;
     const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.items) || {};
     const merged = Object.assign({}, prev);
-    for (const l of listings) { if (l && l.id) merged[String(l.id)] = Object.assign({}, merged[String(l.id)], l, { seenAt: new Date().toISOString() }); }
+    for (const l of listings) { if (l && l.id) {
+      const ancien=merged[String(l.id)]||{};
+      const images=photosAnnonceLbc(l);
+      merged[String(l.id)]=Object.assign({},ancien,l,{images:images.length?images:photosAnnonceLbc(ancien),seenAt:new Date().toISOString()});
+    } }
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
     noterFlux('leboncoin', _okFlux !== false);
   } catch (_) {}
@@ -10459,7 +10474,7 @@ async function handleLbcRaw(url, body, sessionPage) {
         ref: refVRMDe(custom) || (title.match(RE_VRM) ? cleNum(title.match(RE_VRM)[1]) : '') || null,
         customRef: custom || null,
         url: info.URL || '',
-        images: info.ImageSmall ? [info.ImageSmall] : [],
+        images: photosAnnonceLbc(info),
         category: info.Category || info.CategoryId || '',
         status: ad.Status || '',
         createdAt: ad.CreatedAt || ad.PostedAt || null,
@@ -10515,7 +10530,7 @@ async function handleLbcRaw(url, body, sessionPage) {
           body: bodyTxt.slice(0, 400),
           ref: refVRM,
           url: node.url || '',
-          images: (node.images && (node.images.urls || node.images.thumb_urls || node.images.urls_thumb)) || node.image_urls || [],
+          images: photosAnnonceLbc(node),
           category: node.category_name || node.category_id || '',
           status: node.status || node.ad_status || '',
           // ⚠️ Le propriétaire de CETTE annonce (une réponse générique mêle ses

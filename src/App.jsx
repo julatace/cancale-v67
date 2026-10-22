@@ -84,7 +84,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.209.0';
+const EXT_ATTENDUE = '5.210.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -41408,7 +41408,7 @@ function compteLbcConnecte(accounts) {
   return l[0] || null;
 }
 function annonceLbcALui(ad, prouves) {
-  return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account)))));
+  return !!(ad && (ad.ref || ad.customRef || (ad.lbcUser && prouves && prouves.has(String(ad.lbcUser))) || (ad.account && prouves && prouves.has(String(ad.account)))));
 }
 
 // <lbc-en-vente-regle> — LA MÊME, texte pour texte, dans l'app, l'extension et le

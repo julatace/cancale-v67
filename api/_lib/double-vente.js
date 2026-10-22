@@ -121,7 +121,7 @@ function annonceLbcEnVente(ad, vendues) {
   return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
-export function annoncesLbcParNumero(items, ventes, liens, mk) {
+export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {
   const out = new Map();
   const prouves = new Set(), vendues = annoncesLbcVendues(ventes);
   for (const v of Object.values(ventes || {})) {
@@ -129,7 +129,8 @@ export function annoncesLbcParNumero(items, ventes, liens, mk) {
     const ad = items && items[String(v.itemId)];
     if (ad && ad.account) prouves.add(String(ad.account));
   }
-  const aLui = (ad) => !!(ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves.has(String(ad.account))));
+  for(const [id,a] of Object.entries(accounts||{}))if(a?.sessionAt)prouves.add(String(a.id||id));
+  const aLui = (ad) => !!(ad.ref || ad.customRef || (ad.lbcUser && prouves.has(String(ad.lbcUser))) || (ad.account && prouves.has(String(ad.account))));
   for (const ad of Object.values(items || {})) {
     if (!annonceLbcEnVente(ad, vendues) || !aLui(ad)) continue;
     const ks = [];

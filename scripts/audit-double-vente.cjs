@@ -42,7 +42,7 @@ if (PROUVE) {
     "if (!connus.length) { const s = (typeof __cands !== 'undefined' ? suggestionsPaires({ titre: v.title }, __cands) : [])[0]; if (!s) { aRelier.push({ vente: v, ad }); continue; } connus.push(cleNum(s.numero)); }");
   APP = APP.replace('if (ad && ad.account) s.add(String(ad.account));\n  }\n  return s;\n}\nfunction annonceLbcALui',
     'if (ad && ad.account) s.add(String(ad.account));\n  }\n  for (const ad of Object.values(items || {})) if (ad && ad.account) s.add(String(ad.account));\n  return s;\n}\nfunction annonceLbcALui');
-  EXT = EXT.replace('function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || (ad.account && prouves && prouves.has(String(ad.account))))); }',
+  EXT = EXT.replace('function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || (ad.lbcUser && prouves && prouves.has(String(ad.lbcUser))) || (ad.account && prouves && prouves.has(String(ad.account))))); }',
     'function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || ad.lbcUser || ad.account)); }');
   dit(APP !== avant, '(--prouve) la règle de l\'app a bien été réaffaiblie');
 }
