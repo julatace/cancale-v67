@@ -18,9 +18,12 @@
 //  Attribution exigée (OpenFreeMap · © OpenMapTiles · © OpenStreetMap) : la
 //  TileJSON du service la porte ; ce qui manquerait est ajouté, jamais doublé.
 //  Repli : MapLibre absent, pas de WebGL, style ou TileJSON injoignables, ou
-//  AUCUNE tuile dessinée à temps ⇒ l'appelant le sait (promesse rejetée) et ne
+//  AUCUNE tuile arrivée à temps ⇒ l'appelant le sait (promesse rejetée) et ne
 //  laisse jamais une carte grise (la communauté passe en liste). Une tuile
-//  isolée en erreur ne fait PAS tomber une carte qui dessine le reste.
+//  isolée en erreur, ou LENTE (relecture du 22 oct. : une tuile tenue faisait
+//  tomber en liste, au bout de 12 s, une carte qui dessinait déjà le reste), ne
+//  fait PAS tomber une carte qui dessine : le fond est « dessiné » dès qu'une
+//  tuile est arrivée et que la carte s'est repeinte, sans attendre les autres.
 // ════════════════════════════════════════════════════════════════════════════
 export const FOURNISSEUR = {
   id: 'openfreemap',
@@ -118,13 +121,18 @@ function attributionsDesSources(carte, style) {
 }
 
 // Pose le fond sur une carte MapLibre.
-// « Dessiné » = l'évènement `idle` arrivé APRÈS qu'au moins une tuile d'une
-// source du style a été chargée (un `idle` sans aucune tuile ne prouve rien :
-// ce serait une carte grise). Une source qui ne se charge pas (TileJSON
-// injoignable) ⇒ échec tout de suite ; des tuiles en erreur sans qu'AUCUNE
-// n'arrive ⇒ échec au premier `idle` ; rien du tout ⇒ échec au bout de
-// `delaiMs`. Rend { id, attribution } (la mention à AJOUTER, '' si la source
-// porte déjà tout). `annule()` vrai ⇒ on s'arrête (écran fermé, thème changé).
+// « Dessiné » = au moins une tuile d'une source du style est ARRIVÉE, puis la
+// carte s'est repeinte (`render`) ou s'est posée (`idle`). On n'attend PAS les
+// autres tuiles : MapLibre n'émet `idle` qu'une fois TOUTES les tuiles visibles
+// chargées et la carte immobile — une seule tuile lente, ou la personne qui
+// glisse la carte, retenait la carte entière. Un `idle` ou un `render` sans
+// aucune tuile ne prouve rien (ce serait une carte grise). Une source qui ne se
+// charge pas (TileJSON injoignable) ⇒ échec tout de suite ; des tuiles en
+// erreur sans qu'AUCUNE n'arrive ⇒ échec au premier `idle` ; au bout de
+// `delaiMs`, une tuile arrivée (onglet en arrière-plan : pas de repeinte) ⇒
+// dessiné, aucune ⇒ échec. Rend { id, attribution } (la mention à AJOUTER, ''
+// si la source porte déjà tout) — l'appelant la pose donc dès que la carte
+// dessine. `annule()` vrai ⇒ on s'arrête (écran fermé, thème changé).
 export async function poserFond(carte, { sombre, annule = () => false, delaiMs = 12000, url = styleCarte(sombre) } = {}) {
   if (annule()) throw new Error('annule');
   const style = await lireStyle(url);
@@ -134,7 +142,7 @@ export async function poserFond(carte, { sombre, annule = () => false, delaiMs =
     let fini = false, tuilesOk = 0, tuilesKo = 0;
     const fin = (e) => {
       if (fini) return; fini = true; clearTimeout(t);
-      carte.off('error', surErreur); carte.off('idle', surIdle); carte.off('sourcedata', surDonnee);
+      carte.off('error', surErreur); carte.off('idle', surIdle); carte.off('render', surRendu); carte.off('sourcedata', surDonnee);
       e ? ko(e) : ok();
     };
     const surDonnee = (e) => { if (e && e.tile && sources.has(e.sourceId)) tuilesOk++; };
@@ -142,14 +150,22 @@ export async function poserFond(carte, { sombre, annule = () => false, delaiMs =
       if (!e || !sources.has(e.sourceId)) return; // police, icône : le fond tient sans
       if (e.tile) tuilesKo++; else fin(new Error('source'));
     };
+    // Une tuile arrivée et la carte repeinte : elle DESSINE — les autres tuiles
+    // (lentes, ou demandées par un glisser) suivent sans retenir le fond.
+    const surRendu = () => {
+      if (tuilesOk === 0) return;
+      if (annule()) return fin(new Error('annule'));
+      fin();
+    };
     const surIdle = () => {
       if (annule()) return fin(new Error('annule'));
       if (tuilesOk > 0) fin();
       else if (tuilesKo > 0) fin(new Error('tuiles'));
     };
-    const t = setTimeout(() => fin(new Error('delai')), delaiMs);
+    const t = setTimeout(() => fin(annule() ? new Error('annule') : (tuilesOk > 0 ? undefined : new Error('delai'))), delaiMs);
     carte.on('sourcedata', surDonnee);
     carte.on('error', surErreur);
+    carte.on('render', surRendu);
     carte.on('idle', surIdle);
     carte.setStyle(style, { diff: false });
   });
