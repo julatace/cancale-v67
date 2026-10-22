@@ -32,6 +32,9 @@
 //     `saveItemDetail` simultanés se marchaient dessus de la même façon.
 //     ⇒ Toutes les écritures de cette ligne passent par une seule chaîne, et la
 //     capture photo relit la ligne au moment d'écrire et ne pose que SES fiches.
+//     22 oct. : ses fiches passent par une FILE dans `chrome.storage.local`
+//     (une écriture pour 5 pages) ; une relecture ratée au moment d'écrire ne
+//     fait plus relire Vinted : la fiche attend, et part quand la base revient.
 //
 //  `--src chemin` : lancer sur une autre copie (code d'avant, §6.1).
 // ════════════════════════════════════════════════════════════════════════════
@@ -168,7 +171,7 @@ function espionPosts(f) {
       await new Promise((r) => setTimeout(r, 2));
       return { ok: true, status: 200, text: '<html></html>' };
     };
-    const n = await f.ctx.capterPhotosAnnonces(UID);
+    const n = await f.ctx.capterPhotosAnnonces(UID, 2);   // deux pages dans ce tour (22 oct. : le fond n'en lit qu'une)
     if (concurrent) await concurrent;
     const det = f.lignes.vinted_item_details || {};
     dit(n === 2 && det['501'] && det['502'], 'la capture photo range ses deux fiches', `n=${n}, clés=${Object.keys(det).join(',')}`);
@@ -191,11 +194,17 @@ function espionPosts(f) {
     const vraiSbGet = h.ctx.sbGet;
     h.ctx.vintedGetHtml = async () => ({ ok: true, status: 200, text: '<html></html>' });
     h.ctx.sbGet = async (q) => { if (/vinted_item_details/.test(q) && ++lectures > 1) return null; return vraiSbGet(q); };
-    await h.ctx.capterPhotosAnnonces(UID);
+    await h.ctx.capterPhotosAnnonces(UID, 2);
     const d3 = h.lignes.vinted_item_details || {};
-    const memo = (h.store.vrmPhotosFaites) || {};
     dit(!!d3.ANCIENNE && !d3['501'], 'relecture ratée au moment d\'écrire : la ligne n\'est pas réécrite', `clés=${Object.keys(d3).join(',')}`);
-    dit(!memo[`${UID}_501`], 'relecture ratée : les annonces lues seront relues (pas de mémo de 6 h)', JSON.stringify(memo));
+    // 22 oct. : la fiche lue n'est pas perdue — elle attend dans chrome.storage.local
+    // (avant : son mémo était retiré, et Vinted était relu pour la retrouver).
+    const attente = (h.store.vrmFichesAttente || []).map((e) => e.id).sort().join(',');
+    dit(attente === '501,502', 'relecture ratée : les fiches lues attendent dans chrome.storage.local (pas de nouvelle requête Vinted)', attente);
+    h.ctx.sbGet = vraiSbGet;
+    await h.ctx.viderFiches({ force: true });
+    const d4 = h.lignes.vinted_item_details || {};
+    dit(!!d4['501'] && !!d4['502'] && !!d4.ANCIENNE && !(h.store.vrmFichesAttente || []).length, 'la base revenue : elles sont rangées, et la fiche d\'avant reste', `clés=${Object.keys(d4).join(',')}`);
   });
 
   console.log('— 4. Un frein de Vinted ne pose pas le mémo de 6 h d\'une photo —');

@@ -26,6 +26,9 @@
 //      la relecture garde la place de l'argent. Un seul compte lié : rien à
 //      relire, la relecture le note (reste 0) et les photos n'attendent rien —
 //      d'où l'appel `relireAnnoncesAutresComptes` en tête des cas 2 à 4.
+//  22 oct. : les photos lisent UNE page par tour (`PHOTOS_PAR_TOUR`) : « le fond
+//  qui tourne » est donc rejoué tour par tour (`tours`), et les bornes jugées sont
+//  les mêmes — le budget horaire n'a pas bougé, il est étalé.
 //  Données inventées. Usage : node scripts/audit-budget-lectures.cjs [--src f]
 // ════════════════════════════════════════════════════════════════════════════
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');
@@ -72,6 +75,7 @@ const compte = (j, re) => j.vinted.filter((x) => re.test(x.chemin)).length;
 const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
 const actions = (store) => ((store.vrmActions || {})[UID] || []).length;
 const maintenant = () => Date.now();
+const tours = async (ctx, n) => { for (let i = 0; i < n; i++) await ctx.capterPhotosAnnonces(UID); };
 const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await ctx.capterRetraits(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
 
 (async () => {
@@ -97,9 +101,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
   await essaie('réserve', async () => {
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
     await f.ctx.relireAnnoncesAutresComptes(UID);      // un seul compte : rien à relire (noté)
-    await f.ctx.capterPhotosAnnonces(UID);
-    await f.ctx.capterPhotosAnnonces(UID);           // le fond qui tourne chaque minute
-    await f.ctx.capterPhotosAnnonces(UID);
+    await tours(f.ctx, 30);                          // le fond qui tourne chaque minute, une demi-heure
     const ph = compte(f.j, /^\/items\/\d+$/);
     dit(ph === 7, 'trente annonces à compléter, tout l’heure : 7 pages lues, pas 20 (la réserve de 13 tient : 5 versements, 3 codes, 2 relevés, 3 preuves de vente)', `${ph} page(s) lue(s)`);
     const avant = f.j.vinted.length;
@@ -115,8 +117,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     await prioritaires(f.ctx);                          // rien à lire : chacun note « reste 0 »
     await f.ctx.relireAnnoncesAutresComptes(UID);
     dit(f.j.vinted.length === 0, 'rien à lire : aucune requête', `${f.j.vinted.length}`);
-    await f.ctx.capterPhotosAnnonces(UID);
-    await f.ctx.capterPhotosAnnonces(UID);
+    await tours(f.ctx, 30);
     const ph = compte(f.j, /^\/items\/\d+$/);
     dit(ph === 20, 'les photos retrouvent tout le budget (20), la réserve n’a plus d’objet', `${ph} page(s) lue(s)`);
   });
@@ -128,8 +129,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
       lectureKO: (u) => /orders_sold/.test(u) });
     await prioritaires(f.ctx);
     await f.ctx.relireAnnoncesAutresComptes(UID);
-    await f.ctx.capterPhotosAnnonces(UID);
-    await f.ctx.capterPhotosAnnonces(UID);
+    await tours(f.ctx, 30);
     const ph = compte(f.j, /^\/items\/\d+$/);
     dit(ph === 12, 'ventes illisibles : la place des 5 versements et des 3 preuves de vente reste gardée (12 photos, pas 20)', `${ph} page(s) lue(s)`);
   });
@@ -150,7 +150,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     // l'argent et des colis — 13 depuis la fusion avec la preuve de vente (5 versements + 2 relevés
     // + 3 codes + 3 preuves).
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
-    for (let i = 0; i < 4; i++) await f.ctx.capterPhotosAnnonces(UID);
+    await tours(f.ctx, 10);
     const ph = compte(f.j, /^\/items\/\d+$/);
     dit(ph === 4, 'les photos s’arrêtent avant la réserve de l’argent ET celle de la relecture : 4 pages (20 − 13 − 3)', `${ph} page(s) lue(s)`);
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };

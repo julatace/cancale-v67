@@ -11382,6 +11382,56 @@ sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
   tuiles réelles portent `name:fr` (absent ⇒ le nom d'origine, aucune régression) ;
   le rendu de Dark Matter sur de vraies données ; WebGL sur un vrai iPhone ; la
   mini-carte des points relais (injoignable, pas de banc).
+### Les photos de fond ne font plus freiner Vinted, et sa description enregistrée est gardée (22 octobre — propositions 3 et 13, extension non montée)
+**Mesuré (lecture seule, `panel_diag_capture` de Julien, extension 5.211)** :
+`vinted_frein_429` = 23 = `photos_page_refuse_429` = 23 — les 23 « trop de
+demandes » venaient TOUS d'une page d'annonce lue pour ses photos ; paliers de
+pause 1/2/3 : 24/2/1 ; `visite_en_pause` = 119 visites sautées ; dernière pause le
+22 à 05:10 (`quoi: page`). Cause : `capterPhotosAnnonces` lisait jusqu'à 20 pages
+d'affilée, sans écart, à chaque minute (`tickPhotos`) ET à la fin de chaque visite.
+Et sur ses **49 annonces en ligne, 4** ont leur description dans
+`vinted_item_details`, **0** leur catégorie ou leurs couleurs
+(`fiche_codes_absents` = 804) — alors que ses modifications partent en
+`PUT /api/v2/item_upload/items/{id}` avec `{item:{id, description, catalog_id,
+brand_id, color_ids, item_attributes…}}` (6 modifications mesurées : l'`id` du
+corps est toujours celui de l'adresse). `vinted_item_details` est bien la ligne
+de la publication (`buildLbcData`, `buildEbayData`, l'app, le coffre) — pas le
+coffre seul.
+**Tranché (3)** : une page photo par tour d'alarme (`PHOTOS_PAR_TOUR` = 1), jamais
+deux à moins de 45 s (écart FIXE, §3), aucune pendant qu'il navigue sur Vinted
+(2 min de calme, vu par `chrome.tabs.onUpdated` et la visite, zéro requête), plus
+aucune dans la visite ; un 429/403 sur une page photo pose la pause habituelle
+(le reste de l'extension la suit) ET coupe les photos de fond 24 h
+(`vrmPhotosFrein`). Le budget horaire n'a pas bougé (`gardeLecture`). Le clic
+« Publier » (`completerPhotos`) ne subit ni l'écart, ni le calme, ni le frein
+photos. La liste à compléter est calculée une fois par 15 min (`vrmPhotosPlan`)
+et les fiches lues partent en UNE écriture pour 5 pages (`vrmFichesAttente`,
+§4.4) — sinon la ligne de 283 Ko redescendait pour chaque page.
+**Tranché (13)** : `inject.js` transmet la fiche après un 2xx de Vinted seulement,
+sous l'identifiant de l'ADRESSE (modification) ou de la RÉPONSE (publication) ;
+le fond n'en garde que la description et les codes (catégorie, marque, couleurs,
+taille, état, format), jamais les photos envoyées ni la session de dépôt ; une
+valeur vide ne remplace jamais une pleine ; un `id` de corps qui contredit
+l'adresse ne range RIEN. Même file que les pages (`noterFicheVinted` →
+`viderFiches`), rangée tout de suite ; base illisible ⇒ rien n'est écrit, la
+fiche attend (et le rangement automatique attend 10 min après un échec).
+La couleur AFFICHÉE (« Blanc ») n'est pas dans le corps : seuls ses codes sont
+rangés, rien n'est inventé.
+**Prouvé** : `audit-photos-etalees.cjs` (30 contrôles, horloge pilotée) — **17
+rouges** sur `origin/main` (20 pages à la minute 0, 17 pages dans la visite,
+19 pages pendant la « pause finie », versements affamés à 0) et 7 mutations qui
+rougissent ; `audit-fiche-modif.cjs` (22) — **12 rouges** sur `origin/main`
+(la file Leboncoin partait avec « Envoi rapide et soigné… ») et 4 mutations.
+Adaptés à « une page par tour » sans affaiblir la règle : `audit-photos-passif`,
+`audit-budget-lectures`, `audit-fiabilite-fond` (une relecture ratée ne fait
+plus relire Vinted : la fiche attend). `_fond-vm.cjs` rejoue `tabs.onUpdated`.
+**Non mesuré** : le rythme réel que tolère Vinted (aucun appel d'ici) ; la forme
+du `PUT` hors des 6 modifications vues ; que la page de dépôt envoie la
+publication en `fetch` ou XHR (les deux sont couverts). **Version et zip non
+montés** (à l'intégration) : `audit-extension-zip` et le contrôle de version
+d'`audit-preuve-vente` sont rouges tant que la 5.211 n'est pas montée et le zip
+régénéré ; les 65 autres audits qui exécutent l'extension sont verts. **Geste de Julien**, une fois l'extension installée : ouvrir
+« Modifier » puis « Enregistrer » sur ses annonces déjà en ligne.
 
 ---
 
