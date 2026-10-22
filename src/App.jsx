@@ -43899,7 +43899,7 @@ function DoubleVerification({ onEtat } = {}) {
         const noms = { ...(cur.totpNoms && typeof cur.totpNoms === 'object' ? cur.totpNoms : {}) }; delete noms[cible];
         writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== cible), totpNoms: noms });
       }
-      setCours(null);
+      setCours(null); setNom('');   // la proposition de nom se refait sur la liste relue
       setMsg({ t: dernier ? 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.' : `« ${cours.nom} » est retiré : son code ne permet plus d'entrer. Tes autres appareils restent actifs.`, ton: 'ok' });
     } else if (mfaInjoignable(d)) {
       setMsg({ t: "Je ne sais pas s'il a été retiré : le service de connexion n'a pas répondu. Je relis la liste.", ton: 'passu' });
