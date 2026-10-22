@@ -9982,6 +9982,83 @@ l'active pas.
 
 ---
 
+### ⛔ Double vérification GRATUITE : un second appareil de secours, pas de SMS (22 octobre)
+**Décision de Julien, 22 octobre : pas de SMS — c'est payant** (« Advanced MFA
+Phone » : 75 $/mois chez Supabase, hors plafond, plus chaque SMS ; §2.9). La
+double vérification reste l'app d'authentification (TOTP, gratuite), et le
+chemin de secours est un **second appareil**.
+- **La branche `codex/mfa-sms` (4870df1, 21 oct.) a été lue, fusionnée à l'essai
+  avec main (un conflit : l'invitation au démarrage qu'elle modifiait a été
+  retirée de main), puis NON gardée.** Au-delà du prix, elle était dangereuse :
+  1. `utilisateurDe` exigeait `aal2` dès qu'un facteur est vérifié, et sa
+     migration 022 posait une règle RLS restrictive `aal2` sur `app_data` et
+     `vinted_accounts`. Or la session de l'extension est **`aal1`** (lien
+     magique, § TOTP du 16 oct.) : activer la double vérification **coupait
+     toutes les captures** — la limite que ce dossier dit « à trancher plus
+     tard », tranchée dans le mauvais sens ;
+  2. le SMS était proposé à tous, sans savoir si un fournisseur existe (l'erreur
+     n'arrivait qu'au clic) ;
+  3. avec deux apps d'authentification, son écran du code listait « Application
+     d'authentification » deux fois et ne défiait que le premier facteur : le
+     code du second était refusé (mesuré, son build au banc ci-dessous : 13
+     rouges sur 19 à 390 px).
+  `audit-mfa-gratuite.cjs` refuse tout enrôlement `phone`, `channel:'sms'` et les
+  modules `mfaSms`/`VerificationSms` (rouge sur la branche : 6 lignes nommées).
+- **Mesuré (base, lecture seule, `auth.mfa_factors` en comptes)** : **1** facteur
+  TOTP **non vérifié** (21 oct. 16:38 — l'essai de l'invitation retirée), **0
+  vérifié, 0 téléphone** : personne n'a la double vérification active, personne
+  ne peut être enfermé aujourd'hui. `auth.mfa_recovery_code_sets` existe dans le
+  schéma (codes de secours de GoTrue), mais son API n'a pas pu être mesurée
+  (supabase.co bloqué par le proxy du conteneur) : **non livré**.
+- **Livré (app seule — aucune route, aucune migration, extension NON touchée)** :
+  - **L'écran du code accepte le code de N'IMPORTE LEQUEL des appareils**
+    (`mfaVerifierCodeParmi` : chaque facteur vérifié, jusqu'au premier qui
+    accepte). Trois états : un injoignable ⇒ « pas su », jamais « faux » ; un
+    429 ⇒ « trop d'essais » (il affichait « Too many requests », en anglais) et
+    on s'arrête ; tous disparus (appareil retiré ailleurs, il affichait « Factor
+    not found ») ⇒ la liste est relue et UN envoi du bon code suffit. Il nomme
+    les appareils, et « appareil perdu » dit d'entrer avec l'autre puis de
+    retirer le perdu.
+  - **Réglages → Mon compte → Double vérification** : chaque appareil a un
+    **nom** (choisi à l'enrôlement — GoTrue n'a pas de renommage ; un ancien nom
+    automatique « VRM 2026-… » s'affiche « Appareil ajouté le … »), la liste,
+    « Ajouter un appareil de secours » (nom, QR, « prends l'AUTRE appareil »,
+    ajouté seulement après SON premier code), « Retirer… » par appareil avec le
+    code de n'importe lequel (les AUTRES d'abord : le cas « perdu »), le dernier
+    retiré = désactiver. Un seul appareil : une phrase neutre propose un appareil
+    de secours — **jamais imposé, aucune invitation au démarrage**.
+  - Un nom déjà pris est refusé ici (sans casse) **sans rien créer** chez
+    GoTrue ; 422 `name_conflict`, 403 (aal) et 429 sont dits en français.
+  - La session porte `totpNoms` (affichage seul ; `totp` décide toujours, §11) ;
+    la ligne de Réglages dit « Activée · 2 appareils ».
+- **Récupération si l'UNIQUE appareil est perdu** — lui seul, il possède le
+  projet : Supabase → SQL Editor → `delete from auth.mfa_factors where user_id =
+  '<son identifiant>';` (les défis et jeux de codes partent en cascade — vérifié
+  dans le schéma). **Jamais exécuté ici.** Pour un autre vendeur : l'adresse de
+  contact (vide aujourd'hui, « à venir »).
+- **Preuves (§6)** :
+  | contrôle | code d'avant (origin/main d198bca, build copié) | après | mutations |
+  |---|---|---|---|
+  | banc `double-verification-appareils.cjs` (port 6251, faux GoTrue : un code par facteur, nom unique, aal2 pour enrôler et supprimer, 404, 429 ; 390 tactile + 1512) | **26 rouges sur 40** (la suite ne peut pas tourner : rien à cliquer) | **70/70** | `premier` (ne défier que le 1er) · `nompris` · `perime` (ne pas relire) · `trop` (429 non traité) · `ordre` (défier d'abord l'appareil retiré) : chacune rouge sur SON contrôle (1, à 1512 px) |
+  | même banc sur le build de `codex/mfa-sms` (390 px) | 13 rouges sur 19 | — | — |
+  | banc `double-verification.cjs` existant (PORT=6252, inchangé) | — | 62/62 | — |
+  | `audit-mfa-gratuite.cjs` (la vraie règle dans un `vm`) | rouge (règle absente) ; branche codex : 2/2 rouges | 8/8 | `premier` 4 · `trop` 1 · `passu` 1 rouges |
+  Et sur l'arbre final : `npm run build`, les **143 audits** `scripts/audit-*.cjs`
+  verts (lancés un par un), banc `session-reveil.cjs` vert. Captures regardées à
+  390 et 1512 px (écran du code à deux appareils, liste, QR de secours, retrait).
+- **Non mesuré** : le vrai GoTrue (formes tirées de sa doc et de son code : nom
+  unique, `aal2` pour enrôler un second facteur, sessions liées au facteur
+  supprimé rétrogradées en `aal1` — si Julien retire l'appareil dont il vient
+  de taper le code, VRM peut lui redemander un code au renouvellement suivant,
+  ≤ 1 h) ; « Mots de passe » de l'iPhone avec deux QR du même compte ; que TOTP
+  soit activé dans le projet (Authentication → MFA). La règle `aal2` côté base
+  reste **à trancher** — avec une session d'extension en `aal2`, jamais avant.
+- **Geste de Julien** : aucun obligatoire. S'il la veut : Réglages → Mon compte →
+  Double vérification → Activer (iPhone), puis « Ajouter un appareil de
+  secours » avec un AUTRE appareil (iPad, ancien téléphone).
+
+---
+
 ### Studio photo : cadre guide + détourage DANS le navigateur (fonction n°33, 17 octobre)
 Retenue le 11 octobre (« studio photo + détourage »), sous §2.9 : rien de payant
 sur la clé de Julien. Annonces → « ⋯ Outils » → **Studio photo**
