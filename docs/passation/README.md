@@ -62,7 +62,7 @@ journal tout de suite, première chose, pour que l'autre le voie.
 |---|---|---|---|
 | **Intégration à mettre en ligne** (extension **5.175.0**) | `origin/claude/project-review-nsk5su` | `e2d377c`, ou un commit plus récent de la session d'origine | Relecture croisée **faite** : 4 défauts corrigés (`c658216`, `19df09a`, `e2d377c`) — liste : `notes/croisee-5174/defauts-corriges-en-c658216.json`. **Les bancs de la vérification finale tournaient encore** à l'arrêt : à refaire (Agent 1, B). |
 | **Photos, second tour** (correctif de la plainte « plus de photos ») | paquet `branches-2026-10-12.bundle`, branche `passation2/photos-r2` | `bf63bca` (au-dessus de `c7efee0`, déjà dans l'intégration) | 13 défauts signalés, 7 confirmés (5 défauts distincts), **tous corrigés et prouvés** (audit-photos-vinted 50 contrôles, 26 mutations ; banc photos-vinted 166 contrôles). **À fusionner AVANT la mise en ligne.** Le correctif ne touche que l'app : aucune nouvelle version d'extension. |
-| **K3 : migration 014** (mémoire de l'agent eBay) | même paquet, `passation2/k3-014` | `9df8061` (au-dessus de `9dcd405`, déjà dans l'intégration) | Revue 2 : 5 défauts confirmés, **corrigés** (liste : `notes/k3/defauts-revue2-corriges-en-9df8061.json`). Une **3ᵉ relecture tournait**, sans résultat rendu. **PAS appliquée en production.** |
+| **K3 : migration 014** (mémoire de l'agent eBay) | même paquet, `passation2/k3-014` | `9df8061` (au-dessus de `9dcd405`, déjà dans l'intégration) | Revue 2 : 5 défauts confirmés, **corrigés** (liste : `notes/k3/defauts-revue2-corriges-en-9df8061.json`). Une **3ᵉ relecture tournait**, sans résultat rendu. ~~PAS appliquée en production.~~ ✅ appliquée le 12 oct. 20:35 UTC (`vrm_agent_memory_014`, vérifiée le 22 oct.). |
 | **Règle d'offre eBay** (seuil natif, décision du 9 oct.) | même paquet, `passation2/regle-offre` | `00a9d92` | Tours 1 à 3 corrigés. **Tour 4 sur `00a9d92` : 6 défauts CONFIRMÉS + 5 pas encore jugés** — liste complète, avec la sonde, la commande et la sortie de chacun : `notes/regle-offre/defauts-tour4-sur-00a9d92.json`. |
 | **Page d'accueil refaite + film** | même paquet, `passation2/accueil` | `a78fbc9` | Construite. La vérification au rendu et la revue adverse n'ont **pas** été faites. |
 | **21 anciennes branches** (propositions du 8 oct., pointage, coffre, compte de résultat, boutique Chrome, PDF dans le stockage…) | `branches-locales-2026-10-11.bundle` | voir §3 | à trier (Agent 2, F) |
@@ -320,8 +320,8 @@ passation : voir `git log`). Contenu au-dessus de main :
    cause « Masquer mon adresse d'Apple » n'est PAS prouvée — voir la section
    notifications de CLAUDE.md), l'IA de réponse ne refacture plus, détourage
    plafonné à 100/mois.
-4. **K3 : migration 014** (mémoire de l'agent eBay) — **fichier seulement, PAS
-   appliquée** ; audit `scripts/audit-agent-sql.cjs` (193 contrôles, 66
+4. **K3 : migration 014** (mémoire de l'agent eBay) — ~~fichier seulement, PAS
+   appliquée~~ (✅ appliquée le 12 oct., vérifiée le 22) ; audit `scripts/audit-agent-sql.cjs` (193 contrôles, 66
    mutations).
 5. **Extension 5.175.0** réunissant 1, 2 et 3, plus la relecture croisée du
    12 octobre (les 5.171, 5.172, 5.173 et 5.174 n'ont **jamais** été publiées :

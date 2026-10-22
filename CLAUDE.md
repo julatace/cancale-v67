@@ -4499,7 +4499,9 @@ noire en ligne sur eBay sous VRM-82 ; eBay VRM-81 / VRM-48 sont aujourd'hui 80 /
 - **Mémoire de défilement (18 oct.)** : `MemoireDefilement` observait le premier enfant de la zone (un bandeau de 74 px) et s'arrêtait au premier succès — l'écran qui se raccourcit le temps d'un chargement ramenait la position à 0. Elle se tient 2,5 s, réessayée à chaque image, et cède dès que la personne fait défiler (molette, doigt, clavier, clic). Banc `revendeurs.cjs` (rouge sur l'avant : 250 → 0).
 - La ligne « Ventes Vinted à jour / capture ancienne » sort du résumé Vinted replié sur téléphone (une alerte cachée n'en est pas une).
 
-### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
+### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — ✅ APPLIQUÉE le 12 octobre (vérifié le 22)
+> ⚠️ Correction du 22 octobre : `list_migrations` porte `vrm_agent_memory_014` (12 oct., 20:35 UTC), les 16 tables
+> existent et les **28 corps de fonctions** sont identiques au fichier (md5). Ce qui suit « PAS appliquée » est périmé.
 Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
 §5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
 c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides et
@@ -4732,7 +4734,7 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   de Postgres pourra exiger de recopier l'empreinte.
 - **Julien** : rien.
 
-### Le mode équipe : migration 016 (fonction n°37, 16-17 octobre) — PAS APPLIQUÉE ; écran livré le 17
+### Le mode équipe : migration 016 (fonction n°37, 16-17 octobre) — PAS APPLIQUÉE ; écran livré le 17 ; corrigée et essayée sur la vraie base le 22 (voir plus bas)
 Retenue le 11 octobre : le vendeur invite un aide qui voit les colis à expédier
 et à retirer, les codes de retrait, imprime les bordereaux — et RIEN d'autre.
 **Livré le 16 : la migration prouvée. Le 17 : la route, les écrans et leur banc**
@@ -4880,7 +4882,45 @@ de l'agent eBay).
   aide, la prévenir ; elle crée son compte VRM avec cette adresse, la confirme, et
   arrive directement sur « Colis à préparer ».
 
-### La carte de la communauté : migration 018 (20 octobre) — PAS APPLIQUÉE ; écran livré
+#### 22 octobre : la 016 retouchée pour la 021, essai annulé sur la vraie base — sûre à appliquer
+**Mesuré (lecture seule, 22 oct.)** : `list_migrations` porte 005-008, **014** (12 oct.), 017, **018** (20 oct.,
+deux morceaux), 019, 020 ; la **013** est en place (27 corps de fonctions identiques au fichier, md5) ; la **021**
+aussi (ses politiques sont là, appliquée hors `list_migrations`) ; 014 (28 corps), 017, 018-020 (22 corps) : tous
+identiques au fichier. **Seule la 016 manque** (aucune table, aucune fonction `vrm_equipe_*` : d'où les 404 de
+`rpc/vrm_equipe_lister`). La passation du 21 (« 014, 016, 018 non appliquées ») était fausse pour 014 et 018.
+- ⚠️⚠️ **Le défaut, trouvé en relisant la 016 contre le schéma actuel** : la 021 a posé, AVANT la 016, la
+  restrictive `vrm_lecture_privee` (SELECT, `owner = auth.uid()`, sans la clause de l'équipe puisque ses
+  fonctions n'existaient pas). Une restrictive s'ajoute (ET) : la 016 d'avant, appliquée telle quelle, aurait
+  installé un mode équipe **mort** — l'aide lit 0 ligne (rejoué sur Postgres jetable dans l'ordre de la
+  production). Corrigé : §11 bis pose sur `vrm_lecture_privee` l'expression que la 021 prévoit elle-même (§11,
+  mot pour mot, `alter policy`, aucun DROP) ; §11 ter **refuse toute la migration** si une autre restrictive de
+  lecture ignore l'équipe (`vrm_equipe_lecture_bloquee`) ; `--verifier` exige la clause sur `vrm_lecture_privee`
+  quand elle existe (`regles`) et aucune restrictive bloquante (`restrictives_bloquantes`).
+- **Isolation** (relue) : `abonnement_requis` ne s'ouvre que pour `owner = vrm_equipe_vendeur()` (membre ACTIF
+  d'un vendeur dont l'accès est ouvert, DEMANDÉ par l'en-tête) ; les écritures restent fermées par les
+  restrictives d'écriture de la 021 et les permissives `owner = auth.uid()` ; `vinted_accounts` n'est pas
+  touchée ; la vérification de séparation de `api/compte.js?mode=confidentialite` n'envoie pas l'en-tête (rien ne
+  change pour elle).
+- **Essai annulé sur la vraie base** (`scripts/equipe-sql/essai-production.cjs`, UN appel `execute_sql`, BEGIN →
+  migration → contrôles par rôle joués comme PostgREST → ROLLBACK ; aide, vendeur et adresse non confirmée
+  INVENTÉS dans la transaction) : propriétaire 7 840/7 840 lignes avant et après (avec l'en-tête aussi) ; un autre
+  vendeur réel 21 siennes, **0** du propriétaire, même en le demandant ; l'aide **577** lignes = exactement la liste
+  blanche (même empreinte), 0 sans en-tête, 0 de `main`/ventes/transactions/porte-monnaie/eBay, 0 compte Vinted,
+  le PDF lisible, 0 modifiée/effacée, création refusée (42501) ; projection : 36 ventes, 50 achats, clés
+  `date, photo, status, title, transaction_id, transaction_user_status, uid`, **aucune clé d'argent** ; inventaire
+  des clés des 577 lignes : aucune clé d'argent (le seul « € » du texte est le pied légal d'un email Chronopost) ;
+  adresse non confirmée refusée ; révocation : 0 tout de suite ; plans d'index inchangés (+1 à 2 ms sur un
+  balayage de 7 840 lignes) ; `--verifier` ok, empreinte 948f… identique en 17.6. Verrou de table **660 ms**
+  (essai entier 1 s). Relu ensuite : ni table, ni fonction, ni règle, ni compte inventé.
+- Preuves : `audit-equipe-sql.cjs` **144 contrôles** (021 puis 016, 016 puis 021, restrictive inconnue, l'essai de
+  production rejoué et ne laissant rien) ; **6 rouges** sur la 016 d'origin/main (dont « l'aide lit [] ») ;
+  `--prouve` **19/19** mutations (dont `sans-lecture-021`, `sans-garde-restrictive`, `verifier-restrictives`).
+- **Appliquer** : le fichier tel quel (comme 019/020, par `apply_migration` ou l'éditeur SQL), VRM peu sollicité
+  (verrou exclusif bref sur `app_data`). Puis `node scripts/equipe-sql/essai-annule.cjs --verifier` ⇒ `ok: true`.
+- **Non mesuré** : l'en-tête `x-vrm-equipe` à travers la passerelle de Supabase depuis un navigateur (CORS) ; la
+  confirmation d'email obligatoire du projet (geste de Julien, voir plus haut).
+
+### La carte de la communauté : migration 018 (20 octobre) — ✅ APPLIQUÉE le 20 octobre (vérifié le 22)
 Julien : « un onglet avec une carte où les utilisateurs de VRM peuvent mettre
 leur emplacement quand on est connecté, pour s'écrire si on est dans la même
 ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
@@ -12334,7 +12374,7 @@ lignes `plantage_*`, `email_inconnu_*`, quarantaine, journal des emails.
   `EMAIL_INBOUND_SECRET` sur Vercel — absente aujourd'hui, la route des emails
   accepte donc encore un envoi sans clé (§ « la route des emails exige sa clé »).
 - Noté, normal : `rpc/vrm_equipe_lister` → 404 (~60/jour, une par ouverture) tant que
-  la 016 n'est pas appliquée (la route dit « pas encore activé ») ; quelques 401 au
+  la 016 n'est pas appliquée (corrigée et essayée le 22 octobre : voir la section de la 016) (la route dit « pas encore activé ») ; quelques 401 au
   réveil de l'iPhone (jeton expiré, le renouvellement et la reprise d'envoi existent).
 - Noté pour Julien : `STRIPE_SECRET_KEY` absente de Vercel (paiement non branché) ; le
   commentaire de `STRIPE_PRICE_LOOKUP` dit encore « 9,99 € ».

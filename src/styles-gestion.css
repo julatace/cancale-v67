@@ -3,10 +3,68 @@
 .vrm-app-shell{
  --gestion-surface:#fffefa;--gestion-soft:#edf2ef;--gestion-line:#dce5e1;
  --gestion-ink:#243d43;--gestion-muted:#52636b;--gestion-accent:#2b4548;
+ --gestion-on-accent:#fffefa;
 }
 :root[data-theme=dark] .vrm-app-shell{
  --gestion-surface:#243c40;--gestion-soft:#2c4548;--gestion-line:#385155;
  --gestion-ink:#edf5f0;--gestion-muted:#b0c5bc;--gestion-accent:#bad7c9;
+ --gestion-on-accent:#21343e;
+}
+/* Les commandes partagées reprennent la palette de navigation : une recherche,
+   un compte et un filtre ont le même dessin sur chaque plateforme. Les marques
+   et les couleurs de statut conservent leur sens. */
+.vrm-main .vrm-compte-ligne{
+ background:var(--gestion-surface)!important;color:var(--gestion-ink)!important;
+ border:1px solid var(--gestion-line);border-radius:10px;box-sizing:border-box;
+}
+.vrm-main .vrm-compte-ligne label,
+.vrm-main .vrm-compte-chevron{color:var(--gestion-muted)!important;}
+.vrm-main .vrm-compte-ligne select{color:var(--gestion-ink)!important;min-width:0;max-width:100%;}
+.vrm-main [data-comptes-annonces]>button{color:var(--gestion-accent)!important;}
+.vrm-main :is(.vrm-list-search,.vrm-ann-search){
+ background:var(--gestion-surface)!important;border:1px solid var(--gestion-line)!important;
+ border-radius:10px!important;color:var(--gestion-muted);box-sizing:border-box;
+}
+.vrm-main :is(.vrm-list-search,.vrm-ann-search) input{
+ border:0!important;background:transparent!important;color:var(--gestion-ink)!important;
+}
+.vrm-main :is(.vrm-list-search,.vrm-ann-search):focus-within,
+.vrm-main .vrm-compte-ligne:focus-within{
+ border-color:var(--gestion-accent)!important;
+ box-shadow:0 0 0 3px color-mix(in srgb,var(--gestion-accent) 14%,transparent);
+}
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
+ border-radius:8px!important;border:1px solid var(--gestion-line)!important;
+ background:var(--gestion-surface)!important;color:var(--gestion-muted)!important;
+ font-weight:600!important;box-shadow:none!important;
+}
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed=true]{
+ background:var(--gestion-accent)!important;border-color:var(--gestion-accent)!important;
+ color:var(--gestion-on-accent)!important;
+}
+.vrm-main .vrm-shared-workbar>input[type=search]{
+ border:1px solid var(--gestion-line)!important;border-radius:10px!important;
+ background:var(--gestion-surface)!important;color:var(--gestion-ink)!important;
+}
+.vrm-main .vrm-shared-workbar>input[type=search]:focus-visible{
+ outline:2px solid var(--gestion-accent);outline-offset:2px;
+}
+.vrm-main :is(.vrm-sale-row,.vrm-ann-card):last-child{border-bottom:0!important;}
+.vrm-main .vrm-sale-row{border-radius:0!important;box-shadow:none!important;}
+.vrm-main .vrm-sale-row[data-ligne-ouverte=true]{background:var(--gestion-soft)!important;}
+.vrm-main .vrm-ledger-sale-toggle:focus-visible{
+ outline:2px solid var(--gestion-accent);outline-offset:-2px;border-radius:6px;
+}
+@media(hover:hover){
+ .vrm-main .vrm-ann-card:hover{background:var(--gestion-soft)!important;}
+}
+@media(max-width:767px){
+ /* Le titre conserve la priorité même avec un statut ou un montant long. */
+ .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle{
+  grid-template-columns:28px minmax(0,1fr) minmax(0,64px) auto 20px;gap:5px;
+ }
+ .vrm-main .vrm-ledger-sale-state{min-width:0;max-width:64px;}
+ .vrm-main .vrm-compte-ligne{border-radius:8px;}
 }
 .vrm-main :is(.vrm-set-liste,.vrm-buy-list,.vrm-ann-grid,.vrm-pickup-point,.vrm-ventes-liste){
  border:1px solid var(--gestion-line)!important;border-radius:8px!important;box-shadow:none!important;
@@ -176,3 +234,79 @@
  .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:#d4e6c8!important;}
  .vrm-day-benef-inline .vrm-day-k{font-size:10px;letter-spacing:.04em;}
 }
+
+/* Finition transversale : messages, formulaires et états secondaires. Les tons
+   danger/avertissement et les contrôles métier personnalisés sont préservés. */
+.vrm-main .vrm-field{gap:6px!important;min-width:0;}
+.vrm-main .vrm-field>span:first-child{
+ font-size:12px!important;font-weight:600;letter-spacing:0!important;
+ text-transform:none!important;line-height:1.4;color:var(--gestion-muted)!important;
+}
+.vrm-main .vrm-input{
+ border-color:var(--gestion-line)!important;background:var(--gestion-surface)!important;
+ border-radius:8px!important;line-height:1.45;box-sizing:border-box;max-width:100%;
+}
+.vrm-main .vrm-input:focus-visible{
+ outline:2px solid var(--gestion-accent);outline-offset:2px;
+}
+.vrm-main .vrm-input[aria-invalid=true]{border-color:var(--vrm-danger,#b0443d)!important;}
+.vrm-main .vrm-button[data-vrm-tone=brand]:not(.vrm-button--secondary){
+ background:var(--gestion-accent)!important;border-color:var(--gestion-accent)!important;
+ color:var(--gestion-on-accent)!important;
+}
+.vrm-main .vrm-button--secondary[data-vrm-tone=brand]{
+ background:var(--gestion-surface)!important;border-color:var(--gestion-line)!important;
+ color:var(--gestion-ink)!important;
+}
+.vrm-main .vrm-notice{
+ box-shadow:none!important;border-radius:8px!important;padding:12px 14px!important;
+ gap:10px!important;line-height:1.5;
+}
+.vrm-main .vrm-notice>div{overflow-wrap:anywhere;}
+.vrm-main .vrm-notice details>summary{opacity:1!important;min-height:44px;display:flex;align-items:center;}
+.vrm-main .vrm-empty-state{
+ background:var(--gestion-surface)!important;border-color:var(--gestion-line)!important;
+ padding:28px 20px!important;border-radius:10px!important;box-shadow:none!important;
+}
+.vrm-main .vrm-empty-state>div:first-child{
+ width:40px!important;height:40px!important;font-size:20px!important;
+ background:var(--gestion-soft)!important;color:var(--gestion-accent);
+}
+.vrm-main .vrm-empty-state>div:nth-child(2){font-size:14px!important;line-height:1.4;}
+.vrm-main .vrm-empty-state>div:nth-child(3){line-height:1.6!important;}
+.vrm-main .vrm-set-pied{
+ font-size:12px!important;line-height:1.6;max-width:68ch;
+ margin:8px 12px 0;color:var(--gestion-muted)!important;overflow-wrap:anywhere;
+}
+.vrm-main .vrm-set-lib>small{font-size:12px;line-height:1.5;margin-top:4px;overflow-wrap:anywhere;}
+.vrm-main .vrm-set-lib>b{font-weight:600;line-height:1.4;}
+.vrm-main .vrm-set-liste{background:var(--gestion-surface)!important;}
+.vrm-main .vrm-set-ligne:focus-within{background:var(--gestion-soft);}
+.vrm-main .vrm-set-champ:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:2px;border-radius:4px;}
+.vrm-main .vrm-set-titre{margin-left:12px;font-size:12px;line-height:1.5;}
+.vrm-main .vrm-set-carte-tete{padding-bottom:12px;border-bottom:1px solid var(--gestion-line);}
+.vrm-feuille{box-shadow:0 12px 48px #14282e24;border:1px solid var(--vrm-hair,#dce5e1);}
+.vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#2b4548);outline-offset:2px;}
+/* Les messages éphémères sont rendus hors de la coque par React. */
+.vrm-toasts{--message-surface:#fffefa;--message-ink:#243d43;--message-line:#dce5e1;}
+:root[data-theme=dark] .vrm-toasts{--message-surface:#243c40;--message-ink:#edf5f0;--message-line:#385155;}
+.vrm-toast{
+ min-height:48px;border-radius:10px!important;border-color:var(--message-line)!important;
+ background:var(--message-surface)!important;box-shadow:0 4px 20px #14282e1f!important;
+}
+.vrm-toast>span:last-child{color:var(--message-ink)!important;min-width:0;overflow-wrap:anywhere;}
+.vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
+.vrm-toast:focus-visible{outline:2px solid var(--message-ink);outline-offset:3px;}
+@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;padding:0!important;}}
+@media(prefers-reduced-motion:reduce){.vrm-toast{animation:none!important;}}
+.vrm-main .vrm-set-panneau :is(p,small){line-height:1.6;}
+.vrm-main :is(.vrm-reception,.vrm-recus-email){
+ background:var(--gestion-surface);border-color:var(--gestion-line);border-radius:8px;
+}
+.vrm-main :is(.vrm-reception-note,.vrm-recus-email p,.vrm-recus-email small){
+ color:var(--gestion-muted);opacity:1;line-height:1.6;
+}
+.vrm-main .vrm-reception-entete-liste{background:var(--gestion-soft);}
+.vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:10px!important;box-shadow:0 8px 28px #14282e20!important;}
+.vrm-main .vrm-ann-tools-pop button{border-radius:6px;}
+.vrm-main .vrm-ann-tools-pop button:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
