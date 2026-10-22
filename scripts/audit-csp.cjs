@@ -95,7 +95,12 @@ dit((dir(complete, 'worker-src') || []).includes("'self'"), "worker-src 'self' (
 
 console.log('\n── la carte (OpenFreeMap)');
 const fond = lire('src/fondCarte.js');
-const styles = [...((/OFM_STYLE\s*=\s*\{([\s\S]*?)\}/.exec(fond) || [])[1] || '').matchAll(/['"`](https:\/\/[^/'"`]+)/g)].map((m) => m[1]);
+// (22 oct.) La règle, pas l'orthographe : la carte a été réécrite (un seul
+// fournisseur, `FOURNISSEUR.style.{clair,sombre}`) et l'ancien `OFM_STYLE`
+// n'existe plus. On lit dans le CODE (commentaires retirés) toute adresse de
+// style `https://hôte/styles/…` — c'est elle que MapLibre va chercher.
+const fondCode = fond.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:])\/\/.*$/gm, '$1');
+const styles = [...fondCode.matchAll(/['"`](https:\/\/[^/'"`]+)\/styles\//g)].map((m) => m[1]);
 dit(styles.length > 0, 'les styles du fond de carte se lisent dans src/fondCarte.js', [...new Set(styles)].join(' '));
 const imgs = dir(complete, 'img-src') || [];
 for (const o of new Set(styles)) {
