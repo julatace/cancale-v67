@@ -52,6 +52,21 @@ export const DUREE_LIEN_MS = 72 * 3600e3;
 export const DELAI_RENVOI_MS = 10 * 60e3;
 export const MAX_ENVOIS_ADRESSE_JOUR = 5;
 export const MAX_ADRESSES_JOUR = 10;
+// (22 oct., revue) Les freins qui protègent la boîte VRM — elle envoie AUSSI les
+// factures Pro, sur un quota Gmail partagé (~100 destinataires par jour pour un
+// compte grand public, non mesuré d'ici) :
+//   · 15 demandes par vendeur et par 24 h (adresses neuves ET renvois) ;
+//   · 40 liens par jour pour TOUTE l'installation ;
+//   · une adresse que la boîte n'arrive pas à servir sort de la file après 3 échecs.
+// Les deux compteurs vivent dans une ligne NEUTRE, écrite par comparer-et-échanger
+// (`neutre-cas.js`) : des demandes simultanées ne passent plus toutes.
+export const MAX_DEMANDES_VENDEUR_JOUR = 15;
+export const PLAFOND_LIENS_JOUR = 40;
+export const MAX_ECHECS_ENVOI = 3;
+// Le compteur d'un vendeur porte son identifiant (`data.owner`) et le préfixe des
+// preuves : « Fermer mon compte » l'efface avec elles, en une requête.
+export const idCompteurVendeur = (owner) => PREFIXE_PREUVE + 'compteur_' + sha(String(owner || '').trim()).slice(0, 40);
+export const ID_LIENS_JOUR = 'vrm_liens_adresse_jour';
 export const SITE_VRM = 'https://vrm.center';
 export const PARAM_LIEN = 'confirmer-adresse';
 
@@ -109,33 +124,67 @@ export function prouveeParCompte(adresse, user) {
 // ── L'ÉTAT D'UNE ADRESSE POUR CE VENDEUR — UNE RÈGLE (§11) ───────────────────
 // `preuve` : la ligne de preuve (data) de CE vendeur pour CETTE adresse, ou null.
 //   'prouvee'    prouvée (lien ou adresse de connexion confirmée)
-//   'transition' déclarée par le propriétaire de l'installation, pas prouvée
-//   'impossible' relais Apple : aucun lien ne peut y arriver
 //   'envoi'      lien demandé, pas encore parti (la boîte VRM l'envoie)
 //   'envoyee'    lien parti, pas encore cliqué
+//   'echec'      la boîte VRM n'a pas réussi à l'envoyer (3 essais)
 //   'perimee'    lien périmé
+//   'transition' déclarée par le propriétaire de l'installation, rien de demandé
+//   'impossible' relais Apple : aucun lien ne peut y arriver
 //   'aucune'     rien de demandé
+// ⚠️ (22 oct., revue) Une demande en cours PRIME sur « transition » : le
+//    propriétaire qui vient de cliquer « Confirmer » doit lire « lien en
+//    préparation », puis « lien envoyé » — pas « à confirmer » et « Confirmer »
+//    pour toujours. Ce qui est AFFICHÉ et ce qui est RETENU sont deux questions :
+//    `adresseRetenue` répond à la seconde.
+const estInstallation = (owner, installation) => { const o = String(owner || '').trim(); return !!o && !!installation && o === String(installation).trim(); };
 export function etatAdresse({ adresse, owner, preuve, installation, maintenant = Date.now() }) {
   const a = normAdresse(adresse), o = String(owner || '').trim();
   const p = preuve && String(preuve.owner || '') === o && normAdresse(preuve.adresse) === a ? preuve : null;
   if (p && p.etat === 'prouvee') return 'prouvee';
-  if (o && installation && o === String(installation).trim()) return 'transition';
-  if (relaisApple(a)) return 'impossible';
   if (p && p.etat === 'attente') {
     if (!(Date.parse(p.expire) > maintenant)) return 'perimee';
-    return p.envoyeLe ? 'envoyee' : 'envoi';
+    if (p.envoyeLe) return 'envoyee';
+    return p.abandonLe ? 'echec' : 'envoi';
   }
+  if (estInstallation(o, installation)) return 'transition';
+  if (relaisApple(a)) return 'impossible';
   return 'aucune';
 }
-export const etatRetenu = (e) => e === 'prouvee' || e === 'transition';
+// Les emails qui arrivent sur cette adresse sont-ils attribués à ce vendeur ?
+// Prouvée — ou déclarée par le propriétaire de l'installation (la transition),
+// quel que soit l'état de sa demande de lien.
+export function adresseRetenue({ adresse, owner, preuve, installation, maintenant = Date.now() }) {
+  return etatAdresse({ adresse, owner, preuve, installation, maintenant }) === 'prouvee' || estInstallation(owner, installation);
+}
 
-// La garde du registre (base cloisonnée) : la décision d'`etatAdresse`, sur
-// l'index des preuves PROUVÉES (`Map` id → ligne). Rend `true` si l'adresse
-// déclarée par `owner` peut lui être attribuée.
+// La garde du registre (base cloisonnée) : `adresseRetenue`, sur l'index des
+// preuves PROUVÉES (`Map` id → ligne). Rend `true` si l'adresse déclarée par
+// `owner` peut lui être attribuée.
 export function retenue(adresse, owner, garde) {
   if (!garde || !(garde.preuves instanceof Map)) return false;
   const preuve = garde.preuves.get(idPreuve(owner, adresse)) || null;
-  return etatRetenu(etatAdresse({ adresse, owner, preuve, installation: garde.installation }));
+  return adresseRetenue({ adresse, owner, preuve, installation: garde.installation });
+}
+
+// ── LES COMPTEURS (comparer-et-échanger, `neutre-cas.js`) ────────────────────
+// Une demande de lien pour CE vendeur : `d` = la ligne compteur lue (ou null).
+// Rend `{ data }` (à écrire) ou `{ refus: 'trop-adresses' | 'trop-demandes' }`.
+// Fenêtre glissante de 24 h, comme le frein par adresse.
+export function reserverDemande(d, { owner, id, maintenant = Date.now() }) {
+  const recentes = (d && Array.isArray(d.demandes) ? d.demandes : [])
+    .filter((x) => x && x.id && maintenant - Date.parse(x.at || '') < 24 * 3600e3);
+  const adresses = new Set(recentes.map((x) => x.id));
+  if (!adresses.has(id) && adresses.size >= MAX_ADRESSES_JOUR) return { refus: 'trop-adresses' };
+  if (recentes.length >= MAX_DEMANDES_VENDEUR_JOUR) return { refus: 'trop-demandes' };
+  return { data: { owner: String(owner || '').trim(), demandes: [...recentes, { id, at: new Date(maintenant).toISOString() }] } };
+}
+// La boîte VRM demande `n` liens à envoyer : combien en reste-t-il aujourd'hui
+// (jour UTC) pour toute l'installation ? Rend `{ k, data }`.
+export function reserverEnvois(d, { n, maintenant = Date.now() }) {
+  const jour = new Date(maintenant).toISOString().slice(0, 10);
+  const deja = d && d.jour === jour && Number.isSafeInteger(d.n) && d.n >= 0 ? d.n : 0;
+  const k = Math.max(0, Math.min(Number(n) || 0, PLAFOND_LIENS_JOUR - deja));
+  return { k, data: { jour, n: deja + k } };
 }
 
 // L'email de confirmation (le serveur l'écrit, le script Gmail l'envoie tel quel).

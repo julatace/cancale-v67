@@ -26,7 +26,8 @@ import { stampBordereau } from './_lib/stamp.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
-import { retenue, cleLiens, jetonLien, lienConfirmation, emailConfirmation, retirerLiensPreuve, PREFIXE_PREUVE } from './_lib/preuve-adresse.js';
+import { retenue, cleLiens, jetonLien, lienConfirmation, emailConfirmation, retirerLiensPreuve, PREFIXE_PREUVE, ID_LIENS_JOUR, reserverEnvois, MAX_ECHECS_ENVOI } from './_lib/preuve-adresse.js';
+import { modifierNeutre } from './_lib/neutre-cas.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
@@ -1563,16 +1564,64 @@ export async function modeScript(mode, req, res) {
   if (mode === 'preuves-a-envoyer' && req.method === 'GET') {
     const cle = cleLiens(process.env.SUPABASE_SERVICE_KEY || '');
     if (!cle) { res.status(503).json({ ok: false, error: 'cle-service' }); return; }
+    // ⚠️ (22 oct., revue) La file ne garde QUE ce qui peut partir, filtré PAR LA
+    //    BASE avant la limite : pas périmé (`expire` > maintenant — un ISO se
+    //    compare comme un texte), pas abandonné après 3 échecs, plus ancienne
+    //    demande d'abord. Avant, `limit=20` s'appliquait avant le tri des
+    //    périmées : vingt demandes jamais parties (boîte arrêtée > 72 h, adresse
+    //    refusée) bloquaient toutes les suivantes, pour toujours.
+    const maintenant = Date.now();
     let lignes = null;
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.attente&data->>envoyeLe=is.null&select=id,data&order=id.asc&limit=20`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>etat=eq.attente&data->>envoyeLe=is.null&data->>abandonLe=is.null&data->>expire=gt.${encodeURIComponent(new Date(maintenant).toISOString())}&select=id,data&order=data->>demandeLe.asc,id.asc&limit=20`, { headers: { ...sbCle(SUPABASE_KEY) } });
       if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
     } catch (_) { lignes = null; }
     if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
-    const maintenant = Date.now();
-    const envois = lignes.filter((l) => l && l.data && l.data.adresse && l.data.nonce && Date.parse(l.data.expire) > maintenant)
+    const pretes = lignes.filter((l) => l && /^vrm_email_preuve_[0-9a-f]{40}$/.test(String(l.id || '')) && l.data && l.data.adresse && l.data.nonce && Date.parse(l.data.expire) > maintenant);
+    // Le plafond de TOUTE l'installation : la boîte VRM envoie aussi les
+    // factures Pro, sur un quota Gmail partagé. Réservé par comparer-et-échanger
+    // AVANT de rendre les liens ; illisible ⇒ rien ne part (« pas su »).
+    let k = 0;
+    if (pretes.length) {
+      const resa = await modifierNeutre(ID_LIENS_JOUR, (d) => { const r = reserverEnvois(d, { n: pretes.length, maintenant }); return r.k ? { data: r.data, valeur: r.k } : { valeur: 0 }; });
+      if (!resa) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+      k = resa.valeur || 0;
+    }
+    const envois = pretes.slice(0, k)
       .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien) }; });
-    res.status(200).json({ ok: true, envois });
+    res.status(200).json({ ok: true, envois, ...(pretes.length > k ? { plafond: true, enAttente: pretes.length - k } : {}) });
+    return;
+  }
+  // Un envoi que GmailApp a refusé : compté ; au 3ᵉ, la demande sort de la file
+  // (l'écran dit « la boîte VRM n'a pas pu l'envoyer », et « Renvoyer » repart
+  // d'une demande neuve). Écriture CONDITIONNELLE, comme « envoyée ».
+  if (mode === 'preuve-echec' && req.method === 'POST') {
+    let corps = req.body;
+    try { if (typeof corps === 'string') corps = JSON.parse(corps); } catch (_) { corps = null; }
+    const id = String((corps && corps.id) || '');
+    if (!/^vrm_email_preuve_[0-9a-f]{40}$/.test(id)) { res.status(400).json({ ok: false, error: 'identifiant invalide' }); return; }
+    let lignes = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) lignes = j; }
+    } catch (_) { lignes = null; }
+    if (lignes === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    const d = lignes[0] && lignes[0].data;
+    if (!d) { res.status(404).json({ ok: false, error: 'demande introuvable' }); return; }
+    if (d.etat !== 'attente' || d.envoyeLe) { res.status(200).json({ ok: true, deja: true }); return; }
+    const echecs = (Number.isSafeInteger(d.echecs) && d.echecs >= 0 ? d.echecs : 0) + 1;
+    const iso = new Date().toISOString();
+    const nouv = { ...d, echecs, dernierEchec: iso, ...(echecs >= MAX_ECHECS_ENVOI ? { abandonLe: iso } : {}) };
+    let n = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${id}&data->>etat=eq.attente&data->>nonce=eq.${encodeURIComponent(d.nonce || '')}&data->>demandeLe=eq.${encodeURIComponent(d.demandeLe || '')}`, {
+        method: 'PATCH', headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ data: nouv }),
+      });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) n = j.length; }
+    } catch (_) { n = null; }
+    if (n === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    res.status(200).json({ ok: true, echecs, ...(echecs >= MAX_ECHECS_ENVOI ? { abandon: true } : {}), ...(n ? {} : { deja: true }) });
     return;
   }
   if (mode === 'preuve-envoyee' && req.method === 'POST') {

@@ -206,6 +206,9 @@
  :root body .vrm-main [data-messages-lbc] a[data-ouvrir-messages-lbc],
  :root body .vrm-main .vrm-ann-actions a[href],
  :root body .vrm-main :is(.vrm-achats a[data-retour-tx],.vrm-buy-retour>a,.vrm-pickup-cta,.vrm-pickup-lien){min-height:44px!important;}
+ /* (22 oct., revue) « Répondre sur Vinted » d'une offre reçue par email : un
+    lien, pas un bouton — il échappait à la règle des 44 px (26 px au doigt). */
+ :root body .vrm-main [data-offres-messages] a[data-offre-repondre]{min-height:44px!important;}
  :root body .vrm-main :is(a.vrm-lien-touche,.vrm-apub-gestes>a.vrm-apub-lien){min-height:44px;min-width:44px;margin-block:-10px;}
  :root body .vrm-main [role="switch"]{min-height:44px!important;height:44px!important;min-width:46px!important;}
  :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}

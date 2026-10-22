@@ -21,7 +21,8 @@
 //    7. le lien n'est jamais rangé lisible, ni écrit par le navigateur ;
 //    8. le script Gmail envoie tel quel puis le dit, et seulement s'il a envoyé.
 //  `--mutation` réaffaiblit une règle dans une COPIE de `api/` : chacune doit
-//  rendre ce contrôle ROUGE (sansgarde · autrecompte · jetonignore · pasSu).
+//  rendre ce contrôle ROUGE (sansgarde · autrecompte · jetonignore · pasSu ·
+//  et, revue du 22 oct. : sanscas · sansplafond · perimees · abandon · installation).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), os = require('os'), vm = require('vm');
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : ''; };
@@ -37,6 +38,7 @@ if (MUTATION) {
   const dst = fs.mkdtempSync(path.join(os.tmpdir(), 'preuve-mut-'));
   const copie = (src, d) => { fs.mkdirSync(d, { recursive: true }); for (const f of fs.readdirSync(src)) { const s = path.join(src, f), t = path.join(d, f); if (fs.statSync(s).isDirectory()) copie(s, t); else fs.copyFileSync(s, t); } };
   copie(path.join(RACINE, 'api'), path.join(dst, 'api'));
+  fs.mkdirSync(path.join(dst, 'scripts'), { recursive: true }); fs.copyFileSync(path.join(RACINE, 'scripts', 'gmail-forwarder.gs'), path.join(dst, 'scripts', 'gmail-forwarder.gs'));
   try { fs.symlinkSync(path.join(RACINE, 'node_modules'), path.join(dst, 'node_modules')); } catch (_) {}
   fs.writeFileSync(path.join(dst, 'package.json'), fs.readFileSync(path.join(RACINE, 'package.json')));
   const remplace = (rel, de, vers) => { const p = path.join(dst, rel); const s = fs.readFileSync(p, 'utf8'); if (!s.includes(de)) { console.log('❌ mutation introuvable : ' + de.slice(0, 80)); process.exit(1); } fs.writeFileSync(p, s.replace(de, vers)); };
@@ -44,6 +46,12 @@ if (MUTATION) {
   else if (MUTATION === 'autrecompte') remplace('api/email-rattacher.js', "if (!d || String(d.owner || '') !== u.id || idPreuve(u.id, d.adresse) !== id) { inconnu(); return; }", 'if (!d) { inconnu(); return; } u.id = String(d.owner);');
   else if (MUTATION === 'jetonignore') remplace('api/_lib/preuve-adresse.js', "if (attendu.length !== recu.length || !crypto.timingSafeEqual(attendu, recu)) return 'faux';", '');
   else if (MUTATION === 'pasSu') remplace('api/email-inbound.js', 'if(preuves===null)return null;', 'if(preuves===null)return fusionnerRegistresLib([],true,{retenue:()=>false});');
+  // (revue du 22 oct.) Chaque correctif réaffaibli seul doit rendre le contrôle rouge.
+  else if (MUTATION === 'sanscas') remplace('api/_lib/neutre-cas.js', '`${base}?${filtre}&${cond}&select=id`', '`${base}?${filtre}&select=id`');
+  else if (MUTATION === 'sansplafond') remplace('api/_lib/preuve-adresse.js', 'PLAFOND_LIENS_JOUR - deja', 'Infinity');
+  else if (MUTATION === 'perimees') remplace('api/email-inbound.js', '&data->>expire=gt.${encodeURIComponent(new Date(maintenant).toISOString())}', '');
+  else if (MUTATION === 'abandon') remplace('api/email-inbound.js', '&data->>abandonLe=is.null', '');
+  else if (MUTATION === 'installation') remplace('api/_lib/preuve-adresse.js', "  if (p && p.etat === 'prouvee') return 'prouvee';\n  if (p && p.etat === 'attente') {", "  if (p && p.etat === 'prouvee') return 'prouvee';\n  if (estInstallation(o, installation)) return 'transition';\n  if (p && p.etat === 'attente') {");
   else { console.log('❌ mutation inconnue : ' + MUTATION); process.exit(1); }
   RACINE = dst;
   console.log('── mutation « ' + MUTATION + ' » (copie : ' + dst + ')');
@@ -100,6 +108,8 @@ const filtrer = (params) => {
     else if (k === 'owner' && v.startsWith('eq.')) rows = rows.filter((r) => r.owner === v.slice(3));
     else if (/^(data|meta)->>/.test(k) && v === 'is.null') rows = rows.filter((r) => champ(r, k) == null);
     else if (/^(data|meta)->>/.test(k) && v.startsWith('eq.')) rows = rows.filter((r) => champ(r, k) != null && String(champ(r, k)) === v.slice(3));
+    // `gt.` sur un texte (PostgREST compare `data->>x` comme un texte : un ISO se compare bien).
+    else if (/^(data|meta)->>/.test(k) && v.startsWith('gt.')) rows = rows.filter((r) => champ(r, k) != null && String(champ(r, k)) > v.slice(3));
     else if (k === 'or') { const t = parseOu(v); if (!t) return null; rows = rows.filter((r) => t.some((x) => { const w = champ(r, x.col); return w != null && motifRe(x.val).test(String(w)); })); }
     else return null;   // un filtre que le banc ne comprend pas ne passe JAMAIS pour vrai
   }
@@ -117,7 +127,14 @@ const fetchBanc = async (url, opts = {}) => {
   if (m === 'POST') {
     if (pannes.ecriture) return rep('<html>503</html>', 503);
     let arr = []; try { arr = JSON.parse(opts.body || '[]'); } catch (_) {}
-    for (const x of (Array.isArray(arr) ? arr : [arr])) {
+    arr = Array.isArray(arr) ? arr : [arr];
+    // (22 oct., revue) La forme de PostgREST (§6.3) : sans `on_conflict` (ni
+    // `merge-duplicates`), une ligne qui existe déjà fait échouer l'INSERTION
+    // (409) — c'est ce qui sérialise la création d'un compteur. Upserter
+    // toujours aurait laissé deux créateurs simultanés s'écraser.
+    const fusion = /on_conflict=/.test(u) || /merge-duplicates/.test(String((opts.headers && (opts.headers.Prefer || opts.headers.prefer)) || ''));
+    if (!fusion && arr.some((x) => base.some((r) => r.id === x.id && r.owner === (x.owner || '')))) return rep({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409);
+    for (const x of arr) {
       journal.push({ m, owner: x.owner || '', id: x.id, data: x.data, url: u });
       const i = base.findIndex((r) => r.id === x.id && r.owner === (x.owner || ''));
       const ligne = { owner: x.owner || '', id: x.id, data: x.data };
@@ -126,6 +143,14 @@ const fetchBanc = async (url, opts = {}) => {
     return rep('', 201);
   }
   if (/^select=owner&limit=1$/.test(q)) return rep([{ owner: J }]);
+  // Une lecture TENUE (jamais un délai) : les `n` premières lectures du compteur
+  // d'un vendeur attendent d'être toutes arrivées, puis répondent ensemble —
+  // c'est la course réelle de demandes simultanées (toutes lisent la même
+  // version), que l'ordonnancement du banc rendait sinon séquentielle.
+  if (pannes.tenir && m === 'GET' && u.includes('vrm_email_preuve_compteur_')) {
+    const t = pannes.tenir;
+    await new Promise((ok) => { t.file.push(ok); if (t.file.length >= t.n) { pannes.tenir = null; t.file.forEach((f) => f()); } });
+  }
   if (pannes.preuves && m === 'GET' && u.includes('vrm_email_preuve_')) return rep('<html>522</html>', 522);
   if (pannes.registre && m === 'GET' && get('id') === 'eq.vrm_email_owners') return rep('<html>522</html>', 522);
   const rows = filtrer(params);
@@ -137,7 +162,11 @@ const fetchBanc = async (url, opts = {}) => {
   }
   if (m === 'DELETE') { const s = new Set(rows); base = base.filter((r) => !s.has(r)); return rep('', 204); }
   let out = rows;
-  if (get('order')) out = out.slice().sort((a, b) => (String(a.id) < String(b.id) ? -1 : 1));
+  // `order=col.asc,col2.asc` (colonnes ou `data->>x`), comme PostgREST.
+  if (get('order')) {
+    const cles = get('order').split(',').map((x) => { const i = x.lastIndexOf('.'); return { col: x.slice(0, i), desc: x.slice(i + 1) === 'desc' }; });
+    out = out.slice().sort((a, b) => { for (const c of cles) { const x = String(champ(a, c.col) ?? ''), y = String(champ(b, c.col) ?? ''); if (x !== y) return (x < y ? -1 : 1) * (c.desc ? -1 : 1); } return 0; });
+  }
   const mr = /^(\d+)-(\d+)$/.exec(String((opts.headers && (opts.headers.Range || opts.headers.range)) || ''));
   if (mr) out = out.slice(+mr[1], +mr[2] + 1);
   if (get('limit')) out = out.slice(0, +get('limit'));
@@ -323,6 +352,97 @@ const vente = (to) => { n++; return { method: 'POST', query: {}, headers: { 'x-v
     dit(ok1.appels.some((x) => x.mode === 'preuve-envoyee' && x.corps && /^vrm_email_preuve_/.test(x.corps.id)), 'puis le dit à VRM', JSON.stringify(ok1.appels));
     const ko1 = lance(false);
     dit(!ko1.appels.some((x) => x.mode === 'preuve-envoyee'), 'un envoi raté n’est PAS marqué envoyé (il repartira)', JSON.stringify(ko1.appels));
+  });
+
+  // ── 9. (revue du 22 oct.) Les freins tiennent sous des demandes SIMULTANÉES ──
+  await essaie('9', async () => {
+    const adrs = Array.from({ length: 30 }, (_, i) => `cible${i}@exemple-${i}.test`);
+    // Le compteur existe déjà (version 1) : les 30 demandes le lisent ENSEMBLE.
+    // (Sur un code sans compteur, il n'y a rien à tenir : le contrôle juge le résultat.)
+    const avecCompteur = typeof lib.idCompteurVendeur === 'function';
+    base = [registre(J, ['julien@boutique.test']), registre(B, adrs), ...(avecCompteur ? [{ owner: NEUTRE, id: lib.idCompteurVendeur(B), data: { owner: B, demandes: [], rev: 1 } }] : [])];
+    pannes = avecCompteur ? { tenir: { n: adrs.length, file: [] } } : {};
+    const par = await Promise.all(adrs.map((a) => appeler('jeton-de-B', 'preuve-demander', 'POST', { adresse: a })));
+    if (avecCompteur) dit(pannes.tenir === null, '(le banc a bien tenu les 30 lectures du compteur ensemble)', '');
+    const rangees = base.filter((r) => r.owner === NEUTRE && /^vrm_email_preuve_[0-9a-f]{40}$/.test(r.id) && r.data.owner === B).length;
+    const codes = {}; for (const x of par) codes[x.code] = (codes[x.code] || 0) + 1;
+    dit(rangees <= 10 && par.filter((x) => x.code === 200).length === rangees, 'REVUE : 30 demandes EN PARALLÈLE — au plus 10 adresses rangées, et chaque « oui » correspond à une demande rangée', `${rangees} rangées · ${JSON.stringify(codes)}`);
+    let envois = 0; for (let k = 0; k < 4; k++) { const s2 = await script('preuves-a-envoyer', 'GET'); for (const e of (s2.corps.envois || [])) { envois++; await script('preuve-envoyee', 'POST', { id: e.id }); } }
+    dit(envois === rangees, '… et la boîte VRM n’envoie que ces liens-là', `${envois} envois`);
+    // En série : 15 demandes par vendeur et par jour, renvois compris.
+    // 4 adresses × 6 renvois espacés de 11 min : 5 par adresse ⇒ 20 permis par
+    // adresse, mais 15 en tout pour le vendeur.
+    const r4 = ['r1@x.test', 'r2@x.test', 'r3@x.test', 'r4@x.test'];
+    base = [registre(J, ['julien@boutique.test']), registre(B, r4)]; pannes = {};
+    const vrai = Date.now; let decale = 0; Date.now = () => vrai() + decale;
+    const suite = [];
+    try { for (let i = 0; i < 24; i++) { suite.push((await appeler('jeton-de-B', 'preuve-demander', 'POST', { adresse: r4[i % 4] })).code); decale += 11 * 60e3; } }
+    finally { Date.now = vrai; }
+    const oui = suite.filter((c) => c === 200).length;
+    dit(oui === 15, 'REVUE : en série, un vendeur ne fait pas partir plus de 15 liens par jour (renvois compris) — avant : 10 adresses × 5 = 50', `${oui} demandes acceptées · ${suite.join(',')}`);
+    // Le plafond de TOUTE l'installation : 6 vendeurs × 10 adresses = 60 demandes.
+    base = [registre(J, ['julien@boutique.test'])]; pannes = {};
+    const jetons = {};
+    for (let v = 0; v < 6; v++) {
+      const id = `4444444${v}-4444-4444-4444-444444444444`, jeton = `jeton-de-V${v}`;
+      UTIL[jeton] = { id, email: `v${v}@vrm.test`, email_confirmed_at: '2026-10-01T10:00:00Z' }; jetons[jeton] = id;
+      const as = Array.from({ length: 10 }, (_, i) => `v${v}-a${i}@exemple.test`);
+      base.push(registre(id, as));
+      for (const a of as) await appeler(jeton, 'preuve-demander', 'POST', { adresse: a });
+    }
+    let total = 0, plafond = false;
+    for (let k = 0; k < 6; k++) { const s3 = await script('preuves-a-envoyer', 'GET'); if (s3.corps.plafond) plafond = true; for (const e of (s3.corps.envois || [])) { total++; await script('preuve-envoyee', 'POST', { id: e.id }); } }
+    const lib2 = await import('file://' + path.join(RACINE, 'api', '_lib', 'preuve-adresse.js'));
+    const plaf = lib2.PLAFOND_LIENS_JOUR ?? 40;
+    dit(total === plaf && plafond, `REVUE : la boîte VRM n’envoie pas plus de ${plaf} liens par jour pour toute l’installation (60 demandés), et dit qu’il en reste`, `${total} envoyés · plafond ${plafond}`);
+  });
+
+  // ── 10. (revue) Une demande qui ne peut pas partir n’occupe pas la file ───
+  await essaie('10', async () => {
+    base = [registre(J, ['julien@boutique.test']), registre(B, ['b@vendeur-b.test'])]; pannes = {};
+    for (let i = 0; i < 20; i++) base.push({ owner: NEUTRE, id: 'vrm_email_preuve_' + String(i).padStart(40, '0'), data: { owner: C, adresse: `vieux${i}@exemple.test`, etat: 'attente', nonce: 'n' + i, expire: '2026-10-01T00:00:00.000Z', demandeLe: '2026-09-28T00:00:00.000Z' } });
+    await appeler('jeton-de-B', 'preuve-demander', 'POST', { adresse: 'b@vendeur-b.test' });
+    const id = lib.idPreuve(B, 'b@vendeur-b.test');
+    const s1 = await script('preuves-a-envoyer', 'GET');
+    dit((s1.corps.envois || []).some((e) => e.id === id), 'REVUE : une demande fraîche part, malgré 20 demandes périmées jamais envoyées', `envois : ${(s1.corps.envois || []).length}`);
+    // GmailApp refuse l'adresse : 3 échecs, puis elle sort de la file — et l'écran le dit.
+    for (let i = 0; i < 3; i++) await script('preuve-echec', 'POST', { id });
+    const s2 = await script('preuves-a-envoyer', 'GET');
+    dit(!(s2.corps.envois || []).some((e) => e.id === id) && preuveDe(B, 'b@vendeur-b.test').data.abandonLe, 'REVUE : une adresse que la boîte n’arrive pas à servir sort de la file au 3ᵉ échec', JSON.stringify(preuveDe(B, 'b@vendeur-b.test').data).slice(0, 160));
+    const e = await appeler('jeton-de-B', 'preuves', 'GET');
+    dit((e.corps.adresses || {})['b@vendeur-b.test'].etat === 'echec', '… et l’écran dit que l’envoi a échoué (pas « en préparation » pour toujours)', JSON.stringify(e.corps.adresses));
+    const d2 = await (async () => { const vrai = Date.now; Date.now = () => vrai() + 11 * 60e3; try { return await appeler('jeton-de-B', 'preuve-demander', 'POST', { adresse: 'b@vendeur-b.test' }); } finally { Date.now = vrai; } })();
+    dit(d2.code === 200 && !preuveDe(B, 'b@vendeur-b.test').data.abandonLe, '« Renvoyer » repart d’une demande neuve', `HTTP ${d2.code}`);
+    const ech = await script('preuve-echec', 'POST', { id: 'vrm_email_preuve_' + 'z'.repeat(40) });
+    dit(ech.code === 400, 'un identifiant qui n’est pas celui d’une preuve est refusé', `HTTP ${ech.code}`);
+  });
+
+  // ── 11. (revue) Le propriétaire de l’installation : après « Confirmer », l’écran suit ──
+  await essaie('11', async () => {
+    base = [registre(J, ['julien@boutique.test'])]; pannes = {};
+    const d = await appeler('jeton-de-J', 'preuve-demander', 'POST', { adresse: 'julien@boutique.test' });
+    const a1 = ((await appeler('jeton-de-J', 'preuves', 'GET')).corps.adresses || {})['julien@boutique.test'] || {};
+    for (const x of ((await script('preuves-a-envoyer', 'GET')).corps.envois || [])) await script('preuve-envoyee', 'POST', { id: x.id });
+    const a2 = ((await appeler('jeton-de-J', 'preuves', 'GET')).corps.adresses || {})['julien@boutique.test'] || {};
+    dit(d.code === 200 && a1.etat === 'envoi' && a2.etat === 'envoyee', 'REVUE : propriétaire, après « Confirmer » l’écran dit « lien en préparation » puis « lien envoyé »', `${d.code} · ${a1.etat} → ${a2.etat}`);
+    dit(a1.retenue === true && a2.retenue === true, '… et ses emails lui restent attribués pendant ce temps (retenue)', `${a1.retenue}/${a2.retenue}`);
+    const o = await recevoir('julien@boutique.test');
+    dit(chez(o, J).length > 0 && !misDeCote(o).length, '… vérifié à l’arrivée : son email est rangé chez lui, pas mis de côté', `J:${chez(o, J).length}`);
+  });
+
+  // ── 12. (revue) Le script Gmail : les factures d’abord, et un envoi raté est signalé ──
+  await essaie('12', async () => {
+    const source = fs.readFileSync(path.join(RACINE, 'scripts', 'gmail-forwarder.gs'), 'utf8');
+    const corpsFwd = (source.match(/function forwardVintedEmails\(\)[\s\S]*?\n}\n/) || [''])[0];
+    const iF = corpsFwd.indexOf('sendQueuedInvoices();'), iP = corpsFwd.indexOf('envoyerPreuvesAdresse();');
+    dit(iF > 0 && iP > 0 && iF < iP, 'REVUE : la boîte VRM envoie les factures AVANT les liens (quota partagé)', `factures@${iF} liens@${iP}`);
+    const appels = [], envoyes = [];
+    const s = { Logger: { log() {} }, JSON, PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k === 'EMAIL_INBOUND_SECRET' ? 'cle' : null) }) },
+      UrlFetchApp: { fetch: (url, opt = {}) => { const mode = new URL(url).searchParams.get('mode'); appels.push({ mode, corps: opt.payload ? JSON.parse(opt.payload) : null }); const corps = mode === 'preuves-a-envoyer' ? { ok: true, envois: [{ id: 'vrm_email_preuve_' + 'a'.repeat(40), adresse: 'refusee@x.test', sujet: 'S', texte: 'T', html: 'H' }, { id: 'vrm_email_preuve_' + 'b'.repeat(40), adresse: 'b@x.test', sujet: 'S', texte: 'T', html: 'H' }] } : { ok: true }; return { getResponseCode: () => 200, getContentText: () => JSON.stringify(corps) }; } },
+      GmailApp: { sendEmail: (a) => { if (a === 'refusee@x.test') throw new Error('Invalid email'); envoyes.push(a); } } };
+    vm.createContext(s); vm.runInContext(source, s); vm.runInContext('envoyerPreuvesAdresse();', s);
+    dit(appels.some((x) => x.mode === 'preuve-echec' && x.corps && x.corps.id === 'vrm_email_preuve_' + 'a'.repeat(40)) && !appels.some((x) => x.mode === 'preuve-envoyee'), 'REVUE : un envoi refusé est signalé à VRM (preuve-echec), jamais marqué envoyé', JSON.stringify(appels.map((x) => x.mode)));
+    dit(envoyes.length === 0, '… et le passage s’arrête (souvent le quota du jour : on ne brûle pas les suivants)', JSON.stringify(envoyes));
   });
 
   console.log(ko ? `\n❌ audit-preuve-adresse : ${ko} rouge(s) sur ${ok + ko}` : `\n✅ audit-preuve-adresse : ${ok} contrôles verts`);

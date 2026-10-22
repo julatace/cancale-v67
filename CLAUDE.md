@@ -12512,6 +12512,74 @@ vivante ; aucun passage du collecteur partagé enregistré.
   ça aucun lien ne part, et seule l'adresse de connexion d'un vendeur peut être
   prouvée. Pour lui, rien d'autre : ses adresses restent reçues ; « Confirmer »
   est facultatif.
+#### Revue du 22 octobre (soir) — six défauts reproduits, six corrigés
+Chacun REPRODUIT d'abord (vraies routes `email-rattacher` + `email-inbound` dans
+une base à état ; rendu du build), rouge sur 9845685 (copie `git archive`,
+contrôle lancé depuis elle, §6.1), vert après, rouge sous mutation.
+- ⚠️⚠️ **Le frein « 10 adresses par jour » cédait à des demandes simultanées**
+  (30 en parallèle : 30 rangées, 30 emails pour UN compte) et rien ne plafonnait
+  la boîte VRM (10 × 5 renvois = 50 liens/jour par compte gratuit, sur le quota
+  Gmail des factures Pro). ⇒ Les freins du vendeur se RÉSERVENT avant d'écrire la
+  demande, par comparer-et-échanger sur sa ligne compteur neutre
+  (`vrm_email_preuve_compteur_<empreinte>`, `data->>rev`, `api/_lib/neutre-cas.js`,
+  même motif que `modifierDonnee`) : 10 adresses ET **15 demandes** (renvois
+  compris) par 24 h glissantes (`reserverDemande`). **Plafond de toute
+  l'installation : 40 liens par jour** (`vrm_liens_adresse_jour`, réservé dans
+  `preuves-a-envoyer` avant de rendre les liens ; illisible ⇒ 503, rien ne part ;
+  au-delà, `plafond: true`). Le script envoie **les factures AVANT les liens**.
+- **Des demandes périmées bloquaient la file** (`limit=20` avant le filtre
+  d'expiration). ⇒ La base filtre : `expire` > maintenant (un ISO se compare
+  comme un texte), pas abandonnée, plus ancienne demande d'abord
+  (`order=data->>demandeLe.asc`). Une adresse que GmailApp refuse : le script
+  appelle `preuve-echec` et s'arrête (souvent le quota) ; au 3ᵉ échec la demande
+  sort de la file (`abandonLe`), l'écran dit « la boîte VRM n'a pas pu envoyer le
+  lien » (état `echec`) avec « Renvoyer » (une demande neuve).
+- **« Fermer mon compte » laissait ses preuves d'adresse** (son identifiant +
+  l'adresse, sous le neutre). ⇒ Effacées AVANT ses données
+  (`id=like.vrm_email_preuve_*&data->>owner=eq.<lui>` : prouvées, en attente,
+  compteur) ; illisible ⇒ 503, rien d'autre n'est effacé, compte gardé, dit.
+- **Le propriétaire voyait « reçue — à confirmer » + « Confirmer » pour
+  toujours** (la route rendait « transition » avant l'état de sa demande). ⇒ Une
+  demande en cours prime (« lien en préparation », « lien envoyé », « lien
+  expiré »), et ce qui est RETENU est une autre question (`adresseRetenue` :
+  prouvée, ou propriétaire de l'installation) ; la route rend `retenue` par
+  adresse, et une ligne retenue n'est jamais en couleur d'alerte.
+- **L'explication promettait « proposés dès que tu l'ajoutes »** à un vendeur
+  (faux depuis la preuve) — en tête du panneau et dans « ajouter ces
+  adresses ». ⇒ Elle suit l'état lu (`data-adresses-promesse` : `confirmation`
+  pour un vendeur · `directe` pour le propriétaire ou une seule boutique ·
+  `passu` : « rien n'est perdu », aucune promesse).
+- **« Répondre sur Vinted » (offre par email) faisait 26 px au doigt** : 44 px
+  (`styles-iphone.css`, la règle des liens à 44 px depuis le zoom 1).
+- **Prouvé** : `audit-preuve-adresse.cjs` **56 contrôles**, **11 rouges sur
+  9845685** (parallèle 30 rangées, série 20 acceptées, 60 envois, file bloquée,
+  pas d'échec, propriétaire « transition », factures après les liens…) ; les 30
+  lectures du compteur sont TENUES ensemble par le banc (une requête tenue, jamais
+  un délai : sans elle l'ordonnancement les rendait séquentielles et la mutation
+  « sans condition » restait verte) ; mutations `sanscas`, `sansplafond`,
+  `perimees`, `abandon`, `installation` (et les 4 d'avant) : toutes rouges.
+  `audit-fermer-compte.cjs` **35** (la fausse base honore enfin `id=in.`,
+  `id=like.`, `data->>x=eq.` sur un DELETE) : **3 rouges** sur 9845685, 2 sous la
+  mutation « sans filtre de vendeur ». Banc `adresses-preuve.cjs` **54** :
+  **6 rouges** sur le build de 9845685, 2 sous la mutation « promesse figée » ;
+  `messagerie.cjs` : **1 rouge** (26 px) sur le build de 9845685, rouge sans la
+  règle CSS. ⚠️ Lancés depuis un worktree dont `node_modules` est un LIEN vers
+  un autre, les bancs qui visent `/home/user/cancale-v67/node_modules/playwright`
+  ne reçoivent pas le crochet `_porte-banc.cjs` (il patche le playwright de SON
+  dossier) : `messagerie.cjs` restait sur l'écran de connexion. Le crochet a été
+  posé à la main sur ce chemin (`node -r`), l'app n'y est pour rien. Après :
+  les 143 audits verts (`audit-renum-b` sauté), `capacite-securite` 8/8, bancs
+  `emails-mis-de-cote` 52 et `double-vente-push` 28 verts. ⚠️ Les scripts de
+  reproduction du relecteur ne savent plus juger ce code : leur fausse base
+  upserte toute insertion (pas de 409), ignore `gt.` (400) et compte la ligne
+  compteur (même préfixe) comme une demande — §6.3 ; `audit-preuve-adresse`
+  rejoue leurs trois scénarios sur la forme réelle.
+- ⚠️ **Non mesuré** : le comparer-et-échanger sur la vraie PostgREST (`data->>rev=eq.N`,
+  409 sur une insertion en double — formes de `modifierDonnee`, jamais envoyées
+  d'ici) ; `order=data->>demandeLe.asc` et `data->>expire=gt.` sur sa base ; le
+  quota réel de la boîte (40 liens/jour est une borne prudente, pas une mesure).
+  ⚠️ Le relecteur avait lu « aucune ligne `vrm_email_collecteur_*` » : la boîte
+  qui envoie n'a jamais tourné — **recoller le script reste LE geste**.
 ### Tes colis à l'heure : le rappel du matin, le widget et l'heure limite (22 octobre, propositions 1 et 4)
 - **Mesuré (lecture seule)** : le matin du 22, `ship_reminder_dedup` = {total 0} alors que le soir du 21 en comptait 3. Deux règles à lui : il sautait un
   bordereau **imprimé** (`vinted_bords_printed`) comme un colis parti — l'app a décidé l'inverse — et ne partait que des bordereaux reçus par **email** (30 jours :
