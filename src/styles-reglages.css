@@ -80,3 +80,10 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 /* Un panneau dont le titre partage sa ligne avec un verdict (Sécurité des données) :
    seul le titre se tait dans le sous-écran, le verdict reste. */
 [data-sous-ecran] .vrm-titre-panneau { display:none; }
+
+/* Le sélecteur natif de photo ne doit pas retomber à 18 px sur iPhone. */
+.vrm-main [data-photo-profil] input[type=file]{
+ min-height:44px;max-width:100%!important;box-sizing:border-box;padding:10px 0;
+}
+.vrm-main [data-photo-profil] button{min-height:44px;}
+.vrm-main [data-photo-profil]>div{flex-wrap:wrap;}
