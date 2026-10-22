@@ -155,6 +155,9 @@ function lecteurAnnoncesApp(ligne, ids) {
   // 5.167 : le dressing passe par la règle « en ligne » LÀ OÙ IL EST LU
   // (`dressingEnLigne`, bloc <enligne-regle>) — aucune lecture publique servie ici.
   const enligne = morceau(/\/\/ <enligne-regle>[^\n]*\n([\s\S]*?)\/\/ <\/enligne-regle>/, 'enligne-regle');
+  // 22 oct. : `dressingEnLigne` rend aussi les annonces MASQUÉES par Vinted
+  // (bloc <masquees-regle>) — servir la forme que le code appelle (§6.3).
+  const masquees = morceau(/\/\/ <masquees-regle>[^\n]*\n([\s\S]*?)\/\/ <\/masquees-regle>/, 'masquees-regle');
   const dressingEnLigne = morceau(/const dressingEnLigne = async[\s\S]*?\n\};/, 'dressingEnLigne');
   const brut = morceau(/const fetchHarvestBrut = async[\s\S]*?\n\};/, 'fetchHarvestBrut');
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
@@ -166,7 +169,7 @@ function lecteurAnnoncesApp(ligne, ids) {
       return { ok: true, json: async () => projette([ligne], u) };
     } };
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${masquees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 
