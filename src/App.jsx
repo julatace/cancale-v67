@@ -21,6 +21,7 @@ import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
+import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible } from "./journeeWidgets.js";
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
@@ -1507,6 +1508,11 @@ const SYNC_KEYS = [
   // éteint par défaut, rattrapé par `onCloudReady` seulement s'il est resté au
   // défaut (`useBeneficeJournee`).
   'vrm_journee_benefice',
+  // (21 octobre) La disposition des widgets de Ma journée (quels blocs, dans
+  // quel ordre, à quelle taille) : un CHOIX, absent par défaut (= la
+  // disposition d'aujourd'hui), rattrapé par `onCloudReady` seulement s'il est
+  // resté au défaut (`useDispositionJournee`). Aucun chiffre dedans.
+  'vrm_journee_widgets',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -27628,7 +27634,7 @@ function useBeneficeJournee() {
   };
   return [on, poser];
 }
-function BeneficeJournee({ onNav, place }) {
+function BeneficeJournee({ onNav, place, force = false }) {
   const [on, poser] = useBeneficeJournee();
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
@@ -27643,7 +27649,7 @@ function BeneficeJournee({ onNav, place }) {
       </div>
     );
   }
-  if (!on) return null;
+  if (!on && !force) return null;
   const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
   const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
@@ -27696,9 +27702,9 @@ function BeneficeJournee({ onNav, place }) {
             : "Aujourd'hui : aucune vente finalisée pour l'instant."}
         </div>
       </>)}
-      <div style={{ marginTop: 6 }}>
+      {!force && <div style={{ marginTop: 6 }}>
         <button type="button" className="vrm-lien-action" data-journee-benef-masquer="" onClick={() => poser(false)} style={{ background: 'none', border: 0, padding: 0, color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 400, fontFamily: 'inherit' }}>Masquer de Ma journée</button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -27714,6 +27720,318 @@ function BeneficeJourneeSetting() {
       </span>
       <Interrupteur on={on} label="Bénéfice dans Ma journée" onClick={() => poser(!on)}/>
     </div>
+  );
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// MA JOURNÉE EN WIDGETS (21 octobre) — Julien : « organiser le premier onglet
+// comme l'écran d'accueil d'Apple, avec des widgets ».
+// ══════════════════════════════════════════════════════════════════════════════
+// La disposition vit dans `vrm_journee_widgets` (synchronisée) ; le catalogue et
+// la règle de lecture dans `journeeWidgets.js`. La grille ne calcule RIEN : elle
+// range des blocs que Ma journée a déjà rendus (§11). Les alertes qui coûtent de
+// l'argent ne sont pas dedans : elles restent en tête, hors grille.
+const lireDispoJournee = () => { try { return normaliserDispoJournee(load(CLE_WIDGETS_JOURNEE, null)); } catch (_) { return null; } };
+function useDispositionJournee() {
+  const [v, setV] = React.useState(lireDispoJournee);
+  // Rattrapage nuage : seulement si rien n'a été rangé sur cet appareil (§5.49).
+  React.useEffect(() => onCloudReady(() => setV((cur) => cur === null ? lireDispoJournee() : cur)), []);
+  React.useEffect(() => {
+    const g = (e) => { if (e && e.key === CLE_WIDGETS_JOURNEE) setV(lireDispoJournee()); };
+    window.addEventListener('storage', g);
+    return () => window.removeEventListener('storage', g);
+  }, []);
+  const poser = React.useCallback((liste) => {
+    const n = normaliserDispoJournee({ w: liste }) || [];
+    setV(n); save(CLE_WIDGETS_JOURNEE, { v: 1, w: n });
+  }, []);
+  return [v || DISPO_JOURNEE_DEFAUT, poser, v === null];
+}
+const mouvementReduit = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; } };
+const EASE_WIDGET = 'cubic-bezier(0.23,1,0.32,1)';
+
+// La feuille « Ajouter un widget » : ce qui n'est pas déjà sur l'écran.
+function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
+  const presents = new Set(dispo.map((w) => w.id));
+  const libres = Object.keys(WIDGETS_JOURNEE).filter((id) => !presents.has(id));
+  return createPortal(
+    <div data-noswipe data-widgets-feuille="" onClick={onClose} className="vrm-w-voile">
+      <FermeAuRetour fermer={onClose}/>
+      <div role="dialog" aria-label="Ajouter un widget" onClick={(e) => e.stopPropagation()} className="vrm-w-feuille" style={{ background: C.bg, color: C.text }}>
+        <div className="vrm-w-feuille-tete" style={{ borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Ajouter un widget</div>
+            <div style={{ fontSize: 12.5, color: C.muted }}>Il se place à la fin — glisse-le ensuite où tu veux.</div>
+          </div>
+          <button type="button" className="vrm-w-btn" onClick={onClose} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Fermer</button>
+        </div>
+        <div className="vrm-w-feuille-corps">
+          {libres.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
+          {libres.map((id) => {
+            const d = WIDGETS_JOURNEE[id];
+            return (
+              <button key={id} type="button" data-widget-ajout={id} onClick={() => onAjout(id)} className="vrm-w-ajout"
+                style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}>
+                <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accent }}>+</span>
+                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>{d.nom}</span>
+                  <span style={{ display: 'block', fontSize: 12, color: C.muted, lineHeight: 1.4 }}>{d.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+          <button type="button" data-widgets-defaut="" onClick={onDefaut} className="vrm-w-lien" style={{ color: C.muted }}>Remettre la disposition d'origine</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// La grille. `rendus` : { id → élément React, ou null (rien à montrer maintenant) }.
+function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier = true }) {
+  const grilleRef = React.useRef(null);
+  const elems = React.useRef(new Map());
+  const drag = React.useRef(null);
+  const appui = React.useRef(null);
+  const avaler = React.useRef(false);
+  const avant = React.useRef(null);
+  const ordreRef = React.useRef(null);
+  const [ordre, setOrdreBrut] = React.useState(null);
+  const setOrdre = (o) => { ordreRef.current = o; setOrdreBrut(o); };
+  const [tire, setTire] = React.useState(null);
+  const [ajout, setAjout] = React.useState(false);
+  const liste = ordre || dispo;
+  const cle = liste.map((w) => w.id + ':' + w.t).join(',');
+
+  // Les places AVANT un changement d'ordre, de taille, un retrait ou un ajout :
+  // les voisins glissent ensuite de là vers leur nouvelle place (FLIP).
+  const memoriserPlaces = () => {
+    const m = new Map();
+    for (const [id, el] of elems.current) if (el) m.set(id, el.getBoundingClientRect());
+    avant.current = m;
+  };
+  // Le widget tiré suit le doigt. `rect` est en pixels de l'écran, la
+  // translation en pixels CSS de l'élément (le contenu est zoomé à 80 % sur
+  // téléphone) — d'où le facteur `z`.
+  const placerTire = () => {
+    const d = drag.current; if (!d || !d.actif) return;
+    const el = elems.current.get(d.id); if (!el) return;
+    const r = el.getBoundingClientRect();
+    const z = el.offsetWidth ? r.width / el.offsetWidth : 1;
+    const natX = r.left - d.tx * z, natY = r.top - d.ty * z;
+    d.tx = (d.x - d.gx - natX) / z; d.ty = (d.y - d.gy - natY) / z;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${d.tx}px, ${d.ty}px)`;
+  };
+  // FLIP : transform seulement, < 300 ms, ease-out ; rien si « réduire les animations ».
+  React.useLayoutEffect(() => {
+    const prev = avant.current; avant.current = null;
+    const d = drag.current;
+    for (const [id, el] of elems.current) {
+      if (!el) continue;
+      if (d && d.actif && d.id === id) { placerTire(); continue; }
+      if (!prev || mouvementReduit()) continue;
+      const a = prev.get(id); if (!a) continue;
+      const b = el.getBoundingClientRect();
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      const z = el.offsetWidth ? b.width / el.offsetWidth : 1;
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx / z}px, ${dy / z}px)`;
+      el.getBoundingClientRect();
+      el.style.transition = `transform 220ms ${EASE_WIDGET}`;
+      el.style.transform = '';
+    }
+  }, [cle]);
+  // Au doigt, rester immobile 220 ms « arme » le glisser : le défilement est
+  // alors bloqué (touchmove non passif). Un balayage rapide fait défiler la page.
+  React.useEffect(() => {
+    const g = grilleRef.current; if (!g || !edition) return undefined;
+    const f = (e) => { const d = drag.current; if (d && (d.arme || d.actif) && e.cancelable) e.preventDefault(); };
+    g.addEventListener('touchmove', f, { passive: false });
+    const k = (e) => { if (e.key === 'Escape' && !ajout) setEdition(false); };
+    window.addEventListener('keydown', k);
+    return () => { g.removeEventListener('touchmove', f); window.removeEventListener('keydown', k); };
+  }, [edition, ajout, setEdition]);
+  React.useEffect(() => () => {
+    if (appui.current) clearTimeout(appui.current.timer);
+    if (drag.current && drag.current.timer) clearTimeout(drag.current.timer);
+    if (drag.current && drag.current.raf) cancelAnimationFrame(drag.current.raf);
+  }, []);
+
+  const finirTire = (garder) => {
+    const d = drag.current; drag.current = null;
+    if (!d) return;
+    if (d.timer) clearTimeout(d.timer);
+    if (d.raf) cancelAnimationFrame(d.raf);
+    if (!d.actif) return;
+    const el = elems.current.get(d.id);
+    if (el) {
+      el.style.transition = mouvementReduit() ? 'none' : `transform 200ms ${EASE_WIDGET}`;
+      el.style.transform = '';
+    }
+    const fin = ordreRef.current;
+    setTire(null); setOrdre(null);
+    if (garder && fin && fin.map((w) => w.id).join(',') !== dispo.map((w) => w.id).join(',')) poser(fin);
+  };
+
+  const surDown = (id) => (e) => {
+    if (!edition) {
+      // L'appui long au doigt passe en mode « Modifier » (comme sur iPhone).
+      if (e.pointerType !== 'touch') return;
+      if (appui.current) clearTimeout(appui.current.timer);
+      const a = { x: e.clientX, y: e.clientY };
+      a.timer = setTimeout(() => {
+        appui.current = null;
+        avaler.current = true; setTimeout(() => { avaler.current = false; }, 900);
+        try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
+        setEdition(true);
+      }, 500);
+      appui.current = a;
+      return;
+    }
+    if (e.button != null && e.button > 0) return;
+    if (e.target && e.target.closest && e.target.closest('[data-widget-retirer],[data-widget-taille-btn]')) return;
+    const d = { id, pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, actif: false, arme: e.pointerType !== 'touch', tx: 0, ty: 0, gx: 0, gy: 0 };
+    if (e.pointerType === 'touch') d.timer = setTimeout(() => { if (drag.current === d) d.arme = true; }, 220);
+    drag.current = d;
+  };
+  const surMove = (e) => {
+    const a = appui.current;
+    if (a && Math.hypot(e.clientX - a.x, e.clientY - a.y) > 10) { clearTimeout(a.timer); appui.current = null; }
+    const d = drag.current; if (!d || d.pid !== e.pointerId) return;
+    d.x = e.clientX; d.y = e.clientY;
+    const dist = Math.hypot(d.x - d.x0, d.y - d.y0);
+    if (!d.actif) {
+      if (!d.arme) { if (dist > 8) { clearTimeout(d.timer); drag.current = null; } return; }
+      if (dist < (d.type === 'touch' ? 2 : 4)) return;
+      const el = elems.current.get(d.id); if (!el) { drag.current = null; return; }
+      const r = el.getBoundingClientRect();
+      d.gx = d.x0 - r.left; d.gy = d.y0 - r.top; d.actif = true;
+      try { el.setPointerCapture(d.pid); } catch (_) {}
+      setOrdre(dispo); setTire(d.id);
+      defilerPendantTire();
+    }
+    if (e.cancelable) e.preventDefault();
+    suivre();
+  };
+  // Près du bord haut ou bas de la zone qui défile, la page défile toute seule
+  // (sur téléphone, les widgets sont empilés : sans ça, impossible de monter un
+  // widget du bas jusqu'en haut).
+  const zoneDefile = () => {
+    let n = grilleRef.current && grilleRef.current.parentElement;
+    while (n && n !== document.body) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n; n = n.parentElement; }
+    return document.scrollingElement || document.documentElement;
+  };
+  const defilerPendantTire = () => {
+    const z = zoneDefile();
+    const pas = () => {
+      const d = drag.current; if (!d || !d.actif) return;
+      const r = z === document.scrollingElement || z === document.documentElement ? { top: 0, bottom: window.innerHeight } : z.getBoundingClientRect();
+      const bord = 72;
+      const v = d.y < r.top + bord ? -Math.ceil((r.top + bord - d.y) / 6) : d.y > r.bottom - bord ? Math.ceil((d.y - (r.bottom - bord)) / 6) : 0;
+      if (v) { const avantY = z.scrollTop; z.scrollTop += v; if (z.scrollTop !== avantY) suivre(); }
+      d.raf = requestAnimationFrame(pas);
+    };
+    const d = drag.current; if (d) d.raf = requestAnimationFrame(pas);
+  };
+  const suivre = () => {
+    const d = drag.current; if (!d || !d.actif) return;
+    placerTire();
+    // La place visée : le widget sous le doigt (jamais le widget tiré).
+    const cur = ordreRef.current || dispo;
+    const de = cur.findIndex((w) => w.id === d.id);
+    let vers = -1;
+    for (let i = 0; i < cur.length; i++) {
+      if (cur[i].id === d.id) continue;
+      const el = elems.current.get(cur[i].id); if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (d.x >= r.left && d.x <= r.right && d.y >= r.top && d.y <= r.bottom) { vers = i; break; }
+    }
+    if (vers < 0) { d.dernier = null; return; }
+    if (d.dernier === cur[vers].id) return;
+    d.dernier = cur[vers].id;
+    memoriserPlaces();
+    setOrdre(deplacerWidget(cur, de, vers));
+  };
+  const surUp = (e) => {
+    if (appui.current) { clearTimeout(appui.current.timer); appui.current = null; }
+    const d = drag.current; if (!d || d.pid !== e.pointerId) return;
+    finirTire(e.type === 'pointerup');
+  };
+
+  const retirer = (id) => { if (widgetFixe(id)) return; memoriserPlaces(); poser(retirerWidget(dispo, id)); };
+  const changerTaille = (id) => { memoriserPlaces(); poser(dispo.map((w) => w.id === id ? { ...w, t: tailleSuivante(id, w.t) } : w)); };
+  const clavier = (id) => (e) => {
+    if (!edition || e.target !== e.currentTarget) return;
+    const i = dispo.findIndex((w) => w.id === id);
+    if (['ArrowLeft', 'ArrowUp'].includes(e.key) && i > 0) { e.preventDefault(); memoriserPlaces(); poser(deplacerWidget(dispo, i, i - 1)); }
+    else if (['ArrowRight', 'ArrowDown'].includes(e.key) && i < dispo.length - 1) { e.preventDefault(); memoriserPlaces(); poser(deplacerWidget(dispo, i, i + 1)); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); retirer(id); }
+  };
+
+  return (
+    <>
+      {edition && (
+        <div className="vrm-w-outils" data-widgets-outils="" data-noswipe="1" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: C.shadow || 'none' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted, lineHeight: 1.35 }}>Glisse pour déplacer · − pour retirer</span>
+          <button type="button" className="vrm-w-btn" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>+ Ajouter</button>
+          <button type="button" className="vrm-w-btn" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ color: '#fff', background: C.accent, border: `1px solid ${C.accent}` }}>OK</button>
+        </div>
+      )}
+      <div ref={grilleRef} className="vrm-widgets" data-widgets={liste.map((w) => w.id).join(',')} data-edition={edition ? '' : undefined} data-noswipe={edition ? '1' : undefined}
+        onClickCapture={(e) => { if (avaler.current) { avaler.current = false; e.preventDefault(); e.stopPropagation(); } }}
+        onContextMenu={(e) => { if (edition || avaler.current || appui.current) e.preventDefault(); }}>
+        {liste.map((w, i) => {
+          const d = WIDGETS_JOURNEE[w.id];
+          const corps = rendus[w.id];
+          if (!corps && !edition) return null;
+          return (
+            <div key={w.id} ref={(el) => { if (el) elems.current.set(w.id, el); else elems.current.delete(w.id); }}
+              className="vrm-widget" data-widget={w.id} data-taille={w.t} data-vide={corps ? undefined : ''} data-tire={tire === w.id ? '' : undefined}
+              data-fixe={d.fixe ? '' : undefined} data-sans-carte={d.carte === false ? '' : undefined}
+              tabIndex={edition ? 0 : undefined} role={edition ? 'group' : undefined} aria-label={edition ? `${d.nom} — flèches pour déplacer${d.fixe ? '' : ', Suppr pour retirer'}` : undefined}
+              onPointerDown={surDown(w.id)} onPointerMove={surMove} onPointerUp={surUp} onPointerCancel={surUp} onKeyDown={clavier(w.id)}>
+              <div className="vrm-widget-in" style={{ animationDelay: `${-(i % 3) * 90}ms` }}>
+                <div className="vrm-widget-corps">
+                  {corps || (
+                    <div className="vrm-day-card vrm-w-vide" style={{ border: `1px dashed ${C.border}`, background: C.card, color: C.muted }}>
+                      <span style={{ fontWeight: 600, color: C.text }}>{d.nom}</span>
+                      <span style={{ fontSize: 12 }}>Rien à montrer pour l'instant</span>
+                    </div>
+                  )}
+                </div>
+                {edition && !d.fixe && (
+                  <button type="button" className="vrm-w-retirer" data-widget-retirer={w.id} aria-label={`Retirer ${d.nom}`} onClick={() => retirer(w.id)}>
+                    <span aria-hidden="true" style={{ background: C.text, color: C.bg }}>−</span>
+                  </button>
+                )}
+                {edition && d.tailles.length > 1 && (
+                  <button type="button" className="vrm-w-taille" data-widget-taille-btn={w.id} aria-label={`Largeur de ${d.nom} : ${NOM_TAILLE[w.t]} — changer`} onClick={() => changerTaille(w.id)}
+                    style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>{NOM_TAILLE[w.t]}</button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Sur téléphone la tête de l'écran (bonjour, date) est cachée pour gagner
+          de la place : « Modifier » y était donc INVISIBLE (vu au rendu à 390 px).
+          Il vit alors en bas de la grille, comme sur l'écran « Aujourd'hui » de
+          l'iPhone. Un seul des deux se voit à une largeur donnée. */}
+      {!edition && peutModifier && (
+        <div className="vrm-w-modifier-bas">
+          <button type="button" className="vrm-w-btn" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}
+            style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Modifier l'écran</button>
+        </div>
+      )}
+      {ajout && (
+        <FeuilleAjoutWidget dispo={dispo}
+          onAjout={(id) => { memoriserPlaces(); poser([...dispo, { id, t: tailleDefautWidget(id) }]); setAjout(false); }}
+          onDefaut={() => { memoriserPlaces(); poser(DISPO_JOURNEE_DEFAUT); setAjout(false); }}
+          onClose={() => setAjout(false)}/>
+      )}
+    </>
   );
 }
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
@@ -28423,6 +28741,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // les relectures et le cache — jamais `accounts.length` (un compte retiré et
   // un autre ajouté gardent la même longueur).
   const cleComptes = cleComptesVinted(accounts);
+  // (21 oct.) Ma journée en widgets : la disposition (synchronisée) et le mode « Modifier ».
+  const [dispoJournee, poserDispoJournee] = useDispositionJournee();
+  const [editJournee, setEditJournee] = useState(false);
+  // Le bénéfice choisi dans Ma journée (`vrm_journee_benefice`) : lu ici pour
+  // ne pas ranger une case VIDE dans la grille quand il est éteint.
+  const [benefJourneeOn] = useBeneficeJournee();
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -35510,6 +35834,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf});
         }
+        // (21-22 oct.) MA JOURNÉE EN WIDGETS : les colis EN RETARD et les colis
+        // HORS DÉLAI ne sont dits que par la couleur de leur case (barre ou petite
+        // case). Si le vendeur a retiré toutes les cases qui les montrent, ils
+        // remontent ici, en alerte de tête (hors grille, non retirable) — jamais
+        // en double tant qu'une case les montre (§7). Mêmes listes que les cases
+        // (`toShip`, `colisEb`, `pickupUnion`, §11) : aucun recalcul.
+        if (!caseVisible(dispoJournee, 'envoyer')) {
+          const lateE = colisEb && colisEb.aPoster ? colisEb.aPoster.filter(x => x.jours != null && x.jours < 0).length : 0;
+          const nl = late + lateE;
+          if (nl > 0) jobs.push({ id:'colis-en-retard', n:nl, icon:'truck', color:C.warn, urgent:true,
+            title:`${nl} colis en retard`,
+            sub:`La date limite d'envoi est passée${lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
+            tab:'cat_bord', prio:0.15 });
+        }
+        if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.horsDelai.length) {
+          const hd = pickupUnion.horsDelai.length, lx = pickupUnion.lieux || [];
+          jobs.push({ id:'retrait-hors-delai', n:hd, icon:'box', color:C.warn, urgent:true,
+            title:`${hd} colis hors délai à retirer`,
+            sub:`Non retiré, un colis repart chez l'expéditeur — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
+            tab:'cat_achats', prio:0.15 });
+        }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -35545,227 +35890,292 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
         const joursActifs = jours14.some(j => j.vendu.eur > 0 || (j.recu && j.recu.eur > 0));
+        // ═══ MA JOURNÉE EN WIDGETS (21 octobre) ═══
+        // Chaque bloc ci-dessous est celui d'avant, rendu tel quel dans un widget :
+        // aucune règle de calcul n'est réécrite (§11). Les alertes qui coûtent de
+        // l'argent (`j.urgent` : deux paires sous un N°, double vente, colis en
+        // retard, colis eBay à ne pas poster, coché « posté » mais pas parti) ne
+        // sont PAS des widgets : elles restent en tête, et on ne peut pas les retirer.
+        const aWidget = (id) => dispoJournee.some(w => w.id === id);
+        const alertesArgent = jobs.filter(j => j.urgent);
+        // Un widget « Déclaration URSSAF » sur l'écran PREND la ligne de
+        // l'échéance : elle n'est plus dans « À faire » (dite une fois, §7).
+        const urssafJob = aWidget('urssaf') ? jobs.find(j => !j.urgent && j.id === 'urssaf') : null;
+        const jobsAFaire = jobs.filter(j => !j.urgent && j !== urssafJob);
+        const ko = nomsVentesKO.length > 0;
+        const T = [
+          { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
+          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
+          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
+          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
+        ];
+        const tache = (j, i) => (
+          <button className="vrm-day-task" key={(j.id||'j')+i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
+            {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
+                avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
+                empilés, c'est ce qui faisait « application générée ».
+                Maintenant : une pastille neutre et l'icône au trait, du
+                même dessin que la barre du bas. La couleur ne sert plus
+                qu'à l'icône et au chevron — le fond reste calme. */}
+            {/* 30 sept. — « pas assez de photos » : une action qui porte
+                des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
+                les autres gardent leur icône. */}
+            {j.photos && j.photos.length
+              ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
+                  {j.photos.map((ph,k)=>(
+                    <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
+                      style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
+                  ))}
+                </div>
+              : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
+            <div style={{flex:1,minWidth:0}}>
+              <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
+              {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
+                  « 3 en retard — à poster en priorité » et « 3 hors
+                  délai — va vite les chercher » se lisaient de la même
+                  couleur que « Bordereau + paire au stock ». La
+                  consigne porte la couleur seulement quand il y a
+                  vraiment quelque chose à rattraper (§5.65 : c'est le
+                  chiffre qui se colore, pas le fond). */}
+              <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
+            </div>
+            <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
+          </button>
+        );
+        const listeTaches = (liste, attr) => (
+          <div className="vrm-day-task-list" {...attr} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
+            {liste.map(tache)}
+          </div>
+        );
+        const vuHero = !baseKO && !premierJour && !loading && sales.items;
+        const W = {};
+        W.barre = (!baseKO && !premierJour) ? (
+          <div data-barre-jour="" className="vrm-day-bar" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+            {T.map((x, k) => {
+              const n = x.t ? x.t.n : 0;
+              const vif = !x.pasSu && n > 0;
+              return (
+                <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                  style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
+                  <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
+                  <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
+                  <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null;
+        W.afaire = (!loading && jobsAFaire.length>0) ? (
+          <div>
+            <div className="vrm-label vrm-day-section vrm-w-etiquette" style={{color:C.muted}}>À faire</div>
+            {listeTaches(jobsAFaire, {})}
+          </div>
+        ) : null;
+        W.vendu = vuHero ? (
+          <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+            <div className="vrm-day-head">
+              <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
+              <button type="button" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')} style={{color:C.accent}}>Mes ventes ›</button>
+            </div>
+            {/* (16 oct.) « Rien lu » ne vaut pas « 0 € » (§5) : si AUCUN compte
+                n'a pu être lu, le chiffre est « — » ; si une partie seulement,
+                c'est « au moins », et les comptes manquants sont nommés. */}
+            {(() => { const actifs = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length; const toutKO = actifs>0 && nomsVentesKO.length>=actifs && moisN===0; const partiel = !toutKO && nomsVentesKO.length>0; return (<>
+            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <>{partiel && <span style={{fontSize:'0.4em',fontWeight:600,color:C.muted,marginRight:6}}>au moins</span>}<CountUpEuro value={moisEur}/></>}</div>
+            {(toutKO || partiel) && <div data-vendu-manque="" style={{fontSize:12,color:C.muted,marginTop:4}}>{toutKO ? 'Tes ventes n\'ont pas pu être lues pour l\'instant — ce n\'est pas zéro.' : `sans ${nomsVentesKO.length>2 ? nomsVentesKO.length+' comptes' : nomsVentesKO.join(', ')} (ventes pas lues)`}</div>}
+            </>); })()}
+            <div className="vrm-day-meta" style={{color:C.muted}}>
+              <span><b style={{color:C.text,fontWeight:600}}>{moisN}</b> vente{moisN>1?'s':''}</span>
+              {jourN>0 && <>
+                <span aria-hidden="true" style={{opacity:.45}}>·</span>
+                <span data-vendu-jour={Math.round(jourEur*100)} style={{color:C.accent,fontWeight:600}}>+{Math.round(jourEur).toLocaleString('fr-FR')} € aujourd'hui <span style={{fontWeight:500,opacity:.85}}>({jourN} vente{jourN>1?'s':''})</span></span>
+              </>}
+            </div>
+            <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
+              <div style={{minWidth:0}}>
+                <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
+                <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
+              </div>
+              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
+            </div>
+            {!aWidget('benefice') && <BeneficeJournee onNav={onNav} place="integre"/>}
+          </div>
+        ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn && !aWidget('benefice'))) ? (<>
+          {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
+              autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
+          {jourN>0 && (
+            <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
+              style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
+              <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
+              <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.accent,fontVariantNumeric:'tabular-nums'}}>{Math.round(jourEur).toLocaleString('fr-FR')} €</span>
+              <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
+            </button>
+          )}
+          {!baseKO && !premierJour && !aWidget('benefice') && <BeneficeJournee onNav={onNav} place="carte"/>}
+        </>) : null;
+        W.semaine = vuHero ? (()=>{
+          const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
+          const geste = extSait('versement');
+          return (
+          <div data-carte-jours="" className="vrm-day-week vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+            <div className="vrm-day-head">
+              <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
+              <span className="vrm-day-legende" style={{color:C.muted}}>
+                <span><i aria-hidden="true" style={{background:"#5d948b"}}/>Vendu</span>
+                <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
+              </span>
+            </div>
+            <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
+            <CourbeSemaine jours={semaine}/>
+            <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
+              Vendu : au jour de la vente · Reçu : au jour du versement.
+              {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
+              {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
+            </div></DayWeekNote>
+          </div>
+          );
+        })() : null;
+        W.attente = (!baseKO && !premierJour) ? (()=>{
+          const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
+          const val=escrow?escrow.total:inRouteSum;
+          if(loading||val<=0) return null;
+          const avecDispo = !!(escrow && escrow.dispo > 0);
+          return (
+          <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
+            <div style={{minWidth:0}}>
+              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
+              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow?'':'≈ '}{Math.round(val).toLocaleString('fr-FR')} €</div>
+              <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
+            </div>
+            {avecDispo && (
+              <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
+                <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
+                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow.dispo.toFixed(2).replace('.',',')} €</div>
+                <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
+              </div>
+            )}
+          </div>
+          );
+        })() : null;
+        W.recentes = (!loading && dernieresVentes.length>0) ? (
+            <div className="vrm-day-recent">
+              <div className="vrm-w-etiquette" style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
+                <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
+                <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                  style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
+              </div>
+              <div className="vrm-carrousel">
+                {dernieresVentes.map((o,i)=>{
+                  const ph = orderPhoto(o);
+                  const e = effEntry(o); const num = e?.numero;
+                  const vs = venteStage(o);
+                  return (
+                    <button key={o.transaction_id||i} type="button" onClick={()=>onNav&&onNav('cat_ventes')}
+                      style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',padding:0,display:'block'}}>
+                      <div style={{position:'relative',aspectRatio:'1 / 1',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        {/* Le CDN Vinted expire : sans ce repli, la vignette
+                            devient l'icône « image cassée » du navigateur (§5.76). */}
+                        {ph && !imgMortes.has(ph)
+                          ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                          : <Icon name="image" size={30} style={{color:C.muted,opacity:.5}}/>}
+                        {num && <span style={{position:'absolute',top:9,right:9,fontSize:10.5,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:8,padding:'2px 8px'}}>N°{num}</span>}
+                      </div>
+                      <div style={{padding:'10px 11px 11px'}}>
+                        <div style={{fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'—'}</div>
+                        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginTop:4}}>
+                          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text}}>{montantCommande(o).toFixed(0)} €</span>
+                        </div>
+                        <div style={{fontSize:11.5,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,minWidth:0}}>
+                          <span style={{width:7,height:7,borderRadius:999,background:vs.color,flexShrink:0}}/>
+                          <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{vs.label}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+        ) : null;
+        // Base injoignable : le bloc de la coque le dit déjà (une cause, une
+        // phrase, §7) — la carte « Lecture du stock indisponible » n'est plus
+        // une troisième voix.
+        W.stock = (!premierJour && !baseKO) ? (()=>{
+          const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
+          const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
+          return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
+            <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
+            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>annonce{stock?.total===1?'':'s'} en ligne</span></div>
+            {stock ? <>
+              <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
+              <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
+              <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
+            </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
+            {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
+            <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
+          </section>;
+        })() : null;
+        // Les widgets AJOUTABLES (absents de la disposition d'origine) : ils
+        // rendent eux aussi ce que Ma journée calcule déjà.
+        W.jours14 = vuHero ? (
+          <div data-widget-14j="" className="vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+            <div className="vrm-day-head"><span className="vrm-day-k" style={{color:C.muted}}>14 derniers jours</span></div>
+            <BarresVenduRecu jours={jours14}/>
+          </div>
+        ) : null;
+        W.urssaf = (!loading && urssafJob) ? listeTaches([urssafJob], {}) : null;
+        W.benefice = (!baseKO && !premierJour) ? <BeneficeJournee onNav={onNav} place="carte" force/> : null;
+        for (const x of T) {
+          const n = x.t ? x.t.n : 0, vif = !x.pasSu && n > 0;
+          W[x.id] = (!baseKO && !premierJour) ? (
+            <button type="button" className="vrm-day-card vrm-w-tuile" data-widget-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+              style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
+              <span style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
+              <span className="vrm-display vrm-w-tuile-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
+              <span className="vrm-w-tuile-l" style={{color:C.muted}}>{x.l}</span>
+            </button>
+          ) : null;
+        }
         return (
           <div className="vrm-day-layout">
             <ScreenHead icon="sun" title="Ma journée"/>
 
-            {/* ═══ MA JOURNÉE, REFAITE LE 16 OCTOBRE (« pas premium sur iPhone ») ═══
-                Une hiérarchie au lieu de huit blocs de même poids : le bonjour,
-                la barre des quatre gestes, UN héros (le vendu du mois, le jour
-                dedans, le reçu dessous), la semaine VISIBLE (plus dans un repli),
-                puis l'argent en attente. Les chiffres et leurs phrases gardent
-                leur source (§5) ; seuls la forme et la longueur ont changé.
-                Cartes sobres : bord fin, ombre douce, une seule couleur d'accent
-                (le vendu du jour, la courbe, les liens). */}
+            {/* La tête (bonjour, date, nombre de choses à faire) reste hors de la
+                grille ; le bouton « Modifier » y vit, discret. */}
             {!baseKO && (
-              <div className="vrm-day-greeting">
+              <div className="vrm-day-greeting vrm-w-tete">
                 <div className="vrm-day-hello" style={{color:C.text}}>{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}</div>
                 <div className="vrm-day-date" style={{color:C.muted}}>{dateStr}</div>
                 {!loading && jobs.length>0 && <div className="vrm-day-todo" style={{color:C.muted}}><b style={{color:C.text,fontWeight:600}}>{jobs.length} chose{jobs.length>1?'s':''}</b> à faire aujourd'hui</div>}
+                {!premierJour && !editJournee && (
+                  <button type="button" className="vrm-w-modifier" data-widgets-modifier="" aria-label="Modifier les widgets de Ma journée" onClick={()=>setEditJournee(true)} style={{color:C.muted}}>Modifier</button>
+                )}
               </div>
             )}
 
             {/* ⚠️ Rétabli (retiré par #500) : si le serveur ne peut plus envoyer
-                AUCUNE notification, il faut le voir ICI — compter sur les notifs
-                pour ne pas ouvrir l'app et n'apprendre la panne qu'en l'ouvrant
-                serait le pire des deux mondes. Le bandeau s'auto-masque dès que
-                tout va bien. */}
+                AUCUNE notification, il faut le voir ICI. */}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
-            {/* LA BARRE DU QUOTIDIEN (16 oct., Julien : « juste les logos —
-                colis à envoyer, à retirer, messages, baisser les prix — sans les
-                textes, une barre en largeur »). UNE carte, quatre cases séparées
-                d'un filet. Le nombre est un fait ; « — » quand il n'a pas pu être
-                lu (jamais un zéro inventé, §5). */}
-            {!baseKO && !premierJour && (()=>{
-              const ko = nomsVentesKO.length > 0;
-              const T = [
-                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
-                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
-                { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
-                { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
-              ];
-              return (
-                <div data-barre-jour="" className="vrm-day-bar" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                  {T.map((x, k) => {
-                    const n = x.t ? x.t.n : 0;
-                    const vif = !x.pasSu && n > 0;
-                    return (
-                      <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
-                        style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
-                        <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
-                        <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
-                        <span className="vrm-day-bar-l" style={{color:C.muted}}>{x.l}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+            {/* LES ALERTES QUI COÛTENT DE L'ARGENT : toujours en tête, hors grille,
+                jamais retirables — une alerte cachée, c'est une paire vendue deux
+                fois ou un colis qui ne part pas. */}
+            {!loading && alertesArgent.length>0 && listeTaches(alertesArgent, {'data-alertes-argent': ''})}
+            {editJournee && !loading && alertesArgent.length>0 && (
+              <div data-alertes-fixes="" style={{fontSize:12,color:C.muted,margin:'-4px 2px 12px'}}>Ces alertes restent toujours en tête : elles peuvent te coûter de l'argent.</div>
+            )}
+
             {/* (21 octobre) Les messages eBay n'ont pas pu être lus : dit UNE fois,
                 sans chiffre — la case « Messages » ne compte alors que Vinted. */}
             {!baseKO && !premierJour && !loading && tuiles.messages && tuiles.messages.ebay === null && (
               <div data-ebay-msg-passu="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 12px'}}>Messages eBay : je n'ai pas pu les lire — rien n'est perdu, la case « Messages » ne compte pour l'instant que Vinted.</div>
             )}
 
-            {/* ⚠️ SUR ORDINATEUR, LES ACTIONS SE RANGENT EN COLONNES.
-                Empilées, chacune traversait 900 px pour porter trois mots et
-                laissait 400 px de vide sous l'écran (mesuré en capture à
-                1440×900). Une grille qui se remplit toute seule
-                (`auto-fit, minmax(min(340px, 100%), 1fr)`) donne DEUX colonnes sur un
-                grand écran et UNE sur téléphone — la même règle, sans test de
-                largeur dans le JavaScript. */}
-            {!loading && jobs.length>0 && (
-              <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
-            )}
-            {!loading && jobs.length>0 && (
-              <div className="vrm-day-task-list" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
-                {jobs.map((j,i)=>(
-                  /* ⚠️ SURFACE NEUTRE ICI AUSSI. Quatre cartes, quatre teintes
-                     différentes, empilées : c'est exactement ce qui faisait
-                     « brouillon ». La couleur reste sur l'icône et le chevron —
-                     elle sert à reconnaître la nature de l'action, pas à
-                     repeindre un quart de l'écran. */
-                  <button className="vrm-day-task" key={i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
-                    {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
-                        avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
-                        empilés, c'est ce qui faisait « application générée ».
-                        Maintenant : une pastille neutre et l'icône au trait, du
-                        même dessin que la barre du bas. La couleur ne sert plus
-                        qu'à l'icône et au chevron — le fond reste calme. */}
-                    {/* 30 sept. — « pas assez de photos » : une action qui porte
-                        des paires les MONTRE (jusqu'à 3 vignettes en éventail) ;
-                        les autres gardent leur icône. */}
-                    {j.photos && j.photos.length
-                      ? <div style={{display:'flex',flexShrink:0,paddingRight:2}}>
-                          {j.photos.map((ph,k)=>(
-                            <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)}
-                              style={{width:46,height:46,borderRadius:8,objectFit:'cover',border:`2px solid ${C.card}`,marginLeft:k?-18:0,background:C.bg,boxShadow:'0 1px 3px rgba(0,0,0,.25)'}}/>
-                          ))}
-                        </div>
-                      : <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
-                      {/* ⚠️ UNE URGENCE ÉCRITE EN GRIS N'EST PAS UNE URGENCE.
-                          « 3 en retard — à poster en priorité » et « 3 hors
-                          délai — va vite les chercher » se lisaient de la même
-                          couleur que « Bordereau + paire au stock ». La
-                          consigne porte la couleur seulement quand il y a
-                          vraiment quelque chose à rattraper (§5.65 : c'est le
-                          chiffre qui se colore, pas le fond). */}
-                      <div className="vrm-day-task-note" style={{fontSize:12,color:j.urgent?j.color:C.muted,fontWeight:j.urgent?600:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
-                    </div>
-                    <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* LE HAUT DE LA JOURNÉE : héros + semaine (+ argent). Sur
-                téléphone : empilés dans cet ordre. Sur ordinateur : le héros et
-                l'argent à gauche, la semaine à droite (`.vrm-day-top`). */}
-            <div className="vrm-day-top">
-
-            {/* LE HÉROS : VENDU ce mois (le gros chiffre), VENDU aujourd'hui
-                dedans (l'accent, rare), REÇU dessous — deux notions, deux mots
-                (§ 4 oct.). Plus de carte bleue à part pour le jour : c'était le
-                bloc criard de la capture. */}
-            {!baseKO && !premierJour && !loading && sales.items && (
-              <div className="vrm-day-money vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                <div className="vrm-day-head">
-                  <span className="vrm-day-k" style={{color:C.muted}}>Vendu en {moisNom}</span>
-                  <button type="button" className="vrm-day-lien" onClick={()=>onNav&&onNav('cat_ventes')} style={{color:C.accent}}>Mes ventes ›</button>
-                </div>
-                {/* (16 oct.) « Rien lu » ne vaut pas « 0 € » (§5) : si AUCUN compte
-                    n'a pu être lu, le chiffre est « — » ; si une partie seulement,
-                    c'est « au moins », et les comptes manquants sont nommés. */}
-                {(() => { const actifs = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length; const toutKO = actifs>0 && nomsVentesKO.length>=actifs && moisN===0; const partiel = !toutKO && nomsVentesKO.length>0; return (<>
-                <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <>{partiel && <span style={{fontSize:'0.4em',fontWeight:600,color:C.muted,marginRight:6}}>au moins</span>}<CountUpEuro value={moisEur}/></>}</div>
-                {(toutKO || partiel) && <div data-vendu-manque="" style={{fontSize:12,color:C.muted,marginTop:4}}>{toutKO ? 'Tes ventes n\'ont pas pu être lues pour l\'instant — ce n\'est pas zéro.' : `sans ${nomsVentesKO.length>2 ? nomsVentesKO.length+' comptes' : nomsVentesKO.join(', ')} (ventes pas lues)`}</div>}
-                </>); })()}
-                <div className="vrm-day-meta" style={{color:C.muted}}>
-                  <span><b style={{color:C.text,fontWeight:600}}>{moisN}</b> vente{moisN>1?'s':''}</span>
-                  {jourN>0 && <>
-                    <span aria-hidden="true" style={{opacity:.45}}>·</span>
-                    <span data-vendu-jour={Math.round(jourEur*100)} style={{color:C.accent,fontWeight:600}}>+{Math.round(jourEur).toLocaleString('fr-FR')} € aujourd'hui <span style={{fontWeight:500,opacity:.85}}>({jourN} vente{jourN>1?'s':''})</span></span>
-                  </>}
-                </div>
-                <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
-                  <div style={{minWidth:0}}>
-                    <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
-                    <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
-                  </div>
-                  <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
-                </div>
-                <BeneficeJournee onNav={onNav} place="integre"/>
-              </div>
-            )}
-
-            {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
-                autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
-            {jourN>0 && !(!baseKO && !premierJour && !loading && sales.items) && (
-              <button type="button" onClick={()=>onNav&&onNav('cat_ventes')} className="vrm-day-card vrm-day-jour"
-                style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>
-                <span className="vrm-day-k" style={{color:C.muted}}>Vendu aujourd'hui</span>
-                <span data-vendu-jour={Math.round(jourEur*100)} className="vrm-display" style={{fontSize:24,fontWeight:700,color:C.accent,fontVariantNumeric:'tabular-nums'}}>{Math.round(jourEur).toLocaleString('fr-FR')} €</span>
-                <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
-              </button>
-            )}
-
-            {/* LA SEMAINE EN COURS (lundi → dimanche), VISIBLE sans clic (elle
-                était cachée dans « ▸ Ta semaine »). */}
-            {!baseKO && !premierJour && !loading && sales.items && (()=>{
-              const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
-              const geste = extSait('versement');
-              return (
-              <div data-carte-jours="" className="vrm-day-week vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-                <div className="vrm-day-head">
-                  <span className="vrm-day-k" style={{color:C.muted}}>Cette semaine</span>
-                  <span className="vrm-day-legende" style={{color:C.muted}}>
-                    <span><i aria-hidden="true" style={{background:"#5d948b"}}/>Vendu</span>
-                    <span><i aria-hidden="true" className="vrm-day-pointille" style={{borderColor:C.muted}}/>Reçu</span>
-                  </span>
-                </div>
-                <div className="vrm-day-week-n" style={{color:C.text}}><span className="vrm-display" data-total-semaine={Math.round(totSem*100)}>{Math.round(totSem).toLocaleString('fr-FR')} €</span> <span style={{fontSize:13,fontWeight:500,color:C.muted}}>vendus</span></div>
-                <CourbeSemaine jours={semaine}/>
-                <DayWeekNote><div className="vrm-day-note" style={{color:C.muted,marginTop:8}}>
-                  Vendu : au jour de la vente · Reçu : au jour du versement.
-                  {declarables === null && <> Dates de versement illisibles : « reçu » n'est pas dessiné — ce n'est pas zéro.</>}
-                  {adVinted > 0 && <span data-a-dater={adVinted}> {adVinted} vente{adVinted>1?'s':''} finalisée{adVinted>1?'s':''} sans date de versement, pas encore dans « reçu » — {geste==='ok' ? <>l'extension {adVinted>1?'les':'la'} cherche à tes prochaines visites sur Vinted.</> : geste==='retard' ? <>mets l'extension à jour ({EXT_CAPACITES.versement}) pour {adVinted>1?'les':'la'} récupérer.</> : <>l'extension, sur ton ordinateur, {adVinted>1?'les':'la'} récupère.</>}</span>}
-                </div></DayWeekNote>
-              </div>
-              );
-            })()}
-
-            {/* ARGENT EN ATTENTE / DISPONIBLE À VIRER (§5.14 : deux notions,
-                deux montants, jamais confondus ; escrow réel sinon estimation).
-                Deux colonnes au lieu d'une phrase qui passait à la ligne. */}
-            {!baseKO && !premierJour && (()=>{
-              const escrow=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
-              const val=escrow?escrow.total:inRouteSum;
-              if(loading||val<=0) return null;
-              const avecDispo = !!(escrow && escrow.dispo > 0);
-              return (
-              <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
-                <div style={{minWidth:0}}>
-                  <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
-                  <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow?'':'≈ '}{Math.round(val).toLocaleString('fr-FR')} €</div>
-                  <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
-                </div>
-                {avecDispo && (
-                  <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
-                    <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
-                    <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{escrow.dispo.toFixed(2).replace('.',',')} €</div>
-                    <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
-                  </div>
-                )}
-              </div>
-              );
-            })()}
-
-            {!baseKO && !premierJour && (loading || !sales.items) && <BeneficeJournee onNav={onNav} place="carte"/>}
-
-            </div>
+            {/* ⚠️ La grille est rendue AUSSI le premier jour : ses widgets s'y
+                taisent d'eux-mêmes (barre, héros, stock…), mais « À faire » peut
+                déjà porter une action — des emails mis de côté, par exemple.
+                La cacher avec le reste les faisait disparaître (vu au banc
+                `emails-mis-de-cote`, 22 oct.). On n'y propose pas « Modifier ». */}
+            <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO && !premierJour}/>
 
             {loading && <Skeleton variant="card" count={4}/>}
 
@@ -35796,86 +36206,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : null)
             )}
 
-            {/* 🏷️ OFFRES REÇUES — RETIRÉ DE L'ACCUEIL (demande de Julien,
-                28 sept. : « enlève le nombre d'offres reçues, laisse simplement
-                les notifications »). Les offres restent dans le centre de
-                notifications (la cloche) ; on ne double plus l'info sur l'écran
-                d'accueil. Les offres sont maintenant une entrée du centre de
-                notifications (la cloche), via la MÊME règle `offresAtraiter`
-                (§11) — on répond sur Vinted. */}
-
-            {/* ⚠️ L'ACCUEIL S'ARRÊTAIT AU TIERS DE L'ÉCRAN. Sur ordinateur il
-                restait 500 px d'aplat gris sous la dernière carte — ce vide est
-                ce qui fait lire « page pas finie », plus sûrement qu'une couleur.
-                On ne le remplit pas de décoration : on y met ce qu'il vient
-                regarder, ses dernières ventes. Ce n'est pas un conseil ni un
-                diagnostic (ceux-là restent bannis de l'accueil, §5.66) — c'est
-                du contenu, et il mène à l'écran Ventes. */}
-            {/* ⚠️ « les photos sont toutes petites dans les dernières ventes, on
-                comprend rien, c'est nul » (Julien). Elles passent d'une vignette
-                de 36 px à de GROSSES photos carrées en grille : `minmax(150px)`
-                donne deux colonnes sur téléphone, plus sur ordinateur — la même
-                règle CSS, aucun test de largeur en JavaScript (§7). Chaque carte
-                porte son N° et son statut ; PAS de bénéfice (0 prix d'achat, ce
-                serait un faux, §5) — le prix de vente, qui est un fait. */}
-            <div className="vrm-day-lower">
-            {!loading && dernieresVentes.length>0 && (
-              <div className="vrm-day-recent" style={{marginTop:24}}>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
-                  <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
-                  <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                    style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
-                </div>
-                <div className="vrm-carrousel">
-                  {dernieresVentes.map((o,i)=>{
-                    const ph = orderPhoto(o);
-                    const e = effEntry(o); const num = e?.numero;
-                    const vs = venteStage(o);
-                    return (
-                      <button key={o.transaction_id||i} type="button" onClick={()=>onNav&&onNav('cat_ventes')}
-                        style={{textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none',cursor:'pointer',fontFamily:'inherit',padding:0,display:'block'}}>
-                        <div style={{position:'relative',aspectRatio:'1 / 1',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                          {/* Le CDN Vinted expire : sans ce repli, la vignette
-                              devient l'icône « image cassée » du navigateur (§5.76). */}
-                          {ph && !imgMortes.has(ph)
-                            ? <PhotoVinted src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                            : <Icon name="image" size={30} style={{color:C.muted,opacity:.5}}/>}
-                          {num && <span style={{position:'absolute',top:9,right:9,fontSize:10.5,fontWeight:700,color:'#fff',background:'rgba(11,15,21,.62)',borderRadius:8,padding:'2px 8px'}}>N°{num}</span>}
-                        </div>
-                        <div style={{padding:'10px 11px 11px'}}>
-                          <div style={{fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.title||'—'}</div>
-                          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginTop:4}}>
-                            <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text}}>{montantCommande(o).toFixed(0)} €</span>
-                          </div>
-                          <div style={{fontSize:11.5,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,minWidth:0}}>
-                            <span style={{width:7,height:7,borderRadius:999,background:vs.color,flexShrink:0}}/>
-                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{vs.label}</span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {!premierJour && (()=>{
-              const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
-              const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
-              return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
-                <div className="vrm-day-head"><h3>Stock actuel <span>Vinted</span></h3><Icon name="box" size={18}/></div>
-                <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>annonce{stock?.total===1?'':'s'} en ligne</span></div>
-                {stock ? <>
-                  <div className="vrm-day-stock-meter" role="img" aria-label={`${stock.renseignes} annonces sur ${stock.total} avec un prix d’achat`}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
-                  <div className="vrm-day-stock-prices"><span>Coût d’achat renseigné</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
-                  <p>{stock.renseignes} prix d’achat renseigné{stock.renseignes>1?'s':''}{stock.manquants>0?` · ${stock.manquants} à compléter`:''}</p>
-                </> : <p>{baseKO || listings.error?'Lecture du stock indisponible.':'En attente de lecture des annonces.'}</p>}
-                {stock && listings.incomplet && <p role="status">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
-                <div className="vrm-day-stock-links"><button type="button" onClick={()=>onNav&&onNav('cat_annonces')}>Voir les annonces</button><button type="button" onClick={()=>onNav&&onNav('garage')}>Ouvrir le stock</button></div>
-              </section>;
-            })()}
-            </div>
-
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
                 un dixième compte à quelqu'un qui en a neuf. */}
@@ -35886,10 +36216,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
             )}
-            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {!baseKO && !premierJour && !aWidget('benefice') && <BeneficeJournee onNav={onNav} place="lien"/>}
           </div>
-        );
-      })()}
+        );      })()}
 
       {!only && (
         <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>

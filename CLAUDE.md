@@ -2,7 +2,8 @@
 
 > ⚠️⚠️ **PASSATION DU 21 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-21.md`** : ce qui est
 > en ligne, `claude/lot-21oct` (hors ligne, retours, 5.204, carte OpenFreeMap), les branches
-> non déployées (`csp-app`, `app-rapide`, et INACHEVÉES `carte-pro`, `journee-widgets`), les gestes de Julien.
+> non déployées (`csp-app`, `app-rapide`, et INACHEVÉE `carte-pro`), les gestes de Julien.
+> `journee-widgets` est FINIE le 22 octobre sur `v22-widgets` (non déployée) : § « Ma journée en widgets ».
 
 > ⚠️⚠️ **PASSATION DU 12 OCTOBRE — DEUX AGENTS — LIS D'ABORD `docs/passation/README.md`,
 > section « 🔴 LIRE D'ABORD » puis « RÉPARTITION ».** Agent 1 : mettre en ligne
@@ -11089,6 +11090,100 @@ seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conf
   et en Report-Only la violation viendrait du worker, que le journal ne voit pas) ; les
   vraies redirections Stripe et Discord (navigations pleine page, hors CSP).
   L'extension n'est pas touchée.
+### Ma journée en widgets, finie et vérifiée (22 octobre)
+Demande de Julien (21 oct.) : Ma journée « comme l'écran d'un iPhone, avec des
+widgets ». Reprise de `claude/journee-widgets` (f4cfaff, « EN COURS, non
+vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
+`v22-widgets` — **non déployée**.
+- **Ce que c'est** : la disposition SEULE (`src/journeeWidgets.js`) — quels blocs,
+  dans quel ordre, à quelle largeur — rangée dans `vrm_journee_widgets`
+  (synchronisé, `{v:1, w:[{id,t}]}`, rattrapé par `onCloudReady` seulement s'il
+  est resté vide). Chaque widget rend un bloc que Ma journée calculait déjà :
+  **aucun chiffre n'est recalculé** (§11), **aucune lecture de plus**.
+  « Modifier » (ordinateur : en haut de la grille ; téléphone : « Modifier
+  l'écran » en bas) ou appui long au doigt ⇒ les widgets tremblent (rien si
+  « réduire les animations »), on glisse, « − » retire, « + Ajouter » (feuille),
+  « OK ». Clavier : flèches, Suppr, Échap. Catalogue : les 7 blocs d'avant +
+  14 derniers jours, URSSAF, bénéfice, et 4 petites cases (à envoyer, à retirer,
+  messages, prix à baisser).
+- **La mise en page par défaut est CELLE D'AVANT**, même ordre, même place :
+  barre, à faire, vendu | semaine | attente, puis photos 2/3 | stock 1/3 sur
+  ordinateur (grille de 6 colonnes) ; l'un sous l'autre sur téléphone. Le banc
+  `revendeurs` (vert sur origin/main) l'exige — « stock à droite des dernières
+  ventes », tout visible sans défiler — et il était ROUGE sur mon premier jet
+  (grille de 4 colonnes) : *une nouveauté ne doit pas changer ce qu'on voit tant
+  qu'on n'a rien touché.*
+- **Mesuré au rendu sur f4cfaff, corrigé** :
+  1. ⚠️⚠️ **à la souris, glisser un widget de côté CHANGEAIT D'ONGLET** : le
+     balayage horizontal de la coque prenait le geste ; on lâchait le widget sur
+     l'écran Vinted. La grille porte `data-noswipe` en mode « Modifier » ;
+  2. **sur téléphone, « Modifier » était INVISIBLE** : il vivait dans la tête de
+     l'écran, que `styles-mobile-studio` cache sous 768 px. Seul l'appui long
+     (que personne ne devine) y menait. Un seul des deux boutons se voit à une
+     largeur donnée ;
+  3. **« Grand » ne montrait rien de plus** : la même carte, deux rangées plus
+     haute et vide. Une taille est une **largeur** (ordinateur : 1/6, un tiers,
+     deux tiers, pleine largeur) ; sur téléphone (2 colonnes) tout ce qui n'est
+     pas petit fait toute la largeur : le bouton de taille n'y est pas proposé ;
+  4. **« 1 colis en retard » était dit deux fois** (une alerte de tête ajoutée +
+     la case de la barre) : il ne remonte en tête que si AUCUNE case ne le
+     montre (`caseVisible`). Même règle ajoutée pour le colis **hors délai à
+     retirer** (il repart chez l'expéditeur), que le premier jet oubliait :
+     retirer la barre l'aurait rendu muet ;
+  5. **« À faire » était retirable** — et avec lui les emails mis de côté, les
+     colis cochés non partis, le litige, « Tout est OK » à confirmer… Il est
+     **fixe** (déplaçable, jamais retiré ; remis s'il manque d'une disposition
+     abîmée) ;
+  6. **le premier jour, la grille entière était cachée**, « À faire » compris :
+     la ligne « N emails mis de côté » disparaissait (banc `emails-mis-de-cote`,
+     2 ❌ sur un jet intermédiaire, vert sur origin/main). La grille est rendue,
+     ses widgets se taisent d'eux-mêmes, et « Modifier » n'y est pas ;
+  7. **base injoignable** : la carte « Lecture du stock indisponible » était une
+     troisième voix après le bloc de la coque et la ligne de panne (§7) — retirée,
+     et « Modifier » n'est pas proposé pendant la panne.
+- **Décidé (sans lui demander)** : les alertes qui coûtent (`urgent` : deux
+  paires sous un N°, double vente, ne pas poster eBay, coché non parti, « Tout
+  est OK » à moins de 24 h) restent HORS grille, en tête, jamais retirables.
+  Une disposition illisible ou abîmée retombe sur ce qui est lisible, jamais sur
+  un écran vide.
+- **Prouvé** : banc `journee-widgets.cjs` (données inventées, base cloisonnée
+  comme en production, 1512 et 390 px, clair ET sombre, souris et doigt)
+  **129 ✅ · 0 ❌** ; **50 ❌ sur origin/main** (3de5c8f), **34 ❌ sur
+  f4cfaff** ; il compare les chiffres, les actions (`data-job`) et les blocs
+  rendus au build de la base de fusion (mêmes valeurs). Mutations, chacune
+  ROUGE : grille sans `data-noswipe` (5 ❌), alerte de retard sans `caseVisible`
+  (2 ❌), sans le bouton du bas (9 ❌), « À faire » retirable (2 ❌), « Deux
+  tiers » remis en carte plus haute (3 ❌). Audits `tdz`, `boutons`, `icones`,
+  `variables`, `chiffres`, `coherence`, `identite`, `bancs`, `extension-zip`
+  verts.
+  - **Sur le build final** (fusionné avec d198bca) : `journee-widgets`,
+    `journee-premium`, `premierjour`, `vendu-recu`, `emails-mis-de-cote`,
+    `revendeurs`, `hors-ligne`, `demarrage`, `stock-journee` verts, et les bancs
+    Leboncoin arrivés avec main (`lbc-identite-privee`, `lbc-demarrage`,
+    `lbc-rappel-mise-a-jour` — ⚠️ ils cherchent `/usr/bin/chromium` :
+    `CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`).
+  - Sur un build intermédiaire de la branche : `cartes-vivantes`,
+    `chiffres-croises`, `glisser-onglet`, `compact`, `accueil`,
+    `double-verification`, `numeros-remise-a-zero`, `session-reveil`,
+    `photo-vente` verts.
+  - **`vitesse`** : aucune lecture de plus (64 à 390 px comme main, 60 contre 62
+    à 1512) ; rendus au démarrage indiscernables (médianes à 390 px, quatre
+    mesures alternées : main 14·16·17·16, ici 15·14·15·16) — ses deux rouges
+    (« ≤ 62 lectures », « ≤ 13 rendus ») le sont déjà sur main.
+  - Rouges À L'IDENTIQUE sur origin/main (même nombre, déjà rouges avant ce
+    chantier, à regarder à part) : `benefice-journee` 2, `ebay-messages-journee`
+    8, `a-confirmer` 6, `poste-sans-depart` 12, `double-vente` 30,
+    `rappel-urssaf` 6, `statuts-colis` 52, `seuils-vinted` 13,
+    `recherche-numero` 13, `tout-generer` 36, `ebay-colis` 8, `audit-reel-20oct`
+    24, `codes-hors-ligne` 6, `photos-vinted` 40. Pour `benefice-journee`
+    (« éteint ⇒ plus de carte ») la cause est dans le BANC : il sert la sonde de
+    schéma en 400 (base non cloisonnée), donc `cloudPush` ne part pas, et le
+    rechargement relit « allumé » dans le nuage (§6.3 — le même piège que mon
+    propre banc avant qu'il serve 200).
+- **Non mesuré** : le vrai iPhone (appui long, défilement pendant le glisser —
+  tout est au Chromium tactile du banc) ; le mode stream ne floute rien de
+  Ma journée (aucun `vrm-sensible` dans l'écran, sur main non plus : les comptes
+  nommés dans « À faire » restent lisibles — inchangé, à trancher à part).
 
 ---
 
