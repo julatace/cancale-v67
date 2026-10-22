@@ -43893,14 +43893,19 @@ function DoubleVerification({ onEtat } = {}) {
     }
     const d = await mfaAppel('DELETE', `factors/${encodeURIComponent(cible)}`);
     setBusy(false); setCode('');
-    if (d.ok) {
+    // 404 : GoTrue ne connaît plus cet appareil — il a déjà été retiré (depuis un
+    // autre appareil pendant que ce formulaire était ouvert, ou par un essai dont
+    // la réponse s'est perdue). C'est l'état voulu : jamais « reste enregistré ».
+    const dejaParti = !d.ok && d.status === 404;
+    if (d.ok || dejaParti) {
       const cur = AUTH.session;
       if (cur) {
         const noms = { ...(cur.totpNoms && typeof cur.totpNoms === 'object' ? cur.totpNoms : {}) }; delete noms[cible];
         writeSession({ ...cur, totp: (Array.isArray(cur.totp) ? cur.totp : []).filter((x) => x !== cible), totpNoms: noms });
       }
       setCours(null); setNom('');   // la proposition de nom se refait sur la liste relue
-      setMsg({ t: dernier ? 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.' : `« ${cours.nom} » est retiré : son code ne permet plus d'entrer. Tes autres appareils restent actifs.`, ton: 'ok' });
+      if (dejaParti) setMsg({ t: `« ${cours.nom} » n'était déjà plus enregistré (retiré entre-temps) : son code ne permet plus d'entrer. Je relis la liste.`, ton: 'passu' });
+      else setMsg({ t: dernier ? 'Double vérification désactivée. Ton mot de passe suffit de nouveau pour te connecter.' : `« ${cours.nom} » est retiré : son code ne permet plus d'entrer. Tes autres appareils restent actifs.`, ton: 'ok' });
     } else if (mfaInjoignable(d)) {
       setMsg({ t: "Je ne sais pas s'il a été retiré : le service de connexion n'a pas répondu. Je relis la liste.", ton: 'passu' });
     } else {
@@ -43908,6 +43913,16 @@ function DoubleVerification({ onEtat } = {}) {
     }
     relire();
   };
+  // La liste relue ne contient plus l'appareil que le formulaire « retirer » vise
+  // (retiré ailleurs, ou retrait fait chez GoTrue dont la réponse s'est perdue) :
+  // le formulaire se referme et la liste relue s'affiche. Sans ça, avec un seul
+  // appareil restant, il devenait « Pour désactiver la double vérification… Ton
+  // mot de passe suffira ensuite » — faux : l'appareil restant est toujours actif.
+  React.useEffect(() => {
+    if (!f || !cours || cours.etape !== 'off') return;
+    if (f.verifies.some((x) => String(x.id) === String(cours.id))) return;
+    setCours(null); setCode(''); setNom(nomParDefaut(f.verifies, f.verifies.length > 0));
+  }, [f]);
   const ouvrirRetrait = (x) => { setCours({ etape: 'off', id: String(x.id), nom: nomAppareil(x) }); setCode(''); setMsg(null); };
 
   const bandeau = msg && (
