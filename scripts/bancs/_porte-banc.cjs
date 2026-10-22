@@ -88,7 +88,11 @@ function poser(pw) {
   // BANC_TRACE=1 : chaque réponse /rest/v1 ou /api en erreur est imprimée (diagnostic).
   const tracer = (ctx) => { if (process.env.BANC_TRACE !== '1') return; ctx.on('response', (r) => { const u = decodeURIComponent(r.url()); if (/\/rest\/v1\/|\/api\//.test(u) && (r.status() >= 400 || process.env.BANC_TRACE_TOUT)) console.log('TRACE', r.status(), u.slice(0, 200)); }); ctx.on('requestfailed', (r) => { if (/\/rest\/v1\/|\/api\//.test(r.url())) console.log('TRACE échec', r.url().slice(0, 200)); }); };
   const surContexte = (ctx) => { try { ctx.addInitScript(SCRIPT); tracer(ctx); } catch (_) {} return ctx; };
-  const launch = c.launch.bind(c);
+  // Un banc écrit sur une autre machine vise parfois /usr/bin/chromium : absent,
+  // on prend le Chromium installé ici (même moteur, rien d'autre ne change).
+  const fs = require('fs'); const ICI = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  const chemin = (o) => { if (o && o.executablePath && !fs.existsSync(o.executablePath) && fs.existsSync(ICI)) return Object.assign({}, o, { executablePath: ICI }); return o; };
+  const launch0 = c.launch.bind(c); const launch = (o, ...r) => launch0(chemin(o), ...r);
   c.launch = async (...a) => {
     const b = await launch(...a);
     const nc = b.newContext.bind(b), np = b.newPage.bind(b);
@@ -97,7 +101,7 @@ function poser(pw) {
     return b;
   };
   const lpc = c.launchPersistentContext.bind(c);
-  c.launchPersistentContext = async (...a) => surContexte(await lpc(...a));
+  c.launchPersistentContext = async (d, o, ...r) => surContexte(await lpc(d, chemin(o), ...r));
 }
 try { poser(require('playwright')); } catch (_) {}
 module.exports = { SCRIPT_PORTE_BANC: SCRIPT, poserPorteBanc: poser };
