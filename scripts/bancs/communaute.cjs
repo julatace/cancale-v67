@@ -668,6 +668,24 @@ async function partie019(nav) {
       });
     }
 
+    console.log('\n── les deux autres combinaisons : 1512 px sombre, 390 px clair');
+    for (const [largeur, sombre, style] of [[1512, true, 'dark'], [390, false, 'positron']]) {
+      await essaie(`rendu ${largeur} ${sombre ? 'sombre' : 'clair'}`, async () => {
+        reset();
+        B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
+        OFM.styles = []; OFM.tuiles = 0;
+        const { ctx, pg } = await ouvrir(nav, { qui: A, largeur, sombre });
+        await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 20000 }).catch(() => {});
+        dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap' && OFM.styles.includes(style) && OFM.tuiles > 0, `${largeur} px ${sombre ? 'sombre' : 'clair'} : le style « ${style} » est demandé et dessiné`, JSON.stringify({ styles: OFM.styles, tuiles: OFM.tuiles }));
+        const l = await pg.evaluate(() => document.documentElement.scrollWidth);
+        dit(l <= largeur, `${largeur} px : aucun débordement horizontal`, String(l));
+        const pin = await pg.$eval('[data-cm-pin]', (b) => { const r = b.getBoundingClientRect(); const c = b.closest('.vrm-cm-carte').getBoundingClientRect(); return { dedans: r.left >= c.left && r.right <= c.right && r.top >= c.top && r.bottom <= c.bottom, t: Math.round(Math.min(r.width, r.height)) }; }).catch(() => null);
+        dit(pin && pin.dedans && pin.t >= 44, `${largeur} px : l’épingle de Bruno est dans la carte, 44 px`, JSON.stringify(pin));
+        if (process.env.BANC_DEBUG) { await pg.waitForTimeout(600); await pg.screenshot({ path: process.env.BANC_DEBUG + `/carte${largeur}-${sombre ? 'sombre' : 'clair'}-croise.png` }); }
+        await ctx.close();
+      });
+    }
+
     console.log('\n── 1512 px · une tuile sur trois en erreur serveur ⇒ la carte RESTE');
     await essaie('tuiles en erreur', async () => {
       reset();
