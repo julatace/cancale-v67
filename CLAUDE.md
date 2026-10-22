@@ -11638,6 +11638,81 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
 - **Geste de Julien** : installer l'extension de l'intégration, ouvrir sa page
   profil Leboncoin (les 7 annonces fantômes sortent), puis « Mettre en pause » la
   N°18 depuis VRM → Leboncoin → Annonces.
+### Petits correctifs du 22 octobre : code Chronopost, délai d'email, mentions avant paiement, première visite (7, 8, 15, 16)
+- **(7) Le code de retrait Chronopost « …suivant au commerçant : »** — mesuré
+  (lecture seule) : l'email « Votre colis VINTED est arrivé en relais Pickup »
+  écrit « communiquez le code de retrait suivant au commer&ccedil;ant : NNNNNN »
+  (entité HTML non décodée) ; 3 emails Chronopost « arrivé » sur 8 portaient
+  leur code. Une règle (`api/_lib/code-retrait-email.js`, `codeRetraitTournure`,
+  §11) : les 4-10 chiffres qui suivent la tournure SUR LA MÊME LIGNE, rien d'autre
+  (un nombre à la ligne suivante, un suivi de 14 chiffres, « suivant » seul ⇒
+  rien). Lue par la route à l'arrivée ET par l'app (`reclassifyTrack`) dans
+  l'`extraitCode` d'une ligne déjà rangée : **1 ligne en base** (lue en booléen,
+  aucun code publié) affiche son code sans réécriture. `audit-transporteurs.cjs`
+  (règle, vraie route, app dans un `vm`) : **10 rouges sur l'avant** ;
+  mutations `ligne-suivante`, `sans-regle`, `app-sans-relecture` rouges.
+- **(8) « réessaie dans N secondes »** — GoTrue répond 429
+  « For security purposes, you can only request this after N seconds. »
+  (inscription, mot de passe oublié, renvoi, lien, changement d'adresse).
+  `delaiDemandeEmail` le lit, la phrase le dit en français, et le bouton est
+  GRISÉ avec le décompte (« Réessaie dans N s », `data-auth-attente`) ; taper
+  une autre adresse le libère. Le Site URL et l'expéditeur restent des réglages
+  de Julien (non simulés). Banc `attente-email.cjs` (faux GoTrue, horloge
+  pilotée, 390 et 1512) : vert ; **24 rouges sur le build d'avant** ; mutation
+  « décompte toujours à 0 » ⇒ 16 rouges.
+- **(15) Pas de paiement sur des CGV vides** — mesuré : les 10 champs de
+  `public/legal/editeur.js` valent `null`, `src/contact.js` est vide, et l'art. 5
+  des CGV renvoie à une adresse qui n'existe pas. `api/_lib/mentions-legales.js`
+  lit CE fichier (le serveur l'importe ; il reste un simple script pour les
+  pages) ; `checkout` refuse tant qu'un champ de `VRM_EDITEUR_OBLIGATOIRES` est
+  vide ou que le fichier est illisible (« pas su » = fermé) : **503
+  `mentions-legales`, même forme que « prix ≠ CGV »** — phrase générique au
+  vendeur, détail dans les journaux et sur la carte du propriétaire
+  (`mentionsManquantes`, libellés, au propriétaire seul ; `mentionsCompletes`
+  null/true/false pour tous). L'app : la porte et la carte « Mon compte »
+  ferment le paiement (`data-raison="mentions"`), le propriétaire lit la liste
+  (`data-mentions-manquantes`).
+  **Tranché** : la seconde case est une **demande d'accès immédiat** (L221-25),
+  pas une renonciation au droit de rétractation (L221-28 1° exige un service
+  pleinement exécuté sous 14 jours ; l'art. 5 garde ce droit, au prorata).
+  Même composant que la case des CGV (`CaseCgv`, `cases={cgv, acces}`),
+  « S'abonner » exige les deux, envoyée (`accesImmediat: true`, exigée par le
+  serveur : 400 `acces-immediat`) et datée comme les CGV
+  (`acces_immediat_demande_le`). Formulaire type (annexe R221-1) :
+  `public/legal/retractation.html`, lié depuis l'art. 5 des CGV et la case ;
+  CGV mises à jour au 22 octobre (`CGV_VERSION = '2026-10-22'`). Aucune mention
+  inventée : « à compléter ». Preuves : `audit-mentions-paiement.cjs`
+  (16 contrôles, **14 rouges sur l'avant**, 6 mutations rouges : porte retirée,
+  détail au vendeur, pas su ouvert, case ignorée, liste à tous, métadonnée
+  absente) ; `audit-abonnement` et `audit-lancement` remplissent les mentions
+  (valeurs inventées) et envoient la case ; banc `abonnement.cjs` 100 verts
+  (deux cases, porte, mentions vides, propriétaire).
+- **(16) Le premier passage d'un nouvel inscrit n'a rien rangé — diagnostic**
+  (lecture seule, aucune donnée de ce vendeur dans le dépôt) : son onglet
+  Vinted était ouvert AVANT la liaison. La visite est sortie sur
+  `visite_sans_session` (sans garde, voulu), la capture passive du profil a été
+  refusée (`ecriture_ratee_harvest_profile_sans_session` ×2) et le dressing
+  passif ignoré (`ignore_dressing_profil_pas_lu` ×2). Achats et messages sont
+  arrivés 2 s après la liaison (capture passive) ; profil et annonces ont
+  attendu l'alarme des 20 minutes (`runActive`). 0 vente : pas de
+  `orders_sold`, normal. Aucun recul de base ni pause Vinted dans ses
+  compteurs ; l'« heure de vide » lue d'abord venait d'`updated_at` (§4.3).
+  **Corrigé (extension, version NON montée — à l'intégration)** :
+  `visiteApresSession` — une session NEUVE pour la capture (aucune, morte, autre
+  compte VRM ; liaison adressée ou mot de passe) relance `visiteVinted` sur
+  l'onglet Vinted déjà ouvert, avec TOUS ses garde-fous (compte ignoré, pause,
+  recul, garde des 5 min, file, budgets) ; la même session vivante renvoyée,
+  ou aucun onglet Vinted ⇒ rien. `audit-liaison-visite.cjs` (vrai
+  `background.js`) : 10 contrôles, **5 rouges sur l'avant** ; mutations
+  `sans-appel`, `toujours`, `sans-onglet`, `contourne-gardes` rouges.
+- **Non mesuré** : la vraie réponse de GoTrue au rendu (le texte vient de son
+  code) ; Stripe réel ; la page de rétractation relue par un juriste ; la
+  visite relancée dans un vrai Chrome. `audit-extension-zip` est rouge tant que
+  la version n'est pas montée et le zip refait (à l'intégration).
+- **Gestes de Julien** : remplir `public/legal/editeur.js` (les 10 champs, dont
+  le médiateur) ET `src/contact.js` — tant qu'ils sont vides, personne ne peut
+  payer ; faire relire CGV et formulaire par un juriste ; régler le Site URL et
+  le SMTP dans Supabase (inchangé).
 
 ---
 

@@ -33,6 +33,7 @@ import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from '
 import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
+import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -839,6 +840,9 @@ export function parseCarrierEmail(mail, carrier) {
   // (17 oct.) « Votre code de retrait EST 123456 » / « … sera 123456 » aussi :
   // un petit verbe entre le libellé et le nombre faisait manquer le code.
   let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)[\s*_\-–—]*(?:(?:est|sera)\b)?[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/i) || [])[1] || null;
+  // (22 oct.) Chronopost Pickup : « communiquez le code de retrait SUIVANT au
+  // commerçant : 123456 » — règle partagée avec l'app (api/_lib/code-retrait-email.js).
+  if (!code) code = codeRetraitTournure(all) || null;
   if (!code) {
     const m = all.match(/\bcode\s*[:\-]\s*(\d{4,10})\b/i);
     // garde-fou : ne pas confondre avec un code postal

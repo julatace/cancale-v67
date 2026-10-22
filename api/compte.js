@@ -43,6 +43,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    depuis la console du navigateur.
 import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
+import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
@@ -325,8 +326,14 @@ async function abonnement(req, res) {
   // Trois états : `true` le prix de Stripe est celui des CGV · `false` il en
   // diffère (le paiement est fermé) · `null` pas su (Stripe muet ou pas branché).
   const conforme = prix ? prixConforme(prix) : null;
+  // 22 oct. — les mentions de l'éditeur : trois états (`null` = pas su). Vides ⇒
+  // le paiement est fermé (comme `prixConforme: false`) ; la LISTE de ce qui
+  // manque ne part qu'au propriétaire, le seul qui peut la remplir.
+  const manque = mentionsManquantes(await lireMentions());
   return repondre(res, 200, {
     ok: true,
+    mentionsCompletes: manque === null ? null : manque.length === 0,
+    mentionsManquantes: acc.proprietaire ? (manque === null ? null : manque.map((x) => x.libelle)) : undefined,
     proprietaire: acc.proprietaire,
     configure: stripePret(),
     modeTest: stripePret() ? stripeModeTest() : null,
@@ -360,7 +367,8 @@ async function abonnement(req, res) {
 // La version des CGV acceptées : la date de « Dernière mise à jour » de
 // public/legal/cgv.html (audit-lancement vérifie qu'elles concordent).
 // 11 octobre : prix passé à 12,99 € (version précédente : 2026-10-04, 9,99 €).
-const CGV_VERSION = '2026-10-11';
+// 22 octobre : case « accès immédiat » et formulaire de rétractation (art. 5).
+const CGV_VERSION = '2026-10-22';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -381,7 +389,26 @@ async function checkout(req, res) {
   if (acc.proprietaire) return repondre(res, 409, { erreur: 'proprietaire', message: 'Ton compte est gratuit : rien à payer.' });
   // Jamais deux abonnements pour un vendeur : déjà actif ⇒ on l'envoie gérer.
   if (ligne && abonnementActif(ligne.statut)) return repondre(res, 409, { erreur: 'deja', message: 'Tu es déjà abonné.' });
+  // ⚠️ 22 oct. — LES MENTIONS DE L'ÉDITEUR SONT VIDES (mesuré : 10 champs sur
+  //    10 à `null` en production) : on n'ouvre RIEN. Même forme que le refus
+  //    « prix ≠ CGV » plus bas : un message générique au VENDEUR (ce qui
+  //    manque est un réglage du propriétaire, pas son affaire), le détail dans
+  //    les journaux et sur la carte « Mon compte » du propriétaire. Fichier
+  //    illisible = « pas su » = fermé aussi.
+  const manque = mentionsManquantes(await lireMentions());
+  if (manque === null || manque.length) {
+    console.warn('[stripe] mentions de l’éditeur', manque === null ? 'illisibles' : 'incomplètes (' + manque.map((x) => x.libelle).join(', ') + ')', '— paiement refusé. Geste : remplir public/legal/editeur.js et src/contact.js.');
+    return repondre(res, 503, { erreur: 'mentions-legales', message: "Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie plus tard." });
+  }
   if (!corps || corps.cgv !== true) return repondre(res, 400, { erreur: 'cgv', message: "Coche « J'accepte les conditions générales de vente » avant de payer." });
+  // 22 oct. — LA DEMANDE D'ACCÈS IMMÉDIAT (art. L221-25 C. conso), cochée dans
+  //    l'app à côté des CGV, envoyée et rangée comme elles (même date). Sans
+  //    elle, un abonné qui se rétracte sous 14 jours est remboursé en entier,
+  //    même s'il a utilisé VRM. ⚠️ Ce n'est PAS une renonciation au droit de
+  //    rétractation (L221-28 1° exige un service PLEINEMENT exécuté avant la fin
+  //    des 14 jours, ce qu'un abonnement mensuel n'est pas, et l'article 5 des
+  //    CGV garde ce droit) : il reste, au prorata de la période écoulée.
+  if (corps.accesImmediat !== true) return repondre(res, 400, { erreur: 'acces-immediat', message: "Coche « Je demande l'accès immédiat » avant de payer." });
   const accepteLe = new Date().toISOString();
   const prix = await lirePrix();
   if (!prix) return repondre(res, 503, { erreur: 'prix', message: "Le prix de l'abonnement est introuvable chez Stripe." });
@@ -403,8 +430,8 @@ async function checkout(req, res) {
     success_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=merci`,
     cancel_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=annule`,
     client_reference_id: u.id,
-    metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe },
-    subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe } },
+    metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe },
+    subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe } },
     locale: 'fr',
     // ⚠️ LES CGV SE FONT ACCEPTER AVANT DE PAYER (5 octobre). Un abonnement
     //    vendu en ligne sans case « j'accepte les conditions de vente » n'a pas

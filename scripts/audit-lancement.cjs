@@ -113,6 +113,12 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     };
     process.env.STRIPE_SECRET_KEY = 'sk_test_banc';
     const compte = (await import('file://' + path.join(R, 'api', 'compte.js'))).default;
+    // 22 oct. — le paiement ne s'ouvre qu'avec des mentions de l'éditeur
+    // complètes (api/_lib/mentions-legales.js) : on les REMPLIT ici, avec des
+    // valeurs inventées, pour juger le reste. Le refus « mentions vides » a son
+    // propre audit (audit-mentions-paiement.cjs).
+    try { await import('file://' + path.join(R, 'public', 'legal', 'editeur.js')); } catch (_) {}
+    if (globalThis.VRM_EDITEUR) for (const k of Object.keys(globalThis.VRM_EDITEUR)) globalThis.VRM_EDITEUR[k] = 'valeur d’essai ' + k;
     const faire = async (body) => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (x) => { r.corps = x; return r; }; r.setHeader = () => {}; const req = { method: 'POST', query: { mode: 'checkout' }, headers: { authorization: 'Bearer aa.bb.A' }, async *[Symbol.asyncIterator]() {} }; if (body) req.body = body; await compte(req, r); return r; };
     // Les CGV s'acceptent DANS VRM avant Stripe (6 octobre) : sans la case
     // cochée, rien ne part chez Stripe.
@@ -120,7 +126,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     dit(r0.code === 400 && r0.corps && r0.corps.erreur === 'cgv' && !appelsStripe.some((x) => x.chemin === 'checkout/sessions'),
       'sans la case « j’accepte les CGV » cochée dans VRM : 400, aucune session de paiement', `HTTP ${r0.code} · ${r0.corps && r0.corps.erreur}`);
     appelsStripe.length = 0;
-    const r1 = await faire({ cgv: true });
+    const r1 = await faire({ cgv: true, accesImmediat: true });
     const s = appelsStripe.find((x) => x.chemin === 'checkout/sessions');
     const corps = (s && s.corps) || '';
     dit(r1.code === 200 && /consent_collection\[terms_of_service\]=required/.test(corps), 'la session de paiement exige la case « j’accepte les CGV » (required)', `HTTP ${r1.code}`);
@@ -133,7 +139,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
     dit(/subscription_data\[metadata\]\[cgv_version\]=\d{4}-\d{2}-\d{2}/.test(corps) && /subscription_data\[metadata\]\[cgv_acceptees_le\]=\d{4}-\d{2}-\d{2}T/.test(corps) && vers === majIso,
       'l’acceptation est DATÉE et rangée dans l’abonnement, avec la version des CGV (= leur date de mise à jour)', `version ${vers} · CGV du ${majIso}`);
     refusCgv = true; appelsStripe.length = 0;
-    const r2 = await faire({ cgv: true });
+    const r2 = await faire({ cgv: true, accesImmediat: true });
     const re = appelsStripe.filter((x) => x.chemin === 'checkout/sessions');
     // 1er appel refusé (case de Stripe impossible), 2e SANS la case : il ne
     // reste plus refusé (le banc ne refuse que ce qui demande la case).

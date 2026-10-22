@@ -435,6 +435,8 @@ async function authLogin(email, password) {
       user_id: (j.user && j.user.id) || null,
       email: (j.user && j.user.email) || mail,
     });
+    // 22 oct. : l'onglet Vinted déjà ouvert est relu tout de suite (voir `visiteApresSession`).
+    visiteApresSession('connexion');
     return { ok: true, email: (j.user && j.user.email) || mail };
   } catch (e) { return { ok: false, error: 'Réseau indisponible — réessaie.' }; }
 }
@@ -583,9 +585,13 @@ async function recevoirSessionAdressee(msg) {
   //    2 octobre : quelqu'un s'est connecté à VRM avec une AUTRE adresse dans ce
   //    Chrome, et les captures sont parties dans cette autre boutique. On garde
   //    la trace de la bascule pour que la carte du logo la DISE.
+  // Écrivait-elle déjà, vivante, sous CE compte ? (sinon la session est NEUVE
+  // pour la capture : voir `visiteApresSession`, plus bas.)
+  let dejaVivante = false;
   try {
     const avant = await loadSession();
     const sonAvant = avant ? String(avant.user_id || subDuJwt(avant.access_token) || '') : '';
+    dejaVivante = !!(avant && !avant.mort && avant.refresh_token && sonAvant === uid);
     if (avant && sonAvant && sonAvant !== uid) {
       await chrome.storage.local.set({ vrmBascule: { de: avant.email || emailDuJwt(avant.access_token) || '', vers: sess.email || emailDuJwt(sess.access_token) || '', at: Date.now() } });
     }
@@ -594,7 +600,35 @@ async function recevoirSessionAdressee(msg) {
   await saveSession({ access_token: sess.access_token, refresh_token: sess.refresh_token, expires_at: sess.expires_at, user_id: uid, email });
   Promise.resolve().then(() => noterDiag('session_liee')).catch(() => {});
   notifierApp({ type: 'session', etat: 'liee', email });
+  if (!dejaVivante) visiteApresSession('liaison');
   return { ok: true, email };
+}
+// ── 22 oct. — LA PREMIÈRE VISITE, DÈS QUE LA SESSION ARRIVE ─────────────────
+// Mesuré (lecture seule, sa base, le premier inscrit relié le 22 au matin) :
+// son onglet Vinted était ouvert AVANT que l'extension ait une session VRM.
+// La visite de cette page est sortie sur `visite_sans_session` (sans prendre
+// de garde, à raison : 5.165), la capture passive du profil a été refusée
+// (`ecriture_ratee_harvest_profile_sans_session` ×2) et le dressing passif
+// ignoré (`ignore_dressing_profil_pas_lu` ×2). Puis la session est arrivée…
+// et RIEN n'a relancé la visite : profil et annonces ont attendu l'alarme des
+// 20 minutes (achats et messages, eux, sont arrivés par la capture passive).
+// Pour quelqu'un qui découvre VRM, c'est vingt minutes d'une boutique vide.
+// ⇒ Une session NEUVE pour la capture (aucune, morte, ou un autre compte VRM)
+//    relance la visite de l'onglet Vinted DÉJÀ ouvert — la même
+//    `visiteVinted`, donc les MÊMES garde-fous : compte supprimé ou ignoré,
+//    pause demandée par Vinted, recul de notre base, garde des 5 minutes, file
+//    Vinted, budgets. Aucune requête de plus qu'une page rechargée à la main.
+//    Aucun onglet Vinted ouvert ⇒ rien (la prochaine page fera la visite).
+async function visiteApresSession(raison) {
+  try {
+    const onglets = await chrome.tabs.query({});
+    const surVinted = (onglets || []).some((t) => /^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(String((t && t.url) || '')));
+    if (!surVinted) return false;
+    Promise.resolve().then(() => noterDiag('visite_apres_' + String(raison || 'session').replace(/[^a-z]/g, ''))).catch(() => {});
+    clearTimeout(visiteTimer);
+    visiteTimer = setTimeout(() => { visiteVinted(); }, 1500);
+    return true;
+  } catch (_) { return false; }
 }
 async function deconnexionAdressee(msg) {
   const s = await loadSession();
