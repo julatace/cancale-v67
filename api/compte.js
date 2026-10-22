@@ -1,4 +1,5 @@
 import './_lib/sans-bruit.js';
+import {configurationAuthPublique} from './_lib/auth-public.js';
 import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
 // ⚠️ POURQUOI UNE SEULE FONCTION : le plan Vercel Hobby plafonne à 12 fonctions
@@ -950,6 +951,11 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if(mode==='configuration-auth'){
+    if(m!=='GET')return repondre(res,405,{ok:false});
+    const cfg=configurationAuthPublique(SUPABASE_URL,ANON);
+    return repondre(res,cfg?200:503,cfg?{ok:true,...cfg}:{ok:false});
+  }
   if(mode==='confidentialite'){
     if(m!=='GET')return repondre(res,405,{ok:false});
     const u=await utilisateurDe(req);if(!u)return repondre(res,401,{ok:false,raison:'session'});
