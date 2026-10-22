@@ -7,6 +7,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import {nettoyerAbonnementPush} from './_lib/abonnement-push.js';
 import { loadSubs, modifierSubs, sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
@@ -71,7 +72,7 @@ async function traiter(req, res) {
     const PAS_CONCLU = { erreur: 'base-occupee', message: "Je n'ai pas pu enregistrer cet appareil : la liste de tes appareils changeait au même moment. Rien n'est perdu — réessaie." };
     const echec = (raison) => (raison === 'lecture' ? PAS_LU : raison === 'conflit' ? PAS_CONCLU : PAS_ECRIT);
     if (body.action === 'subscribe') {
-      const sub = body.sub;
+      const sub = nettoyerAbonnementPush(body.sub);
       if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }
       const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub]));
       if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
@@ -102,6 +103,6 @@ async function traiter(req, res) {
 
     res.status(400).json({ error: 'action inconnue' });
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    res.status(500).json({ error: 'Erreur interne. Réessaie dans un instant.' });
   }
 }

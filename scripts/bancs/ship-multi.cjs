@@ -13,6 +13,7 @@
 // §6.1 : sur le code mono-vendeur (une passe globale), ces exigences TOMBENT.
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
+process.env.CRON_SECRET='cle-banc-rappels';
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -24,8 +25,8 @@ const limiteAuj = `${D}/${M}/${Y}`;
 
 // Deux vendeurs, chacun SES données.
 const V = {
-  A: { subs: [{ endpoint: 'https://push/A1' }], bord: { dateLimite: limiteAuj, transaction: 'TXA', suivi: 'SA', numero: '1' }, txns: ['TXA'] },
-  B: { subs: [{ endpoint: 'https://push/B1' }], bord: { dateLimite: limiteAuj, transaction: 'TXB', suivi: 'SB', numero: '2' }, txns: ['TXB'] },
+  A: { subs: [{ endpoint: 'https://fcm.googleapis.com/A1' }], bord: { dateLimite: limiteAuj, transaction: 'TXA', suivi: 'SA', numero: '1' }, txns: ['TXA'] },
+  B: { subs: [{ endpoint: 'https://fcm.googleapis.com/B1' }], bord: { dateLimite: limiteAuj, transaction: 'TXB', suivi: 'SB', numero: '2' }, txns: ['TXB'] },
 };
 
 const lus = [];            // toutes les URL GET vues
@@ -60,7 +61,7 @@ function poserFetch({ sonde = 200, mainKO = new Set(), vendeurs = ['A', 'B'] } =
     if (/id=eq\.ship_reminder_dedup/.test(u)) return J([{ data: {} }]);        // pas encore notifié
     if (/id=eq\.urssaf_reminder_dedup/.test(u)) return J([{ data: {} }]);
     if (/id=eq\.push_prefs/.test(u)) return J([{ data: { expedier: true } }]);
-    const v = o && (V[o] || (/^V\d+$/.test(o) ? { subs: [{ endpoint: 'https://push/' + o }], bord: { dateLimite: limiteAuj, transaction: 'TX' + o }, txns: ['TX' + o] } : null));
+    const v = o && (V[o] || (/^V\d+$/.test(o) ? { subs: [{ endpoint: 'https://fcm.googleapis.com/' + o }], bord: { dateLimite: limiteAuj, transaction: 'TX' + o }, txns: ['TX' + o] } : null));
     if (/id=eq\.push_subs/.test(u)) return J([{ data: { subs: v ? v.subs : [] } }]);
     if (/id=like\.email_bord_/.test(u)) return J(v ? [v.bord] : []);
     if (/orders_sold/.test(u)) return J(v ? [{ txns: v.txns }] : []);
@@ -72,7 +73,7 @@ function poserFetch({ sonde = 200, mainKO = new Set(), vendeurs = ['A', 'B'] } =
   poserFetch();
   const mod = await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'));
   const res = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } };
-  await mod.default({ method: 'GET', headers: {}, query: {} }, res);
+  await mod.default({ method: 'GET', headers: {authorization:'Bearer cle-banc-rappels'}, query: {} }, res);
 
   const bordsScopes = new Set(lus.filter(u => /id=like\.email_bord_/.test(u)).map(u => (u.match(/owner=eq\.([^&]+)/) || [])[1]).filter(Boolean));
   const bordsGlobal = lus.some(u => /id=like\.email_bord_/.test(u) && !/owner=eq\./.test(u));
@@ -103,7 +104,7 @@ function poserFetch({ sonde = 200, mainKO = new Set(), vendeurs = ['A', 'B'] } =
   dit(res.corps && res.corps.vendeurs === 2,
     'la réponse rend un bilan par vendeur', 'vendeurs=' + (res.corps && res.corps.vendeurs));
 
-  const lancer = async () => { const r = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } }; await mod.default({ method: 'GET', headers: {}, query: {} }, r); return r; };
+  const lancer = async () => { const r = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } }; await mod.default({ method: 'GET', headers: {authorization:'Bearer cle-banc-rappels'}, query: {} }, r); return r; };
   // Sans clé VAPID le banc n'envoie rien pour de vrai : ce qui prouve qu'un
   // vendeur a été NOTIFIÉ est son mémo du jour (écrit après l'envoi) et la
   // lecture de SES appareils. Indépendant de la date (le rappel URSSAF du 1er

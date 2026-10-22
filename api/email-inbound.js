@@ -1162,16 +1162,48 @@ const duVendeur = (url) => duVendeurLib(url, baseCloisonnee);
 // « installation ». « Rien lu » ne vaut pas « rien ».
 // Exportée : `api/email-rattacher.js` juge une réclamation avec CE registre-là,
 // lu de la même façon (§11).
+let registreEmailsEnVol=null;
 export async function lireRegistreEmails(cloisonnee) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=${cloisonnee ? 'owner,data' : 'data'}`, {
-      headers: { ...sbCle(SUPABASE_KEY) },
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    if (!Array.isArray(j)) return null;
-    return fusionnerRegistres(j, cloisonnee);
-  } catch (_) { return null; }
+  if(cloisonnee!==true)return null;
+  // Uniquement les lectures simultanées : aucun cache durable d'attribution.
+  if(registreEmailsEnVol)return registreEmailsEnVol;
+  const lecture=chargerRegistreEmails();registreEmailsEnVol=lecture;
+  try{return await lecture;}finally{if(registreEmailsEnVol===lecture)registreEmailsEnVol=null;}
+}
+async function chargerRegistreEmails() {
+  const lignes=[],vus=new Set(),taille=500;let debut=0;
+  // Ordre stable et pages bornées : une adresse conflictuelle après la
+  // millième ligne doit être détectée aussi. Jamais de résultat partiel.
+  for(let page=0;page<100;page++){
+    try {
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_email_owners&select=owner,data&order=owner.asc`,{
+        headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
+        signal:AbortSignal.timeout(10000),
+      });
+      if(!r.ok)return null;
+      const j=await r.json();if(!Array.isArray(j))return null;
+      for(const l of j){if(!l.owner||vus.has(l.owner))return null;vus.add(l.owner);lignes.push(l);}
+      // PostgREST peut imposer une limite plus basse que notre page. Son
+      // Content-Range prévaut alors sur la taille demandée ; on avance du
+      // nombre réellement lu, sans sauter les vendeurs suivants.
+      const plage=r.headers?.get?.('content-range');
+      const cr=plage&&/^(\d+)-(\d+)\/(\d+|\*)$/.exec(plage);
+      if(cr){
+        if(Number(cr[1])!==debut||Number(cr[2])-debut+1!==j.length)return null;
+        debut+=j.length;
+        if(cr[3]!=='*'){
+          if(debut>Number(cr[3]))return null;
+          if(debut===Number(cr[3]))return fusionnerRegistres(lignes,true);
+        }
+      }else{
+        if(plage){const fin=/^\*\/(\d+|\*)$/.exec(plage);if(!fin||j.length!==0||(fin[1]!=='*'&&Number(fin[1])!==debut))return null;}
+        if(j.length<taille)return fusionnerRegistres(lignes,true);
+        debut+=j.length;
+      }
+      if(j.length===0)return fusionnerRegistres(lignes,true);
+    }catch(_){return null;}
+  }
+  return null;
 }
 
 // Email non attribuable : on le garde ENTIER, avec la raison et les adresses

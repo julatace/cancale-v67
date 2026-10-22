@@ -19,7 +19,7 @@ export async function utilisateurDe(req) {
   // Un JWT a trois morceaux ; tout le reste est refusé sans appel réseau.
   if (!jeton || jeton.split('.').length !== 3 || jeton.length > 4096) return null;
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { signal:AbortSignal.timeout(10000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
     if (!r.ok) return null;
     const j = await r.json();
     const id = String((j && j.id) || '');
