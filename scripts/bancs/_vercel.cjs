@@ -15,6 +15,14 @@
 //    la console (« Refused to … because it violates … »), y compris en
 //    Report-Only (« [Report Only] »).
 //  · `vercelMute(fn)`           : une copie modifiée de vercel.json (mutations).
+//  · les RAPPORTS (22 oct.) : chaque CSP servie reçoit `report-uri
+//    /__vrm-csp-rapport`, et ce que le navigateur y envoie rejoint les
+//    violations observées. ⚠️ C'est la SEULE voie qui voit un worker (le moteur
+//    de la carte, MapLibre, charge ses tuiles DEPUIS son worker) ou le service
+//    worker : mesuré dans Chromium le 22 octobre, leur refus n'arrive ni à
+//    l'évènement de la page ni à sa console — un banc sans rapports était vert
+//    sur une carte dont toutes les tuiles auraient été refusées.
+//    `BANC_CSP_SANS_RAPPORTS=1` les coupe (pour prouver que le contrôle mord).
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), http = require('http');
 const RACINE = path.join(__dirname, '..', '..');
@@ -36,7 +44,14 @@ function motif(source) {
   let re = '';
   for (let i = 0; i < source.length; i++) {
     const c = source[i];
-    if (c === '(') { const j = source.indexOf(')', i); re += '(' + source.slice(i + 1, j) + ')'; i = j; continue; }
+    // Un groupe est recopié tel quel, parenthèses ÉQUILIBRÉES : `/((?!sw\\.js).*)`
+    // (22 oct.) porte un groupe dans le groupe — couper à la première `)` donnait
+    // une expression fausse, donc des en-têtes qui ne seraient pas ceux de Vercel.
+    if (c === '(') {
+      let n = 0, j = i;
+      for (; j < source.length; j++) { if (source[j] === '\\') { j++; continue; } if (source[j] === '(') n++; else if (source[j] === ')' && --n === 0) break; }
+      re += '(' + source.slice(i + 1, j) + ')'; i = j; continue;
+    }
     if (c === ':') {
       const m = /^:([A-Za-z0-9_]+)(\*|\+|\?)?/.exec(source.slice(i));
       re += m[2] === '*' ? '(.*)' : '([^/]+)'; i += m[0].length - 1; continue;
@@ -46,11 +61,37 @@ function motif(source) {
   return new RegExp('^' + re + '$');
 }
 
-function entetesPour(chemin) {
+// Les rapports de violation (report-uri) : ajoutés aux en-têtes SERVIS par le
+// banc — jamais à vercel.json (la production n'a pas de collecteur : elle note
+// les violations de la page dans le journal des plantages, src/plantages.js).
+const RAPPORT_CHEMIN = '/__vrm-csp-rapport';
+const RAPPORTS = process.env.BANC_CSP_SANS_RAPPORTS !== '1';
+const avecRapport = (cle, valeur) => (RAPPORTS && /^content-security-policy/i.test(cle) ? valeur + '; report-uri ' + RAPPORT_CHEMIN : valeur);
+
+// `brut: true` : les en-têtes EXACTS de vercel.json (sans le report-uri du banc).
+function entetesPour(chemin, { brut = false } = {}) {
   const cfg = lireConfig();
   const out = {};
-  for (const h of cfg.headers || []) if (motif(h.source).test(chemin)) for (const e of h.headers || []) out[e.key] = e.value;
+  for (const h of cfg.headers || []) if (motif(h.source).test(chemin)) for (const e of h.headers || []) out[e.key] = brut ? e.value : avecRapport(e.key, e.value);
   return out;
+}
+
+// Un rapport reçu (forme `application/csp-report`, ou celle de la Reporting API)
+// → les violations observées des contextes abonnés (ou de CE contexte).
+const ABONNES = new Map();   // contexte → note(v)
+function recevoirRapport(corps, ctx) {
+  let liste = [];
+  try { const j = JSON.parse(String(corps || '')); liste = Array.isArray(j) ? j.map((x) => x && x.body).filter(Boolean) : [j && j['csp-report']].filter(Boolean); } catch (_) {}
+  for (const r of liste) {
+    const d = String(r['effective-directive'] || r.effectiveDirective || r['violated-directive'] || r.violatedDirective || '?').split(' ')[0];
+    const u = String(r['blocked-uri'] || r.blockedURL || r.blockedURI || '');
+    const doc = String(r['document-uri'] || r.documentURL || '');
+    const disp = String(r.disposition || '');
+    const src = String(r['source-file'] || r.sourceFile || '');
+    const v = { cle: d + ' ' + u, texte: `[rapport${disp === 'report' ? ' Report-Only' : ''}] ${d} ← ${u || '(en ligne)'} — document ${doc.replace(/^https?:\/\/[^/]+/, '') || '?'}${src && src !== doc ? ' (' + src.replace(/^https?:\/\/[^/]+/, '') + ')' : ''}`, page: doc, rapport: true, doc };
+    const cibles = ctx && ABONNES.has(ctx) ? [ABONNES.get(ctx)] : [...ABONNES.values()];
+    for (const note of cibles) note(v);
+  }
 }
 
 function reecrire(url) {
@@ -73,6 +114,10 @@ const TYPES = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'te
 // est servi tel quel ou 404.
 function servir(dist, port) {
   const srv = http.createServer((q, r) => {
+    if (q.method === 'POST' && q.url.split('?')[0] === RAPPORT_CHEMIN) {
+      let b = ''; q.on('data', (c) => { b += c; }); q.on('end', () => { recevoirRapport(b); r.writeHead(204); r.end(); });
+      return;
+    }
     const url = reecrire(q.url);
     const chemin = url.split('?')[0];
     const entetes = entetesPour(q.url.split('?')[0]);
@@ -99,6 +144,12 @@ async function brancher(ctx, origine) {
       return route.fulfill({ response: rep, headers: { ...rep.headers(), ...entetesPour(chemin) } });
     } catch (_) { return route.fallback(); }
   });
+  // Les rapports envoyés à CETTE origine : gardés ici (enregistrée APRÈS la
+  // route générale, elle passe d'abord — §6.6).
+  await ctx.route((u) => u.href.split('?')[0] === o + RAPPORT_CHEMIN, (route) => {
+    try { recevoirRapport(route.request().postData(), ctx); } catch (_) {}
+    return route.fulfill({ status: 204, body: '' });
+  });
 }
 
 // Les violations : (1) l'évènement, posé dans chaque document du contexte ;
@@ -121,6 +172,8 @@ function observer(ctx) {
   });
   ctx.on('page', ecoute);
   for (const p of ctx.pages()) ecoute(p);
+  ABONNES.set(ctx, note);
+  ctx.on('close', () => ABONNES.delete(ctx));
   return vues;
 }
 
@@ -141,4 +194,4 @@ function bilanCsp() {
   return v.length;
 }
 
-module.exports = { servir, brancher, observer, cspBanc, bilanCsp, entetesPour, reecrire, motif, lireConfig, vercelMute, RACINE };
+module.exports = { servir, brancher, observer, cspBanc, bilanCsp, entetesPour, reecrire, motif, lireConfig, vercelMute, recevoirRapport, RAPPORT_CHEMIN, RAPPORTS, RACINE };

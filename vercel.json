@@ -60,10 +60,6 @@
           "value": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
         },
         {
-          "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://lgonxzrzjcqthjtbdpzo.supabase.co wss://lgonxzrzjcqthjtbdpzo.supabase.co https://cdn.jsdelivr.net https://*.vinted.net https://api-adresse.data.gouv.fr https://nominatim.openstreetmap.org data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com chrome-extension: moz-extension:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-        },
-        {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
         },
@@ -82,6 +78,15 @@
         {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains"
+        }
+      ]
+    },
+    {
+      "source": "/((?!sw\\.js).*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://lgonxzrzjcqthjtbdpzo.supabase.co wss://lgonxzrzjcqthjtbdpzo.supabase.co https://tiles.openfreemap.org https://cdn.jsdelivr.net https://*.vinted.net https://api-adresse.data.gouv.fr https://nominatim.openstreetmap.org data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com chrome-extension: moz-extension:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     },

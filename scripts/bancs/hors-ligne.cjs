@@ -22,6 +22,7 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 const http = require('http'), fs = require('fs'), path = require('path');
 const { servir } = require('./_minipgrest.cjs');
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : service worker, QR)
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
@@ -115,6 +116,7 @@ async function main() {
       console.log(`\n── ${T} · A. lecture complète → hors ligne → retour du réseau`);
       await essaie(`${T} A`, async () => {
         const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false };
         await brancher(ctx, etat);
         await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
@@ -179,6 +181,7 @@ async function main() {
       console.log(`\n── ${T} · B. lecture partielle (emails de suivi en panne) → aucune photo`);
       await essaie(`${T} B`, async () => {
         const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false, suiviKO: true };
         await brancher(ctx, etat);
         await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
@@ -201,6 +204,7 @@ async function main() {
       console.log(`\n── ${T} · C. la photo d'un autre vendeur reste à lui`);
       await essaie(`${T} C`, async () => {
         const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false, baseKO: true };
         await brancher(ctx, etat);
         const photoB = { v: 1, uid: UID_B, at: Date.now() - 600e3, nEnvoyer: 1, nRetirer: 1, nePasPoster: 0,
@@ -225,6 +229,7 @@ async function main() {
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }
   finally { await nav.close(); srv.close(); }
+  ko += bilanCsp();
   console.log(ko ? `\n❌ hors-ligne : ${ko} rouge(s)` : '\n✅ hors-ligne : tout est vert');
   process.exit(ko ? 1 : 0);
 }

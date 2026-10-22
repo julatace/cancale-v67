@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');   // l'« accès direct » est retiré de l'app (22 oct.) : session de banc
 // ════════════════════════════════════════════════════════════════════════════
 //  CSP — la politique de sécurité du contenu de vercel.json, servie POUR DE VRAI
 //  (21 octobre). Un banc qui sert dist/ sans les en-têtes de Vercel ne voit
@@ -18,12 +19,29 @@
 //  Contrôle positif : un `onerror` glissé dans la page DOIT être signalé —
 //  sinon l'observation serait aveugle et le banc vert par accident.
 //
+//  ⚠️ (22 oct.) Les violations d'un WORKER et du SERVICE WORKER n'arrivent ni à
+//  l'évènement de la page ni à sa console (mesuré dans Chromium) : le banc pose
+//  `report-uri` sur la CSP qu'il sert (`_vercel.cjs`) et compte les RAPPORTS.
+//  C'est ce qui voit les tuiles de la carte (MapLibre les charge depuis son
+//  worker) et le QR de Ma journée hors ligne (le service worker). Deux contrôles
+//  positifs de plus : un worker qui contacte une adresse interdite DOIT être
+//  signalé, et la carte DOIT avoir demandé ses tuiles (sinon « zéro violation »
+//  sur la carte ne prouverait rien).
+//  Sont rendus aussi (22 oct.) : la carte de la Communauté avec son fond
+//  OpenFreeMap (style, tuiles, sprites, polices — servis par le banc), la page
+//  de nouveau mot de passe (/recuperation.html, qui appelle la base), et la
+//  mise en réserve d'un QR hors ligne par le service worker.
+//
 //  Lancer : npm run build && node scripts/bancs/csp.cjs
 //    BANC_PORT=…                     (défaut 4993)
 //    BANC_CSP_EN_VIGUEUR=1           la Report-Only servie EN VIGUEUR (ce que
 //                                    donnerait la bascule) : écrans rendus, 0 violation
-//    BANC_CSP_MUTATION=supabase|jsdelivr|vinted|tous
+//    BANC_CSP_MUTATION=supabase|jsdelivr|vinted|openfreemap|tous
 //                                    retire un hôte nécessaire ⇒ le banc DOIT rougir
+//    BANC_CSP_MUTATION=swpolitique     remet le service worker SOUS la politique de
+//                                    la page ⇒ la réserve des QR DOIT rougir
+//    BANC_CSP_SANS_RAPPORTS=1          (`_vercel.cjs`) aucun rapport ⇒ les contrôles
+//                                    positifs worker DOIVENT rougir
 //    ECRANS=journee,cat_ventes       ne rendre que ces écrans
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs');
@@ -43,21 +61,29 @@ const MUT = process.env.BANC_CSP_MUTATION || '';
 const VIGUEUR = !!process.env.BANC_CSP_EN_VIGUEUR;
 if (VIGUEUR || MUT) {
   V.vercelMute((cfg) => {
-    const h = cfg.headers.find((x) => x.source === '/(.*)').headers;
+    // La politique complète vit dans SA règle (22 oct. : `/((?!sw\.js).*)`, le
+    // service worker n'est pas sous elle) — on la cherche par sa clé.
+    const regle = cfg.headers.find((x) => (x.headers || []).some((e) => e.key === 'Content-Security-Policy-Report-Only'));
+    const h = regle.headers;
     const ro = h.find((e) => e.key === 'Content-Security-Policy-Report-Only');
-    if (MUT) {
-      const retirer = { supabase: /\s(https|wss):\/\/lgonxzrzjcqthjtbdpzo\.supabase\.co/g, jsdelivr: /\shttps:\/\/cdn\.jsdelivr\.net/g, vinted: /\shttps:\/\/\*\.vinted\.net/g, tous: /\s(https|wss):\/\/[^\s;]+/g }[MUT];
+    if (MUT === 'swpolitique') regle.source = '/(.*)';
+    else if (MUT) {
+      const retirer = { supabase: /\s(https|wss):\/\/lgonxzrzjcqthjtbdpzo\.supabase\.co/g, jsdelivr: /\shttps:\/\/cdn\.jsdelivr\.net/g, vinted: /\shttps:\/\/\*\.vinted\.net/g, openfreemap: /\shttps:\/\/tiles\.openfreemap\.org/g, tous: /\s(https|wss):\/\/[^\s;]+/g }[MUT];
       if (!retirer) { console.log('mutation inconnue : ' + MUT); process.exit(2); }
       ro.value = ro.value.split(';').map((d) => (/^\s*connect-src/.test(d) ? d.replace(retirer, '') : d)).join(';');
     }
-    if (VIGUEUR) { const en = h.find((e) => e.key === 'Content-Security-Policy'); en.value = ro.value; h.splice(h.indexOf(ro), 1); }
+    // La bascule, telle qu'elle se fera : la clé Report-Only de cette règle
+    // devient `Content-Security-Policy` (elle passe après la règle générale :
+    // c'est elle qui est servie ; elle porte aussi les directives structurelles).
+    if (VIGUEUR) ro.key = 'Content-Security-Policy';
   });
 }
 
 const cfg = V.lireConfig();
-const entetes = V.entetesPour('/');
+const entetes = V.entetesPour('/', { brut: true });
 const ro = entetes['Content-Security-Policy-Report-Only'] || '';
 const en = entetes['Content-Security-Policy'] || '';
+const SUPABASE_URL = (/const SUPABASE_URL = "([^"]+)"/.exec(fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8')) || [])[1] || '';
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 
@@ -67,13 +93,50 @@ const TABS = (process.env.ECRANS ? process.env.ECRANS.split(',') : ['journee', '
 const SRC = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
 const extrait = (debut, fin = '\n};\n') => { const i = SRC.indexOf(debut); if (i < 0) return null; const j = SRC.indexOf(fin, i); return SRC.slice(i, j + fin.length); };
 
-async function contexte(b, vp, acces = true) {
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), serviceWorkers: 'block' });
+// Le fond OpenFreeMap servi par le banc : un style minimal mais de la MÊME FORME
+// que les vrais `liberty`/`dark` (relus le 22 oct. dans hyperknot/openfreemap-styles :
+// une source vectorielle par TileJSON `…/planet`, un fond raster
+// `…/natural_earth/ne2sr/{z}/{x}/{y}.png`, un sprite, des polices — tout sur
+// tiles.openfreemap.org). MapLibre va les chercher depuis la page ET son worker.
+const OFM = { vus: [] };
+const TILEJSON = JSON.stringify({ tilejson: '3.0.0', tiles: ['https://tiles.openfreemap.org/planet/banc/{z}/{x}/{y}.pbf'], minzoom: 0, maxzoom: 14 });
+const styleOfm = (nom) => JSON.stringify({ version: 8, name: nom,
+  sprite: 'https://tiles.openfreemap.org/sprites/ofm_f384/ofm',
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sources: { ne2_shaded: { type: 'raster', tileSize: 256, maxzoom: 6, tiles: ['https://tiles.openfreemap.org/natural_earth/ne2sr/{z}/{x}/{y}.png'] },
+    openmaptiles: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' } },
+  layers: [{ id: 'background', type: 'background', paint: { 'background-color': nom === 'dark' ? '#0e0e0e' : '#f8f4f0' } },
+    { id: 'relief', type: 'raster', source: 'ne2_shaded', paint: { 'raster-opacity': 0.3 } },
+    { id: 'water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water', paint: { 'fill-color': '#9ec8ff' } },
+    { id: 'place', type: 'symbol', source: 'openmaptiles', 'source-layer': 'place', layout: { 'text-field': '{name}', 'text-font': ['Noto Sans Regular'], 'icon-image': 'town' } }] });
+// Un PNG RGBA 2×2 valide, et l'index de sprite qui le décrit : un sprite que
+// MapLibre ne sait pas lire déclenche son évènement « error », et la carte
+// passe en liste (mesuré : avec '{}' et un PNG gris, plus aucune tuile demandée).
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAE0lEQVR4nGP4z8DwHwwZGP5DAABUvgr2vQeGRgAAAABJRU5ErkJggg==', 'base64');
+const SPRITE = JSON.stringify({ town: { width: 2, height: 2, x: 0, y: 0, pixelRatio: 1 } });
+const QR = { servis: 0 };
+
+async function contexte(b, vp, acces = true, { sw = false } = {}) {
+  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), serviceWorkers: sw ? 'allow' : 'block' });
   const vues = V.observer(ctx);
   if (acces) await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   // Rien d'extérieur n'est réellement servi (déterminisme) : la CSP est jugée
   // AVANT le réseau — une adresse refusée l'est avant d'atteindre cette route.
   await ctx.route(/^https?:\/\/(?!localhost)/i, (r) => r.abort());
+  // Sauf le fond de carte OpenFreeMap (style, tuiles, sprites, polices) et les QR
+  // des transporteurs : servis par le banc, pour que la carte et le service
+  // worker FASSENT leurs requêtes (une requête jamais faite ne viole rien).
+  await ctx.route(/^https:\/\/tiles\.openfreemap\.org\//, (r) => {
+    const u = r.request().url();
+    OFM.vus.push(u.replace(/^https:\/\/[^/]+/, '').split('?')[0]);
+    const m = u.match(/\/styles\/([a-z]+)/);
+    if (m) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: styleOfm(m[1]) });
+    if (/\/planet$/.test(u.split('?')[0])) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: TILEJSON });
+    if (/\.json$/.test(u.split('?')[0])) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: SPRITE });
+    if (/\.png$/.test(u.split('?')[0])) return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PNG });
+    return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: { 'access-control-allow-origin': '*' }, body: Buffer.alloc(0) });
+  });
+  await ctx.route(/^https:\/\/qr\.exemple\.test\//, (r) => { QR.servis++; return r.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
   const base = fabriquer();
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
@@ -82,7 +145,14 @@ async function contexte(b, vp, acces = true) {
     const rep = repondre(rq.url(), h.range, base);
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body: JSON.stringify(rep.body) });
   });
-  await ctx.route(`${ORIGINE}/api/**`, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+  await ctx.route(`${ORIGINE}/api/**`, (r) => {
+    const u = new URL(r.request().url()), mode = u.searchParams.get('mode');
+    // La Communauté ne dessine sa carte que sur une lecture réussie (une carte vide).
+    if (u.pathname === '/api/compte' && mode === 'communaute' && r.request().method() === 'GET') return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, carte: { profils: [], groupes: [], moi: null }, conversations: [], discordConnexion: true }) });
+    // La page de nouveau mot de passe lit l'adresse de la base ici, puis l'appelle.
+    if (u.pathname === '/api/compte' && mode === 'configuration-auth') return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, url: SUPABASE_URL, cle: 'cle-publique-de-banc' }) });
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' });
+  });
   return { ctx, vues };
 }
 
@@ -107,6 +177,17 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
   dit(enLigne.length === 0, "index.html n'a plus aucun script en ligne", enLigne.map((s) => s.slice(0, 60)).join(' | '));
   const xfo = r0.headers.get('x-frame-options');
   dit(/^deny$/i.test(xfo || ''), 'X-Frame-Options DENY (cohérent avec frame-ancestors none)', xfo);
+  // (22 oct.) Le service worker n'est PAS sous la politique de la page : il va
+  // chercher les QR des transporteurs (hôtes variables) pour Ma journée hors
+  // ligne. Le worker de la carte (/assets/…), lui, l'est : ses tuiles doivent
+  // être permises par connect-src.
+  const rsw = await fetch(ORIGINE + '/sw.js');
+  const swPol = rsw.headers.get('content-security-policy-report-only') || '';
+  dit(!/connect-src/.test(swPol) && !/connect-src/.test(rsw.headers.get('content-security-policy') || ''), "/sw.js n'est pas sous la politique complète (il va chercher les QR des transporteurs)", swPol ? 'il la reçoit : ' + swPol.slice(0, 60) : 'directives structurelles seulement');
+  const assetJs = (fs.readdirSync(path.join(DIST, 'assets')).find((f) => /^maplibre-gl-worker.*\.js$/.test(f)) || fs.readdirSync(path.join(DIST, 'assets')).find((f) => /\.js$/.test(f)));
+  const rw = await fetch(ORIGINE + '/assets/' + assetJs);
+  const cs = (/(?:^|;)\s*connect-src([^;]*)/.exec(rw.headers.get('content-security-policy-report-only') || rw.headers.get('content-security-policy') || '') || [])[1] || '';
+  dit(/https:\/\/tiles\.openfreemap\.org/.test(cs), `le worker de la carte (/assets/${assetJs}) peut joindre tiles.openfreemap.org (connect-src)`, cs.trim().slice(0, 120));
   const api = await fetch(ORIGINE + '/api/sante');
   dit(api.status === 404, "les réécritures de vercel.json sont appliquées (/api/sante → /api/compte?mode=sante, servi par Vercel, 404 ici)");
 
@@ -124,6 +205,42 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
       dit(!tombe && v.length === 0, `${tab}`, tombe ? 'écran tombé ou vide' : v.map((x) => x.texte).join(' | '));
     }
     dit(errs.length === 0, 'aucune erreur de page', errs.slice(0, 3).join(' | '));
+
+    // ── La carte de la Communauté : le fond OpenFreeMap, demandé ET dessiné ──
+    // (22 oct.) Une carte qui n'a rien demandé ne viole rien : on exige qu'elle
+    // ait demandé son style, ses tuiles (depuis le worker de MapLibre) et ses
+    // polices ou son sprite, puis ZÉRO violation — rapports des workers compris.
+    console.log(`── ${vp.width} px — carte de la Communauté (OpenFreeMap)`);
+    // ⚠️ Dans un contexte NEUF : les violations d'un contexte sont dédoublonnées,
+    // et celles déjà vues pendant la tournée des écrans rendaient ce contrôle
+    // vert par accident sur le code d'avant (vu le 22 oct.).
+    {
+      const c2 = await contexte(b, vp); const pgc = await c2.ctx.newPage();
+      const vuesC = c2.vues, n0 = 0, o0 = OFM.vus.length;
+      const pg = pgc, vues = vuesC;
+      await pg.goto(`${ORIGINE}/?tab=communaute`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 20000 }).catch(() => {});
+      for (let i = 0; i < 40 && !OFM.vus.slice(o0).some((u) => /\/planet\//.test(u)); i++) await pg.waitForTimeout(250);
+      await calme(pg, 2500);
+      const fond = await pg.evaluate(() => { const c = document.querySelector('[data-cm-carte]'); return c ? c.getAttribute('data-cm-fond') + ' · ' + c.getAttribute('data-cm-carte') + ' · canvas ' + !!document.querySelector('.maplibregl-canvas, .vrm-cm-carte canvas') : 'pas de carte'; }).catch(() => '?');
+      const demandes = OFM.vus.slice(o0);
+      dit(/^openfreemap/.test(fond), 'la carte dessine son fond OpenFreeMap (MapLibre)', fond);
+      dit(demandes.some((u) => /\/styles\//.test(u)) && demandes.some((u) => /\/planet$/.test(u)) && demandes.some((u) => /\/planet\//.test(u)) && demandes.some((u) => /\/natural_earth\//.test(u)) && demandes.some((u) => /\/(fonts|sprites)\//.test(u)), 'elle a demandé son style, sa TileJSON, ses tuiles vectorielles ET raster, et ses polices/sprite (sinon « zéro violation » ne prouverait rien)', [...new Set(demandes.map((u) => u.split('/').slice(0, 3).join('/')))].join(' '));
+      const v = nouvelles(vues, n0);
+      dit(v.length === 0, 'carte : aucune violation (page ET worker de MapLibre)', v.map((x) => x.texte).join(' | '));
+      await c2.ctx.close();
+    }
+    // Contrôle positif WORKER : une violation DANS un worker doit être vue (par
+    // les rapports — ni l'évènement ni la console de la page ne la voient).
+    {
+      const n0 = vues.length;
+      await pg.evaluate((jeton) => { try { const w = new Worker(URL.createObjectURL(new Blob([`fetch('https://interdit-worker.exemple.test/${jeton}').catch(() => {});`], { type: 'text/javascript' }))); setTimeout(() => w.terminate(), 3000); } catch (_) {} }, String(Date.now()));
+      let v = [];
+      for (let i = 0; i < 40; i++) { v = nouvelles(vues, n0); if (v.some((x) => /interdit-worker/.test(x.texte))) break; await pg.waitForTimeout(100); }
+      dit(v.some((x) => /interdit-worker/.test(x.texte)), 'contrôle positif : une adresse interdite contactée DEPUIS UN WORKER est signalée', v.map((x) => x.texte).join(' | ') || 'rien vu — les workers seraient invisibles');
+      await pg.waitForTimeout(300);
+      vues.splice(n0);
+    }
 
     // ── La fenêtre du reçu d'achat : le VRAI `openReceipt`, ses deux boutons ──
     console.log(`── ${vp.width} px — reçu, facture, bordereau`);
@@ -200,7 +317,7 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
     console.log(`── ${vp.width} px — pages publiques`);
     const pub = await contexte(b, vp, false);
     const p2 = await pub.ctx.newPage();
-    for (const u of ['/', '/?connexion', '/?inscription', '/?film', '/legal/cgv.html', '/legal/mentions-legales.html', '/legal/confidentialite.html']) {
+    for (const u of ['/', '/?connexion', '/?inscription', '/?film', '/legal/cgv.html', '/legal/mentions-legales.html', '/legal/confidentialite.html', '/recuperation.html#type=recovery&access_token=en.tete.banc']) {
       const n0 = pub.vues.length;
       await p2.goto(ORIGINE + u, { waitUntil: 'domcontentloaded' }).catch(() => {});
       await calme(p2, 2500);
@@ -210,6 +327,40 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
       dit(t > 20 && v.length === 0, `page ${u}`, t <= 20 ? 'vide' : v.map((x) => x.texte).join(' | '));
     }
     await pub.ctx.close();
+  }
+
+  // ── Ma journée hors ligne : le QR d'un colis à retirer mis en réserve ──
+  // (22 oct.) Le VRAI `rechaufferQr` d'App.jsx, service worker en marche. Avant,
+  // la PAGE allait chercher le QR chez le transporteur (connect-src le refuse :
+  // ces hôtes varient — six mesurés dans sa base) ; c'est le service worker, hors
+  // de la politique, qui le fait. On exige : la réserve remplie, et ZÉRO
+  // violation — ni de la page, ni du service worker (rapports).
+  console.log('\n── service worker — QR de Ma journée hors ligne mis en réserve');
+  {
+    const { ctx, vues } = await contexte(b, { width: 390, height: 844 }, true, { sw: true });
+    const pg = await ctx.newPage();
+    await pg.goto(`${ORIGINE}/?tab=journee`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await pg.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready).catch(() => {});
+    if (!(await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)).catch(() => false))) await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await calme(pg, 1500);
+    const HL = fs.readFileSync(path.join(RACINE, 'src', 'journeeHorsLigne.js'), 'utf8');
+    const decl = [/^export const CACHE_QR = .*$/m, /^export const adresseQrLocale = .*$/m].map((re) => ((HL.match(re) || [])[0] || '').replace(/^export /, ''));
+    const code = extrait('const rechaufferQr = async (photo) => {');
+    const controle = await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)).catch(() => false);
+    dit(controle, 'le service worker de VRM commande la page');
+    if (!code || decl.some((x) => !x)) dit(false, 'le code de la réserve des QR se retrouve dans App.jsx / journeeHorsLigne.js');
+    else {
+      const n0 = vues.length, q0 = QR.servis;
+      const qr = 'https://qr.exemple.test/api/barcode/AztecCode?d=PICKUPPASS:BANC' + Date.now();
+      await pg.evaluate(`(async () => { ${decl.join('\n')}\n${code}\n await rechaufferQr({ retirer: [{ qr: ${JSON.stringify(qr)} }] }); })()`).catch((e) => dit(false, 'rechaufferQr s\'exécute', String(e).slice(0, 120)));
+      let n = 0;
+      for (let i = 0; i < 30 && !n; i++) { n = await pg.evaluate(async (u) => (await (await caches.open('vrm-hl-qr')).match('/hl-qr?u=' + encodeURIComponent(u))) ? 1 : 0, qr).catch(() => 0); if (!n) await pg.waitForTimeout(200); }
+      dit(n === 1 && QR.servis > q0, 'le QR est dans la réserve (allé chercher une fois)', `réserve ${n} · demandes au transporteur ${QR.servis - q0}`);
+      await calme(pg, 1500);
+      const v = nouvelles(vues, n0);
+      dit(v.length === 0, 'réserve des QR : aucune violation (page ET service worker)', v.map((x) => x.texte).join(' | '));
+    }
+    await ctx.close();
   }
 
   await b.close(); srv.close();

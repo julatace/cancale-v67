@@ -159,7 +159,16 @@ self.addEventListener('fetch', event => {
         const hit = await c.match(req);
         if (hit) return hit;
         const u = url.searchParams.get('u') || '';
-        if (/^https:\/\//i.test(u)) return await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+        if (/^https:\/\//i.test(u)) {
+          const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+          // (22 oct.) C'est ICI que le QR entre dans la réserve : la page ne va
+          // plus le chercher elle-même. Sa politique de sécurité du contenu
+          // (connect-src, vercel.json) refuserait les hôtes des transporteurs —
+          // six mesurés chez lui, et ils changent ; ce fichier-ci n'est pas sous
+          // cette politique (vercel.json l'exclut, `/((?!sw\.js).*)`).
+          if (res && (res.ok || res.type === 'opaque')) { try { await c.put(req, res.clone()); } catch (_) {} }
+          return res;
+        }
       } catch (_) {}
       return new Response('', { status: 404 });
     })());

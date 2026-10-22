@@ -32,7 +32,8 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4538;
+const PORT = Number(process.env.BANC_PORT || 4538);
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : Stripe, Mon compte)
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
@@ -94,6 +95,7 @@ const srv = http.createServer((q, r) => {
 async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, onglet = 'abonnement', extra = '', fermer = null, largeur = 1512 }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
+  await cspBanc(ctx, `http://localhost:${PORT}`, `abonnement ${largeur}`);
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
@@ -440,6 +442,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
   finally {
     await nav.close(); srv.close();
+    ko += bilanCsp();
     console.log(ko ? `\n❌ abonnement (rendu) : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ abonnement (rendu) : ${ok} verts, 0 rouge`);
     process.exit(ko ? 1 : 0);
   }

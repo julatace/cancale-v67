@@ -10,7 +10,15 @@
 //   · aucun gestionnaire en ligne (`onclick="…"`, `javascript:`) n'est écrit
 //     dans un HTML fabriqué par l'app (les fenêtres imprimables héritent de la CSP) ;
 //   · chaque hôte que l'app CONTACTE (fetch, script chargé, cadre) est permis
-//     par la bonne directive — l'adresse de la base est lue dans App.jsx (§11).
+//     par la bonne directive — l'adresse de la base est lue dans App.jsx (§11) ;
+//   · (22 oct.) le fond de carte OpenFreeMap (adresse LUE dans src/fondCarte.js)
+//     est permis en connect-src (style, tuiles depuis le worker de MapLibre,
+//     sprite, polices) et en img-src ; worker-src permet 'self' (le worker de
+//     MapLibre est servi par VRM) et blob: (pdf.js) ;
+//   · le service worker n'est PAS sous la politique de la page (il va chercher
+//     les QR des transporteurs, hôtes variables) — ou, s'il l'est, connect-src
+//     lui ouvre https: ; et la PAGE ne va jamais chercher un QR elle-même : elle
+//     passe par `/hl-qr` (même origine), le service worker range ce qu'il ramène.
 // Usage : node scripts/audit-csp.cjs   (sort en 1 si un contrôle échoue)
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
@@ -18,9 +26,13 @@ const lire = (f) => fs.readFileSync(path.join(R, f), 'utf8');
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 
-const cfg = JSON.parse(lire('vercel.json'));
-const tout = (cfg.headers || []).find((h) => h.source === '/(.*)');
-const h = (k) => ((tout && tout.headers) || []).find((e) => e.key.toLowerCase() === k.toLowerCase());
+// Les en-têtes que Vercel servira, chemin par chemin, LUS dans vercel.json avec
+// la même lecture des motifs que les bancs (`_vercel.cjs` : la politique complète
+// vit depuis le 22 oct. dans sa propre règle, qui exclut /sw.js).
+const V = require('./bancs/_vercel.cjs');
+const pour = (chemin) => { const e = V.entetesPour(chemin, { brut: true }); const out = {}; for (const [k, v] of Object.entries(e)) out[k.toLowerCase()] = v; return out; };
+const ICI = pour('/');
+const h = (k) => (ICI[k.toLowerCase()] != null ? { value: ICI[k.toLowerCase()] } : null);
 const en = (h('Content-Security-Policy') || {}).value || '';
 const ro = (h('Content-Security-Policy-Report-Only') || {}).value || '';
 const complete = /default-src/.test(en) ? en : ro;
@@ -79,6 +91,35 @@ dit(ssList.includes("'wasm-unsafe-eval'"), "script-src permet WebAssembly ('wasm
 const fs_ = dir(complete, 'frame-src') || [];
 dit(fs_.includes('https://challenges.cloudflare.com') && ssList.includes('https://challenges.cloudflare.com'), 'Turnstile : script-src ET frame-src challenges.cloudflare.com');
 dit((dir(complete, 'worker-src') || []).includes('blob:'), "worker-src blob: (le lecteur pdf.js lance son worker depuis un blob)");
+dit((dir(complete, 'worker-src') || []).includes("'self'"), "worker-src 'self' (le worker de MapLibre est un fichier servi par VRM)");
+
+console.log('\n── la carte (OpenFreeMap)');
+const fond = lire('src/fondCarte.js');
+const styles = [...((/OFM_STYLE\s*=\s*\{([\s\S]*?)\}/.exec(fond) || [])[1] || '').matchAll(/['"`](https:\/\/[^/'"`]+)/g)].map((m) => m[1]);
+dit(styles.length > 0, 'les styles du fond de carte se lisent dans src/fondCarte.js', [...new Set(styles)].join(' '));
+const imgs = dir(complete, 'img-src') || [];
+for (const o of new Set(styles)) {
+  dit(permis(cs, o), `connect-src permet ${o} (style, tuiles — depuis le worker de MapLibre —, sprite, polices)`);
+  dit(permis(imgs, o) || imgs.includes(o), `img-src permet ${o}`);
+}
+// Le worker de MapLibre reçoit LA MÊME politique que la page (vercel.json sert
+// aussi /assets/) : c'est elle qui juge ses tuiles.
+const wk = pour('/assets/maplibre-gl-worker-banc.js');
+const wkPol = wk['content-security-policy-report-only'] || wk['content-security-policy'] || '';
+dit(permis(dir(wkPol, 'connect-src') || [], styles[0] || 'https://?'), 'le worker de la carte (/assets/…) est servi avec une politique qui permet ses tuiles');
+
+console.log('\n── le service worker et les QR de Ma journée hors ligne');
+const sw = pour('/sw.js');
+const swCs = dir(sw['content-security-policy-report-only'] || '', 'connect-src') || dir(/connect-src/.test(sw['content-security-policy'] || '') ? sw['content-security-policy'] : '', 'connect-src');
+dit(!swCs || swCs.includes('https:'), "/sw.js n'est pas sous la politique de la page (ou connect-src lui ouvre https:) — il va chercher les QR des transporteurs, hôtes variables", swCs ? swCs.join(' ') : 'directives structurelles seulement');
+const swSrc = lire('public/sw.js');
+const blocQr = (/url\.pathname === '\/hl-qr'[\s\S]*?\n  \}\n/.exec(swSrc) || [''])[0];
+dit(/fetch\(/.test(blocQr) && /\.put\(/.test(blocQr), 'le service worker RANGE dans la réserve le QR qu\'il ramène (sinon la réserve ne se remplit plus)', blocQr ? '' : 'bloc /hl-qr introuvable');
+const appSrc = sansCommentaires(app);
+const rq = (/const rechaufferQr = async[\s\S]*?\n\};\n/.exec(appSrc) || [''])[0];
+const cibles = [...rq.matchAll(/\bfetch\(\s*([A-Za-z_$][\w$]*|[^,)]*)/g)].map((m) => m[1].trim());
+const locales = new Set([...rq.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*adresseQrLocale\(/g)].map((m) => m[1]));
+dit(!!rq && cibles.length > 0 && cibles.every((c) => locales.has(c) || /^adresseQrLocale\(/.test(c)), "la page ne va chercher un QR que par `/hl-qr` (même origine) — jamais chez le transporteur", rq ? 'fetch(' + cibles.join('), fetch(') + ')' : 'rechaufferQr introuvable');
 
 console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) en échec' : '✅ tout est vert'}`);
 process.exit(ko ? 1 : 0);

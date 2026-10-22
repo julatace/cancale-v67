@@ -12119,16 +12119,27 @@ function BandeauLiaison() {
 // Les QR hébergés de la photo hors ligne mis en réserve (src/journeeHorsLigne.js) :
 // le service worker les sert depuis cette réserve quand le réseau manque
 // (`/hl-qr?u=…`). Une image refusée ne casse rien : la vue dit d'utiliser le code.
+// ⚠️ (22 oct.) La page NE VA PLUS chercher le QR chez le transporteur : sa
+// politique de sécurité du contenu (connect-src, vercel.json) refuserait ces
+// hôtes — six mesurés dans sa base (p.vintedgo.com, tracking.network1.pickup.fr,
+// static.chronopost.fr…), et ils changent. Elle demande `/hl-qr?u=…` (même
+// origine) : c'est le service worker, hors de cette politique, qui va le
+// chercher et le range dans la réserve. Sans service worker aux commandes, rien
+// n'est rangé (la réserve ne sert QUE par lui) : on réessaie à l'ouverture suivante.
 const rechaufferQr = async (photo) => {
   try {
     if (typeof caches === 'undefined' || !photo) return;
+    const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : null;
+    if (!sw) return;
+    if (!sw.controller) await new Promise((ok) => { const t = setTimeout(ok, 8000); try { sw.addEventListener('controllerchange', () => { clearTimeout(t); ok(); }, { once: true }); } catch (_) { clearTimeout(t); ok(); } });
+    if (!sw.controller) return;
     const c = await caches.open(CACHE_QR);
     for (const r of photo.retirer) {
       const u = r && r.qr;
       if (!/^https:\/\//i.test(String(u || ''))) continue;
       const k = adresseQrLocale(u);
       if (await c.match(k)) continue;
-      try { const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' }); await c.put(k, res); } catch (_) {}
+      try { await fetch(k, { credentials: 'omit' }); } catch (_) {}
     }
   } catch (_) {}
 };

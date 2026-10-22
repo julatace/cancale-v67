@@ -10947,7 +10947,7 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
   la communauté en liste (jamais une carte grise). Mini-carte des points relais
   (`FondMiniCarte`) ⇒ fond uni, épingles gardées — ⚠️ elle est injoignable
   aujourd'hui (`openRelayPicker` n'a aucun appelant) : pas de banc.
-- **CSP** : `vercel.json` ne pose que `frame-ancestors` ⇒ rien à changer. Si une
+- **CSP** (✅ fait le 22 oct., « La CSP finie ») : `vercel.json` ne pose que `frame-ancestors` ⇒ rien à changer. Si une
   CSP complète est posée : `connect-src`/`img-src https://tiles.openfreemap.org`,
   `worker-src 'self' blob:`.
 - Preuves : banc `communaute.cjs` (OpenFreeMap servi par le banc, `liberty` puis
@@ -10980,7 +10980,9 @@ Suite de l'audit du 4-5 octobre (« Pas fait : une vraie politique `script-src` 
   `default-src 'none'`. pdf.js : `isEvalSupported: false` (sa sonde `eval`
   était une violation). ORT (studio photo) : `'wasm-unsafe-eval'` + jsdelivr.
   Le pont de l'extension ouvre `popup.html?mode=reparer` en iframe ⇒
-  `frame-src chrome-extension: moz-extension:`. Leaflet et les tuiles : `img-src https:`.
+  `frame-src chrome-extension: moz-extension:`. Leaflet et les tuiles : `img-src https:`
+  (⚠️ 22 oct. : plus vrai pour le fond OpenFreeMap — MapLibre va chercher ses
+  tuiles par `fetch`, donc `connect-src` ; voir « La CSP finie » juste après).
 - ⚠️ **Toute nouvelle origine appelée par le navigateur** (un CDN, une API) doit
   entrer dans `connect-src`/`script-src`, sinon elle sera refusée le jour du
   basculement — `csp.cjs` et `audit-csp.cjs` le voient.
@@ -10994,6 +10996,94 @@ Suite de l'audit du 4-5 octobre (« Pas fait : une vraie politique `script-src` 
 - **Non mesuré** : la vraie production (en-têtes réels après déploiement), Safari
   iOS, le vrai Turnstile, Discord/Stripe (redirections pleine page, hors
   `connect-src`). L'extension n'a pas été touchée.
+
+### La CSP finie (22 octobre) — la carte OpenFreeMap, le service worker, et des workers que le banc ne voyait pas
+Branche `claude/csp-app` reprise : **vrai merge** d'origin/main (3de5c8f, un seul
+conflit : ce fichier, les deux sections gardées).
+- **Mesuré d'abord, sur l'arbre fusionné** : `communaute.cjs` → **38 violations**
+  `connect-src ← https://tiles.openfreemap.org/…` (style, sprite). La carte
+  OpenFreeMap arrivée sur main (21 oct.) n'était pas dans la politique : passée
+  en vigueur telle quelle, la carte de la Communauté serait tombée en liste chez
+  tout le monde, sans un mot.
+- ⚠️⚠️ **LE BANC NE VOYAIT PAS LES WORKERS.** Mesuré dans Chromium : une violation
+  DANS un worker (MapLibre charge ses tuiles depuis le sien) ou dans le service
+  worker n'arrive **ni** à l'évènement `securitypolicyviolation` de la page **ni**
+  à sa console. Seul `report-uri` la voit. `_vercel.cjs` pose donc
+  `report-uri /__vrm-csp-rapport` sur la CSP qu'il SERT (jamais dans vercel.json :
+  la production n'a pas de collecteur) et compte les rapports. Sur le code
+  d'avant, 4 tuiles refusées (`document /assets/maplibre-gl-worker-*.js`)
+  n'étaient visibles QUE par là. Contrôle positif : un worker qui contacte une
+  adresse interdite DOIT être signalé — `BANC_CSP_SANS_RAPPORTS=1` ⇒ rouge.
+  ⚠️ Conséquence en production : le journal des plantages (`origine: 'csp'`) ne
+  voit que les violations de la PAGE. Celles du worker de la carte et du service
+  worker ne remontent nulle part — elles ne sont tenues que par ce banc et
+  `audit-csp.cjs`.
+- ⚠️⚠️ **MA JOURNÉE HORS LIGNE : LA PAGE ALLAIT CHERCHER LES QR CHEZ LES
+  TRANSPORTEURS** (`rechaufferQr` → `fetch(u)`). Mesuré dans sa base (lecture
+  seule, hôtes seulement) : `qrUrl` sur **6 hôtes** — p.vintedgo.com ×15,
+  avn-webexternal.azureedge.net ×11, tracking.network1.pickup.fr ×9,
+  avisageng-colis-webexternal.pickup-services.com ×5,
+  pickup-services.email-messaging.com ×4, static.chronopost.fr ×1. Une liste
+  blanche en `connect-src` éteindrait la réserve au premier changement d'hôte.
+  ⇒ La page demande `/hl-qr?u=…` (même origine), **seulement quand le service
+  worker la commande** ; c'est lui qui va chercher et qui **range** (`public/sw.js`).
+  ⇒ `/sw.js` n'est **plus sous la politique complète** :
+  `"source": "/((?!sw\\.js).*)"` (vérifié avec path-to-regexp 6.1.0, celle de
+  `@vercel/routing-utils` : `/`, `/index.html`, `/assets/…`, `/recuperation.html`
+  oui, `/sw.js` non). Il garde les directives structurelles. Sans service worker
+  aux commandes, rien n'est rangé (la réserve ne sert que par lui) : réessayé à
+  l'ouverture suivante.
+- **`vercel.json`** : `connect-src` et `img-src` + `https://tiles.openfreemap.org`
+  (style, TileJSON, tuiles vectorielles et raster, sprite, polices — un seul
+  domaine dans les vrais `liberty`/`dark`, relus dans hyperknot/openfreemap-styles) ;
+  `worker-src 'self' blob:` (déjà là : le worker de MapLibre est un fichier servi
+  par VRM, celui de pdf.js un blob). La politique complète vit dans SA règle ; la
+  bascule = renommer SA clé en `Content-Security-Policy`.
+- `_vercel.cjs` : un motif à parenthèses imbriquées était mal lu (coupé à la
+  première `)`) — les bancs auraient servi d'autres en-têtes que Vercel.
+- **Bancs** : `csp.cjs` passe par `_porte-banc` (l'« accès direct » est retiré),
+  rend la carte dans un contexte NEUF (les violations sont dédoublonnées par
+  contexte : la tournée des écrans rendait ce contrôle vert par accident sur le
+  code d'avant) et exige qu'elle ait DEMANDÉ style, TileJSON, tuiles, raster et
+  sprite ; `/recuperation.html` ; la réserve d'un QR par le service worker (le
+  VRAI `rechaufferQr`). `abonnement.cjs` (Stripe : clic « S'abonner » →
+  checkout.stripe.com) et `hors-ligne.cjs` observent maintenant la CSP.
+- **Preuves** — §6.1, arbre `git archive` de la fusion (7a7038f), banc copié dedans :
+  `csp.cjs` **7 rouges** avant (101 verts), **0** après (109) ; en vigueur
+  (`BANC_CSP_EN_VIGUEUR=1`) **0** (111 verts, carte dessinée, QR rangé) ;
+  mutations `openfreemap` 3 rouges · `swpolitique` 2 rouges (le rapport vient de
+  `/sw.js`) · `BANC_CSP_SANS_RAPPORTS=1` 2 rouges. `audit-csp.cjs` **5 rouges**
+  avant, 0 après. `hors-ligne.cjs` avant : **4 violations** (le QR demandé par la
+  page) ; après 0, la réserve se remplit et le QR s'affiche sans réseau.
+  `communaute` 144 + 0 violation (dont « Se connecter avec Discord »), `captcha`
+  (Turnstile) 62, `imprimante` 32, `studio-photo`, `abonnement` 83 + 0 violation,
+  `sw-cache` : verts. Et avec la politique complète servie **EN
+  VIGUEUR** (copie de vercel.json par `BANC_VERCEL_JSON`) : `communaute`,
+  `captcha`, `abonnement`, `hors-ligne`, `imprimante`, `studio-photo` — tous
+  verts, **0 violation**.
+- **Les 143 audits** (`scripts/audit-*.cjs`) : tous verts sur cette branche —
+  aucun rouge, donc rien à comparer avec main. `verif_visuel.cjs` (fixtures
+  réelles, hors dépôt) : 21 contrôles non conformes, **exactement la même liste
+  sur un arbre `git archive origin/main`** (CA par plateforme, vente Leboncoin
+  prouvée, résumé Vinted, carte héros) : rien ne vient de ce chantier.
+- **Passer en vigueur** : les directives structurelles le sont déjà
+  (`frame-ancestors 'none'` : aucun écran ne s'encadre lui-même, vérifié). La
+  politique complète peut passer en vigueur après **7 jours sans aucune ligne
+  `plantage_*` d'origine `csp`** depuis le déploiement, à condition qu'il ait
+  ouvert pendant ces 7 jours, sur son iPhone ET sur l'ordinateur : la carte de la
+  Communauté, Ma journée avec un colis à retirer, Mon compte, un reçu d'achat,
+  une impression de bordereau, le studio photo. La vérification (lecture seule) :
+  `select data->>'message', data->>'navigateur', count(*), max(data->>'at') from app_data where id like 'plantage_%' and data->>'origine' = 'csp' group by 1, 2;`
+  Le geste : dans la règle `/((?!sw\\.js).*)` de vercel.json, renommer la clé
+  `Content-Security-Policy-Report-Only` en `Content-Security-Policy`.
+- **Non mesuré** : les en-têtes réels de Vercel avec cette règle (aucun
+  déploiement d'ici) ; Safari iOS ; le vrai Turnstile ; la vraie instance
+  OpenFreeMap (bloquée d'ici ; que sa TileJSON `/planet` désigne des tuiles sur
+  le MÊME domaine est DOCUMENTÉ — README d'hyperknot/openfreemap, « `/planet/latest/{z}/{x}/{y}.pbf` » —
+  pas mesuré : un autre hôte ferait passer la carte en liste une fois en vigueur,
+  et en Report-Only la violation viendrait du worker, que le journal ne voit pas) ; les
+  vraies redirections Stripe et Discord (navigations pleine page, hors CSP).
+  L'extension n'est pas touchée.
 
 ---
 
