@@ -390,7 +390,7 @@ const VENTE_BODY = JSON.stringify({ pageProps: {
       'une place par famille, l\'id est gommé (la 100e vente rafraîchit, n\'ajoute pas)',
       'clés : ' + JSON.stringify(cles));
     const v = ventes[cles[0]] || {};
-    dit(v.body === CORPS && v.coupe === false, 'le corps de la vente est gardé pour voir la forme (état, acheteur, bordereau)');
+    dit(v.taille === new TextEncoder().encode(CORPS).length && v.coupe === false && !v.body && !JSON.stringify(v).includes('ACHETEUR'), 'le diagnostic garde la taille et la date, sans recopier le corps privé ni l’acheteur');
     dit(Array.isArray(w.data.paths) && w.data.paths.includes('x'), 'sans perdre ce que lbc_recon portait déjà');
   });
 

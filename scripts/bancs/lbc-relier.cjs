@@ -36,6 +36,8 @@ const AD = { id: 'lbc777', subject: 'Basket test à relier', price: 40, lbcUser:
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'lbc_listings', data: { items: { lbc777: AD } } },
+  // Une annonce héritée portant seulement lbcUser n'est montrée qu'avec une session prouvée.
+  { id: 'lbc_accounts', data: { accounts: { u_test: { id:'u_test', name:'Boutique de test', sessionAt:auj.toISOString() } } } },
 ];
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
