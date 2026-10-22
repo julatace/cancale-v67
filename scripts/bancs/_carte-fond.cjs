@@ -14,8 +14,8 @@
 //    « Allemagne ») : la règle des noms en français se voit à l'écran.
 //  · Polices : les glyphes « Noto Sans » de protomaps/basemaps-assets (commit
 //    épinglé) — « Noto Sans Bold » n'y existe pas, le banc sert « Medium » à la
-//    place (au banc seulement). Icônes (sprites) : non servies, ce que le fond
-//    tolère (une icône manquante ne fait pas tomber la carte).
+//    place (au banc seulement). Icônes (sprites) : le banc sert une planche
+//    VALIDE mais vide (communaute.cjs) — aucune icône, aucune erreur.
 //  Tout est téléchargé UNE fois dans un dossier temporaire (curl, qui suit le
 //  relais réseau du conteneur ; npm pour les paquets). Hors ligne ⇒ `pret:false`
 //  et le banc le DIT (il ne peut alors pas juger le rendu réel).
@@ -117,9 +117,14 @@ async function fixtureCarte() {
     for (const n of Object.keys(couches)) { const t = couches[n].getTile(z, x, y); if (t) l[n] = t; }
     return Object.keys(l).length ? Buffer.from(vtpbf.fromGeojsonVt(l, { version: 2, extent: 4096 })) : Buffer.alloc(0);
   };
+  // Comme la vraie TileJSON d'OpenFreeMap, elle DÉCLARE toutes les couches du
+  // schéma OpenMapTiles que les styles lisent (même si les tuiles du banc n'en
+  // portent que trois) : sinon MapLibre crie « Source layer … does not exist »
+  // pour chaque couche — une erreur que le vrai service ne produit pas (§6.3).
+  const declarees = [...new Set([...styles.positron.layers, ...styles.dark.layers].map((l) => l['source-layer']).filter(Boolean).concat(Object.keys(couches)))];
   const tilejson = () => ({ tilejson: '3.0.0', name: 'OpenFreeMap (banc)', attribution: ATTRIBUTION_OFM, minzoom: 0, maxzoom: 14,
     tiles: [`https://${DOMAINE}/planet/banc/{z}/{x}/{y}.pbf`],
-    vector_layers: Object.keys(couches).map((id) => ({ id, fields: {} })) });
+    vector_layers: declarees.map((id) => ({ id, fields: {} })) });
   const glyphe = (pile, plage) => glyphes[String(pile).split(',')[0].trim() + '/' + plage] || null;
   return { pret: true, style: (sombre) => JSON.parse(JSON.stringify(styles[sombre ? 'dark' : 'positron'])), tilejson, tuile, glyphe, attribution: ATTRIBUTION_OFM };
 }

@@ -275,6 +275,7 @@ let compte = null;
 // `hotes` : tout domaine EXTÉRIEUR que la page a demandé pendant le banc.
 const OFM = { styles: [], tuiles: 0, tuilesKo: 0, tilejson: 0, glyphes: 0, interdit: [], hotes: new Set() };
 const CORS = { 'access-control-allow-origin': '*' };
+const PNG_VIDE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 // Les domaines extérieurs qui NE SONT PAS la carte (base, villes, avatars Discord).
 const hotesCarte = () => [...OFM.hotes].filter((h) => !/(^|\.)supabase\.co$|(^|\.)data\.gouv\.fr$|(^|\.)discord(app)?\.com$/.test(h));
 async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansMoteur = false, sansFond = false, sourceKo = false, tuilesKo = false, reduit = false, fragment = '' }) {
@@ -310,7 +311,11 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansMoteur = f
       }
       const g = chemin.match(/^\/fonts\/([^/]+)\/(\d+-\d+)\.pbf$/);
       if (g) { const b = FIX.glyphe(decodeURIComponent(g[1]), g[2]); if (b) { OFM.glyphes++; return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: CORS, body: b }); } }
-      return r.fulfill({ status: 404, headers: CORS, body: '' }); // icônes (sprites) : non servies au banc
+      // Icônes : le vrai service sert une planche ; le banc en sert une VALIDE
+      // mais vide (aucune icône dessinée, aucune erreur de chargement).
+      if (/^\/sprites\/.+\.json$/.test(chemin)) return r.fulfill({ status: 200, contentType: 'application/json', headers: CORS, body: '{}' });
+      if (/^\/sprites\/.+\.png$/.test(chemin)) return r.fulfill({ status: 200, contentType: 'image/png', headers: CORS, body: PNG_VIDE });
+      return r.fulfill({ status: 404, headers: CORS, body: '' });
     }
     return ['image', 'media', 'font'].includes(rq.resourceType()) ? r.abort() : r.fulfill({ status: 404, body: '' });
   });
