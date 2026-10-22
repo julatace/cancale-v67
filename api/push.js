@@ -31,6 +31,7 @@ const SANS_SESSION = { erreur: 'session', message: "Reconnecte-toi à VRM, puis 
 export default async function handler(req, res) {
   res.setHeader?.('Cache-Control','no-store');
   const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ erreur: 'connexion-injoignable', message: "Le service de connexion ne répond pas — rien n'est activé, réessaie dans un instant." }); return; }
   if (!u) { res.status(401).json(SANS_SESSION); return; }
   const owner = u.id;
   return contexteVendeur.run({ owner }, () => traiter(req, res));
