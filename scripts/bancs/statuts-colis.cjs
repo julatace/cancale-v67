@@ -49,7 +49,9 @@
 //      mais faux pour un filtre de colis. Corrigé dans le filtre seul ;
 //   5. Achats : l'achat au relais porte « À retirer », jamais « Reçu » ;
 //   6. aucun débordement horizontal, aucune erreur de page, aucun écran tombé
-//      sur le garde-fou.
+//      sur le garde-fou ;
+//   7. (22 oct.) achats LUS ⇒ « À retirer » vaut 1 ; achats en ÉCHEC (503,
+//      relais compris), ventes lues ⇒ « À retirer » dit « — », jamais « 0 ».
 // On juge les ATTRIBUTS (`data-bord-card`, `data-groupe`, `data-tx`,
 // `data-bouton-bord`) et les NOMBRES rendus. Les libellés d'étape ne sont lus
 // que là où le libellé EST la chose vérifiée (l'étape affichée d'une vente).
@@ -146,12 +148,20 @@ async function preparer(b, vp, opts = {}) {
     // APRÈS les comptes et les ventes — c'est la forme réelle d'un premier
     // démarrage (§5.49), pas un cas d'école.
     if (eq && eq[1] === 'main' && opts.retardMain) return new Promise((ok) => setTimeout(ok, opts.retardMain)).then(() => j(ROWS.filter((r) => r.id === 'main').map(forme)));
-    if (eq) return j(ROWS.filter((r) => r.id === eq[1]).map(forme));
+    // `achatsKO` (22 oct., revue) : la lecture des ACHATS échoue — la lecture
+    // groupée du démarrage (`harvest_*_orders_*`) répond 503, la ligne des achats
+    // du compte manque, et le relais serveur (ci-dessous) répond 503 aussi : la
+    // forme réelle d'une base qui hoquette sur cette famille, les ventes lues.
+    const servies = opts.achatsKO ? ROWS.filter((r) => r.id !== 'harvest_111_orders_purchased') : ROWS;
+    if (eq) return j(servies.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk && opts.achatsKO && /^harvest_[*%]_orders_/.test(lk[1])) return route.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' });
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(servies.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  await pg.route('**/api/**', (r) => (opts.achatsKO && /\/api\/vinted-proxy/.test(r.request().url())
+    ? r.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' })
+    : r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' })));
   return { ctx, pg, errs };
 }
 
@@ -233,6 +243,10 @@ async function filtre(pg, nom) {
           return { n: v === null || v === '' ? null : Number(v), pub };
         });
         dit(j.n === 2, 'Ma journée : « Expédier N colis » (tuile « À envoyer ») vaut 2', 'lu ' + j.n);
+        // L'autre sens du contrôle « achats en échec » (3c) : achats LUS ⇒ un nombre.
+        await pg.waitForFunction(() => { const t = document.querySelector('[data-tuile="retirer"]'); return t && t.getAttribute('data-n') !== ''; }, null, { timeout: 10000 }).catch(() => {});
+        const r1 = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); return t ? t.getAttribute('data-n') : null; });
+        dit(r1 === '1', 'Ma journée : achats lus ⇒ « À retirer » vaut 1 (le colis au relais)', 'lu ' + JSON.stringify(r1));
         dit(!!j.pub && j.pub.total === 2, 'Ma journée publie 2 colis à poster pour la cloche', JSON.stringify(j.pub));
         await sain(pg, 'Ma journée');
         // (17 oct.) L'écran Collectif — dernier lecteur rendu de la cloche — est
@@ -323,6 +337,24 @@ async function filtre(pg, nom) {
         await sain(n2.pg, 'Ma journée (appareil neuf)');
         dit(n2.errs.length === 0, 'aucune erreur de page (tableau de bord)', n2.errs.join(' | ').slice(0, 200));
         await n2.ctx.close();
+      });
+
+      // ── 3c. ACHATS EN ÉCHEC (22 oct., revue) ───────────────────────────────
+      // La lecture des achats ÉCHOUE (503 partout), les ventes sont lues. Un échec
+      // rend `items:[]` : la tuile disait « 0 À retirer » pendant qu'Achats disait
+      // « Impossible de charger » — un zéro inventé (§5), deux écrans qui se
+      // contredisent (§11). « Pas su » : `data-n` vide (« — »).
+      await essaie('achats en échec', async () => {
+        const n3 = await preparer(b, vp, { achatsKO: true });
+        await n3.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await n3.pg.waitForFunction(() => { const t = document.querySelector('[data-tuile="envoyer"]'); return t && t.getAttribute('data-n') !== ''; }, null, { timeout: 15000 }).catch(() => {});
+        await n3.pg.waitForTimeout(4000);       // le relais des achats a répondu (503)
+        const t = await n3.pg.evaluate(() => { const g = (k) => { const e = document.querySelector(`[data-tuile="${k}"]`); return e ? e.getAttribute('data-n') : null; }; return { envoyer: g('envoyer'), retirer: g('retirer') }; });
+        dit(t.envoyer === '2', 'achats en échec : les ventes, elles, sont lues (« À envoyer » vaut 2)', 'lu ' + JSON.stringify(t.envoyer));
+        dit(t.retirer === '', 'achats en échec : « À retirer » dit « — » (pas su), jamais « 0 »', 'lu ' + JSON.stringify(t.retirer));
+        await sain(n3.pg, 'Ma journée (achats en échec)');
+        dit(n3.errs.length === 0, 'aucune erreur de page (achats en échec)', n3.errs.join(' | ').slice(0, 200));
+        await n3.ctx.close();
       });
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }

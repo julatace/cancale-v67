@@ -11699,3 +11699,42 @@ Les trois points « reste ouvert » de `docs/passation/2026-10-22.md`.
   partagée (4 cœurs) — la médiane tient le plafond, un tirage isolé peut le
   dépasser ; la route serveur des photos en production (le défaut U ne se voit
   que si elle échoue) ; rien n'a été vu sur un vrai téléphone.
+- **Revue du soir (22 octobre) — trois défauts de cette passe, reproduits, corrigés.**
+  Chacun : rouge sur 204618c (copie `git archive`, contrôle lancé depuis elle),
+  vert après, rouge sous mutation.
+  1. ⚠️ **Une lecture PENDUE captait toutes les suivantes** (régression de la
+     cause 5) : sans `signal`, `lbc_ventes` entre dans le partage, qui gardait
+     une lecture EN COURS sans limite. Une requête perdue (réseau qui change,
+     iPhone qui se réveille) : « ↻ Actualiser » de l'écran Leboncoin ne
+     relançait plus rien, l'écran restait « — » jusqu'à une écriture. Une
+     lecture en cours ne se partage plus que `VOL_MAX_MS` = **8 s** (plus court
+     que les 12 s de `lireReceptionLeboncoin`) ; deux lectures simultanées
+     restent UN appel. `audit-lectures-partagees.cjs` §10 (mutation
+     `vol-sans-fin` rouge) ; `rafraichissement-leboncoin.test.mjs` 6/6 (« une
+     lecture pendue ne capte pas Actualiser », rouge sur 204618c).
+  2. **« 0 À retirer » sur un échec des achats** : la correction « — tant que
+     les achats ne sont pas lus » ne couvrait que l'attente (`items:null`) ; un
+     ÉCHEC rend `items:[]` + `error` + `failedUids`, et Achats disait
+     « Impossible de charger » au même moment (§5, §11). La tuile vaut « pas
+     su » si les achats sont en échec (`buys.error`, ou un compte non exclu
+     dans `failedUids`), comme « À envoyer » pour les ventes.
+     `statuts-colis.cjs` §3c (lecture groupée des commandes et relais en 503,
+     ventes lues) : **2 rouges sur 204618c** (« lu 0 »), 2 sous la mutation
+     « échec ignoré », vert après ; l'autre sens (achats lus ⇒ « 1 ») ajouté.
+  3. **Extension qui alterne muette/présente** : son retour rouvrait toutes les
+     photos refusées SANS le recul — chaque lien mort redemandé à chaque retour
+     (16 demandes par lien en 10 min contre 3 sur `main`, la borne « quinze
+     retours, quinze demandes » du 11 octobre contournée). `rouvrirTout(true)` :
+     une photo jamais rouverte l'est tout de suite (U reste vert), un lien mort
+     attend son recul ⇒ **4** demandes par lien. `audit-photos-vinted.cjs` :
+     contrôle « extension qui alterne », rouge sur 204618c ([16,…]) et sous
+     `ext-revenue-sans-recul` et `retour-sans-borne`.
+  Bancs relancés un par un (ports 6431-6434) : statuts-colis, photos-vinted U,
+  journee-premium (17 ✅), ebay-colis, ebay-messages-journee, vitesse (lectures
+  inchangées, 57/55). ⚠️ vitesse a donné une fois une médiane de 14 rendus sur
+  Ma journée 390 px (12/14/15) pendant le passage complet ; relancé seul deux
+  fois : 13/14/12 et 13/13/14, contre 13/14/13 et 13/13/13 sur 204618c — le
+  bruit de la machine partagée déjà noté, la tuile ne crée aucun état.
+  **Non mesuré** : la durée réelle d'une lecture lente sur un vrai téléphone
+  (une lecture de plus de 8 s n'est plus partagée : au pire une requête de
+  plus, jamais une réponse fausse).

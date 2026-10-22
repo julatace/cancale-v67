@@ -35655,9 +35655,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // « lu 0 » rouge sur `main`. Un zéro inventé (§5) : « — » tant que
               // ce n'est pas lu. Pareil pour « À retirer » sans les achats.
               const pasLuComptes = accountsReady === false;
+              // (22 oct., revue) Un ÉCHEC rend `items:[]` (+ `error`, `failedUids`) :
+              // la tuile disait « 0 À retirer » pendant qu'Achats disait « Impossible
+              // de charger ». Un compte non exclu pas lu = « pas su », comme les ventes.
+              const achatsKO = !!buys.error || (Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u));
               const T = [
                 { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
-                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading || pasLuComptes || (accounts.length>0 && buys.items==null && !(tuiles.retirer && tuiles.retirer.n)) },
+                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading || pasLuComptes || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
                 { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
               ];

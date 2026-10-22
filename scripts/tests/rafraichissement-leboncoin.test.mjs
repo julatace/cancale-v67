@@ -32,3 +32,16 @@ test('deux lectures identiques en même temps ne partent qu\'une fois',async()=>
  const [a,b]=await Promise.all([lireReceptionLeboncoin(url,{authorization:'Bearer x'},{transport:lp.fetch}),lireReceptionLeboncoin(url,{authorization:'Bearer x'},{transport:lp.fetch})]);
  assert.equal(parties,1);assert.deepEqual(a,[{data:{ventes:{}}}]);assert.deepEqual(b,a);
 });
+
+// (22 oct., revue) Sans `signal`, la lecture entre dans le partage. Une requête
+// PERDUE (réseau qui change, iPhone qui se réveille) ne répond jamais : elle ne
+// doit pas capter « Actualiser » ni le retour dans VRM — passé le délai de
+// partage (`volMax`), la lecture suivante repart sur le réseau et répond.
+test('une lecture pendue ne capte pas « Actualiser » : la suivante repart sur le réseau',async()=>{
+ let parties=0;const reseau=async()=>{parties++;if(parties===1)return new Promise(()=>{});return new Response('[{"data":{"ventes":{"x":1}}}]',{status:200,headers:{'content-type':'application/json'}});};
+ const lp=creerLecturesPartagees(reseau,'https://base.test',{origine:'',volMax:50});
+ const url='https://base.test/rest/v1/app_data?id=eq.lbc_ventes&select=data',h={authorization:'Bearer x'};
+ assert.equal(await lireReceptionLeboncoin(url,h,{transport:lp.fetch,delai:100}),null);
+ const actualiser=await lireReceptionLeboncoin(url,h,{transport:lp.fetch,delai:100});
+ assert.deepEqual(actualiser,[{data:{ventes:{x:1}}}]);assert.equal(parties,2);
+});
