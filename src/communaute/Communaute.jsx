@@ -21,6 +21,7 @@
 //  au démarrage), fond OpenFreeMap (MapLibre, sans clé) avec son attribution.
 //  Injoignable ⇒ la même communauté en liste.
 // ════════════════════════════════════════════════════════════════════════════
+import {avatarDiscordPermis,initialesProfil} from './avatarDiscord.js';
 import { DISCORD_ERREURS } from './discordErreurs.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -63,6 +64,12 @@ function useApi(headers) {
 }
 
 // ── LA CARTE (Leaflet) ───────────────────────────────────────────────────────
+function AvatarProfil({profil,grand=false}) {
+  const url=avatarDiscordPermis(profil?.avatar)?profil.avatar:'';
+  const [rate,setRate]=useState('');
+  return <span className={'vrm-cm-avatar'+(grand?' grand':'')} aria-hidden="true">{initialesProfil(profil)}{url&&rate!==url&&<img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setRate(url)}/>}</span>;
+}
+
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), calque = useRef(null), fond = useRef(null);
   const [pret, setPret] = useState(false), [fondPret, setFondPret] = useState(false);
@@ -127,6 +134,12 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
         // au clavier), sans dépendre de la détection de « clic » de la carte.
         const bouton = mk.getElement() && mk.getElement().querySelector('button');
         if (bouton) {
+          const personnes=g.cells.flatMap(c=>c.personnes);
+          if(g.n===1){
+            const p=personnes[0]||{};bouton.textContent=initialesProfil(p);bouton.classList.add('profil');
+            bouton.setAttribute('aria-label',String(p.pseudo||'Revendeur')+' · '+String(p.ville||''));
+            if(avatarDiscordPermis(p.avatar)){const img=document.createElement('img');img.src=p.avatar;img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});bouton.append(img);}
+          }
           L.DomEvent.disableClickPropagation(bouton);
           bouton.addEventListener('click', (e) => {
             e.preventDefault();
@@ -439,6 +452,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     {blocGroupes}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 
+    <div className="vrm-cm-identite-discord"><AvatarProfil profil={moi||{pseudo:prenom}} grand/><MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi?.discord||''} compte={discordCompte} onFait={t=>{setToast(t);lire(true);}}/></div>
     {/* Ma présence : l'opt-in, toujours visible */}
     <div className="vrm-cm-carton vrm-cm-moi" data-cm-moi={moi ? 'visible' : 'invisible'}>
       {moi ? <>
@@ -447,7 +461,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
           <button type="button" onClick={() => setRejoindre(true)} data-cm-changer>Changer</button>
           <button type="button" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
         </div>
-        {'discord' in moi && <MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi.discord || ''} compte={discordCompte} onFait={(t) => { setToast(t); lire(true); }} />}
+
       </> : <>
         <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit tant que tu ne l’as pas décidé.</span></div>
         <button type="button" className="vrm-cm-primaire" onClick={() => setRejoindre(true)} data-cm-apparaitre>Apparaître sur la carte</button>
@@ -471,7 +485,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
 
     {pres.length > 0 && <div className="vrm-cm-carton" data-cm-pres={pres.length}>
       <h3>Près de toi</h3>
-      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
+      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><AvatarProfil profil={p}/><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
         <div className="vrm-cm-ligne-boutons">
           <button type="button" onClick={() => coucou(p)} disabled={envoye.has(p.pid)}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
           <button type="button" className="vrm-cm-primaire" onClick={() => ouvrirEcrire(p)}>Écrire</button>
@@ -633,12 +647,15 @@ function Classement({ api, moi, groupe }) {
     {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
       : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier : entre dans le classement, les prochains te trouveront en haut.</p></div>
       : <div className="vrm-cm-carton">
-        {c.moi ? <p className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}>Tu es <b>{rangTexte(c.moi.rang)}</b> sur {c.n} · {c.moi.ventes} vente{c.moi.ventes > 1 ? 's' : ''}</p>
-          : <p className="vrm-cm-note">{c.n} membre{c.n > 1 ? 's' : ''} dans le classement.</p>}
+        <div className="vrm-cm-palmares-tete"><div><span className="vrm-cm-sur-titre">LA COMMUNAUTÉ VRM</span><h2>Classement des vendeurs</h2><p>{PERIODES.find(([k])=>k===periode)?.[1]} · {c.n} membre{c.n>1?'s':''}</p></div><span className="vrm-cm-palmares-metrique">Ventes Vinted</span></div>
+        {c.moi ? <div className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}><span>Ta position <b>{rangTexte(c.moi.rang)} <small>/ {c.n}</small></b></span><span><b>{c.moi.ventes}</b> vente{c.moi.ventes>1?'s':''}</span></div>
+          : <p className="vrm-cm-note">Le nombre de ventes est partagé uniquement par les membres inscrits.</p>}
+        {c.lignes.some(l=>l.rang<=3)&&<div className="vrm-cm-podium" aria-label="Les premières places">{c.lignes.filter(l=>l.rang<=3).slice(0,3).map(l=><div className={'vrm-cm-laureat place-'+l.rang} key={l.pid}><span className="vrm-cm-place">{rangTexte(l.rang)}</span><AvatarProfil profil={l} grand/><b title={l.pseudo}>{l.pseudo}{l.moi?' · toi':''}</b><small>{l.ville}</small><span className="vrm-cm-score">{l.ventes}<small> ventes</small></span></div>)}</div>}
+        <div className="vrm-cm-entete-liste"><span>Position et membre</span><span>Ventes</span></div>
         <ol className="vrm-cm-classement">{c.lignes.map((l) => <li key={l.pid} className={l.moi ? 'moi' : ''} data-cm-ligne={l.pid} data-cm-ligne-ventes={l.ventes} data-cm-ligne-moi={l.moi ? 'oui' : 'non'}>
-          <span className="vrm-cm-rang">{l.rang <= 3 ? ['🥇', '🥈', '🥉'][l.rang - 1] + ' ' : ''}{rangTexte(l.rang)}</span>
-          <span className="vrm-cm-qui"><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span>
-          <span className="vrm-cm-ventes"><b>{l.ventes}</b> vente{l.ventes > 1 ? 's' : ''}</span>
+          <span className="vrm-cm-rang">{rangTexte(l.rang)}</span>
+          <span className="vrm-cm-qui"><AvatarProfil profil={l}/><span><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span></span>
+          <span className="vrm-cm-ventes"><b>{l.ventes}</b><small> vente{l.ventes>1?'s':''}</small></span>
         </li>)}</ol>
       </div>}
     {note}
