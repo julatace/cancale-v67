@@ -47,7 +47,7 @@ function poserFetch({ base = 'ok', expire = false, ecriture = 'ok' } = {}) {
       lectures.push({ u, auth: String(h.Authorization || '') });
       if (base === 'panne') return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
       // Le compte 42 est à lui ; tout autre identifiant : RLS ne rend rien.
-      if (/vinted_user_id=eq\.42(&|$)/.test(u)) return J([{ access_token: 'JETON_BASE', refresh_token: 'REF_BASE', anon_id: 'anon', csrf_token: 'csrf', domain: 'www.vinted.fr' }]);
+      if (/vinted_user_id=eq\.42(&|$)/.test(u)) return J([{ owner: VENDEUR, access_token: 'JETON_BASE', refresh_token: 'REF_BASE', anon_id: 'anon', csrf_token: 'csrf', domain: 'www.vinted.fr' }]); // la ligne porte son owner (lu par la route, 439081d)
       return J([]);
     }
     if (/vinted\./.test(u)) {
