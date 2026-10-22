@@ -44,14 +44,9 @@
        racine : le CSS ci-dessous et la barre d'état suivent aussitôt. Trois
        lignes, aucune dépendance, et un `try` parce qu'un navigateur qui
        refuse le stockage ne doit pas empêcher l'app de démarrer (§4.1). -->
-  <script>
-    try {
-      var d = JSON.parse(localStorage.getItem('vinted_dark') || 'false') === true;
-      document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
-      var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', d ? '#07090D' : '#F4F3EF');
-    } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
-  </script>
+  <!-- ⚠️ Un FICHIER, plus un script en ligne : la politique de sécurité du
+       contenu (vercel.json) refuse tout script en ligne. -->
+  <script src="/demarrage-theme.js"></script>
   <style>
     body{margin:0;padding:0;background:#F4F3EF;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
@@ -389,7 +384,6 @@
 <!-- Densité d'affichage (Réglages → Affichage). Appliquée AVANT le chargement
      de l'app : sinon la page s'affiche à 100 % puis saute de taille sous les
      yeux de l'utilisateur à chaque ouverture. -->
-<script>try{var z=localStorage.getItem('vrm_zoom'),f=parseFloat(z);
-if(f&&f!==1&&!(matchMedia('(max-width: 767px)').matches&&f<1)){var d=document.documentElement,w=d.clientWidth;d.style.zoom=z;d.style.setProperty('--vrm-zoom',String(f));d.style.minWidth=Math.round(w/f)+'px';}}catch(e){}</script>
+<script src="/demarrage-densite.js"></script>
 <script type="module" src="/src/main.jsx"></script></body>
 </html>

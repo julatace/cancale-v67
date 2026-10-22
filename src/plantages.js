@@ -145,3 +145,35 @@ export function ecouterPlantages(contexte) {
     });
   } catch (_) {}
 }
+
+// ── LES VIOLATIONS DE LA POLITIQUE DE SÉCURITÉ DU CONTENU (21 octobre) ─────────
+// La politique complète part d'abord en « Report-Only » (vercel.json) : elle ne
+// bloque rien, le navigateur SIGNALE seulement ce qu'elle aurait bloqué. Sans
+// fournisseur de rapports (aucun tiers, comme pour les plantages), on note ces
+// signalements dans le MÊME journal — « CSP connect-src ← https://hôte ». C'est
+// ce qui dira, sur ses vrais appareils, si la politique peut passer en vigueur.
+// Rien d'une extension (elles injectent dans la page : ce n'est pas l'app), et
+// jamais une adresse complète : l'origine seule.
+export function decrireViolation(e) {
+  const u = String((e && e.blockedURI) || '');
+  let ou = u;
+  if (!u || u === 'inline') ou = 'en ligne';
+  else if (u === 'eval' || u === 'wasm-eval') ou = u;
+  else if (/^(data|blob|chrome-extension|moz-extension|safari-web-extension|safari-extension):/i.test(u)) ou = u.split(':')[0] + ':';
+  else { try { ou = new URL(u).origin; } catch (_) { ou = u.slice(0, 60); } }
+  const dir = String((e && (e.effectiveDirective || e.violatedDirective)) || '?').split(' ')[0];
+  return { message: `CSP ${dir} ← ${ou}${e && e.disposition === 'report' ? ' (report-only)' : ''}`, ou, dir };
+}
+export function ecouterViolationsCsp(contexte) {
+  try {
+    document.addEventListener('securitypolicyviolation', (e) => {
+      try {
+        const src = String(e.sourceFile || '');
+        const { message, ou } = decrireViolation(e);
+        if (/extension:/i.test(ou) || /extension:\/\//i.test(src)) return;
+        const err = { message, stack: src ? `Error\n    at ${src}:${e.lineNumber || 0}` : '' };
+        noterPlantage(err, Object.assign({ origine: 'csp' }, contexte && contexte()));
+      } catch (_) {}
+    });
+  } catch (_) {}
+}

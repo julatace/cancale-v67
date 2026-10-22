@@ -3718,7 +3718,7 @@ const openReceipt = (a) => {
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
   <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
     <div class="topbar" style="position:sticky;top:0;z-index:10;background:#f4f6f5;padding:12px 16px 8px;display:flex;align-items:center;gap:10px">
-      <button onclick="try{window.close()}catch(e){}; setTimeout(function(){history.length>1?history.back():(location.href='/?tab=cat_achats')},120)" style="border:none;border-radius:12px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;color:#111">‹ Fermer</button>
+      <button id="vrm-recu-fermer" type="button" style="border:none;border-radius:12px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;color:#111">‹ Fermer</button>
       <span style="font-size:12px;color:#99a">Retour à VRM</span>
     </div>
     <div style="max-width:520px;margin:0 auto;padding:4px 16px 40px">
@@ -3737,11 +3737,23 @@ const openReceipt = (a) => {
         </div>` : `
         <div style="padding:18px 20px;white-space:pre-wrap;line-height:1.6;font-size:14px;color:#333">${esc(cleaned)}</div>`}
       </div>
-      <button onclick="window.print()" style="display:block;width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;background:#111;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🖨 Imprimer / Enregistrer en PDF</button>
+      <button id="vrm-recu-imprimer" type="button" style="display:block;width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;background:#111;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🖨 Imprimer / Enregistrer en PDF</button>
       <div style="text-align:center;color:#99a;font-size:11px;margin-top:12px">Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
     </div>
   </body></html>`);
   w.document.close();
+  // ⚠️ AUCUN `onclick` EN LIGNE (21 octobre) : la fenêtre hérite de la politique
+  // de sécurité du contenu de l'app (vercel.json), qui refuse tout script en
+  // ligne. Les deux gestes sont branchés D'ICI, depuis l'app.
+  try {
+    const fermer = w.document.getElementById('vrm-recu-fermer');
+    if (fermer) fermer.addEventListener('click', () => {
+      try { w.close(); } catch (_) {}
+      setTimeout(() => { try { if (w.closed) return; if (w.history.length > 1) w.history.back(); else w.location.href = '/?tab=cat_achats'; } catch (_) {} }, 120);
+    });
+    const imprimer = w.document.getElementById('vrm-recu-imprimer');
+    if (imprimer) imprimer.addEventListener('click', () => { try { w.focus(); w.print(); } catch (_) {} });
+  } catch (_) {}
 };
 // ⚠️ Le générateur de QR (qrcode-generator) a été RETIRÉ à dessein.
 // Vérifié sur 61 colis : le QR n'existe que chez Chronopost (image hébergée).
@@ -8256,7 +8268,9 @@ const chargerPdfjs = () => _pdfjs || (_pdfjs = new Promise((ok, ko) => {
 // pointillés autour de `zone` (coordonnées PDF) — « ce qui part en thermique ».
 const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = null } = {}) => {
   const L = await chargerPdfjs();
-  const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets }).promise;
+  // `isEvalSupported: false` : pdf.js sonde sinon `new Function('')`, ce que la
+  // politique de sécurité du contenu refuse (une violation par aperçu).
+  const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets, isEvalSupported: false }).promise;
   const pg = await d.getPage(page);
   const v0 = pg.getViewport({ scale: 1 });
   const dpr = Math.min(2, window.devicePixelRatio || 1), sc = (largeur / v0.width) * dpr;
@@ -12107,16 +12121,27 @@ function BandeauLiaison() {
 // Les QR hébergés de la photo hors ligne mis en réserve (src/journeeHorsLigne.js) :
 // le service worker les sert depuis cette réserve quand le réseau manque
 // (`/hl-qr?u=…`). Une image refusée ne casse rien : la vue dit d'utiliser le code.
+// ⚠️ (22 oct.) La page NE VA PLUS chercher le QR chez le transporteur : sa
+// politique de sécurité du contenu (connect-src, vercel.json) refuserait ces
+// hôtes — six mesurés dans sa base (p.vintedgo.com, tracking.network1.pickup.fr,
+// static.chronopost.fr…), et ils changent. Elle demande `/hl-qr?u=…` (même
+// origine) : c'est le service worker, hors de cette politique, qui va le
+// chercher et le range dans la réserve. Sans service worker aux commandes, rien
+// n'est rangé (la réserve ne sert QUE par lui) : on réessaie à l'ouverture suivante.
 const rechaufferQr = async (photo) => {
   try {
     if (typeof caches === 'undefined' || !photo) return;
+    const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : null;
+    if (!sw) return;
+    if (!sw.controller) await new Promise((ok) => { const t = setTimeout(ok, 8000); try { sw.addEventListener('controllerchange', () => { clearTimeout(t); ok(); }, { once: true }); } catch (_) { clearTimeout(t); ok(); } });
+    if (!sw.controller) return;
     const c = await caches.open(CACHE_QR);
     for (const r of photo.retirer) {
       const u = r && r.qr;
       if (!/^https:\/\//i.test(String(u || ''))) continue;
       const k = adresseQrLocale(u);
       if (await c.match(k)) continue;
-      try { const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' }); await c.put(k, res); } catch (_) {}
+      try { await fetch(k, { credentials: 'omit' }); } catch (_) {}
     }
   } catch (_) {}
 };
