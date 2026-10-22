@@ -11556,6 +11556,88 @@ montés** (à l'intégration) : `audit-extension-zip` et le contrôle de version
 d'`audit-preuve-vente` sont rouges tant que la 5.211 n'est pas montée et le zip
 régénéré ; les 65 autres audits qui exécutent l'extension sont verts. **Geste de Julien**, une fois l'extension installée : ouvrir
 « Modifier » puis « Enregistrer » sur ses annonces déjà en ligne.
+### Leboncoin : « plus vue sur Leboncoin » et « Mettre en pause » (22 octobre, propositions 14 et 6)
+**Mesuré (lecture seule, sa base, 22 oct.)** : 11 annonces à son compte
+`8442c3e8…` (Totomondu), toutes `status: 'active'` ; 4 vues le 22/10, 7 jamais
+revues depuis le 20/09 (3 vendues, 4 très probablement supprimées par lui le
+10/10 : `lbc_recon.envois` porte son `DELETE …/manual/delete/ads`). Sa page
+profil charge `POST adfinder/v2/owner_listing` (corps : `limit, offset, sort_by,
+sort_order, filters.owner.user_id, filters.enums.ad_type`, réponse `total,
+total_active, max_pages, referrer_id, ads[].list_id, ads[].owner.user_id`) ; la
+v1 (« autres annonces du vendeur ») exclut l'annonce affichée (`displayed_id`) ;
+`dashboard/v1/search` (sa page « Mes annonces ») dit `all_ads: 4, active_ads: 4`
+mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106) :
+`PUT api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads`, corps
+`{list_ids:[number]}` — ni sa réponse ni ses en-têtes n'ont jamais été vus.
+`lbc-account:<id>` (session privée) = l'`user_id` des annonces (mesuré).
+- **(14) « plus vue »** : `lbc-inject.js` n'envoie `lbcListeComplete` que pour une
+  liste PROUVÉE complète — `owner_listing` v2 filtré sur le SEUL vendeur (aucun
+  mot-clé ni catégorie, `ad_type` absent ou `['offer']`), `referrer_id` vide,
+  chaque annonce à ce vendeur, total atteint par les identifiants distincts de
+  toutes les pages lues dans le document (même total, < 3 min), total > 0. Le fond
+  (`noterListeLbcComplete`, chaîne `enChaineLbcListings` : trois écrivains de
+  `lbc_listings`, une file) n'agit que pour un de SES comptes (`comptesMiens`) :
+  ses annonces absentes reçoivent `plusVueAt` (un état — jamais « vendue », jamais
+  « supprimée », rien d'effacé), une liste complète qui la remontre l'efface ;
+  lecture ratée ⇒ rien n'est écrit ; `lectures[compte]` date la lecture.
+- **La règle partagée** `<lbc-en-vente-regle>` (app = extension = serveur, §11) :
+  plus « en vente » si `plusVueAt`, `pauseAt`, ou un état `paus|inacti`. Elle sort
+  donc l'annonce de « à retirer », « à vérifier », « non reliée », du compteur, de
+  la double vente serveur. `numerosLbcSortis` (une règle, écran Leboncoin + Ma
+  journée) : un N° dont l'annonce est sortie n'est plus « à retirer » — même par la
+  marque « publiée » (`vinted_lbc_posted`) — sauf si une autre annonce en vente le
+  porte. Une annonce pas revue depuis plus de 7 jours ne demande plus « quelle
+  paire ? » ; une ligne dit le geste (sa page profil Leboncoin). Sans `seenAt` :
+  rien ne change (on ne sait pas qu'elle est vieille).
+- **(6) « Mettre en pause sur Leboncoin »** : sur la ligne « vendue sur Vinted — à
+  retirer », seulement si l'extension d'ici le sait (`lbcPause` dans son état,
+  capacité par présence ; en retard ⇒ « mets-la à jour » ; absente ⇒ le lien seul).
+  Confirmation qui nomme l'annonce (titre, N°, prix) et dit « pas une
+  suppression » ; l'app n'envoie que l'identifiant. Le fond (`pauseLbcDepuisApp`)
+  relit l'annonce EN BASE, exige que son compte soit celui de la session privée de
+  l'onglet (`vrmLbcTransport`), sinon refuse et nomme le compte ; sans onglet, en
+  ouvre un en arrière-plan, attend la session (20 s), le referme ; une à la fois,
+  10 par heure. L'ordre passe fond → `lbc-relay.js` (cadre principal, émetteur =
+  l'extension) → `lbc-inject.js` (monde MAIN) qui envoie UNE requête à l'adresse
+  écrite en dur, avec les en-têtes que le site met lui-même, et rend statut +
+  300 caractères + forme. 2xx ⇒ « fait » (`pauseAt` posé), sinon « pas fait » avec
+  la réponse, silence ⇒ « je ne sais pas ». La forme de la réponse est rangée
+  (`lbc_recon.envois`, clés et types seulement). Une pause encore listée moins
+  d'1 h après n'est pas levée (index de recherche, borne non mesurée).
+- **Fusion avec main (6056c7d, « sources privées »)** : main range désormais ses
+  annonces sous `account: 'lbc-account:{id}'` (0 aujourd'hui en base, les 10 de
+  Julien portent l'id nu). Les deux formes sont UNE identité (`idCompteLbc`) pour
+  « plus vue » et pour la pause — sinon ses annonces recapturées n'auraient plus
+  jamais été marquées, et la pause aurait répondu « autre compte » sur son propre
+  compte. Et `storeLbcListings` (main) réécrivait `{items, updatedAt, lastUrl}`
+  seul : il garde maintenant les autres clés (`lectures`).
+- **Preuves** : `audit-lbc-plus-vue-pause.cjs` (vrais `lbc-inject.js`, `lbc-relay.js`,
+  `background.js` en vm) **49 contrôles, 30 rouges sur origin/main (6056c7d)**, et
+  `--prouve` : 12 mutations (dont `prefixe`), chacune rouge. Banc `bancs/lbc-pause.cjs` (port 6331,
+  données inventées, 390 et 1512 px, 4 scénarios) **38 contrôles, 28 rouges sur le
+  build d'origin/main** (dont Ma journée « 2 à retirer » au lieu de 1) ; trois
+  builds réaffaiblis, chacun rouge : règle sans `plusVueAt`/`pauseAt` (8),
+  pause sans confirmation (4), « quelle paire ? » sur une annonce périmée (2).
+  `audit-double-vente` lit encore `let lbcRemoveCount=0;` (orthographe gardée).
+  `double-vente.cjs` (30) et `lbc-relier.cjs` (8) sont rouges À L'IDENTIQUE sur
+  main 6056c7d (mêmes contrôles, comparés ligne à ligne pour le premier).
+- **Extension touchée** (`background.js`, `lbc-inject.js`, `lbc-relay.js`), **version
+  NON montée** (5.212.0 de main, `audit-extension-zip` rouge jusqu'à l'intégration) ; aucune
+  entrée d'`EXT_CAPACITES` (capacité par présence).
+- ⚠️ **Non mesuré** : la réponse de Leboncoin à la pause et ses en-têtes requis (le
+  premier clic EST la mesure) ; la valeur de `ad_type` et de `referrer_id` dans
+  SA requête v2 (si elles diffèrent, rien ne décide : sens sûr) ; quelle page
+  déclenche exactement la v2 (l'ordre des chemins désigne la page profil) ; le
+  retard de l'index après une pause ; un `account_id` différent de l'`user_id`
+  chez un autre vendeur (la pause serait refusée « autre compte » : sens sûr).
+  Limite connue : un script de la page leboncoin.fr peut poster l'ordre de pause
+  au capteur — il pourrait déjà envoyer cette requête lui-même (même session).
+  Non fait : la pastille « Aussi sur Leboncoin » (écran Annonces) suit
+  `vinted_lbc_posted`, pas les captures — la relier coûterait 235 Ko par
+  ouverture (§4.4).
+- **Geste de Julien** : installer l'extension de l'intégration, ouvrir sa page
+  profil Leboncoin (les 7 annonces fantômes sortent), puis « Mettre en pause » la
+  N°18 depuis VRM → Leboncoin → Annonces.
 
 ---
 

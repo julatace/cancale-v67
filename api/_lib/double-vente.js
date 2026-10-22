@@ -106,8 +106,13 @@ export function annoncesEbayParNumero(lignes, idsActifs, mk, fiches, liensEbay) 
 // PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
 // prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
 // vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
-// une liste paginée — seulement sur une vente vue.
-const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+// une liste paginée — seulement sur une vente vue, sur une liste COMPLÈTE de son
+// compte qui ne la montre plus (`plusVueAt` : toutes les pages lues, le total
+// annoncé atteint — posé par l'extension, 22 octobre), ou sur une mise en pause
+// que Leboncoin a acceptée depuis VRM, sur SON clic (`pauseAt`, réponse 2xx).
+// Rien n'est effacé : ce sont des états, et une liste complète qui la remontre
+// les retire.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu|paus|inacti)/i;
 function annoncesLbcVendues(ventes) {
   const s = new Set();
   for (const v of Object.values(ventes || {})) {
@@ -118,7 +123,7 @@ function annoncesLbcVendues(ventes) {
   return s;
 }
 function annonceLbcEnVente(ad, vendues) {
-  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !ad.plusVueAt && !ad.pauseAt && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
 export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {

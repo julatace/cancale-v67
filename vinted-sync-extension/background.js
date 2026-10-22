@@ -2179,6 +2179,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if(/\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
             const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
           }
+          // 22 oct. : une liste COMPLÈTE d'un vendeur (toutes les pages, total
+          // atteint — prouvé par la page, voir lbc-inject.js). Seulement depuis le
+          // cadre principal d'un onglet leboncoin.fr, et seulement pour un de SES
+          // comptes : la liste d'un autre vendeur ne marque rien.
+          if (msg.action === 'lbcListeComplete') {
+            const tabUrl = (sender && sender.tab && sender.tab.url) || '';
+            const owner = String(msg.owner || ''), total = Number(msg.total);
+            const ids = Array.isArray(msg.ids) ? msg.ids.map(String) : null;
+            if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !/^[0-9a-f-]{8,64}$/i.test(owner)
+              || !ids || !Number.isInteger(total) || total < 1 || ids.length !== total || new Set(ids).size !== total || ids.some((x) => !/^\d{1,15}$/.test(x))) { sendResponse({ ok: false }); return; }
+            const miens = await comptesMiens();
+            if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }
+            await noterListeLbcComplete(owner, ids, total);
+            sendResponse({ ok: true }); return;
+          }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
           // range un échantillon capé par famille d'endpoint, pour voir la FORME
           // (où vivent l'état, l'acheteur, le bordereau) — sans rien analyser
@@ -6701,7 +6716,10 @@ async function etatPourApp() {
   // 20 octobre : ce que CE navigateur n'a pas (Orion iPhone…), mesuré par
   // l'extension elle-même. Absent sur Chrome (tout est là) : l'état est inchangé.
   const nav = await avecDelai(etatNavigateur(), 300, null).catch(() => null);
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus },
+  // 22 oct. : `lbcPause` — cette extension sait mettre une annonce Leboncoin en
+  //    pause sur commande (l'app ne montre le bouton qu'à elle, capacité par
+  //    présence comme `pause` et `vivant`).
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -7018,6 +7036,8 @@ async function executerCommande(msg) {
     try { ok = await avecVinted(() => completerPhotos(uid, id)); } catch (_) { ok = false; }
     return ok ? { accepte: true, etape: 'fait' } : { accepte: true, etape: 'echec', raison: "Vinted n'a pas rendu ses photos pour l'instant" };
   }
+  // 22 oct. : mettre UNE annonce Leboncoin en pause, sur son clic (voir `pauseLbcDepuisApp`).
+  if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
@@ -9113,8 +9133,13 @@ function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || (ad.l
 // PROUVÉE (il est le vendeur, `isSeller`, pas annulée) ne l'a emportée : la vente
 // prime sur un `status: 'active'` périmé (mesuré le 20 octobre : ses 3 annonces
 // vendues sont restées « active » en base). On ne juge JAMAIS sur une absence dans
-// une liste paginée — seulement sur une vente vue.
-const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu)/i;
+// une liste paginée — seulement sur une vente vue, sur une liste COMPLÈTE de son
+// compte qui ne la montre plus (`plusVueAt` : toutes les pages lues, le total
+// annoncé atteint — posé par l'extension, 22 octobre), ou sur une mise en pause
+// que Leboncoin a acceptée depuis VRM, sur SON clic (`pauseAt`, réponse 2xx).
+// Rien n'est effacé : ce sont des états, et une liste complète qui la remontre
+// les retire.
+const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu|paus|inacti)/i;
 function annoncesLbcVendues(ventes) {
   const s = new Set();
   for (const v of Object.values(ventes || {})) {
@@ -9125,7 +9150,7 @@ function annoncesLbcVendues(ventes) {
   return s;
 }
 function annonceLbcEnVente(ad, vendues) {
-  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !(vendues && vendues.has(String(ad.id))));
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !ad.plusVueAt && !ad.pauseAt && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
 // Ses annonces Leboncoin : celles qu'on peut lui attribuer, moins celles qu'il
@@ -9806,12 +9831,21 @@ function photosAnnonceLbc(node){
     if(out.length>=20)return out;
   }}return out;
 }
+// ⚠️ (22 oct.) TROIS ÉCRIVAINS DE `lbc_listings` — les annonces vues, la liste
+//    complète d'un compte (`noterListeLbcComplete`) et la mise en pause
+//    (`noterPauseLbc`) — chacun en lire-fusionner-réécrire. Ils passent par la
+//    MÊME file que `storeLbcListings` : deux écritures proches repartaient sinon
+//    de la même lecture, et la seconde effaçait la première (une annonce marquée
+//    « plus vue » redevenait muette). Une étape qui lève n'arrête pas la suite.
 let _chainestoreLbcListings=Promise.resolve();
+function enChaineLbcListings(fn){
+  const p=_chainestoreLbcListings.then(fn,fn);
+  _chainestoreLbcListings=p.catch(()=>{});return p;
+}
 async function storeLbcListings(url, listings,ownerAttendu=null){
   const owner=ownerAttendu||(await loadSession())?.user_id;
   if(!owner)return {ok:false,etat:'ecriture-refusee'};
-  const p=_chainestoreLbcListings.then(()=>storeLbcListingsUneFois(url, listings,owner));
-  _chainestoreLbcListings=p.catch(()=>{});return p;
+  return enChaineLbcListings(()=>storeLbcListingsUneFois(url, listings,owner));
 }
 async function storeLbcListingsUneFois(url, listings,owner) {
   try {
@@ -9829,11 +9863,194 @@ async function storeLbcListingsUneFois(url, listings,owner) {
       const images=photosAnnonceLbc(l);
       merged[String(l.id)]=Object.assign({},ancien,l,{images:images.length?images:photosAnnonceLbc(ancien),seenAt:new Date().toISOString()});
     } }
-    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id',owner);
+    // (22 oct.) On garde les autres clés de la ligne — `lectures`, la date de la
+    // dernière liste COMPLÈTE de chaque compte — : réécrire `{items,…}` seul les
+    // effaçait à chaque annonce vue.
+    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, (prevRows[0] && prevRows[0].data) || {}, { items: merged, updatedAt: new Date().toISOString(), lastUrl: url }) }], 'id',owner);
     await noterFlux('leboncoin', _okFlux === true);
     if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});
     return {ok:_okFlux===true,etat:_okFlux===true?'enregistre':'ecriture-refusee',nombre:listings.length,photos:listings.filter(l=>photosAnnonceLbc(merged[String(l.id)]).length>0).length};
   } catch (_) {return {ok:false,etat:'ecriture-refusee'};}
+}
+// ══════════════════════════════════════════════════════════════════════════
+// LA LISTE COMPLÈTE D'UN COMPTE LEBONCOIN (22 octobre — proposition 14)
+// ══════════════════════════════════════════════════════════════════════════
+// Mesuré (lecture seule, sa base) : 11 annonces à son nom, toutes « active » ;
+// 4 revues le 22 octobre, 7 jamais revues depuis le 20 septembre — 3 vendues,
+// 4 très probablement supprimées par lui le 10 octobre (`lbc_recon.envois` porte
+// son `DELETE …/manual/delete/ads`). Rien ne marquait une annonce ABSENTE :
+// `storeLbcListings` ne fait que fusionner ce qu'il voit. Deux d'entre elles
+// demandaient « quelle paire ? » — relier une annonce morte à une paire vivante.
+// ⇒ La page (`lbc-inject.js`) n'envoie `lbcListeComplete` que pour une liste
+//   PROUVÉE complète : `adfinder/v2/owner_listing` filtré sur le SEUL vendeur,
+//   le total annoncé atteint (toutes les pages), chaque annonce à ce vendeur.
+//   Ici : le vendeur doit être un de SES comptes ; chacune de ses annonces
+//   rangées qui n'y figure pas reçoit `plusVueAt` — un ÉTAT : jamais une
+//   suppression, jamais « vendue », jamais « supprimée » (pause, suppression,
+//   vente : on ne sait pas laquelle). Une liste complète qui la remontre
+//   l'efface. Lecture ratée ⇒ rien n'est écrit (« rien lu » ne vaut pas « rien »).
+// Une pause acceptée depuis VRM (`pauseAt`) n'est effacée par une liste complète
+// qui la montre encore qu'au-delà d'une heure : l'index de recherche de
+// Leboncoin peut avoir du retard (non mesuré — borne prudente).
+const LBC_PAUSE_INDEX_MS = 3600e3;
+// Le compte d'une annonce s'écrit de deux façons : l'identifiant nu (captures
+// d'avant) ou `lbc-account:{id}` (la source privée, depuis le 22 octobre). Une
+// seule identité : on compare sans le préfixe.
+const idCompteLbc = (x) => String(x || '').replace(/^lbc-account:/i, '');
+async function noterListeLbcComplete(owner, ids, total) {
+  owner = idCompteLbc(owner);
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) { noterDiag('lbc_liste_complete_lecture_ratee'); return { ok: false, code: 'lecture' }; }
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      const vus = new Set(ids.map(String));
+      const maintenant = Date.now(), nowIso = new Date(maintenant).toISOString();
+      let sortent = 0, reviennent = 0;
+      for (const [id, ad] of Object.entries(items)) {
+        if (!ad || typeof ad !== 'object') continue;
+        if (idCompteLbc(ad.account || ad.lbcUser) !== owner) continue;
+        if (vus.has(String(id))) {
+          const n = Object.assign({}, ad); let change = false;
+          if (n.plusVueAt) { delete n.plusVueAt; change = true; }
+          if (n.pauseAt && maintenant - Date.parse(n.pauseAt) > LBC_PAUSE_INDEX_MS) { delete n.pauseAt; delete n.pauseStatut; change = true; }
+          if (change) { items[id] = n; reviennent++; }
+        } else if (!ad.plusVueAt) { items[id] = Object.assign({}, ad, { plusVueAt: nowIso }); sortent++; }
+      }
+      const lectures = Object.assign({}, data.lectures || {});
+      const avant = lectures[owner];
+      lectures[owner] = { at: nowIso, total, n: ids.length };
+      // Rien ne change et la dernière lecture complète date de moins d'une heure :
+      // on ne réécrit pas 230 Ko pour une date (§4.4).
+      if (!sortent && !reviennent && avant && maintenant - Date.parse(avant.at || 0) < 3600e3 && avant.total === total) return { ok: true, sortent, reviennent, ecrit: false };
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, lectures, updatedAt: nowIso }) }], 'id');
+      noterDiag(ok === false ? 'lbc_liste_complete_ecriture_ratee' : 'lbc_liste_complete');
+      if (ok !== false && (sortent || reviennent)) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
+      return { ok: ok !== false, sortent, reviennent, ecrit: ok !== false };
+    } catch (_) { return { ok: false, code: 'erreur' }; }
+  });
+}
+// Après une mise en pause que Leboncoin a ACCEPTÉE (réponse 2xx) : l'état, sur
+// l'annonce. Lecture ratée ⇒ rien n'est écrit, et l'app le dit (`note:false`).
+async function noterPauseLbc(id, statut) {
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) return false;
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      if (!items[id]) return false;
+      items[id] = Object.assign({}, items[id], { pauseAt: new Date().toISOString(), pauseStatut: statut });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: new Date().toISOString() }) }], 'id');
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+}
+// ══════════════════════════════════════════════════════════════════════════
+// METTRE EN PAUSE UNE ANNONCE LEBONCOIN, SUR SON CLIC (22 octobre — proposition 6)
+// ══════════════════════════════════════════════════════════════════════════
+// La N°18, vendue sur Vinted le 18 octobre, était encore en ligne sur Leboncoin
+// 4 jours après : VRM disait « à retirer de Leboncoin » avec un simple lien.
+// ⚠️ La requête n'est PAS devinée : l'extension l'a VUE dans ses propres gestes
+//    (`lbc_recon.envois`, 23 septembre, 5.106) — `PUT api.leboncoin.fr/api/
+//    pintad/v1/public/manual/pause/ads`, corps `{list_ids:[nombre]}`. Ni sa
+//    réponse, ni ses en-têtes n'ont été vus : le premier clic est une MESURE,
+//    la réponse de Leboncoin est rendue telle quelle, et un refus dit « pas fait ».
+// Garde-fous : sur SON clic (l'app confirme en nommant l'annonce) · l'annonce
+// est relue EN BASE (l'app n'envoie qu'un identifiant) · elle doit être sur le
+// compte Leboncoin CONNECTÉ dans l'onglet (l'identité privée que la page a lue,
+// `vrmLbcTransport`) · UNE à la fois · 10 par heure · une PAUSE, jamais une
+// suppression (§3) · la requête part de la page leboncoin.fr (avec les en-têtes
+// du site), adresse exacte écrite en dur dans `lbc-inject.js` : rien d'autre ne
+// passe par cet ordre.
+const LBC_PAUSE_MAX_HEURE = 10;
+const LBC_PAUSE_ATTENTE_SESSION_MS = 20000;
+let PAUSE_LBC_EN_VOL = false;
+const nomCompteLbc = (accs, id) => { const a = accs && (accs['lbc-account:' + id] || accs[id]); return (a && a.name) || ''; };
+async function ongletLbcDuCompte(compte) {
+  const voulu = 'lbc-account:' + compte;
+  let cartes = {};
+  try { cartes = (await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {}; } catch (_) { return { ok: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+  const autres = [];
+  const ordre = Object.entries(cartes).sort((a, b) => (((b[1] && b[1].at) || 0) - ((a[1] && a[1].at) || 0)));
+  for (const [tid, c] of ordre) {
+    if (!c || c.source !== 'prive' || c.ambigue || !c.compte) continue;
+    let tab = null; try { tab = await chrome.tabs.get(Number(tid)); } catch (_) { tab = null; }
+    if (!tab || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tab.url || '')) continue;
+    if (c.compte === voulu) return { ok: true, tabId: Number(tid) };
+    autres.push(String(c.compte).replace(/^lbc-account:/, ''));
+  }
+  return { ok: false, autres };
+}
+async function attendreSessionOnglet(tabId, ms) {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin) {
+    await new Promise((r) => setTimeout(r, 500));
+    try { const c = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tabId]; if (c && c.source === 'prive') return c; } catch (_) {}
+  }
+  return null;
+}
+async function pauseLbcDepuisApp(msg) {
+  const id = String((msg && msg.id) || '');
+  if (!/^\d{6,12}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre mise en pause est en cours — une à la fois' };
+  PAUSE_LBC_EN_VOL = true;
+  let ouvert = null;
+  try {
+    let journal;
+    try { journal = ((await chrome.storage.local.get('vrmLbcPauses')).vrmLbcPauses || []).filter((t) => Date.now() - Number(t) < 3600e3); } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    if (journal.length >= LBC_PAUSE_MAX_HEURE) return { accepte: false, code: 'plafond', raison: `déjà ${LBC_PAUSE_MAX_HEURE} mises en pause cette heure-ci — réessaie plus tard` };
+    // L'annonce, relue EN BASE (l'app n'envoie qu'un identifiant, jamais un compte).
+    const [rows, accRows] = await Promise.all([
+      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->${id}`),
+      sbGet('app_data?id=eq.lbc_accounts&select=a:data->accounts'),
+    ]);
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
+    const ad = rows[0] && rows[0].a;
+    if (!ad || typeof ad !== 'object') return { accepte: false, code: 'inconnue', raison: "cette annonce n'est pas parmi tes annonces Leboncoin captées — rien n'est parti" };
+    const compte = idCompteLbc(ad.account || ad.lbcUser);
+    if (!/^[0-9a-f-]{8,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette annonce — rien n'est parti" };
+    const accs = (accRows && accRows[0] && accRows[0].a) || {};
+    const nom = nomCompteLbc(accs, compte) || 'le compte de cette annonce';
+    const autreCompte = (autre) => ({ accepte: false, code: 'autre-compte', raison: `Leboncoin est connecté sur ${nomCompteLbc(accs, autre) || 'un autre compte'} dans ce Chrome, l'annonce est sur ${nom} — connecte-toi sur ${nom}, puis réessaie` });
+    let o = await ongletLbcDuCompte(compte);
+    if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
+    if (!o.ok && o.autres && o.autres.length) return autreCompte(o.autres[0]);
+    if (!o.ok) {
+      // Aucun onglet Leboncoin connu : on en ouvre UN, en arrière-plan, et on
+      // attend que la page dise quel compte est connecté. Rien n'est envoyé avant.
+      try { ouvert = await chrome.tabs.create({ url: 'https://www.leboncoin.fr/compte/part/mes-annonces', active: false }); } catch (_) { ouvert = null; }
+      if (!ouvert || ouvert.id == null) return { accepte: false, code: 'lbc-absent', raison: `ouvre leboncoin.fr dans ce Chrome, connecté sur ${nom}, puis réessaie` };
+      const c = await attendreSessionOnglet(ouvert.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+      if (!c || c.ambigue || !c.compte) return { accepte: false, code: 'session', raison: `Leboncoin ne m'a pas dit quel compte est connecté — ouvre leboncoin.fr connecté sur ${nom}, puis réessaie` };
+      if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
+      o = { ok: true, tabId: ouvert.id };
+    }
+    // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
+    try { await chrome.storage.local.set({ vrmLbcPauses: [...journal, Date.now()] }); } catch (_) {}
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcPauseAnnonce', id }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
+    // La FORME de la réponse (clés et types, jamais une valeur) : la passe suivante saura.
+    try { await storeLbcRecon({ envoiOne: { cle: 'VRM PUT api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'PUT', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
+    if (rep && rep.ok === true && rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre mise en pause est en cours dans cet onglet' };
+    if (!rep || rep.ok !== true || !statut) {
+      noterDiag('lbc_pause_incertain');
+      return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si la pause est partie : regarde l'annonce sur Leboncoin" };
+    }
+    noterDiag('lbc_pause_' + statut);
+    if (statut >= 200 && statut < 300) {
+      const note = await noterPauseLbc(id, statut);
+      try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
+      return { accepte: true, etape: 'fait', statut, reponse, note };
+    }
+    return { accepte: true, etape: 'refuse', statut, reponse };
+  } finally {
+    PAUSE_LBC_EN_VOL = false;
+    if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
+  }
 }
 // COMPTES LEBONCOIN connectes. Julien en a plusieurs : on garde la liste des
 // comptes reellement vus dans le navigateur, avec la date de derniere vue. L'app

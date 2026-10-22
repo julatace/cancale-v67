@@ -390,7 +390,93 @@
     } finally { relectureListes = false; }
   };
 
-  const handle = (url, text, ctype, statut = 200) => {
+
+  // ── LA LISTE COMPLÈTE D'UN VENDEUR (22 octobre — proposition 14) ──────────
+  // Mesuré (lecture seule) : sa page profil Leboncoin charge
+  // `POST api.leboncoin.fr/api/adfinder/v2/owner_listing`, corps
+  // `{limit, offset, sort_by, sort_order, filters:{owner:{user_id}, enums:{ad_type}}}`,
+  // réponse `{total, total_active, max_pages, referrer_id, ads:[{list_id, owner:{user_id}}]}`.
+  // Une liste ne DÉCIDE que si elle est PROUVÉE complète, sinon rien :
+  //   · la requête ne filtre QUE sur le vendeur (aucun mot-clé, aucune catégorie,
+  //     aucune annonce mise à part — la v1 « autres annonces du vendeur » exclut
+  //     l'annonce affichée : elle ne décide jamais) ;
+  //   · chaque annonce rendue est à CE vendeur ;
+  //   · le total annoncé est atteint par les annonces distinctes de toutes les
+  //     pages lues dans ce document, au même total, en moins de 3 minutes (une
+  //     liste qui bouge entre deux pages repart de zéro) ;
+  //   · un total nul ne décide rien (une réponse vide peut être un hoquet).
+  // On n'envoie que des identifiants et le total : la décision (« plus vue sur
+  // Leboncoin ») est prise par le fond, sur SES comptes seulement.
+  const OWNER_LISTING = /^https:\/\/api\.leboncoin\.fr\/api\/adfinder\/v2\/owner_listing\/?(?:\?.*)?$/i;
+  const requeteProprietaire = (corps) => {
+    let r; try { r = typeof corps === 'string' ? JSON.parse(corps) : null; } catch (_) { return null; }
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+    for (const k of Object.keys(r)) if (!['limit', 'offset', 'filters', 'sort_by', 'sort_order'].includes(k)) return null;
+    const f = r.filters;
+    if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
+    for (const k of Object.keys(f)) if (k !== 'owner' && k !== 'enums') return null;
+    const o = f.owner;
+    if (!o || typeof o !== 'object' || Object.keys(o).length !== 1 || typeof o.user_id !== 'string' || !/^[0-9a-f-]{8,64}$/i.test(o.user_id)) return null;
+    if (f.enums !== undefined) {
+      const e = f.enums;
+      if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+      for (const k of Object.keys(e)) if (k !== 'ad_type') return null;
+      if (e.ad_type !== undefined && !(Array.isArray(e.ad_type) && e.ad_type.length === 1 && e.ad_type[0] === 'offer')) return null;
+    }
+    const offset = r.offset === undefined ? 0 : r.offset;
+    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(r.limit) || r.limit <= 0) return null;
+    return { owner: o.user_id, offset, tri: String(r.sort_by || '') + '/' + String(r.sort_order || '') };
+  };
+  const reponseProprietaire = (texte, owner) => {
+    let j; try { j = JSON.parse(texte); } catch (_) { return null; }
+    if (!j || typeof j !== 'object' || !Array.isArray(j.ads) || !Number.isInteger(j.total) || j.total < 0) return null;
+    if (j.referrer_id != null && String(j.referrer_id) !== '') return null;      // une annonce mise à part
+    const ids = [];
+    for (const a of j.ads) {
+      const id = a && a.list_id;
+      if (!(Number.isSafeInteger(id) || /^\d{1,15}$/.test(String(id == null ? '' : id)))) return null;
+      if (String((a.owner && a.owner.user_id) || '') !== owner) return null;    // l'annonce d'un autre : pas SA liste
+      ids.push(String(id));
+    }
+    if (new Set(ids).size !== ids.length) return null;
+    return { total: j.total, ids };
+  };
+  const lecturesProprio = new Map();          // cle → { ids:Set, t0, envoye } — en mémoire, ce document seulement
+  const noterListeProprietaire = (url, texte, corpsReq) => {
+    if (!OWNER_LISTING.test(String(url || ''))) return;
+    const req = requeteProprietaire(corpsReq); if (!req) return;
+    const rep = reponseProprietaire(texte, req.owner); if (!rep) return;
+    const cle = req.owner + '|' + req.tri + '|' + rep.total;
+    // Un autre total pour ce vendeur : la liste a bougé, on repart.
+    for (const k of [...lecturesProprio.keys()]) if (k.startsWith(req.owner + '|') && k !== cle) lecturesProprio.delete(k);
+    let l = lecturesProprio.get(cle);
+    if (!l || Date.now() - l.t0 > 180000) { l = { ids: new Set(), t0: Date.now(), envoye: false }; lecturesProprio.set(cle, l); }
+    for (const id of rep.ids) l.ids.add(id);
+    if (l.ids.size > rep.total) { lecturesProprio.delete(cle); return; }           // incohérent : rien ne décide
+    if (rep.total > 0 && l.ids.size === rep.total && !l.envoye) {
+      l.envoye = true;
+      post({ kind: 'lbclistecomplete', owner: req.owner, ids: [...l.ids], total: rep.total });
+    }
+  };
+
+  // ── LES EN-TÊTES DU SITE, POUR LA MISE EN PAUSE SUR SON CLIC (22 oct.) ─────
+  // La mise en pause part de CETTE page, avec les en-têtes que Leboncoin met
+  // lui-même sur ses appels à son API (jamais vus d'ici : on les recopie, on ne
+  // les devine pas). Gardés en mémoire, dans la page — jamais envoyés ailleurs,
+  // jamais rangés. Seuls leurs NOMBRE part dans le diagnostic.
+  let entetesApi = null, entetesPintad = null;
+  const SANS_ENTETE = /^(content-type|content-length|cookie|host|x-vrm)$/i;
+  const noterEntetes = (url, h) => {
+    try {
+      if (!/^https:\/\/api\.leboncoin\.fr\/api\//i.test(String(url || '')) || !h) return;
+      const o = h instanceof Headers ? Object.fromEntries(h.entries()) : (Array.isArray(h) ? Object.fromEntries(h) : Object.assign({}, h));
+      for (const k of Object.keys(o)) if (SANS_ENTETE.test(k) || typeof o[k] !== 'string') delete o[k];
+      if (!Object.keys(o).length) return;
+      if (/\/api\/pintad\//i.test(url)) entetesPintad = o; else entetesApi = o;
+    } catch (_) {}
+  };
+
+  const handle = (url, text, ctype, statut = 200, corpsReq = null) => {
     try {
       if (NOISE.test(url)||statut<200||statut>=300) return;
       if (!text || text.length > 8000000) return;
@@ -445,6 +531,8 @@
       if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
       if (MOI_LISTE.test(url)) { posterListeMoi(url, text); return; }
       post({ kind: 'lbcraw', url, body: text });
+      // APRÈS les annonces : la liste complète ne part qu'une fois rangées (même file).
+      try { noterListeProprietaire(url, text, corpsReq); } catch (_) {}
     } catch (_) {}
   };
 
@@ -475,6 +563,10 @@
       const url = (typeof input === 'string') ? input : (input instanceof URL ? input.href : (input && input.url) || '');
       const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
+      // La liste d'un vendeur : son corps de requête dit si elle peut DÉCIDER (22 oct.).
+      let corpsReq = null;
+      try { if (init && typeof init.body === 'string' && OWNER_LISTING.test(url)) corpsReq = init.body; } catch (_) {}
+      try { noterEntetes(url, init && init.headers); } catch (_) {}
       // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
       // tels quels pour lire le détail (restent dans la page, jamais envoyés ailleurs).
       try {
@@ -490,7 +582,7 @@
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
             noteSeen(url, meth, res.status, ct);
-            res.clone().text().then((t) => handle(url, t, ct, res.status)).catch(() => {});
+            res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -500,10 +592,12 @@
 
   const OX = window.XMLHttpRequest;
   if (OX) {
-    const origOpen = OX.prototype.open, origSend = OX.prototype.send;
-    OX.prototype.open = function (method, url) { this.__lbcUrl = url; this.__lbcMeth = method; return origOpen.apply(this, arguments); };
+    const origOpen = OX.prototype.open, origSend = OX.prototype.send, origSetH = OX.prototype.setRequestHeader;
+    OX.prototype.open = function (method, url) { this.__lbcUrl = url; this.__lbcMeth = method; this.__lbcH = null; return origOpen.apply(this, arguments); };
+    if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
     OX.prototype.send = function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
+      try { this.__lbcCorps = (typeof corps === 'string' && OWNER_LISTING.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
@@ -512,11 +606,43 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
             const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t) handle(url, t, ct, this.status);
+            if (t) handle(url, t, ct, this.status, this.__lbcCorps || null);
           } catch (_) {}
         });
       } catch (_) {}
       return origSend.apply(this, arguments);
     };
   }
+
+  // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre — proposition 6) ─────────────
+  // L'ordre vient du relais (lbc-relay.js), qui le tient du fond de l'extension,
+  // qui le tient de l'app — après SA confirmation, et après avoir vérifié que
+  // l'annonce est sur le compte connecté dans CET onglet. Ici : UNE adresse,
+  // écrite en dur, VUE dans ses propres gestes (`lbc_recon.envois`, 23 sept.) ;
+  // une méthode (PUT), un corps (`{list_ids:[n]}`), une annonce. Jamais une
+  // suppression, jamais une autre adresse. La réponse de Leboncoin repart telle
+  // quelle (statut + 300 premiers caractères + la FORME du corps).
+  const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads';
+  let pauseEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'pause') return;
+    const id = String(d.id || ''), jeton = String(d.jeton || '');
+    if (!/^\d{6,12}$/.test(id) || !/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return;
+    if (pauseEnCours) { post({ kind: 'lbcpauseresultat', jeton, id, statut: 0, erreur: 'en-cours' }); return; }
+    pauseEnCours = true;
+    try {
+      const h = Object.assign({}, entetesPintad || entetesApi || {}, { 'Content-Type': 'application/json', Accept: 'application/json' });
+      let statut = 0, corps = '', erreur = '';
+      try {
+        const res = await origFetch.call(window, URL_PAUSE_LBC, { method: 'PUT', credentials: 'include', headers: h, body: JSON.stringify({ list_ids: [Number(id)] }) });
+        statut = Number(res.status) || 0;
+        try { corps = String(await res.text()).slice(0, 2000); } catch (_) {}
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      let cles = [];
+      try { cles = cheminsDeCles(JSON.parse(corps)).slice(0, 60); } catch (_) {}
+      post({ kind: 'lbcpauseresultat', jeton, id, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
+    } finally { pauseEnCours = false; }
+  }); } catch (_) {}
 })();
