@@ -834,6 +834,12 @@ async function fermerCompte(req, res) {
   // Si leur effacement échoue, le compte reste récupérable pour recommencer.
   etapes.profilPrive=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=in.(${lignesPriveesProfil(u.id).join(',')})`,SERVICE);
   if(etapes.profilPrive===null)return repondre(res,503,{ok:false,erreur:'profil-non-efface',message:'La photo de profil et les preuves de connexion n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
+  // (22 oct., revue) Ses preuves d'adresse de réception vivent AUSSI sous le
+  // propriétaire neutre : son identifiant et l'adresse (demande en attente,
+  // adresse prouvée, et son compteur de demandes — même préfixe). Elles
+  // partent AVANT ses données ; illisible ⇒ rien d'autre n'est effacé, et c'est dit.
+  etapes.preuvesAdresse=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=like.vrm_email_preuve_*&data->>owner=eq.${encodeURIComponent(u.id)}`,SERVICE);
+  if(etapes.preuvesAdresse===null)return repondre(res,503,{ok:false,erreur:'preuves-non-effacees',message:'Tes adresses de réception confirmées n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
   etapes.donnees = await effacer(`app_data?${filtre}`, SERVICE);
   etapes.comptesVinted = etapes.donnees === null ? null : await effacer(`vinted_accounts?${filtre}`, SERVICE);
   etapes.compteurs = etapes.comptesVinted === null ? null : await effacer(`detourage_usage?${filtre}`, SERVICE);
@@ -857,6 +863,7 @@ async function fermerCompte(req, res) {
   const fait = [], pasFait = [];
   if (etapes.abonnement === 'resilie') fait.push('abonnement résilié (aucun nouveau prélèvement)');
   if (etapes.abonnement === 'arrete') fait.push('abonnement arrêté');
+  if (etapes.preuvesAdresse > 0) fait.push('tes adresses de réception confirmées effacées');
   if (etapes.donnees !== null) fait.push(`tes données effacées (${nb(etapes.donnees, 'élément', 'éléments')})`);
   if (etapes.comptesVinted != null) fait.push(nb(etapes.comptesVinted, 'compte Vinted délié', 'comptes Vinted déliés'));
   if (etapes.equipe != null && etapes.equipe > 0) fait.push(nb(etapes.equipe, 'invitation d’équipe effacée', 'invitations d’équipe effacées'));

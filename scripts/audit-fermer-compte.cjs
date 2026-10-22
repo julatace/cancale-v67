@@ -27,12 +27,22 @@ const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m, St
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 const P = '99999999-9999-4999-8999-999999999999';
+const NEUTRE = '00000000-0000-0000-0000-000000000000';
 const JETONS = { 'aa.bb.A': { id: A, email: 'vendeuse.a@exemple.test' }, 'aa.bb.B': { id: B, email: 'b@exemple.test' }, 'aa.bb.P': { id: P, email: 'proprio@exemple.test' } };
 
 let base, deletes, appelsStripe, pannes, proprioRpc;
 const reset = () => {
   base = {
-    app_data: [{ owner: A, id: 'main' }, { owner: A, id: 'harvest_11_orders_sold' }, { owner: A, id: 'email_bord_1' }, { owner: B, id: 'main' }, { owner: B, id: 'harvest_22_orders_sold' }],
+    app_data: [{ owner: A, id: 'main' }, { owner: A, id: 'harvest_11_orders_sold' }, { owner: A, id: 'email_bord_1' }, { owner: B, id: 'main' }, { owner: B, id: 'harvest_22_orders_sold' },
+      // (22 oct., revue) Les preuves d'adresse vivent sous le propriétaire NEUTRE
+      // et portent SON identifiant et SON adresse : une prouvée, une en attente,
+      // son compteur de demandes — et celles de B, et un email mis de côté
+      // (neutre, à personne) qui ne doivent PAS partir.
+      { owner: NEUTRE, id: 'vrm_email_preuve_' + 'a'.repeat(40), data: { owner: A, adresse: 'vendeuse.a@exemple.test', etat: 'prouvee' } },
+      { owner: NEUTRE, id: 'vrm_email_preuve_' + 'c'.repeat(40), data: { owner: A, adresse: 'autre.a@exemple.test', etat: 'attente', nonce: 'n', expire: '2099-01-01T00:00:00.000Z' } },
+      { owner: NEUTRE, id: 'vrm_email_preuve_compteur_' + 'd'.repeat(40), data: { owner: A, demandes: [{ id: 'x', at: '2026-10-22T00:00:00Z' }] } },
+      { owner: NEUTRE, id: 'vrm_email_preuve_' + 'b'.repeat(40), data: { owner: B, adresse: 'b@exemple.test', etat: 'prouvee' } },
+      { owner: NEUTRE, id: 'email_quarantaine_1', data: { destinataires: '["vendeuse.a@exemple.test"]' } }],
     vinted_accounts: [{ owner: A, vinted_user_id: '11' }, { owner: B, vinted_user_id: '22' }],
     detourage_usage: [{ owner: A, mois: '2026-10' }, { owner: B, mois: '2026-10' }],
     abonnements: { [A]: { statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' }, [B]: { statut: 'active', client_stripe: 'cus_B', abonnement_stripe: 'sub_B' } },
@@ -107,10 +117,26 @@ global.fetch = async (url, opts = {}) => {
   if (mr && m === 'DELETE') {
     deletes.push(u);
     if (pannes.has(mr[1])) return rep('<html>522</html>', 522);
+    if (pannes.has('preuves') && /vrm_email_preuve_/.test(mr[2])) return rep('<html>522</html>', 522);
     const own = (/(?:^|&)owner=eq\.([^&]+)/.exec(mr[2]) || [])[1];
+    // (22 oct., revue) Les AUTRES filtres sont honorés aussi (§6.3) : `id=in.(…)`,
+    // `id=like.…`, `data->>X=eq.…`. Sans eux la fausse base effaçait toute la
+    // ligne neutre d'un coup — le contrôle de la revue ne pouvait pas mordre.
+    // Un filtre qu'elle ne comprend pas fait échouer la requête (jamais « vrai »).
+    const filtres = mr[2].split('&').filter((x) => x && !/^owner=eq\./.test(x));
+    let inconnu = false;
+    const passe = (l) => filtres.every((f) => {
+      let k;
+      if ((k = /^id=in\.\((.*)\)$/.exec(f))) return k[1].split(',').includes(l.id);
+      if ((k = /^id=like\.(.*)$/.exec(f))) return new RegExp('^' + k[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/_/g, '.') + '$').test(l.id);
+      if ((k = /^data->>([a-zA-Z_]+)=eq\.(.*)$/.exec(f))) return !!(l.data && String(l.data[k[1]]) === k[2]);
+      inconnu = true; return false;
+    });
     // Une suppression sans filtre propriétaire viderait TOUTE la table : la
     // fausse base l'exécute pour de vrai, pour que le contrôle le voie.
-    const garde = (l) => own ? l.owner !== own : false;
+    const garde = (l) => own ? !(l.owner === own && passe(l)) : false;
+    base[mr[1]].forEach((l) => passe(l));
+    if (inconnu) return rep({ message: 'filtre inconnu du banc : ' + mr[2] }, 400);
     const avant = base[mr[1]].length;
     base[mr[1]] = base[mr[1]].filter(garde);
     return rep(null, 204, { 'content-range': `*/${avant - base[mr[1]].length}` });
@@ -188,8 +214,11 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     const rest = deletes.filter((x) => x.includes('/rest/v1/'));
     const { lignesPriveesProfil } = await import('../api/_lib/profil-avatar.js');
     const prive = '/rest/v1/app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=in.(' + lignesPriveesProfil(A).join(',') + ')';
-    const ordinaires = rest.filter(x => !x.endsWith(prive));
-    dit(rest.length === 4 && rest.filter(x => x.endsWith(prive)).length === 1 && ordinaires.length === 3 && ordinaires.every(x => ['/rest/v1/app_data?owner=eq.'+A,'/rest/v1/vinted_accounts?owner=eq.'+A,'/rest/v1/detourage_usage?owner=eq.'+A].some(fin=>x.endsWith(fin))), 'suppression limitée au vendeur et à ses trois enregistrements privés exacts', rest.map(x=>x.split('/rest/v1/')[1]).join(' · '));
+    const preuves = '/rest/v1/app_data?owner=eq.' + NEUTRE + '&id=like.vrm_email_preuve_*&data->>owner=eq.' + A;
+    const ordinaires = rest.filter(x => !x.endsWith(prive) && !x.endsWith(preuves));
+    dit(rest.length === 5 && rest.filter(x => x.endsWith(prive)).length === 1 && rest.filter(x => x.endsWith(preuves)).length === 1 && ordinaires.length === 3 && ordinaires.every(x => ['/rest/v1/app_data?owner=eq.'+A,'/rest/v1/vinted_accounts?owner=eq.'+A,'/rest/v1/detourage_usage?owner=eq.'+A].some(fin=>x.endsWith(fin))), 'suppression limitée au vendeur, à ses trois enregistrements privés exacts et à SES preuves d’adresse', rest.map(x=>x.split('/rest/v1/')[1]).join(' · '));
+    dit(!base.app_data.some((l) => /^vrm_email_preuve_/.test(l.id) && l.data && l.data.owner === A), 'REVUE : ses preuves d’adresse (son identifiant + l’adresse, sous le propriétaire neutre) — prouvée, en attente, et son compteur — sont effacées', JSON.stringify(base.app_data.filter((l) => /^vrm_email_preuve_/.test(l.id) && l.data && l.data.owner === A).map((l) => l.id)));
+    dit(base.app_data.some((l) => l.id === 'vrm_email_preuve_' + 'b'.repeat(40)) && base.app_data.some((l) => l.id === 'email_quarantaine_1'), '… et RIEN d’autre sous le propriétaire neutre (la preuve de B, un email mis de côté restent)', base.app_data.filter((l) => l.owner === NEUTRE).map((l) => l.id).join(', '));
     const ordre = deletes.map((x) => x.includes('admin/users') ? 'auth' : x.startsWith('stockage') ? 'photos' : x.startsWith('equipe') ? 'equipe' : x.startsWith('communaute') ? 'communaute' : x.split('/rest/v1/')[1].split('?')[0]);
     dit(ordre[ordre.length - 1] === 'auth' && ordre.indexOf('app_data') < ordre.indexOf('auth'), 'ordre : données, puis comptes, puis photos, puis le compte de connexion', ordre.join(' → '));
     const res = appelsStripe.find((x) => x.m === 'POST');
@@ -226,6 +255,12 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     dit(base.utilisateurs.has(A), '… et son compte de connexion est GARDÉ (il peut se reconnecter et relancer)');
     dit(/INCOMPL/i.test(c.message || '') && /comptes Vinted/.test(c.message || '') && /données effacées/.test(c.message || ''), '… et le message dit ce qui est fait ET ce qui ne l’est pas', c.message);
     dit(intactB(), '… l’autre vendeur reste intact');
+  });
+  await essaie('preuves illisibles', async () => {
+    reset(); pannes.add('preuves');
+    const r = await fermer('aa.bb.A', { confirmation: 'vendeuse.a@exemple.test' });
+    const c = r.corps || {};
+    dit(r.code === 503 && c.ok === false && /adresses de réception/.test(c.message || '') && base.app_data.some((l) => l.owner === A && l.id === 'main') && base.utilisateurs.has(A), 'REVUE : ses preuves d’adresse ne s’effacent pas : rien d’autre n’est effacé, son compte est gardé, et c’est dit', `HTTP ${r.code} · ${c.message}`);
   });
   await essaie('compte de connexion raté', async () => {
     reset(); pannes.add('auth');

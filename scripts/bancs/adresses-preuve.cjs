@@ -70,12 +70,16 @@ async function ouvrir(nav, { registre, vues = [], etats = {}, installation = fal
       if (preuves === 'panne') return r.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false,"error":"base-injoignable"}' });
       if (preuves === 'unique') return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"cloisonnee":false,"adresses":{}}' });
       const adresses = {};
-      for (const a of Object.keys(etat.registre)) adresses[a.toLowerCase()] = etat.etats[a.toLowerCase()] || { etat: installation ? 'transition' : 'aucune' };
+      // La forme de la VRAIE route (§6.3) : `retenue` dit si ses emails lui sont
+      // attribués (prouvée, ou propriétaire de l'installation quel que soit l'état).
+      for (const a of Object.keys(etat.registre)) { const e = etat.etats[a.toLowerCase()] || { etat: installation ? 'transition' : 'aucune' }; adresses[a.toLowerCase()] = { ...e, retenue: e.etat === 'prouvee' || installation }; }
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, cloisonnee: true, installation, adresses, collecteur }) });
     }
     if (/\/api\/email-rattacher\?mode=preuve-demander/.test(u)) {
       appels.push({ mode: 'demander', auth, corps });
       const a = String((corps && corps.adresse) || '').toLowerCase();
+      // (22 oct., revue) La vraie route rend « envoi » AUSSI au propriétaire de
+      // l'installation (une demande en cours prime sur « à confirmer »).
       etat.etats[a] = { etat: 'envoi', demandeLe: new Date().toISOString(), expire: new Date(Date.now() + 72 * 3600e3).toISOString() };
       return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"etat":"envoi"}' });
     }
@@ -96,7 +100,8 @@ const ouvrirAdresses = async (pg) => { const s = pg.locator('[data-sous-ouvrir="
 const lignes = (pg) => pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-reglage-adresses] [data-adresse]')].map((x) => [x.getAttribute('data-adresse'), {
   etat: x.getAttribute('data-adresse-etat'), texte: x.innerText.replace(/\s+/g, ' ').trim(), bouton: (x.querySelector('[data-confirmer-adresse]') || {}).innerText || null,
   alerte: (() => { const p = x.querySelector('[data-adresse-preuve]'); return p ? getComputedStyle(p).color : null; })() }])));
-const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[data-reglage-adresses]'); return t ? { texte: t.innerText, expl: [...t.querySelectorAll('[data-preuve-explication]')].map((x) => x.getAttribute('data-preuve-explication')), boite: (t.querySelector('[data-preuve-boite]') || {}).getAttribute?.('data-preuve-boite') || null, pasSu: t.querySelectorAll('[data-preuves="pas-su"]').length } : null; });
+const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[data-reglage-adresses]'); return t ? { texte: t.innerText, expl: [...t.querySelectorAll('[data-preuve-explication]')].map((x) => x.getAttribute('data-preuve-explication')), boite: (t.querySelector('[data-preuve-boite]') || {}).getAttribute?.('data-preuve-boite') || null, pasSu: t.querySelectorAll('[data-preuves="pas-su"]').length,
+  promesse: (t.querySelector('[data-adresses-promesse]') || {}).getAttribute?.('data-adresses-promesse') || null, promesseTexte: (t.querySelector('[data-adresses-promesse]') || {}).innerText || '' } : null; });
 
 (async () => {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e)); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
@@ -106,8 +111,8 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
     for (const viewport of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) {
       console.log(`\n── A. Un vendeur, ${viewport.width} px : chaque adresse dit SON état`);
       await essaie('A', async () => {
-        const reg = { 'ok@exemple.test': { owner: SESSION.user.id }, 'envoye@exemple.test': { owner: SESSION.user.id }, 'rien@exemple.test': { owner: SESSION.user.id } };
-        const etats = { 'ok@exemple.test': { etat: 'prouvee', via: 'lien' }, 'envoye@exemple.test': { etat: 'envoyee', envoyeLe: vieux, demandeLe: vieux }, 'rien@exemple.test': { etat: 'aucune' } };
+        const reg = { 'ok@exemple.test': { owner: SESSION.user.id }, 'envoye@exemple.test': { owner: SESSION.user.id }, 'rien@exemple.test': { owner: SESSION.user.id }, 'refusee@exemple.test': { owner: SESSION.user.id } };
+        const etats = { 'ok@exemple.test': { etat: 'prouvee', via: 'lien' }, 'envoye@exemple.test': { etat: 'envoyee', envoyeLe: vieux, demandeLe: vieux }, 'rien@exemple.test': { etat: 'aucune' }, 'refusee@exemple.test': { etat: 'echec', demandeLe: vieux } };
         const { ctx, pg, erreurs, appels } = await ouvrir(nav, { registre: reg, etats, viewport });
         await ouvrirAdresses(pg);
         const l = await lignes(pg); const p = await panneau(pg);
@@ -117,6 +122,10 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
         dit(l['rien@exemple.test'] && l['rien@exemple.test'].etat === 'aucune' && /pas confirmée — ses emails sont mis de côté/.test(l['rien@exemple.test'].texte) && l['rien@exemple.test'].bouton === 'Confirmer', 'pas confirmée : ce que ça coûte (mis de côté) et le geste', JSON.stringify(l['rien@exemple.test']));
         dit(p && p.expl.length === 1 && p.expl[0] === 'vendeur' && (p.texte.match(/Chaque adresse se confirme une fois/g) || []).length === 1, 'la règle est dite UNE fois au-dessus des lignes (§7)', JSON.stringify(p && p.expl));
         dit(p && !/Les tiennes restent reçues/.test(p.texte), 'à un vendeur, jamais « les tiennes restent reçues » (c’est faux pour lui)', '');
+        // (22 oct., revue) La phrase qui promet suit la règle : pour un vendeur,
+        // AJOUTER ne suffit plus — c'est la confirmation qui attribue (§5).
+        dit(p && p.promesse === 'confirmation' && /confirmée/.test(p.promesseTexte) && !/dès que tu l'ajoutes/.test(p.texte), 'REVUE : l’explication en tête ne promet plus « dès que tu l’ajoutes » à un vendeur — « dès que tu l’as ajoutée puis confirmée »', p && p.promesseTexte);
+        dit(l['refusee@exemple.test'] && l['refusee@exemple.test'].etat === 'echec' && /n'a pas pu envoyer/.test(l['refusee@exemple.test'].texte) && l['refusee@exemple.test'].bouton === 'Renvoyer', 'REVUE : un lien que la boîte VRM n’a pas pu envoyer est dit, avec « Renvoyer » — jamais « en préparation » pour toujours', JSON.stringify(l['refusee@exemple.test']));
         // Le geste : « Confirmer » envoie la demande POUR CETTE adresse, avec la session.
         await pg.locator('[data-confirmer-adresse="rien@exemple.test"]').click();
         await pg.waitForTimeout(1500);
@@ -143,6 +152,15 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
       dit(p && p.expl[0] === 'installation' && /Les tiennes restent reçues/.test(p.texte) && !/sont mis de côté/.test(p.texte.split('Chaque adresse')[1] || ''), 'la règle lui dit que ses adresses restent reçues — aucune alerte', p && p.texte.replace(/\n/g, ' ').slice(0, 300));
       const couleurs = Object.values(l).map((x) => x.alerte);
       dit(new Set(couleurs).size === 1, 'aucune ligne en couleur d’alerte (rien ne lui est retiré)', JSON.stringify(couleurs));
+      dit(p && p.promesse === 'directe', 'l’explication en tête lui garde « dès que tu l’ajoutes » (ses adresses restent reçues)', p && p.promesseTexte);
+      // (22 oct., revue) Après « Confirmer », la ligne le dit — plus de
+      // « reçue — à confirmer » + « Confirmer » pour toujours.
+      await pg.locator('[data-confirmer-adresse="julien@exemple.test"]').click();
+      await pg.waitForTimeout(1500);
+      const l3 = await lignes(pg); const p3 = await panneau(pg);
+      dit(l3['julien@exemple.test'] && l3['julien@exemple.test'].etat === 'envoi' && /lien en préparation/.test(l3['julien@exemple.test'].texte) && !/reçue — à confirmer/.test(l3['julien@exemple.test'].texte) && !l3['julien@exemple.test'].bouton, 'REVUE : propriétaire, après « Confirmer » : « lien en préparation », plus de « Confirmer » immédiat', JSON.stringify(l3['julien@exemple.test']));
+      dit(p3 && p3.boite === 'active' && /boîte VRM/.test(p3.texte), '… et d’où part le lien, une fois', p3 && p3.boite);
+      dit(l3['julien@exemple.test'] && l3['julien@exemple.test'].alerte === couleurs[0], '… sans couleur d’alerte : ses emails lui restent attribués', JSON.stringify(l3['julien@exemple.test']));
       dit(erreurs.length === 0, 'aucune erreur d’app', erreurs.join(' | ').slice(0, 160));
       await ctx.close();
     });
@@ -153,6 +171,7 @@ const panneau = (pg) => pg.evaluate(() => { const t = document.querySelector('[d
       const { ctx, pg } = await ouvrir(nav, { registre: reg, preuves: 'panne' });
       const l = await lignes(pg); const p = await panneau(pg);
       dit(p && p.pasSu === 1 && Object.values(l).every((x) => x.etat === 'pas-su' && !/confirmée|pas confirmée/.test(x.texte)), 'une phrase « pas pu vérifier », UNE fois — aucun état deviné sur les lignes', JSON.stringify({ pasSu: p && p.pasSu, l }));
+      dit(p && p.promesse === 'passu' && !/te sont proposés/.test(p.promesseTexte), 'pas su : l’explication ne promet rien (« rien n’est perdu »)', p && p.promesseTexte);
       await ctx.close();
     });
 

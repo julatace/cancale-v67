@@ -32,7 +32,8 @@ import {lireReceptionEmail} from './_lib/reception-email.js';
 import { traiterEmail, lireRegistreEmails } from './email-inbound.js';
 import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation, normAdresse, estAdresseCollectrice } from './_lib/proprietaire-email.js';
-import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR } from './_lib/preuve-adresse.js';
+import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, adresseRetenue, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR, MAX_DEMANDES_VENDEUR_JOUR, idCompteurVendeur, reserverDemande } from './_lib/preuve-adresse.js';
+import { modifierNeutre } from './_lib/neutre-cas.js';
 import { sbCle } from './_lib/cle.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -341,7 +342,9 @@ async function preuves(req, res) {
   for (const a of declarees) {
     const p = parId.get(idPreuve(u.id, a)) || null;
     const etat = etatAdresse({ adresse: a, owner: u.id, preuve: p, installation: installation() });
-    adresses[a] = { etat, via: (p && p.etat === 'prouvee' && p.via) || null, envoyeLe: (p && p.envoyeLe) || null, demandeLe: (p && p.demandeLe) || null, expire: (p && p.expire) || null, prouveeLe: (p && p.prouveeLe) || null,
+    // `retenue` : ses emails lui sont-ils attribués (prouvée, ou propriétaire de
+    // l'installation quel que soit l'état de son lien) — l'écran n'alerte pas sinon.
+    adresses[a] = { etat, retenue: adresseRetenue({ adresse: a, owner: u.id, preuve: p, installation: installation() }), via: (p && p.etat === 'prouvee' && p.via) || null, envoyeLe: (p && p.envoyeLe) || null, demandeLe: (p && p.demandeLe) || null, expire: (p && p.expire) || null, prouveeLe: (p && p.prouveeLe) || null,
       // L'adresse de connexion VRM, confirmée par un lien : « Confirmer » la prouve d'un clic, sans email.
       compte: etat !== 'prouvee' && prouveeParCompte(a, u) };
   }
@@ -387,9 +390,17 @@ async function preuveDemander(req, res) {
   const demandes = (d && Array.isArray(d.demandes) ? d.demandes : []).filter(jour);
   if (d && d.etat === 'attente' && maintenant - Date.parse(d.demandeLe || '') < DELAI_RENVOI_MS) { res.status(429).json({ ok: false, raison: 'trop-tot', attenteMs: DELAI_RENVOI_MS - (maintenant - Date.parse(d.demandeLe)), message: 'Un lien vient de partir : attends quelques minutes avant de le renvoyer.' }); return; }
   if (demandes.length >= MAX_ENVOIS_ADRESSE_JOUR) { res.status(429).json({ ok: false, raison: 'trop-envois', message: "Déjà 5 liens envoyés à cette adresse aujourd'hui : réessaie demain." }); return; }
-  const miennes = await lirePages(`owner=eq.${NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>owner=eq.${enc(u.id)}&select=id,quand:data->>demandeLe`);
-  if (!miennes) { indispo(res); return; }
-  if (miennes.rows.filter((x) => x.id !== id && jour(x.quand)).length >= MAX_ADRESSES_JOUR) { res.status(429).json({ ok: false, raison: 'trop-adresses', message: "Déjà 10 adresses à confirmer aujourd'hui : réessaie demain." }); return; }
+  // ⚠️ (22 oct., revue) Les freins du VENDEUR se réservent par comparer-et-
+  //    échanger sur SA ligne compteur (neutre) AVANT d'écrire la demande : lire
+  //    ses demandes puis écrire laissait passer 30 demandes simultanées (toutes
+  //    lisaient « 0 »). Une réservation qui n'aboutit pas n'écrit rien.
+  const resa = await modifierNeutre(idCompteurVendeur(u.id), (c) => {
+    const r = reserverDemande(c, { owner: u.id, id, maintenant });
+    return r.refus ? { valeur: r.refus } : { data: r.data, valeur: 'ok' };
+  });
+  if (!resa) { indispo(res); return; }
+  if (resa.valeur === 'trop-adresses') { res.status(429).json({ ok: false, raison: 'trop-adresses', message: `Déjà ${MAX_ADRESSES_JOUR} adresses à confirmer aujourd'hui : réessaie demain.` }); return; }
+  if (resa.valeur === 'trop-demandes') { res.status(429).json({ ok: false, raison: 'trop-demandes', message: `Déjà ${MAX_DEMANDES_VENDEUR_JOUR} liens demandés aujourd'hui : réessaie demain.` }); return; }
   // Un lien encore valable plus d'une heure garde son aléa (l'email déjà parti
   // reste bon) ; sinon un aléa neuf (l'ancien lien ne vaut plus rien).
   const garder = d && d.etat === 'attente' && d.nonce && Date.parse(d.expire || '') > maintenant + 3600e3;

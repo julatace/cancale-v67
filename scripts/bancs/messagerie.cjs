@@ -272,6 +272,12 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       if (ofs) dit(ofs && /1 autre déjà réglée/.test(ofs.txt), 'celle réglée par une vente est mise de côté, et c’est DIT', ofs && ofs.txt.slice(0, 260));
       if (ofs) dit(ofs && /tes Samba se revendent 55,00 € en moyenne \(3 ventes\)/.test(ofs.txt), 'le repère est celui du MODÈLE, dit comme tel (jamais « ton prix » deviné par le titre)', ofs && ofs.txt.slice(0, 300));
       if (ofs) dit(ofs && !/remise|ton prix/i.test(ofs.txt), 'aucune remise ni « ton prix » inventés (l’email ne dit pas quelle paire)');
+      if (ofs && tel) {
+        // (22 oct., revue) Les gestes d'une offre se touchent au doigt : 44 px
+        // AFFICHÉS au moins (le lien « Répondre sur Vinted » en faisait 26).
+        const cibles = await r.pg.evaluate(() => [...document.querySelectorAll('[data-offres-messages] [data-offre-email] a, [data-offres-messages] [data-offre-email] button')].map((el) => { const q = el.getBoundingClientRect(); return { t: el.innerText.trim().slice(0, 24), h: Math.round(q.height), css: el.offsetHeight, zoom: getComputedStyle(document.querySelector('.vrm-main') || document.body).zoom }; }));
+        dit(cibles.length >= 2 && cibles.every((c) => c.h >= 44), 'REVUE : au doigt, « Répondre sur Vinted » et « c’est fait » font 44 px au moins', JSON.stringify(cibles));
+      }
       if (ofs) {
         await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-offres-' + (tel ? 390 : 1512) + '.png') });
         await r.pg.click('[data-offre-traitee="email_offer_o1"]');

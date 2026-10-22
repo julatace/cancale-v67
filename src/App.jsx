@@ -38736,7 +38736,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:11,color:C.muted}}>{quand(of.receivedAt)}{comptes.size>1&&of.account?` · ${of.account}`:''}{r && r.n>=REPERE_MIN ? ` · repère : tes ${nomModele(k)} se revendent ${fmtE(r.s/r.n)} en moyenne (${r.n} ventes)` : ''}</div>
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
-                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center'}}>Répondre sur Vinted</a>
+                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" data-offre-repondre="" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center',display:'inline-flex',alignItems:'center',justifyContent:'center',boxSizing:'border-box',minHeight:32}}>Répondre sur Vinted</a>
                       <button type="button" data-offre-traitee={of.id} onClick={()=>offreTraitee(of)} style={{border:'none',background:'transparent',color:C.muted,fontSize:11.5,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline',minHeight:32}}>c'est fait</button>
                     </div>
                   </div>
@@ -45868,6 +45868,9 @@ const PREUVE_LIGNE = {
   envoi: { t: 'lien en préparation', alerte: false, geste: '' },
   envoyee: { t: 'lien envoyé', alerte: false, geste: 'Renvoyer' },
   perimee: { t: 'lien expiré', alerte: true, geste: 'Renvoyer' },
+  // (22 oct., revue) La boîte VRM n'a pas réussi à l'envoyer (3 essais) : la
+  // demande sort de sa file — « Renvoyer » repart d'une demande neuve.
+  echec: { t: "la boîte VRM n'a pas pu envoyer le lien — vérifie l'adresse", alerte: true, geste: 'Renvoyer' },
   aucune: { t: 'pas confirmée — ses emails sont mis de côté', alerte: true, geste: 'Confirmer' },
   impossible: { t: "relais Apple : VRM ne peut pas y envoyer de lien", alerte: true, geste: '' },
 };
@@ -46070,10 +46073,16 @@ function EmailsSetting({onComptes}) {
   // Les suggestions : SES adresses déjà vues, pas encore déclarées.
   const declarees = new Set(liste.map(normAdresse));
   const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
+  // ⚠️ (22 oct., revue) La phrase qui promet suit la RÈGLE lue (§5) : pour un
+  //    vendeur (base cloisonnée, pas le propriétaire), AJOUTER ne suffit plus —
+  //    c'est la confirmation qui attribue. Pas su ⇒ une phrase vraie dans les
+  //    deux cas, sans promesse.
+  const promesse = preuves && preuves.cloisonnee && !preuves.installation ? 'confirmation'
+    : preuves && (preuves.cloisonnee === false || preuves.installation) ? 'directe' : 'passu';
   const toutesSugg = async () => {
     const ok = await askConfirm({
       title: `Ajouter ${sugg.length} adresses ?`,
-      desc: `Les emails qui arrivent dessus te seront attribués, et ceux déjà mis de côté te seront proposés.\n\n${sugg.map((v) => v.adresse).join('\n')}`,
+      desc: `${promesse === 'confirmation' ? "Un lien de confirmation part à chacune : une fois confirmée, les emails qui arrivent dessus te sont attribués, et ceux déjà mis de côté te sont proposés." : promesse === 'directe' ? 'Les emails qui arrivent dessus te seront attribués, et ceux déjà mis de côté te seront proposés.' : "Les emails qui arrivent dessus sont gardés entiers — rien n'est perdu."}\n\n${sugg.map((v) => v.adresse).join('\n')}`,
       ok: 'Les ajouter',
     });
     if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
@@ -46094,7 +46103,11 @@ function EmailsSetting({onComptes}) {
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
           <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
-          <span>Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes.</span>
+          <span data-adresses-promesse={promesse}>{promesse === 'confirmation'
+            ? "Une adresse manque, ou n'est pas encore confirmée ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'as ajoutée puis confirmée."
+            : promesse === 'directe'
+              ? "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
+              : "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
         </div>
         <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} style={{font:'inherit',color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',cursor:'pointer'}}>Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
@@ -46146,7 +46159,7 @@ function EmailsSetting({onComptes}) {
             <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:10,color:C.danger,background:`${C.danger}0d`,borderRadius:5,padding:'1px 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
             <span style={{fontSize:11.5,color:C.muted}}>{adr}</span>
             {lp && (
-              <span data-adresse-preuve={ep.etat} style={{display:'flex',alignItems:'center',gap:5,marginTop:3,fontSize:11.5,lineHeight:1.4,color:lp.alerte?C.warn:C.muted}}>
+              <span data-adresse-preuve={ep.etat} data-adresse-retenue={ep.retenue ? 'oui' : 'non'} style={{display:'flex',alignItems:'center',gap:5,marginTop:3,fontSize:11.5,lineHeight:1.4,color:lp.alerte && !ep.retenue ? C.warn : C.muted}}>
                 {ep.etat === 'prouvee' && <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="check" size={12}/></span>}
                 <span>{lp.t}{ep.etat === 'prouvee' && ep.via === 'compte' ? ' (ton adresse de connexion VRM)' : ''}{ep.etat === 'envoyee' && ep.envoyeLe ? ` le ${quandLisible(ep.envoyeLe)} — ouvre-le depuis cette boîte` : ''}{ep.etat === 'transition' && estRelaisApple(adr) ? ' (relais Apple : aucun lien ne peut y arriver, elle reste à toi)' : ''}</span>
               </span>
