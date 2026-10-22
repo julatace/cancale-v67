@@ -55,7 +55,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m +
     //    jet comptait TOUT et sortait rouge sur un comportement normal : on ne
     //    retient que ce que la sonde aurait créé.
     const ecrits = [];
-    await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+    await pg.addInitScript((e) => { try { if (e === 'cloisonnee') localStorage.setItem('vrm_banc_sans_session', '1'); /* l'état jugé est SANS session (posé AVANT le drapeau) */ localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} }, etat);
     const cors = { 'access-control-allow-origin': '*' };
     await pg.route('**/rest/v1/**', (route) => {
       const req = route.request(), u = req.url(), m = req.method();

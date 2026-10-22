@@ -20,8 +20,8 @@
 //  propre session garde la sienne.
 //  Pour CETTE session seulement, la base servie est traduite en base cloisonnée
 //  (la production l'est : l'app filtre toujours `owner=eq.` et exige que chaque
-//  ligne de `main` porte SON owner, 439081d) : la sonde `select=owner&limit=1`
-//  répond la colonne, `select=owner,data` est demandé au banc en `select=data`,
+//  ligne de `main` porte SON owner, 439081d) : `select=owner,data` est demandé
+//  au banc en `select=data` (la sonde de schéma reste celle du banc),
 //  et chaque ligne rendue reçoit l'owner de la session — l'ancien « accès
 //  direct » voulait dire « toutes les lignes sont à moi », c'est la même chose.
 //  Posé une fois sur `playwright` (chromium.launch / launchPersistentContext) ;
@@ -31,10 +31,11 @@ const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
   const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
   const ls = window.localStorage; const poserSess = () => {
-    try { if (ls.getItem('vrm_acces_direct') === '1' && !ls.getItem('vrm_session')) { Storage.prototype.setItem.call(ls, 'vrm_session', JSON.stringify(SESS_BANC)); Storage.prototype.setItem.call(ls, 'vrm_local_owner', SESS_BANC.user.id); } } catch (_) {}
+    try { if (ls.getItem('vrm_acces_direct') === '1' && !ls.getItem('vrm_session') && ls.getItem('vrm_banc_sans_session') !== '1') { Storage.prototype.setItem.call(ls, 'vrm_session', JSON.stringify(SESS_BANC)); Storage.prototype.setItem.call(ls, 'vrm_local_owner', SESS_BANC.user.id); } } catch (_) {}
   };
   try { const si = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { si.call(this, k, v); if (this === ls && k === 'vrm_acces_direct') poserSess(); }; } catch (_) {}
   poserSess();
+  // Un banc qui juge l'état SANS session (porte d'entrée) pose vrm_banc_sans_session.
   // Un appareil où CE vendeur a déjà travaillé porte son identité : sans elle,
   // l'app efface les réglages de l'appareil comme pour un autre vendeur (voulu).
   const poserProprio = () => { try { const c = JSON.parse(ls.getItem('vrm_session') || 'null'); if (c && c.user && c.user.id && !ls.getItem('vrm_local_owner')) Storage.prototype.setItem.call(ls, 'vrm_local_owner', c.user.id); } catch (_) {} };
@@ -53,7 +54,6 @@ const SCRIPT = `(() => {
       const uid = cur && cur.user && cur.user.id;
       const synth = !!(cur && cur.access_token === SESS_BANC.access_token);
       if (uid && meth === 'GET') {
-        if (synth && /[?&]select=owner&limit=1(&|$)/.test(url)) return new Response(JSON.stringify([{ owner: uid }]), { status: 200, headers: { 'content-type': 'application/json' } });
         // Lecture filtrée sur CET owner : un vrai PostgREST ne rendrait que ses
         // lignes, toutes à lui — celles qui n'en disent rien reçoivent son owner.
         const filtre = url.indexOf('owner=eq.' + encodeURIComponent(uid)) >= 0 || url.indexOf('owner=eq.' + uid) >= 0;
