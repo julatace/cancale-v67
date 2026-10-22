@@ -81,11 +81,15 @@
   .vrm-widgets[data-edition] .vrm-widget-in { animation:none; }
 }
 
-/* « − » pour retirer, « Moyen / Grand » pour la taille. La zone au doigt fait
+/* « − » pour retirer, « Un tiers / Deux tiers » pour la largeur. La zone au doigt fait
    44 px (55 px CSS sous le zoom de 80 % du téléphone, voir styles-mineral). */
 .vrm-w-retirer { position:absolute; top:-14px; left:-14px; z-index:3; width:44px; height:44px; min-height:44px; padding:0; border:0; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .vrm-w-retirer > span { width:24px; height:24px; border-radius:999px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,.18), 0 4px 10px rgba(0,0,0,.12); }
-.vrm-w-taille { position:absolute; top:8px; right:8px; z-index:3; min-height:44px; padding:0 12px; border-radius:999px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.08), 0 4px 10px rgba(0,0,0,.06); }
+/* ⚠️ Le bouton de largeur est SOUS la carte, jamais posé dessus (revue du
+   22 oct.) : en haut à droite il couvrait « Mes ventes › » (il ne restait que
+   « Me »), la légende « Vendu » de la semaine, « tout voir › ». Il n'existe qu'en
+   mode « Modifier » : la place qu'il prend ne change rien au repos. */
+.vrm-w-taille { position:relative; align-self:flex-end; margin-top:8px; z-index:3; min-height:44px; padding:0 12px; border-radius:999px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; flex-shrink:0; box-shadow:0 1px 2px rgba(0,0,0,.08), 0 4px 10px rgba(0,0,0,.06); }
 /* Sous 1024 px, moyen et grand ont la même largeur : un bouton qui ne change
    rien à l'écran ne se propose pas. */
 @media (max-width:1023px) { .vrm-w-taille { display:none; } }
