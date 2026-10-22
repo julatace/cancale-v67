@@ -11103,7 +11103,12 @@ vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
     remis en absolu (E2, 1 ❌). ⚠️ Une seule des deux gardes du clavier (ou de
     l'appui long) retirée reste VERTE : défense en profondeur, voulu.
     137 audits verts (les 5 qui montent un Postgres jetable, sans lien avec ce
-    chantier, n'ont pas été lancés).
+    chantier, n'ont pas été lancés). Bancs voisins sur ce build, un par un :
+    `journee-premium` 17, `premierjour` 86, `vendu-recu` 57, `demarrage` 12,
+    `hors-ligne` 45, `glisser-onglet` 14, `revendeurs` 196, `stock-journee` 7,
+    `emails-mis-de-cote` 52 verts ; `benefice-journee` : ses 2 mêmes rouges que
+    sur main (« éteint ⇒ plus de carte », cause dans le banc), et « CA et
+    bénéfice partagent la même carte » vert.
 
 ---
 
