@@ -29,7 +29,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
-  const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b', email: 'banc@vrm.test', totp: [] } };
+  const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: 'u1', email: 'vendeur@exemple.test', totp: [] } // l'identité que les ponts de banc déclarent };
   const ls = window.localStorage; const poserSess = () => {
     try { if (ls.getItem('vrm_acces_direct') === '1' && !ls.getItem('vrm_session')) { Storage.prototype.setItem.call(ls, 'vrm_session', JSON.stringify(SESS_BANC)); Storage.prototype.setItem.call(ls, 'vrm_local_owner', SESS_BANC.user.id); } } catch (_) {}
   };
