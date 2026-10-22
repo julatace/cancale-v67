@@ -84,7 +84,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.208.0';
+const EXT_ATTENDUE = '5.209.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -42939,7 +42939,7 @@ function LeboncoinScreen() {
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span data-compte-lbc-nom={a.id} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name || 'nom pas encore lu'}{a.type === 'pro' ? ' · pro' : a.type === 'particulier' ? ' · particulier' : ''}</span>
                   <span data-compte-lbc-annonces={nb} style={{ display: 'block', fontSize: 10.5, color: C.muted, marginTop: 1 }}>
-                    {data.lbcConnecte && String(data.lbcConnecte.id) === String(a.id) ? 'connecté en dernier · ' : ''}{nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
+                    {data.lbcConnecte && String(data.lbcConnecte.id) === String(a.id) ? 'dernier compte relevé · ' : ''}{nb} annonce{nb > 1 ? 's' : ''}{jours != null ? ` · vu ${jours === 0 ? "aujourd'hui" : `il y a ${jours} j`}` : ''}
                   </span>
                 </span>
               </div>

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.208.0';
+const CODE_VERSION = '5.209.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2074,7 +2074,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const tabId=sender?.tab?.id;
             if(sender?.frameId>0||tabId==null||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
             const avant=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{};
-            avant[tabId]={capteur:msg.capteur===true,at:Date.now()};
+            avant[tabId]={...(msg.capteur===true?avant[tabId]:{}),capteur:msg.capteur===true,at:Date.now()};
             const recent=Object.fromEntries(Object.entries(avant).sort((a,b)=>b[1].at-a[1].at).slice(0,32));
             await chrome.storage.local.set({vrmLbcTransport:recent});sendResponse({ok:true});return;
           }
@@ -2155,9 +2155,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             sendResponse({ ok: true }); return;
           }
           if (msg.action === 'lbcCapture') {
-            if (Array.isArray(msg.listings) && msg.listings.length) await storeLbcListings(msg.url, msg.listings);
-            if (msg.account && msg.account.id) await storeLbcAccount(msg.account);
-            sendResponse({ ok: true }); return;
+            // Un objet du DOM, même avec un email, ne prouve pas la session.
+            // Les listes privées passent par lbcRaw avec le compte du même document.
+            sendResponse({ok:false,raison:'source-compte-non-confirmee'});return;
           }
           if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body, msg.session); sendResponse({ ok: true }); return; }
           // LA VENTE LEBONCOIN : détail transaction / commande / livraison. On
@@ -2185,7 +2185,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'lbcSchema' && msg.endpoint && Array.isArray(msg.cles)) { await storeLbcRecon({ schemaOne: { endpoint: msg.endpoint, cles: msg.cles } }); sendResponse({ ok: true }); return; }
           // La messagerie Leboncoin : le nombre de non-lus d'un compte, et ses
           // comptes liés. Rangés dans `lbc_messages` (voir storeLbcMessages).
-          if (msg.action === 'lbcMsgCompteur' && msg.userId) { await storeLbcMessages({ compteur: { userId: String(msg.userId).slice(0, 64), unread: Number(msg.unread) } }); try { await noterSessionLbc(String(msg.userId).slice(0, 64)); } catch (_) {} sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcMsgCompteur' && msg.userId) {
+            const id=String(msg.userId).slice(0,64);if(!/^[0-9a-f-]{8,64}$/i.test(id)){sendResponse({ok:false});return;}
+            await storeLbcMessages({compteur:{userId:id,unread:Number(msg.unread)}});
+            const tabId=sender?.tab?.id;
+            const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{};
+            const avant=cartes[tabId]||{};
+            const ambigue=avant.ambigue===true||!!(avant.compte&&avant.compte!==id);
+            if(tabId!=null && !(sender?.frameId>0)){
+              cartes[tabId]={...avant,compte:ambigue?'':id,ambigue,at:Date.now()};
+              await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
+              if(!ambigue)try{await noterSessionLbc(id);}catch(_){}
+            }
+            sendResponse({ok:!ambigue});return;
+          }
           if (msg.action === 'lbcComptes' && Array.isArray(msg.comptes)) { try { await noterComptesLies(msg.comptes); } catch (_) {} await storeLbcMessages({ comptes: msg.comptes }); sendResponse({ ok: true }); return; }
           // SONDE PHOTOS (lecture seule, aucun contenu) : à quoi ressemblent les
           // vignettes acceptées + combien l'extension a posé. Sert à MESURER la
@@ -6325,7 +6338,9 @@ async function etatSite(url,tabId) {
     // choix fait dans CE Chrome (`oui` · `non` · `null` = jamais répondu).
     site = uid ? { id: String(uid), nom: (await loginDe(String(uid))) || (await loginVu(String(uid))), choix: await choixCompte(String(uid)) } : { id: null, nom: '' };
   } else if (plateforme === 'leboncoin') {
-    const c = local.vrmLbcCompte;
+    const vu=local.vrmLbcTransport?.[tabId];
+    const connu=local.vrmLbcCompte;
+    const c=vu?.compte&&!vu.ambigue?(connu?.id===vu.compte?connu:{v:2,id:vu.compte}):null;
     // 5.186 : seul un compte vu sur l'endpoint de la SESSION (`courant`, v:2)
     // nomme le compte connecté — une ancienne valeur (le dernier « moi » vu,
     // parfois un autre compte lié ou un vendeur) n'est plus montrée.
@@ -10246,6 +10261,7 @@ function detectLbcAccount(data, url) {
   // Un compte ne se reconnaît que sur un endpoint « moi » — jamais une fiche
   // d'autrui (voir le bloc ci-dessus). Sinon on ne prend rien.
   if (!LBC_URL_MOI.test(u) || LBC_URL_AUTRUI.test(u)) return null;
+  if(!LBC_URL_SESSION.test(u)&& !/\/users\/me\/linked_accounts\/?(?:\?|$)/i.test(u))return null;
   const marqueurMoi = (o) => !!(o.email || o.phone || o.phone_number || o.phoneNumber
     || o.siren || o.siret || o.is_pro != null || o.is_business_user != null || o.store_id || o.storeId || o.company_name);
   const session = LBC_URL_SESSION.test(u);

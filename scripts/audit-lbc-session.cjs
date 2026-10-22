@@ -87,6 +87,17 @@ const compteur = (env, id) => env.envoyer({ from: 'cancale-lbc', action: 'lbcMsg
 const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', comptes: [{ id: PRO, name: 'BOUTIQUEPRO', pro: true }] });
 
 (async () => {
+  await essaie('comptes ambigus et ancien compte',async()=>{
+    const env=faire();await compteur(env,PART);
+    dit(!(await env.ctx.etatSite('https://www.leboncoin.fr/',2)).site?.id,'un autre onglet ne reprend pas le dernier compte global');
+    await compteur(env,PRO);
+    const etat=await env.ctx.etatSite('https://www.leboncoin.fr/',1);
+    dit(!etat.site?.id&&etat.transport?.ambigue===true,'deux comptes dans le même onglet : aucun compte choisi');
+    const avant=env.ecrits.length;
+    await env.envoyer({from:'cancale-lbc',action:'lbcCapture',account:{id:AUTRE,name:'AUTRE',email:'a@exemple.test'},listings:[{id:'999',ref:'123',subject:'autrui'}]});
+    dit(env.ecrits.length===avant,'un compte et une annonce du DOM ne sont pas intégrés sans preuve de session');
+    dit(env.ctx.detectLbcAccount({buyer:{user_id:AUTRE,name:'Acheteur',email:'x@exemple.test'}},'https://api.leboncoin.fr/api/users/me/conversations')===null,'un acheteur avec email dans une conversation ne devient pas le compte courant');
+  });
   await essaie('écriture de session refusée puis reprise',async()=>{
     const env=faire(),original=env.ctx.supabaseUpsert;
     env.ctx.supabaseUpsert=async()=>false;
@@ -110,7 +121,7 @@ const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', c
     await lies(env);
     await relais(env, 'https://api.leboncoin.fr/api/account/v2/members/me/account', MEMBER);
     await compteur(env, PART);
-    const etat=await env.ctx.etatSite('https://www.leboncoin.fr/');
+    const etat=await env.ctx.etatSite('https://www.leboncoin.fr/',1);
     dit(etat.site && etat.site.id===PART,'la carte reconnaît la session même avant de connaître son pseudo');
     const c = env.local.vrmLbcCompte;
     dit(!!c && c.v === 2 && c.id === PART, 'le compte connecté = celui du compteur', JSON.stringify(c || null));
@@ -138,6 +149,7 @@ const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', c
     const env = faire();
     await compteur(env, PART);
     await relais(env, `https://api.leboncoin.fr/api/user-card/v2/${PART}/infos`, CARTE(PART, 'Particulier35', 'private'));
+    await env.envoyer({from:'cancale-lbc',action:'lbcTransport',capteur:false}); // nouveau document après changement de compte
     await compteur(env, PRO);
     const c = env.local.vrmLbcCompte || {};
     dit(c.id === PRO && c.name !== 'Particulier35', 'connecté sur l’autre compte : son id, pas l’ancien nom', JSON.stringify(c));
