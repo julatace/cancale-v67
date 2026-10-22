@@ -171,6 +171,12 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   const widget = (await charge('api/widget.js')).default;
   oublierAcces = (await charge('api/_lib/abonnement.js')).oublierAcces || null;
   const commeVendeur = (owner, f) => contexteVendeur.run({ owner }, f);
+  // 22 oct. — le paiement ne s'ouvre qu'avec des mentions de l'éditeur
+  // complètes (api/_lib/mentions-legales.js) : on les REMPLIT ici, avec des
+  // valeurs inventées, pour juger le reste. Le refus « mentions vides » a son
+  // propre audit (audit-mentions-paiement.cjs).
+  try { await import('file://' + path.join(RACINE, 'public', 'legal', 'editeur.js')); } catch (_) {}
+  if (globalThis.VRM_EDITEUR) for (const k of Object.keys(globalThis.VRM_EDITEUR)) globalThis.VRM_EDITEUR[k] = 'valeur d’essai ' + k;
 
   console.log('── Le webhook : seule une signature Stripe valide écrit');
   await essaie('webhook signé', async () => {
@@ -234,8 +240,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   await essaie('checkout A', async () => {
     reset();
     const r = faireRes();
-    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A', origin: 'https://site-pirate.example' }, corps: JSON.stringify({ cgv: true, owner: B, client_reference_id: B }) });
-    q.body = { cgv: true, owner: B, client_reference_id: B };
+    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A', origin: 'https://site-pirate.example' }, corps: JSON.stringify({ cgv: true, accesImmediat: true, owner: B, client_reference_id: B }) });
+    q.body = { cgv: true, accesImmediat: true, owner: B, client_reference_id: B };
     await compte(q, r);
     const s = appelsStripe.find((x) => x.chemin === 'checkout/sessions');
     const corps = decodeURIComponent((s && s.corps) || '');
@@ -270,8 +276,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   console.log('\n── Le prix facturé est celui des CGV, sinon le paiement reste fermé');
   const payer = async () => {
     const r = faireRes();
-    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' }, corps: JSON.stringify({ cgv: true }) });
-    q.body = { cgv: true };
+    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' }, corps: JSON.stringify({ cgv: true, accesImmediat: true }) });
+    q.body = { cgv: true, accesImmediat: true };
     await compte(q, r);
     return { r, session: appelsStripe.some((x) => x.chemin === 'checkout/sessions') };
   };

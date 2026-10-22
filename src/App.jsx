@@ -34,6 +34,7 @@ import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
+import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
@@ -968,7 +969,7 @@ const authConfirmFromLink = async (raw, email) => {
 // bloqué par le quota du serveur d'envoi de test de Supabase).
 const authResendConfirm = async (email) => {
   const r = await authCall(avecRetour('resend'), { type: 'signup', email: String(email).trim().toLowerCase() });
-  if (!r.ok) return { ok: false, error: mapMailError(r.error) };
+  if (!r.ok) return { ok: false, error: mapMailError(r.error), attente: delaiDemandeEmail(r.error) };
   return { ok: true };
 };
 
@@ -979,7 +980,7 @@ const authResendConfirm = async (email) => {
 // COLLER dans l'app, qui le vérifie elle-même.
 const authMagicLink = async (email) => {
   const r = await authCall(avecRetour('otp'), { email: String(email).trim().toLowerCase(), create_user: false });
-  if (!r.ok) return { ok: false, error: mapMailError(r.error) };
+  if (!r.ok) return { ok: false, error: mapMailError(r.error), attente: delaiDemandeEmail(r.error) };
   return { ok: true };
 };
 
@@ -992,9 +993,37 @@ const authMagicLink = async (email) => {
 // accès. Le vrai remède (brancher un serveur d'envoi, cf. la revue du
 // 4 octobre) est un geste du propriétaire, pas de l'utilisateur.
 const MAIL_QUOTA = "Trop d'emails envoyés en peu de temps : le serveur a atteint sa limite pour l'heure. Rien n'est perdu — réessaie dans une heure.";
+// ⚠️ 22 oct. — « FOR SECURITY PURPOSES, YOU CAN ONLY REQUEST THIS AFTER N
+//    SECONDS ». GoTrue refuse (429) un email redemandé moins d'une minute après
+//    le précédent pour la MÊME adresse. Mesuré dans ses journaux le 22 octobre :
+//    4 refus en une minute (« after 57/50/34/30 seconds ») sur une récupération
+//    de compte — le message partait tel quel, EN ANGLAIS, sur l'inscription, le
+//    renvoi de l'email, le lien de connexion et le changement d'adresse. On le
+//    traduit, et l'écran grise le bouton pendant ces N secondes.
+//    `null` = ce n'est pas ce refus-là (rien n'est deviné).
+const delaiDemandeEmail = (err) => {
+  const m = /only request this after\s+(\d{1,4})\s*seconds?/i.exec(String(err || ''));
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n > 0 && n <= 3600 ? n : null;
+};
+const texteDelaiEmail = (n) => `Par sécurité, un nouvel email ne peut partir que dans ${n} seconde${n > 1 ? 's' : ''}. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.`;
 const mapMailError = (err) => {
+  const n = delaiDemandeEmail(err);
+  if (n) return texteDelaiEmail(n);
   if (/rate limit/i.test(err || '')) return MAIL_QUOTA;
   return err;
+};
+// Les secondes qui restent avant `fin` (ms), et un rendu par seconde tant qu'il
+// en reste. 0 = plus d'attente.
+const useSecondesRestantes = (fin) => {
+  const [, tic] = React.useState(0);
+  React.useEffect(() => {
+    if (!(fin > Date.now())) return undefined;
+    const t = setInterval(() => { tic((x) => x + 1); if (Date.now() >= fin) clearInterval(t); }, 1000);
+    return () => clearInterval(t);
+  }, [fin]);
+  return fin > Date.now() ? Math.ceil((fin - Date.now()) / 1000) : 0;
 };
 const authSignUp  = async (email, password) => {
   const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password });
@@ -1004,6 +1033,8 @@ const authSignUp  = async (email, password) => {
     // exceeded » ne veut rien dire pour quelqu'un qui essaie juste de créer un
     // compte, alors que la cause est précise et la solution simple.
     let msg = r.error;
+    const attente = delaiDemandeEmail(r.error);
+    if (attente) return { ok: false, error: texteDelaiEmail(attente), attente };
     if (/already registered/i.test(r.error)) msg = 'Un compte existe déjà avec cet email.';
     else if (/rate limit/i.test(r.error)) msg = MAIL_QUOTA;
     else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse email est refusée par le serveur.';
@@ -1170,7 +1201,7 @@ const authSetEmail = async (email) => {
       body: JSON.stringify({ email: String(email).trim().toLowerCase() }),
     });
     const j = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: mapMailError(j.msg || j.message || `Erreur ${res.status}`) };
+    if (!res.ok) { const brut = j.msg || j.message || `Erreur ${res.status}`; return { ok: false, error: mapMailError(brut), attente: delaiDemandeEmail(brut) }; }
     return { ok: true };
   } catch (_) { return { ok: false, error: 'Pas de connexion internet.' }; }
 };
@@ -3110,6 +3141,11 @@ const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinatai
 const TRACK_AVAILABLE_RE = /disponible|à\s*retirer|arriv[ée]\s+(?:dans|en|au)\s+point|pr[êe]t.*retrait|vous\s+attend/i;
 const reclassifyTrack = (d) => {
   if(!d)return d;
+  // 22 oct. — le code de retrait « … suivant au commerçant : 123456 » d'une
+  // ligne DÉJÀ rangée (la route ne le lisait pas ; cette ligne ne sera jamais
+  // réécrite) : relu dans `extraitCode` avec la règle de la route (§11). Rien
+  // d'autre n'est deviné : sans la tournure exacte, le code reste vide.
+  if(!codeRetrait(d.code)&&d.extraitCode){const c=codeRetraitTournure(d.extraitCode);if(c)d={...d,code:c};}
   const etat=etatColisDepuisTexte(d.subject||d.sujet||'',d.statusLabel||'');
   if(etat==='delivered')return {...d,status:'delivered',statusLabel:'Livré / retiré'};
   if(etat==='available'&&d.status!=='delivered'&&normaliserSuivi(d.suivi))return {...d,status:'available',statusLabel:'Arrivé au point de retrait'};
@@ -11660,6 +11696,13 @@ function AuthScreen() {
   const [info, setInfo] = React.useState('');
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
   const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
+  // 22 oct. : GoTrue a refusé un email redemandé trop tôt (« after N seconds »)
+  // ⇒ les boutons qui envoient un email restent grisés jusqu'à `finAttente`, et
+  // la phrase dit le temps qui reste. Une autre adresse tapée remet à zéro.
+  const [finAttente, setFinAttente] = React.useState(0);
+  const resteAttente = useSecondesRestantes(finAttente);
+  const enAttenteEmail = resteAttente > 0;
+  const attendreEmail = (r) => { if (r && r.attente) { setFinAttente(Date.now() + r.attente * 1000); setErr(''); return true; } return false; };
   const captcha = useCaptcha();
   // Sans jeton anti-robot, les appels protégés ne partent pas : le bouton le DIT.
   const attendCaptcha = captchaActif() && mode !== 'newpw' && captcha.statut !== 'pret';
@@ -11674,6 +11717,7 @@ function AuthScreen() {
   const submit = async (e) => {
     e && e.preventDefault();
     if(busy)return;
+    if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
     setErr(''); setInfo('');
     if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
     if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
@@ -11688,6 +11732,7 @@ function AuthScreen() {
       } else if (mode === 'reset') {
         const rr = await authReset(email);
         if (rr && rr.captcha) { setErr(rr.error); return; }
+        if (rr && !rr.ok && attendreEmail({ attente: delaiDemandeEmail(rr.error) })) return;
         if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un email, utilise le lien le plus récent.');return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
@@ -11698,7 +11743,7 @@ function AuthScreen() {
         // on n'invente pas un prénom vide (§5 : mieux vaut un blanc qu'un faux).
         try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
-        if (!r.ok) { if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
+        if (!r.ok) { if(attendreEmail(r)){} else if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
         else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton email, puis connecte-toi ici : inutile de quitter cette page.'); }
         else location.reload();
       } else {
@@ -11843,7 +11888,7 @@ function AuthScreen() {
           )}
           {mode!=='newpw' && (
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-              value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');}} style={{...field, marginBottom:9}}/>
+              value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={{...field, marginBottom:9}}/>
           )}
           {mode!=='reset' && (
             <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
@@ -11853,6 +11898,7 @@ function AuthScreen() {
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div role="alert" style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {enAttenteEmail && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{texteDelaiEmail(resteAttente)}</div>}
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
@@ -11875,18 +11921,18 @@ function AuthScreen() {
                     fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
                   Confirmer avec ce lien
                 </button>
-                <button type="button" disabled={busy}
+                <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
                   onClick={async()=>{ setBusy(true); const r=await authResendConfirm(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else setErr(r.error); }}
+                    if(r.ok){ setErr(''); setInfo('Nouvel email envoyé — utilise le plus récent.'); } else if(!attendreEmail(r)) setErr(r.error); }}
                   style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
-                    borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                  Renvoyer l'email
+                    borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
+                  {enAttenteEmail ? `Renvoyer dans ${resteAttente} s` : "Renvoyer l'email"}
                 </button>
-                <button type="button" disabled={busy}
+                <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
                   onClick={async()=>{ setBusy(true); const r=await authMagicLink(email); setBusy(false);
-                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le mail, copie le lien, colle-le ci-dessus : ça confirme ton compte ET te connecte."); } else setErr(r.error); }}
+                    if(r.ok){ setErr(''); setInfo("Lien de connexion envoyé. Ouvre le mail, copie le lien, colle-le ci-dessus : ça confirme ton compte ET te connecte."); } else if(!attendreEmail(r)) setErr(r.error); }}
                   style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
-                    borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    borderRadius:8,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
                   Recevoir un lien de connexion
                 </button>
               </div>
@@ -11895,10 +11941,13 @@ function AuthScreen() {
           {info && <div role="status" aria-live="polite" style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
           {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Le lien ne s’ouvre pas dans Safari ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
-          <button type="submit" data-auth-valider="" disabled={busy||attendCaptcha} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
-            borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:(busy||attendCaptcha)?'default':'pointer',opacity:(busy||attendCaptcha)?0.6:1,fontFamily:'inherit'}}>
-            {busy ? '…' : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
-          </button>
+          {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
+              mot de passe) — jamais sur « Se connecter ». */}
+          {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
+          <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
+            borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
+            {busy ? '…' : (enAttenteEmail && (mode==='up'||mode==='reset')) ? `Réessaie dans ${resteAttente} s` : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
+          </button>);})()}
           {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
               C. civ., RGPD art. 13 : l'information est donnée au moment de la
               collecte). */}
@@ -43118,6 +43167,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const [acct, setAcct] = React.useState(null);   // { mode:'email'|'pw'|'out', val, err, busy }
   // Fenêtre d'action sur le compte (email / mot de passe / déconnexion).
   const AcctSheet = () => {
+    // 22 oct. : un changement d'adresse redemandé trop tôt (« after N seconds »)
+    // grise « Enregistrer » le temps qui reste, et la phrase le dit en français.
+    const resteEmail = useSecondesRestantes((acct && acct.finAttente) || 0);
     if (!acct) return null;
     const M = acct.mode;
     const titre = M==='email' ? 'Changer mon email' : M==='pw' ? 'Changer mon mot de passe' : 'Se déconnecter';
@@ -43135,8 +43187,9 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         return;
       }
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(acct.val.trim())) { setAcct(a=>({...a,busy:false,err:'Adresse email invalide.'})); return; }
+      if (resteEmail > 0) { setAcct(a=>({...a,busy:false})); return; }
       const r = await authSetEmail(acct.val);
-      if (!r.ok) { setAcct(a=>({...a,busy:false,err:r.error})); return; }
+      if (!r.ok) { setAcct(a=>({...a,busy:false,err:r.attente?'':r.error,finAttente:r.attente?Date.now()+r.attente*1000:0})); return; }
       close(); toast("✓ Demande envoyée — ouvre le lien reçu pour valider la nouvelle adresse");
     };
     // ⚠️ 30 sept. (Julien) : « le bouton Se déconnecter est trop bas, la barre
@@ -43163,12 +43216,13 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
               style={{width:'100%',boxSizing:'border-box',marginTop:12,border:`1px solid ${acct.err?C.danger:C.border}`,borderRadius:10,padding:'13px 14px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
           )}
           {acct.err && <div style={{fontSize:12.5,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
+          {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:12.5,color:C.text,marginTop:8,lineHeight:1.4}}>{texteDelaiEmail(resteEmail)}</div>}
           <div style={{display:'flex',gap:9,marginTop:14}}>
             <button type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-            <button type="button" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim())}
+            <button type="button" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
               style={{flex:2,border:'none',background:M==='out'?C.danger:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,
-                cursor:(acct.busy||(M!=='out'&&!acct.val.trim()))?'default':'pointer',opacity:(acct.busy||(M!=='out'&&!acct.val.trim()))?0.5:1,fontFamily:'inherit'}}>
-              {acct.busy ? '…' : M==='out' ? 'Se déconnecter' : 'Enregistrer'}
+                cursor:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?'default':'pointer',opacity:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1,fontFamily:'inherit'}}>
+              {acct.busy ? '…' : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
             </button>
           </div>
         </div>
@@ -43920,16 +43974,33 @@ function LigneContact() {
 // le serveur la redemande (`cgv: true`) et date l'acceptation. Elle ne dépend
 // plus d'un réglage du tableau de bord de Stripe. Une seule case pour les deux
 // écrans qui vendent l'abonnement (§11).
-function CaseCgv({ coche, onChange }) {
-  return (
-    <label data-case-cgv={coche ? 'cochee' : 'vide'} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, marginTop: 10, lineHeight: 1.45, cursor: 'pointer' }}>
-      <input type="checkbox" checked={!!coche} onChange={(ev) => onChange(ev.target.checked)} style={{ marginTop: 2, width: 16, height: 16, flex: '0 0 auto' }}/>
+// 22 oct. — À CÔTÉ, LA DEMANDE D'ACCÈS IMMÉDIAT (art. L221-25 C. conso) : sans
+// elle, un abonné qui se rétracte dans les 14 jours est remboursé en entier,
+// même s'il a utilisé VRM. Envoyée et rangée comme les CGV (`accesImmediat:
+// true`, datée par le serveur). ⚠️ Ce n'est PAS une renonciation au droit de
+// rétractation (impossible pour un abonnement qui n'est pas entièrement exécuté
+// en 14 jours, L221-28 1°) : le droit reste, au prorata — article 5 des CGV.
+// `cases` = { cgv, acces } ; « S'abonner » exige les deux (`casesCgvCochees`).
+const casesCgvCochees = (c) => !!(c && c.cgv && c.acces);
+function CaseCgv({ cases, onChange }) {
+  const c = cases || {};
+  const pose = (k) => (ev) => onChange({ ...c, [k]: ev.target.checked });
+  const ligne = { display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.text, marginTop: 10, lineHeight: 1.45, cursor: 'pointer' };
+  const boite = { marginTop: 2, width: 16, height: 16, flex: '0 0 auto' };
+  return (<>
+    <label data-case-cgv={c.cgv ? 'cochee' : 'vide'} style={ligne}>
+      <input type="checkbox" checked={!!c.cgv} onChange={pose('cgv')} style={boite}/>
       <span>J'accepte les <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.text }}>conditions générales de vente</a> de VRM.</span>
     </label>
-  );
+    <label data-case-acces-immediat={c.acces ? 'cochee' : 'vide'} style={ligne}>
+      <input type="checkbox" checked={!!c.acces} onChange={pose('acces')} style={boite}/>
+      <span>Je demande l'accès immédiat, avant la fin des 14 jours de rétractation : si je me rétracte ensuite, seule la période déjà écoulée reste due (<a href="/legal/retractation.html" target="_blank" rel="noopener noreferrer" style={{ color: C.text }}>formulaire de rétractation</a>).</span>
+    </label>
+  </>);
 }
 function MonAbonnement() {
-  const [cgv, setCgv] = React.useState(false);
+  const [cases, setCases] = React.useState({ cgv: false, acces: false });
+  const cgv = casesCgvCochees(cases);
   const [e, setE] = React.useState(undefined);
   const [fx, setFx] = React.useState(undefined);
   const [occupe, setOccupe] = React.useState('');
@@ -43951,9 +44022,9 @@ function MonAbonnement() {
     return () => { mort = true; };
   }, []);
   const agir = async (mode) => {
-    if (mode === 'checkout' && !cgv) { setMsg("Coche « J'accepte les conditions générales de vente » avant de payer."); return; }
+    if (mode === 'checkout' && !cgv) { setMsg("Coche les deux cases (conditions de vente et accès immédiat) avant de payer."); return; }
     setOccupe(mode); setMsg('');
-    const m = await ouvrirStripe(mode, mode === 'checkout' ? { cgv: true } : null);
+    const m = await ouvrirStripe(mode, mode === 'checkout' ? { cgv: true, accesImmediat: true } : null);
     if (m) { setMsg(m); setOccupe(''); }
   };
   const resilierOuReprendre = async (reprendre) => {
@@ -43989,9 +44060,21 @@ function MonAbonnement() {
   //    « 0,00 € » pour un prix sans montant fixe — juste quand il doit voir son
   //    erreur dans Stripe (revue du 11 octobre).
   const prixAcorriger = e.proprietaire && e.prixConforme === false && e.prixStripe;
+  // 22 oct. — les mentions de l'éditeur vides ferment le paiement (api/compte.js,
+  // 503 `mentions-legales`) : la liste de ce qui manque n'arrive qu'au
+  // propriétaire, avec le geste. Pas su (`null`) : dit tel quel, jamais « ok ».
+  const mentionsAremplir = e.proprietaire && e.mentionsCompletes === false && Array.isArray(e.mentionsManquantes) && e.mentionsManquantes.length ? e.mentionsManquantes : null;
   const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
   if (e.proprietaire) return (
     <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div>
+      {mentionsAremplir && (
+        <div data-mentions-manquantes={mentionsAremplir.length} style={{ fontSize: 12.5, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
+          Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
+        </div>
+      )}
+      {e.proprietaire && e.mentionsCompletes === null && (
+        <div data-mentions-manquantes="pas-su" style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Je n'ai pas pu relire les mentions légales : le paiement reste fermé tant qu'elles ne sont pas lisibles.</div>
+      )}
       {prixAcorriger && (
         <div data-prix-stripe="different" style={{ fontSize: 12.5, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
           Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
@@ -44056,8 +44139,8 @@ function MonAbonnement() {
   // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
   // ⚠️ Un ANCIEN abonné garde ses factures (sa compta) : cette branche les rend
   //    comme celle du dessous — elle les perdait (revue du 11 octobre).
-  if (e.prixConforme === false) return (<>
-    <div style={carte} data-abonnement="non-branche" data-raison="prix">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
+  if (e.prixConforme === false || e.mentionsCompletes === false) return (<>
+    <div style={carte} data-abonnement="non-branche" data-raison={e.prixConforme === false ? 'prix' : 'mentions'}>{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
     {listeFactures}
   </>);
   return (<>
@@ -44069,7 +44152,7 @@ function MonAbonnement() {
       </div>
       {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
       {test}
-      <CaseCgv coche={cgv} onChange={setCgv}/>
+      <CaseCgv cases={cases} onChange={setCases}/>
       <button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} style={{ ...bouton(true), opacity: cgv ? 1 : 0.5 }}>{occupe ? 'Ouverture…' : "S'abonner"}</button>
       <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>
       {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
@@ -44170,13 +44253,16 @@ function AbonnementRequis({ info }) {
   //    menait au refus. Un impayé, lui, garde « Mettre à jour ma carte » (son
   //    abonnement existe : rien à voir avec le prix de l'offre).
   //    « Pas su » (`info` pas encore lu, `prixConforme: null`) ne ferme rien.
-  const paiementFerme = !impaye && !!info && (info.prixConforme === false || info.configure === false);
-  const [cgv, setCgv] = React.useState(false);
+  // 22 oct. — et les mentions légales vides (`mentionsCompletes: false`) : même
+  //    fermeture, même phrase générique (le détail n'est dit qu'au propriétaire).
+  const paiementFerme = !impaye && !!info && (info.prixConforme === false || info.configure === false || info.mentionsCompletes === false);
+  const [cases, setCases] = React.useState({ cgv: false, acces: false });
+  const cgv = casesCgvCochees(cases);
   const agir = async () => {
     if (paiementFerme) return;
-    if (!impaye && !cgv) { setMsg("Coche « J'accepte les conditions générales de vente » avant de payer."); return; }
+    if (!impaye && !cgv) { setMsg("Coche les deux cases (conditions de vente et accès immédiat) avant de payer."); return; }
     setOccupe(true); setMsg('');
-    const m = await ouvrirStripe(impaye ? 'portail' : 'checkout', impaye ? null : { cgv: true });
+    const m = await ouvrirStripe(impaye ? 'portail' : 'checkout', impaye ? null : { cgv: true, accesImmediat: true });
     if (m) { setMsg(m); setOccupe(false); }
   };
   return (
@@ -44192,7 +44278,7 @@ function AbonnementRequis({ info }) {
               : `${prixLisible(info && info.prix)}, sans engagement, résiliable à tout moment. Tes données sont intactes : elles t'attendent dès que l'abonnement est actif.`}
         </div>
         {!paiementFerme && info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
-        {!impaye && !paiementFerme && <CaseCgv coche={cgv} onChange={setCgv}/>}
+        {!impaye && !paiementFerme && <CaseCgv cases={cases} onChange={setCases}/>}
         {!paiementFerme && (
           <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} style={{ marginTop: 18, width: '100%', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: (!impaye && !cgv) ? 0.5 : 1 }}>
             {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : "S'abonner")}
