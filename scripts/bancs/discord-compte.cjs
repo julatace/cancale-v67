@@ -102,6 +102,7 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
       return json(undefined, 204);
     }
   }
+  if (cible.startsWith('vinted_accounts') && /owner\.neq\./.test(u))return json([]);
   if (cible.startsWith('vinted_accounts')) return json(uid ? [{ vinted_user_id: '1' + uid.slice(0, 3), login: 'compte', owner: uid }] : []);
   return json([], 200, { 'content-range': '0-0/0' });
 }
@@ -130,7 +131,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   const appels = [];
   await pg.addInitScript(({ s, sombre, ticket }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_reglages_vue', 'compte'); } catch (_) {}
-    try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
+    try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner',s.user.id); } catch (_) {}
     try { if (ticket && !sessionStorage.getItem('banc_ticket_pose')) { sessionStorage.setItem('banc_ticket_pose', '1'); localStorage.setItem('vrm_discord_ticket', JSON.stringify({ t: ticket, ou: 'compte', at: Date.now() })); } } catch (_) {}
   }, { s: session(qui), sombre, ticket });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
@@ -145,7 +146,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
-    if (u.pathname === '/api/compte' && ['communaute', 'abonnement', 'discord-debut', 'discord-attente'].includes(mode)) {
+    if (u.pathname === '/api/compte' && ['communaute', 'abonnement', 'discord-debut', 'discord-attente', 'confidentialite'].includes(mode)) {
       let corps = null; try { corps = rq.postData() ? JSON.parse(rq.postData()) : null; } catch (_) {}
       if (mode === 'discord-debut') appels.push('debut:' + JSON.stringify(corps));
       if (mode === 'discord-attente') appels.push('attente:' + JSON.stringify(corps));
@@ -266,7 +267,7 @@ const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const e = document.queryS
         await o.pg.waitForSelector('[data-discord-compte="relie"]', { timeout: 10000 }).catch(() => {});
         const ligne = B.lignes[A] && B.lignes[A].vrm_discord;
         dit(!!ligne && ligne.discord === 'alice.discord' && ligne.verifie === true, 'le bon code (même tapé avec une espace) : Discord est relié au compte', JSON.stringify(ligne || null) + ' · ' + o.pg.url() + ' · ' + o.appels.filter((x) => x.startsWith('NAV')).slice(-2).join(' ').slice(-190));
-        dit(!(B.lignes[A] && B.lignes[A].discord_attente), 'la preuve en attente est effacée (une seule fois)');
+        dit(!Object.keys(B.lignes['00000000-0000-0000-0000-000000000000']||{}).some(k=>k.startsWith('discord_attente_')), 'la preuve en attente privée est effacée (une seule fois)');
         dit(!(await o.pg.$('[data-discord-demande-code]')), 'la feuille est partie');
         await o.ctx.close();
       });

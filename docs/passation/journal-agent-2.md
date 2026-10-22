@@ -611,3 +611,13 @@ Corrections : pagination du registre email (plafonds bas, frontières exactes HT
 Avant 2 000 utilisateurs : preuve de possession des adresses de réception supplémentaires, attribution historique, deux sessions réelles, quotas et débit Gmail/Vercel/Supabase, sauvegarde/restauration et supervision restent à vérifier. Ne pas transformer une simulation en certification de capacité.
 
 Bilan final local : les 141 scripts d’audit existants sont validés après correction des simulations ; les cinq audits SQL initialement bloqués sont exécutés sur PostgreSQL 17.11 jetable. Le nouveau banc SQL de confidentialité ajoute un 142e audit validé (45 contrôles). Renumérotation historique : 126 contrôles réussis après relance sans la limite initiale de 120 s. Aucun test de production chargé en données n’a été lancé. PR638 ouverte et attachée.
+
+## 22 octobre — profils Discord, photo facultative et classement
+
+PR639 est fusionnée : récupération autonome sur `/recuperation.html` et inscription avec confirmation claire. Le script de configuration Supabase est préparé, mais les réglages distants SMTP/redirects ne sont PAS appliqués faute d'accès administrateur. Ne pas annoncer l'expéditeur personnalisé comme configuré.
+
+Carte : avatars Discord provenant d'une preuve OAuth signée, puis liés au PID renvoyé par la base. Aucune URL arbitraire ni owner navigateur accepté. Les preuves de liaison mobile sont privées, bornées à une par vendeur et expirantes. Le classement affiche une position personnelle, un podium compact et une liste, sans montants financiers.
+
+Photo VRM facultative : recadrage local PNG, limites de taille, stockage privé inaccessible au client SQL, quota atomique partagé entre instances. Publication uniquement sur choix explicite et présence volontaire sur la carte. URL publique signée expirante, cache 60 secondes ; retrait interdit les prochaines lectures mais ne peut reprendre les copies téléchargées. Suppression de compte : effacement des trois enregistrements privés exacts du vendeur avant suppression de sa connexion, échec signalé sans fausse réussite.
+
+Validation locale : 130 tests unitaires, build, OAuth 32 contrôles, fermeture 32 contrôles, parcours Discord navigateur 45 contrôles, audit sans bruit 44 et en-têtes 10 ; ajout/partage/retrait de photo vérifiés dans Chromium 390 px. Aucun envoi de mail ni connexion Discord réelle ni donnée ajoutée en production. Les limites de préparation à 2 000 utilisateurs citées ci-dessus restent ouvertes ; ces tests ne certifient pas la capacité de production.

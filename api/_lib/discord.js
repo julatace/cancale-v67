@@ -14,6 +14,8 @@
 // secret Discord (serveur seulement, jamais envoyé au navigateur).
 // Sans `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` : « pas configuré », dit.
 import crypto from 'node:crypto';
+import {PROPRIETAIRE_NEUTRE} from './proprietaire-email.js';
+import {signerIdentiteDiscord,lireIdentiteDiscord} from './avatar-discord.js';
 
 export const DISCORD_REDIRECT = 'https://vrm.center/api/compte?mode=discord';
 const ID = () => String(process.env.DISCORD_CLIENT_ID || '').trim();
@@ -78,6 +80,7 @@ export function signerPreuve(owner, pseudo, maintenant = Date.now()) {
   return ts + '.' + mac('preuve', String(owner).toLowerCase(), pseudo, ts);
 }
 export function lirePreuve(preuve, owner, pseudo, maintenant = Date.now()) {
+  if(lireIdentiteDiscord(preuve,owner,pseudo,maintenant))return true;
   const m = /^([0-9a-z]{6,12})\.([0-9a-f]{40})$/.exec(String(preuve || ''));
   if (!m || !SECRET()) return false;
   const age = maintenant - parseInt(m[1], 36);
@@ -123,15 +126,15 @@ export async function retourDiscord(req, res, f = fetch) {
   if (!/^[A-Za-z0-9_-]{10,100}$/.test(code)) return versApp(res, 'discord-erreur=lien', ou);
   try {
     const t = await f('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: ID(), client_secret: SECRET(), grant_type: 'authorization_code', code, redirect_uri: DISCORD_REDIRECT }).toString() });
+      signal:AbortSignal.timeout(10000), body: new URLSearchParams({ client_id: ID(), client_secret: SECRET(), grant_type: 'authorization_code', code, redirect_uri: DISCORD_REDIRECT }).toString() });
     const jt = await t.json().catch(() => null);
     if (!t.ok || !jt || typeof jt.access_token !== 'string') return versApp(res, 'discord-erreur=discord', ou);
-    const u = await f('https://discord.com/api/users/@me', { headers: { Authorization: 'Bearer ' + jt.access_token } });
+    const u = await f('https://discord.com/api/users/@me', { signal:AbortSignal.timeout(10000), headers: { Authorization: 'Bearer ' + jt.access_token } });
     const ju = await u.json().catch(() => null);
     if (!u.ok || !ju) return versApp(res, 'discord-erreur=discord', ou);
     const pseudo = pseudoDiscordDe(ju);
     if (!pseudo) return versApp(res, 'discord-erreur=ancien', ou);
-    const frag = 'discord=' + encodeURIComponent(pseudo) + '&preuve=' + encodeURIComponent(signerPreuve(owner, pseudo));
+    const frag = 'discord=' + encodeURIComponent(pseudo) + '&preuve=' + encodeURIComponent(signerIdentiteDiscord(owner,pseudo,ju)||signerPreuve(owner, pseudo));
     if (etat.memeNavigateur) return versApp(res, frag, ou);
     // Autre navigateur (téléphone : app Discord → Safari) : rangé pour l'app qui a lancé.
     // ⚠️ 21 oct. (revue de sécurité) : sans le cookie, RIEN ne prouve que ce
@@ -143,7 +146,7 @@ export async function retourDiscord(req, res, f = fetch) {
     // Et la page ne porte plus la preuve quand elle est rangée (elle aurait
     // dispensé du code).
     const codeMontre = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
-    const range = await rangerAttente(owner, etat.ticket, pseudo, ou, f, codeMontre);
+    const range = await rangerAttente(owner, etat.ticket, pseudo, ou, f, codeMontre, ju);
     return pageAilleurs(res, range, frag, ou, codeMontre);
   } catch (_) { return versApp(res, 'discord-erreur=discord', ou); }
 }
@@ -152,19 +155,20 @@ export async function retourDiscord(req, res, f = fetch) {
 const SB_URL = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SERVICE = () => String(process.env.SUPABASE_SERVICE_KEY || '');
 export const DISCORD_ATTENTE_ID = 'discord_attente';
+export const idAttenteDiscord=(owner,ticket)=>DISCORD_ATTENTE_ID+'_'+crypto.createHash('sha256').update(String(owner)).digest('hex');
 const empreinte = (t) => crypto.createHash('sha256').update('vrm-discord-ticket|' + String(t)).digest('hex');
 const empreinteCode = (t, c) => crypto.createHash('sha256').update('vrm-discord-code|' + String(t) + '|' + String(c)).digest('hex');
 export const ESSAIS_CODE = 5;
 const CODE_RE = /^\d{6}$/;
 const enTetesService = () => { const k = SERVICE(); return k.startsWith('eyJ') ? { apikey: k, Authorization: 'Bearer ' + k } : { apikey: k }; };
 
-export async function rangerAttente(owner, ticket, pseudo, ou, f = fetch, code = '') {
+export async function rangerAttente(owner, ticket, pseudo, ou, f = fetch, code = '', identite = null) {
   if (!SERVICE() || !UUID_RE.test(String(owner)) || !NONCE_RE.test(String(ticket)) || !CODE_RE.test(String(code))) return false;
   try {
     const r = await f(SB_URL() + '/rest/v1/app_data?on_conflict=owner,id', {
       method: 'POST',
       headers: { ...enTetesService(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([{ owner, id: DISCORD_ATTENTE_ID, data: { v: 2, h: empreinte(ticket), c: empreinteCode(ticket, code), essais: 0, discord: pseudo, preuve: signerPreuve(owner, pseudo), ou, at: new Date().toISOString() } }]),
+      body: JSON.stringify([{ owner:PROPRIETAIRE_NEUTRE, id: idAttenteDiscord(owner,ticket), data: { v: 2, h: empreinte(ticket), c: empreinteCode(ticket, code), essais: 0, discord: pseudo, preuve: signerIdentiteDiscord(owner,pseudo,identite)||signerPreuve(owner, pseudo), ou, at: new Date().toISOString() } }]),
     });
     return !!(r && r.ok);
   } catch (_) { return false; }
@@ -180,14 +184,14 @@ export async function attenteDiscord(req, res, utilisateur, corps, f = fetch, ma
   if (!UUID_RE.test(owner)) return res.status(400).json({ ok: false, erreur: 'session' });
   let rows;
   try {
-    const r = await f(SB_URL() + '/rest/v1/app_data?id=eq.' + DISCORD_ATTENTE_ID + '&owner=eq.' + owner + '&select=data', { headers: enTetesService() });
+    const r = await f(SB_URL() + '/rest/v1/app_data?id=eq.' + idAttenteDiscord(owner,ticket) + '&owner=eq.' + PROPRIETAIRE_NEUTRE + '&select=data', { headers: enTetesService() });
     if (!r || !r.ok) return res.status(503).json({ ok: false, erreur: 'pas-su' });
     rows = await r.json();
   } catch (_) { return res.status(503).json({ ok: false, erreur: 'pas-su' }); }
   const d = Array.isArray(rows) && rows[0] && rows[0].data;
   const age = d ? maintenant - Date.parse(d.at || '') : NaN;
   if (!d || !egal(String(d.h || ''), empreinte(ticket)) || !(age >= -60000 && age <= VALIDITE_MS) || typeof d.c !== 'string') return res.status(200).json({ ok: true, pret: false });
-  const ligne = SB_URL() + '/rest/v1/app_data?id=eq.' + DISCORD_ATTENTE_ID + '&owner=eq.' + owner;
+  const ligne = SB_URL() + '/rest/v1/app_data?id=eq.' + idAttenteDiscord(owner,ticket) + '&owner=eq.' + PROPRIETAIRE_NEUTRE;
   const effacer = async () => { try { await f(ligne, { method: 'DELETE', headers: { ...enTetesService(), Prefer: 'return=minimal' } }); } catch (_) {} };
   // Le code montré dans l'autre navigateur : sans lui, la preuve ne sort pas.
   const code = String((corps && corps.code) || '').replace(/\D/g, '');

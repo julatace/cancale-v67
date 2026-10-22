@@ -186,7 +186,10 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     dit(!base.utilisateurs.has(A), 'son compte de connexion est supprimé, EN DERNIER');
     dit(intactB(), 'l’autre vendeur est INTACT (lignes, comptes Vinted, compteurs, photos, compte, abonnement)');
     const rest = deletes.filter((x) => x.includes('/rest/v1/'));
-    dit(rest.length === 3 && rest.every((x) => new RegExp(`/rest/v1/(app_data|vinted_accounts|detourage_usage)\\?owner=eq\\.${A}$`).test(x)), 'chaque suppression porte owner=eq.<lui> et RIEN d’autre', rest.map((x) => x.split('/rest/v1/')[1]).join(' · '));
+    const { lignesPriveesProfil } = await import('../api/_lib/profil-avatar.js');
+    const prive = '/rest/v1/app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=in.(' + lignesPriveesProfil(A).join(',') + ')';
+    const ordinaires = rest.filter(x => !x.endsWith(prive));
+    dit(rest.length === 4 && rest.filter(x => x.endsWith(prive)).length === 1 && ordinaires.length === 3 && ordinaires.every(x => ['/rest/v1/app_data?owner=eq.'+A,'/rest/v1/vinted_accounts?owner=eq.'+A,'/rest/v1/detourage_usage?owner=eq.'+A].some(fin=>x.endsWith(fin))), 'suppression limitée au vendeur et à ses trois enregistrements privés exacts', rest.map(x=>x.split('/rest/v1/')[1]).join(' · '));
     const ordre = deletes.map((x) => x.includes('admin/users') ? 'auth' : x.startsWith('stockage') ? 'photos' : x.startsWith('equipe') ? 'equipe' : x.startsWith('communaute') ? 'communaute' : x.split('/rest/v1/')[1].split('?')[0]);
     dit(ordre[ordre.length - 1] === 'auth' && ordre.indexOf('app_data') < ordre.indexOf('auth'), 'ordre : données, puis comptes, puis photos, puis le compte de connexion', ordre.join(' → '));
     const res = appelsStripe.find((x) => x.m === 'POST');
