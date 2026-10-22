@@ -4785,10 +4785,15 @@ const TAUX_URSSAF_DEFAUT = 13.5;
 // Le taux est un RÉGLAGE, pas une constante : il dépend de l'activité et de
 // l'option pour le versement libératoire, et lui seul connaît le sien. On garde
 // 13,5 % par défaut pour ne rien changer en silence à ce qu'il voyait avant.
-const tauxUrssaf = () => {
-  const v = parseFloat(String(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)).replace(',', '.'));
+// (22 oct.) La règle de lecture est À PART de la lecture du navigateur : le
+// rappel URSSAF du serveur (api/ship-reminders.js) lit le MÊME réglage dans la
+// ligne `main` et passe par la même règle (`tauxDe`, recopiée dans
+// api/_lib/urssaf-regle.js, jugée identique par audit-rappel-urssaf.cjs).
+const tauxDe = (brut) => {
+  const v = parseFloat(String(brut == null ? TAUX_URSSAF_DEFAUT : brut).replace(',', '.'));
   return (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT;
 };
+const tauxUrssaf = () => tauxDe(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT));
 // À payer à l'URSSAF, arrondi UNE fois au centime (en centimes entiers), et le
 // net qui s'en DÉDUIT. Vu au banc le 5 octobre sur ses vraies données : CA
 // 157,00 €, « à payer 21,20 € », « net 135,81 € » — 157 × 13,5 % = 21,195,
@@ -4813,23 +4818,43 @@ const aPayerUrssaf = (ca, tauxPct = tauxUrssaf()) => {
 // ligne PUBLIÉE (`vinted_urssaf_mois`) — absente : aucun montant, jamais 0 ;
 // des ventes sans date de versement : « au moins » (§5).
 // Rend null (rien à rappeler) ou { text, sub, label, dueIso, daysLeft, ca, apayer, partiel }.
+// Les mois (AAAA-MM) d'une période d'échéance — une règle pour le rappel, la
+// carte de Comptabilité et le serveur (§11).
+const moisPeriodeUrssaf = (due) => {
+  const yms = [];
+  if (!due) return yms;
+  for (let d = new Date(due.periodStart.getFullYear(), due.periodStart.getMonth(), 1); d <= due.periodEnd; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    yms.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return yms;
+};
+// Le montant d'une période d'échéance, lu dans la ligne PUBLIÉE par l'écran
+// Ventes (`vinted_urssaf_mois`) — une règle pour le rappel (Ma journée, la
+// notification du 1er) et la carte « Prochaine déclaration » de Comptabilité.
+// Sans ligne : aucun montant (jamais 0). « Au moins » quand des ventes n'ont pas
+// de date de versement, ET (22 oct.) quand la ligne a été publiée AVANT la fin
+// de la période : elle ne peut pas porter les ventes versées depuis — c'est le
+// cas de la notification du 1er si Ventes n'a pas été rouvert depuis la fin du
+// mois. Date de publication illisible ⇒ pas su ⇒ « au moins » (§5 : jamais un
+// total partiel présenté comme complet).
+const montantPeriodeUrssaf = (due, ligne, taux) => {
+  if (!due || !ligne || !Array.isArray(ligne.mois)) return { ca: null, apayer: null, partiel: false };
+  const yms = moisPeriodeUrssaf(due);
+  const ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
+  const atPub = typeof ligne.at === 'number' ? ligne.at : Date.parse(ligne.at || '');
+  const finPeriode = new Date(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1).getTime();
+  const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !(atPub >= finPeriode);
+  return { ca, apayer: aPayerUrssaf(ca, taux), partiel };
+};
 const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, taux = tauxUrssaf() } = {}) => {
   const due = nextUrssafDeadline(freq, now);
   if (!due) return null;
   if (_startOfDay(now) <= _startOfDay(due.periodEnd)) return null; // période pas finie : rien à déclarer encore
-  const yms = [];
-  for (let d = new Date(due.periodStart.getFullYear(), due.periodStart.getMonth(), 1); d <= due.periodEnd; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
-    yms.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
+  const yms = moisPeriodeUrssaf(due);
   if (declare && typeof declare === 'object' && yms.length && yms.every((ym) => moisDeclare(declare, ym))) return null;
   const proche = due.daysLeft <= 7;
   if (!(now.getDate() <= 3 || proche)) return null;
-  let ca = null, apayer = null, partiel = false;
-  if (ligne && Array.isArray(ligne.mois)) {
-    ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
-    apayer = aPayerUrssaf(ca, taux);
-    partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0);
-  }
+  const { ca, apayer, partiel } = montantPeriodeUrssaf(due, ligne, taux);
   const date = due.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   const quand = due.daysLeft <= 0 ? "aujourd'hui" : due.daysLeft === 1 ? 'demain' : `dans ${due.daysLeft} jours`;
   const text = proche
@@ -4839,7 +4864,11 @@ const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, ta
   const sub = apayer == null
     ? 'Le montant se calcule dans Ventes (ouvre-le une fois).'
     : `${partiel ? 'Au moins ' : ''}${eur(ca)} reçus · à payer ≈ ${partiel ? 'au moins ' : ''}${eur(apayer)}`;
-  return { text, sub, label: due.label, dueIso: `${due.dueDate.getFullYear()}-${String(due.dueDate.getMonth() + 1).padStart(2, '0')}-${String(due.dueDate.getDate()).padStart(2, '0')}`, daysLeft: due.daysLeft, ca, apayer, partiel, proche };
+  // (22 oct.) Les mois de la période qui ne sont PAS encore notés « déclaré » :
+  // « C'est déclaré » (Ma journée, Comptabilité) ouvre le formulaire du rapport
+  // comptable sur le premier — un seul formulaire, le sien (§11).
+  const aNoter = yms.filter((ym) => !moisDeclare(declare, ym));
+  return { text, sub, label: due.label, dueIso: `${due.dueDate.getFullYear()}-${String(due.dueDate.getMonth() + 1).padStart(2, '0')}-${String(due.dueDate.getDate()).padStart(2, '0')}`, daysLeft: due.daysLeft, ca, apayer, partiel, proche, mois: yms, aNoter };
 };
 // ── BÉNÉFICE BRUT ET NET (19 octobre) — UNE règle, deux écrans (§11) ────────
 // L'écran Ventes (`totals`) et Comptabilité (« Ton bénéfice ») passent par ici :
@@ -9665,6 +9694,26 @@ function Badge({children,color}) {
 // à l'instant du clic, l'écran Annonces n'est pas encore monté, personne
 // n'écoute. Un drapeau attend.
 const DEMANDE_SAISIE_PRIX = { on: false };
+// ── « C'EST DÉCLARÉ » (22 octobre) ─────────────────────────────────────────
+// Le rappel du 1er et Ma journée envoyaient sur Comptabilité, qui n'avait qu'un
+// lien vers l'URSSAF : le geste « J'ai déclaré ce mois » n'existait que dans
+// Ventes → Outils → Rapport comptable, et il n'a JAMAIS été fait (mesuré le
+// 22 octobre : `vrm_urssaf_declare` absent). Le bouton « C'est déclaré » de
+// Comptabilité et de Ma journée pose ce drapeau (le mois à noter) et va sur
+// Ventes : le rapport s'y ouvre sur CE mois, formulaire ouvert — le MÊME
+// formulaire, avec les mêmes gardes (`lectureIncomplete`, refus sur « pas su »).
+// Aucune copie du geste ailleurs (§11) : le registre retient l'IDENTITÉ des
+// ventes du mois, et seul le rapport les a. Le drapeau vieillit (30 s) : un
+// clic oublié ne rouvre pas le rapport à la prochaine visite de Ventes.
+const DEMANDE_DECLARATION = { ym: null, at: 0 };
+const demanderDeclaration = (ym, onNav) => {
+  if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) return;
+  DEMANDE_DECLARATION.ym = ym; DEMANDE_DECLARATION.at = Date.now();
+  if (onNav) onNav('cat_ventes');
+};
+// « Ajouter une dépense » depuis Ma journée : Comptabilité s'ouvre avec le
+// formulaire des dépenses déplié (le sien, pas une copie).
+const DEMANDE_DEPENSE = { on: false, at: 0 };
 
 // Petit LOGO de plateforme — demande de Julien (21 sept.) : « un logo par
 // application pour dire sur quoi est postée la paire ». C'est une identité de
@@ -26459,7 +26508,23 @@ const ABONNEMENTS_COURANTS = [
   { nom: 'Photoroom' },
 ];
 const rCompId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length);
+// (22 oct.) « Je n'ai pas de dépenses à noter » est une RÉPONSE, rangée dans la
+// même ligne (`vrm_compta.sansDepenses = { at }`, synchronisée) : elle compte
+// comme une saisie — le rattrapage du nuage (§5.49) ne l'écrase pas.
+const comptaVide = (d) => !((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length || d.sansDepenses);
+// Les charges de sa comptabilité, en TROIS états (§5 : un total partiel qui se
+// présente comme complet est pire qu'un total absent) :
+//   'jamais'  — rien n'a JAMAIS été noté, et il n'a pas répondu : un « net » qui
+//               retire 0 € de charges n'est qu'un net AVANT ses dépenses ;
+//   'aucune'  — il a répondu « je n'ai pas de dépenses à noter » : 0 € est vrai ;
+//   'notees'  — au moins une charge notée (dépense, abonnement, pack, coût fixe).
+// Mesuré le 22 octobre : `vrm_compta` ABSENT de sa ligne `main` — Ma journée lui
+// affichait « Bénéfice net » chaque jour avec 0 € de cartons, scotch et essence.
+const depensesEtat = (d) => {
+  if (!d || typeof d !== 'object') return 'jamais';
+  if ((d.depenses || []).length || (d.fixes || []).length || (d.packs || []).length || (d.abonnements || []).length) return 'notees';
+  return d.sansDepenses ? 'aucune' : 'jamais';
+};
 // Montant saisi « 12,50 » ou « 12.50 » → nombre. Jamais NaN silencieux : on
 // renvoie null, et l'appelant refuse d'ajouter (mieux vaut un blanc qu'un faux).
 const parseMontant = (s) => { const n = parseFloat(String(s == null ? '' : s).replace(',', '.').replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : null; };
@@ -27204,15 +27269,18 @@ function CarteUrssafMois({ liveStats, onNav }) {
   // §5.49 : réglage synchronisé, rattrapé seulement s'il est resté au défaut.
   React.useEffect(() => onCloudReady(() => setUrssafFreq((x) => x === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : x)), []);
   const urssafDue = React.useMemo(() => nextUrssafDeadline(urssafFreq), [urssafFreq]);
+  // (22 oct.) Le registre « J'ai déclaré ce mois », en TROIS états : `null` tant
+  // que le nuage n'est pas arrivé (pas su ⇒ on ne dit pas « déclarée »).
+  const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const registreDecl = regPret ? regLu : null;
   // Le « CA finalisé » de la prochaine échéance : les mois PUBLIÉS qui tombent
   // dans la période ; sans ligne publiée, `null` — un tiret, jamais un zéro.
-  const urssafPeriodCA = (!urssafDue || !urssafMois) ? null : Math.round(urssafMois.reduce((s, m) => {
-    const [y, mo] = m.ym.split('-'); const d = new Date(Number(y), Number(mo) - 1, 1);
-    return (d >= urssafDue.periodStart && d <= urssafDue.periodEnd) ? s + (Number(m.ca) || 0) : s;
-  }, 0) * 100) / 100;
-  // Des ventes finalisées sans date de versement peuvent tomber dans cette
-  // période : le montant de l'échéance est alors un MINIMUM, et il le dit (§5).
-  const echeancePartiel = (urssafInfo && urssafInfo.aDater && Number(urssafInfo.aDater.n)) || 0;
+  // (22 oct.) La MÊME règle que le rappel de Ma journée et la notification du 1er
+  // (`montantPeriodeUrssaf`, §11) : des ventes sans date de versement, ou une
+  // ligne publiée avant la fin de la période ⇒ le montant est un MINIMUM (§5).
+  const montantEcheance = montantPeriodeUrssaf(urssafDue, v, TAUX_URSSAF * 100);
+  const urssafPeriodCA = montantEcheance.ca;
+  const echeancePartiel = montantEcheance.partiel ? 1 : 0;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
@@ -27341,7 +27409,19 @@ function CarteUrssafMois({ liveStats, onNav }) {
             </div>
           </div>
           {urssafDue ? (()=>{
-            const late=urssafDue.daysLeft<0, soon=urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
+            // (22 oct.) « C'EST DÉCLARÉ » ICI, À CÔTÉ DU LIEN : le rappel envoie sur
+            // cet écran, et le geste n'existait que dans Ventes → Outils → Rapport
+            // comptable. Le bouton ouvre CE formulaire-là sur le mois à noter (un
+            // seul formulaire, ses gardes, §11). Période pas finie : rien à noter.
+            // Tout noté : la ligne le dit, et l'échéance ne se colore plus (§7 :
+            // la couleur seulement s'il reste quelque chose à faire).
+            const ymsDue = moisPeriodeUrssaf(urssafDue);
+            const finie = _startOfDay(new Date()) > _startOfDay(urssafDue.periodEnd);
+            const aNoter = registreDecl == null ? ymsDue : ymsDue.filter((ym) => !moisDeclare(registreDecl, ym));
+            const faite = registreDecl != null && ymsDue.length > 0 && aNoter.length === 0;
+            const noteeLe = faite ? Math.max(...ymsDue.map((ym) => Number(registreDecl[ym] && registreDecl[ym].at) || 0)) : 0;
+            const nomYm = (ym) => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); };
+            const late=!faite&&urssafDue.daysLeft<0, soon=!faite&&urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
             const col=late?C.danger:soon?C.warn:C.text;
             return (
               <div style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
@@ -27358,10 +27438,22 @@ function CarteUrssafMois({ liveStats, onNav }) {
                   <span>Reçu (versé)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
                   <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
                 </div>
+                {faite ? (
+                  <div data-urssaf-declaree={ymsDue.join(',')} style={{fontSize:13,color:C.text,lineHeight:1.45,marginTop:12}}>
+                    <b>✓ Notée « déclarée »</b>{noteeLe > 0 ? <> le {new Date(noteeLe).toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}</> : null}<span style={{color:C.muted}}> — {ymsDue.length > 1 ? 'leurs ventes ne seront' : 'ses ventes ne seront'} pas recomptées dans un autre mois.</span>
+                  </div>
+                ) : (
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
                   <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:10,padding:'8px 14px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Déclarer sur l'URSSAF →</a>
-                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.</span>
+                  {finie && aNoter.length > 0 && (
+                    <button type="button" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}
+                      style={{fontSize:13,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>
+                      {ymsDue.length > 1 ? `C'est déclaré — noter ${nomYm(aNoter[0])}` : "C'est déclaré"}
+                    </button>
+                  )}
+                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.{finie && aNoter.length > 0 ? <> Une fois déclaré, note-le ici : ses ventes ne seront plus recomptées le mois suivant.</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} mois sur {ymsDue.length} déjà noté{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
                 </div>
+                )}
               </div>
             );
           })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
@@ -27790,7 +27882,7 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const complet = v.nCout === v.n;
   const netFinal = complet && v.net != null && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : '';
-  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes };
+  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta) };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
@@ -27802,7 +27894,31 @@ function useBeneficeCalcul(compta, periode) {
   const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2 }) : null;
   return { pub, etat, B };
 }
-function BeneficeCompta({ compta, onNav }) {
+// (22 oct.) LE CHOIX, UNE SEULE FOIS : tant que rien n'a jamais été noté, le
+// « net » n'est qu'un net AVANT ses dépenses (cartons, scotch, essence…). Deux
+// réponses, synchronisées dans `vrm_compta` : « je n'ai pas de dépenses à
+// noter » (le 0 € devient vrai) ou « ajouter une dépense » (le formulaire de
+// Comptabilité, le sien). Rendu par Comptabilité ET Ma journée (§11 : une règle,
+// `depensesEtat`) ; pas avant l'arrivée du nuage (pas su ≠ jamais noté).
+function ChoixDepenses({ onAucune, onAjouter, compact = false }) {
+  const lien = { background: 'none', border: 0, padding: 0, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit', minHeight: 0 };
+  return (
+    <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 12.5 : 13, color: C.muted, lineHeight: 1.45 }}>
+      <span style={{ flex: '1 1 100%' }}>Aucune dépense notée (cartons, scotch, essence pour le relais…) : ce net est <b style={{ color: C.text, fontWeight: 600 }}>avant tes dépenses</b>.</span>
+      <button type="button" data-depenses-aucune="" onClick={onAucune} style={{ ...lien, color: C.text }}>Je n'ai pas de dépenses à noter</button>
+      <button type="button" data-depenses-ajouter="" onClick={onAjouter} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
+    </div>
+  );
+}
+// La réponse « aucune dépense », écrite dans la ligne de Comptabilité — jamais
+// par-dessus une charge notée entre-temps.
+const repondreSansDepenses = (compta, ecrire) => {
+  if (depensesEtat(compta) !== 'jamais') return;
+  ecrire({ ...COMPTA_DEFAUT, ...(compta || {}), sansDepenses: { at: Date.now() } });
+};
+function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
+  const [nuagePret, setNuagePret] = React.useState(() => isCloudReady());
+  React.useEffect(() => onCloudReady(() => setNuagePret(true)), []);
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
   const { pub, etat, B } = useBeneficeCalcul(compta, periode);
@@ -27823,7 +27939,8 @@ function BeneficeCompta({ compta, onNav }) {
       data-benef-brut={B && B.nCout > 0 ? e2(B.brut) : ''} data-benef-ventes-net={B && B.nCout > 0 ? e2(B.net) : ''}
       data-benef-charges={B ? e2(B.charges) : ''} data-benef-cotis={B ? e2(B.cotis) : ''}
       data-benef-net={B ? e2(B.netFinal) : ''} data-benef-raison={B ? B.raison : ''}
-      data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}>
+      data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}
+      data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
         <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
         <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
@@ -27841,14 +27958,22 @@ function BeneficeCompta({ compta, onNav }) {
               : <>CA − prix d'achat · prix d'achat connus pour {B.nCout} vente{B.nCout > 1 ? 's' : ''} sur {B.n} — {lienSaisie}</>}
             data={{ 'data-benef-ligne': 'brut' }} />
           {B.nCout > 0 && (B.fraisCouverts > 0 || B.fraisInconnus > 0) && <Ligne lib="− boosts et frais de vente" val={B.fraisInconnus > 0 ? null : B.fraisCouverts} sous={B.fraisInconnus > 0 ? `frais eBay pas connus pour ${B.fraisInconnus} vente${B.fraisInconnus > 1 ? 's' : ''}` : 'des mêmes ventes'} data={{ 'data-benef-ligne': 'frais' }} />}
-          <Ligne lib="− charges" val={B.charges} sous="abonnements, dépenses, packs et coûts fixes de la période" data={{ 'data-benef-ligne': 'charges' }} />
+          <Ligne lib="− charges" val={B.depenses === 'jamais' ? null : B.charges}
+            sous={B.depenses === 'jamais' ? (nuagePret && onSansDepenses ? null : 'aucune dépense notée') : B.depenses === 'aucune' ? 'aucune — tu as indiqué ne pas avoir de dépenses à noter' : 'abonnements, dépenses, packs et coûts fixes de la période'}
+            data={{ 'data-benef-ligne': 'charges' }} />
+          {B.depenses === 'jamais' && nuagePret && onSansDepenses && (
+            <div className="vrm-set-ligne"><span className="vrm-set-lib" style={{ minWidth: 0 }}>
+              <ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} />
+            </span></div>
+          )}
           <Ligne lib="− cotisations URSSAF" val={B.cotis}
             sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA ${B.toutes ? 'déclaré (Vinted, Leboncoin, eBay)' : 'Vinted'} versé sur la période (${fmt(B.caDecl)})`}
             data={{ 'data-benef-ligne': 'cotis' }} />
-          <Ligne lib="Bénéfice net" fort val={B.netFinal}
+          <Ligne lib={B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Bénéfice net'} fort val={B.netFinal}
             sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas{(B.n > 0 && B.nCout !== B.n) ? '' : <> — {lienSaisie}</>}</>
               : B.raison === 'frais' ? 'des frais eBay ne sont pas connus : sans eux, le net ne se calcule pas'
               : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
+              : B.depenses === 'jamais' ? 'brut − frais − cotisations'
               : 'brut − frais − charges − cotisations'}
             data={{ 'data-benef-ligne': 'net' }} />
           <div className="vrm-set-ligne"><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0, lineHeight: 1.5 }}>
@@ -27889,8 +28014,13 @@ function useBeneficeJournee() {
 }
 function BeneficeJournee({ onNav, place }) {
   const [on, poser] = useBeneficeJournee();
-  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const [compta, comptaPret] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
+  // (22 oct.) Rien n'a jamais été noté : « net avant tes dépenses », et le choix
+  // une seule fois (`ChoixDepenses`, le même que Comptabilité).
+  const depenses = B ? (comptaPret ? B.depenses : 'passu') : '';
+  const sansDepenses = () => repondreSansDepenses(lireComptaSynchro(), (v) => save('vrm_compta', v));
+  const ajouterDepense = () => { DEMANDE_DEPENSE.on = true; DEMANDE_DEPENSE.at = Date.now(); if (onNav) onNav('compta'); };
   if (place === 'lien') {
     if (on) return null;
     return (
@@ -27913,6 +28043,7 @@ function BeneficeJournee({ onNav, place }) {
   const raisonNet = !B ? '' : B.raison === 'achats' ? `il manque le prix d'achat de ${sansAchat} vente${sansAchat > 1 ? 's' : ''}`
     : B.raison === 'frais' ? 'des frais eBay ne sont pas connus'
     : B.raison === 'cotisations' ? 'en attente de ton CA déclaré (écran Ventes)'
+    : B.depenses === 'jamais' ? 'après frais et cotisations'
     : 'après frais, charges et cotisations';
   const allerCompta = (ev) => { if (ev) ev.preventDefault(); if (onNav) onNav('compta'); };
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
@@ -27930,6 +28061,7 @@ function BeneficeJournee({ onNav, place }) {
       data-journee-benef-raison={B ? B.raison : ''} data-journee-benef-couverture={B ? couvertureBenefice(B) : ''}
       data-journee-benef-jour-n={J ? String(J.n) : ''} data-journee-benef-jour-brut={J && J.nCout > 0 ? e2(J.brut) : ''}
       data-journee-benef-jour-net={J && J.nCout > 0 ? e2(J.net) : ''}
+      data-journee-benef-depenses={depenses}
       style={place === 'integre' ? {borderTop:`1px solid ${C.border}`} : { border: `1px solid ${C.border}`, background: C.card, boxShadow: C.shadow || 'none' }}>
       <div className="vrm-day-head">
         <span className="vrm-day-k" style={{ color: C.muted }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</span>
@@ -27942,8 +28074,13 @@ function BeneficeJournee({ onNav, place }) {
       ) : (<>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
           {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : `prix d'achat connus pour ${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n}`, 'brut')}
-          {chiffre('Net ce mois', B.netFinal, raisonNet, 'net')}
+          {chiffre(B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Net ce mois', B.netFinal, raisonNet, 'net')}
         </div>
+        {depenses === 'jamais' && (
+          <div className="vrm-day-note" style={{ marginTop: 8 }}>
+            <ChoixDepenses compact onAucune={sansDepenses} onAjouter={ajouterDepense} />
+          </div>
+        )}
         {B.nCout < B.n && (
           <div className="vrm-day-note" style={{ marginTop: 6 }}>
             <button type="button" className="vrm-lien-action" data-journee-benef-porte="" onClick={versSaisiePrix} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>
@@ -28392,7 +28529,17 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const [aDeb, setADeb] = React.useState(auj);
   const [aFin, setAFin] = React.useState('');
   const [aErr, setAErr] = React.useState('');
-  const [ouvert, setOuvert] = React.useState('');          // '' · 'abo' · 'dep' · 'pack' : un formulaire à la fois
+  // (22 oct.) « Ajouter une dépense » depuis Ma journée : le formulaire des
+  // dépenses s'ouvre déplié (drapeau `DEMANDE_DEPENSE`, 30 s au plus).
+  const depenseDemandee = () => DEMANDE_DEPENSE.on && Date.now() - DEMANDE_DEPENSE.at < 30000;
+  const [ouvert, setOuvert] = React.useState(() => depenseDemandee() ? 'dep' : '');          // '' · 'abo' · 'dep' · 'pack' : un formulaire à la fois
+  const [versDepense, setVersDepense] = React.useState(() => depenseDemandee() ? 1 : 0);
+  React.useEffect(() => { DEMANDE_DEPENSE.on = false; }, []);
+  React.useEffect(() => {
+    if (!versDepense) return;
+    const t = setTimeout(() => { try { const el = document.querySelector('[data-dep-form]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); } catch (_) {} }, 80);
+    return () => clearTimeout(t);
+  }, [versDepense]);
   const [packLbc, setPackLbc] = React.useState(undefined);
   React.useEffect(() => {
     let mort = false;
@@ -28519,7 +28666,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </div>
       </Card>
 
-      <BeneficeCompta compta={data} onNav={onNav} />
+      <BeneficeCompta compta={data} onNav={onNav}
+        onSansDepenses={() => repondreSansDepenses(data, maj)}
+        onAjouterDepense={() => { setOuvert('dep'); setVersDepense((n) => n + 1); }} />
 
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
           libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
@@ -34861,9 +35010,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_releve_${encodeURIComponent(reportMonth)}`
           + `&select=id,vir:data->resume->>virements,ent:data->resume->>entrees,sor:data->resume->>sorties,n:data->resume->>n`,
           { headers: sbAuth() });
-        const j = r.ok ? await r.json() : [];
-        if (!mort) setReleveMois({ mois: reportMonth, lignes: Array.isArray(j) ? j : [] });
-      } catch (_) { if (!mort) setReleveMois({ mois: reportMonth, lignes: [] }); }
+        // (22 oct.) Trois états : une lecture RATÉE n'est pas « rien de capté ».
+        const j = r.ok ? await r.json() : null;
+        if (!mort) setReleveMois({ mois: reportMonth, lignes: Array.isArray(j) ? j : null, ko: !Array.isArray(j) });
+      } catch (_) { if (!mort) setReleveMois({ mois: reportMonth, lignes: null, ko: true }); }
     })();
     return () => { mort = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -35058,6 +35208,43 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     if (buys.items===null && accounts.length) loadOrders('purchased', setBuys);
   };
+  // ── « C'EST DÉCLARÉ », venu de Comptabilité ou de Ma journée (22 octobre) ──
+  // Le drapeau `DEMANDE_DECLARATION` porte le MOIS à noter : le rapport s'ouvre
+  // dessus, et le formulaire « Qu'as-tu déclaré ? » se déplie TOUT SEUL — mais
+  // seulement quand le bouton « J'ai déclaré ce mois » serait actif : mêmes
+  // gardes (§11). Lecture encore en cours ⇒ on attend ; lecture RATÉE ⇒ on
+  // n'ouvre rien, le bouton reste grisé avec sa raison (`RaisonDeclBloquee`) ;
+  // mois déjà noté ⇒ le rapport le montre. Il change de mois ou ferme : oublié.
+  const declVoulue = useRef(null);
+  useEffect(() => {
+    if (curSub !== 'ventes' || !DEMANDE_DECLARATION.ym) return;
+    const ym = DEMANDE_DECLARATION.ym, frais = Date.now() - DEMANDE_DECLARATION.at < 30000;
+    DEMANDE_DECLARATION.ym = null;
+    if (!frais) return;
+    moisChoisiMain.current = true;
+    setReportMonth(ym); setReportAnnee(Number(ym.slice(0, 4)));
+    declVoulue.current = { ym, arme: false };
+    openReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub]);
+  useEffect(() => {
+    const d = declVoulue.current;
+    if (!d) return;
+    if (!d.arme) { if (showReport && reportMonth === d.ym) d.arme = true; else return; }
+    if (!showReport || reportMonth !== d.ym || !report) { declVoulue.current = null; return; }
+    if (report.declaration) { declVoulue.current = null; return; }          // déjà noté : le rapport le dit
+    if (report.declarePasSu) return;                                        // registre pas encore lu : on attend
+    if (report.incomplet) { if (!(report.incomplet.rates || []).length) return; declVoulue.current = null; return; }
+    declVoulue.current = null;
+    setDeclForm({ regle: 'versement', montant: '', venu: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReport, reportMonth, report]);
+  // Le formulaire est en bas d'une feuille qui défile : on l'amène sous les yeux.
+  useEffect(() => {
+    if (!declForm || !declForm.venu) return;
+    const t = setTimeout(() => { try { const el = document.querySelector('[data-decl-form]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); } catch (_) {} }, 60);
+    return () => clearTimeout(t);
+  }, [declForm]);
 
   // Export CSV du rapport (ventes + registre d'achats).
   const exportReportCsv = () => {
@@ -36246,7 +36433,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
-        const tache = (j, i) => (
+        const tacheSimple = (j, i) => (
           <button className="vrm-day-task" key={(j.id||'j')+i} type="button" title={j.sub} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',cursor:'pointer',textAlign:'left',width:'100%',minWidth:0,fontFamily:'inherit'}}>
             {/* ⚠️ Avant : un carré de 46 px teinté à la couleur du statut,
                 avec un EMOJI de 24 px dedans. Trois de ces pavés colorés
@@ -36279,6 +36466,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>{j.action || 'Voir'} <span aria-hidden="true">›</span></span>
           </button>
         );
+        // (22 oct., chantier URSSAF) LE RAPPEL URSSAF PORTE SON GESTE : « C'est
+        // déclaré » à côté de « Voir ». Un bouton ne se met pas dans un bouton :
+        // la ligne devient un groupe de deux, même surface, mêmes attributs.
+        const tache = (j, i) => (j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0) ? (
+          <div className="vrm-day-task" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined}
+            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 15px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',textAlign:'left',width:'100%',minWidth:0,boxSizing:'border-box',flexWrap:'wrap'}}>
+            <button type="button" title={j.sub} onClick={()=>{ if (onNav) onNav(j.tab); }} style={{display:'flex',alignItems:'center',gap:13,flex:'1 1 220px',minWidth:0,background:'transparent',border:0,padding:0,margin:0,cursor:'pointer',textAlign:'left',fontFamily:'inherit',color:'inherit'}}>
+              <div style={{width:42,height:42,borderRadius:8,background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:j.color}}><Icon name={j.icon} size={20}/></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div className="vrm-day-task-title" style={{fontSize:15,fontWeight:700,color:C.text}}>{j.title}</div>
+                <div className="vrm-day-task-note" style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2,lineHeight:1.35}}>{j.sub}</div>
+              </div>
+              <span className="vrm-day-task-action" style={{fontSize:12,color:j.color,fontWeight:600,flexShrink:0}}>Voir <span aria-hidden="true">›</span></span>
+            </button>
+            <button type="button" data-urssaf-cest-declare={j.urssaf.aNoter[0]} onClick={()=>demanderDeclaration(j.urssaf.aNoter[0], onNav)}
+              style={{flexShrink:0,fontSize:12.5,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 12px',cursor:'pointer',fontFamily:'inherit'}}>
+              {j.urssaf.mois && j.urssaf.mois.length > 1 ? `C'est déclaré — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : "C'est déclaré"}
+            </button>
+          </div>
+        ) : tacheSimple(j, i);
         const listeTaches = (liste, attr) => (
           <div className="vrm-day-task-list" {...attr} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',gap:10}}>
             {liste.map(tache)}
@@ -41237,7 +41444,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   virement vers SA banque. On ne baptise donc pas « recette » ce
                   qu'on n'a pas encore mesuré. */}
               {releveTotaux ? (
-                <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:8,padding:'9px 12px',marginBottom:12}}>
+                <div data-releve="lu" style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${C.accent}`,borderRadius:8,padding:'9px 12px',marginBottom:12}}>
                   <div style={{fontSize:12.5,color:C.text,lineHeight:1.45}}>
                     <b>Relevé de ton porte-monnaie Vinted</b> — {releveTotaux.n} mouvement{releveTotaux.n>1?'s':''} sur {releveTotaux.comptes} compte{releveTotaux.comptes>1?'s':''}
                   </div>
@@ -41251,18 +41458,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
               ) : (
-                /* ⚠️ MÊME GARDE QUE LES CODES DE RETRAIT. `capterReleves` est
-                   arrivé en 5.52 : en dessous, « à ta prochaine visite » est une
-                   promesse que SON extension ne peut pas tenir, et il attendrait
-                   un relevé qui n'arrivera jamais. Mesuré le 8 septembre :
-                   0 compteur `releve_*` sur 42, donc elle n'a jamais tourné. */
-                <div style={{fontSize:11.5,color:C.muted,marginBottom:12,lineHeight:1.4}}>
-                  Relevé du porte-monnaie : rien de capté pour ce mois. {(() => {
-                    const e = extSait('releve');
-                    if (e === 'retard') return <>Mets d'abord ton extension à jour — celle installée ne sait pas encore lire le relevé.</>;
-                    if (e === 'absente') return <>C'est l'extension, sur ton ordinateur, qui va le chercher : ouvre l'app dans le Chrome où elle est installée.</>;
-                    return <>L'extension le récupère à ta prochaine visite sur Vinted, compte par compte.</>;
-                  })()}
+                /* ⚠️⚠️ (22 oct.) PLUS AUCUNE PROMESSE. La phrase disait « l'extension
+                   le récupère à ta prochaine visite sur Vinted » dès que l'extension
+                   était à jour — et ça n'arrivait JAMAIS. Mesuré sur sa base le
+                   22 octobre, extension 5.211 : 0 ligne `harvest_*_releve_*`,
+                   0 compteur `releve_*` ; `capterReleves` part de
+                   `payload.history` de la ligne `_billing`, et Vinted le rend VIDE
+                   (`[]`) sur les 4 comptes qui en portent un — la fonction sort
+                   sans une seule requête. Aller le chercher autrement voudrait dire
+                   deviner une adresse Vinted jamais vue (§3) : rien avant une
+                   mesure. La phrase dit donc ce qui est vrai pour TOUTE version de
+                   l'extension (pas de garde de version : aucune ne le tient), et
+                   que le CA ci-dessus n'en dépend pas. Lecture ratée ⇒ on le dit
+                   (« rien lu » ne vaut pas « rien »). */
+                <div data-releve={releveMois.mois !== reportMonth ? 'encours' : releveMois.ko ? 'passu' : 'pasencore'} style={{fontSize:11.5,color:C.muted,marginBottom:12,lineHeight:1.4}}>
+                  {releveMois.mois !== reportMonth
+                    ? <>Relevé du porte-monnaie Vinted : lecture…</>
+                    : releveMois.ko
+                      ? <>Relevé du porte-monnaie Vinted : la base n'a pas répondu — rouvre le rapport dans un moment.</>
+                      : <>Relevé du porte-monnaie Vinted : VRM n'a pas encore réussi à le lire pour ce mois. Le CA ci-dessus n'en dépend pas : il vient de tes ventes finalisées.</>}
                 </div>
               )}
               {/* ── REGISTRE DES VENTES (G2) ─────────────────────────────
@@ -48649,7 +48863,12 @@ function AppCoeur() {
   useEffect(() => {
     const on = () => setColisTick(t => t + 1);
     window.addEventListener('vrm:colis', on);
-    return () => window.removeEventListener('vrm:colis', on);
+    // (22 oct.) Un mois noté « déclaré » (Ventes → Rapport comptable, ou le
+    // bouton « C'est déclaré ») : le rappel URSSAF de Ma journée se recalcule
+    // tout de suite, au lieu de rester affiché jusqu'au prochain chargement.
+    const decl = (e) => { if (e && e.detail && e.detail.k === 'vrm_urssaf_declare') on(); };
+    window.addEventListener('vrm:save', decl);
+    return () => { window.removeEventListener('vrm:colis', on); window.removeEventListener('vrm:save', decl); };
   }, []);
   // ⚠️⚠️ (revue du 11 octobre) UNE PREUVE RANGÉE PENDANT QUE VRM EST OUVERT.
   //    Le retrait automatique d'eBay (`retirerEbayAuto`, allumé par lui) ne
