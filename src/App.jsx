@@ -44291,6 +44291,11 @@ function PorteEquipe({ uid, children }) {
     if (lu && !lu.nonInstalle && lu.invitations.length) return <InvitationsEquipe invitations={lu.invitations} uid={uid} onPropre={propre} onFait={relire}/>;
   }
   if (attente && lu === undefined) return <div data-equipe-attente="" style={{ minHeight: '100vh', background: C.bg }}/>;
+  // Le préchargement des données (comptes, ventes) ne part qu'ICI : la porte
+  // sait maintenant que c'est SA boutique qui s'ouvre. Lancé dès la porte de
+  // confidentialité, il lisait les lignes d'un aide (mode équipe) pour rien
+  // avant qu'il soit envoyé sur les colis du vendeur (banc equipe.cjs).
+  prechargerDemarrage();
   return children;
 }
 
@@ -46244,7 +46249,7 @@ export default function App() {
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return (MULTI_USER && authState.user)
-    ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;prechargerDemarrage();}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
+    ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
     : coeur;
 }
 
