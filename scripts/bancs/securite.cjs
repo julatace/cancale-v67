@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ⚠️⚠️ BANC — LE PANNEAU « SÉCURITÉ DES DONNÉES » DIT-IL TOUTE LA VÉRITÉ ?
 //
 // Demande de Julien, 15 septembre : « je veux que tu commences à réfléchir à une

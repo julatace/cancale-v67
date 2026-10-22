@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « ÉQUIPE » — le mode équipe (migration 016), RENDU, à 390 et 1512 px.
 //

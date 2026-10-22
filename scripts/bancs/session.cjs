@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « LA CONNEXION DE L'EXTENSION TIENT » — 11 octobre
 //

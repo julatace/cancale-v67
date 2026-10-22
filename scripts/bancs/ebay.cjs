@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : L'ASSISTANT eBAY, EXÉCUTÉ POUR DE VRAI
 //        node scripts/bancs/ebay.cjs

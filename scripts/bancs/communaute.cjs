@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « COMMUNAUTÉ » — la carte des revendeurs (migration 018), RENDU,
 //  à 1512 px (clair) et 390 px tactile (sombre).

@@ -64,7 +64,7 @@ const SCRIPT = `(() => {
           if (r.status === 400 && /[?&]select=owner,/.test(url)) r = await vrai(url.replace(/([?&]select=)owner,/, '$1'), init);
           let j = null; try { j = await r.clone().json(); } catch (_) { return r; }
           if (!r.ok || !Array.isArray(j)) return r;
-          const rows = j.map((o) => (o && typeof o === 'object' && !Array.isArray(o) && !('owner' in o) ? Object.assign({ owner: uid }, o) : o));
+          const rows = j.map((o) => (o && typeof o === 'object' && !Array.isArray(o) && (o.owner == null) ? Object.assign({}, o, { owner: uid }) : o));
           return new Response(JSON.stringify(rows), { status: r.status, headers: r.headers });
         }
       }
@@ -85,7 +85,9 @@ const SCRIPT = `(() => {
 function poser(pw) {
   if (!pw || !pw.chromium || pw.chromium.__vrmPorte || process.env.BANC_PORTE_STRICTE === '1') return;
   const c = pw.chromium; c.__vrmPorte = true;
-  const surContexte = (ctx) => { try { ctx.addInitScript(SCRIPT); } catch (_) {} return ctx; };
+  // BANC_TRACE=1 : chaque réponse /rest/v1 ou /api en erreur est imprimée (diagnostic).
+  const tracer = (ctx) => { if (process.env.BANC_TRACE !== '1') return; ctx.on('response', (r) => { const u = decodeURIComponent(r.url()); if (/\/rest\/v1\/|\/api\//.test(u) && (r.status() >= 400 || process.env.BANC_TRACE_TOUT)) console.log('TRACE', r.status(), u.slice(0, 200)); }); ctx.on('requestfailed', (r) => { if (/\/rest\/v1\/|\/api\//.test(r.url())) console.log('TRACE échec', r.url().slice(0, 200)); }); };
+  const surContexte = (ctx) => { try { ctx.addInitScript(SCRIPT); tracer(ctx); } catch (_) {} return ctx; };
   const launch = c.launch.bind(c);
   c.launch = async (...a) => {
     const b = await launch(...a);

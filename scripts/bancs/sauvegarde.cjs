@@ -43,7 +43,7 @@ const LOCAL = {
 const LIGNES = [
   { id: 'harvest_111_inbox', data: { payload: { conversations: [{ id: 9, opposite_user: { login: 'acheteuse' }, session: { access_token: 'SECRET-PROFOND' } }] } } },
   { id: 'ebay_tokens', data: { refresh_token: 'SECRET-EBAY' } },
-  { id: 'push_subs', data: { subs: [{ endpoint: 'https://push/x', keys: { p256dh: 'SECRET-P256', auth: 'a' } }] } },
+  { id: 'push_subs', data: { subs: [{ endpoint: 'https://fcm.googleapis.com/x', keys: { p256dh: 'SECRET-P256', auth: 'a' } }] } },
 ];
 
 function exclusDe(u) {

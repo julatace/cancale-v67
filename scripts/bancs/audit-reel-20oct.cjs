@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ═══ AUDIT SUR SES DONNÉES DU JOUR (20 octobre) — les six défauts, sur des
 // données INVENTÉES à la forme réelle (aucune donnée réelle : dépôt public) ═══
 // L'audit a rendu l'app sur une copie fraîche de sa base (hors dépôt) et

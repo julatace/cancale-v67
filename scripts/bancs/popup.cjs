@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « POPUP DE L'EXTENSION » — la fenêtre où se fait l'étape 2.
 //

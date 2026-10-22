@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // BANC — « Pourquoi le nuage en haut est barré ? » (Julien, 16 octobre).
 //
 // Le nuage barré = la dernière sauvegarde vers la base n'est pas partie. Avant :

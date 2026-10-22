@@ -1,3 +1,4 @@
+require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « PARAMÈTRES PREMIUM » — Réglages et Mon compte, RENDUS à 390 et 1512 px.
 //
