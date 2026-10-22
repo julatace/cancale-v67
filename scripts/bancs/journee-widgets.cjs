@@ -12,8 +12,9 @@
 //      origin/main, fabriqué une fois, ou BANC_DIST_AVANT), les mêmes blocs ;
 //      la grille porte la disposition par défaut ; UN SEUL « Modifier » VISIBLE
 //      (sur téléphone la tête de l'écran est cachée : il doit être ailleurs) ;
-//      ordinateur : vendu | semaine et attente | stock sur une même rangée,
-//      les photos sur toute la largeur ; téléphone : tout sur toute la largeur ;
+//      ordinateur : la mise en page d'avant (vendu | semaine | attente, photos
+//      2/3 | stock 1/3, tout visible sans défiler — le banc `revendeurs` l'exige
+//      aussi) ; téléphone : tout sur toute la largeur ;
 //   B. « Modifier » (le bouton visible, l'appui long au doigt) : les widgets
 //      tremblent ; « À faire » n'a pas de « − » (fixe) ; le bouton de LARGEUR
 //      n'existe que sur ordinateur (sur téléphone il ne changerait rien) ;
@@ -21,7 +22,7 @@
 //      change de place ET on reste sur Ma journée (le glisser de côté à la
 //      souris faisait changer d'onglet : vu au banc, 22 oct.) ;
 //   D. « − » retire ; E. « + » ajoute (« À envoyer » : le même nombre que la
-//      barre) ; E2. ordinateur : la largeur change vraiment ;
+//      barre) ; E2. ordinateur : la largeur change vraiment (un tiers → deux tiers) ;
 //   F. « OK » ⇒ la disposition part dans la ligne synchronisée ; un appareil
 //      NEUF la retrouve ;
 //   G. disposition abîmée : widget inconnu, doublon, taille fausse ignorés,
@@ -263,16 +264,17 @@ if (require.main === module) (async () => {
         if (SHOTS) { await pg.setViewportSize({ width: T.vp.width, height: 2200 }); await pg.waitForTimeout(400); await pg.screenshot({ path: path.join(SHOTS, `widgets-${tag}-defaut.png`) }); await pg.setViewportSize(T.vp); }
         dit(!l.tombe && errs.length === 0, 'l’écran s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
         dit(l.deb <= 1, 'aucun débordement horizontal', `${l.deb} px`);
-        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,stock,recentes', 'la grille porte la disposition par défaut', String(l.dispo));
-        dit(l.rendus === 'barre,afaire,vendu,semaine,attente,stock,recentes', 'chaque widget par défaut est rendu dans la grille', l.rendus);
+        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,recentes,stock', 'la grille porte la disposition par défaut', String(l.dispo));
+        dit(l.rendus === 'barre,afaire,vendu,semaine,attente,recentes,stock', 'chaque widget par défaut est rendu dans la grille', l.rendus);
         dit(l.vides === 0, 'aucune case vide dans la grille', `${l.vides}`);
         dit(l.modifierVisibles === 1, 'UN bouton « Modifier », et on le voit', `${l.modifierVisibles} visible(s)`);
         dit(l.tailleVisibles === 0, 'aucun bouton de largeur hors du mode « Modifier »', `${l.tailleVisibles}`);
         const R = l.R;
         if (ordi) {
-          dit(!!(R.vendu && R.semaine && egaux(R.vendu.top, R.semaine.top) && R.semaine.left > R.vendu.left), 'ordinateur : « Vendu » et « Cette semaine » côte à côte', JSON.stringify([R.vendu, R.semaine]));
-          dit(!!(R.attente && R.stock && egaux(R.attente.top, R.stock.top)), 'ordinateur : « En attente » et « Stock » côte à côte', JSON.stringify([R.attente, R.stock]));
-          dit(!!(R.recentes && egaux(R.recentes.w, l.grilleL)) && !!(R.barre && egaux(R.barre.w, l.grilleL)), 'ordinateur : la barre et les photos sur toute la largeur', JSON.stringify([R.barre && R.barre.w, R.recentes && R.recentes.w, l.grilleL]));
+          dit(!!(R.vendu && R.semaine && R.attente && egaux(R.vendu.top, R.semaine.top) && egaux(R.semaine.top, R.attente.top) && R.vendu.left < R.semaine.left && R.semaine.left < R.attente.left), 'ordinateur : vendu | semaine | attente sur une rangée, comme avant', JSON.stringify([R.vendu, R.semaine, R.attente]));
+          dit(!!(R.recentes && R.stock && egaux(R.recentes.top, R.stock.top) && R.stock.left >= R.recentes.left + R.recentes.w - 1 && R.recentes.w > R.stock.w * 1.6), 'ordinateur : les photos (2/3) puis le stock à leur droite (1/3), comme avant', JSON.stringify([R.recentes, R.stock]));
+          dit(!!(R.barre && egaux(R.barre.w, l.grilleL)), 'ordinateur : la barre sur toute la largeur', JSON.stringify([R.barre && R.barre.w, l.grilleL]));
+          dit(!!(R.stock && R.recentes && R.stock.top + R.stock.h <= T.vp.height && R.recentes.top + R.recentes.h <= T.vp.height), 'ordinateur : toute la journée visible sans défiler', JSON.stringify([R.recentes, R.stock]));
         } else {
           const pleins = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'stock', 'recentes'].filter((id) => R[id] && egaux(R[id].w, l.grilleL));
           dit(pleins.length === 7, 'téléphone : chaque widget prend toute la largeur', pleins.join(','));
@@ -288,6 +290,7 @@ if (require.main === module) (async () => {
 
       console.log('── B à F. Modifier, glisser, retirer, ajouter, largeur, garder');
       const etat = { main: {} };
+      let vendu2 = 0;
       await essaie('BF' + tag, async () => {
         const { ctx, pg, errs } = await page(b, T, PORT, { etat });
         const cdp = T.hasTouch ? await ctx.newCDPSession(pg) : null;
@@ -335,14 +338,15 @@ if (require.main === module) (async () => {
         dit((l.dispo || '').endsWith('envoyer'), '« + » ajoute « À envoyer » à la fin', l.dispo);
         const nBarre = (/envoyer=([^,]*)/.exec(l.tuiles) || [])[1];
         dit(l.envoyerW != null && l.envoyerW === nBarre, 'le widget « À envoyer » dit le même nombre que la barre', `${l.envoyerW} | barre ${nBarre}`);
-        dit(!!(l.R.envoyer && l.R.envoyer.w < l.grilleL * 0.6), 'la petite case prend une seule colonne', JSON.stringify(l.R.envoyer));
+        dit(!!(l.R.envoyer && l.R.envoyer.w < l.grilleL * (ordi ? 0.2 : 0.6)), 'la petite case prend une seule colonne', JSON.stringify(l.R.envoyer));
         // E2. Ordinateur : la largeur change pour de vrai.
         if (ordi) {
           const avantL = l.R.vendu ? l.R.vendu.w : 0;
           await appuyer(pg, T, '[data-widget-taille-btn="vendu"]');
           await pg.waitForTimeout(500);
           l = await lire(pg);
-          dit(!!(l.R.vendu && egaux(l.R.vendu.w, l.grilleL) && avantL < l.grilleL * 0.6), 'ordinateur : « largeur » passe « Vendu » de la moitié à toute la largeur', `${avantL} → ${l.R.vendu && l.R.vendu.w} / ${l.grilleL}`);
+          dit(!!(l.R.vendu && avantL < l.grilleL * 0.4 && l.R.vendu.w > avantL * 1.8 && l.R.vendu.w < l.grilleL * 0.8), 'ordinateur : « largeur » passe « Vendu » d’un tiers à deux tiers', `${avantL} → ${l.R.vendu && l.R.vendu.w} / ${l.grilleL}`);
+          vendu2 = l.R.vendu ? l.R.vendu.w : 0;
         }
         // F. OK, puis la disposition repart au nuage.
         await appuyer(pg, T, '[data-widgets-ok]');
@@ -361,7 +365,7 @@ if (require.main === module) (async () => {
         const l2 = await lire(neuf.pg);
         dit(l2.dispo === attendu, 'sur un appareil neuf, la disposition revient (rechargée du nuage)', `${l2.dispo} | attendu ${attendu}`);
         dit(!l2.rendus.includes('semaine') && l2.rendus.includes('envoyer'), 'le widget retiré reste retiré, l’ajouté reste là', l2.rendus);
-        if (ordi) dit(!!(l2.R.vendu && egaux(l2.R.vendu.w, l2.grilleL)), 'la largeur choisie est gardée', JSON.stringify(l2.R.vendu));
+        if (ordi) dit(!!(l2.R.vendu && egaux(l2.R.vendu.w, vendu2)), 'la largeur choisie est gardée', `${l2.R.vendu && l2.R.vendu.w} | ${vendu2}`);
         if (SHOTS) { await neuf.pg.setViewportSize({ width: T.vp.width, height: 2200 }); await neuf.pg.waitForTimeout(400); await neuf.pg.screenshot({ path: path.join(SHOTS, `widgets-${tag}-garde.png`) }); }
         await neuf.ctx.close();
       });

@@ -14,32 +14,35 @@
 // ⚠️ UNE TAILLE EST UNE LARGEUR, et elle ne se propose que là où elle change
 // quelque chose (22 oct.). Le premier jet offrait « Grand » = la même carte,
 // deux rangées plus haute et vide en bas : un choix qui ne montre rien de plus
-// est un faux choix. Désormais, sur la grille de l'ordinateur (4 colonnes) :
-// petit = 1 colonne, moyen = la moitié, grand = toute la largeur. Sur
-// téléphone (2 colonnes) moyen et grand font la même largeur : le bouton de
-// taille n'y est pas montré (styles-widgets.css).
+// est un faux choix. Sur la grille de l'ordinateur (6 colonnes, la mise en page
+// d'avant : vendu | semaine | attente, puis photos 2/3 | stock 1/3 — le banc
+// `revendeurs` l'exige, « tout visible sans défiler ») : petit = 1/6, un tiers,
+// deux tiers, pleine largeur. Sur téléphone (2 colonnes) tout ce qui n'est pas
+// petit fait la largeur entière : le bouton de taille n'y est pas montré
+// (styles-widgets.css).
 
 export const CLE_WIDGETS_JOURNEE = 'vrm_journee_widgets';
-export const TAILLES_WIDGET = ['petit', 'moyen', 'grand'];
-export const NOM_TAILLE = { petit: 'Petit', moyen: 'Moitié', grand: 'Pleine largeur' };
+export const TAILLES_WIDGET = ['petit', 'moyen', 'grand', 'pleine'];
+export const NOM_TAILLE = { petit: 'Petit', moyen: 'Un tiers', grand: 'Deux tiers', pleine: 'Pleine largeur' };
 
-// L'ordre de ce catalogue est celui de la feuille « Ajouter ».
+// L'ordre de ce catalogue est celui de la feuille « Ajouter ». La première
+// taille de chaque widget est sa taille par défaut.
 // `fixe` : jamais retirable (on peut le déplacer). « À faire » porte les gestes
 // qui coûtent s'ils sont oubliés (colis cochés non partis, litige, emails mis
 // de côté, « Tout est OK » à confirmer…) : le retirer les ferait disparaître.
 // `carte: false` : le bloc n'a pas de cadre à lui (un titre puis une liste) —
 // en mode « Modifier » la grille lui en dessine un, pour qu'on voie ce qu'on tient.
 export const WIDGETS_JOURNEE = {
-  barre:    { nom: 'Les quatre gestes', desc: 'À envoyer, à retirer, messages, prix à baisser', tailles: ['grand'] },
-  afaire:   { nom: 'À faire', desc: 'Les actions du jour', tailles: ['grand', 'moyen'], fixe: true, carte: false },
-  vendu:    { nom: 'Vendu et reçu', desc: 'Vendu ce mois et aujourd’hui, reçu ce mois', tailles: ['moyen', 'grand'] },
-  semaine:  { nom: 'Cette semaine', desc: 'La courbe vendu et reçu de la semaine', tailles: ['moyen', 'grand'] },
-  attente:  { nom: 'Argent en attente', desc: 'En attente chez Vinted et disponible à virer', tailles: ['moyen', 'grand'] },
-  stock:    { nom: 'Stock actuel', desc: 'Annonces en ligne et prix d’achat renseignés', tailles: ['moyen', 'grand'] },
-  recentes: { nom: 'Dernières ventes', desc: 'Les photos de tes dernières ventes', tailles: ['grand', 'moyen'], carte: false },
-  jours14:  { nom: '14 derniers jours', desc: 'Vendu et reçu, jour par jour', tailles: ['moyen', 'grand'] },
-  urssaf:   { nom: 'Déclaration URSSAF', desc: 'Le rappel de la prochaine échéance (sorti de « À faire »)', tailles: ['moyen', 'grand'], carte: false },
-  benefice: { nom: 'Ton bénéfice', desc: 'Brut et net du mois — les chiffres de Comptabilité', tailles: ['moyen', 'grand'] },
+  barre:    { nom: 'Les quatre gestes', desc: 'À envoyer, à retirer, messages, prix à baisser', tailles: ['pleine'] },
+  afaire:   { nom: 'À faire', desc: 'Les actions du jour', tailles: ['pleine', 'grand', 'moyen'], fixe: true, carte: false },
+  vendu:    { nom: 'Vendu et reçu', desc: 'Vendu ce mois et aujourd’hui, reçu ce mois', tailles: ['moyen', 'grand', 'pleine'] },
+  semaine:  { nom: 'Cette semaine', desc: 'La courbe vendu et reçu de la semaine', tailles: ['moyen', 'grand', 'pleine'] },
+  attente:  { nom: 'Argent en attente', desc: 'En attente chez Vinted et disponible à virer', tailles: ['moyen', 'grand', 'pleine'] },
+  recentes: { nom: 'Dernières ventes', desc: 'Les photos de tes dernières ventes', tailles: ['grand', 'pleine'], carte: false },
+  stock:    { nom: 'Stock actuel', desc: 'Annonces en ligne et prix d’achat renseignés', tailles: ['moyen', 'grand', 'pleine'] },
+  jours14:  { nom: '14 derniers jours', desc: 'Vendu et reçu, jour par jour', tailles: ['moyen', 'grand', 'pleine'] },
+  urssaf:   { nom: 'Déclaration URSSAF', desc: 'Le rappel de la prochaine échéance (sorti de « À faire »)', tailles: ['grand', 'pleine', 'moyen'], carte: false },
+  benefice: { nom: 'Ton bénéfice', desc: 'Brut et net du mois — les chiffres de Comptabilité', tailles: ['moyen', 'grand', 'pleine'] },
   envoyer:  { nom: 'À envoyer', desc: 'Petite case : le nombre de colis à poster', tailles: ['petit'] },
   retirer:  { nom: 'À retirer', desc: 'Petite case : le nombre de colis à aller chercher', tailles: ['petit'] },
   messages: { nom: 'Messages', desc: 'Petite case : les messages récents sans réponse', tailles: ['petit'] },
@@ -52,11 +55,10 @@ export const tailleDefautWidget = (id) => {
 };
 export const widgetFixe = (id) => !!(WIDGETS_JOURNEE[id] && WIDGETS_JOURNEE[id].fixe);
 
-// La disposition par défaut : les blocs de Ma journée d'avant, rangés pour
-// tomber juste sur les deux grilles (téléphone : l'un sous l'autre ; ordinateur :
-// vendu | semaine, attente | stock, puis les photos sur toute la largeur — sans
-// trou ni carte étirée à vide).
-export const DISPO_JOURNEE_DEFAUT = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'stock', 'recentes']
+// La disposition par défaut : les blocs de Ma journée d'avant, dans le même
+// ordre et à la même place sur ordinateur (vendu | semaine | attente, puis
+// photos 2/3 | stock 1/3) ; sur téléphone, l'un sous l'autre.
+export const DISPO_JOURNEE_DEFAUT = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'recentes', 'stock']
   .map((id) => ({ id, t: tailleDefautWidget(id) }));
 
 // `null` = rien de rangé (ou illisible) ⇒ l'appelant prend le défaut.

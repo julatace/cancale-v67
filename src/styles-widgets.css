@@ -1,18 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    MA JOURNÉE EN WIDGETS (21-22 octobre)
    Une grille comme l'écran d'accueil d'un iPhone : 2 colonnes sur téléphone,
-   4 sur ordinateur. Une taille est une LARGEUR : petit = 1 colonne, moyen =
-   2 colonnes, grand = toute la largeur (sur téléphone, moyen et grand font la
-   même largeur : le bouton de taille n'y est pas proposé). Les blocs gardent
-   leur propre carte (couleurs du thème) ; la grille ne fait que les ranger.
+   6 sur ordinateur. Une taille est une LARGEUR : sur ordinateur petit = 1/6,
+   moyen = 1/3, grand = 2/3, pleine = toute la largeur (la mise en page d'avant :
+   vendu | semaine | attente, photos 2/3 | stock 1/3). Sur téléphone tout ce qui
+   n'est pas petit prend la largeur : le bouton de taille n'y est pas proposé.
+   Les blocs gardent leur propre carte ; la grille ne fait que les ranger.
    Animations : transform/opacity seulement, < 300 ms, ease-out, rien si
    « réduire les animations ».
    ═══════════════════════════════════════════════════════════════════════════ */
 .vrm-widgets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:stretch; margin-bottom:12px; }
-@media (min-width:1024px) { .vrm-widgets { grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; } }
 .vrm-widget { position:relative; min-width:0; grid-column:span 2; touch-action:manipulation; }
 .vrm-widget[data-taille="petit"] { grid-column:span 1; }
-@media (min-width:1024px) { .vrm-widget[data-taille="grand"] { grid-column:1 / -1; } }
+@media (min-width:1024px) {
+  .vrm-widgets { grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
+  .vrm-widget[data-taille="grand"] { grid-column:span 4; }
+  .vrm-widget[data-taille="pleine"] { grid-column:1 / -1; }
+}
 .vrm-widget-in { position:relative; height:100%; display:flex; flex-direction:column; transform-origin:50% 50%; }
 .vrm-widget-corps { flex:1; min-width:0; display:flex; flex-direction:column; }
 .vrm-widget-corps > * { flex:1 1 auto; min-width:0; }
