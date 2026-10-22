@@ -40,7 +40,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
   await essaie('redirect_to', async () => {
     const noms = ['retourEmail', 'avecRetour', 'authCall', 'MAIL_QUOTA', 'mapMailError', 'authResendConfirm', 'authMagicLink', 'authSignUp', 'authReset', 'authSetEmail'];
     const appels = [];
-    const ctx = vm.createContext({
+    const ctx = vm.createContext({ AbortController, setTimeout, clearTimeout,
       SUPABASE_URL: 'https://base.test', SUPABASE_KEY: 'cle-publique', AUTH: { session: { access_token: 'a.b.c' } },
       writeSession: () => {}, sessionFrom: (x) => x, encodeURIComponent, JSON, String, Promise,
       // src/captcha.js tel qu'il est livré (clé de site vide : rien ne change)
