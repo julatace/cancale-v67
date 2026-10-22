@@ -22,6 +22,8 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
 
 (async () => {
   const mod = await import(path.join(__dirname, '..', 'api', '_lib', 'proprietaire-email.js'));
+  let idPreuve = () => '';
+  try { ({ idPreuve } = await import(path.join(__dirname, '..', 'api', '_lib', 'preuve-adresse.js'))); } catch (_) {}
   const { resoudreProprietaire: r, adressesDeLivraison: adr, normAdresse, sansEtiquette } = mod;
 
   // ── L'adresse de réception décide, et elle seule ──────────────────────────
@@ -93,9 +95,21 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
   const LIGNE_B = { owner: B, data: { adresses: { 'sophie@vrm.center': { owner: B } } } };
 
   await essaie('fusion des registres', () => {
-    const f = mod.fusionnerRegistres;
+    // (22 oct.) Base cloisonnée : le registre ne retient qu'une adresse PROUVÉE
+    // (`garde`, api/_lib/preuve-adresse.js). Ces contrôles jugent la FUSION des
+    // lignes : ils servent un monde où toute adresse déclarée est prouvée ; la
+    // preuve elle-même est jugée plus bas et par audit-preuve-adresse.cjs.
+    const TOUT_PROUVE = { retenue: () => true };
+    const f0 = mod.fusionnerRegistres;
+    const f = typeof f0 === 'function' ? (l, c) => f0(l, c, c ? TOUT_PROUVE : undefined) : f0;
     dit(typeof f === 'function', 'le registre se lit sur TOUTES les lignes (une par vendeur)', typeof f);
     if (typeof f !== 'function') return;
+    // Sans garde, base cloisonnée : on ne retient RIEN (mis de côté, réparable)
+    // plutôt que de donner une adresse non prouvée (irréparable).
+    dit(Object.keys(f0([LIGNE_J, LIGNE_B], true).registre).length === 0, 'base cloisonnée sans preuves lues : aucune adresse n’est retenue (jamais l’adresse d’un autre au premier qui la déclare)');
+    // Une déclaration NON prouvée ne désigne personne ET ne bloque pas le vrai propriétaire.
+    const nonProuveeB = f0([LIGNE_J, { owner: B, data: { adresses: { 'recu@vrm.center': { owner: B } } } }], true, { retenue: (a, o) => o === J });
+    dit(nonProuveeB.registre['recu@vrm.center'] === J && !nonProuveeB.conflits.length, 'l’adresse de Julien, déclarée aussi (sans preuve) par un autre : elle reste à Julien, sans conflit', JSON.stringify(nonProuveeB));
     const u = f([LIGNE_J, LIGNE_B], true);
     dit(u.registre['recu@vrm.center'] === J && u.registre['sophie@vrm.center'] === B,
       'deux vendeurs, deux lignes : les deux adresses sont connues', JSON.stringify(u.registre));
@@ -135,6 +149,14 @@ const B = '22222222-2222-2222-2222-222222222222';   // un second vendeur
     }
     if (/select=owner&limit=1/.test(u)) return etat.sondeKO ? rep('<html>502</html>', 502) : etat.sansColonne ? rep({ code: '42703' }, 400) : rep([{ owner: J }]);
     if (/id=eq\.vrm_email_owners/.test(u)) return etat.registreKO ? rep('<html>522</html>', 522) : rep(etat.lignes || []);
+    // (22 oct.) Les preuves : par défaut, chaque adresse déclarée est prouvée
+    // par son vendeur (le monde que ces contrôles jugent) ; `etat.preuves`
+    // remplace cette liste, `etat.preuvesKO` simule une panne.
+    if (/vrm_email_preuve_/.test(u)) {
+      if (etat.preuvesKO) return rep('<html>522</html>', 522);
+      const rows = etat.preuves || (etat.lignes || []).flatMap((l) => Object.keys((l.data && l.data.adresses) || {}).filter((a) => a.includes('@')).map((a) => ({ id: idPreuve(l.owner, a), owner: l.owner, adresse: a.trim().toLowerCase(), etat: 'prouvee' })));
+      return rep(rows);
+    }
     return rep([]);
   };
   const faireRes = () => { const x = { code: null, corps: null }; x.status = (n) => { x.code = n; return x; }; x.json = (o) => { x.corps = o; return x; }; x.setHeader = () => {}; x.end = () => x; return x; };

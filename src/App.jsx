@@ -12048,6 +12048,74 @@ function BlocNumerosPerimes() {
   );
 }
 
+// ── LE LIEN « CONFIRMER MON ADRESSE DE RÉCEPTION » (22 octobre) ─────────────
+// L'email envoyé À l'adresse déclarée porte `?confirmer-adresse=<empreinte>.<jeton>`.
+// On le garde (30 min, `sessionStorage`) le temps d'une connexion éventuelle —
+// le rechargement qui suit ne doit pas le perdre — et on l'efface de l'adresse.
+// La preuve se range CÔTÉ SERVEUR, et seulement depuis la session du vendeur
+// qui l'a demandée (api/email-rattacher.js, `preuve-confirmer`) : ce bandeau ne
+// fait que transmettre le lien et dire le résultat, UNE fois, sur la coque.
+const CONF_ADR_CLE = 'vrm_confirmer_adresse';
+const CONF_ADR_FORME = /^[0-9a-f]{40}\.[A-Za-z0-9_-]{43}$/;
+let __confAdr = null;   // { lien, at, etat: 'attente'|'encours'|'ok'|'deja'|'perime'|'inconnu'|'refus'|'passu', adresse, message }
+const __confAdrSubs = new Set();
+const poserConfAdr = (v) => { __confAdr = v; try { if (v && (v.etat === 'attente' || v.etat === 'encours' || v.etat === 'passu')) sessionStorage.setItem(CONF_ADR_CLE, JSON.stringify({ lien: v.lien, at: v.at })); else sessionStorage.removeItem(CONF_ADR_CLE); } catch (_) {} __confAdrSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
+if (typeof window !== 'undefined') {
+  try {
+    const q = new URLSearchParams(window.location.search || '');
+    const lien = q.get('confirmer-adresse');
+    if (lien && CONF_ADR_FORME.test(lien)) {
+      __confAdr = { lien, at: Date.now(), etat: 'attente' };
+      try { sessionStorage.setItem(CONF_ADR_CLE, JSON.stringify({ lien, at: Date.now() })); } catch (_) {}
+      try { q.delete('confirmer-adresse'); const rest = q.toString(); window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (_) {}
+    } else {
+      const g = JSON.parse(sessionStorage.getItem(CONF_ADR_CLE) || 'null');
+      if (g && CONF_ADR_FORME.test(String(g.lien || '')) && Date.now() - Number(g.at || 0) < 30 * 60000) __confAdr = { lien: String(g.lien), at: Number(g.at), etat: 'attente' };
+    }
+  } catch (_) {}
+}
+async function confirmerAdresseParLien() {
+  const c = __confAdr;
+  if (!c || !(c.etat === 'attente' || c.etat === 'passu')) return;
+  if (!AUTH.session || !AUTH.session.access_token) return;
+  poserConfAdr({ ...c, etat: 'encours' });
+  let r = null, j = null;
+  try { r = await fetch('/api/email-rattacher?mode=preuve-confirmer', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ lien: c.lien }) }); j = await r.json().catch(() => null); } catch (_) { r = null; }
+  const etat = r && r.ok && j && j.ok ? (j.deja ? 'deja' : 'ok')
+    : r && r.status === 410 ? 'perime'
+    : r && r.status === 404 ? 'inconnu'
+    : r && (r.status === 409 || r.status === 400) ? 'refus'
+    : 'passu';
+  poserConfAdr({ ...c, etat, adresse: (j && j.adresse) || '', message: (j && j.message) || '' });
+  if (etat === 'ok' || etat === 'deja') { try { lireMisDeCote(); } catch (_) {} }
+}
+function BandeauConfirmationAdresse({ onVoir }) {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { __confAdrSubs.add(force); return () => { __confAdrSubs.delete(force); }; }, []);
+  React.useEffect(() => { confirmerAdresseParLien(); }, []);
+  const c = __confAdr;
+  if (!c) return null;
+  const bon = c.etat === 'ok' || c.etat === 'deja';
+  const voir = onVoir ? <button type="button" data-voir-adresses="" onClick={() => { poserConfAdr(null); onVoir(); }} style={{ marginLeft: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes adresses</button> : null;
+  const texte = c.etat === 'attente' || c.etat === 'encours' ? 'Je confirme ton adresse de réception…'
+    : c.etat === 'ok' ? <>Adresse <b>{c.adresse || 'de réception'}</b> confirmée ✓ — les emails qui y arrivent sont rangés chez toi, et ceux mis de côté te sont proposés.{voir}</>
+    : c.etat === 'deja' ? <>Cette adresse{c.adresse ? <> (<b>{c.adresse}</b>)</> : null} était déjà confirmée ✓ — rien à faire.</>
+    : c.etat === 'perime' ? <>Ce lien a expiré (il vaut 72 heures) : demande-en un nouveau.{voir}</>
+    : c.etat === 'inconnu' ? <>Ce lien ne correspond à aucune demande de ce compte VRM : ouvre-le en étant connecté avec le compte qui a ajouté l'adresse.</>
+    : c.etat === 'refus' ? <>{c.message || "Ce lien n'a pas pu servir."}{voir}</>
+    : <>Je n'ai pas pu confirmer ton adresse pour l'instant (le serveur ne répond pas) — rien n'est perdu. <button type="button" onClick={() => confirmerAdresseParLien()} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0 }}>Réessayer</button></>;
+  const fermable = c.etat !== 'attente' && c.etat !== 'encours';
+  return (
+    <div className="vrm-tete-row">
+    <div data-confirmation-adresse={c.etat} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 10,
+      background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : (c.etat === 'attente' || c.etat === 'encours') ? C.border : C.warn}`, fontSize: 12.5, lineHeight: 1.45, color: C.text }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
+      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserConfAdr(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+    </div>
+    </div>
+  );
+}
+
 // ── « SE CONNECTER AVEC VRM » : CE QUI SE PASSE (11 octobre) ────────────────
 // Julien : « quand j'appuie sur se connecter, ça doit envoyer directement dans
 // l'application VRM ». L'extension ouvre VRM avec son identifiant ; l'app,
@@ -45767,6 +45835,43 @@ async function lireAdressesVues() {
     return Object.values(vues).sort((a, b) => b.n - a.n || (a.dernier < b.dernier ? 1 : -1));
   } catch (_) { return null; }
 }
+// ── LES ADRESSES PROUVÉES (22 octobre) ────────────────────────────────────────
+// Une adresse déclarée ne suffit plus (base cloisonnée) : VRM envoie un lien À
+// CETTE adresse, et c'est le clic, depuis la session du vendeur, qui la prouve
+// (api/_lib/preuve-adresse.js). Le SERVEUR décide l'état de chaque adresse ;
+// l'écran l'écrit tel quel (§11). Trois états de lecture : `undefined` en cours ·
+// `null` pas su · objet lu `{ cloisonnee, installation, adresses, collecteur }`.
+async function lirePreuvesAdresses() {
+  try {
+    const r = await fetch('/api/email-rattacher?mode=preuves', { headers: { ...enTeteSession() }, cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && j.adresses && typeof j.adresses === 'object' ? j : null;
+  } catch (_) { return null; }
+}
+// Demande un lien pour UNE adresse. Rend `{ etat, message }` (etat `null` = pas su).
+async function demanderPreuveAdresse(adresse) {
+  try {
+    const r = await fetch('/api/email-rattacher?mode=preuve-demander', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ adresse }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok) return { etat: j.etat, via: j.via || null, message: '' };
+    if (r.status === 422) return { etat: 'impossible', message: j.message || '' };
+    if (r.status === 429 || r.status === 409) return { etat: 'refus', message: j.message || '' };
+    return { etat: null, message: (j && j.message) || "Le serveur n'a pas répondu — rien n'est perdu, réessaie dans un moment." };
+  } catch (_) { return { etat: null, message: 'Réseau indisponible — réessaie.' }; }
+}
+// Ce qu'une ligne d'adresse dit de son état : le mot, s'il faut agir, et le geste.
+// Une cause, une phrase (§7) : l'explication générale vit UNE fois au-dessus.
+const PREUVE_LIGNE = {
+  prouvee: { t: 'confirmée', alerte: false, geste: '' },
+  transition: { t: 'reçue — à confirmer', alerte: false, geste: 'Confirmer' },
+  envoi: { t: 'lien en préparation', alerte: false, geste: '' },
+  envoyee: { t: 'lien envoyé', alerte: false, geste: 'Renvoyer' },
+  perimee: { t: 'lien expiré', alerte: true, geste: 'Renvoyer' },
+  aucune: { t: 'pas confirmée — ses emails sont mis de côté', alerte: true, geste: 'Confirmer' },
+  impossible: { t: "relais Apple : VRM ne peut pas y envoyer de lien", alerte: true, geste: '' },
+};
+// (`estRelaisApple`, déclarée plus haut, sert aussi ici — une règle, §11.)
 function EmailsSetting({onComptes}) {
   // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
   //    Sans ce troisième état, une lecture ratée affichait « Aucune adresse
@@ -45782,6 +45887,8 @@ function EmailsSetting({onComptes}) {
   const [busy, setBusy] = useState('');
   const [versionReception,setVersionReception]=useState(0);
   const [suiviAdresses,setSuiviAdresses]=useState(null);
+  const [preuves, setPreuves] = useState(undefined);
+  const [preuveBusy, setPreuveBusy] = useState('');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const racine = useRef(null);
   useEffect(() => {
@@ -45805,6 +45912,7 @@ function EmailsSetting({onComptes}) {
     //    avait rien à réclamer. « Rien lu » ne vaut pas « rien ».
     lireMisDeCote();
     lireAdressesVues().then(setVues);
+    lirePreuvesAdresses().then(setPreuves);
   }, []);
   useEffect(() => { charger(); }, [charger]);
 
@@ -45824,11 +45932,25 @@ function EmailsSetting({onComptes}) {
       });
       ok = !!(r && r.ok);
     } catch (_) { ok = false; }
-    if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return; }
+    if (!ok) { setReg(avant); toast("La liste n'a pas pu être enregistrée — réessaie."); return false; }
     setVersionReception(v=>v+1);
     // Une adresse ajoutée (ou retirée) change ce qui t'est proposé en dessous :
     // on relit, sans attendre la prochaine ouverture de l'écran.
     lireMisDeCote();
+    return true;
+  };
+  // ── LA PREUVE (22 octobre) : un lien part À CETTE ADRESSE ─────────────────
+  const confirmerAdresse = async (adr, silencieux) => {
+    setPreuveBusy(adr);
+    const r = await demanderPreuveAdresse(adr);
+    setPreuveBusy('');
+    if (!silencieux || r.etat === null) {
+      if (r.etat === 'prouvee') toast(r.via === 'compte' ? `${adr} est ton adresse de connexion VRM, déjà confirmée : c'est fait.` : `${adr} est confirmée.`);
+      else if (r.etat === 'envoi') toast(`Un lien de confirmation va partir vers ${adr}. Ouvre-le en étant connecté à VRM.`);
+      else if (r.message) toast(r.message);
+    }
+    const p = await lirePreuvesAdresses(); setPreuves(p);
+    if (r.etat === 'prouvee') lireMisDeCote();
   };
   // Une ou plusieurs adresses d'un coup (saisie à la main, ou suggestion).
   const ajouterAdresses = async (liste) => {
@@ -45841,7 +45963,15 @@ function EmailsSetting({onComptes}) {
       nouv[adr] = { owner: uid || '', label: '', at: new Date().toISOString() };
       n++;
     }
-    if (n) await ecrire(nouv);
+    if (!n) return;
+    const ok = await ecrire(nouv);
+    // Déclarer une adresse envoie son lien de confirmation (base cloisonnée :
+    // sinon aucune preuve n'est nécessaire). Le résultat s'écrit sur sa ligne.
+    if (ok && preuves && preuves.cloisonnee) {
+      const neuves = Object.keys(nouv).filter((k) => !(reg || {})[k]);
+      for (const a of neuves) { if (!estRelaisApple(a)) await demanderPreuveAdresse(a); }
+      setPreuves(await lirePreuvesAdresses());
+    }
   };
   const ajouter = async () => {
     const a = await askText({ desc: "Tes adresses personnelles.\n\nIndique les adresses où Vinted t’écrit, avant leur transfert vers VRM. Tu peux en ajouter plusieurs, séparées par des virgules. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
@@ -45924,6 +46054,19 @@ function EmailsSetting({onComptes}) {
     : misDeCote
       ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
       : { t: "Aucune adresse déclarée. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: false };
+  // ── L'état de preuve de chaque adresse, tel que le SERVEUR le décide ──────
+  const etatsPreuve = preuves && preuves.cloisonnee ? (preuves.adresses || {}) : null;
+  const etatDe = (adr) => (etatsPreuve ? (etatsPreuve[normAdresse(adr)] || null) : null);
+  const aConfirmer = liste.filter((a) => { const e = etatDe(a); return e && e.etat !== 'prouvee'; });
+  const enPreparation = liste.some((a) => (etatDe(a) || {}).etat === 'envoi');
+  const boite = preuves ? preuves.collecteur : null;               // null = pas su
+  const boiteAge = boite && boite.at ? Date.now() - Date.parse(boite.at) : null;
+  const dureeLisible = (ms) => { const h = ms / 3600e3; return h < 1 ? `${Math.max(1, Math.round(ms / 60000))} min` : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} jours`; };
+  const phraseBoite = !enPreparation || !boite ? null
+    : !boite.at ? "La boîte d'envoi de VRM n'a pas encore tourné : le lien partira dès qu'elle sera en marche."
+    : boiteAge > 30 * 60000 ? `La boîte d'envoi de VRM n'a pas tourné depuis ${dureeLisible(boiteAge)} : le lien partira dès qu'elle reprend.`
+    : `Il part de la boîte VRM (${ADRESSE_COLLECTRICE}) dans les prochaines minutes — regarde aussi les indésirables.`;
+  const quandLisible = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; };
   // Les suggestions : SES adresses déjà vues, pas encore déclarées.
   const declarees = new Set(liste.map(normAdresse));
   const sugg = Array.isArray(vues) ? vues.filter((v) => !declarees.has(v.adresse)) : [];
@@ -45976,16 +46119,48 @@ function EmailsSetting({onComptes}) {
         <div data-adresses-vide={vide.alerte ? 'alerte' : 'info'} style={{fontSize:12,color:vide.alerte?C.warn:C.muted,background:vide.alerte?`${C.warn}12`:C.bg,border:`1px solid ${vide.alerte?`${C.warn}44`:C.border}`,borderRadius:8,padding:'9px 11px',lineHeight:1.45}}>
           {vide.t}
         </div>
-      ) : liste.map(adr => (
-        <div key={adr} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+      ) : (<>
+        {/* (22 oct.) La règle de la preuve, UNE fois au-dessus des lignes (§7) ;
+            sur chaque ligne il ne reste que SON état et SON geste. */}
+        {aConfirmer.length > 0 && (
+          <div data-preuve-explication={preuves && preuves.installation ? 'installation' : 'vendeur'} style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
+            Chaque adresse se confirme une fois : VRM envoie un lien <b style={{color:C.text}}>à cette adresse</b>, et tu l'ouvres en étant connecté à VRM.{' '}
+            {preuves && preuves.installation
+              ? "Les tiennes restent reçues en attendant (tu es le propriétaire de cette installation) ; les confirmer les protège le jour où d'autres vendeurs rejoindront VRM."
+              : "Tant qu'une adresse n'est pas confirmée, ses emails sont mis de côté — rien n'est perdu, ils te sont proposés dès la confirmation."}
+            {phraseBoite ? <span data-preuve-boite={!boite.at ? 'jamais' : boiteAge > 30 * 60000 ? 'arretee' : 'active'}>{' '}{phraseBoite}</span> : null}
+          </div>
+        )}
+        {preuves === null && (
+          <div data-preuves="pas-su" style={{fontSize:11.5,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
+            Je n'ai pas pu vérifier quelles adresses sont confirmées — rien n'est perdu, rouvre cet écran dans un moment.
+          </div>
+        )}
+        {liste.map(adr => { const ep = etatDe(adr); const lp = ep ? PREUVE_LIGNE[ep.etat] : null;
+          // « Renvoyer » seulement quand le serveur l'accepterait (10 min après la demande).
+          const renvoiPermis = !ep || !ep.demandeLe || Date.now() - Date.parse(ep.demandeLe) > 10 * 60000;
+          const geste = lp && lp.geste && !(ep.etat === 'transition' && estRelaisApple(adr)) && (lp.geste !== 'Renvoyer' || renvoiPermis) ? lp.geste : '';
+          return (
+        <div key={adr} data-adresse={normAdresse(adr)} data-adresse-etat={ep ? ep.etat : (preuves === undefined ? 'lecture' : preuves === null ? 'pas-su' : 'sans-preuve')} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`,flexWrap:'wrap'}}>
           <span style={{flex:'1 1 140px',minWidth:0,fontSize:12,color:C.text,overflowWrap:'anywhere'}}>
             <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:10,color:C.danger,background:`${C.danger}0d`,borderRadius:5,padding:'1px 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
             <span style={{fontSize:11.5,color:C.muted}}>{adr}</span>
+            {lp && (
+              <span data-adresse-preuve={ep.etat} style={{display:'flex',alignItems:'center',gap:5,marginTop:3,fontSize:11.5,lineHeight:1.4,color:lp.alerte?C.warn:C.muted}}>
+                {ep.etat === 'prouvee' && <span aria-hidden="true" style={{display:'inline-flex'}}><Icon name="check" size={12}/></span>}
+                <span>{lp.t}{ep.etat === 'prouvee' && ep.via === 'compte' ? ' (ton adresse de connexion VRM)' : ''}{ep.etat === 'envoyee' && ep.envoyeLe ? ` le ${quandLisible(ep.envoyeLe)} — ouvre-le depuis cette boîte` : ''}{ep.etat === 'transition' && estRelaisApple(adr) ? ' (relais Apple : aucun lien ne peut y arriver, elle reste à toi)' : ''}</span>
+              </span>
+            )}
           </span>
+          {geste && (
+            <button type="button" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
+              style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:preuveBusy===adr?'default':'pointer',fontFamily:'inherit',opacity:preuveBusy===adr?0.5:1}}>{preuveBusy === adr ? '…' : geste}</button>
+          )}
           <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
             style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Retirer</button>
         </div>
-      ))}
+      ); })}
+      </>)}
       {/* ── CE QUE PERSONNE NE PEUT RÉCUPÉRER (le seul propriétaire le voit) ──
           Le nombre et la cause, jamais le contenu : ce tas peut contenir les
           emails d'un autre vendeur. Placé AVANT les suggestions : on lit le
@@ -48503,6 +48678,7 @@ function AppCoeur() {
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
+        <BandeauConfirmationAdresse onVoir={() => { DEMANDE_ADRESSES.on = true; try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} setTab('settings'); }}/>
         <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
