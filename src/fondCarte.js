@@ -1,42 +1,42 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  LE FOND DE CARTE — VersaTiles « muted », secours OpenFreeMap (21 octobre)
-//  Julien : « une autre carte, beaucoup plus professionnelle, fiable et de
-//  qualité » — sans clé d'API, gratuite, usage commercial permis (§2.9).
-//
-//  1. VersaTiles (tiles.versatiles.org) : pile libre (code MIT, données
-//     OpenStreetMap ODbL), « no API keys, no usage fees, does not track your
-//     users » (dépôt versatiles-org/versatiles-website). Styles PRÉ-CONSTRUITS
-//     de versatiles-org/versatiles-style 7.x, sources déjà résolues en adresses
-//     absolues : « muted » (clair : sable doux, eau bleu pâle, verts sourds — le
-//     rendu le plus proche d'Apple Plans) et « muted-dark » (un sombre COMPLET,
-//     même couches que le clair). Limite publique : 200 requêtes/s par adresse
-//     (nginx de versatiles-org/tiles.versatiles.org).
-//  2. Secours, d'un AUTRE fournisseur : OpenFreeMap (tiles.openfreemap.org,
-//     « no registration, no API keys, no cookies », aucune limite de vues —
-//     dépôt hyperknot/openfreemap) : « positron » (clair) et « dark » (sombre,
-//     « pas encore complet » selon ses auteurs : c'est un secours, pas le fond).
-//  3. Les deux injoignables (ou pas de WebGL) ⇒ l'appelant passe en LISTE :
-//     jamais une carte grise.
-//  Attributions exigées : « © OpenStreetMap » (ODbL) et le fournisseur.
-//  Ce module n'est chargé qu'à l'ouverture d'une carte (jamais au démarrage) :
-//  MapLibre GL JS (BSD-3) est un morceau à part.
+//  LE FOND DE CARTE — OpenFreeMap, « positron » (clair) et « dark » (sombre)
+//  21 octobre : « trouve autre chose pour la carte, il y a besoin d'une API
+//  key » ⇒ OpenFreeMap (instance publique : « no registration, no user
+//  database, no API keys, and no cookies », aucune limite de vues, usage
+//  commercial permis — README de hyperknot/openfreemap). Tuiles VECTORIELLES :
+//  MapLibre GL JS (BSD-3), chargé à la demande, jamais au démarrage.
+//  22 octobre : « une carte plus professionnelle » ⇒ les deux styles SOBRES
+//  d'OpenFreeMap (hyperknot/openfreemap-styles) : « positron » (gris clair,
+//  sans points d'intérêt) et « dark » (Dark Matter). Presque aucune couleur :
+//  la seule couleur d'accent de l'écran reste l'épingle de la personne (§7).
+//  « liberty » (couleurs d'OpenStreetMap) est retiré.
+//  UN seul fournisseur, UN seul domaine (tiles.openfreemap.org : style, tuiles,
+//  polices, icônes) — c'est celui que la CSP prépare et que la politique de
+//  confidentialité nomme. Aucun autre domaine n'est appelé pour le fond.
+//  Noms des lieux EN FRANÇAIS quand la tuile porte `name:fr` (« Allemagne »,
+//  pas « Germany ») ; sinon le nom d'origine du style, inchangé.
+//  Attribution exigée (OpenFreeMap · © OpenMapTiles · © OpenStreetMap) : la
+//  TileJSON du service la porte ; ce qui manquerait est ajouté, jamais doublé.
+//  Repli : MapLibre absent, pas de WebGL, style ou TileJSON injoignables, ou
+//  AUCUNE tuile dessinée à temps ⇒ l'appelant le sait (promesse rejetée) et ne
+//  laisse jamais une carte grise (la communauté passe en liste). Une tuile
+//  isolée en erreur ne fait PAS tomber une carte qui dessine le reste.
 // ════════════════════════════════════════════════════════════════════════════
-export const OSM_ATTR = '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>';
-export const FOURNISSEURS = [
-  {
-    id: 'versatiles', nom: 'VersaTiles',
-    style: { clair: 'https://tiles.versatiles.org/assets/styles/muted/style.json', sombre: 'https://tiles.versatiles.org/assets/styles/muted-dark/style.json' },
-    attribution: '<a href="https://versatiles.org" target="_blank" rel="noopener">VersaTiles</a>',
+export const FOURNISSEUR = {
+  id: 'openfreemap',
+  style: {
+    clair: 'https://tiles.openfreemap.org/styles/positron',
+    sombre: 'https://tiles.openfreemap.org/styles/dark',
   },
-  {
-    id: 'openfreemap', nom: 'OpenFreeMap',
-    style: { clair: 'https://tiles.openfreemap.org/styles/positron', sombre: 'https://tiles.openfreemap.org/styles/dark' },
-    attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>',
-    exige: ['OpenMapTiles', '<a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a>'],
-  },
+};
+export const styleCarte = (sombre) => FOURNISSEUR.style[sombre ? 'sombre' : 'clair'];
+// Ce que les licences exigent : [mot qui le reconnaît, mention à ajouter s'il manque].
+export const ATTRIBUTIONS_EXIGEES = [
+  ['OpenFreeMap', '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>'],
+  ['OpenMapTiles', '<a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a>'],
+  ['OpenStreetMap', 'Données <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">&copy; OpenStreetMap</a>'],
 ];
-export const styleCarte = (sombre, i = 0) => FOURNISSEURS[i].style[sombre ? 'sombre' : 'clair'];
-export const ATTRIBUTION_TEXTE = 'VersaTiles · © OpenStreetMap (secours : OpenFreeMap · © OpenMapTiles)';
+export const ATTRIBUTION_TEXTE = 'OpenFreeMap · © OpenMapTiles · © OpenStreetMap';
 
 let promesseMl = null;
 // MapLibre + sa feuille de style + son « worker » (module à part, servi par VRM).
@@ -68,19 +68,36 @@ export const mouvementReduit = () => {
   try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
 };
 
-// L'attribution à afficher : le fournisseur, plus ce que les licences exigent
-// et que les sources du style ne disent pas déjà (OpenStreetMap, OpenMapTiles) —
-// jamais deux fois la même mention.
-export function attributionPour(f, style) {
-  const deja = Object.values((style && style.sources) || {}).map((x) => String((x && x.attribution) || '')).join(' ');
-  const parts = [f.attribution];
-  if (f.exige && !deja.includes(f.exige[0])) parts.push(f.exige[1]);
-  if (!/OpenStreetMap/i.test(deja)) parts.push(OSM_ATTR);
-  return parts.join(' ');
+// Les mentions exigées que le texte déjà affiché (attributions des sources)
+// ne porte pas — jamais deux fois la même.
+export function attributionManquante(deja) {
+  const t = String(deja || '');
+  return ATTRIBUTIONS_EXIGEES.filter(([mot]) => !t.includes(mot)).map(([, html]) => html).join(' ');
 }
 
-// Lit le style d'un fournisseur (délai borné) et le rend PLAT : projection
-// mercator (pas de globe), sans ciel — une carte de ville, pas un planétarium.
+// Une expression de texte qui affiche un NOM (name, name_en, name:latin…) est
+// enveloppée : le nom français d'abord, s'il existe dans la tuile ; sinon
+// l'expression d'origine, telle quelle. Les numéros de route (`ref`), eux, ne
+// sont pas touchés.
+const litUnNom = (e) => JSON.stringify(e).includes('"name');
+export function enFrancais(style) {
+  if (!style || !Array.isArray(style.layers)) return style;
+  const layers = style.layers.map((l) => {
+    const tf = l && l.layout && l.layout['text-field'];
+    if (!Array.isArray(tf) || !litUnNom(tf)) return l;
+    return { ...l, layout: { ...l.layout, 'text-field': ['coalesce', ['get', 'name:fr'], tf] } };
+  });
+  return { ...style, layers };
+}
+
+// Une carte de VILLES, pas un planétarium : projection plate, ni ciel ni relief.
+export function aplatir(style) {
+  const plat = { ...style, projection: { type: 'mercator' } };
+  delete plat.sky; delete plat.terrain;
+  return plat;
+}
+
+// Lit le style (délai borné), refuse une forme qui n'est pas un style.
 export async function lireStyle(url, delaiMs = 8000) {
   const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const t = setTimeout(() => { try { ctl && ctl.abort(); } catch (_) {} }, delaiMs);
@@ -88,45 +105,54 @@ export async function lireStyle(url, delaiMs = 8000) {
     const r = await fetch(url, { signal: ctl ? ctl.signal : undefined, credentials: 'omit' });
     if (!r.ok) throw new Error('style ' + r.status);
     const s = await r.json();
-    if (!s || s.version !== 8 || !Array.isArray(s.layers) || !s.sources) throw new Error('style illisible');
-    const plat = { ...s, projection: { type: 'mercator' } };
-    delete plat.sky; delete plat.terrain;
-    return plat;
+    if (!s || s.version !== 8 || !Array.isArray(s.layers) || !s.sources || typeof s.sources !== 'object') throw new Error('style illisible');
+    return enFrancais(aplatir(s));
   } finally { clearTimeout(t); }
 }
 
-// Pose le fond sur une carte MapLibre : premier fournisseur, puis le secours.
-// « Dessiné » = l'évènement `idle` (style + tuiles du premier écran) arrivé sans
-// erreur de source/tuile, en moins de `delaiMs`. Rend l'identifiant du
-// fournisseur retenu ({ id, attribution }), ou rejette si aucun n'a pu dessiner (⇒ la liste).
-// `annule()` vrai ⇒ on s'arrête (écran fermé, thème changé entre-temps).
-export async function poserFond(carte, { sombre, annule = () => false, delaiMs = 10000, fournisseurs = FOURNISSEURS } = {}) {
-  for (let i = 0; i < fournisseurs.length; i++) {
-    if (annule()) throw new Error('annule');
-    const f = fournisseurs[i];
-    try {
-      const style = await lireStyle(f.style[sombre ? 'sombre' : 'clair']);
-      if (annule()) throw new Error('annule');
-      await new Promise((ok, ko) => {
-        let fini = false;
-        const fin = (e) => { if (fini) return; fini = true; clearTimeout(t); carte.off('error', surErreur); carte.off('idle', surIdle); e ? ko(e) : ok(); };
-        const surErreur = (e) => {
-          if (!e) return;
-          // une erreur de SOURCE de ce style (style, TileJSON, tuile) ; une police
-          // ou une icône manquante ne fait pas tomber le fond.
-          if (e.sourceId ? !!(carte.getSource && carte.getSource(e.sourceId)) : /style/i.test(String(e.error && e.error.message))) fin(new Error('tuiles'));
-        };
-        const surIdle = () => { if (carte.isStyleLoaded && carte.isStyleLoaded()) fin(); };
-        const t = setTimeout(() => fin(new Error('delai')), delaiMs);
-        carte.on('error', surErreur);
-        carte.on('idle', surIdle);
-        carte.setStyle(style, { diff: false });
-      });
-      return { id: f.id, attribution: attributionPour(f, style) };
-    } catch (e) {
-      if (String(e && e.message) === 'annule') throw e;
-      // ce fournisseur ne répond pas : le suivant
-    }
-  }
-  throw new Error('aucun fond');
+// L'attribution affichée par les sources du style (TileJSON chargée).
+function attributionsDesSources(carte, style) {
+  return Object.keys(style.sources || {}).map((k) => {
+    try { const s = carte.getSource && carte.getSource(k); return String((s && s.attribution) || ''); } catch (_) { return ''; }
+  }).join(' ');
+}
+
+// Pose le fond sur une carte MapLibre.
+// « Dessiné » = l'évènement `idle` arrivé APRÈS qu'au moins une tuile d'une
+// source du style a été chargée (un `idle` sans aucune tuile ne prouve rien :
+// ce serait une carte grise). Une source qui ne se charge pas (TileJSON
+// injoignable) ⇒ échec tout de suite ; des tuiles en erreur sans qu'AUCUNE
+// n'arrive ⇒ échec au premier `idle` ; rien du tout ⇒ échec au bout de
+// `delaiMs`. Rend { id, attribution } (la mention à AJOUTER, '' si la source
+// porte déjà tout). `annule()` vrai ⇒ on s'arrête (écran fermé, thème changé).
+export async function poserFond(carte, { sombre, annule = () => false, delaiMs = 12000, url = styleCarte(sombre) } = {}) {
+  if (annule()) throw new Error('annule');
+  const style = await lireStyle(url);
+  if (annule()) throw new Error('annule');
+  const sources = new Set(Object.keys(style.sources || {}));
+  await new Promise((ok, ko) => {
+    let fini = false, tuilesOk = 0, tuilesKo = 0;
+    const fin = (e) => {
+      if (fini) return; fini = true; clearTimeout(t);
+      carte.off('error', surErreur); carte.off('idle', surIdle); carte.off('sourcedata', surDonnee);
+      e ? ko(e) : ok();
+    };
+    const surDonnee = (e) => { if (e && e.tile && sources.has(e.sourceId)) tuilesOk++; };
+    const surErreur = (e) => {
+      if (!e || !sources.has(e.sourceId)) return; // police, icône : le fond tient sans
+      if (e.tile) tuilesKo++; else fin(new Error('source'));
+    };
+    const surIdle = () => {
+      if (annule()) return fin(new Error('annule'));
+      if (tuilesOk > 0) fin();
+      else if (tuilesKo > 0) fin(new Error('tuiles'));
+    };
+    const t = setTimeout(() => fin(new Error('delai')), delaiMs);
+    carte.on('sourcedata', surDonnee);
+    carte.on('error', surErreur);
+    carte.on('idle', surIdle);
+    carte.setStyle(style, { diff: false });
+  });
+  if (annule()) throw new Error('annule');
+  return { id: FOURNISSEUR.id, attribution: attributionManquante(attributionsDesSources(carte, style)) };
 }

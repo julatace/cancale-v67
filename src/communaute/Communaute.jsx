@@ -18,7 +18,7 @@
 //  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
 //  classement peuvent n'afficher que les membres d'un groupe.
 //  La carte : MapLibre (vectoriel), chargée à l'ouverture de l'écran (jamais
-//  au démarrage), fond VersaTiles, secours OpenFreeMap, sans clé d'API.
+//  au démarrage), fond OpenFreeMap sobre (positron / dark), sans clé d'API.
 //  Injoignable ⇒ la même communauté en liste.
 // ════════════════════════════════════════════════════════════════════════════
 import {avatarProfilPermis,initialesProfil} from './avatarDiscord.js';
@@ -29,7 +29,7 @@ import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAY
 import './communaute.css';
 import { chargerMaplibre, poserFond, webglDispo, mouvementReduit } from '../fondCarte.js';
 
-// Le fond : VersaTiles (secours OpenFreeMap), dessiné par MapLibre, chargé
+// Le fond : OpenFreeMap (positron / dark), dessiné par MapLibre, chargé
 // seulement à l'ouverture de la carte (src/fondCarte.js). Plus de Leaflet.
 
 const ENDPOINT = '/api/compte?mode=communaute';
@@ -56,11 +56,17 @@ function AvatarProfil({profil,grand=false}) {
 }
 
 // ── LA CARTE (MapLibre, vectorielle) ─────────────────────────────────────────
-// Fond VersaTiles, secours OpenFreeMap (src/fondCarte.js) ; aucun ne dessine ⇒
-// la liste. Ni rotation ni inclinaison (une carte de villes, pas un globe à
-// manipuler) ; zoom fluide ; épingles = de vrais boutons HTML de 44 px,
-// regroupées au zoom courant ; la sienne en accent. Mouvement réduit ⇒ aucun vol.
+// Fond OpenFreeMap sobre (src/fondCarte.js : « positron » clair, « dark »
+// sombre, noms en français) ; il ne dessine pas ⇒ la liste. Ni rotation ni
+// inclinaison (une carte de villes, pas un globe à manipuler) ; zoom fluide ;
+// épingles = de vrais boutons HTML de 44 px, regroupées au zoom courant ; la
+// sienne en accent. Mouvement réduit ⇒ aucun vol.
+// ⚠️ L'épingle est DANS un porteur : MapLibre place le marqueur par un
+// `transform` en ligne ; une transition ou un `position` posé sur l'élément
+// marqueur lui-même ferait traîner ou décaler les épingles quand on déplace la
+// carte. Le porteur bouge, le bouton (taille, survol, pouls) vit dedans.
 const CENTRE_FRANCE = [2.4, 46.6];
+const FOND_ATTENTE = { clair: '#F2F3F0', sombre: '#0C0C0C' }; // le fond des styles : pas d'éclair au chargement
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), ml = useRef(null), marqueurs = useRef([]), attrib = useRef(null);
   const [pret, setPret] = useState(false), [fond, setFond] = useState('charge');
@@ -75,7 +81,7 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
       const centre = moi ? [Number(moi.lon), Number(moi.lat)] : CENTRE_FRANCE;
       const m = new lib.Map({
         container: boite.current,
-        style: { version: 8, sources: {}, layers: [{ id: 'vrm-fond', type: 'background', paint: { 'background-color': sombre ? '#10141B' : '#EEF1F5' } }] },
+        style: { version: 8, sources: {}, layers: [{ id: 'vrm-fond', type: 'background', paint: { 'background-color': sombre ? FOND_ATTENTE.sombre : FOND_ATTENTE.clair } }] },
         center: centre, zoom: moi ? 8 : 4.3, minZoom: 1.5, maxZoom: 11.5,
         dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0,
         attributionControl: false, renderWorldCopies: true, fadeDuration: reduit ? 0 : 200,
@@ -93,8 +99,9 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
       if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; }
     };
   }, []);
-  // 2. Le fond suit le thème : premier fournisseur, puis le secours, puis la liste.
-  //    L'attribution est celle du fournisseur RETENU (exigée par les licences).
+  // 2. Le fond suit le thème ; il ne dessine pas ⇒ la liste. L'attribution
+  //    exigée : celle des sources, complétée de ce qui manquerait (jamais deux
+  //    fois). Repliée en « i » sur un écran étroit, dépliée ailleurs.
   useEffect(() => {
     if (!pret) return undefined;
     let annule = false;
@@ -103,7 +110,7 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
     poserFond(m, { sombre, annule: () => annule || !carte.current }).then(({ id, attribution }) => {
       if (annule || !carte.current) return;
       if (attrib.current) { m.removeControl(attrib.current); attrib.current = null; }
-      attrib.current = new lib.AttributionControl({ compact: true, customAttribution: attribution });
+      attrib.current = new lib.AttributionControl(attribution ? { customAttribution: attribution } : {});
       m.addControl(attrib.current, 'bottom-right');
       setFond(id);
     }).catch((e) => { if (!annule && String(e && e.message) !== 'annule') onEchec(); });
@@ -118,6 +125,8 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
       marqueurs.current = [];
       const groupes = grouperParPixels(cells, (c) => m.project([c.lon, c.lat]));
       for (const g of groupes) {
+        const porteur = document.createElement('div');
+        porteur.className = 'vrm-cm-porteur';
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'vrm-cm-pin' + (g.moi ? ' moi' : '') + (g.pres ? ' pres' : '') + (g.cells.length > 1 ? ' groupe' : '');
@@ -141,7 +150,8 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
             m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 80, maxZoom: 10.5, duration: reduit ? 0 : 700 });
           } else onCellules(g.cells);
         });
-        marqueurs.current.push(new lib.Marker({ element: b, anchor: 'center' }).setLngLat([g.lon, g.lat]).addTo(m));
+        porteur.append(b);
+        marqueurs.current.push(new lib.Marker({ element: porteur, anchor: 'center' }).setLngLat([g.lon, g.lat]).addTo(m));
       }
     };
     dessiner();

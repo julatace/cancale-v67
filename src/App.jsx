@@ -3924,8 +3924,9 @@ function FondMiniCarte({ lat, lon, zoom, sombre }) {
       if (!f.webglDispo()) throw new Error('webgl');
       return f.chargerMaplibre().then((ml) => {
         if (!vivant || !boite.current) return;
-        // Fond uni d'abord, puis VersaTiles, puis le secours OpenFreeMap (poserFond).
-        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [lon, lat], zoom, interactive: false, attributionControl: false });
+        // Fond uni d'abord, puis le style OpenFreeMap (poserFond). L'attribution
+        // exigée vient de la TileJSON, repliée en « i » (mini-carte).
+        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [lon, lat], zoom, interactive: false, attributionControl: { compact: true } });
         carte.once('load', () => {
           f.poserFond(carte, { sombre, annule: () => !vivant }).then(() => { if (vivant) setEtat('pret'); }).catch(() => { if (vivant) setEtat('ko'); });
         });
@@ -3954,7 +3955,7 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
   const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
   const c = proj(clat, clon, z);
-  // Fond : VersaTiles, secours OpenFreeMap (sans clé, src/fondCarte.js), MapLibre,
+  // Fond : OpenFreeMap (sans clé, src/fondCarte.js), MapLibre,
   // immobile, centré sur le même point et à la même échelle que les épingles
   // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
   // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
