@@ -10978,7 +10978,8 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
   GRISÉ avec le décompte (« Réessaie dans N s », `data-auth-attente`) ; taper
   une autre adresse le libère. Le Site URL et l'expéditeur restent des réglages
   de Julien (non simulés). Banc `attente-email.cjs` (faux GoTrue, horloge
-  pilotée, 390 et 1512) : vert ; RESULTAT_ATTENTE.
+  pilotée, 390 et 1512) : vert ; **24 rouges sur le build d'avant** ; mutation
+  « décompte toujours à 0 » ⇒ 16 rouges.
 - **(15) Pas de paiement sur des CGV vides** — mesuré : les 10 champs de
   `public/legal/editeur.js` valent `null`, `src/contact.js` est vide, et l'art. 5
   des CGV renvoie à une adresse qui n'existe pas. `api/_lib/mentions-legales.js`
