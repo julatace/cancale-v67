@@ -1,3 +1,4 @@
+import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
@@ -29,7 +30,7 @@ import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
-import { MINERAL } from "./themeMineral.js";
+import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
@@ -530,9 +531,9 @@ const THEMES = {
 // fond clair légèrement crème, encre, un bleu de marque, barre latérale bleu nuit (via le
 // jeton `chrome`). Elle REMPLACE la direction « Minéral » pierre du 13 octobre,
 // que Julien a refusée. Mêmes hex que la page d'accueil (identité commune).
-// Toute clé non couverte garde sa valeur d'avant ; le thème SOMBRE n'est pas
-// touché.
+// La palette Perle couvre les deux thèmes, y compris les portails de détail.
 Object.assign(THEMES.light, MINERAL);
+Object.assign(THEMES.dark, MINERAL_DARK);
 let C = THEMES.light;
 
 // Données d'amorçage vidées : chaque utilisateur part d'un catalogue/ventes
@@ -9878,7 +9879,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
   const H = compact ? 136 : hauteur, gx = 14, gd = 46, gy = 24, bas = 36;
-  const trait = "#5d948b";
+  const trait = C.accent;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
   const pas = max <= 50 ? 10 : max <= 200 ? 50 : max <= 500 ? 100 : max <= 1000 ? 250 : 500;
@@ -9961,7 +9962,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
     }
     return p;
   })();
-  const trait = surSombre ? '#8FB2FF' : C.accent;
+  const trait = C.accent;
   const grille = surSombre ? 'rgba(255,255,255,.08)' : C.border;
   const texte = surSombre ? 'rgba(255,255,255,.5)' : C.muted;
   const last = pts[pts.length - 1];
@@ -20093,6 +20094,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         return (
           <div data-stats-carte="courbe" data-stats-courbe data-notion="vendu" style={{...sCarte,marginTop:4}}>
             <div style={sLib}>Vendu · 12 derniers mois</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:4}}>Toutes plateformes · ventes en cours comprises</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
             <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
             <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" legende={false}/></div>
@@ -20356,7 +20358,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                   acc+=len; return el; })}
                 {/* (20 oct., revue) Le centre disait « 6984 € » à côté de « 6983,57 € » dans la
                     légende : le même total, arrondi deux fois (§7). Le montant exact. */}
-                <text x="66" y="62" textAnchor="middle" className="vrm-display" data-anneau-total={Math.round(platParts.total*100)} style={{fontSize:fmt(platParts.total).length>9?'12px':'14px',fontWeight:800,fill:C.text}}>{fmt(platParts.total)}</text>
+                <text x="66" y="62" textAnchor="middle" className="vrm-display" data-anneau-total={Math.round(platParts.total*100)} style={{fontSize:'13px',fontWeight:800,fill:C.text}}>{fmt(platParts.total)}</text>
                 <text x="66" y="79" textAnchor="middle" style={{fontSize:'11px',fill:C.muted}}>CA total</text>
               </svg>
               {/* 220 px : sur téléphone la légende passe SOUS l'anneau — à 150 px elle
@@ -27259,6 +27261,15 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
   }
   return R;
 };
+function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
+ const [ouvert,setOuvert]=React.useState(false);
+ return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
+  <div className="vrm-day-head"><h3>Performance</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
+  <div className="vrm-performance-chiffres"><div><span>Ventes ce mois</span><b>{partiel?'—':moisN}</b></div><div><span>Prix de vente moyen</span><b>{!partiel&&moisN?fmt(moisEur/moisN):'—'}</b></div></div>
+  {partiel&&<p style={{fontSize:11,color:C.muted}}>Lecture partielle : les indicateurs attendent les ventes manquantes.</p>}
+  <details onToggle={e=>setOuvert(e.currentTarget.open)}><summary>Marques et pays des acheteurs <span>Vinted · toutes périodes</span></summary>{ouvert&&<RepartitionsVentes panelOff={panelOff}/>}</details>
+ </section>;
+}
 function RepartitionsVentes({ panelOff }) {
   const { ventes, ko } = useVentesCoque();
   const [extras, setExtras] = React.useState(undefined);
@@ -27315,6 +27326,8 @@ function RepartitionsVentes({ panelOff }) {
           <button key={k} type="button" data-repart-mode={k} aria-pressed={mode === k} onClick={() => setMode(k)} style={{border:'none',borderRadius:999,padding:'5px 12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:32,background:mode === k ? C.card : 'transparent',color:mode === k ? C.text : C.muted,boxShadow:mode === k ? C.shadow : 'none'}}>{l}</button>
         ))}
       </div>
+      <div className="vrm-repartition-visuel">
+      {bloc?.n>0 && <RepartitionAnneau elements={top.map(e=>({...e,k:lib(e.k)}))} total={bloc.n}/>}
       <div data-repart-liste={mode} style={{marginTop:12}}>
         {mode === 'pays' && extrasPasSu ? <div style={sNote}>Le détail de tes transactions n'a pas pu être lu : le pays de tes clients n'est pas affiché plutôt qu'un pays faux.</div>
           : mode === 'pays' && extras === undefined ? <div style={sNote}>Je lis le pays de tes clients…</div>
@@ -27333,6 +27346,7 @@ function RepartitionsVentes({ panelOff }) {
           Sur {bloc.n} vente{bloc.n > 1 ? 's' : ''} dont {mode === 'pays' ? 'le pays du client' : mode === 'marques' ? 'la marque' : mode === 'tailles' ? 'la taille' : 'le modèle'} est connu{mode === 'marques' || mode === 'tailles' ? 'e' : ''} (sur {R.total}){mode === 'pays' ? ' · lu dans le détail de la transaction' : mode === 'modeles' ? ' · lu dans le titre' : ' · lue sur l’annonce, sinon dans le titre'}.
         </div>}
         {manque > 0 && <div style={{...sNote,fontSize:11,marginTop:4}}>Sans {manque} compte{manque > 1 ? 's' : ''} dont les ventes n'ont pas pu être lues.</div>}
+      </div>
       </div>
     </div>
   );
@@ -28392,7 +28406,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null }) {
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
@@ -35835,6 +35849,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
 
+            {!baseKO && !premierJour && !loading && sales.items && <PerformanceJournee panelOff={panelOff} onNav={onNav} moisN={moisN} moisEur={moisEur} partiel={nomsVentesKO.length>0}/>}
             {!premierJour && (()=>{
               const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
               const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
@@ -46600,6 +46615,7 @@ function AppCoeur() {
     try {
       const t = dark ? THEMES.dark : THEMES.light;
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      for (const [nom,valeur] of Object.entries(variablesTheme(t,dark))) document.documentElement.style.setProperty(nom,valeur);
       const m = document.querySelector('meta[name="theme-color"]');
       if (m) m.setAttribute('content', t.bg);
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
@@ -48051,7 +48067,7 @@ function AppCoeur() {
   if (MULTI_USER && authState.session && etatMfa(authState.session) !== 'ok') return <PorteMfa session={authState.session}/>;
 
   return (
-    <div className="vrm-app-shell" style={{'--vrm-ink':C.text,'--vrm-brand-filter':dark?'invert(1)':'none','--vrm-muted':C.muted,'--vrm-faint':C.faint,'--vrm-hair':C.hair,'--vrm-bar':C.bar,'--vrm-accent':C.accent,'--vrm-card2':C.card2,'--vrm-line':C.border,'--vrm-surface':C.card,'--vrm-bg':C.bg,height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    <div className="vrm-app-shell" style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
       onTouchStart={e=>{
       // Pas de navigation par balayage quand le geste commence dans une
       // surface flottante (modale, ajustement du tampon, carte...) :
@@ -48539,7 +48555,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" accounts={vintedAccounts} only="journee" alertes={notifItems} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
