@@ -29,7 +29,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
-  const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b', email: 'banc@vrm.test', totp: [] } };
+  const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
   const ls = window.localStorage; const poserSess = () => {
     try { if (ls.getItem('vrm_acces_direct') === '1' && !ls.getItem('vrm_session')) { Storage.prototype.setItem.call(ls, 'vrm_session', JSON.stringify(SESS_BANC)); Storage.prototype.setItem.call(ls, 'vrm_local_owner', SESS_BANC.user.id); } } catch (_) {}
   };
@@ -87,7 +87,9 @@ function poser(pw) {
   const c = pw.chromium; c.__vrmPorte = true;
   // BANC_TRACE=1 : chaque réponse /rest/v1 ou /api en erreur est imprimée (diagnostic).
   const tracer = (ctx) => { if (process.env.BANC_TRACE !== '1') return; ctx.on('response', (r) => { const u = decodeURIComponent(r.url()); if (/\/rest\/v1\/|\/api\//.test(u) && (r.status() >= 400 || process.env.BANC_TRACE_TOUT)) console.log('TRACE', r.status(), u.slice(0, 200)); }); ctx.on('requestfailed', (r) => { if (/\/rest\/v1\/|\/api\//.test(r.url())) console.log('TRACE échec', r.url().slice(0, 200)); }); };
-  const surContexte = (ctx) => { try { ctx.addInitScript(SCRIPT); tracer(ctx); } catch (_) {} return ctx; };
+  // BANC_SESSION_UID : un banc qui déclare SON vendeur (owner explicite sur ses lignes) le donne ici.
+  const script = () => SCRIPT.replace('__UID_BANC__', process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
+  const surContexte = (ctx) => { try { ctx.addInitScript(script()); tracer(ctx); } catch (_) {} return ctx; };
   // Un banc écrit sur une autre machine vise parfois /usr/bin/chromium : absent,
   // on prend le Chromium installé ici (même moteur, rien d'autre ne change).
   const fs = require('fs'); const ICI = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -97,7 +99,7 @@ function poser(pw) {
     const b = await launch(...a);
     const nc = b.newContext.bind(b), np = b.newPage.bind(b);
     b.newContext = async (...x) => surContexte(await nc(...x));
-    b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(SCRIPT); } catch (_) {} return p; };
+    b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return p; };
     return b;
   };
   const lpc = c.launchPersistentContext.bind(c);

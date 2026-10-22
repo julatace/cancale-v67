@@ -45375,13 +45375,15 @@ function SecuriteSetting() {
   };
   // Ce qu'on écrit quand la sonde n'a pas répondu : jamais un diagnostic.
   const PAS_SU = "Le sondage n'a pas abouti (réseau, ou base injoignable). Rouvre cet écran pour réessayer.";
+  // Un état « OK » s'écrit à l'encre, sans couleur (§7) : INV_STATUS.online.color est le vert
+  // #0F8A6A de l'ancienne palette menthe (banc formes-communes, 22 oct.).
   const Ligne = ({ t, ok, etat, d, action }) => (
     <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
-      <span style={{flexShrink:0,marginTop:2,display:'inline-flex',color: ok == null ? C.muted : ok ? INV_STATUS.online.color : C.warn}}>
+      <span style={{flexShrink:0,marginTop:2,display:'inline-flex',color: ok == null ? C.muted : ok ? C.text : C.warn}}>
         <Icon name={ok == null ? 'clock' : ok ? 'check' : 'alert'} size={14}/>
       </span>
       <div style={{minWidth:0,flex:'1 1 140px'}}>
-        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok == null ? C.muted : ok ? INV_STATUS.online.color : C.warn}}>· {etat}</span></div>
+        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color: ok == null ? C.muted : ok ? C.text : C.warn}}>· {etat}</span></div>
         <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
         {action}
       </div>
@@ -45402,7 +45404,7 @@ function SecuriteSetting() {
         {/* Le titre du sous-écran (téléphone) le dit déjà : caché là par CSS (§7) ;
             le verdict à côté reste. Sur ordinateur, c'est le seul titre du panneau. */}
         <div className="vrm-titre-panneau" style={{fontSize:13,fontWeight:600,color:C.text}}>Sécurité des données</div>
-        <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn,background:(sondeInconnue?C.muted:proteges?INV_STATUS.online.color:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
+        <span style={{fontSize:11,fontWeight:600,color:sondeInconnue?C.muted:proteges?C.text:C.warn,background:(sondeInconnue?C.muted:proteges?C.text:C.warn)+'18',borderRadius:8,padding:'1px 8px'}}>
           {st === null ? 'vérification…' : sondeInconnue ? 'pas encore vérifié' : proteges ? 'cloisonnées' : 'partagées'}
         </span>
       </div>

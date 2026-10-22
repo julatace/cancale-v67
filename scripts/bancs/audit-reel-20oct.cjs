@@ -24,6 +24,7 @@ const { servir } = require('./_minipgrest.cjs');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4917;
 const OWNER = '00000000-0000-0000-0000-0000000000aa';
+process.env.BANC_SESSION_UID = OWNER; // la session de banc (_porte-banc.cjs) est celle de ce vendeur
 const UID = '111';
 const now = Date.now();
 const iso = (ms) => new Date(ms).toISOString();
