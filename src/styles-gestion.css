@@ -33,17 +33,24 @@
  border-color:var(--gestion-accent)!important;
  box-shadow:0 0 0 3px color-mix(in srgb,var(--gestion-accent) 14%,transparent);
 }
-.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-stock-views)>button[aria-pressed]{
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
  border-radius:8px!important;border:1px solid var(--gestion-line)!important;
  background:var(--gestion-surface)!important;color:var(--gestion-muted)!important;
  font-weight:600!important;box-shadow:none!important;
 }
-.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-stock-views)>button[aria-pressed=true]{
+.vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed=true]{
  background:var(--gestion-accent)!important;border-color:var(--gestion-accent)!important;
  color:var(--gestion-on-accent)!important;
 }
+.vrm-main .vrm-shared-workbar>input[type=search]{
+ border:1px solid var(--gestion-line)!important;border-radius:10px!important;
+ background:var(--gestion-surface)!important;color:var(--gestion-ink)!important;
+}
+.vrm-main .vrm-shared-workbar>input[type=search]:focus-visible{
+ outline:2px solid var(--gestion-accent);outline-offset:2px;
+}
 .vrm-main :is(.vrm-sale-row,.vrm-ann-card):last-child{border-bottom:0!important;}
-.vrm-main .vrm-ventes-liste>.vrm-sale-row{border-radius:0!important;box-shadow:none!important;}
+.vrm-main .vrm-sale-row{border-radius:0!important;box-shadow:none!important;}
 .vrm-main .vrm-sale-row[data-ligne-ouverte=true]{background:var(--gestion-soft)!important;}
 .vrm-main .vrm-ledger-sale-toggle:focus-visible{
  outline:2px solid var(--gestion-accent);outline-offset:-2px;border-radius:6px;
