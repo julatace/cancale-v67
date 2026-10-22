@@ -114,7 +114,7 @@ const PONT = (o) => {
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: connecte ? { ok: true, connecte: true, email: 'vendeur@exemple.test', user_id: 'u1' } : { ok: true, connecte: false }, vinted: null, cmds: {} }, code) });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, vrm: connecte ? { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ } : { ok: true, connecte: false }, vinted: null, cmds: {} }, code) });
   });
   post({ __vmr: 'ready', version });
 };
