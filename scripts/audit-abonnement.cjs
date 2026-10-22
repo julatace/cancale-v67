@@ -421,7 +421,7 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
 
   console.log('\n── Qui ne paie plus ne reçoit plus rien (notifications)');
   const pousser = (owner) => commeVendeur(owner, () => libPush.sendPushToAll({ title: 'vente', tag: 't' }));
-  const avecAppareil = (o) => { appData[`${o}|push_subs`] = { owner: o, id: 'push_subs', data: { subs: [{ endpoint: 'https://push.exemple.test/' + o.slice(0, 4), keys: {} }] } }; };
+  const avecAppareil = (o) => { appData[`${o}|push_subs`] = { owner: o, id: 'push_subs', data: { subs: [{ endpoint: 'https://fcm.googleapis.com/' + o.slice(0, 4), keys: {p256dh:'cle-publique-banc',auth:'auth-banc'} }] } }; };
   await essaie('push coupé', async () => {
     reset(); obligatoire = true; avecAppareil(A);
     const r = await pousser(A);
@@ -472,13 +472,13 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   };
   await essaie('push sans session', async () => {
     reset();
-    const r = await appelPush('', { action: 'subscribe', sub: { endpoint: 'https://push.exemple.test/x', keys: {} } });
+    const r = await appelPush('', { action: 'subscribe', sub: { endpoint: 'https://fcm.googleapis.com/x', keys: {p256dh:'cle-publique-banc',auth:'auth-banc'} } });
     dit(r.code === 401 && ecrituresData.length === 0, 'base cloisonnée, sans session → refusé, aucun appareil rangé (il n’atterrit pas chez le propriétaire)', `HTTP ${r.code} · ${ecrituresData.length} écriture(s)`);
   });
   await essaie('push deux vendeurs', async () => {
     reset();
-    const ra = await appelPush('aa.bb.A', { action: 'subscribe', sub: { endpoint: 'https://push.exemple.test/A', keys: {} } });
-    const rb = await appelPush('aa.bb.B', { action: 'subscribe', sub: { endpoint: 'https://push.exemple.test/B', keys: {} } });
+    const ra = await appelPush('aa.bb.A', { action: 'subscribe', sub: { endpoint: 'https://fcm.googleapis.com/A', keys: {p256dh:'cle-publique-banc',auth:'auth-banc'} } });
+    const rb = await appelPush('aa.bb.B', { action: 'subscribe', sub: { endpoint: 'https://fcm.googleapis.com/B', keys: {p256dh:'cle-publique-banc',auth:'auth-banc'} } });
     const la = appData[`${A}|push_subs`], lb = appData[`${B}|push_subs`], lp = appData[`${PROPRIO}|push_subs`];
     dit(ra.code === 200 && rb.code === 200, 'chaque vendeur connecté enregistre son appareil', `A ${ra.code} · B ${rb.code}`);
     dit(la && la.data.subs.length === 1 && la.data.subs[0].endpoint.endsWith('/A') && lb && lb.data.subs[0].endpoint.endsWith('/B') && !lp,

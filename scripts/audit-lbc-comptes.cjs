@@ -63,7 +63,7 @@ function faireCtx(SRC, seed, local) {
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined; ctx.__ecrits = ecrits;
-  vm.createContext(ctx); vm.runInContext(SRC, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  vm.createContext(ctx); vm.runInContext(SRC, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken; // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   return ctx;
 }
 

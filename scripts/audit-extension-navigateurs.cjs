@@ -118,7 +118,7 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
   // ── D. Le VRAI fond dans un Firefox imité : la liaison par le pont ─────────
   const SRC_BG = path.join(EXT, 'background.js');
   const UID = '11111111-2222-4333-8444-555555555555';
-  const faireFx = (avecCompat) => faireFond({ src: SRC_BG, firefox: { compat: avecCompat ? COMPAT : null } });
+  const faireFx = (avecCompat) => faireFond({ src: SRC_BG, store:{__sansSession:true}, firefox: { compat: avecCompat ? COMPAT : null } });
   await essaie('fond Firefox : liaison par le pont', async () => {
     const f = faireFx(true);
     const app = { origin: 'https://vrm.center', url: 'https://vrm.center/', tab: { id: 3, url: 'https://vrm.center/' } };

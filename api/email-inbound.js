@@ -1186,6 +1186,9 @@ async function chargerRegistreEmails() {
         headers:{...sbCle(SUPABASE_KEY),Range:`${debut}-${debut+taille-1}`,'Range-Unit':'items'},
         signal:AbortSignal.timeout(10000),
       });
+      // À une frontière exacte, PostgREST peut répondre 416 plutôt qu'une
+      // page vide. Seul son total confirmé égal au nombre déjà lu conclut.
+      if(r.status===416){const fin=/^\*\/(\d+)$/.exec(r.headers?.get?.('content-range')||'');return debut>0&&fin&&Number(fin[1])===debut?fusionnerRegistres(lignes,true):null;}
       if(!r.ok)return null;
       const j=await r.json();if(!Array.isArray(j))return null;
       for(const l of j){if(!l.owner||vus.has(l.owner))return null;vus.add(l.owner);lignes.push(l);}

@@ -65,7 +65,7 @@ function faire(seed) {
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   vm.createContext(ctx); vm.runInContext(SRC, ctx, { filename: 'background.js' });
-  ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 });
+  ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken;
   const envoyer = (msg) => new Promise((res) => {
     let fini = false; const r = (v) => { if (!fini) { fini = true; res(v); } };
     let async_ = false;

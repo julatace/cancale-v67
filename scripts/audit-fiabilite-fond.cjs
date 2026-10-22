@@ -120,13 +120,13 @@ function espionPosts(f) {
     dit(!melange, 'session qui change en route : jamais owner d\'un côté et clé publique / autre cible de l\'autre',
       ph.map((q) => `${q.url.replace(/^.*\?/, '')} ${q.auth.slice(0, 16)} [${q.rows.map((x) => x.owner || '∅')}]`).join(' | ') || 'aucun POST');
 
-    // d) base non cloisonnée : comportement d'avant (clé publique, cible id).
+    // d) Même sans schéma de séparation, aucune écriture anonyme.
     const k = faireFond({ src: SRC });
     k.ctx.isCloisonne = async () => false;
     k.ctx.authToken = async () => null;
     const pk = espionPosts(k);
     const r4 = await k.ctx.supabaseUpsert('app_data', [{ id: 'harvest_111_profile', data: {} }], 'id');
-    dit(r4 === true && pk.length === 1 && /on_conflict=id/.test(pk[0].url), 'base non cloisonnée : l\'écriture part comme avant', `${pk.length} POST`);
+    dit(r4 === false && pk.length === 0, 'base non cloisonnée : sans session, aucune écriture', `${pk.length} POST`);
   });
 
   console.log('— 2. Une réponse d\'erreur de Vinted n\'est pas une conversation —');
