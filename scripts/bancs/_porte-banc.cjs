@@ -61,7 +61,7 @@ const SCRIPT = `(() => {
           // Les bancs d'avant le 21 oct. traitent tout « select=owner… » comme LEUR sonde
           // de cloisonnement (400, ou [] — « pas de ligne », ce qui faisait renuméroter
           // à partir de 1). Un vrai PostgREST rend la ligne : on la demande au banc sans
-          // `owner`, puis on pose l'owner (lecture filtrée sur lui).
+          // « owner », puis on pose l'owner (lecture filtrée sur lui).
           const r = await vrai(url.replace(/([?&]select=)owner,/, '$1'), init);
           let j = null; try { j = await r.clone().json(); } catch (_) { return r; }
           if (!r.ok || !Array.isArray(j)) return r;
