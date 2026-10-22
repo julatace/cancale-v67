@@ -2492,6 +2492,27 @@ function enLigneDesLignes(lignesL, lignesP, supp, maintenant) {
   return { lignes, aConfirmer, parCompte };
 }
 // </enligne-regle>
+// <masquees-regle> — ⚠️⚠️ 22 OCTOBRE : UNE ANNONCE MASQUÉE PAR VINTED EST UNE
+// PAIRE SUR L'ÉTAGÈRE. Mesuré (lecture seule) sur julatace35260 : son dressing
+// (lu le 17/10) porte 6 annonces `is_hidden: true` (ni `is_closed`, ni
+// `is_draft`, `item_closing_action` vide) — Vinted les a masquées, la paire est
+// toujours chez lui. Quatre portaient un N° (51, 52, 59, 73) redonné le 18/10 à
+// une AUTRE paire en ligne, et la règle des doublons du 20 octobre ne les voyait
+// pas : elles n'étaient ni « en ligne », ni « à confirmer » (la règle les range
+// parmi les FERMÉES). Deux paires présentes sous un même N° est le seul risque
+// irréversible de l'app (§5) : elles comptent désormais comme PRÉSENTES partout
+// où un numéro se protège (`annoncesPresentes`, §11). Elles ne sont PAS « en
+// ligne » : ni dans les totaux, ni dans les files Leboncoin/eBay.
+// Prises dans les FERMÉES rendues par `enLigneDuCompte` (jamais dans le dressing
+// brut : une annonce démasquée depuis y est déjà « en ligne »). Une suppression
+// vue APRÈS la lecture qui l'a vue masquée la retire (`supprimeeApres`, le même
+// jugement que pour les annonces en ligne ; « pas su » n'écarte rien). Fonctions
+// PURES.
+function masqueeSurVinted(it) { return !!(it && it.is_hidden && !it.is_closed && !it.is_draft); }
+function masqueesDuCompte(fermees, suppIds, capDressing) {
+  return (Array.isArray(fermees) ? fermees : []).filter((it) => masqueeSurVinted(it) && !supprimeeApres(suppIds, it.id, capDressing));
+}
+// </masquees-regle>
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
 // La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
@@ -2996,8 +3017,9 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
   // La date de LECTURE du dressing (`capturedAt`, jamais `updated_at` qui ment,
   // §4.3) — la même fonction que ses autres lecteurs (`dateLectureDressing`, §11).
   const ts = row ? dateLectureDressing(row) : NaN;
+  const supp = await lireSupprimees(uid);
   const res = enLigneDuCompte(payload && Array.isArray(payload.items) ? { items: payload.items, cap: ts } : null,
-    pub, await lireSupprimees(uid), Date.now());
+    pub, supp, Date.now());
   if (isFinite(res.lu)) _harvestSeen[`${uid}_listings`] = res.lu; else if (!isNaN(ts)) _harvestSeen[`${uid}_listings`] = ts;
   const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
   if (maxAge > 0 && isFinite(res.lu) && (Date.now() - res.lu) > maxAge) return null;
@@ -3005,7 +3027,10 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
   const items = res.fermees.concat(res.absentes.map((it) => ({ ...it, is_closed: true, _vrmAbsente: true })), res.enLigne);
   return { ...(payload || {}), items,
     _vrmSupprimees: res.supprimees.map((it) => String(it.id)), _vrmAbsentes: res.absentes.map((it) => String(it.id)),
-    _vrmAConfirmer: res.aConfirmer, _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source };
+    _vrmAConfirmer: res.aConfirmer, _vrmLu: isFinite(res.lu) ? res.lu : null, _vrmSource: res.source,
+    // 22 oct. : les annonces MASQUÉES par Vinted (paires présentes, jamais « en
+    // ligne ») et l'heure de la lecture qui les a vues masquées.
+    _vrmMasquees: masqueesDuCompte(res.fermees, supp, ts), _vrmMasqueesLu: isFinite(ts) ? ts : null };
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
@@ -7239,6 +7264,9 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                soldIds: h.items.filter(venduChezVinted).map(x => String(x.id)),
                supprimees: (h._vrmSupprimees || []).length + (h._vrmAbsentes || []).length,
                aConfirmer: (h._vrmAConfirmer || []).map(mapWardrobeItem),
+               // 22 oct. : masquées par Vinted — paires PRÉSENTES (numéros),
+               // jamais « en ligne » (`<masquees-regle>`).
+               masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null })),
                lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null,
                pagination: h.pagination || null, source: 'harvest' };
     }
@@ -7275,7 +7303,10 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   }
   const items = brut.filter(isOnlineListing).map(mapWardrobeItem);
   // Lue à l'instant, page après page : c'est une lecture complète et fraîche.
-  return { ok: okUn, items, pagination, lu: okUn ? Date.now() : null };
+  // Les annonces masquées par Vinted sont des paires présentes (22 oct.).
+  const vueLe = okUn ? Date.now() : null;
+  const masquees = brut.filter(masqueeSurVinted).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: vueLe }));
+  return { ok: okUn, items, masquees, pagination, lu: vueLe };
 };
 
 // Detecte un numero de paire ecrit dans un titre Vinted, au format "nXX",
@@ -10935,7 +10966,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
   const lu = (v) => (v === undefined ? null : v);
   const rn = toutSurLeNumero(q, {
     fiches: fichesLues, pool: cloud ? load('vinted_used_numeros', null) : null,
-    enLigne: lu(nd.enLigne), aConfirmer: nd.aConfirmer || null,
+    enLigne: lu(nd.enLigne), aConfirmer: nd.aConfirmer || null, masquees: nd.masquees || null,
     comptesOk: comptesRecherche(comptes),
     ventes: lu(nd.ventes), txnItem: lu(nd.txnItem),
     saleOv: load('vinted_sale_overrides', {}) || {},
@@ -10970,7 +11001,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
     </button>
   );
   const titreSec = (t) => <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4, margin: '12px 2px 2px' }}>{t}</div>;
-  const ETAT_ANN = { 'en-ligne': 'En ligne sur Vinted', 'a-confirmer': 'À confirmer (dernière lecture ancienne)', 'plus-en-ligne': 'Plus en ligne', passu: 'Annonces pas encore lues' };
+  const ETAT_ANN = { 'en-ligne': 'En ligne sur Vinted', 'a-confirmer': 'À confirmer (dernière lecture ancienne)', masquee: 'Masquée par Vinted, toujours chez toi', 'plus-en-ligne': 'Plus en ligne', passu: 'Annonces pas encore lues' };
   const ETAT_BORD = { pret: 'Prêt à imprimer', imprime: 'Imprimé', poste: 'Posté', attente: 'En attente du PDF' };
   const { vinted, lbc, ebay } = rn.ventes;
   const rien = rn.etat === 'rien';
@@ -30130,7 +30161,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    `numeroReprises`, `vinted_nums_physiques`) — comme `numDoublons` (§11).
   //    (`onlineAnnonceIds` reste « en ligne » : relier une vente PROUVÉE à une
   //    annonce à confirmer est juste — c'est même souvent pour ça qu'elle l'est.)
-  const presentesAnnonceIds = useMemo(() => new Set([...(listings.items || []), ...(listings.aConfirmer || [])].map(it => String(it.id))), [listings.items, listings.aConfirmer]);
+  // ⚠️⚠️ 22 OCTOBRE — ET LES ANNONCES MASQUÉES PAR VINTED (`<masquees-regle>`) :
+  //    la paire est sur l'étagère, son numéro aussi. UNE liste des annonces
+  //    PRÉSENTES pour tout ce qui protège un numéro (§11) : `porteursNum`,
+  //    `numDoublons`, le règlement des doublons, `vinted_nums_physiques`, les
+  //    cartons à vérifier / à réécrire. Jamais pour les totaux « en ligne » ni
+  //    les files Leboncoin/eBay. Une même annonce ne compte qu'une fois.
+  const annoncesPresentes = useMemo(() => {
+    const vus = new Set(), out = [];
+    for (const it of [...(listings.items || []), ...(listings.aConfirmer || []), ...(listings.masquees || [])]) {
+      const k = it && it.id != null ? String(it.id) : ''; if (!k || vus.has(k)) continue; vus.add(k); out.push(it);
+    }
+    return out;
+  }, [listings.items, listings.aConfirmer, listings.masquees]);
+  const presentesAnnonceIds = useMemo(() => new Set(annoncesPresentes.map(it => String(it.id))), [annoncesPresentes]);
   // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
   // ⚠️ UNE SEULE RÈGLE D'IDENTITÉ (§11) : « quelle annonce est cette vente ? ».
   // Deux voies, toutes deux certaines, et RIEN d'autre :
@@ -30265,7 +30309,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
     // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
     // présentes, `porteursNum`/`numDoublons`, §11).
-    const presentes = [...(listings.items || []), ...(listings.aConfirmer || [])];
+    // 22 oct. : et les masquées par Vinted (`annoncesPresentes`).
+    const presentes = annoncesPresentes;
     if (!presentes.length) return;   // rien de sûr à publier
     if (!sales.items) return;
     const vivants = new Set();
@@ -30280,7 +30325,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i]);
       if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
     } catch (_) {}
-  }, [listings.items, listings.aConfirmer, sales.items, numeros, saleOv]);
+  }, [annoncesPresentes, sales.items, numeros, saleOv]);
 
   // ⚠️⚠️ LE RÉCAP URSSAF DU TABLEAU DE BORD AFFICHAIT 0 € PARTOUT.
   // Il lit `vinted_sales` — l'archive des anciennes ventes, VIDÉE en juillet
@@ -30477,6 +30522,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = numeros[it.id]; const uid = String((it._acc && it._acc.vinted_user_id) || '');
       if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id, aConfirmer: true, lu: Number((listings.lues || {})[uid]) || null });
     }
+    // 22 oct. : une annonce MASQUÉE par Vinted est une paire sur l'étagère — elle
+    // PORTE son numéro (`<masquees-regle>`). Marquée, pour le dire autrement.
+    const dejaAnn = new Set([...(listings.items || []), ...(listings.aConfirmer || [])].map(it => String(it.id)));
+    for (const it of (listings.masquees || [])) {
+      if (dejaAnn.has(String(it.id))) continue;
+      const e = numeros[it.id];
+      if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id, masquee: true, lu: Number(it._vrmVueMasqueeLe) || null });
+    }
     for (const o of (sales.items || [])) {
       // ⚠️ UNE VENTE ANNULÉE AVANT L'ENVOI GARDE SA PLACE. La paire n'a jamais
       // quitté la maison : son carton est toujours sur l'étagère, avec son
@@ -30498,7 +30551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, listings.aConfirmer, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
+  }, [listings.items, listings.aConfirmer, listings.masquees, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
 
   // Numéros OCCUPÉS par une paire réellement présente — jamais réattribuables.
   const numsOccupes = useMemo(() => {
@@ -30599,7 +30652,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Revue de la 5.167 : une annonce « à confirmer » n'est ni « en ligne » ni
       // « partie » — on ne sait pas. On le dit tel quel, et on ne propose JAMAIS
       // de lui prendre son numéro.
-      const qui = presents.map(p => p.type === 'annonce' ? (p.aConfirmer
+      const qui = presents.map(p => p.type === 'annonce' ? (p.masquee
+          ? `📦 masquée par Vinted, toujours chez toi « ${p.titre} »`
+          : p.aConfirmer
           ? `📦 peut-être encore en ligne « ${p.titre} » (son compte n'a pas été relu depuis ${p.lu ? depuisFr(p.lu).replace(/^il y a /, '') : 'longtemps'})`
           : `📦 en ligne « ${p.titre} »`)
         : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
@@ -31000,13 +31055,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ── NUMÉROS À VÉRIFIER SUR LES CARTONS (18 octobre) ─────────────────────
   // Les paires en ligne (ou à confirmer) numérotées automatiquement pendant la
   // panne de synchronisation : leur N° a pu être redonné (`PANNE_NUMEROS`).
-  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer].filter((it) => ficheAVerifier(numeros[it.id])),
-  [annBase, annAConfirmer, numeros]);
+  // 22 oct. : les paires MASQUÉES par Vinted sont sur l'étagère, numérotées
+  // elles aussi pendant la panne — même filtre que la grille (`garderAnnonce`).
+  const annMasquees = useMemo(() => (listings.masquees || []).filter(garderAnnonce),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [listings.masquees, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer, ...annMasquees].filter((it) => ficheAVerifier(numeros[it.id])),
+  [annBase, annAConfirmer, annMasquees, numeros]);
   // Les paires qui ont reçu un numéro NEUF (doublon réglé) et dont le carton
   // porte encore l'ancien : dites jusqu'à « C'est écrit » (sinon le bordereau
   // dit N°90 et le carton N°51 — la mauvaise paire part).
-  const aEcrireCarton = useMemo(() => [...(listings.items || []), ...(listings.aConfirmer || [])].filter((it) => reattribueAEcrire(numeros[it.id])),
-  [listings.items, listings.aConfirmer, numeros]);
+  const aEcrireCarton = useMemo(() => annoncesPresentes.filter((it) => reattribueAEcrire(numeros[it.id])),
+  [annoncesPresentes, numeros]);
   // Le numéro que porte la paire sur eBay, par IDENTITÉ seulement : un brouillon
   // eBay préparé depuis CETTE annonce (`pairId`), et la référence (SKU) de
   // l'annonce eBay qu'il a créée. Jamais un rapprochement par titre (§5).
@@ -31059,7 +31119,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const moi = String(it.id), cle = cleNum((numeros[moi] || {}).numero);
     return cle ? (porteursNum[cle] || []).filter((p) => !(p.type === 'annonce' && String(p.id) === moi)) : [];
   };
-  const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à expédier' : p.type === 'annulee' ? 'vente annulée, encore là' : 'en ligne'})`;
+  const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à expédier' : p.type === 'annulee' ? 'vente annulée, encore là' : p.masquee ? 'masquée par Vinted, toujours chez toi' : 'en ligne'})`;
   // Donner un numéro NEUF à une paire (jamais un numéro déjà servi) — sur SON clic.
   const donnerNumeroNeuf = async (it, pourquoi) => {
     const f = numeros[String(it.id)] || {};
@@ -31091,7 +31151,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
     if (!a.length) return;
     const pris = new Set([...takenNums, ...numsOccupes]), prisK = new Set([...takenCles, ...Object.keys(porteursNum)]);
-    const tous = [...(listings.items || []), ...(listings.aConfirmer || [])];
+    const tous = annoncesPresentes;      // 22 oct. : masquées comprises
     const now = new Date().toISOString(), faits = [];
     for (const x of a) {
       const it = tous.find((y) => String(y.id) === x.id); if (!it) continue;
@@ -31189,7 +31249,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const par = new Map();
     // 5.167 : une paire « à confirmer » est peut-être encore sur l'étagère — un
     // numéro en double avec elle reste un risque (le seul irréversible, §5).
-    for (const it of [...(listings.items || []), ...(listings.aConfirmer || [])]) {
+    // 22 oct. : et une paire MASQUÉE par Vinted — elle est sur l'étagère.
+    for (const it of annoncesPresentes) {
       const n = cleNum((numeros[it.id] || {}).numero);
       if (!n) continue;
       if (!par.has(n)) par.set(n, []);
@@ -31200,7 +31261,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       .map(([numero, list]) => ({ numero, items: list }))
       .sort((a, b) => triNum(a.numero, b.numero));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, listings.aConfirmer, numeros]);
+  }, [annoncesPresentes, numeros]);
 
   // Un numéro en double est trop grave pour rester derrière une barre repliée :
   // on déplie tout seul. Les autres signalements restent discrets.
@@ -32306,8 +32367,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (avant && avant.loading) signalPendantLecture.current = true;
       return;
     }
-    const cached = !force && !parSignal && entreeCache('listings');
-    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    // (22 oct.) Une entrée de cache d'avant les annonces MASQUÉES ne sait pas
+    // lesquelles le sont : « pas su » — on relit plutôt que de servir « aucune ».
+    const cached0 = !force && !parSignal && entreeCache('listings');
+    const cached = cached0 && Array.isArray(cached0.masquees) ? cached0 : null;
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
     // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
     // est affiché pendant la lecture, et un échec ne remplace rien.
     if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
@@ -32329,7 +32393,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // dressing, ou sa lecture publique relue depuis un autre compte) ; les
     // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
     // jamais dans `items`, donc jamais comptées en ligne.
-    const lues = {}, supprimees = {}, aConfirmer = [];
+    const lues = {}, supprimees = {}, aConfirmer = [], masquees = [];
     for (const { acc, r } of results) {
       const uid = String(acc.vinted_user_id);
       if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
@@ -32337,6 +32401,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (avant.lues && avant.lues[uid]) lues[uid] = avant.lues[uid];
         if (avant.supprimees && avant.supprimees[uid]) supprimees[uid] = avant.supprimees[uid];
         (avant.aConfirmer || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) aConfirmer.push(it); });
+        (avant.masquees || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) masquees.push(it); });
         if ((avant.ko || []).includes(uid)) { anyErr = true; failedUids.push(uid); }
         continue;
       }
@@ -32344,7 +32409,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (Number.isFinite(r.lu)) lues[uid] = r.lu;
         else if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
         if (r.supprimees) supprimees[uid] = r.supprimees;
-        (r.aConfirmer || []).forEach(it => aConfirmer.push({ ...it, _acc:acc })); }
+        (r.aConfirmer || []).forEach(it => aConfirmer.push({ ...it, _acc:acc }));
+        (r.masquees || []).forEach(it => masquees.push({ ...it, _acc:acc })); }
       else { anyErr=true; failedUids.push(uid); }
     }
     const error = out.length===0 && anyErr && !anyOk;
@@ -32361,13 +32427,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.ph) it.captPhotos = info.ph;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
-    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer });
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer, masquees });
     // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
     // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
     if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, aConfirmer, ko: failedUids });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, aConfirmer, masquees, ko: failedUids });
     if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
@@ -37837,7 +37903,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {it.photo && <PhotoVinted src={it.photo} alt="" style={{width:34,height:34,borderRadius:8,objectFit:'cover',flexShrink:0}}/>}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
-                      <div style={{fontSize:10,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/></div>
+                      <div style={{fontSize:10,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/>{it._vrmMasquee ? <span data-doublon-masquee> · masquée par Vinted, toujours chez toi</span> : null}</div>
                     </div>
                     <button type="button" onClick={async ()=>{
                       const libre = String(nextNumero);
@@ -39065,12 +39131,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // propose son numéro neuf. Sinon on ne devine pas (§5).
               const fautives=c.porteurs.filter(p=>p.type==='annonce'&&ficheAVerifier(numeros[p.id]));
               const fautive=fautives.length===1&&c.porteurs.length>1?fautives[0]:null;
-              const item=fautive?(listings.items||[]).concat(listings.aConfirmer||[]).find(x=>String(x.id)===String(fautive.id)):null;
+              const item=fautive?annoncesPresentes.find(x=>String(x.id)===String(fautive.id)):null;
               const autres=fautive?c.porteurs.filter(p=>p!==fautive):[];
               return (
               <div key={c.numero} data-conflit-num={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
                 <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
-                  <span key={i}>{i>0?' · ':''}{p.type==='annonce'?'en ligne':p.type==='vente'?'à expédier':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                  <span key={i} data-conflit-porteur={p.masquee?'masquee':p.type}>{i>0?' · ':''}{p.type==='annonce'?(p.masquee?'masquée par Vinted, toujours chez toi':'en ligne'):p.type==='vente'?'à expédier':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
                 ))}
                 {item && <div data-conflit-fautive={String(item.id)} style={{marginTop:4,lineHeight:1.45}}>
                   La panne du 18 octobre a redonné ce numéro à « {String(item.title||'').slice(0,40)} », alors qu'il était déjà sur {autres.map(nomPorteur).join(' et ')}.{' '}
@@ -42996,6 +43062,7 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
         <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
         <div style={{ fontSize: 12, color: C.muted }}>
           VRM dit <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
+          {it._vrmMasquee ? <> · <span data-verif-masquee>masquée par Vinted</span></> : null}
           {preuve ? <> · <span data-verif-preuve>{preuve}</span></> : null}
         </div>
       </div>
@@ -46687,10 +46754,15 @@ function AppCoeur() {
       loadRoomPlan().catch(()=>undefined),
     ]);
     const plan=planLu===undefined?null:normalizePlan(planLu);
-    let enLigne=null, aConfirmer=null;
-    if(lstRows){ try{ const lu=await lireLignesEnLigne(lstRows); enLigne=new Set(); aConfirmer=new Set();
+    let enLigne=null, aConfirmer=null, masquees=null;
+    if(lstRows){ try{ const lu=await lireLignesEnLigne(lstRows); enLigne=new Set(); aConfirmer=new Set(); masquees=new Set();
       for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
-      for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id)); }catch(_){ enLigne=null; aConfirmer=null; } }
+      for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
+      // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
+      const supp=await lireSupprimeesTous();
+      for(const r of lstRows){ const k=/^harvest_(\d+)_listings$/.exec(String((r&&r.id)||'')); const res=k?lu.parCompte.get(k[1]):null; if(!res) continue;
+        for(const it of masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r))) masquees.add(String(it.id)); }
+    }catch(_){ enLigne=null; aConfirmer=null; masquees=null; } }
     let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(o); } } } }
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
     let lbcVentes=null, lbcItems=null;
@@ -46699,7 +46771,7 @@ function AppCoeur() {
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders','orders:data->orders','orders'), tous('ebay_listings','items:data->items','items')]); }
-    if(vivant) setNumData({enLigne,aConfirmer,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
+    if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
