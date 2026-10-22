@@ -38,7 +38,9 @@ if (process.argv.includes('--prouve')) {
     ['filtres', 'inject', "for (const k of Object.keys(f)) if (k !== 'owner' && k !== 'enums') return null;", ''],
     // « rien lu » lu comme « rien » : la forme `|| {}` qui effaçait (audit-fusion).
     ['lecture', 'src', "if (rows === null) { noterDiag('lbc_liste_complete_lecture_ratee'); return { ok: false, code: 'lecture' }; }\n      const data = (rows[0] && rows[0].data) || {};", 'const data = (rows && rows[0] && rows[0].data) || {};'],
-    ['proprio', 'src', "if (!miens.has(owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }", ''],
+    ['proprio', 'src', "if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }", ''],
+    // Le compte écrit `lbc-account:{id}` (la source privée de main, 22 oct.) n'est plus reconnu.
+    ['prefixe', 'src', "const idCompteLbc = (x) => String(x || '').replace(/^lbc-account:/i, '');", "const idCompteLbc = (x) => String(x || '');"],
     ['compte', 'src', 'if (c.compte === voulu) return { ok: true, tabId: Number(tid) };', 'return { ok: true, tabId: Number(tid) };'],
     ['suppression', 'inject', "const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads';", "const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads';"],
     ['uneALaFois', 'src', "if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre mise en pause est en cours — une à la fois' };", ''],
@@ -103,7 +105,10 @@ function page({ reseau = () => null, top = true, hote = 'www.leboncoin.fr', fond
   win.crypto = { randomUUID: () => 'jeton-' + Math.random().toString(16).slice(2, 14) };
   const ls = {};
   const commun = () => ({
-    window: win, self: win, location: { origin: 'https://' + hote, hostname: hote, href: 'https://' + hote + '/' },
+    window: win, self: win, location: { origin: 'https://' + hote, hostname: hote, href: 'https://' + hote + '/', pathname: '/' },
+    // Un document sans `__NEXT_DATA__`, déjà chargé : le capteur est déjà dans la
+    // page (`currentScript` présent), il ne se réinjecte pas.
+    document: { currentScript: {}, readyState: 'complete', getElementById: () => null, addEventListener() {}, createElement: () => ({}), head: { appendChild() {} } },
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
     URL, FormData: class {}, TextEncoder, console: silence, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
     Headers: class { constructor(o) { this.o = o || {}; } entries() { return Object.entries(this.o); } },
@@ -260,6 +265,7 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     '303': { id: '303', subject: 'C (revenue)', account: MON, status: 'active', plusVueAt: '2026-10-01T10:00:00.000Z' },
     '304': { id: '304', subject: 'D (pause ancienne, revue)', account: MON, status: 'active', pauseAt: new Date(Date.now() - 2 * 3600e3).toISOString(), pauseStatut: 200 },
     '305': { id: '305', subject: 'E (pause récente, encore listée)', account: MON, status: 'active', pauseAt: new Date(Date.now() - 10 * 60e3).toISOString(), pauseStatut: 200 },
+    '306': { id: '306', subject: 'F (capturée par la source privée, absente)', account: 'lbc-account:' + MON, status: 'active', seenAt: '2026-10-22T14:00:00.000Z' },
     '901': { id: '901', subject: 'Chalet', account: AUTRE, status: 'active' },
   });
   const comptes = { accounts: { ['lbc-account:' + MON]: { id: 'lbc-account:' + MON, name: 'Totomondu', sessionAt: '2026-10-22T10:00:00.000Z', preuveCompte: 'membre-prive-v1' }, [MON]: { id: MON, sessionAt: '2026-10-22T10:00:00.000Z', source: 'session:messagerie' } } };
@@ -274,6 +280,7 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     dit(!it['301'].plusVueAt && !it['303'].plusVueAt, 'présente dans la liste ⇒ pas « plus vue » ; une « plus vue » revenue est rétablie', JSON.stringify([it['301'].plusVueAt, it['303'].plusVueAt]));
     dit(!it['304'].pauseAt && !!it['305'].pauseAt, 'une pause d’il y a 2 h encore listée est levée ; d’il y a 10 min, gardée (index en retard)', JSON.stringify([it['304'].pauseAt, it['305'].pauseAt]));
     dit(!it['901'].plusVueAt, 'l’annonce d’un autre vendeur n’est jamais touchée');
+    dit(!!(it['306'] && it['306'].plusVueAt), 'une annonce rangée sous « lbc-account:{id} » (la source privée) est le MÊME compte : absente ⇒ « plus vue »', JSON.stringify(it['306']));
     const lec = ((f.base.lbc_listings || {}).lectures || {})[MON];
     dit(!!lec && lec.total === 4 && lec.n === 4, 'la lecture complète est datée, par compte', JSON.stringify(lec));
   });
@@ -372,6 +379,13 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(!!it.pauseAt && it.pauseStatut === 200 && it.status === 'active', 'l’annonce porte « mise en pause » (un état ; rien n’est effacé)', JSON.stringify(it));
     dit(((f.local.vrmLbcPauses || []).length) === 1, 'la pause compte dans le plafond horaire');
+  });
+  await essaie('compte écrit lbc-account:', async () => {
+    const p = page({ reseau: sitePause(200, '{}') });
+    const b = baseP(); b.lbc_listings.items[ID].account = 'lbc-account:' + MON;
+    const f = fond(b, transport(MON), { tabs: unOnglet, onglet: versPage(p) });
+    const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
+    dit(r && r.etape === 'fait', 'une annonce dont le compte s’écrit « lbc-account:{id} » se met en pause sur ce compte (pas « autre compte »)', JSON.stringify(r));
   });
   await essaie('pause refusée', async () => {
     const p = page({ reseau: sitePause(403, '{"error":"forbidden"}') });

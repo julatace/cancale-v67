@@ -11006,17 +11006,25 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   la réponse, silence ⇒ « je ne sais pas ». La forme de la réponse est rangée
   (`lbc_recon.envois`, clés et types seulement). Une pause encore listée moins
   d'1 h après n'est pas levée (index de recherche, borne non mesurée).
+- **Fusion avec main (6056c7d, « sources privées »)** : main range désormais ses
+  annonces sous `account: 'lbc-account:{id}'` (0 aujourd'hui en base, les 10 de
+  Julien portent l'id nu). Les deux formes sont UNE identité (`idCompteLbc`) pour
+  « plus vue » et pour la pause — sinon ses annonces recapturées n'auraient plus
+  jamais été marquées, et la pause aurait répondu « autre compte » sur son propre
+  compte. Et `storeLbcListings` (main) réécrivait `{items, updatedAt, lastUrl}`
+  seul : il garde maintenant les autres clés (`lectures`).
 - **Preuves** : `audit-lbc-plus-vue-pause.cjs` (vrais `lbc-inject.js`, `lbc-relay.js`,
-  `background.js` en vm) **47 contrôles, 28 rouges sur origin/main**, et
-  `--prouve` : 11 mutations, chacune rouge. Banc `bancs/lbc-pause.cjs` (port 6331,
+  `background.js` en vm) **49 contrôles, 30 rouges sur origin/main (6056c7d)**, et
+  `--prouve` : 12 mutations (dont `prefixe`), chacune rouge. Banc `bancs/lbc-pause.cjs` (port 6331,
   données inventées, 390 et 1512 px, 4 scénarios) **38 contrôles, 28 rouges sur le
   build d'origin/main** (dont Ma journée « 2 à retirer » au lieu de 1) ; trois
   builds réaffaiblis, chacun rouge : règle sans `plusVueAt`/`pauseAt` (8),
   pause sans confirmation (4), « quelle paire ? » sur une annonce périmée (2).
   `audit-double-vente` lit encore `let lbcRemoveCount=0;` (orthographe gardée).
-  `double-vente.cjs` (6) et `lbc-relier.cjs` (8) sont rouges À L'IDENTIQUE sur main.
+  `double-vente.cjs` (30) et `lbc-relier.cjs` (8) sont rouges À L'IDENTIQUE sur
+  main 6056c7d (mêmes contrôles, comparés ligne à ligne pour le premier).
 - **Extension touchée** (`background.js`, `lbc-inject.js`, `lbc-relay.js`), **version
-  NON montée** (5.211.0, `audit-extension-zip` rouge jusqu'à l'intégration) ; aucune
+  NON montée** (5.212.0 de main, `audit-extension-zip` rouge jusqu'à l'intégration) ; aucune
   entrée d'`EXT_CAPACITES` (capacité par présence).
 - ⚠️ **Non mesuré** : la réponse de Leboncoin à la pause et ses en-têtes requis (le
   premier clic EST la mesure) ; la valeur de `ad_type` et de `referrer_id` dans

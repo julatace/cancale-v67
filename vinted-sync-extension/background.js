@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.211.0';
+const CODE_VERSION = '5.212.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -813,7 +813,7 @@ function renouvelerUneFois() {
 // qui vient de le poser — donc toujours frais, même en cas d'écritures en
 // parallèle.
 let _statutDernierRefus = null;
-async function supabaseUpsert(table, rows, onConflict) {
+async function supabaseUpsert(table, rows, onConflict, ownerAttendu = null) {
   const list = Array.isArray(rows) ? rows : [rows];
   // ⚠️⚠️ 19 octobre (5.193) — LA SESSION SE LIT UNE FOIS PAR ENVOI, ET SANS
   //    ELLE UNE BASE CLOISONNÉE NE REÇOIT RIEN. Mesuré chez Julien :
@@ -829,6 +829,7 @@ async function supabaseUpsert(table, rows, onConflict) {
   const envoyer = async () => {
     const s = await authToken();
     if (!(s && s.access_token && s.user_id)) return 'sans_session';
+    if(ownerAttendu!=null&&String(s.user_id)!==String(ownerAttendu))return 'sans_session';
     const owned = list.map((r) => Object.assign({}, r, { owner: s.user_id }));
     let target = onConflict;
     if (table === 'app_data' && onConflict === 'id') target = 'owner,id';
@@ -2072,6 +2073,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // « 0 annonce » et « je n'ai rien pu lire » sont le même silence.
 
           if(msg.action==='lbcSessionPrivee'){
+            const ownerReception=(await loadSession())?.user_id;
+            if(!ownerReception){sendResponse({ok:false});return;}
             const compte=lireSessionPriveeLbc(msg.preuve,msg.url),tabId=sender?.tab?.id;
             if(!compte||tabId==null||sender?.frameId>0||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
             const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{},avant=cartes[tabId]||{};
@@ -2079,7 +2082,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             cartes[tabId]={...avant,source:'prive',compte:ambigue?'':compte.id,ambigue,at:Date.now()};
             await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
             if(ambigue){sendResponse({ok:false});return;}
-            const ok=await storeLbcAccount(compte);sendResponse({ok});return;
+            const ok=await storeLbcAccount(compte,ownerReception);sendResponse({ok});return;
           }
           if(msg.action==='lbcTransport'){
             const tabId=sender?.tab?.id;
@@ -2172,7 +2175,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             // Les listes privées passent par lbcRaw avec le compte du même document.
             sendResponse({ok:false,raison:'source-compte-non-confirmee'});return;
           }
-          if (msg.action === 'lbcRaw' && msg.body) { await handleLbcRaw(msg.url, msg.body, msg.session); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcRaw' && msg.body) {
+            if(/\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
+            const r=await handleLbcRaw(msg.url,msg.body,msg.session);if(r&&(r.etat==='enregistre'||/\/adfinder\/v\d+\/myads\b|\/classifieds\/analysis\/list|\/compte\/(?:part|pro)\/mes-annonces/i.test(String(msg.url))))await noterReceptionLbc('annonces',r,sender);sendResponse(r||{ok:true,etat:'sans-annonce'});return;
+          }
           // 22 oct. : une liste COMPLÈTE d'un vendeur (toutes les pages, total
           // atteint — prouvé par la page, voir lbc-inject.js). Seulement depuis le
           // cadre principal d'un onglet leboncoin.fr, et seulement pour un de SES
@@ -2184,7 +2190,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             if ((sender && sender.frameId > 0) || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tabUrl) || !/^[0-9a-f-]{8,64}$/i.test(owner)
               || !ids || !Number.isInteger(total) || total < 1 || ids.length !== total || new Set(ids).size !== total || ids.some((x) => !/^\d{1,15}$/.test(x))) { sendResponse({ ok: false }); return; }
             const miens = await comptesMiens();
-            if (!miens.has(owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }
+            if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }
             await noterListeLbcComplete(owner, ids, total);
             sendResponse({ ok: true }); return;
           }
@@ -2194,7 +2200,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // encore. C'est une lecture de SES ventes (§3), rangée dans lbc_recon.
           // On garde une place par famille (pas par id) : la 100e vente n'écrase
           // pas la carte, elle la rafraîchit. Jamais dans une fixture (§6).
-          if (msg.action === 'lbcVente' && msg.body) { const corps = String(msg.body).slice(0, 200000); await storeLbcVente(msg.url, corps, !!msg.coupe); try { await rangerLbcVentes(extraireVentesLbc(msg.url, corps)); } catch (_) {} sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcVente' && msg.body) {
+            const ownerReception=(await loadSession())?.user_id;
+            if(!ownerReception){sendResponse({ok:false,etat:'ecriture-refusee'});return;}
+            const corps=String(msg.body);
+            if(/\/compte\/(?:part|pro)\/(?:transaction|mes-transactions)/i.test(String(msg.url))){try{const u=new URL(msg.url),t=new URL(sender.url||sender.tab?.url);if(sender.frameId>0||u.origin+u.pathname!==t.origin+t.pathname){sendResponse({ok:false});return;}}catch(_){sendResponse({ok:false});return;}}
+            if(msg.coupe||new TextEncoder().encode(corps).length>200000){const r={ok:false,etat:'partiel'};await noterReceptionLbc('transactions',r,sender);sendResponse(r);return;}
+            const compte=msg.session?await sessionDeListe(msg.session):null;
+            if(msg.session&&!compte){sendResponse({ok:false,etat:'compte-non-confirme'});return;}
+            const ventes=extraireVentesLbc(msg.url,corps);
+            if(compte)for(const v of ventes){v.account=compte.id;v.accountName=compte.name||'';}
+
+            if(!ventes.length){const r={ok:false,etat:'format-non-reconnu',nombre:0};await noterReceptionLbc('transactions',r,sender);sendResponse(r);return;}
+            const ok=await rangerLbcVentes(ventes,ownerReception),r={ok:ok===true,etat:ok===true?'enregistre':'ecriture-refusee',nombre:ventes.length};await noterReceptionLbc('transactions',r,sender);sendResponse(r);storeLbcVente(msg.url,corps,false,ownerReception).catch(()=>{});return;
+          }
           // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
           // propre ligne, une place par endpoint, rien ne peut l'évincer.
           if (msg.action === 'lbcCatalogue' && msg.body) { await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
@@ -9534,6 +9553,16 @@ async function buildLbcData() {
   const postedList = [...posted].filter((x) => /^\d+$/.test(x)).map((pid) => { const e = numeros[pid] || {}; return { id: pid, numero: String(e.numero || '?'), title: e.title || '' }; }).sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   return { queue, removals, unlinked, stats, postedList };
 }
+// Un accusé porte le résultat d'une écriture de données, pas d'un compteur.
+async function noterReceptionLbc(famille,resultat,sender){
+  const tab=sender?.tab?.id;if(tab==null||sender?.frameId>0||!['annonces','transactions'].includes(famille))return;
+  try{const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{},avant=cartes[tab]||{};
+    const etats=['enregistre','liste-vide','compte-non-confirme','aucune-annonce-reconnue','format-non-reconnu','ecriture-refusee','lecture-refusee','partiel'];
+    const etat=etats.includes(resultat?.etat)?resultat.etat:'format-non-reconnu';
+    cartes[tab]={...avant,receptions:{...(avant.receptions||{}),[famille]:{etat,nombre:Math.max(0,Math.min(10000,Number(resultat?.nombre)||0)),photos:Math.max(0,Math.min(10000,Number(resultat?.photos)||0)),at:Date.now()}},at:Date.now()};
+    await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
+  }catch(_){}
+}
 // Range TES annonces Leboncoin captées passivement dans une ligne dédiée. On
 // fusionne (par id) avec ce qui est déjà connu → l'historique se complète au fil
 // de ta navigation, sans écraser. Sert au dispatcher LBC→Vinted + synchro inverse.
@@ -9550,20 +9579,21 @@ function photosAnnonceLbc(node){
 }
 // ⚠️ (22 oct.) TROIS ÉCRIVAINS DE `lbc_listings` — les annonces vues, la liste
 //    complète d'un compte (`noterListeLbcComplete`) et la mise en pause
-//    (`noterPauseLbc`) — chacun en lire-fusionner-réécrire. Sans file, deux
-//    écritures proches repartaient de la MÊME lecture : la seconde effaçait la
-//    première (une annonce marquée « plus vue » redevenait muette). Une seule
-//    chaîne ; une étape qui lève n'arrête pas les suivantes.
-let chaineLbcListings = Promise.resolve();
-function enChaineLbcListings(fn) {
-  const p = chaineLbcListings.then(fn, fn);
-  chaineLbcListings = p.catch(() => {});
-  return p;
+//    (`noterPauseLbc`) — chacun en lire-fusionner-réécrire. Ils passent par la
+//    MÊME file que `storeLbcListings` : deux écritures proches repartaient sinon
+//    de la même lecture, et la seconde effaçait la première (une annonce marquée
+//    « plus vue » redevenait muette). Une étape qui lève n'arrête pas la suite.
+let _chainestoreLbcListings=Promise.resolve();
+function enChaineLbcListings(fn){
+  const p=_chainestoreLbcListings.then(fn,fn);
+  _chainestoreLbcListings=p.catch(()=>{});return p;
 }
-async function storeLbcListings(url, listings) {
-  return enChaineLbcListings(() => storeLbcListingsUn(url, listings));
+async function storeLbcListings(url, listings,ownerAttendu=null){
+  const owner=ownerAttendu||(await loadSession())?.user_id;
+  if(!owner)return {ok:false,etat:'ecriture-refusee'};
+  return enChaineLbcListings(()=>storeLbcListingsUneFois(url, listings,owner));
 }
-async function storeLbcListingsUn(url, listings) {
+async function storeLbcListingsUneFois(url, listings,owner) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_listings&select=data');
     // ⚠️ « RIEN LU » NE VAUT PAS « RIEN ». `sbGet` rend `null` quand la base n'a
@@ -9571,7 +9601,7 @@ async function storeLbcListingsUn(url, listings) {
     //    du moment, et effacerait tout l'historique de ses annonces Leboncoin.
     //    Le cas qui détruit n'est pas la panne totale (l'écriture échoue aussi),
     //    c'est LECTURE KO / ÉCRITURE OK — un simple timeout.
-    if (prevRows === null) return;
+    if (prevRows === null) return {ok:false,etat:'lecture-refusee'};
     const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.items) || {};
     const merged = Object.assign({}, prev);
     for (const l of listings) { if (l && l.id) {
@@ -9579,9 +9609,14 @@ async function storeLbcListingsUn(url, listings) {
       const images=photosAnnonceLbc(l);
       merged[String(l.id)]=Object.assign({},ancien,l,{images:images.length?images:photosAnnonceLbc(ancien),seenAt:new Date().toISOString()});
     } }
-    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: { items: merged, updatedAt: new Date().toISOString(), lastUrl: url } }], 'id');
-    noterFlux('leboncoin', _okFlux !== false);
-  } catch (_) {}
+    // (22 oct.) On garde les autres clés de la ligne — `lectures`, la date de la
+    // dernière liste COMPLÈTE de chaque compte — : réécrire `{items,…}` seul les
+    // effaçait à chaque annonce vue.
+    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, (prevRows[0] && prevRows[0].data) || {}, { items: merged, updatedAt: new Date().toISOString(), lastUrl: url }) }], 'id',owner);
+    await noterFlux('leboncoin', _okFlux === true);
+    if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});
+    return {ok:_okFlux===true,etat:_okFlux===true?'enregistre':'ecriture-refusee',nombre:listings.length,photos:listings.filter(l=>photosAnnonceLbc(merged[String(l.id)]).length>0).length};
+  } catch (_) {return {ok:false,etat:'ecriture-refusee'};}
 }
 // ══════════════════════════════════════════════════════════════════════════
 // LA LISTE COMPLÈTE D'UN COMPTE LEBONCOIN (22 octobre — proposition 14)
@@ -9604,7 +9639,12 @@ async function storeLbcListingsUn(url, listings) {
 // qui la montre encore qu'au-delà d'une heure : l'index de recherche de
 // Leboncoin peut avoir du retard (non mesuré — borne prudente).
 const LBC_PAUSE_INDEX_MS = 3600e3;
+// Le compte d'une annonce s'écrit de deux façons : l'identifiant nu (captures
+// d'avant) ou `lbc-account:{id}` (la source privée, depuis le 22 octobre). Une
+// seule identité : on compare sans le préfixe.
+const idCompteLbc = (x) => String(x || '').replace(/^lbc-account:/i, '');
 async function noterListeLbcComplete(owner, ids, total) {
+  owner = idCompteLbc(owner);
   return enChaineLbcListings(async () => {
     try {
       const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
@@ -9616,7 +9656,7 @@ async function noterListeLbcComplete(owner, ids, total) {
       let sortent = 0, reviennent = 0;
       for (const [id, ad] of Object.entries(items)) {
         if (!ad || typeof ad !== 'object') continue;
-        if (String(ad.account || ad.lbcUser || '') !== owner) continue;
+        if (idCompteLbc(ad.account || ad.lbcUser) !== owner) continue;
         if (vus.has(String(id))) {
           const n = Object.assign({}, ad); let change = false;
           if (n.plusVueAt) { delete n.plusVueAt; change = true; }
@@ -9715,7 +9755,7 @@ async function pauseLbcDepuisApp(msg) {
     if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
     const ad = rows[0] && rows[0].a;
     if (!ad || typeof ad !== 'object') return { accepte: false, code: 'inconnue', raison: "cette annonce n'est pas parmi tes annonces Leboncoin captées — rien n'est parti" };
-    const compte = String(ad.account || ad.lbcUser || '');
+    const compte = idCompteLbc(ad.account || ad.lbcUser);
     if (!/^[0-9a-f-]{8,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette annonce — rien n'est parti" };
     const accs = (accRows && accRows[0] && accRows[0].a) || {};
     const nom = nomCompteLbc(accs, compte) || 'le compte de cette annonce';
@@ -9842,7 +9882,14 @@ async function storeLbcMessages(patch) {
     noterFlux('leboncoin', ok !== false);
   } catch (_) {}
 }
-async function storeLbcAccount(acc) {
+let _chainestoreLbcAccount=Promise.resolve();
+async function storeLbcAccount(acc,ownerAttendu=null){
+  const owner=ownerAttendu||(await loadSession())?.user_id;
+  if(!owner)return false;
+  const p=_chainestoreLbcAccount.then(()=>storeLbcAccountUneFois(acc,owner));
+  _chainestoreLbcAccount=p.catch(()=>{});return p;
+}
+async function storeLbcAccountUneFois(acc,owner) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
     if (prevRows === null) {await noterFlux('leboncoin',false);return false;}                 // pas su ≠ aucun compte (voir storeLbcListings)
@@ -9867,13 +9914,16 @@ async function storeLbcAccount(acc) {
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
+    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id',owner);
+    await noterFlux('leboncoin', _okFlux === true);
+    if(_okFlux===true&&(await loadSession())?.user_id===owner){
     try {
       if (acc.courant === true && acc.source && !LBC_URL_AUTRUI.test(String(acc.source))) {
         await chrome.storage.local.set({ vrmLbcCompte: { v: 2, id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', source:acc.source||'', at: Date.now() } });
       }
     } catch (_) {}
-    const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
-    await noterFlux('leboncoin', _okFlux === true);
+    }
+
     return _okFlux === true;
   } catch (_) {await noterFlux('leboncoin',false);return false;}
 }
@@ -10072,6 +10122,7 @@ function viderLbcRecon() {
   const p = _lbcReconChaine.then(async () => {
     const st = await lireTamponLbc();
     if (!st || !st.patch || !Object.keys(st.patch).length) return;
+    if(!st.owner||(await loadSession())?.user_id!==st.owner)return;
     const reste = LBC_ECRITURE_MIN_MS - (Date.now() - Number(st.dernier || 0));
     if (reste > 0) { programmerLbcRecon(reste); return; }
     const prevRows = await sbGet('app_data?id=eq.lbc_recon&select=data');
@@ -10080,17 +10131,17 @@ function viderLbcRecon() {
     //    ratée réécrivait la ligne avec le seul échantillon du moment : la carte
     //    partait. Prouvé : `form:PERDU · etapes:PERDUES`. Ici : on garde les
     //    morceaux, et on réessaie au prochain passage.
-    if (prevRows === null) { await ecrireTamponLbc({ patch: st.patch, dernier: Date.now() }); programmerLbcRecon(LBC_ECRITURE_MIN_MS); return; }
+    if (prevRows === null) { await ecrireTamponLbc({ owner:st.owner,patch: st.patch, dernier: Date.now() }); programmerLbcRecon(LBC_ECRITURE_MIN_MS); return; }
     const prev = (prevRows[0] && prevRows[0].data) || {};
     const next = appliquerMorceauxLbc(prev, st.patch);
     const change = sansDateLbc(next) !== sansDateLbc(prev);
     if (change) {
       next.updatedAt = new Date().toISOString();
-      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id');
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_recon', data: next }], 'id',st.owner);
       noterFlux('leboncoin', ok !== false);
-      if (ok === false) { await ecrireTamponLbc({ patch: st.patch, dernier: Date.now() }); programmerLbcRecon(LBC_ECRITURE_MIN_MS); return; }
+      if (ok === false) { await ecrireTamponLbc({ owner:st.owner,patch: st.patch, dernier: Date.now() }); programmerLbcRecon(LBC_ECRITURE_MIN_MS); return; }
     } else noterDiag('lbc_recon_inchange');
-    await ecrireTamponLbc({ patch: {}, dernier: Date.now() });
+    await ecrireTamponLbc({ owner:st.owner,patch: {}, dernier: Date.now() });
     if (change && (st.patch.etapes || st.patch.envois)) await publierPrepLbc({ recon: next });
   });
   _lbcReconChaine = p.catch(() => {});
@@ -10098,11 +10149,14 @@ function viderLbcRecon() {
 }
 // Un appelant donne un MORCEAU ; il est rangé tout de suite dans le tampon
 // (sans réseau), et la ligne est écrite si le dernier vidage date de 30 s ou plus.
-function storeLbcRecon(patch) {
+async function storeLbcRecon(patch,ownerAttendu=null) {
+  const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return;
+
   const p = _lbcReconChaine.then(async () => {
-    const st = await lireTamponLbc();
-    if (st === null) return;                      // stockage illisible : rien à accumuler
-    await ecrireTamponLbc({ patch: fusionnerMorceauLbc(st.patch, patch || {}), dernier: st.dernier || 0 });
+    const avant=await lireTamponLbc();
+    if(avant===null)return;
+    const st=avant.owner===owner?avant:{owner,patch:{},dernier:0};
+    await ecrireTamponLbc({ owner,patch: fusionnerMorceauLbc(st.patch, patch || {}), dernier: st.dernier || 0 });
   });
   _lbcReconChaine = p.catch(() => {});
   return _lbcReconChaine.then(() => viderLbcRecon());
@@ -10113,7 +10167,7 @@ function storeLbcRecon(patch) {
 // la carte au lieu de l'écraser, et rien ne peut l'évincer. On NE parse RIEN ici
 // (on ne devine pas la forme d'une vente jamais vue) — on collecte, la prochaine
 // passe branchera l'extraction + la capture du PDF sur la vraie forme (§6.3).
-async function storeLbcVente(url, body, coupe) {
+async function storeLbcVente(url, body, coupe,ownerAttendu=null) {
   try {
     let fam = '';
     try { const u = new URL(url); fam = (u.host + u.pathname).replace(/\/\d{3,}/g, '/{id}').replace(/\/[0-9a-f]{16,}/gi, '/{id}'); }
@@ -10122,7 +10176,7 @@ async function storeLbcVente(url, body, coupe) {
     if (!fam) return;
     // 11 octobre : un MORCEAU, fusionné (et borné à 12 familles) par le vidage
     //    regroupé de `lbc_recon` — plus de relecture entière à chaque vente.
-    await storeLbcRecon({ venteOne: { cle: fam, val: { url: String(url).split('?')[0].slice(0, 160), body, coupe: !!coupe, ver: EXT_VERSION, at: new Date().toISOString() } } });
+    await storeLbcRecon({ venteOne: { cle: fam, val: { url: String(url).split('?')[0].slice(0, 160), taille: new TextEncoder().encode(String(body)).length, coupe: !!coupe, ver: EXT_VERSION, at: new Date().toISOString() } } },ownerAttendu);
   } catch (_) {}
 }
 
@@ -10227,6 +10281,10 @@ function extraireVentesLbc(url, body) {
   const d = (j && j.pageProps && (j.pageProps.transaction || j.pageProps.data)) || j;
   if (d && typeof d === 'object' && (d.item || d.step || d.parcel_id || d.is_seller != null)) {
     const mid = String(url).match(/transactions?\/(\d+)/);
+    const explicite=d.id?.purchase_id??d.purchase_id??j?.pageProps?.purchaseId;
+    if(mid&&explicite!=null&&String(explicite)!==mid[1])return [];
+    const transactionId=mid?.[1]||(explicite!=null?String(explicite):'');
+    if(!/^\d+$/.test(transactionId))return []; // Un id d'annonce n'est jamais un id de transaction.
     const li = labelInfoDe(d);
     const pr = (d.item && d.item.prices) || {};
     // ⚠️ LE VRAI SIGNAL « FINALISÉ » (Julien : « regarde ce que l'extension dit »).
@@ -10236,7 +10294,7 @@ function extraireVentesLbc(url, body) {
     // classe sur la mesure, pas sur un mot. LECTURE seule, aucune donnée perso.
     const pcl = (d.parcel && d.parcel.timeline_config) || {};
     const v = {
-      txId: (mid && mid[1]) || String((d.id && d.id.purchase_id) || d.purchase_id || (d.item && d.item.id) || ''),
+      txId: transactionId,
       itemId: String((d.item && d.item.id) || ''),
       // ⚠️ L'IMAGE DE LA VENTE — on ne DEVINE pas un champ : on cherche la
       // première URL d'image réelle dans l'article (plusieurs formes possibles,
@@ -10270,20 +10328,22 @@ function extraireVentesLbc(url, body) {
 //    détail envoyés ensemble ⇒ plus aucune `dateVente`. Les rangements passent
 //    maintenant à la file : chacun relit ce que le précédent a écrit.
 let _lbcVentesChaine = Promise.resolve();
-function rangerLbcVentes(list) {
-  const p = _lbcVentesChaine.then(() => rangerLbcVentesUneFois(list));
+async function rangerLbcVentes(list,ownerAttendu=null) {
+  const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return false;
+  const p = _lbcVentesChaine.then(() => rangerLbcVentesUneFois(list,owner));
   _lbcVentesChaine = p.catch(() => {});
   return p;
 }
-async function rangerLbcVentesUneFois(list) {
-  if (!list || !list.length) return;
+async function rangerLbcVentesUneFois(list,owner) {
+  if (!list || !list.length) return false;
   const prev = await sbGet('app_data?id=eq.lbc_ventes&select=data');
-  if (prev === null) return;                          // pas su ≠ vide — on n'écrase rien
+  if (prev === null) return false;                          // pas su ≠ vide — on n'écrase rien
   const cur = (prev[0] && prev[0].data) || {};
   const ventes = Object.assign({}, cur.ventes || {});
   for (const v of list) {
     const k = v.txId; if (!k) continue;
     const old = ventes[k] || {};
+    if(old.account&&String(old.account)!==String(v.account||''))return false; // Une source non concordante ne déplace pas une vente.
     const m = Object.assign({}, old);
     for (const [kk, vv] of Object.entries(v)) {
       if (kk === 'label') continue;                   // fusionné à part
@@ -10301,8 +10361,10 @@ async function rangerLbcVentesUneFois(list) {
   }
   const noms = Object.keys(ventes);
   if (noms.length > 500) { const g = noms.sort((x, y) => Date.parse((ventes[y] || {}).at || 0) - Date.parse((ventes[x] || {}).at || 0)).slice(0, 500); for (const n of noms) if (!g.includes(n)) delete ventes[n]; }
-  const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id');
-  noterFlux('leboncoin', _okFlux !== false);
+  const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_ventes', data: { ventes, updatedAt: new Date().toISOString() } }], 'id',owner);
+  await noterFlux('leboncoin', _okFlux === true);
+  if(_okFlux===true)notifierApp({type:'maj',quoi:'lbc'});
+  return _okFlux===true;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // LE CATALOGUE LEBONCOIN — SES CODES EXACTS DE CATÉGORIE, MARQUE, TAILLE, ÉTAT
@@ -10666,7 +10728,8 @@ async function sessionDeListe(sessionPage) {
   const meme = !!(c && c.v === 2 && String(c.id) === id);
   return { id, name: meme ? String(c.name || '') : '', type: meme ? String(c.type || '') : '' };
 }
-async function handleLbcRaw(url, body, sessionPage) {
+async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
+  const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return {ok:false,etat:'ecriture-refusee'};
   let data = null;
   try { data = JSON.parse(body); } catch (_) { return; }
   if (LBC_URL_PACKS.test(String(url || ''))) { try { await noterPackPhoto(data, url); } catch (_) {} }
@@ -10681,7 +10744,7 @@ async function handleLbcRaw(url, body, sessionPage) {
   //    dans l'app). Sur CET endpoint « moi », une annonce sans owner (ou dont
   //    l'owner est le compte de la SESSION) est à lui, taguée de ce compte.
   //    Compte de session inconnu ⇒ on ne tague rien (blanc plutôt que faux, §5).
-  const listeMoi = /\/adfinder\/v\d+\/myads\b/i.test(String(url || ''));
+  const listeMoi = /\/adfinder\/v\d+\/myads\b|\/compte\/(?:part|pro)\/mes-annonces\/?$/i.test(String(url || ''));
   let sess = null;
   try { const c = (await chrome.storage.local.get('vrmLbcCompte')).vrmLbcCompte; if (c && c.v === 2 && c.id) sess = c; } catch (_) {}
   // 5.195 : la fiche publique DU compte de session (même id, exactement) donne
@@ -10696,10 +10759,11 @@ async function handleLbcRaw(url, body, sessionPage) {
   // document), jamais `vrmLbcCompte` (le dernier vu, peut-être l'ancien).
   const sessListe = await sessionDeListe(sessionPage);
   if (sessListe) miens.add(sessListe.id);
+  if(listeMoi&&String(sessionPage||'').startsWith('lbc-account:')&&!sessListe)return {ok:false,etat:'compte-non-confirme'};
   if(listeMoi&&sessListe?.prive){try{const u=new URL(url);for(const[k,v]of u.searchParams)if(/^(user_id|store_id|account_id|owner_id)$/i.test(k)&&!(k==='account_id'&&v===sessListe.id.slice('lbc-account:'.length)))return;}catch(_){return;}}
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
-  if (acct) await storeLbcAccount(acct);
+  if (acct) await storeLbcAccount(acct,owner);
 
   // ── CAS PRO LEBONCOIN (endpoint réel de « mes annonces ») ──────────────────
   // GET /api/stats/proxy/v2/account/classifieds/analysis/list
@@ -10748,7 +10812,7 @@ async function handleLbcRaw(url, body, sessionPage) {
         platform: 'leboncoin',
       });
     }
-    if (found.length) { await storeLbcListings(url, found); return; }
+    if (found.length) return await storeLbcListings(url, found,owner);
   }
 
   const priceOf = (o) => {
@@ -10805,8 +10869,10 @@ async function handleLbcRaw(url, body, sessionPage) {
   // Détection auto du quota d'annonces (offre Leboncoin) → la limite s'adapte.
   const quota = detectLbcQuota(data);
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
-  await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } });
-  if (found.length) await storeLbcListings(url, found);
+  await storeLbcRecon({ url, quota: quota || undefined, sample: { url, at: new Date().toISOString(), found: found.length, quota, body: String(body).slice(0, 9000) } },owner);
+  if (found.length) return await storeLbcListings(url, found,owner);
+  if(listeMoi&&sessListe&&(Array.isArray(data?.ads)||Array.isArray(data?.data?.ads))&&racine.length===0)return {ok:true,etat:'liste-vide',nombre:0,photos:0};
+  return {ok:true,etat:'aucune-annonce-reconnue',nombre:0,photos:0};
 }
 // Télécharge les photos d'une paire en FICHIERS (fini les onglets). Rangées dans
 // un sous-dossier VRM-{N°} pour les retrouver et les glisser dans Leboncoin.

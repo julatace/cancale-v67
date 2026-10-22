@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.211.0';
+  const CAPTEUR_VERSION='5.212.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -33,6 +33,7 @@
     const m=Object.assign({__tag:TAG,__vrmSequence:++sequence},payload);
     if(!relaisPret){const taille=JSON.stringify(m).length;if(taille<=1500000){attente.push({m,taille});octetsAttente+=taille;while(attente.length>64||octetsAttente>4000000)octetsAttente-=attente.shift().taille;}}
     try{window.postMessage(m,'*');}catch(_){}
+    return m.__vrmSequence;
   };
   try{window.addEventListener('message',event=>{
     if(event.source!==window||event.data?.__tag!=='CANCALE_LBC_RELAY'||event.data.kind!=='pret')return;
@@ -113,7 +114,7 @@
       const pp = (j && j.pageProps) || j;
       if (pp && typeof pp === 'object') { delete pp.messages; delete pp.confidence; delete pp.experimentContext; delete pp._sentryTraceData; delete pp.i18n; }
       return JSON.stringify(j);
-    } catch (_) { return txt; }   // corps tronqué/illisible ⇒ on garde le brut
+    } catch (_) { return null; }   // Un JSON illisible n'est jamais tronqué puis présenté comme reçu.
   };
 
   // ⚠️ ET LA FORME DE CE QUI PART. La requête de soumission dit, mieux que tout
@@ -247,6 +248,21 @@
   const memoDetail = () => { try { return JSON.parse(localStorage.getItem('vrm_lbc_detail_vus') || '{}') || {}; } catch (_) { return {}; } };
   const ecrireMemo = (m) => { try { localStorage.setItem('vrm_lbc_detail_vus', JSON.stringify(m)); } catch (_) {} };
   let detailEnCours = false;
+  const detailsTentes=new Map(),accusesTransactions=new Map();
+  window.addEventListener('message',event=>{
+    const d=event.data;if(event.source!==window||d?.__tag!=='CANCALE_LBC_ACCUSE'||!Number.isSafeInteger(d.sequence))return;
+    const a=accusesTransactions.get(d.sequence);if(!a)return;clearTimeout(a.timer);accusesTransactions.delete(d.sequence);
+    if(d.ok===true){const memo=memoDetail();memo[a.id]={t:Date.now(),st:a.st,preuve:'detail-integre-v1'};ecrireMemo(memo);}
+  });
+  const envoyerAvecAccuse=payload=>{
+    const seq=post(payload);if(payload.kind!=='lbcvente')return;
+    const id=/transactions?\/(\d+)/.exec(payload.url)?.[1];if(!id)return;
+    try{const j=JSON.parse(payload.body),d=j?.pageProps?.transaction||j?.pageProps?.data||j;if(typeof d?.is_seller!=='boolean')return;
+      const st=typeof d.step==='string'?d.step:d.step?.status||'';
+      const timer=setTimeout(()=>accusesTransactions.delete(seq),25000);
+      accusesTransactions.set(seq,{id,st,timer});
+    }catch(_){}
+  };
   const lireDetails = async (listeTexte) => {
     if (detailEnCours) return;
     let arr; try { arr = JSON.parse(listeTexte); } catch (_) { return; }
@@ -257,7 +273,8 @@
       st: typeof t.step === 'string' ? t.step : ((t.step && t.step.status) || ''),
     }).filter((t) => t && t.id && !/cancel/i.test(t.st)).filter((t) => {
       const m = memo[t.id];
-      if (!m) return true;
+      if(now-(detailsTentes.get(t.id)||0)<60000)return false;
+      if (!m || m.preuve!=='detail-integre-v1') return true;
       if (FINI.test(m.st || '')) return false;             // déjà lue une fois terminée
       return now - (m.t || 0) > DETAIL_REVOIR_MS;
     }).slice(0, DETAIL_MAX);
@@ -265,18 +282,19 @@
     detailEnCours = true;
     try {
       for (const t of aLire) {
+        detailsTentes.set(t.id,Date.now());
         const url = 'https://api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/' + encodeURIComponent(t.id);
         let st = t.st;
         try {
           // window.fetch (notre crochet) : la réponse repasse par `handle`, donc
           // elle est rangée exactement comme une transaction ouverte à la main.
           const res = await window.fetch(url, { method: 'GET', credentials: 'include', headers: entetesLbc || { Accept: 'application/json' } });
-          if (res.status === 401 || res.status === 403) break;   // refusé : on s'arrête
-          if (res.ok) { try { const j = await res.clone().json(); st = (j && j.step && j.step.status) || (j && j.pageProps && j.pageProps.transaction && j.pageProps.transaction.step && j.pageProps.transaction.step.status) || st; } catch (_) {} }
-        } catch (_) {}
-        memo[t.id] = { t: Date.now(), st };
+          if ([401,403,429].includes(res.status)) break;   // refusé : on s'arrête
+          if (!res.ok) continue;
+          if (res.ok) { try { const j=await res.clone().json(),d=j?.pageProps?.transaction||j?.pageProps?.data||j;if(typeof d?.is_seller!=='boolean'||!d.item||!d.step)continue;st=typeof d.step==='string'?d.step:d.step.status||st; } catch (_) {continue;} }
+        } catch (_) {continue;}
+        // Le mémo durable attend l'accusé du fond, pas la seule réponse HTTP.
       }
-      ecrireMemo(memo);
     } finally { detailEnCours = false; }
   };
 
@@ -297,11 +315,15 @@
       // On conserve les listes en attente pour une éventuelle identité privée.
     }
   };
-  const posterListeMoi = (url, body) => {
+  const posterListeMoi=(url,body)=>posterDonneeMoi('lbcraw',url,body);
+  const posterDonneeMoi = (kind, url, body) => {
+    // Un détail porte déjà is_seller : on peut le lire sans inventer un compte.
+    // Seules les annonces exigent une identité privée pour prouver leur propriétaire.
+    if(kind==='lbcvente'&&!comptePriveDoc){envoyerAvecAccuse({kind,url,body,session:''});return;}
     if (basculeDoc && comptePriveDoc) return;
-    if (comptePriveDoc) { post({ kind: 'lbcraw', url, body, session: sessDoc }); return; }
+    if (comptePriveDoc) { envoyerAvecAccuse({ kind, url, body, session: sessDoc }); return; }
     if (listesEnAttente.length >= 3) clearTimeout(listesEnAttente.shift().t);
-    const x = { url, body, t: 0 };
+    const x = { kind, url, body, t: 0 };
     x.t = setTimeout(() => { const i = listesEnAttente.indexOf(x); if (i >= 0) listesEnAttente.splice(i, 1); }, 90000);
     listesEnAttente.push(x);
   };
@@ -319,7 +341,7 @@
     if(comptePriveDoc&&comptePriveDoc!==cle){basculeDoc=true;return true;}
     if(!comptePriveDoc)basculeDoc=false;
     comptePriveDoc=cle;sessDoc=cle;
-    while(listesEnAttente.length){const x=listesEnAttente.shift();clearTimeout(x.t);if(!basculeDoc)post({kind:'lbcraw',url:x.url,body:x.body,session:cle});}
+    while(listesEnAttente.length){const x=listesEnAttente.shift();clearTimeout(x.t);if(!basculeDoc)envoyerAvecAccuse({kind:x.kind,url:x.url,body:x.body,session:cle});}
     return true;
   };
   // ── LA DATE DES VENTES (20 oct., 5.196) ────────────────────────────────────
@@ -457,12 +479,25 @@
   const handle = (url, text, ctype, statut = 200, corpsReq = null) => {
     try {
       if (NOISE.test(url)||statut<200||statut>=300) return;
-      if (!text || text.length > 1500000) return;
+      if (!text || text.length > 8000000) return;
       if (ctype && !/json/i.test(ctype)) return;
       if (!DE_LEBONCOIN(url)) return;                       // ni pub, ni tiers
       // ⚠️ Un jeton de connexion temps réel : rien, nulle part, pas même ses clés.
       if (/\/realtime\/credentials/i.test(url)) return;
       if(sessionPrivee(url,text))return;
+      // Alléger les grosses réponses de transaction AVANT le plafond générique.
+      // Ne jamais couper du JSON : la fin contient souvent la vraie transaction.
+      if(VENTE_HINT.test(url)){
+        const c=allegeVente(text);
+        if(c)noteSchema(url,c);
+        if(!c||new TextEncoder().encode(c).length>VENTE_MAX){post({kind:'lbcblocage',famille:'transactions',raison:c?'taille':'format'});return;}
+        posterDonneeMoi('lbcvente',url,c);
+        if(/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)){noterListe(url,c);if(relusParNous.has(url))relusParNous.delete(url);else setTimeout(()=>lireDetails(c),800);}
+        else if(/consumergoods\/proxy\/v\d+\/pages\/transactions\/\d+/i.test(url))setTimeout(()=>dateSiVendeur(url,c),800);
+        return;
+      }
+      if(text.length>1500000)return;
+
       noteSchema(url, text);                                // la structure, jamais les valeurs
       // ── LA MESSAGERIE (4 octobre) : SEULEMENT LE NOMBRE DE NON-LUS ─────────
       // Julien : « dans Leboncoin, il y ait les messages ». Mesuré : la page
@@ -493,13 +528,6 @@
         post({ kind: 'lbccatalogue', url, body: text.slice(0, CAT_MAX), coupe: text.length > CAT_MAX });
         return;
       }
-      // LA VENTE : sa propre transaction/commande/livraison. Ligne dédiée, capée.
-      if (VENTE_HINT.test(url)) {
-        const c = allegeVente(text); post({ kind: 'lbcvente', url, body: c.slice(0, VENTE_MAX), coupe: c.length > VENTE_MAX });
-        if (/consumergoods\/proxy\/v\d+\/pages\/transactions(?:\?|$)/i.test(url)) { noterListe(url, text); if (relusParNous.has(url)) relusParNous.delete(url); else setTimeout(() => { lireDetails(text); }, 800); }
-        else if (/consumergoods\/proxy\/v\d+\/pages\/transactions\/\d+/i.test(url)) setTimeout(() => { dateSiVendeur(url, text); }, 800);
-        return;
-      }
       if (!AD_HINT.test(text) && !AD_HINT.test(url) && !ACCOUNT_HINT.test(url) && !ACCOUNT_HINT.test(text)) return;
       if (MOI_LISTE.test(url)) { posterListeMoi(url, text); return; }
       post({ kind: 'lbcraw', url, body: text });
@@ -507,6 +535,27 @@
       try { noterListeProprietaire(url, text, corpsReq); } catch (_) {}
     } catch (_) {}
   };
+
+  // Certaines pages contiennent déjà les données : aucun fetch n'aura lieu.
+  // La source est le document privé exact, jamais un objet public du DOM.
+  const cheminInitial=location.pathname;
+  const lireDocumentInitial=()=>{
+    if(window.top!==window||location.pathname!==cheminInitial)return;
+    const el=document.getElementById('__NEXT_DATA__');if(!el?.textContent||el.textContent.length>8000000)return;
+    let j;try{j=JSON.parse(el.textContent);}catch(_){return;}
+    const p=j?.props?.pageProps||j?.pageProps;if(!p||typeof p!=='object')return;
+    const url=location.origin+cheminInitial;
+    if(/^\/compte\/(?:part|pro)\/mes-annonces\/?$/.test(cheminInitial)){
+      const ads=Array.isArray(p.ads)?p.ads:Array.isArray(p.data?.ads)?p.data.ads:null;
+      if(ads){const body=JSON.stringify({ads});noteSchema(url,body);if(body.length<=1500000)posterListeMoi(url,body);}
+    }else if(/^\/compte\/(?:part|pro)\/transaction\/\d+\/?$/.test(cheminInitial)){
+      const d=p.transaction||p.data;
+      if(d&&typeof d.is_seller==='boolean')handle(url,JSON.stringify({pageProps:{transaction:d}}),'application/json',200);
+    }else if(/^\/compte\/(?:part|pro)\/mes-transactions\/?$/.test(cheminInitial)&&Array.isArray(p.transactions)){
+      handle(url,JSON.stringify(p.transactions),'application/json',200);
+    }
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',lireDocumentInitial,{once:true});else lireDocumentInitial();
 
   const origFetch = window.fetch;
   if (origFetch) {
