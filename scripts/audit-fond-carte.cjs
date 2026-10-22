@@ -16,12 +16,15 @@
 //   3. les noms en français (`name:fr` d'abord, sinon le nom d'origine), sur les
 //      VRAIS styles d'OpenFreeMap quand ils sont joignables, évalués par le
 //      moteur d'expressions de MapLibre ; les numéros de route intacts ;
-//   4. le fond est « dessiné » seulement quand au moins UNE tuile est arrivée ;
-//      une tuile isolée en erreur ne fait pas tomber la carte, une source
-//      injoignable si, une police manquante non, rien du tout ⇒ délai ;
+//   4. le fond est « dessiné » seulement quand au moins UNE tuile est arrivée,
+//      et DÈS qu'elle est peinte (sans attendre « idle », que MapLibre n'émet
+//      qu'une fois TOUTES les tuiles là — une tuile lente retenait la carte
+//      jusqu'au délai, puis la liste) ; une tuile isolée en erreur ne fait pas
+//      tomber la carte, une source injoignable si, une police manquante non,
+//      aucune tuile ⇒ délai ;
 //   5. Leaflet est retiré ; MapLibre n'est jamais importé au démarrage (et, si
 //      dist/ existe, aucun morceau chargé par index.html ne le contient).
-// `--prouve` réaffaiblit la règle (sept mutations du fond) : chacune doit
+// `--prouve` réaffaiblit la règle (dix mutations du fond) : chacune doit
 // repasser au ROUGE.
 const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
@@ -76,6 +79,7 @@ const ERR_TUILE = ['error', { sourceId: 'openmaptiles', tile: {}, error: new Err
 const ERR_SOURCE = ['error', { sourceId: 'openmaptiles', error: new Error('TileJSON 503') }];
 const ERR_POLICE = ['error', { error: new Error('glyphs 404') }];
 const IDLE = ['idle', {}];
+const RENDU = ['render', {}];
 const ATTR_OFM = '<a href="https://openfreemap.org">OpenFreeMap</a> <a href="https://www.openmaptiles.org/">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 async function executer(src, { dit }, { styles }) {
@@ -156,6 +160,19 @@ async function executer(src, { dit }, { styles }) {
     dit(x.ok, 'une police ou une icône manquante ne fait pas tomber le fond', JSON.stringify(x.ok ? x.r : x.e));
     x = await poser([], { delaiMs: 60 });
     dit(!x.ok && x.e === 'delai', 'rien du tout ⇒ échec au bout du délai (jamais une attente sans fin)', JSON.stringify(x.ok ? x.r : x.e));
+    // Relecture du 22 oct. : MapLibre n'émet « idle » qu'une fois TOUTES les
+    // tuiles visibles chargées et la carte immobile. Une seule tuile lente (ou
+    // un glisser) le retient : la carte qui dessine déjà ne doit PAS tomber.
+    let t0 = Date.now();
+    x = await poser([TUILE, RENDU], { delaiMs: 5000 });
+    const ms = Date.now() - t0;
+    dit(x.ok && ms < 2000, 'une tuile arrivée puis la carte repeinte ⇒ dessiné TOUT DE SUITE, sans attendre « idle » ni les autres tuiles', JSON.stringify(x.ok ? { ms } : x.e));
+    x = await poser([TUILE], { delaiMs: 80 });
+    dit(x.ok, 'une tuile arrivée, puis plus rien (une tuile tenue, onglet en arrière-plan) ⇒ au délai, dessiné — pas la liste', JSON.stringify(x.ok ? x.r : x.e));
+    x = await poser([RENDU, RENDU], { delaiMs: 80 });
+    dit(!x.ok && x.e === 'delai', 'une repeinte SANS aucune tuile ne vaut pas « dessiné » (carte grise) ⇒ délai', JSON.stringify(x.ok ? x.r : x.e));
+    x = await poser([ERR_TUILE, RENDU, ERR_TUILE, IDLE]);
+    dit(!x.ok && x.e === 'tuiles', 'toutes les tuiles en erreur, même avec des repeintes ⇒ échec (la liste)', JSON.stringify(x.ok ? x.r : x.e));
     x = await poser([TUILE, IDLE], { annule: () => true });
     dit(!x.ok && x.e === 'annule', 'écran fermé ou thème changé ⇒ on s’arrête', JSON.stringify(x.ok ? x.r : x.e));
     x = await poser([TUILE, IDLE], { style: EXTRAIT });
@@ -230,6 +247,9 @@ async function executer(src, { dit }, { styles }) {
       ['les numéros de route traduits aussi', "if (!Array.isArray(tf) || !litUnNom(tf)) return l;", 'if (!Array.isArray(tf)) return l;'],
       ['attribution ajoutée même quand la source la porte', "return ATTRIBUTIONS_EXIGEES.filter(([mot]) => !t.includes(mot)).map(([, html]) => html).join(' ');", "return ATTRIBUTIONS_EXIGEES.map(([, html]) => html).join(' ');"],
       ['le style coloré « liberty » revient', "clair: 'https://tiles.openfreemap.org/styles/positron'", "clair: 'https://tiles.openfreemap.org/styles/liberty'"],
+      ['le délai rejette même quand des tuiles sont arrivées', "(tuilesOk > 0 ? undefined : new Error('delai'))", "new Error('delai')"],
+      ['on attend « idle » (la repeinte est ignorée)', "carte.on('render', surRendu);", ''],
+      ['une repeinte sans tuile vaut « dessiné »', 'if (tuilesOk === 0) return;', ''],
     ];
     let prouvees = 0;
     for (const [nom, de, vers] of MUT) {

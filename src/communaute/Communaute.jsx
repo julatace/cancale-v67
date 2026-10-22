@@ -101,7 +101,11 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   }, []);
   // 2. Le fond suit le thème ; il ne dessine pas ⇒ la liste. L'attribution
   //    exigée : celle des sources, complétée de ce qui manquerait (jamais deux
-  //    fois). Repliée en « i » sur un écran étroit, dépliée ailleurs.
+  //    fois), posée dès que la carte dessine (première tuile arrivée, sans
+  //    attendre les autres). Écran étroit (≤ 640 px, règle de MapLibre) :
+  //    VISIBLE à l'ouverture, repliée en « i » au premier glisser de la carte —
+  //    on garde ce comportement (la licence veut la mention vue) ; dépliée
+  //    ailleurs.
   useEffect(() => {
     if (!pret) return undefined;
     let annule = false;

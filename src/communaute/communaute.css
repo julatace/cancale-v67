@@ -162,3 +162,8 @@ form.vrm-cm-discord-moi { display: block !important; }
 /* Sa propre épingle reste EN ACCENT même quand elle porte ses initiales (une
    seule personne) : la règle « profil » ci-dessus la repeignait en blanc. */
 .vrm-communaute .vrm-cm-pin.profil.moi { background: var(--cm-accent); border-color: var(--cm-accent); color: #fff; }
+/* Les initiales des AUTRES en encre neutre (relecture du 22 oct.) : la règle
+   « profil » de main les peignait en accent ; avec 50 personnes à l'écran
+   l'accent n'aurait plus rien de rare (§7). L'accent PLEIN reste à SA propre
+   épingle ; un liseré accent signale seulement « près de toi » (`.pres`). */
+.vrm-communaute .vrm-cm-pin.profil:not(.moi) { color: var(--cm-encre); }

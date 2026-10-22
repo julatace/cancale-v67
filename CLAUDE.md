@@ -10973,12 +10973,14 @@ sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
   mesuré depuis son téléphone. Le repli reste la LISTE (jamais une carte grise).
 - **Le rendu pro** : styles SOBRES d'OpenFreeMap — `positron` (clair, gris, sans
   points d'intérêt) et `dark` (Dark Matter). `liberty` (couleurs OSM) est retiré :
-  sur un fond presque sans couleur, la seule couleur de l'écran reste SON épingle
-  (§7). **Noms en français** : `enFrancais` enveloppe chaque étiquette de NOM par
+  sur un fond presque sans couleur, l'accent PLEIN reste à SON épingle (§7 ;
+  un liseré accent marque seulement « près de toi », et depuis la relecture les
+  initiales des autres sont en encre neutre). **Noms en français** : `enFrancais` enveloppe chaque étiquette de NOM par
   `["coalesce", ["get","name:fr"], <expression d'origine>]` (« Allemagne », pas
   « Germany ») ; sans `name:fr`, le nom d'origine ; les numéros de route intacts.
   Ni rotation ni inclinaison, zoom 44 px, « Ma ville », attribution dépliée sur
-  ordinateur (repliée en « i » sous 640 px, comme le veut MapLibre).
+  ordinateur ; sous 640 px elle est VISIBLE à l'ouverture et se replie en « i »
+  au premier glisser (comportement de MapLibre, gardé — voir la relecture).
 - **Quatre défauts de l'état laissé, VUS AU RENDU** (banc, 390 et 1512) :
   1. ⚠️ l'épingle ÉTAIT le marqueur MapLibre, qui se place par un `transform` en
      ligne : la `transition: transform .15s` de `.vrm-cm-pin` la faisait TRAÎNER
@@ -10995,11 +10997,14 @@ sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
   Et le fond tombait en liste sur UNE tuile en erreur (500) : `poserFond` ne
   déclare « dessiné » qu'après une tuile ARRIVÉE ; une tuile isolée en erreur ne
   fait pas tomber la carte ; une source (TileJSON) injoignable si ; une police ou
-  une icône manquante non ; rien du tout ⇒ délai (12 s) ⇒ liste.
+  une icône manquante non ; AUCUNE tuile arrivée ⇒ délai (12 s) ⇒ liste (une
+  tuile LENTE la faisait encore tomber : corrigé par la relecture, ci-dessous).
 - **Politique de confidentialité** : elle nommait encore **CARTO** (retiré le
   21 oct.) — la ligne dit OpenFreeMap (IP + zone affichée, aucun compte, aucun
-  cookie, lieu « non précisé par le service ») et le géocodage (BAN, Photon,
-  Nominatim, par le serveur ; BAN depuis le navigateur en repli). Date au 22 oct.
+  cookie, lieu « non précisé par le service ») et le géocodage de la communauté
+  (BAN, Photon, Nominatim, par le serveur ; BAN depuis le navigateur en repli).
+  Date au 22 oct. ⚠️ Ce remplacement avait retiré la déclaration du géocodage
+  de l'écran ACHATS (relecture, ci-dessous) : remise.
 - **Le banc sert la VRAIE forme** (§6.3) : les vrais styles `positron`/`dark`
   (`hyperknot/openfreemap-styles` @ 6e53612), une TileJSON qui déclare toutes les
   couches et porte l'attribution exacte du README, de vraies tuiles OpenMapTiles
@@ -11025,7 +11030,70 @@ sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
 - **Non mesuré** : la vraie instance depuis son téléphone (bloquée d'ici) ; que les
   tuiles réelles portent `name:fr` (absent ⇒ le nom d'origine, aucune régression) ;
   le rendu de Dark Matter sur de vraies données ; WebGL sur un vrai iPhone ; la
-  mini-carte des points relais (injoignable, pas de banc).
+  mini-carte des points relais (injoignable, pas de banc ; `interactive: false` et
+  `compact: true` : son attribution reste dépliée, jamais repliée).
+
+#### Relecture adverse du 22 octobre (soir) — quatre défauts reproduits, corrigés
+Chacun REPRODUIT d'abord (copie `git archive` de 87df182 compilée, contrôles lancés
+depuis la copie, §6.1), corrigé, rouge sur 87df182, vert après, rouge sous mutation.
+- ⚠️ **Une tuile LENTE faisait tomber en liste une carte qui dessinait déjà.**
+  MapLibre (6.11.2) n'émet `idle` qu'une fois TOUTES les tuiles visibles chargées
+  ET la carte immobile ; le délai de 12 s de `poserFond` rejetait sans regarder si
+  des tuiles étaient arrivées. Reproduit au banc : une tuile tenue sans réponse,
+  3 servies ⇒ à ~11 s `data-cm-fond="charge"` et AUCUNE attribution, à 18 s la
+  liste (« La carte n'a pas pu se charger »). Même défaut sur main (déjà là
+  avant), mais l'en-tête de `fondCarte.js` et ce dossier affirmaient le contraire.
+  Même effet attendu sur un réseau lent ou si la personne glisse la carte pendant
+  le chargement (pas d'`idle` pendant un mouvement) — non mesuré.
+  ⇒ « dessiné » = une tuile ARRIVÉE puis la carte REPEINTE (`render`), sans
+  attendre `idle` ni les autres tuiles ; au délai, une tuile arrivée (onglet en
+  arrière-plan : pas de repeinte) ⇒ dessiné, aucune ⇒ liste ; une repeinte sans
+  aucune tuile ne compte pas. L'attribution est donc posée dès que la carte
+  dessine.
+- ⚠️ **La politique ne déclarait plus le géocodage de l'écran ACHATS.** À chaque
+  ouverture d'Achats, le NAVIGATEUR envoie l'adresse de chaque point relais à la
+  Base Adresse Nationale puis à Nominatim (`geocode`, `useEffect` sur `tracking`)
+  — reproduit : 8 requêtes pour 4 points (colis inventés). L'ancienne ligne
+  « Nominatim, CARTO … points relais » le couvrait ; la nouvelle ne parlait que de
+  la communauté, « envoyé par le serveur ». ⇒ une ligne « Base Adresse Nationale,
+  Nominatim — placer sur la carte les points relais (écran Achats) — adresse du
+  point relais, envoyée par ton navigateur ». Et, trouvés par le contrôle écrit
+  pour ça, deux autres envois du navigateur jamais déclarés : les **photos de
+  profil Discord** de la carte (`cdn.discordapp.com`, une ligne) et **jsDelivr**
+  (pdf.js des aperçus de bordereaux, onnxruntime du Studio photo — adresse IP
+  seulement, une ligne). ⇒ `scripts/audit-politique-hotes.cjs` : TOUTE adresse
+  `https://` du CODE de `src/` (commentaires retirés) est dans une liste FERMÉE
+  (« politique » · « lien » · « vrm » · « éteint ») ; un hôte contacté tout seul
+  par le navigateur exige une ligne qui nomme le service, dit À QUOI il sert ici
+  et QUI l'envoie (juger le seul nom serait vert sur le défaut : Nominatim restait
+  nommé) ; un couple (fichier, hôte) inconnu ⇒ rouge. **5 rouges sur 87df182**,
+  `--prouve` 5/5. ⚠️ Turnstile (`challenges.cloudflare.com`) reste « éteint » :
+  la politique devra citer Cloudflare le jour où la clé est posée.
+- **L'attribution à 390 px était annoncée « repliée en « i » » : FAUX** —
+  MapLibre ajoute `maplibregl-compact-show` sous 640 px et ne replie qu'au premier
+  glisser. Tranché : on GARDE ce comportement (une mention vue à l'ouverture est le
+  choix sûr pour la licence) ; ce qui l'annonçait est corrigé (en-tête du
+  composant, ce dossier). Le banc juge maintenant ce qui est vrai : texte visible à
+  l'ouverture, replié derrière le « i » après un glisser AU DOIGT (événements tactiles
+  CDP). Le comportement n'a pas changé (vert aussi sur 87df182 — c'est un défaut
+  d'annonce) ; rouge sous la mutation « repliée d'office » (`display:none
+  !important` sur le texte).
+- **Les initiales des AUTRES étaient en accent** (règle `.profil` de main) : avec
+  50 vendeurs l'accent n'aurait plus rien de rare (§7). ⇒ `.profil:not(.moi)` en
+  encre neutre ; l'accent plein reste à SA propre épingle.
+- **Banc** `scripts/bancs/communaute.cjs` : **175 verts** (scènes « tuile lente »,
+  « attribution 390 », couleur des épingles à 1512 sombre et 390 clair) ; **5
+  rouges sur 87df182** (2 couleurs, 3 tuile lente) ; 3 mutations de l'app posées
+  ensemble (délai qui rejette + repeinte ignorée · règle `:not(.moi)` retirée ·
+  attribution repliée d'office) ⇒ **6 rouges**, chacune par SON contrôle.
+  ⚠️ Un rouge intermittent sous charge (« un coucou : le message part » ×4 en
+  cascade) venait du BANC : il attendait « un toast » quelconque, et celui de
+  l'arrivée sur la carte (3,5 s) était encore là ⇒ il lisait la base avant
+  l'envoi. Il attend maintenant le toast du coucou. `audit-fond-carte.cjs`
+  `--prouve` **10/10** (3 mutations de plus : délai qui rejette malgré des tuiles,
+  repeinte ignorée, repeinte sans tuile = dessiné) ; **2 rouges sur 87df182**.
+  Les 138 audits non SQL : 0 rouge.
+- **Non mesuré** : un vrai réseau mobile lent ; la vraie instance OpenFreeMap.
 
 ---
 
