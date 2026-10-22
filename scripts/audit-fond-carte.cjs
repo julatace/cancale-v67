@@ -65,6 +65,7 @@ function fausseCarte(script, { attributionSource = '' } = {}) {
     off(t, f) { h[t] = (h[t] || []).filter((x) => x !== f); },
     fire(t, e) { for (const f of [...(h[t] || [])]) f(e); },
     getSource(k) { return { attribution: attributionSource, id: k }; },
+    isStyleLoaded() { return !!carte.styleRecu; }, // comme MapLibre une fois le style posé
     setStyle(s) { carte.styleRecu = s; let i = 0; const pas = () => { if (i >= script.length) return; const [t, e] = script[i++]; carte.fire(t, e); setTimeout(pas, 2); }; setTimeout(pas, 2); },
   };
   return carte;
