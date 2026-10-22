@@ -267,7 +267,7 @@
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
 
-    const diagnosticLbc=e.plateforme==='leboncoin'&&!e.site?.id?`<div class="pied">${e.transport?.capteur===true?'Capteur actif. Ouvre ta messagerie Leboncoin pour lire la session de ton compte.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
+    const diagnosticLbc=e.plateforme==='leboncoin'&&!e.site?.id?`<div class="pied">${e.transport?.ambigue===true?'Plusieurs comptes ont répondu dans cet onglet. Aucune session courante n’est choisie. Recharge Leboncoin sur le compte voulu.':e.transport?.capteur===true?'Capteur actif. Ouvre ta messagerie Leboncoin pour lire la session de ton compte.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
     let bascule = '';
     if (e.bascule) {
       const b = e.bascule;
