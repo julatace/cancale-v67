@@ -79,11 +79,12 @@ function poserFetch({ ebay = 'ok', vinted = true }) {
       try { for (const r of JSON.parse(opts.body || '[]')) if (r && r.id === 'ship_reminder_dedup') ecritDedup = r.data; } catch (_) {}
       return new Response('', { status: 201 });
     }
-    if (/select=owner&limit=1/.test(u)) return R({ message: 'column app_data.owner does not exist' }, 400);
+    if (/select=owner&limit=1/.test(u)) return R([]);
+    if (/id=eq\.main&select=owner/.test(u)) return R((opts.headers?.Range&&!/^0-/.test(opts.headers.Range))?[]:[{owner:'vendeur_banc'}]);
     if (/vinted_accounts/.test(u)) return R([{ vinted_user_id: '111', login: 'compte_a' }]);
     if (/id=eq\.main/.test(u) && /select=data/.test(u)) return R([{ data: { vinted_ship_done: {} } }]);
     if (/id=eq\.main/.test(u)) return R([{ vrm_widget_token: '', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_sales_hidden: [], vinted_bords_printed: {} }]);
-    if (/id=eq\.push_subs/.test(u)) return R([{ data: { subs: [{ endpoint: 'https://push/A', keys: { p256dh: 'x', auth: 'y' } }] } }]);
+    if (/id=eq\.push_subs/.test(u)) return R([{ data: { subs: [{ endpoint: 'https://fcm.googleapis.com/A', keys: { p256dh: 'x', auth: 'y' } }] } }]);
     if (/id=eq\.push_prefs/.test(u)) return R([{ data: {} }]);
     if (/id=eq\.ebay_comptes/.test(u)) return ebay === 'panne' ? new Response('<html>522</html>', { status: 522 }) : R([]);
     if (/id=like\.ebay_orders/.test(u)) {
@@ -105,13 +106,14 @@ async function widget(opts) {
   const r = res(); await mod.default({ method: 'GET', headers: {}, query: {} }, r); return r;
 }
 async function rappel(opts) {
+  process.env.CRON_SECRET='cle-banc-ebay';
   poserFetch(opts); pushes.length = 0; ecritDedup = null;
   const wp = require(path.join(RACINE, 'node_modules', 'web-push'));
   wp.setVapidDetails = () => {};
   wp.sendNotification = async (sub, body) => { const b = JSON.parse(body); if (b.tag === 'ship-reminder') pushes.push(b); return { statusCode: 201 }; };   // le bilan du lundi a son propre banc
   process.env.VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'x';
   const mod = await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js') + '?t=' + Math.random());
-  const r = res(); await mod.default({ method: 'GET', headers: {}, query: {} }, r); return r;
+  const r = res(); await mod.default({ method: 'GET', headers: {authorization:'Bearer cle-banc-ebay'}, query: {} }, r); return r;
 }
 
 (async () => {

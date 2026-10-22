@@ -29,7 +29,7 @@ const dit = (bon, quoi, detail) => {
 const essaie = async (quoi, fn) => { try { await fn(); } catch (e) { ko++; console.log(`  ❌ ${quoi} — a levé : ${e && e.message}`); } };
 
 async function connexion(reponseGoTrue) {
-  const f = faireFond({ src: cheminSource() });
+  const f = faireFond({ src: cheminSource(), store:{__sansSession:true} });
   const appels = [];
   f.ctx.fetch = async (url, opts) => {
     const u = String(url);

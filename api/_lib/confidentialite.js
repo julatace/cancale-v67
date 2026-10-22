@@ -4,7 +4,7 @@ export async function verifierConfidentialite({url,anon,jeton,uid,fetcher=fetch}
  if(!uid||!jeton)return {ok:false,raison:'session'};
  const verifier=async(table,token,filtre='')=>{
   try{
-   const r=await fetcher(`${url}/rest/v1/${table}?select=owner&limit=1${filtre}`,{headers:{apikey:anon,Authorization:`Bearer ${token}`}});
+   const r=await fetcher(`${url}/rest/v1/${table}?select=owner&limit=1${filtre}`,{headers:{apikey:anon,Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(10000)});
    if(r.status===401||r.status===403)return token===anon?true:null;
    if(!r.ok)return null;
    const j=await r.json();return Array.isArray(j)?j.length===0:null;

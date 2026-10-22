@@ -91,7 +91,7 @@ const convConfirm = (tx, msgs, side = 'seller') => ({ conversation: { id: 700000
     dit(appels.length === 3, 'un lieu SANS code ne sonne pas', appels.length);
     f.ctx.authToken = async () => null;
     await f.ctx.noterRetrait({ ...base, tx: '30000000004', code: 'C44444' }, '111');
-    dit(appels.length === 3 && !!(f.store.vrmRetraitNotifs || {})['30000000004'], 'sans session VRM ⇒ rien envoyé, gardé pour plus tard (pas su)', JSON.stringify(f.store.vrmRetraitNotifs));
+    dit(appels.length === 3 && !(f.store.vrmRetraitNotifs || {})['30000000004'], 'sans session VRM ⇒ aucune capture ni notification attribuée ; la conversation sera relue après reconnexion', JSON.stringify(f.store.vrmRetraitNotifs));
   });
 
   // ═══ C ═══

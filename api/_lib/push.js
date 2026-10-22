@@ -13,6 +13,7 @@
 
 import webpush from 'web-push';
 import crypto from 'node:crypto';
+import {endpointPushPermis} from './abonnement-push.js';
 
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
@@ -350,8 +351,11 @@ export async function sendPushToAll(payload) {
   const alive = [];
   let sent = 0, perimes = 0;
   for (const s of subs) {
+    // Ne pas contacter une URL interne ou un service arbitraire, même si
+    // un ancien abonnement a été écrit directement dans la base.
+    if(!endpointPushPermis(s?.endpoint)){alive.push(s);continue;}
     try {
-      await webpush.sendNotification(s, body);
+      await webpush.sendNotification(s, body, {timeout:10000});
       alive.push(s); sent += 1;
     } catch (e) {
       const code = e && e.statusCode;

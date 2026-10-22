@@ -43,7 +43,7 @@ const replyArgs = (conv = 5501, uid = UID) => ({ uid, method: 'POST', endpoint: 
 // Un fond avec une base qui connaît `owner` et le PATCH conditionnel.
 function monter({ rel = [], session = true, connecte = UID, lectureFileKO = false, store = null, actions = null, patchLent = null } = {}) {
   const st = store || {};
-  if (session) st.vrmSession = SESSION; else delete st.vrmSession;
+  if (session) st.vrmSession = SESSION; else { delete st.vrmSession; st.__sansSession=true; }
   st.vrmCloisonne = true;
   if (actions) st.vrmActions = actions;
   const comptes = [{ vinted_user_id: UID, login: 'compte_un', domain: 'www.vinted.fr', access_token: 'jt1' },

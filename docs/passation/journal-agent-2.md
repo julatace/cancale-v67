@@ -599,3 +599,15 @@ Le vendeur a reporté la double vérification et refusé les SMS payants : la br
 Réception publique : clé obligatoire pour tous les formats, pas seulement Gmail partagé. Contexte vendeur obligatoire pour les lectures/écritures métier, conflit owner,id. Plus de repli attribuant un email inconnu au propriétaire d'installation : quarantaine privée neutre et reprise après association. Push : authentification obligatoire sur la route et contexte obligatoire côté serveur, même si la sonde dit ancien schéma. Tests synthétiques actualisés pour enregistrer explicitement les adresses et le contexte des notifications.
 
 Limites encore ouvertes : SQL021 non appliquée faute d'accès administrateur ; attribution historique non auditée ; possession des adresses supplémentaires déclarées à prouver (ne pas confondre déclaration et preuve de propriété). Aucun email ou push réel envoyé par les tests.
+
+## Revue de fiabilité et préparation des 2 000 utilisateurs — 22 octobre
+
+Branche `codex/audit-fiabilite-2000`, basée sur main PR636 puis fusion réelle de PR637 (b790ed4). Aucun code SMS/MFA de la branche mise de côté n'est repris. Extension 5.206 de main conservée ; seules les capacités annoncées par l'app sont remontées à 5.206 pour les fonctions absentes des 5.204/5.205 déjà publiées.
+
+Corrections : pagination du registre email (plafonds bas, frontières exactes HTTP416, conflits après la millième ligne, regroupement des lectures simultanées sans cache durable), whitelist Web Push + délai, CRON_SECRET obligatoire et sans clé en URL, échec fermé si schéma/énumération impossible, délais session/confidentialité, Vite 6.4.5 corrigé. Les tests synthétiques de l'extension utilisent des sessions cohérentes et n'exigent plus d'écritures anonymes. Les protections de production ne sont pas affaiblies.
+
+**État SQL actualisé** : Julien a lui-même appliqué 021 et fourni le diagnostic structurel sans écart. Les anciennes mentions « SQL à appliquer » décrivent l'état précédent. Cela ne certifie pas les copies historiques ni deux vraies sessions de production. Un nouveau test PostgreSQL jetable exécute réellement 021 : 45 contrôles réussis, y compris une ancienne politique trop large et les cas équipe/abonnement. 120 tests unitaires réussis, compilation réussie, zéro alerte npm connue. Rapport détaillé et limites : `docs/securite/audit-2026-10-22-2000-utilisateurs.md`.
+
+Avant 2 000 utilisateurs : preuve de possession des adresses de réception supplémentaires, attribution historique, deux sessions réelles, quotas et débit Gmail/Vercel/Supabase, sauvegarde/restauration et supervision restent à vérifier. Ne pas transformer une simulation en certification de capacité.
+
+Bilan final local : les 141 scripts d’audit existants sont validés après correction des simulations ; les cinq audits SQL initialement bloqués sont exécutés sur PostgreSQL 17.11 jetable. Le nouveau banc SQL de confidentialité ajoute un 142e audit validé (45 contrôles). Renumérotation historique : 126 contrôles réussis après relance sans la limite initiale de 120 s. Aucun test de production chargé en données n’a été lancé. PR638 ouverte et attachée.

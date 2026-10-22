@@ -158,8 +158,8 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     if (typeof libAcces.oublierAcces === 'function') libAcces.oublierAcces();
     pose(A, 'vrm_email_owners', { adresses: { 'a@vrm.test': { owner: A } } });
     pose(B, 'vrm_email_owners', { adresses: { 'b@vrm.test': { owner: B } } });
-    pose(A, 'push_subs', { subs: [{ endpoint: 'https://push.test/A-iphone' }] });
-    pose(B, 'push_subs', { subs: [{ endpoint: 'https://push.test/B-iphone' }] });
+    pose(A, 'push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/A-iphone' }] });
+    pose(B, 'push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/B-iphone' }] });
     pose(A, 'main', { vinted_annonce_numeros: {} });
     pose(B, 'main', { vinted_annonce_numeros: {} });
   };

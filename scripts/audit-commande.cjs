@@ -28,7 +28,7 @@ const UID = '3175765377', TX = '22501209977', APP = 'https://vrm.center';
 
 // `vinted` décrit ce que Vinted répond : shipment déjà là ? PUT accepté / 409 ?
 function faireCtx({ connecte = UID, dejaRange = false, shipment = false, putStatus = 200, labelUrl = true } = {}) {
-  const store = {}; let ecouteur = null;
+  const store = {vrmSession:{user_id:'vendeur_banc',access_token:'jeton.banc.x',expires_at:Date.now()+3600e3}}; let ecouteur = null;
   const j = { requetes: [], puts: 0, enVol: 0, maxEnVol: 0, evts: [], ecritures: [] };
   let shipCree = shipment;
   const ctx = {
@@ -59,7 +59,7 @@ function faireCtx({ connecte = UID, dejaRange = false, shipment = false, putStat
   vm.createContext(ctx);
   vm.runInContext(src, ctx, { filename: 'background.js' });
   // Les portes du monde extérieur, remplacées pour COMPTER.
-  ctx.getStoredAccounts = async () => [{ vinted_user_id: UID, login: 'angeled92', domain: 'www.vinted.fr' }, { vinted_user_id: '999', login: 'julienf765', domain: 'www.vinted.fr' }];
+  ctx.getStoredAccounts = async () => [{ owner:'vendeur_banc', vinted_user_id: UID, login: 'angeled92', domain: 'www.vinted.fr' }, { owner:'vendeur_banc', vinted_user_id: '999', login: 'julienf765', domain: 'www.vinted.fr' }];
   ctx.activeAccountId = async () => connecte;
   ctx.sbGet = async (q) => (/label_/.test(q) ? (dejaRange ? [{ id: `harvest_${UID}_label_${TX}`, cap: '2026-10-02' }] : []) : []);
   ctx.supabaseUpsert = async (t, rows) => { j.ecritures.push(rows.map((r) => r.id)); return true; };
