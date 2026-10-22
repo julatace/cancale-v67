@@ -1,4 +1,5 @@
 import './_lib/sans-bruit.js';
+import {routeProfilAvatar,routeAvatarPublic} from './_lib/profil-avatar.js';
 import {configurationAuthPublique} from './_lib/auth-public.js';
 import {verifierConfidentialite} from './_lib/confidentialite.js';
 // ── /api/compte — santé du serveur ET abonnement du vendeur ──────────────────
@@ -951,6 +952,8 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const mode = String((req.query && req.query.mode) || 'sante');
   const m = req.method;
+  if(mode==='profil-avatar')return routeProfilAvatar(req,res);
+  if(mode==='avatar-public')return routeAvatarPublic(req,res);
   if(mode==='configuration-auth'){
     if(m!=='GET')return repondre(res,405,{ok:false});
     const cfg=configurationAuthPublique(SUPABASE_URL,ANON);

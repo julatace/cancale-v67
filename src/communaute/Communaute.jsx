@@ -21,7 +21,7 @@
 //  au démarrage), fond OpenFreeMap (MapLibre, sans clé) avec son attribution.
 //  Injoignable ⇒ la même communauté en liste.
 // ════════════════════════════════════════════════════════════════════════════
-import {avatarDiscordPermis,initialesProfil} from './avatarDiscord.js';
+import {avatarProfilPermis,initialesProfil} from './avatarDiscord.js';
 import { DISCORD_ERREURS } from './discordErreurs.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -65,7 +65,7 @@ function useApi(headers) {
 
 // ── LA CARTE (Leaflet) ───────────────────────────────────────────────────────
 function AvatarProfil({profil,grand=false}) {
-  const url=avatarDiscordPermis(profil?.avatar)?profil.avatar:'';
+  const url=avatarProfilPermis(profil?.avatar)?profil.avatar:'';
   const [rate,setRate]=useState('');
   return <span className={'vrm-cm-avatar'+(grand?' grand':'')} aria-hidden="true">{initialesProfil(profil)}{url&&rate!==url&&<img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setRate(url)}/>}</span>;
 }
@@ -138,7 +138,7 @@ function Carte({ cells, moi, sombre, onCellules, onEchec }) {
           if(g.n===1){
             const p=personnes[0]||{};bouton.textContent=initialesProfil(p);bouton.classList.add('profil');
             bouton.setAttribute('aria-label',String(p.pseudo||'Revendeur')+' · '+String(p.ville||''));
-            if(avatarDiscordPermis(p.avatar)){const img=document.createElement('img');img.src=p.avatar;img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});bouton.append(img);}
+            if(avatarProfilPermis(p.avatar)){const img=document.createElement('img');img.src=p.avatar;img.alt='';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.addEventListener('error',()=>img.remove(),{once:true});bouton.append(img);}
           }
           L.DomEvent.disableClickPropagation(bouton);
           bouton.addEventListener('click', (e) => {
@@ -452,7 +452,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     {blocGroupes}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 
-    <div className="vrm-cm-identite-discord"><AvatarProfil profil={moi||{pseudo:prenom}} grand/><MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi?.discord||''} compte={discordCompte} onFait={t=>{setToast(t);lire(true);}}/></div>
+    {(!moi?discordPret:'discord' in moi)&&<div className="vrm-cm-identite-discord"><AvatarProfil profil={moi||{pseudo:prenom}} grand/><MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi?.discord||''} compte={discordCompte} onFait={t=>{setToast(t);lire(true);}}/></div>}
     {/* Ma présence : l'opt-in, toujours visible */}
     <div className="vrm-cm-carton vrm-cm-moi" data-cm-moi={moi ? 'visible' : 'invisible'}>
       {moi ? <>

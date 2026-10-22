@@ -35,6 +35,7 @@
 //   · 503 `erreur: 'pas-su'`        — la base n'a pas répondu : rien n'est
 //     affirmé (ni « personne », ni « refusé ») ;
 //   · 4xx `erreur: <raison>`        — un refus RÉEL, dit en clair.
+import {lierPhotoAuProfil,retirerPhotoDeCarte,ajouterPhotosPersonnelles} from './profil-avatar.js';
 import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
@@ -220,7 +221,8 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (carte.acces === false) return refus('abonnement');
     if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
     await lierAvatarAuProfil(utilisateur.id,qui,objet(carte.moi));
-    const profils=await ajouterAvatars(carte.profils);
+    await lierPhotoAuProfil(utilisateur.id,objet(carte.moi)?.pid).catch(()=>{});
+    const profils=await ajouterPhotosPersonnelles(await ajouterAvatars(carte.profils));
     const moi=objet(carte.moi);
     const c2 = { moi: moi?{...moi,avatar:profils.find(p=>p.pid===moi.pid)?.avatar||''}:null, profils };
     if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
@@ -251,6 +253,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   if (action === 'quitter') {
     const d = await appel('vrm_communaute_quitter', {}, (x) => typeof x === 'boolean');
     if (d === undefined) return;
+    if(d)await retirerPhotoDeCarte(utilisateur.id).catch(()=>{});
     return dire(200, { ok: true, retire: d });
   }
   if (action === 'ecrire') {
@@ -351,7 +354,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if (c.acces === false) return refus('abonnement');
     if (c.erreur === 'groupe') return refus('groupe', 404);
     if (!Array.isArray(c.lignes) || !Number.isFinite(Number(c.n))) return pasSu();
-    const photos=await ajouterAvatars([...c.lignes,...(c.moi?[c.moi]:[])]);
+    const photos=await ajouterPhotosPersonnelles(await ajouterAvatars([...c.lignes,...(c.moi?[c.moi]:[])]));
     return dire(200, { ok: true, classement: { periode: c.periode, debut: c.debut, fin: c.fin, n: Number(c.n), inscrit: c.inscrit === true,
       visible: c.visible === true, moi: c.moi?photos[photos.length-1]:null, lignes: photos.slice(0,c.lignes.length), groupe: c.groupe || null } });
   }

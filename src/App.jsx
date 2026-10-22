@@ -1,5 +1,6 @@
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat} from './liensColis.js';
+import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {qrMfa} from './qrMfa.js';
 import {conflitAdresseCompte} from './receptionEmail.js';
@@ -43374,6 +43375,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
     ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
+    AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
     AUTH.user && { id:'discord', titre:'Discord', items:[
       { id:'discord', type:'el', el:<DiscordCompte key="discord"/> },
     ], pied:'Facultatif. VRM ne lit que ton pseudo Discord (jamais ton email, tes serveurs ni tes messages). Il est proposé quand tu apparais sur la carte de la communauté.' },
@@ -43419,7 +43421,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const profil = MULTI_USER && voirCompte && (AUTH.user ? (
     <div className="vrm-set-profil" data-profil-compte="" style={{background:C.card,border:`1px solid ${C.border}`}}>
       <span className="vrm-set-avatar" aria-hidden="true" style={{background:`${C.text}0f`,color:C.text}}>
-        {String(AUTH.user.email||'?').slice(0,1).toUpperCase()}
+        <AvatarCompte key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/>
       </span>
       <span>
         <span style={{display:'block',fontSize:16,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',letterSpacing:'-.01em'}}>{AUTH.user.email}</span>

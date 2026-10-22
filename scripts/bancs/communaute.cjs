@@ -236,6 +236,7 @@ function fauxSupabase(urlBrut, methode, entetes, corps) {
     }
     return json({ code: 'PGRST202' }, 404);
   }
+  if (cible.startsWith('vinted_accounts') && /owner\.neq\./.test(u))return json([]);
   if (cible.startsWith('vinted_accounts')) return json(uid ? [{ vinted_user_id: '1' + uid.slice(0, 3), login: USERS[uid].login, owner: uid }] : []);
   return json([], 200, { 'content-range': '0-0/0' });
 }
@@ -316,7 +317,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansLeaflet = 
   await pg.route('**/api/**', async (r) => {
     const rq = r.request(), u = new URL(rq.url());
     const mode = u.searchParams.get('mode');
-    if (u.pathname === '/api/compte' && (mode === 'communaute' || mode === 'abonnement' || mode === 'discord-debut')) {
+    if (u.pathname === '/api/compte' && (mode === 'communaute' || mode === 'abonnement' || mode === 'discord-debut' || mode === 'confidentialite')) {
       let corps = null; try { corps = rq.postData() ? JSON.parse(rq.postData()) : null; } catch (_) {}
       const res = { code: 200, corps: null, setHeader() {}, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, end() { return this; } };
       const lecteur = corps ? (async function* () { yield Buffer.from(JSON.stringify(corps)); })() : null;
@@ -398,7 +399,7 @@ async function partie019(nav) {
       await pg.waitForSelector('[data-cm-inscrit="oui"]', { timeout: 8000 });
       await classementLu(pg);
       dit(B.profils[A].classement === true, 'elle entre dans le classement sur son geste (confirmé)');
-      dit(await attr(pg, '[data-cm-rang-moi]', 'data-cm-rang-moi') === '2' && /Tu es\s*2ᵉ\s*sur 2/.test(await texte(pg)), '« Tu es 2ᵉ sur 2 » cette semaine');
+      dit(await attr(pg, '[data-cm-rang-moi]', 'data-cm-rang-moi') === '2' && /Ta position\s*2ᵉ\s*\/ 2/.test(await texte(pg)), 'la carte de position affiche 2ᵉ / 2 cette semaine');
       dit(await attr(pg, '[data-cm-ligne-moi="oui"]', 'data-cm-ligne-ventes') === '3', 'sa ligne est mise en avant avec SES ventes (3)');
       await pg.click('[data-cm-periode="mois"]'); await classementLu(pg);
       await pg.waitForFunction(() => document.querySelector('[data-cm-rang-moi]') && document.querySelector('[data-cm-rang-moi]').getAttribute('data-cm-rang-moi') === '1', null, { timeout: 8000 }).catch(() => {});
