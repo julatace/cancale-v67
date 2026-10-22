@@ -6787,7 +6787,7 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
