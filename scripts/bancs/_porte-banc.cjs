@@ -107,4 +107,10 @@ function poser(pw) {
   c.launchPersistentContext = async (d, o, ...r) => surContexte(await lpc(d, chemin(o), ...r));
 }
 try { poser(require('playwright')); } catch (_) {}
+// (22 oct.) La plupart des bancs lancent `/home/user/cancale-v67/node_modules/playwright`
+// (chemin absolu). Dans un worktree dont `node_modules` est un lien vers un AUTRE
+// arbre, `require('playwright')` d'ici rend un second module : la porte était posée
+// sur lui, le banc lançait l'autre — écran de connexion, et des dizaines de rouges
+// qui ne mesuraient rien (photos-vinted : 40). `poser` ne pose qu'une fois par module.
+try { poser(require('/home/user/cancale-v67/node_modules/playwright')); } catch (_) {}
 module.exports = { SCRIPT_PORTE_BANC: SCRIPT, poserPorteBanc: poser };

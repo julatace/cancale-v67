@@ -88,6 +88,8 @@ const MUTER_MODULE = {
   'cause-perimee': (s) => s.replace("    else if (r === 'erreur') {\n      sonde = 'encours';", "    else if (r === 'erreur') {"),
   // le bilan part pendant la mesure
   'bilan-tot': (s) => s.replace("if (sondeEnCours || sonde === 'encours') { bilanTimerAt = maintenant() + 2000; bilanTimer = setTimeout(envoyerBilan, 2000); return; }", ''),
+  // (22 oct.) le retour de l'extension n'est plus un signal quand le secours ne change pas (session)
+  'ext-revenue': (s) => s.replace("  } else if (extRevenue && s === 'oui') rouvrirTout();\n", '  }\n'),
   // ── seconde revue du 11 octobre ──
   // un refus de l'extension redevient DÉFINITIF (les listes retirent la photo)
   'refus-definitif': (s) => s.replace('export function estDefinitive(url) { void url; return false; }', "export function estDefinitive(url) { const e = entrees.get(url); return !!(e && e.etat === 'ko'); }"),
@@ -536,6 +538,22 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     secours = 'non'; w.m.secoursChange(); secours = 'oui'; w.m.secoursChange();
     await w.avancer(10);
     dit([U(6), U(7)].every((u) => w.m.etat(u) === 'ok'), 'l’extension revient (battement) : les photos qu’elle avait refusées lui sont redemandées', [U(6), U(7)].map((u) => w.m.etat(u)).join(','));
+    // (22 oct.) AVEC UNE SESSION, le secours vaut « oui » en permanence (la route
+    // serveur de l'app) : le retour de l'extension ne change plus `secours`. Une
+    // extension MUETTE puis de nouveau présente reste un signal neuf — les photos
+    // refusées pendant qu'elle se taisait lui sont redemandées sans attendre leur
+    // recul (banc photos-vinted, U).
+    w = monde({ sonde: () => 'erreur' });
+    x = transitoire();
+    let extEtat = 'muette';
+    w.m.configurer({ secours: () => 'oui', ext: () => extEtat, demander: x.demander, chargerImage: async () => false });
+    monterEchouer(w.m, [U(16), U(17)]);
+    await w.avancer(10);
+    const avantRetour = [U(16), U(17)].map((u) => w.m.etat(u)).join(',');
+    w.m.secoursChange();                   // battement : toujours muette
+    extEtat = 'presente'; w.m.secoursChange();
+    await w.avancer(10);
+    dit(avantRetour === 'ko,ko' && [U(16), U(17)].every((u) => w.m.etat(u) === 'ok'), 'avec une session (secours toujours « oui ») : l’extension muette qui revient se voit redemander les photos refusées, sans attendre leur recul', `avant ${avantRetour} · après ${[U(16), U(17)].map((u) => w.m.etat(u)).join(',')}`);
     // `online` : tout réessaie, et le refus tombe.
     w = monde({ sonde: () => 'erreur' });
     x = transitoire();

@@ -176,3 +176,15 @@
  .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:#d4e6c8!important;}
  .vrm-day-benef-inline .vrm-day-k{font-size:10px;letter-spacing:.04em;}
 }
+
+/* (22 oct.) « ⋯ Outils » des Ventes : sous 1 024 px la rangée des filtres défile
+   au doigt — le bouton reste collé à son bord droit (il était hors de l'écran,
+   au bout de la rangée) ; son menu s'ouvre sous la barre (App.jsx). */
+@media(max-width:1023px){
+ .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes{position:sticky;right:0;z-index:1;padding-left:8px;background:var(--vrm-surface);box-shadow:-10px 0 10px -6px var(--vrm-surface);}
+ .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes>button{min-height:36px;}
+}
+@media(max-width:767px){
+ .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes{background:var(--vrm-mobile-paper,var(--vrm-bg));box-shadow:-10px 0 10px -6px var(--vrm-mobile-paper,var(--vrm-bg));}
+ [data-outils-ventes] .vrm-outils-reglages .vrm-vues{margin:8px 0 0;}
+}

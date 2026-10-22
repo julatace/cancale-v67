@@ -33,6 +33,9 @@ const DEBIT = 2_000_000;    // octets/s — une 4G correcte
 const CPU = Number(process.env.VITESSE_CPU || 4);   // téléphone : processeur 4× plus lent qu'un ordinateur (émulation Chrome)
 
 const base = fabriquer();
+// Les achats « déposés en point relais » de la base : les seuls dont Ma journée
+// a besoin du n° de suivi (`vintedToPickup`).
+const ACHATS_AU_RELAIS = base.rows.filter((r) => /_orders_purchased$/.test(r.id)).reduce((n, r) => n + (((r.data || {}).payload || {}).my_orders || []).filter((o) => /point relais/i.test(o.status || '')).length, 0);
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff' };
 const srv = http.createServer((q, r) => {
   let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
@@ -82,6 +85,8 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   if (vp.width < 600 && CPU > 1) { const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
   const req = [];
+  let fige = false;   // après la mesure d'ouverture : les lectures du signal ne comptent pas dans le bilan
+  const noter = (e) => { if (!fige) req.push(e); };
   const t0 = Date.now();
   // L'histoire du héros de Ma journée : à quel moment il apparaît, avec quelle
   // valeur (un héros qui apparaît tôt avec un FAUX chiffre ne compte pas).
@@ -95,7 +100,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const url = rq.url();
     const debut = Date.now() - t0;
     if (rq.method() !== 'GET') {
-      req.push({ m: rq.method(), url, debut, fin: debut + RTT, octets: 0, pdf: 0 });
+      noter({ m: rq.method(), url, debut, fin: debut + RTT, octets: 0, pdf: 0 });
       await new Promise((r) => setTimeout(r, RTT));
       return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     }
@@ -104,7 +109,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     // préchargement du démarrage) échoue — l'app doit retomber sur la lecture
     // par compte et rendre EXACTEMENT le même écran.
     if (opts.couperFamille && /id=like\.harvest_\*_orders_\*&select=id,data/.test(decodeURIComponent(url))) {
-      req.push({ m: 'GET', url, range: h.range || '', debut, fin: debut + RTT, octets: 0, pdf: 0, coupe: true });
+      noter({ m: 'GET', url, range: h.range || '', debut, fin: debut + RTT, octets: 0, pdf: 0, coupe: true });
       await new Promise((r) => setTimeout(r, RTT));
       return route.fulfill({ status: 503, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>503</html>' });
     }
@@ -113,7 +118,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const pdf = (body.match(/JVBERi0x*/g) || []).reduce((a, s) => a + s.length, 0);
     const delai = RTT + Math.round(body.length / DEBIT * 1000);
     const e = { m: 'GET', url, range: h.range || '', debut, fin: debut + delai, octets: body.length, pdf };
-    req.push(e);
+    noter(e);
     await new Promise((r) => setTimeout(r, delai));
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
@@ -130,6 +135,34 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   // ⚠️ Sauf la phrase des photos (`data-photos-bloquees`) : le banc coupe les
   // images, et elle apparaît au bout d'un délai — elle dit le temps écoulé.
   const lu = await pg.evaluate(() => { let t = document.body.innerText; for (const x of document.querySelectorAll('[data-photos-bloquees]')) t = t.replace(x.innerText, ''); return { tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: t, rendus: window.__vrmRendus ? window.__vrmRendus.rendus : null }; });
+  // ── UN SIGNAL « vrm:colis » SANS RIEN DE NEUF NE RE-REND PAS L'ÉCRAN (22 oct.) ──
+  // À l'ouverture, « à retirer » puis « à poster » publient chacun leur compte
+  // et préviennent la cloche. C'était un compteur d'état de la coque : chaque
+  // signal re-rendait toute la coque et l'écran ouvert, puis la cloche reposait
+  // une liste identique (un tableau neuf) — deux rendus pour rien.
+  // ⚠️ Le PREMIER signal peut légitimement changer la cloche : la numérotation
+  // automatique a pu passer après son premier calcul (mesuré : « 84 annonces
+  // sans numéro » puis plus rien). On en envoie donc un pour rattraper, puis on
+  // compte les rendus que provoque le SECOND, quand plus rien n'a changé
+  // (attendu : aucun ; le code d'avant en faisait deux).
+  let rendusSignal = null;
+  if (opts.signalColis && lu.rendus != null) {
+    const nReq = req.length;
+    const signal = async () => {
+      const n0 = req.length;
+      await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:colis')));
+      for (let i = 0; i < 40; i++) {
+        await pg.waitForTimeout(250);
+        const nouv = req.slice(n0); const dern = nouv.length ? Math.max(...nouv.map((x) => x.fin)) : 0;
+        if (i >= 8 && Date.now() - t0 - dern > 1500) break;
+      }
+    };
+    await signal();
+    const avant = await pg.evaluate(() => window.__vrmRendus ? window.__vrmRendus.rendus : null);
+    await signal();
+    rendusSignal = (await pg.evaluate(() => window.__vrmRendus ? window.__vrmRendus.rendus : null)) - avant;
+    fige = true; req.length = nReq;
+  }
   // Ce que coûte une FRAPPE dans la recherche de la liste : chaque lettre de
   // « salomon », jusqu'à l'image suivante peinte (deux rAF).
   let frappes = null;
@@ -155,7 +188,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   const heros = await pg.evaluate(() => window.__heros || []).catch(() => []);
   if (DETAIL) console.log('    héros :', JSON.stringify(heros));
   await ctx.close();
-  return { req, utile, errs, lu, frappes, heros };
+  return { req, utile, errs, lu, frappes, heros, rendusSignal };
 }
 
 function bilan(nom, r) {
@@ -229,7 +262,7 @@ const ECRANS = [
       console.log(`\n── ${vp.width} px (RTT ${RTT} ms, ${DEBIT / 1e6} Mo/s)`);
       for (const [tab, att, frappe] of ECRANS) {
         if (seuls && !seuls.includes(tab)) continue;
-        const r = await ouvrir(b, vp, tab, att, frappe, tab === 'journee' ? { rendus: 'journee' } : {});
+        const r = await ouvrir(b, vp, tab, att, frappe, tab === 'journee' ? { rendus: 'journee', signalColis: true } : {});
         res[vp.width + ':' + tab] = { ...bilan(tab, r), tombe: r.lu.tombe, errs: r.errs, frappes: r.frappes };
         if (r.frappes) console.log(`     frappe « salomon » : ${r.frappes.t.join(' · ')} ms (max ${r.frappes.max})`);
         if (process.env.VITESSE_TEXTES) fs.writeFileSync(path.join(process.env.VITESSE_TEXTES, vp.width + '-' + tab + '.txt'), r.lu.texte);
@@ -244,6 +277,29 @@ const ECRANS = [
         dit(m.txn <= 2, `${vp.width} px · ${tab} : la famille des transactions balayée deux fois au plus`, `${m.txn}`);
         dit(m.supprParCompte === 0, `${vp.width} px · ${tab} : les suppressions lues en une lecture, pas une par compte`, `${m.supprParCompte}`);
         if (tab === 'journee') {
+          // ── CE QUE LES AJOUTS DU 21-22 OCTOBRE FAISAIENT LIRE ET RENDRE EN TROP (22 oct.) ──
+          // Mesuré par bissection (une construction par fusion de `main`) : Ma
+          // journée est passée de 54 à 64 lectures et de ~13 à 15-16 rendus. Les
+          // causes, chacune jugée ici pour elle-même (le plafond global ne voit
+          // pas laquelle revient) :
+          const gj = r.req.filter((x) => x.m === 'GET'), dj = (x) => decodeURIComponent(x.url);
+          //  1. #634 (21 oct.) : les n° de suivi de TOUS les achats (560, six lectures
+          //     à la suite) pour n'en utiliser que les achats au point relais ;
+          const suivis = new Set();
+          for (const x of gj) if (/select=id,tx:data->payload->transaction->>id,suivi:/.test(dj(x))) { const mm = /id=in\.\(([^)]*)\)/.exec(dj(x)); if (mm) mm[1].split(',').forEach((id) => suivis.add(id)); }
+          dit(suivis.size > 0 && suivis.size <= ACHATS_AU_RELAIS, `${vp.width} px · journee : les n° de suivi lus ne portent que sur les achats au point relais (et ils sont lus)`, `${suivis.size} lus · ${ACHATS_AU_RELAIS} au point relais`);
+          //  2. #635 (21 oct.) : la liste noire lue à DEUX adresses (filtrée sur le
+          //     vendeur, et pas) — deux lectures que le partage ne peut pas réunir ;
+          const noirs = new Set(gj.filter((x) => /id=eq\.vrm_blocked_accounts/.test(dj(x))).map((x) => x.url));
+          dit(noirs.size <= 1, `${vp.width} px · journee : la liste des comptes supprimés n'est lue qu'à une seule adresse`, [...noirs].map((u) => decodeURIComponent(u).replace(/^.*\?/, '')).join(' | ') || 'aucune');
+          //  3. (18 oct., revenu au rendu) : les brouillons eBay lus pour le bloc
+          //     « numéros à vérifier », qui ne s'affiche que sur Annonces ;
+          dit(!gj.some((x) => /ebay_brouillons/.test(dj(x))), `${vp.width} px · journee : les brouillons eBay ne sont pas lus (le bloc qui s'en sert vit sur Annonces)`, `${gj.filter((x) => /ebay_brouillons/.test(dj(x))).length} lecture(s)`);
+          //  4. le signal « vrm:colis » re-rendait toute la coque (`colisTick`) puis la
+          //     cloche reposait une liste identique : deux rendus de l'écran pour rien.
+          dit(r.rendusSignal === 0, `${vp.width} px · journee : un signal « vrm:colis » sans rien de neuf ne re-rend pas l'écran`, `${r.rendusSignal} rendu(s)`);
+          // (5. f199b91, 22 oct. : `lbc_ventes` lue avec un `signal` sortait du partage
+          //  des lectures — prouvé par scripts/tests/rafraichissement-leboncoin.test.mjs.)
           // ── LES RENDUS AU DÉMARRAGE (17 octobre) ──
           // Trois ouvertures à froid (la première est celle mesurée plus haut) :
           // le nombre de rendus dépend de l'ordre d'arrivée des lectures, on

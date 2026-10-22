@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from '../../src/rafraichissementLeboncoin.js';
+import {creerLecturesPartagees} from '../../src/lecturesPartagees.js';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 function setup(relire){const fenetre=new EventTarget(),document=new EventTarget();document.hidden=false;return{fenetre,document,s:suivreReceptionLeboncoin({fenetre,document,relire,delai:2})};}
 test('revenir dans VRM recharge les données, les signaux rapprochés sont regroupés',async()=>{
@@ -14,8 +15,20 @@ test('sortir de cet écran empêche une ancienne lecture de remplacer le nouvel 
 });
 
 test('une requête bloquée expire ; une erreur ne devient jamais une liste vide',async()=>{
- const transport=(_url,opts)=>new Promise((_r,rejet)=>opts.signal.addEventListener('abort',()=>rejet(new Error('timeout'))));
- assert.equal(await lireReceptionLeboncoin('https://base.test',{}, {transport,delai:3}),null);
- let cache;const vide=await lireReceptionLeboncoin('https://base.test',{}, {transport:async(_u,o)=>{cache=o.cache;return{ok:true,json:async()=>[]};}});
- assert.deepEqual(vide,[]);assert.equal(cache,'no-store');
+ assert.equal(await lireReceptionLeboncoin('https://base.test',{}, {transport:()=>new Promise(()=>{}),delai:3}),null);
+ assert.equal(await lireReceptionLeboncoin('https://base.test',{}, {transport:async()=>{throw new Error('réseau');}}),null);
+ assert.equal(await lireReceptionLeboncoin('https://base.test',{}, {transport:async()=>({ok:false,json:async()=>[]})}),null);
+ const vide=await lireReceptionLeboncoin('https://base.test',{}, {transport:async()=>({ok:true,json:async()=>[]})});
+ assert.deepEqual(vide,[]);
+});
+// (22 oct.) La coque, Ma journée et le centre de notifications lisent la MÊME
+// ligne `lbc_ventes` au démarrage : passée avec un `signal` ou un mode de cache,
+// chaque lecture sortait du partage (src/lecturesPartagees.js) et partait sur le
+// réseau — banc `vitesse.cjs`, Ma journée 390 px : 3 lectures au lieu d'une.
+test('deux lectures identiques en même temps ne partent qu\'une fois',async()=>{
+ let parties=0;const vrai=async()=>{parties++;await pause(5);return new Response('[{"data":{"ventes":{}}}]',{status:200,headers:{'content-type':'application/json'}});};
+ const lp=creerLecturesPartagees(vrai,'https://base.test',{origine:''});
+ const url='https://base.test/rest/v1/app_data?id=eq.lbc_ventes&select=data';
+ const [a,b]=await Promise.all([lireReceptionLeboncoin(url,{authorization:'Bearer x'},{transport:lp.fetch}),lireReceptionLeboncoin(url,{authorization:'Bearer x'},{transport:lp.fetch})]);
+ assert.equal(parties,1);assert.deepEqual(a,[{data:{ventes:{}}}]);assert.deepEqual(b,a);
 });

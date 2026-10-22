@@ -2220,8 +2220,12 @@ const deleteVintedAccount = async (vintedUserId, login) => {
 // (un numéro n'est jamais réattribué, §5) : la recherche les écarte.
 const purgerComptesSupprimes = async () => {
   try {
-    const lire = async (id) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`, { headers: sbAuth() }); if (!r.ok) return undefined; const j = await r.json(); return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : undefined; };
-    const [noirs, off] = await Promise.all([lire('vrm_blocked_accounts'), lire('panel_accounts_off')]);
+    const lire = async (id, filtre = '') => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data${filtre}`, { headers: sbAuth() }); if (!r.ok) return undefined; const j = await r.json(); return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : undefined; };
+    // La liste noire se lit à la MÊME adresse que `fetchVintedAccounts` (filtrée
+    // sur le vendeur, 21 oct.) : sinon les deux lectures de la même ligne ne se
+    // partagent plus (src/lecturesPartagees.js) — une de plus au démarrage (22 oct.).
+    const owner = AUTH.user?.id;
+    const [noirs, off] = await Promise.all([lire('vrm_blocked_accounts', owner ? `&owner=eq.${encodeURIComponent(owner)}` : ''), lire('panel_accounts_off')]);
     if (!noirs || !off) return 0;
     const uids = (noirs.uids || []).map(String).filter((u) => /^\d+$/.test(u) && off[u] !== false);
     let n = 0;
@@ -6730,6 +6734,14 @@ photosVinted.configurer({
     const debut=Date.now();
     const dataUrl=await photoViaServeur(u);
     if(dataUrl)return {dataUrl,issue:'ok'};
+    // (22 oct.) Extension présente mais MUETTE (`état` sans réponse) : lui demander
+    // ne rendrait qu'un délai — et une photo « en délai » n'est jamais comptée
+    // perdue. Avec une session, le secours vaut « oui » en permanence (la route
+    // serveur) : quand le serveur échouait aussi, les photos restaient des
+    // pictogrammes SANS phrase, au lieu de « ne répond pas : recharge cette
+    // page » (banc photos-vinted, U). Rien ne peut la chercher maintenant : un
+    // refus, jamais définitif — son retour la redemande (`secoursChange`).
+    if(__vmrExtReady && __vmrEtat===null)return {dataUrl:null,issue:'refus'};
     return __vmrExtReady ? vmrPhotoIssue(u,Math.max(1000,photosVinted.DELAI_SECOURS_MS-(Date.now()-debut))) : {dataUrl:null,issue:'refus'};
   },
   secours: secoursPhotos,
@@ -28703,6 +28715,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [photosVentesTransactions,setPhotosVentesTransactions]=useState({});
   const [photosVentesForcees,setPhotosVentesForcees]=useState(()=>new Set());
   const photosVentesValides=React.useRef(new Map());
+  const photosVentesLues=React.useRef(new Set()), photosVentesLuesPour=React.useRef(null);
   // Bordereaux marqués « imprimés » : grisés en attendant l'expédition.
   // Clé = n° de transaction. Synchronisé (vinted_bords_printed).
   const [bordsPrinted, setBordsPrinted] = useState(() => load('vinted_bords_printed', {}));
@@ -29585,6 +29598,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [tipsOpen, setTipsOpen] = useState(() => !!load('vinted_tips_open', false));
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
+  // (22 oct.) Barre d'outils des Ventes : la largeur décide où vivent les choses.
+  // Téléphone (< 768 px) : « Bordereaux auto » et « Mes vues » passent dans
+  // « ⋯ Outils » (la barre faisait 273 px de haut, mesuré, avant la 1re vente).
+  // Sous 1 024 px, la rangée des filtres défile au doigt : le menu ne peut plus
+  // s'ouvrir DANS la rangée (elle le coupait — invisible et intouchable,
+  // mesuré au banc) ; il s'ouvre sous la barre entière.
+  const outilsTelephone = useEtroitReglages();
+  const outilsOrdinateur = useOrdinateur();
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
   const [studioOpen, setStudioOpen] = useState(false); // « Studio photo » (cadre guide + détourage local)
   const [annToolsCote, setAnnToolsCote] = useState('droite'); // côté où s'ancre ce menu (mesuré au clic)
@@ -30221,7 +30242,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`, { headers: sbAuth() });
       if (!res.ok) { setReservesNum((v) => (v === undefined ? null : v)); return; }
       const rows = await res.json();
-      setReservesNum(numerosReserves(Array.isArray(rows) && rows[0] ? rows[0].data : null));
+      // Relue à chaque arrivée des annonces : la même réponse ne repose pas un
+      // objet neuf (un rendu de Ma journée pour rien, banc `vitesse.cjs`, 22 oct.).
+      const n = numerosReserves(Array.isArray(rows) && rows[0] ? rows[0].data : null);
+      const memes = (a, b) => !!(a && b) && a.cles.size === b.cles.size && [...a.cles].every((c) => b.cles.has(c)) && JSON.stringify(a.parItem) === JSON.stringify(b.parItem);
+      setReservesNum((v) => (memes(v, n) ? v : n));
     } catch (_) { setReservesNum((v) => (v === undefined ? null : v)); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -31012,8 +31037,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'annonce eBay qu'il a créée. Jamais un rapprochement par titre (§5).
   // Les annonces eBay sont listées à part, telles qu'eBay les porte.
   const [ebayVerif, setEbayVerif] = useState(null);   // null = pas lu · { preuves, annonces } · { ko: true }
+  // Lu seulement là où le bloc « numéros à vérifier » s'affiche (Annonces) :
+  // ailleurs ces deux lectures et le rendu qui suit ne servaient à rien —
+  // mesuré sur Ma journée au banc `vitesse.cjs` (22 oct.).
   useEffect(() => {
-    if (!aVerifierCarton.length || ebayVerif) return;
+    if (curSub !== 'annonces' || !aVerifierCarton.length || ebayVerif) return;
     let fini = false;
     (async () => {
       try {
@@ -31041,7 +31069,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       } catch (_) { if (!fini) setEbayVerif({ ko: true }); }
     })();
     return () => { fini = true; };
-  }, [aVerifierCarton.length, ebayVerif]);
+  }, [curSub, aVerifierCarton.length, ebayVerif]);
   const marquerCartonVerifie = (id, cle) => {
     setNumeros((prev) => {
       const c = prev[id];
@@ -32487,25 +32515,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let stop=false;
     const forces=new Set([...photosVentesForcees].filter(key=>{const url=photosVentesValides.current.get(key);return !url || photosVinted.estPhotoVinted(url) && photosVinted.estMorte(url);}));
     const besoins=demandesPhotosVentes(sales.items,listings.items || [],txnItem,photosVentesArchivees,photosVentesTransactions,forces);
+    // (22 oct.) Une ligne déjà lue — ou EN COURS de lecture — était redemandée
+    // à chaque arrivée des annonces ou des identités (deux lectures identiques
+    // à l'ouverture de Ventes, banc `vitesse.cjs`). Une ligne n'est relue que si
+    // les ventes ont été relues (une capture a pu arriver), si sa lecture a
+    // échoué, ou si sa photo a été déclarée morte. Une réponse arrivée après
+    // un nouveau passage est gardée : une photo par clé, rien ne se contredit.
+    if(photosVentesLuesPour.current!==sales.items){photosVentesLuesPour.current=sales.items;photosVentesLues.current=new Set();}
+    const aLire=(m)=>[...m.entries()].filter(([id,key])=>forces.has(key)||!photosVentesLues.current.has(id)).map(([id])=>id);
+    const lues=photosVentesLues.current;
     (async()=>{
-      const transactions=[...besoins.transactions.keys()];
+      const transactions=aLire(besoins.transactions);
       for(let i=0;i<transactions.length && !stop;i+=100){
+        const lot=transactions.slice(i,i+100);
+        lot.forEach(id=>lues.add(id));
         try{
-          const rows=await lireTout(`id=in.(${transactions.slice(i,i+100).join(',')})&select=id,photo:data->payload->transaction->item_photo,photoItem:data->payload->transaction->item->photo`,{strict:true});
-          if(stop || !Array.isArray(rows))continue;
+          const rows=await lireTout(`id=in.(${lot.join(',')})&select=id,photo:data->payload->transaction->item_photo,photoItem:data->payload->transaction->item->photo`,{strict:true});
+          if(!Array.isArray(rows)){lot.forEach(id=>lues.delete(id));continue;}
           const patch=photosTransactionsLues(rows,besoins.transactions);
           if(Object.keys(patch).length)setPhotosVentesTransactions(prev=>({...prev,...patch}));
-        }catch(_){ /* Lecture ratée : conserver les sources précédentes. */ }
+        }catch(_){ lot.forEach(id=>lues.delete(id)); /* Lecture ratée : conserver les sources précédentes, relire au passage suivant. */ }
       }
-      const ids=[...besoins.archives.keys()];
+      const ids=aLire(besoins.archives);
       for(let i=0;i<ids.length && !stop;i+=100){
+        const lot=ids.slice(i,i+100);
+        lot.forEach(id=>lues.add(id));
         try{
-          const rows=await lireTout(`id=in.(${ids.slice(i,i+100).join(',')})&select=id,photo:data->photos->0`,{strict:true});
-          if(stop || !Array.isArray(rows))continue;
+          const rows=await lireTout(`id=in.(${lot.join(',')})&select=id,photo:data->photos->0`,{strict:true});
+          if(!Array.isArray(rows)){lot.forEach(id=>lues.delete(id));continue;}
           const patch={};
           for(const row of rows){const key=besoins.archives.get(row.id);if(key && photoArticle({photo:row.photo}))patch[key]={photo:row.photo};}
           if(Object.keys(patch).length)setPhotosVentesArchivees(prev=>({...prev,...patch}));
-        }catch(_){ /* Une archive illisible ne supprime pas les photos déjà lues. */ }
+        }catch(_){ lot.forEach(id=>lues.delete(id)); /* Une archive illisible ne supprime pas les photos déjà lues. */ }
       }
     })();
     return()=>{stop=true;};
@@ -32514,20 +32555,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  // ── LES N° DE SUIVI DES ACHATS, LUS POUR CE QUE L'ÉCRAN EN FAIT (22 oct.) ──
+  // Ma journée ne s'en sert QUE pour sortir de « à retirer » un achat déjà
+  // retiré selon l'email du transporteur (`pickupUnion` → `extra`, qui ne
+  // regarde que `vintedToPickup`). Achats, lui, relie aussi une photo à chaque
+  // colis vu par email (`photoColis`) : là, tous les achats.
+  // Mesuré au banc `vitesse.cjs` (base inventée, 7 comptes) : Ma journée lisait
+  // les 560 achats en 6 lectures à la suite pour n'en utiliser que les 140 au
+  // point relais, et reposait l'index — un objet neuf, même contenu — à chaque
+  // passage : un rendu de plus pour rien. La clé ne change que si la LISTE des
+  // transactions demandées change (triée), et un index identique n'est pas reposé.
+  const demandesSuivis = useMemo(() => {
+    if (curSub !== 'achats' && curSub !== 'journee') return '';
+    const base = curSub === 'journee' ? vintedToPickup : buysBase;
+    return [...new Set(base.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))].sort().join(',');
+  }, [curSub, buysBase, vintedToPickup]);
   useEffect(()=>{
-    if(!['achats','journee'].includes(curSub)||!buysBase.length)return;
+    if(!demandesSuivis)return;
     let stop=false;
     (async()=>{
-      const demandes=[...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))];
+      const demandes=demandesSuivis.split(',');
       const resultat={};
       for(let i=0;i<demandes.length;i+=100){
         const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,suivi:data->payload->transaction->shipment->>tracking_code,suivi2:data->payload->transaction->shipment->>tracking_number,suivi3:data->payload->transaction->>tracking_code,photo:data->payload->transaction->item_photo`,{strict:true});
         if(rows===null||stop)return;
         for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={...r,photo:photoArticle({photo:r.photo})};}
       }
-      if(!stop)setIndexSuivisAchats(resultat);
+      if(!stop)setIndexSuivisAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
     })();return()=>{stop=true;};
-  },[curSub,buysBase]);
+  },[demandesSuivis]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -33151,17 +33207,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Leboncoin (226 Ko) ne sont lues que si une vente finalisée n'a pas de lien
   // posé à la main (sa référence vit sur l'annonce). Trois états : `undefined`
   // en cours · `null` pas su · objet lu (`{}` quand rien n'est à lire).
-  const [lbcItemsBenef, setLbcItemsBenef] = useState(undefined);
-  useEffect(() => {
-    if (lbcLu === undefined) return;
-    if (lbcLu === null) { setLbcItemsBenef(null); return; }
+  // (22 oct.) « {} » et « null » se DÉDUISENT de la lecture des ventes : posés
+  // par un effet, ils coûtaient un second rendu juste après celui des ventes
+  // Leboncoin (banc `vitesse.cjs`, Ma journée). Seules les annonces lues sont un état.
+  const lbcBesoinAnnonces = useMemo(() => {
+    if (lbcLu !== true) return false;
     const liens = load('vrm_lbc_liens', {}) || {};
-    const besoin = (lbcVentes.ventes || []).some(v => v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v) && lbcFinalisee(v) && !(liens[String(v.itemId)] != null && String(liens[String(v.itemId)]).trim()));
-    if (!besoin) { setLbcItemsBenef({}); return; }
-    let mort = false;
-    lbcAnnoncesSession().then((it) => { if (!mort) setLbcItemsBenef(it == null ? null : it); });
-    return () => { mort = true; };
+    return (lbcVentes.ventes || []).some(v => v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v) && lbcFinalisee(v) && !(liens[String(v.itemId)] != null && String(liens[String(v.itemId)]).trim()));
   }, [lbcLu, lbcVentes]);
+  const [lbcItemsLus, setLbcItemsLus] = useState(undefined);
+  useEffect(() => {
+    if (!lbcBesoinAnnonces) return;
+    let mort = false;
+    lbcAnnoncesSession().then((it) => { if (!mort) setLbcItemsLus(it == null ? null : it); });
+    return () => { mort = true; };
+  }, [lbcBesoinAnnonces, lbcVentes]);
+  const lbcItemsBenef = lbcLu === undefined ? undefined : lbcLu === null ? null : !lbcBesoinAnnonces ? {} : lbcItemsLus;
   // `null` tant qu'une source n'est pas lue (ou a raté) : jamais un bénéfice
   // partiel présenté comme complet. Une liste sinon.
   const autresBenefice = useMemo(() => {
@@ -35052,6 +35113,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // s'écrivent sur deux chiffres, un prix rond reste rond.
   const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{minimumFractionDigits:Number.isInteger(Number(p))?0:2,maximumFractionDigits:2})} ${cur(c)}`;
 
+  // Le menu « ⋯ Outils » des Ventes : UN contenu, deux ancrages (dans le
+  // bouton sur ordinateur, sous la barre ailleurs). Sur téléphone il porte en
+  // tête « Bordereaux auto » et « Mes vues », sortis de la barre (22 oct.).
+  const menuOutilsVentes = (sousBarre) => (
+    <>
+      <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
+      <div data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:220})}}>
+        {outilsTelephone && (
+          <div className="vrm-outils-reglages" style={{padding:'4px 6px 8px',borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
+            <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
+            <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);setToolsOpen(false);}}/>
+          </div>
+        )}
+        {[
+          {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
+          {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
+          /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
+             pas un problème, je reçois les articles après ; ils sont déjà
+             dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
+          ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
+        ].map(t=>(
+          <button type="button" key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
+            <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
+            <span style={{minWidth:0}}>
+              <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
+              <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
   // Export CSV des ventes (pour compta / déclarations).
   const exportCsv = () => {
     const rows = [['Date','Compte','N°','Titre','Prix vente','Prix achat','Frais renseignés','Bénéfice avant charges générales','Statut','Boost','Commission','Port vendeur','Remboursement','Autres frais','Frais confirmés']];
@@ -35554,9 +35647,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 lu (jamais un zéro inventé, §5). */}
             {!baseKO && !premierJour && (()=>{
               const ko = nomsVentesKO.length > 0;
+              // (22 oct.) `loading` ne vaut vrai que si les comptes sont connus ET que
+              // les QUATRE lectures manquent. Avant que la liste des comptes soit
+              // revenue (`accountsReady`), ou les achats arrivés avant les ventes,
+              // la tuile « À envoyer » disait « 0 » — mesuré au banc
+              // `statuts-colis.cjs` : « 0 » puis « 2 » une seconde plus tard,
+              // « lu 0 » rouge sur `main`. Un zéro inventé (§5) : « — » tant que
+              // ce n'est pas lu. Pareil pour « À retirer » sans les achats.
+              const pasLuComptes = accountsReady === false;
               const T = [
-                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
-                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading },
+                { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
+                { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading || pasLuComptes || (accounts.length>0 && buys.items==null && !(tuiles.retirer && tuiles.retirer.n)) },
                 { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
                 { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
               ];
@@ -35883,9 +35984,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
         <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
-        <div className="vrm-workbar vrm-sales-workbar">
-        <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
-        <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>
+        <div className="vrm-workbar vrm-sales-workbar" style={{position:'relative'}}>
+        {!outilsTelephone && <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>}
+        {!outilsTelephone && <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>}
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
             <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
@@ -35902,44 +36003,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ))}
           {/* OUTILS regroupés : la barre mélangeait filtres et outils (10 boutons
               sur une ligne). Les filtres restent visibles — c'est le réglage du
-              quotidien — et Compta / Registre / Litiges / CSV passent derrière un
-              seul « ⋯ Outils ». Les litiges gardent une pastille d'alerte car
-              c'est de l'argent en jeu. */}
-          {accounts.length>0 && (()=>{
-            const alert = disputes.salesLost.length>0 || disputes.buysBack.length>0;
-            return (
-              <div style={{position:'relative'}}>
-                <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Outils : compta, registre annuel, litiges, export"
-                  style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
-                  ⋯ Outils {alert && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
-                </button>
-                {toolsOpen && (
-                  <>
-                    <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
-                    <div style={{position:'absolute',right:0,top:'calc(100% + 6px)',zIndex:71,minWidth:220,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
-                      {[
-                        {k:'rep', icon:'📊', lab:'Rapport comptable', desc:'CA, bénéfice, cotisations du mois', on:()=>{ setToolsOpen(false); openReport(); }},
-                        {k:'ann', icon:'📚', lab:'Registre annuel', desc:'Ventes + achats ligne par ligne', on:()=>{ setToolsOpen(false); openAnnual(); }},
-                        /* « Litiges » retiré des Outils le 30 septembre (Julien : « ce n'est
-                           pas un problème, je reçois les articles après ; ils sont déjà
-                           dans Annulées »). La modale reste, plus rien n'y mène d'ici. */
-                        ...((sales.items&&sales.items.length>0)?[{k:'csv', icon:'⬇️', lab:'Exporter (CSV · Excel · Numbers)', desc:'Toutes tes ventes, lisible dans Excel et Numbers', on:()=>{ setToolsOpen(false); exportCsv(); }}]:[]),
-                      ].map(t=>(
-                        <button type="button" key={t.k} onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:8,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                          <span style={{fontSize:17,flexShrink:0}}>{t.icon}</span>
-                          <span style={{minWidth:0}}>
-                            <span style={{display:'block',fontSize:13,fontWeight:600,color:t.danger?C.danger:C.text}}>{t.lab}</span>
-                            <span style={{display:'block',fontSize:11,color:C.muted,marginTop:1}}>{t.desc}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })()}
+              quotidien — et Compta / Registre / CSV passent derrière un seul
+              « ⋯ Outils » (sur téléphone, aussi « Bordereaux auto » et « Mes
+              vues »). Les litiges gardent une pastille d'alerte : de l'argent. */}
+          {accounts.length>0 && (
+            <div className="vrm-outils-ventes" style={{position:outilsOrdinateur?'relative':undefined,flexShrink:0}}>
+              <button type="button" onClick={()=>setToolsOpen(v=>!v)} aria-expanded={toolsOpen} title="Outils : compta, registre annuel, export"
+                style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${toolsOpen?C.accent:C.border}`,background:toolsOpen?`${C.accent}12`:'transparent',color:toolsOpen?C.accent:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
+                ⋯ Outils {(disputes.salesLost.length>0 || disputes.buysBack.length>0) && <span style={{width:7,height:7,borderRadius:8,background:C.danger,display:'inline-block'}}/>}
+              </button>
+              {toolsOpen && outilsOrdinateur && menuOutilsVentes(false)}
+            </div>
+          )}
         </div>
+        {/* Sous 1 024 px la rangée des filtres défile au doigt : un menu ouvert
+            DEDANS était coupé par elle (invisible, intouchable — mesuré au banc
+            `revendeurs.cjs`). Il s'ouvre sous la barre entière. */}
+        {accounts.length>0 && toolsOpen && !outilsOrdinateur && menuOutilsVentes(true)}
         {/* LA PÉRIODE, SOUS LE FILTRE QU'ELLE AFFINE. Elle était tout en haut,
             au-dessus de tout : six pastilles + la recherche formaient deux blocs
             pleins avant la première vente. Ici, elle est là où on l'utilise —
@@ -47678,14 +47758,6 @@ function AppCoeur() {
   }, [widgetBase, liveStatsVus]);
 
   const vintedNotifChecked = React.useRef(false);
-  // Le propriétaire des colis à retirer (`pickupUnion`) publie ses comptes ;
-  // ce compteur nous fait relire quand il vient de le faire (voir plus haut).
-  const [colisTick, setColisTick] = useState(0);
-  useEffect(() => {
-    const on = () => setColisTick(t => t + 1);
-    window.addEventListener('vrm:colis', on);
-    return () => window.removeEventListener('vrm:colis', on);
-  }, []);
   // ⚠️⚠️ (revue du 11 octobre) UNE PREUVE RANGÉE PENDANT QUE VRM EST OUVERT.
   //    Le retrait automatique d'eBay (`retirerEbayAuto`, allumé par lui) ne
   //    tournait qu'à l'ouverture : l'extension range le bordereau d'une vente
@@ -47708,6 +47780,21 @@ function AppCoeur() {
   }, []);
   useEffect(()=>{
     if(!vintedAccounts || vintedAccounts.length===0) return;
+    // ── LE SIGNAL « vrm:colis » RELANCE CE PASSAGE, SANS RENDRE LA COQUE (22 oct.)
+    // Le propriétaire des colis à retirer (`pickupUnion`) et celui des colis à
+    // poster publient leurs comptes, puis préviennent : la cloche doit relire.
+    // C'était un compteur d'état (`colisTick`) : chaque signal re-rendait toute
+    // la coque ET l'écran ouvert, et à l'ouverture les deux publications
+    // tombent à quelques centaines de ms d'écart — deux rendus, deux passages
+    // dont le premier aussitôt annulé. Mesuré au banc `vitesse.cjs` (Ma journée,
+    // téléphone) : 2 rendus de trop. Le passage ne lit que la base et le
+    // navigateur (aucun état de la coque hors dépendances) : le relancer d'ici
+    // donne le même résultat. Comme avant, un signal annule le passage en cours
+    // et repart tout de suite — ses lectures se partagent alors avec celles du
+    // passage annulé (src/lecturesPartagees.js) ; un délai les aurait refaites.
+    let annulerPrecedent=()=>{};
+    const passe=()=>{
+    annulerPrecedent();
     // ⚠️ DEUX CHOSES DIFFÉRENTES VIVAIENT DANS LE MÊME « UNE SEULE FOIS » :
     //  · le BANDEAU « nouveautés depuis la dernière ouverture » → doit être unique ;
     //  · le CENTRE de notifications (la cloche) → c'est une liste de choses À FAIRE,
@@ -47719,6 +47806,7 @@ function AppCoeur() {
     // immédiatement sur le drapeau → **la cloche restait vide pour toujours**.
     // Mesuré en base au même moment : 37 messages non lus et 6 ventes à expédier.
     let cancelled=false;
+    annulerPrecedent=()=>{cancelled=true;};
     (async()=>{
       // (6 octobre) Le nuage était-il là AU DÉPART du passage ? Les fiches N°
       // et les réglages lus ci-dessous viennent du navigateur : sur un appareil
@@ -47987,7 +48075,9 @@ function AppCoeur() {
         const r=rappelUrssaf({ freq: load('vinted_urssaf_freq','trimestriel'), declare: lireDeclarations(), ligne: lireLigneUrssaf() });
         if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'compta', jr:true, job:'urssaf', urssaf:r});
       }
-      setNotifItems(items);
+      // Une liste identique ne se repose pas : un tableau neuf re-rendait toute
+      // la coque et l'écran ouvert pour rien à chaque recalcul (22 oct.).
+      setNotifItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
       // Le mémo des conversations reste borné (les plus récentes gardées).
       { const ks=Object.keys(nextSeen); if(ks.length>4000){ const garde={}; ks.slice(-4000).forEach(k=>{ garde[k]=nextSeen[k]; }); save('vinted_notif_seen_convs',garde); } else save('vinted_notif_seen_convs',nextSeen); }
       // ⚠️⚠️ « ~300 NOTIFICATIONS À L'OUVERTURE » (3 octobre). Les nouvelles
@@ -48020,7 +48110,10 @@ function AppCoeur() {
         }
       }
     })();
-    return ()=>{cancelled=true;};
+    };
+    passe();
+    window.addEventListener('vrm:colis', passe);
+    return ()=>{ annulerPrecedent(); window.removeEventListener('vrm:colis', passe); };
   // ⚠️ `nuagePret` (4 octobre, banc `statuts-colis.cjs`) : le repli lit dans le
   // NAVIGATEUR les colis cochés « posté », les ventes masquées et les comptes
   // exclus — trois réglages SYNCHRONISÉS. Sur un appareil neuf, quand le nuage
@@ -48028,7 +48121,7 @@ function AppCoeur() {
   // 2 colis réels, et ne se recalculait jamais (§5.49). On recompte à
   // l'arrivée du nuage.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[vintedAccounts, colisTick, nuagePret, preuveTick]);
+  },[vintedAccounts, nuagePret, preuveTick]);
 
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans

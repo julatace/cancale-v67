@@ -145,14 +145,23 @@ const secoursIci = () => { try { return deps.secours(); } catch (_) { return 'no
 //    en délai OU rendues sans octets retrouvent leurs essais : son retour est un
 //    signal neuf (son service worker a pu échouer pour une raison passagère).
 let dernierSecours = null;
+// (22 oct.) Avec une session, le secours vaut « oui » en permanence (la route
+// serveur) : le retour de l'extension ne CHANGE plus la réponse ci-dessus. Une
+// extension qui REDEVIENT présente (elle était muette ou absente) reste un
+// signal neuf — sans ça, une photo refusée pendant qu'elle se taisait attendait
+// son recul avant d'être redemandée.
+let derniereExt = null;
 export function secoursChange() {
   const s = secoursIci();
+  let x = 'absente'; try { x = deps.ext(); } catch (_) {}
+  const extRevenue = derniereExt !== null && derniereExt !== 'presente' && x === 'presente';
+  derniereExt = x;
   if (s !== dernierSecours) {
     const avant = dernierSecours;
     dernierSecours = s;
     if (s === 'oui' && avant !== null && avant !== 'oui') rouvrirTout();
     toutNotifier();
-  }
+  } else if (extRevenue && s === 'oui') rouvrirTout();
   pomper();
   planifierTemoin();
 }

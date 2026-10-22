@@ -11613,3 +11613,89 @@ Julien : « qu'elle marche sur Orion sur l'iPhone, pareil que sur Chrome », pui
 - **Au doigt** : le bandeau de dépôt Leboncoin tient à 390 px et ses boutons font 44 px (`pointer: coarse` + `hover: none` seulement — rien ne change à la souris). Banc `leboncoin.cjs` (`BANC_PORT`).
 - Preuves : `audit-extension-navigateurs.cjs` sections G-I (profils `chromium`, `firefox-android`, `safari-ios`, `orion-ios`, `orion-ios-pire` dans `_fond-vm.cjs` — option `retirer`, `storage.onChanged` à état) : **30 rouges sur origin/main** (§6.1) ; `--mutation cookies|alarms|main` ⇒ 1 · 4 · 2 rouges ; parité : sans `scripting` ni `tabs.sendMessage`, exactement les mêmes requêtes Vinted que Chrome.
 - ⚠️ **Non mesuré** : aucun vrai Orion, iPhone, Safari ni Firefox Android ; la liste officielle d'API d'Orion (feuille Google, bloquée) ; si les cookies de session de Vinted sont HttpOnly (déterminant sans API `cookies`) ; WebKit absent du conteneur. **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (kit prêt, section 3), puis essayer Orion sur l'iPhone (section 2) ; Safari : Mac + Xcode + compte Apple 99 $/an (section 4).
+
+### Fiabilité laissée ouverte le 22 octobre : Ma journée relit moins, la barre des Ventes tient sur téléphone, les photos d'une extension muette (22 octobre)
+Les trois points « reste ouvert » de `docs/passation/2026-10-22.md`.
+- **Mesuré (bissection de `main`, une construction par fusion, banc `vitesse.cjs`)** :
+  Ma journée à 390 px est passée de 54 à 64 lectures et de ~13 à 15-16 rendus
+  entre le 21 et le 22 octobre. Cinq causes, toutes retirées (aucun plafond
+  touché, 62 et 13) :
+  1. #634 lisait les n° de suivi de **tous** les achats (560, six requêtes) pour
+     n'en utiliser que ceux au point relais ⇒ sur Ma journée, seulement
+     `vintedToPickup` (`demandesSuivis`, une clé stable) ;
+  2. #635 lisait `vrm_blocked_accounts` à **deux** adresses (filtrée sur le
+     vendeur et non) : le partage des lectures ne les réunit pas ⇒
+     `purgerComptesSupprimes` lit à la même adresse que `fetchVintedAccounts` ;
+  3. les brouillons eBay étaient lus pour « numéros à vérifier », qui ne vit que
+     sur Annonces ⇒ lus sur Annonces seulement ;
+  4. un signal `vrm:colis` re-rendait toute la coque (`colisTick`) puis la cloche
+     reposait une liste identique ⇒ le signal relance la passe directement, et
+     une liste, un index ou des réserves IDENTIQUES ne sont pas reposés ;
+  5. `lireReceptionLeboncoin` passait `signal` et `cache:'no-store'` : la lecture
+     sortait du partage (`lbc_ventes` lue trois fois) ⇒ attente bornée par une
+     course, plus de signal.
+  Mesuré après : **55 à 57 lectures (64 à 390 px et 63 à 1512 avant)** ;
+  rendus médiane 13, de 12 à 14 (19/16/15 avant) ; texte de Ma journée
+  **identique caractère pour caractère** à celui de `main` aux deux tailles
+  (`VITESSE_REFERENCE`). ⚠️ Les deux textes se produisent à la MÊME heure : le
+  bonjour suit l'heure (« Bon après-midi » contre « Bonsoir » a fait un faux
+  écart au premier essai).
+- ⚠️⚠️ **LE PLAFOND GLOBAL NE VOIT PAS LAQUELLE REVIENT** : les causes 1 à 4
+  remises ensemble donnent **exactement 62 lectures et une médiane de 13
+  rendus** — le banc était VERT sur la régression. D'où quatre contrôles, un par
+  cause (n° de suivi ⊆ achats au relais, une seule adresse pour la liste noire,
+  aucun brouillon eBay, 0 rendu sur le second signal) : **12 rouges** sur `main`
+  (d198bca), 8 rouges sous les quatre mutations. La cinquième est prouvée par
+  `scripts/tests/rafraichissement-leboncoin.test.mjs` (2 lectures pour 2
+  demandes sur l'ancien code, 1 après).
+- **Barre d'outils des Ventes, décidé** : sous 768 px, « Bordereaux auto » et
+  « Mes vues » passent dans « ⋯ Outils » ; sur ordinateur rien ne bouge. Mesuré
+  à 390 px : **273 → 113 px** de barre avant la première vente. Seuil du banc
+  `revendeurs.cjs` revenu à 150.
+  ⚠️ **Trouvé en le faisant, et c'était déjà cassé sur `main`** : sous 1024 px le
+  menu « ⋯ Outils » s'ouvrait DANS la rangée qui défile (`.vrm-rangee`,
+  `overflow-x:auto`) — coupé, Rapport comptable et Registre annuel
+  intouchables au doigt. Il s'ouvre sous la barre ; le bouton reste collé à
+  droite de la rangée. `revendeurs.cjs` : **8 rouges sur `main`**, 210 verts
+  après ; menu remis dans la rangée ⇒ rouge, outils remis dans la barre ⇒ rouge.
+- **`photos-vinted.cjs` : 40 rouges qui ne mesuraient aucune photo** — l'écran
+  de connexion. La porte de banc (`_porte-banc.cjs`, chargée par `_meta.cjs`) se
+  posait sur `require('playwright')` ; or le banc lance
+  `/home/user/cancale-v67/node_modules/playwright`, et dans un **worktree dont
+  `node_modules` est un lien vers un autre arbre** ce sont DEUX modules : la
+  porte sur l'un, le navigateur de l'autre. Même cause pour `rapport.cjs` (7
+  rouges) et `seuils-vinted.cjs` (13) — verts une fois la porte posée aussi sur
+  le chemin absolu (dans la porte elle-même, pas banc par banc). ⚠️ Les
+  workflows lancent leurs agents dans des worktrees : *un banc rouge en masse
+  dans un worktree, regarder d'abord l'écran capturé*. Porte posée, 6 rouges :
+  - ⚠️ **U, un vrai défaut d'app** (depuis e4a755f, 13 oct.) : avec une session,
+    le secours des photos vaut « oui » en permanence (la route serveur). Serveur
+    qui échoue + extension MUETTE ⇒ chaque photo partait en « délai », jamais
+    comptée perdue : des pictogrammes **sans aucune phrase**. Une extension
+    muette n'est plus interrogée (refus, jamais définitif), et son retour
+    redemande les photos refusées même quand le secours ne change pas
+    (`secoursChange`, contrôle ajouté à `audit-photos-vinted.cjs`, rouge sur
+    l'ancien code et sous la mutation `ext-revenue`). U : 3 rouges sur `main`
+    et sous mutation, verts après.
+  - **O et N, le banc en retard** : hors ligne, la coque remplace TOUS les écrans
+    par la copie de Ma journée (5588c02, 21 oct.) — plus de liste de photos ni de
+    navigation de sections pendant la coupure. Les deux scénarios jugent
+    maintenant ce qui existe : la coque dit « hors ligne », aucune phrase de
+    photos fausse, et au retour du réseau tout s'affiche sans phrase.
+- **« À envoyer 0 » avant la liste des comptes** (trouvé en relançant
+  `statuts-colis.cjs`, rouge sur `main`) : la tuile de Ma journée n'était « pas
+  su » que si les QUATRE lectures manquaient ET que des comptes étaient connus —
+  avant le retour de la liste des comptes, elle disait « 0 », puis « 2 » une
+  seconde plus tard. Un zéro inventé (§5) : « — » tant que les comptes, les
+  ventes (ou, pour « À retirer », les achats) ne sont pas lus. Rouge sur `main`
+  à 390 px (deux passages sur deux), et sur la mutation aux deux tailles ; vert
+  deux fois après. `ebay-colis`, `ebay-messages-journee`, `journee-premium`
+  (qui lisent la même tuile) restent verts.
+- ⚠️ **Disque plein pendant la passe** (`/` à 20 Mo libres) : Chromium mourait
+  (« No space left on device » dans ses journaux) et le banc disait seulement
+  « Target page, context or browser has been closed ». Un banc qui meurt ainsi,
+  c'est la machine : regarder `df -h /` avant d'accuser l'app.
+- **Non mesuré** : les rendus varient de 12 à 14 sous la charge de la machine
+  partagée (4 cœurs) — la médiane tient le plafond, un tirage isolé peut le
+  dépasser ; la route serveur des photos en production (le défaut U ne se voit
+  que si elle échoue) ; rien n'a été vu sur un vrai téléphone.
