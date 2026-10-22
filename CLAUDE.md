@@ -11762,7 +11762,13 @@ contrôle lancé depuis elle, §6.1), vert après, rouge sous mutation.
   un autre, les bancs qui visent `/home/user/cancale-v67/node_modules/playwright`
   ne reçoivent pas le crochet `_porte-banc.cjs` (il patche le playwright de SON
   dossier) : `messagerie.cjs` restait sur l'écran de connexion. Le crochet a été
-  posé à la main sur ce chemin (`node -r`), l'app n'y est pour rien.
+  posé à la main sur ce chemin (`node -r`), l'app n'y est pour rien. Après :
+  les 143 audits verts (`audit-renum-b` sauté), `capacite-securite` 8/8, bancs
+  `emails-mis-de-cote` 52 et `double-vente-push` 28 verts. ⚠️ Les scripts de
+  reproduction du relecteur ne savent plus juger ce code : leur fausse base
+  upserte toute insertion (pas de 409), ignore `gt.` (400) et compte la ligne
+  compteur (même préfixe) comme une demande — §6.3 ; `audit-preuve-adresse`
+  rejoue leurs trois scénarios sur la forme réelle.
 - ⚠️ **Non mesuré** : le comparer-et-échanger sur la vraie PostgREST (`data->>rev=eq.N`,
   409 sur une insertion en double — formes de `modifierDonnee`, jamais envoyées
   d'ici) ; `order=data->>demandeLe.asc` et `data->>expire=gt.` sur sa base ; le
