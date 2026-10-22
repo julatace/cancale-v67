@@ -58,10 +58,11 @@ const SCRIPT = `(() => {
         // lignes, toutes à lui — celles qui n'en disent rien reçoivent son owner.
         const filtre = url.indexOf('owner=eq.' + encodeURIComponent(uid)) >= 0 || url.indexOf('owner=eq.' + uid) >= 0;
         if (filtre) {
-          let r = await vrai(synth ? url.replace(/([?&]select=)owner,/, '$1') : url, init);
-          // Un banc d'avant le 21 oct. répond 400 à tout « select=owner… » (sa sonde) :
-          // la ligne lue avec l'owner se redemande sans lui.
-          if (r.status === 400 && /[?&]select=owner,/.test(url)) r = await vrai(url.replace(/([?&]select=)owner,/, '$1'), init);
+          // Les bancs d'avant le 21 oct. traitent tout « select=owner… » comme LEUR sonde
+          // de cloisonnement (400, ou [] — « pas de ligne », ce qui faisait renuméroter
+          // à partir de 1). Un vrai PostgREST rend la ligne : on la demande au banc sans
+          // `owner`, puis on pose l'owner (lecture filtrée sur lui).
+          const r = await vrai(url.replace(/([?&]select=)owner,/, '$1'), init);
           let j = null; try { j = await r.clone().json(); } catch (_) { return r; }
           if (!r.ok || !Array.isArray(j)) return r;
           const rows = j.map((o) => (o && typeof o === 'object' && !Array.isArray(o) && (o.owner == null) ? Object.assign({}, o, { owner: uid }) : o));
