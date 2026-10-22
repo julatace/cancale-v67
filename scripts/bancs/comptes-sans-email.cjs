@@ -27,9 +27,12 @@
 //        qui a vendu sans email, sous le seuil, a sa propre phrase (« 1 vente
 //        sans email depuis le … — pas encore de quoi conclure ») ;
 //      · un compte dormant (ventes d'avant le premier email) n'est pas accusé ;
-//      · le bloc dit l'effet PROUVÉ (pas de rappel du matin pour leurs colis à
-//        poster), jamais « leurs codes de retrait n'arrivent pas » ; il parle au
-//        singulier pour UN compte ;
+//      · le bloc dit l'effet PROUVÉ, jamais « leurs codes de retrait
+//        n'arrivent pas » ; il parle au singulier pour UN compte. ⚠️ (22 oct.)
+//        « pas de rappel du matin pour leurs colis » est devenu FAUX : le rappel
+//        du matin compte maintenant toutes les ventes à expédier. L'effet
+//        prouvé qui reste : leur date limite est ESTIMÉE (vente + 7 j, sans
+//        l'heure). Le banc exige la nouvelle phrase ET l'absence de l'ancienne ;
 //      · Réglages déplié ne redit pas le résumé ; la table ne redit pas un compte
 //        déjà nommé dans le bloc ;
 //      · Achats : une ligne compacte (≤ 60 px à 390 px), APRÈS les colis jamais
@@ -175,7 +178,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       // ⚠️ Jugé dans le BLOC seul : la liste des notifications dessous dit
       //    légitimement « avec le code de retrait » (📍 Colis à retirer).
       const blocR = await pg.evaluate(() => { const e = document.querySelector('[data-comptes-muets]'); return e ? e.innerText.replace(/\s+/g, ' ') : ''; });
-      dit(/rappel du matin/i.test(blocR) && !/codes? de retrait/i.test(blocR), `${T} Réglages : l’effet PROUVÉ (pas de rappel du matin pour leurs colis à poster), pas « leurs codes de retrait »`, (blocR.match(/s’affichent bien.{0,240}/) || [''])[0]);
+      dit(/date limite[^.]{0,40}estimée/i.test(blocR) && !/pas de rappel du matin/i.test(blocR) && !/codes? de retrait/i.test(blocR), `${T} Réglages : l’effet PROUVÉ (leur date limite est estimée), plus « pas de rappel du matin » (faux depuis le 22 oct.), pas « leurs codes de retrait »`, (blocR.match(/s’affichent bien.{0,240}/) || [''])[0]);
       const nommes = MUETS.filter((l) => det.includes(l));
       const aTort = PAS_MUETS.filter((l) => det.includes(l));
       dit(nommes.length === 3 && !aTort.length, `${T} Réglages : les 3 comptes muets sont nommés, et eux seuls`, `nommés ${JSON.stringify(nommes)} · à tort ${JSON.stringify(aTort)}`);
@@ -213,7 +216,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
         `${T} Achats : le bloc (une fois ouvert) nomme les 3 comptes muets, et eux seuls`, bloc.slice(0, 220));
       dit(/\b3 comptes\b/.test(resumeCompact) && !/Masquer/.test(resumeCompact), `${T} Achats : la ligne repliée dit le nombre`, resumeCompact);
       dit(/arthuror2[^.]*depuis le \d{1,2} [a-zéû]+/i.test(bloc), `${T} Achats : arthuror2 « plus aucun email depuis le … »`, (bloc.match(/arthuror2[^.]{0,120}/) || [''])[0]);
-      dit(/rappel du matin/i.test(bloc) && !/codes? de retrait/i.test(bloc.slice(0, bloc.indexOf('Pour') > 0 ? bloc.indexOf('Pour') : 1400)), `${T} Achats : l’effet prouvé, pas les codes de retrait`, (bloc.match(/s’affichent bien.{0,240}/) || [''])[0]);
+      dit(/date limite[^.]{0,40}estimée/i.test(bloc) && !/pas de rappel du matin/i.test(bloc) && !/codes? de retrait/i.test(bloc.slice(0, bloc.indexOf('Pour') > 0 ? bloc.indexOf('Pour') : 1400)), `${T} Achats : l’effet prouvé (date limite estimée), plus « pas de rappel du matin », pas les codes de retrait`, (bloc.match(/s’affichent bien.{0,240}/) || [''])[0]);
       // Le détail des comptes (déplié s'il est replié).
       const resumes = pg.locator('summary', { hasText: /détail|Réception des emails/ });
       if (await resumes.count()) { await resumes.first().click().catch(() => {}); await pg.waitForTimeout(400); }

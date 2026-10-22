@@ -72,6 +72,10 @@ export function construirePhoto({ uid, at, envoyer = [], retirer = [], nePasPost
     envoyer: envoyer.slice(0, MAX_LIGNES).map((e) => ({
       titre: txt(e.titre), numero: txt(e.numero, 12), compte: txt(e.compte, 40), plateforme: e.plateforme === 'ebay' ? 'ebay' : 'vinted',
       limite: Number.isFinite(e.jours) ? jourLocal(at, e.jours) : '',
+      // (22 oct.) L'HEURE limite lue dans l'email (« avant 10 h ») et l'instant
+      // exact, pour que la ligne hors ligne dise la même chose que Colis — et
+      // passe « en retard » à l'heure, même sans réseau. Absents ⇒ le jour seul.
+      ...(Number.isFinite(e.limiteAt) && /^\d{4}-\d{2}-\d{2}$/.test(String(e.jour || '')) ? { jour: e.jour, limiteAt: e.limiteAt, heure: /^\d{2}:\d{2}$/.test(String(e.heure || '')) ? e.heure : '' } : {}),
     })),
     nEnvoyer: envoyer.length,
     retirer: retirer.slice(0, MAX_LIGNES).map((r) => ({
