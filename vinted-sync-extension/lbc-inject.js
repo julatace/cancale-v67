@@ -35,6 +35,7 @@
   };
   try{window.addEventListener('message',event=>{
     if(event.source!==window||event.data?.__tag!=='CANCALE_LBC_RELAY'||event.data.kind!=='pret')return;
+    if(!relaisPret)try{window.postMessage({__tag:'CANCALE_LBC_CAPTEUR',kind:'actif'},'*');}catch(_){}
     relaisPret=true;for(const {m} of attente.splice(0))try{window.postMessage(m,'*');}catch(_){}octetsAttente=0;
   });window.postMessage({__tag:'CANCALE_LBC_CAPTEUR',kind:'pret'},'*');}catch(_){}
 
@@ -408,7 +409,7 @@
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
-      const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      const url = (typeof input === 'string') ? input : (input instanceof URL ? input.href : (input && input.url) || '');
       const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
       // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
@@ -447,7 +448,7 @@
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
-            const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
+            const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct);
           } catch (_) {}
         });

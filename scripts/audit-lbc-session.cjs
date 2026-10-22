@@ -87,6 +87,14 @@ const compteur = (env, id) => env.envoyer({ from: 'cancale-lbc', action: 'lbcMsg
 const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', comptes: [{ id: PRO, name: 'BOUTIQUEPRO', pro: true }] });
 
 (async () => {
+  await essaie('écriture de session refusée puis reprise',async()=>{
+    const env=faire(),original=env.ctx.supabaseUpsert;
+    env.ctx.supabaseUpsert=async()=>false;
+    dit(await env.ctx.noterSessionLbc(PART)===false,'un envoi refusé reste un échec');
+    dit(!env.local.vrmLbcSessionEcrit,'un envoi refusé ne bloque pas la session pendant six heures');
+    env.ctx.supabaseUpsert=original;
+    dit(await env.ctx.noterSessionLbc(PART)===true && env.base.lbc_accounts?.accounts?.[PART],'la capture suivante reprend et enregistre le compte');
+  });
   console.log('── 1. LE COMPTE PRO LIÉ EST RANGÉ « PRO », ET N’EST PAS LA SESSION');
   await essaie('linked_accounts', async () => {
     const env = faire();
@@ -102,6 +110,8 @@ const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', c
     await lies(env);
     await relais(env, 'https://api.leboncoin.fr/api/account/v2/members/me/account', MEMBER);
     await compteur(env, PART);
+    const etat=await env.ctx.etatSite('https://www.leboncoin.fr/');
+    dit(etat.site && etat.site.id===PART,'la carte reconnaît la session même avant de connaître son pseudo');
     const c = env.local.vrmLbcCompte;
     dit(!!c && c.v === 2 && c.id === PART, 'le compte connecté = celui du compteur', JSON.stringify(c || null));
     await relais(env, `https://api.leboncoin.fr/api/user-card/v2/${PART}/infos`, CARTE(PART, 'Particulier35', 'private'));

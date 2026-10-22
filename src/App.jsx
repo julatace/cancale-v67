@@ -1,3 +1,5 @@
+import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
+import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat} from './liensColis.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
@@ -82,7 +84,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.207.0';
+const EXT_ATTENDUE = '5.208.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1049,7 +1051,7 @@ const OAUTH_PROVIDERS = [
 let AUTH_SETTINGS = null;
 const loadAuthSettings = async () => {
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY },signal:AbortSignal.timeout(15000) });
     if (r.ok) { AUTH_SETTINGS = await r.json(); _emitAuth(); }  // réveille l'écran de connexion
   } catch (_) {}
   return AUTH_SETTINGS;
@@ -1062,6 +1064,7 @@ const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfi
 
 const oauthStart = async (provider) => {
   try {
+    try{sessionStorage.removeItem('vrm_oauth_liaison');localStorage.removeItem('vrm_oauth_liaison');}catch(_){}
     const verifier = makeVerifier();
     sessionStorage.setItem(PKCE_KEY, verifier);          // cet onglet
     // Téléphone : l'app Discord/Google renvoie souvent le retour dans un NOUVEL
@@ -1075,6 +1078,13 @@ const oauthStart = async (provider) => {
     window.location.href = url;
     return { ok: true };
   } catch (e) { return { ok: false, error: "Impossible d'ouvrir la connexion " + provider + '.' }; }
+};
+
+const lireConnexionsOAuth = async()=>{
+ try{const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,...enTeteSession()},signal:AbortSignal.timeout(15000)});if(!r.ok)return null;const j=await r.json();return Array.isArray(j.identities)?j.identities.map(i=>i.provider):null;}catch(_){return null;}
+};
+const oauthRelier = async provider => {
+  try{const verifier=makeVerifier();const r=await preparerLiaisonOAuth({provider,enabled:providerEnabled(provider),token:AUTH.session?.access_token,owner:AUTH.user?.id,base:SUPABASE_URL,cle:SUPABASE_KEY,origine:window.location.origin,verifier,challenge:await makeChallenge(verifier)});if(r.ok)window.location.assign(r.url);return r;}catch(_){return{ok:false,error:'Impossible de préparer cette connexion. Réessaie.'};}
 };
 
 // Au retour du fournisseur. Deux formes possibles :
@@ -1092,11 +1102,12 @@ const consumeAuthRedirect = async () => {
   const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
 
   const err = q.get('error_description') || q.get('error') || hash.get('error_description') || hash.get('error');
-  if (err) { cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
+  if (err) { lireLiaisonOAuth(sessionStorage,localStorage); cleanAuthUrl(); return { error: decodeURIComponent(String(err).replace(/\+/g, ' ')) }; }
 
   const code = q.get('code');
   if (code) {
-    let verifier = sessionStorage.getItem(PKCE_KEY);
+    const liaison=lireLiaisonOAuth(sessionStorage,localStorage);
+    let verifier = liaison?.verifier || sessionStorage.getItem(PKCE_KEY);
     sessionStorage.removeItem(PKCE_KEY);
     try {
       const o = JSON.parse(localStorage.getItem(PKCE_KEY) || 'null');
@@ -1107,8 +1118,9 @@ const consumeAuthRedirect = async () => {
     if (!verifier) return { error: 'Connexion expirée, réessaie depuis cet appareil.' };
     const r = await authCall('token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
     if (!r.ok) return { error: r.error };
+    if(!resultatLiaisonPermis(liaison,r.json))return{error:'La liaison ne correspond pas à ton compte VRM. Ta session a été conservée.'};
     writeSession(sessionFrom(r.json));
-    return { ok: true };
+    return { ok: true, liaison:liaison?.provider };
   }
 
   const at = hash.get('access_token');
@@ -43273,23 +43285,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
           <span className="vrm-set-lib"><b style={{color:C.text}}>Email et mot de passe</b></span>
           <span className="vrm-set-val" style={{color:C.muted}}>Actif</span>
         </div>
-        {OAUTH_PROVIDERS.map(pr => {
-          const on = providerEnabled(pr.id);
-          return (
-            <div key={pr.id} className="vrm-set-ligne">
-              <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`}}><BrandMark id={pr.id}/></span>
-              <span className="vrm-set-lib"><b style={{color:C.text}}>{pr.label}</b></span>
-              {on
-                ? (AUTH.user
-                    ? <span className="vrm-set-val" style={{color:C.muted}}>Disponible</span>
-                    : <button type="button" onClick={()=>oauthStart(pr.id)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'0 14px',minHeight:36,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Utiliser</button>)
-                : <span className="vrm-set-val" style={{color:C.muted}}>Pas activé</span>}
-            </div>
-          );
-        })}
+
       </div>
       <div className="vrm-set-pied" style={{color:C.muted}}>
-        Google et Discord apparaîtront ici dès que leurs clés seront collées dans Supabase. Tant que ce n'est pas fait, on ne les propose pas : un bouton qui mène à une page d'erreur ne sert à rien.
+        Ton accès par email reste disponible après l’association d’un compte.
       </div>
     </div>
   );
@@ -43382,10 +43381,12 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'prenom', type:'el', el:<PrenomSetting key="prenom"/> },
     ], pied:'Ton prénom sert seulement à te dire bonjour sur l’accueil. Vide, l’app dit « Bonjour ».' },
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
+
+    AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
+      {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS.filter(p=>p.id==='google')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
+    ]},
     AUTH.user && {id:'photo-profil',titre:'Photo de profil',items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C}/>} ]},
-    AUTH.user && { id:'discord', titre:'Discord', items:[
-      { id:'discord', type:'el', el:<DiscordCompte key="discord"/> },
-    ], pied:'Facultatif. VRM ne lit que ton pseudo Discord (jamais ton email, tes serveurs ni tes messages). Il est proposé quand tu apparais sur la carte de la communauté.' },
     AUTH.user && { id:'equipe', titre:'Équipe', items:[
       { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', el:<EquipeSetting/> },
     ]},
@@ -44590,8 +44591,8 @@ function DiscordCompte() {
     setMsg('Ton Discord est retiré de ton compte.');
     relire();
   };
-  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
-  const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45 }}>{msg}</div>;
+  const bouton = (plein) => ({ border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? '#5865F2' : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 8, padding: '8px 12px', minHeight: 38, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' });
+  const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45,flexBasis:'100%' }}>{msg}</div>;
   if (lu === undefined) return <div data-discord-compte="chargement" style={{ fontSize: 13, color: C.muted, padding: '4px 0' }}>Lecture de ton Discord…{note}</div>;
   if (lu === null) return (
     <div data-discord-compte="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5, padding: '4px 0' }}>
@@ -44599,10 +44600,10 @@ function DiscordCompte() {
     </div>
   );
   return (
-    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 14, color: C.text, padding: '4px 0' }}>
-      <div style={{ marginBottom: 8 }}>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : 'Aucun compte Discord relié.'}</div>
+    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
+      <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:8,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Associe ton profil et son avatar à VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} style={bouton(true)}>{occupe ? 'Un instant…' : lu.discord ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>}
+        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} style={bouton(true)}>{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
         {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} style={bouton(false)}>Retirer</button>}
       </div>
       {!lu.connexion && !lu.discord && <div style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>{DISCORD_ERREURS['non-configure']}</div>}
