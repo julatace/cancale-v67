@@ -21,7 +21,7 @@ import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
-import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible } from "./journeeWidgets.js";
+import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables } from "./journeeWidgets.js";
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
@@ -27887,7 +27887,7 @@ function useBeneficeJournee() {
   };
   return [on, poser];
 }
-function BeneficeJournee({ onNav, place, force = false }) {
+function BeneficeJournee({ onNav, place }) {
   const [on, poser] = useBeneficeJournee();
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
@@ -27902,7 +27902,7 @@ function BeneficeJournee({ onNav, place, force = false }) {
       </div>
     );
   }
-  if (!on && !force) return null;
+  if (!on) return null;
   const minuit = new Date(); minuit.setHours(0, 0, 0, 0);
   const demain = new Date(minuit); demain.setDate(demain.getDate() + 1);
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
@@ -27955,9 +27955,9 @@ function BeneficeJournee({ onNav, place, force = false }) {
             : "Aujourd'hui : aucune vente finalisée pour l'instant."}
         </div>
       </>)}
-      {!force && <div style={{ marginTop: 6 }}>
+      <div style={{ marginTop: 6 }}>
         <button type="button" className="vrm-lien-action" data-journee-benef-masquer="" onClick={() => poser(false)} style={{ background: 'none', border: 0, padding: 0, color: C.muted, cursor: 'pointer', fontSize: 12, fontWeight: 400, fontFamily: 'inherit' }}>Masquer de Ma journée</button>
-      </div>}
+      </div>
     </div>
   );
 }
@@ -28002,10 +28002,11 @@ function useDispositionJournee() {
 const mouvementReduit = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; } };
 const EASE_WIDGET = 'cubic-bezier(0.23,1,0.32,1)';
 
-// La feuille « Ajouter un widget » : ce qui n'est pas déjà sur l'écran.
+// La feuille « Ajouter un widget » : ce qui n'est pas déjà sur l'écran — et
+// jamais une petite case qui redirait un nombre de la barre, ni la barre quand
+// une petite case est là (le même nombre deux fois, §7 ; revue du 22 oct.).
 function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
-  const presents = new Set(dispo.map((w) => w.id));
-  const libres = Object.keys(WIDGETS_JOURNEE).filter((id) => !presents.has(id));
+  const { ids: libres, retenu } = widgetsAjoutables(dispo);
   return createPortal(
     <div data-noswipe data-widgets-feuille="" onClick={onClose} className="vrm-w-voile">
       <FermeAuRetour fermer={onClose}/>
@@ -28015,10 +28016,17 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
             <div style={{ fontSize: 16, fontWeight: 700 }}>Ajouter un widget</div>
             <div style={{ fontSize: 12.5, color: C.muted }}>Il se place à la fin — glisse-le ensuite où tu veux.</div>
           </div>
-          <button type="button" className="vrm-w-btn" onClick={onClose} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Fermer</button>
+          <button type="button" className="vrm-w-btn" data-widgets-fermer="" onClick={onClose} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Fermer</button>
         </div>
         <div className="vrm-w-feuille-corps">
           {libres.length === 0 && <div style={{ fontSize: 13, color: C.muted, padding: '6px 2px 12px' }}>Tous les widgets sont déjà sur ta journée.</div>}
+          {retenu && (
+            <div data-widgets-retenu={retenu} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45, padding: '0 2px 4px' }}>
+              {retenu === 'tuiles'
+                ? <>Les petites cases (à envoyer, à retirer, messages, prix) redisent la barre « Les quatre gestes » : retire la barre pour les choisir une par une.</>
+                : <>« Les quatre gestes » redirait tes petites cases : retire-les pour remettre la barre.</>}
+            </div>
+          )}
           {libres.map((id) => {
             const d = WIDGETS_JOURNEE[id];
             return (
@@ -28106,6 +28114,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
     window.addEventListener('keydown', k);
     return () => { g.removeEventListener('touchmove', f); window.removeEventListener('keydown', k); };
   }, [edition, ajout, setEdition]);
+  React.useEffect(() => { if (edition && !peutModifier) setEdition(false); }, [edition, peutModifier, setEdition]);
   React.useEffect(() => () => {
     if (appui.current) clearTimeout(appui.current.timer);
     if (drag.current && drag.current.timer) clearTimeout(drag.current.timer);
@@ -28130,8 +28139,11 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
 
   const surDown = (id) => (e) => {
     if (!edition) {
-      // L'appui long au doigt passe en mode « Modifier » (comme sur iPhone).
-      if (e.pointerType !== 'touch') return;
+      // L'appui long au doigt passe en mode « Modifier » (comme sur iPhone) —
+      // jamais là où « Modifier » n'est pas proposé (premier jour, panne : revue
+      // du 22 oct., l'appui long y ouvrait six cases « Rien à montrer » et ce
+      // qu'on y retirait partait au nuage).
+      if (e.pointerType !== 'touch' || !peutModifier) return;
       if (appui.current) clearTimeout(appui.current.timer);
       const a = { x: e.clientX, y: e.clientY };
       a.timer = setTimeout(() => {
@@ -28215,12 +28227,19 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
 
   const retirer = (id) => { if (widgetFixe(id)) return; memoriserPlaces(); poser(retirerWidget(dispo, id)); };
   const changerTaille = (id) => { memoriserPlaces(); poser(dispo.map((w) => w.id === id ? { ...w, t: tailleSuivante(id, w.t) } : w)); };
+  // ⚠️ Les flèches d'un widget le DÉPLACENT, et rien d'autre (revue du 22 oct.) :
+  // la coque écoute ← → sur la fenêtre pour changer d'onglet, et un widget
+  // (role="group") n'est pas un bouton pour elle — « → » déplaçait le widget ET
+  // emmenait sur l'onglet Vinted, mode « Modifier » perdu. Même au bord (premier
+  // ou dernier widget, rien à déplacer) la flèche reste ici.
   const clavier = (id) => (e) => {
     if (!edition || e.target !== e.currentTarget) return;
     const i = dispo.findIndex((w) => w.id === id);
-    if (['ArrowLeft', 'ArrowUp'].includes(e.key) && i > 0) { e.preventDefault(); memoriserPlaces(); poser(deplacerWidget(dispo, i, i - 1)); }
-    else if (['ArrowRight', 'ArrowDown'].includes(e.key) && i < dispo.length - 1) { e.preventDefault(); memoriserPlaces(); poser(deplacerWidget(dispo, i, i + 1)); }
-    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); retirer(id); }
+    const fleche = ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(e.key);
+    if (fleche) { e.preventDefault(); e.stopPropagation(); }
+    if (['ArrowLeft', 'ArrowUp'].includes(e.key) && i > 0) { memoriserPlaces(); poser(deplacerWidget(dispo, i, i - 1)); }
+    else if (['ArrowRight', 'ArrowDown'].includes(e.key) && i < dispo.length - 1) { memoriserPlaces(); poser(deplacerWidget(dispo, i, i + 1)); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); retirer(id); }
   };
 
   return (
@@ -36316,9 +36335,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
             </div>
-            {!aWidget('benefice') && <BeneficeJournee onNav={onNav} place="integre"/>}
+            <BeneficeJournee onNav={onNav} place="integre"/>
           </div>
-        ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn && !aWidget('benefice'))) ? (<>
+        ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn)) ? (<>
           {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
               autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
           {jourN>0 && (
@@ -36329,7 +36348,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span style={{fontSize:13,color:C.muted}}>{jourN} vente{jourN>1?'s':''}</span>
             </button>
           )}
-          {!baseKO && !premierJour && !aWidget('benefice') && <BeneficeJournee onNav={onNav} place="carte"/>}
+          {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="carte"/>}
         </>) : null;
         W.semaine = vuHero ? (()=>{
           const totSem = semaine.filter(j=>!j.futur).reduce((a,j)=>a+j.vendu.eur,0);
@@ -36441,7 +36460,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         ) : null;
         W.urssaf = (!loading && urssafJob) ? listeTaches([urssafJob], {}) : null;
-        W.benefice = (!baseKO && !premierJour) ? <BeneficeJournee onNav={onNav} place="carte" force/> : null;
         for (const x of T) {
           const n = x.t ? x.t.n : 0, vif = !x.pasSu && n > 0;
           W[x.id] = (!baseKO && !premierJour) ? (
@@ -36534,7 +36552,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {accounts.length===0 && !baseKO && !(jobs.length===0 && !loading && premierJour) && (
               <div style={{marginTop:16,fontSize:13,color:C.muted,textAlign:'center',lineHeight:1.5,padding:'0 10px'}}>Lie un compte Vinted (⚙️ → Comptes liés) pour que ta journée se remplisse automatiquement.</div>
             )}
-            {!baseKO && !premierJour && !aWidget('benefice') && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {/* Le bénéfice vit dans « Vendu et reçu » ; si cette carte n'est pas
+                sur l'écran (retirée), il garde sa propre carte ici : allumé dans
+                Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
+            {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
+            {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
           </div>
         );      })()}
 
@@ -47674,7 +47696,12 @@ function AppCoeur() {
     const onKey=e=>{
       if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
       if(e.metaKey||e.ctrlKey||e.altKey) return;
+      // Une flèche déjà prise par ce qu'elle touche (un widget en mode
+      // « Modifier ») ou partie d'une zone qui refuse le balayage (`data-noswipe`)
+      // n'est pas un changement d'onglet.
+      if(e.defaultPrevented) return;
       const a=document.activeElement, tag=a&&a.tagName;
+      if(a && a.closest && a.closest('[data-noswipe]')) return;
       if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(a&&a.isContentEditable)) return;
       if(a && a!==document.body && gesteHorsNavigation(a)) return;
       slideTab(e.key==='ArrowRight'?-999:999, 0, 1);

@@ -11235,11 +11235,14 @@ vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
   l'écran » en bas) ou appui long au doigt ⇒ les widgets tremblent (rien si
   « réduire les animations »), on glisse, « − » retire, « + Ajouter » (feuille),
   « OK ». Clavier : flèches, Suppr, Échap. Catalogue : les 7 blocs d'avant +
-  14 derniers jours, URSSAF, bénéfice, et 4 petites cases (à envoyer, à retirer,
-  messages, prix à baisser).
+  14 derniers jours, URSSAF, et 4 petites cases (à envoyer, à retirer,
+  messages, prix à baisser). PAS de widget « bénéfice » (revue ci-dessous).
 - **La mise en page par défaut est CELLE D'AVANT**, même ordre, même place :
   barre, à faire, vendu | semaine | attente, puis photos 2/3 | stock 1/3 sur
-  ordinateur (grille de 6 colonnes) ; l'un sous l'autre sur téléphone. Le banc
+  ordinateur (grille de 6 colonnes) ; l'un sous l'autre sur téléphone.
+  ⚠️ **Une exception, assumée** : les alertes qui coûtent étaient les premières
+  lignes de « À faire », SOUS la barre ; elles sont maintenant au-dessus de la
+  grille, donc de la barre (revue ci-dessous). Le banc
   `revendeurs` (vert sur origin/main) l'exige — « stock à droite des dernières
   ventes », tout visible sans défiler — et il était ROUGE sur mon premier jet
   (grille de 4 colonnes) : *une nouveauté ne doit pas changer ce qu'on voit tant
@@ -11315,6 +11318,59 @@ vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
   tout est au Chromium tactile du banc) ; le mode stream ne floute rien de
   Ma journée (aucun `vrm-sensible` dans l'écran, sur main non plus : les comptes
   nommés dans « À faire » restent lisibles — inchangé, à trancher à part).
+- **Revue adverse du 22 octobre (soir) — six défauts reproduits sur 43c8e48,
+  six corrigés** :
+  1. ⚠️ **En mode « Modifier », → déplaçait le widget ET menait à l'onglet
+     Vinted** (mode perdu) : la coque écoute ← → sur la fenêtre, et un widget
+     (`role="group"`) n'est pas un bouton pour elle. Les flèches d'un widget
+     sont prises (`preventDefault` + `stopPropagation`), même au bord (rien à
+     déplacer) ; et la coque ignore une flèche déjà prise ou partie d'une zone
+     `data-noswipe` (deux gardes indépendantes) ;
+  2. ⚠️ **Le premier jour, l'appui long ouvrait « Modifier »** (absent ce jour-là) :
+     six cases « Rien à montrer », et ce qu'on retirait partait au nuage. Même
+     trou pour un vendeur eBay/Leboncoin sans compte Vinted (premier jour
+     permanent). L'appui long lit `peutModifier`, et le mode se ferme tout seul
+     s'il ne l'est plus (panne pendant la modification) ;
+  3. **Deux propriétaires pour le bénéfice** : le widget « Ton bénéfice »
+     l'affichait pendant que Réglages disait « éteint », et l'interrupteur n'avait
+     plus d'effet (§11). Tranché : le widget est RETIRÉ du catalogue — le
+     réglage `vrm_journee_benefice` reste le seul propriétaire, et le bénéfice
+     reste DANS la carte « Vendu et reçu » (décision de Julien du 21 oct.,
+     c136941, « regrouper CA et bénéfice »). Carte « Vendu » retirée, réglage
+     allumé ⇒ il a sa propre carte sous la grille (jamais « allumé » et
+     invisible). Mesuré (lecture seule) : un vendeur a `vrm_journee_benefice`
+     à `true`, aucun n'a de disposition rangée ; un `benefice` resté dans une
+     disposition (builds intermédiaires) est ignoré ;
+  4. **« Même ordre qu'avant » était faux avec une alerte qui coûte** (au-dessus
+     de la barre au lieu de dessous). Tranché : ASSUMÉ — aucune disposition ne
+     doit pouvoir pousser « deux paires sous un N° » en bas de l'écran. Dit
+     ci-dessus et vérifié au banc (A2), plus « même ordre » sur ces données-là ;
+  5. **La feuille « Ajouter » proposait les petites cases à côté de la barre** :
+     « 2 À envoyer » écrit deux fois (§7 — et le banc l'exigeait). Une petite
+     case n'est plus proposée tant que la barre est là, ni la barre tant qu'une
+     petite case est là (`widgetsAjoutables`), et la feuille dit pourquoi en
+     une phrase ;
+  6. **En mode « Modifier » à 1512 px, le bouton de largeur recouvrait la carte**
+     (« Mes ventes › » réduit à « Me », la légende « Vendu », « tout voir › ») :
+     il est SOUS la carte.
+  - Prouvé : banc `journee-widgets.cjs` **163 ✅ · 0 ❌** (sections A2, B3, B4,
+    K, E réécrite, E2 étendue) ; le même banc lancé depuis une copie de 43c8e48
+    (`git archive`, §6.1) **15 ❌** (clavier 4, premier jour 2, bénéfice 4,
+    petites cases 2 + la suite de BF qui meurt faute du bouton « Fermer »
+    marqué) ; le recouvrement mesuré à part sur 43c8e48 : 6 boutons sur 6
+    recouvrent leur carte (`afaire:105x30`, `vendu:71x30`…), 0 après. Mutations
+    (`BANC_SECTIONS`), chacune ROUGE : flèches sans les deux gardes (B3, 4 ❌),
+    appui long sans `peutModifier` (B4, 2 ❌), bénéfice sans sa carte hors
+    « Vendu » (K, 2 ❌), feuille sans exclusion (E, 4 ❌), bouton de largeur
+    remis en absolu (E2, 1 ❌). ⚠️ Une seule des deux gardes du clavier (ou de
+    l'appui long) retirée reste VERTE : défense en profondeur, voulu.
+    137 audits verts (les 5 qui montent un Postgres jetable, sans lien avec ce
+    chantier, n'ont pas été lancés). Bancs voisins sur ce build, un par un :
+    `journee-premium` 17, `premierjour` 86, `vendu-recu` 57, `demarrage` 12,
+    `hors-ligne` 45, `glisser-onglet` 14, `revendeurs` 196, `stock-journee` 7,
+    `emails-mis-de-cote` 52 verts ; `benefice-journee` : ses 2 mêmes rouges que
+    sur main (« éteint ⇒ plus de carte », cause dans le banc), et « CA et
+    bénéfice partagent la même carte » vert.
 ### La carte de la communauté « plus professionnelle » (22 octobre) — branche `v22-carte`
 Julien (21 oct.) : « une autre carte, beaucoup plus professionnelle, fiable et de
 qualité ». Une session l'avait commencée (`claude/carte-pro`, b3fe852, « EN COURS,

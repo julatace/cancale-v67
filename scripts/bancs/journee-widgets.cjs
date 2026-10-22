@@ -21,8 +21,14 @@
 //   C. glisser un widget (souris de côté / doigt immobile puis glissé) ⇒ il
 //      change de place ET on reste sur Ma journée (le glisser de côté à la
 //      souris faisait changer d'onglet : vu au banc, 22 oct.) ;
-//   D. « − » retire ; E. « + » ajoute (« À envoyer » : le même nombre que la
-//      barre) ; E2. ordinateur : la largeur change vraiment (un tiers → deux tiers) ;
+//   B3. (revue du 22 oct.) clavier : la flèche déplace le widget et NE CHANGE
+//      PAS d'onglet (avant : « → » menait à Vinted, mode perdu), y compris au bord ;
+//   B4. (revue du 22 oct.) premier jour : l'appui long n'ouvre PAS « Modifier » ;
+//   D. « − » retire ; E. « + » ajoute — jamais une petite case qui redit la
+//      barre (le même nombre deux fois, §7 — revue du 22 oct.) : on retire la
+//      barre, PUIS « À envoyer » arrive avec le nombre qu'elle disait ;
+//      E2. ordinateur : la largeur change vraiment (un tiers → deux tiers), et le
+//      bouton de largeur ne recouvre RIEN de la carte (revue du 22 oct.) ;
 //   F. « OK » ⇒ la disposition part dans la ligne synchronisée ; un appareil
 //      NEUF la retrouve ;
 //   G. disposition abîmée : widget inconnu, doublon, taille fausse ignorés,
@@ -31,10 +37,17 @@
 //      délai à retirer) remonte en tête dès qu'aucune case ne la montre — et
 //      jamais en double tant qu'une case la montre ;
 //   I. « réduire les animations » : aucun tremblement ;
-//   J. base injoignable : pas de « Modifier », pas de case vide de la grille.
+//   J. base injoignable : pas de « Modifier », pas de case vide de la grille ;
+//   A2. (revue du 22 oct.) une alerte qui coûte (deux paires sous un N°) : au-
+//      dessus de la grille ET de la barre (l'ordre décidé, dit dans CLAUDE.md),
+//      hors grille, et les mêmes actions qu'avant ;
+//   K. (revue du 22 oct.) le bénéfice dans Ma journée a UN propriétaire, le
+//      réglage : un widget « benefice » resté dans une disposition est ignoré,
+//      Réglages l'allume, et sans la carte « Vendu » il garde sa propre carte.
 // Jugé sur des attributs (`data-widgets`, `data-widget`, `data-job`, `data-n`…)
 // et des positions rendues, jamais sur un libellé (§6.5).
 // BANC_DIST=… rend un autre build (preuve sur le code d'avant : rouge).
+// BANC_SECTIONS=… ne joue que les sections nommées (expression sur le nom).
 // EXPLORE=dossier : captures.
 const path = require('path');
 const fs = require('fs'), http = require('http'), os = require('os'), cp = require('child_process');
@@ -127,7 +140,10 @@ const serveur = (dist, port) => new Promise((res, rej) => {
 });
 
 let ko = 0, ok = 0; const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e.message || e).split('\n')[0].slice(0, 160)); } };
+// BANC_SECTIONS=expression (ex. « ^(B3|K)\d ») : ne joue que ces sections — pour
+// les preuves par mutation, qui n'ont pas besoin de tout rejouer.
+const SECTIONS = process.env.BANC_SECTIONS ? new RegExp(process.env.BANC_SECTIONS) : null;
+const essaie = async (nom, f) => { if (SECTIONS && !SECTIONS.test(nom)) return; try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e.message || e).split('\n')[0].slice(0, 160)); } };
 
 const TAILLES = [
   { nom: '1512 clair (souris)', vp: { width: 1512, height: 950 }, sombre: false },
@@ -161,18 +177,25 @@ async function page(b, T, port, opts = {}) {
     // (crochet commun `_porte-banc`).
     if (/select=owner/.test(u) && !/owner=eq\./.test(u)) return j([]);
     const S = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(opts.premierJour ? [] : accounts);
     const eq = /[?&]id=eq\.([^&]*)/.exec(u);
     if (eq && eq[1] === 'main') return j([projette({ id: 'main', data: etat.main || {} }, S)]);
+    if (opts.premierJour) return j([]);
     if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, S)));
     const lk = /[?&]id=like\.([^&]*)/.exec(u); if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, S))); }
     return j([]);
   });
   await pg.route('**/api/**', (r2) => r2.request().url().includes('mode=confidentialite')
     ? r2.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, uid: SESSION.user.id }) })
-    : r2.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
-  await pg.goto(`http://localhost:${port}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+    // Premier jour : le propriétaire de l'installation a 3 emails mis de côté
+    // que personne ne peut récupérer — « À faire » porte alors UNE ligne.
+    : (opts.premierJour && /\/api\/email-rattacher/.test(r2.request().url()))
+      ? r2.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, cloisonnee: true, emails: [], installation: { repli: false, personne: { n: 3, auMoins: false, causes: { inconnue: 3 } } } }) })
+      : r2.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+  await pg.goto(`http://localhost:${port}/?${opts.tab ? 'tab=' + opts.tab : 'tab=journee'}`, { waitUntil: 'domcontentloaded' });
   if (opts.panne) { await pg.waitForTimeout(9000); return { ctx, pg, errs, etat }; }
+  if (opts.premierJour) { await pg.waitForFunction(() => document.querySelector('[data-job="emails-personne"]'), null, { timeout: 25000 }).catch(() => {}); await pg.waitForTimeout(1500); return { ctx, pg, errs, etat }; }
+  if (opts.tab) { await pg.waitForTimeout(3000); return { ctx, pg, errs, etat }; }
   await pg.waitForFunction(() => document.querySelector('[data-vendu-mois]') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 25000 }).catch(() => {});
   await pg.waitForFunction(() => document.querySelector('[data-courbe-semaine]') && document.querySelector('[data-stock-en-ligne]') && (document.querySelector('[data-tuile="envoyer"][data-n="2"]') || !document.querySelector('[data-barre-jour]')), null, { timeout: 10000 }).catch(() => {});
   await pg.waitForTimeout(1500);
@@ -216,6 +239,10 @@ const lire = (pg) => pg.evaluate(() => {
     envoyerW: a('[data-widget-tuile="envoyer"]', 'data-n'),
     inconnu: !!document.querySelector('[data-widget="inconnu"]'),
     grilleL: g ? Math.round(g.width) : null, R,
+    grilleTop: g ? Math.round(g.top + window.scrollY) : null,
+    alertesBas: alertes ? Math.round(alertes.getBoundingClientRect().bottom + window.scrollY) : null,
+    benef: document.querySelectorAll('[data-journee-benef]').length,
+    benefActiver: document.querySelectorAll('[data-journee-benef-activer]').length,
     texte: document.body.innerText,
   };
 });
@@ -288,6 +315,23 @@ if (require.main === module) (async () => {
       });
       if (T.seulementA) continue;
 
+      console.log('── A2. Une alerte qui coûte : au-dessus de la grille et de la barre (l’ordre décidé)');
+      await essaie('A2' + tag, async () => {
+        // Deux annonces EN LIGNE sous le N°12 : « deux paires sous un même
+        // numéro », le seul rouge de l'app (§5).
+        const main = { vinted_annonce_numeros: { 8101: { numero: '12' }, 8102: { numero: '12' }, 8201: { numero: '13' } } };
+        let refA2 = null;
+        if (srvAv) { const s0 = await page(b, T, PORT + 1, { etat: { main: { ...main } } }); refA2 = await lire(s0.pg); await s0.ctx.close(); }
+        const { ctx, pg, errs } = await page(b, T, PORT, { etat: { main: { ...main } } });
+        const l = await lire(pg);
+        dit(/numeros-en-double/.test(l.alertesJobs) && l.alertesHorsGrille, 'l’alerte « deux paires sous un N° » est en tête, hors grille', l.alertesJobs || '(aucune)');
+        dit(l.alertesBas != null && l.grilleTop != null && l.alertesBas <= l.grilleTop + 1 && !!(l.R.barre && l.alertesBas <= l.R.barre.top + 1), 'elle est AU-DESSUS de la grille, donc de la barre', JSON.stringify([l.alertesBas, l.grilleTop, l.R.barre && l.R.barre.top]));
+        dit(l.dispo === 'barre,afaire,vendu,semaine,attente,recentes,stock', 'la grille garde la disposition par défaut', String(l.dispo));
+        if (refA2) dit(sansRetard(l.jobs) === sansRetard(refA2.jobs) && /numeros-en-double/.test(refA2.jobs), 'exactement les mêmes actions qu’avant (l’alerte comprise)', `${l.jobs} | avant ${refA2.jobs}`);
+        dit(errs.length === 0 && !l.tombe, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+        await ctx.close();
+      });
+
       console.log('── B à F. Modifier, glisser, retirer, ajouter, largeur, garder');
       const etat = { main: {} };
       let vendu2 = 0;
@@ -327,20 +371,46 @@ if (require.main === module) (async () => {
         await pg.waitForTimeout(400);
         l = await lire(pg);
         dit(!(l.dispo || '').split(',').includes('semaine') && !l.rendus.includes('semaine'), '« − » retire « Cette semaine »', l.dispo);
-        // E. Ajouter « À envoyer ».
+        // E. Ajouter — jamais une petite case qui redit la barre (§7).
+        const nBarre = (/envoyer=([^,]*)/.exec(l.tuiles) || [])[1];
         await appuyer(pg, T, '[data-widgets-ajouter]');
-        await pg.waitForSelector('[data-widget-ajout="envoyer"]', { timeout: 4000 });
+        await pg.waitForSelector('[data-widget-ajout="semaine"]', { timeout: 4000 });
         dit(await pg.locator('[data-widget-ajout="semaine"]').count() === 1 && await pg.locator('[data-widget-ajout="barre"]').count() === 0 && await pg.locator('[data-widget-ajout="afaire"]').count() === 0, 'la feuille propose ce qui n’est pas sur l’écran (et seulement ça)');
+        const tuilesProposees = await pg.locator('[data-widget-ajout="envoyer"], [data-widget-ajout="retirer"], [data-widget-ajout="messages"], [data-widget-ajout="prix"]').count();
+        dit(tuilesProposees === 0, 'barre sur l’écran : aucune petite case proposée (elle redirait un nombre de la barre)', `${tuilesProposees} proposée(s)`);
+        dit(await pg.locator('[data-widgets-retenu="tuiles"]').count() === 1, 'la feuille dit pourquoi les petites cases ne sont pas proposées');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `widgets-${tag}-ajout.png`) });
+        await appuyer(pg, T, '[data-widgets-fermer]');
+        await pg.waitForTimeout(400);
+        // On retire la barre : les petites cases deviennent proposables.
+        await appuyer(pg, T, '[data-widget-retirer="barre"]');
+        await pg.waitForTimeout(400);
+        await appuyer(pg, T, '[data-widgets-ajouter]');
+        await pg.waitForSelector('[data-widget-ajout="envoyer"]', { timeout: 4000 }).catch(() => {});
         await appuyer(pg, T, '[data-widget-ajout="envoyer"]');
         await pg.waitForTimeout(500);
         l = await lire(pg);
-        dit((l.dispo || '').endsWith('envoyer'), '« + » ajoute « À envoyer » à la fin', l.dispo);
-        const nBarre = (/envoyer=([^,]*)/.exec(l.tuiles) || [])[1];
-        dit(l.envoyerW != null && l.envoyerW === nBarre, 'le widget « À envoyer » dit le même nombre que la barre', `${l.envoyerW} | barre ${nBarre}`);
+        dit((l.dispo || '').endsWith('envoyer') && !(l.dispo || '').split(',').includes('barre'), 'barre retirée, « + » ajoute « À envoyer » à la fin', l.dispo);
+        dit(l.envoyerW != null && l.envoyerW === nBarre, 'le widget « À envoyer » dit le nombre que disait la barre', `${l.envoyerW} | barre ${nBarre}`);
+        const fois = await pg.evaluate(() => document.querySelectorAll('[data-tuile="envoyer"], [data-widget-tuile="envoyer"]').length);
+        dit(fois === 1, 'le nombre de colis à envoyer est écrit UNE fois', `${fois}`);
         dit(!!(l.R.envoyer && l.R.envoyer.w < l.grilleL * (ordi ? 0.2 : 0.6)), 'la petite case prend une seule colonne', JSON.stringify(l.R.envoyer));
-        // E2. Ordinateur : la largeur change pour de vrai.
+        // Et la barre ne se repropose pas tant qu'une petite case est là.
+        await appuyer(pg, T, '[data-widgets-ajouter]');
+        await pg.waitForSelector('[data-widgets-feuille]', { timeout: 4000 }).catch(() => {});
+        dit(await pg.locator('[data-widget-ajout="barre"]').count() === 0 && await pg.locator('[data-widgets-retenu="barre"]').count() === 1, 'une petite case là : la barre n’est pas reproposée, et la feuille dit pourquoi');
+        await appuyer(pg, T, '[data-widgets-fermer]');
+        await pg.waitForTimeout(400);
+        // E2. Ordinateur : la largeur change pour de vrai — et le bouton de
+        // largeur ne recouvre rien du contenu de sa carte.
         if (ordi) {
+          const couvre = await pg.evaluate(() => [...document.querySelectorAll('[data-widget-taille-btn]')].map((b) => {
+            const w = b.closest('[data-widget]'); const c = w && w.querySelector('.vrm-widget-corps'); if (!c) return null;
+            const r = b.getBoundingClientRect(), q = c.getBoundingClientRect();
+            const ix = Math.min(r.right, q.right) - Math.max(r.left, q.left), iy = Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top);
+            return ix > 2 && iy > 2 ? w.getAttribute('data-widget') + ':' + Math.round(ix) + 'x' + Math.round(iy) : null;
+          }).filter(Boolean));
+          dit(couvre.length === 0, 'ordinateur : le bouton de largeur ne recouvre rien de la carte (« Mes ventes », la légende, « tout voir »)', couvre.join(' · '));
           const avantL = l.R.vendu ? l.R.vendu.w : 0;
           await appuyer(pg, T, '[data-widget-taille-btn="vendu"]');
           await pg.waitForTimeout(500);
@@ -383,6 +453,84 @@ if (require.main === module) (async () => {
           await ctx.close();
         });
       }
+
+      if (!T.hasTouch) {
+        console.log('── B3. Clavier : la flèche déplace le widget, jamais l’onglet');
+        await essaie('B3' + tag, async () => {
+          const { ctx, pg, etat } = await page(b, T, PORT, { reduit: true });
+          const ecran = () => pg.evaluate(() => { const g = document.querySelector('.vrm-widgets'); return { journee: !!document.querySelector('.vrm-day-layout'), edition: !!(g && g.hasAttribute('data-edition')), focus: document.activeElement && document.activeElement.getAttribute('data-widget'), dispo: g ? g.getAttribute('data-widgets') : null }; });
+          if (await modifierVisible(pg)) await appuyer(pg, T, '[data-banc-cible]');
+          await pg.waitForTimeout(400);
+          // Le geste du relecteur : un clic souris sur « Cette semaine » (il prend le focus), puis →.
+          await pg.locator('.vrm-widgets > [data-widget="semaine"]').click({ position: { x: 120, y: 60 }, force: true });
+          await pg.waitForTimeout(200);
+          let e = await ecran();
+          dit(e.focus === 'semaine', 'un clic sur un widget en mode « Modifier » lui donne le focus', JSON.stringify(e));
+          await pg.keyboard.press('ArrowRight'); await pg.waitForTimeout(700);
+          e = await ecran();
+          dit(e.journee && e.edition, '→ sur un widget : on reste sur Ma journée, en mode « Modifier »', JSON.stringify(e));
+          const o = (e.dispo || '').split(',');
+          dit(o.indexOf('semaine') === o.indexOf('attente') + 1, '→ a déplacé « Cette semaine » d’une place', e.dispo);
+          // Au bord : rien à déplacer, et toujours pas d'onglet voisin.
+          await pg.evaluate(() => { const w = document.querySelector('.vrm-widgets > [data-widget="stock"]'); if (w) w.focus(); });
+          await pg.keyboard.press('ArrowRight'); await pg.waitForTimeout(700);
+          e = await ecran();
+          dit(e.journee && e.edition, '→ sur le dernier widget : on reste sur Ma journée', JSON.stringify(e));
+          await pg.evaluate(() => { const w = document.querySelector('.vrm-widgets > [data-widget="barre"]'); if (w) w.focus(); });
+          await pg.keyboard.press('ArrowLeft'); await pg.waitForTimeout(700);
+          e = await ecran();
+          dit(e.journee && e.edition, '← sur le premier widget : on reste sur Ma journée', JSON.stringify(e));
+          await ctx.close();
+        });
+      }
+
+      if (T.hasTouch) {
+        console.log('── B4. Premier jour : l’appui long n’ouvre pas « Modifier »');
+        await essaie('B4' + tag, async () => {
+          const { ctx, pg, errs } = await page(b, T, PORT, { premierJour: true });
+          let l = await lire(pg);
+          dit(/emails-personne/.test(l.jobs) && l.modifierVisibles === 0, 'premier jour : une ligne dans « À faire », aucun « Modifier »', `${l.jobs} · ${l.modifierVisibles}`);
+          const cdp = await ctx.newCDPSession(pg);
+          const c = await centre(pg, '[data-job="emails-personne"]');
+          if (c) await touchSeq(cdp, [c], 750);
+          await pg.waitForTimeout(700);
+          l = await lire(pg);
+          dit(!!c && !l.edition && !(await pg.locator('[data-widgets-outils]').count()), 'l’appui long n’ouvre pas le mode « Modifier »', `edition=${l.edition}`);
+          dit(l.vides === 0, 'aucune case « Rien à montrer »', `${l.vides}`);
+          dit(errs.length === 0 && !l.tombe, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+          await ctx.close();
+        });
+      }
+
+      console.log('── K. Le bénéfice : un seul propriétaire, le réglage');
+      await essaie('K' + tag, async () => {
+        // Une disposition (d'un build intermédiaire) qui porte « benefice », le
+        // réglage éteint (son défaut) : rien ne doit l'afficher.
+        const etatK = { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'barre', t: 'pleine' }, { id: 'afaire', t: 'pleine' }, { id: 'vendu', t: 'moyen' }, { id: 'benefice', t: 'moyen' }] }, vrm_journee_benefice: false } };
+        let s1 = await page(b, T, PORT, { etat: etatK });
+        let l = await lire(s1.pg);
+        dit(!(l.dispo || '').split(',').includes('benefice') && l.benef === 0 && l.benefActiver === 1, 'réglage éteint : aucun bénéfice affiché (un widget « benefice » est ignoré), le geste pour l’afficher est là', `${l.dispo} · bénéfice ${l.benef} · geste ${l.benefActiver}`);
+        await s1.ctx.close();
+        // Réglages l'allume ⇒ il apparaît dans Ma journée.
+        const etatK2 = { main: { ...etatK.main } };
+        s1 = await page(b, T, PORT, { etat: etatK2, tab: 'settings' });
+        await s1.pg.waitForFunction(() => document.querySelector('[data-reglage-benef-journee]'), null, { timeout: 15000 }).catch(() => {});
+        const avantR = await s1.pg.evaluate(() => { const e = document.querySelector('[data-reglage-benef-journee]'); return e ? e.getAttribute('data-reglage-benef-journee') : null; });
+        if (avantR === 'off') await appuyer(s1.pg, T, '[data-reglage-benef-journee] button');
+        await s1.pg.waitForTimeout(1500);
+        const apresR = await s1.pg.evaluate(() => { const e = document.querySelector('[data-reglage-benef-journee]'); return e ? e.getAttribute('data-reglage-benef-journee') : null; });
+        await s1.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await s1.pg.waitForFunction(() => document.querySelector('[data-vendu-mois]'), null, { timeout: 20000 }).catch(() => {});
+        await s1.pg.waitForTimeout(1500);
+        l = await lire(s1.pg);
+        dit(avantR === 'off' && apresR === 'on' && l.benef === 1, 'Réglages dit « éteint », l’allume ⇒ le bénéfice est dans Ma journée, une fois', `${avantR} → ${apresR} · bénéfice ${l.benef}`);
+        await s1.ctx.close();
+        // Allumé, carte « Vendu » retirée : il garde sa propre carte.
+        s1 = await page(b, T, PORT, { etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'barre', t: 'pleine' }, { id: 'afaire', t: 'pleine' }, { id: 'stock', t: 'moyen' }] }, vrm_journee_benefice: true } } });
+        l = await lire(s1.pg);
+        dit(l.benef === 1 && l.benefActiver === 0, 'allumé, sans la carte « Vendu » : le bénéfice garde sa carte (une fois)', `bénéfice ${l.benef} · geste ${l.benefActiver}`);
+        await s1.ctx.close();
+      });
 
       console.log('── G. Disposition abîmée');
       await essaie('G' + tag, async () => {

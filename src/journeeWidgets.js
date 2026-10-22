@@ -35,18 +35,42 @@ export const NOM_TAILLE = { petit: 'Petit', moyen: 'Un tiers', grand: 'Deux tier
 export const WIDGETS_JOURNEE = {
   barre:    { nom: 'Les quatre gestes', desc: 'À envoyer, à retirer, messages, prix à baisser', tailles: ['pleine'] },
   afaire:   { nom: 'À faire', desc: 'Les actions du jour', tailles: ['pleine', 'grand', 'moyen'], fixe: true, carte: false },
-  vendu:    { nom: 'Vendu et reçu', desc: 'Vendu ce mois et aujourd’hui, reçu ce mois', tailles: ['moyen', 'grand', 'pleine'] },
+  vendu:    { nom: 'Vendu et reçu', desc: 'Vendu ce mois et aujourd’hui, reçu ce mois (et ton bénéfice, si tu l’affiches)', tailles: ['moyen', 'grand', 'pleine'] },
   semaine:  { nom: 'Cette semaine', desc: 'La courbe vendu et reçu de la semaine', tailles: ['moyen', 'grand', 'pleine'] },
   attente:  { nom: 'Argent en attente', desc: 'En attente chez Vinted et disponible à virer', tailles: ['moyen', 'grand', 'pleine'] },
   recentes: { nom: 'Dernières ventes', desc: 'Les photos de tes dernières ventes', tailles: ['grand', 'pleine'], carte: false },
   stock:    { nom: 'Stock actuel', desc: 'Annonces en ligne et prix d’achat renseignés', tailles: ['moyen', 'grand', 'pleine'] },
   jours14:  { nom: '14 derniers jours', desc: 'Vendu et reçu, jour par jour', tailles: ['moyen', 'grand', 'pleine'] },
   urssaf:   { nom: 'Déclaration URSSAF', desc: 'Le rappel de la prochaine échéance (sorti de « À faire »)', tailles: ['grand', 'pleine', 'moyen'], carte: false },
-  benefice: { nom: 'Ton bénéfice', desc: 'Brut et net du mois — les chiffres de Comptabilité', tailles: ['moyen', 'grand', 'pleine'] },
   envoyer:  { nom: 'À envoyer', desc: 'Petite case : le nombre de colis à poster', tailles: ['petit'] },
   retirer:  { nom: 'À retirer', desc: 'Petite case : le nombre de colis à aller chercher', tailles: ['petit'] },
   messages: { nom: 'Messages', desc: 'Petite case : les messages récents sans réponse', tailles: ['petit'] },
   prix:     { nom: 'Prix à baisser', desc: 'Petite case : les paires vues qui ne partent pas', tailles: ['petit'] },
+};
+
+// ⚠️ PAS DE WIDGET « TON BÉNÉFICE » (revue du 22 oct.) : le bénéfice dans Ma
+// journée a déjà UN propriétaire, le réglage `vrm_journee_benefice` (Réglages →
+// Affichage, « + Afficher ton bénéfice », « Masquer »), et il vit DANS la carte
+// « Vendu et reçu » (décision de Julien du 21 oct., « regrouper CA et
+// bénéfice »). Un widget à côté était une seconde règle : Réglages disait
+// « éteint » pendant que le widget l'affichait, et l'interrupteur n'avait plus
+// d'effet (§11). Un `benefice` resté dans une disposition est ignoré (inconnu).
+
+// Les petites cases redisent, une par une, un nombre de la barre « Les quatre
+// gestes ». Les deux à la fois, c'est le même nombre écrit deux fois (§7) : la
+// feuille « Ajouter » ne propose pas l'un quand l'autre est sur l'écran.
+export const TUILES_JOURNEE = ['envoyer', 'retirer', 'messages', 'prix'];
+export const widgetsAjoutables = (dispo) => {
+  const presents = new Set((Array.isArray(dispo) ? dispo : []).map((w) => w && w.id));
+  const barre = presents.has('barre');
+  const tuile = TUILES_JOURNEE.some((id) => presents.has(id));
+  const ids = Object.keys(WIDGETS_JOURNEE).filter((id) => !presents.has(id)
+    && !(barre && TUILES_JOURNEE.includes(id))
+    && !(tuile && id === 'barre'));
+  // Ce qui n'est PAS proposé, et pourquoi (une phrase, seulement si c'est le cas).
+  const retenu = barre && TUILES_JOURNEE.some((id) => !presents.has(id)) ? 'tuiles'
+    : tuile ? 'barre' : '';
+  return { ids, retenu };
 };
 
 export const tailleDefautWidget = (id) => {
@@ -58,6 +82,12 @@ export const widgetFixe = (id) => !!(WIDGETS_JOURNEE[id] && WIDGETS_JOURNEE[id].
 // La disposition par défaut : les blocs de Ma journée d'avant, dans le même
 // ordre et à la même place sur ordinateur (vendu | semaine | attente, puis
 // photos 2/3 | stock 1/3) ; sur téléphone, l'un sous l'autre.
+// ⚠️ UN CHANGEMENT, ASSUMÉ (revue du 22 oct.) : les alertes qui coûtent (deux
+// paires sous un N°, double vente, colis en retard…) étaient avant les
+// premières lignes de « À faire », SOUS la barre. Elles sont maintenant au-dessus
+// de la grille — donc au-dessus de la barre — et ne bougent pas avec elle :
+// aucune disposition ne peut les pousser en bas de l'écran. Le banc
+// `journee-widgets` (A2) vérifie cet ordre-là, pas « le même qu'avant ».
 export const DISPO_JOURNEE_DEFAUT = ['barre', 'afaire', 'vendu', 'semaine', 'attente', 'recentes', 'stock']
   .map((id) => ({ id, t: tailleDefautWidget(id) }));
 
