@@ -81,6 +81,10 @@ async function monter(nav, { lignesKO = false, patchKO = false } = {}) {
     }
     if (/app_data\?select=id,meta&or=/.test(u)) return J([{ id: 'harvest_111_txn_9', meta: { status: '450' } }]);
     if (/vinted_accounts\?select=vinted_user_id,login,domain/.test(u)) return J([{ vinted_user_id: '111', login: 'vendeur_banc', domain: 'www.vinted.fr' }]);
+    // (22 oct.) Au démarrage l'app relit la liste COMPLÈTE (select=*, jetons compris)
+    // et remplace la copie du navigateur par elle (ba317a6) : le banc la sert, jetons
+    // compris — c'est justement ce que la sauvegarde doit retirer.
+    if (/vinted_accounts\?select=\*/.test(u)) return J(LOCAL.vinted_accounts);
     return J([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
