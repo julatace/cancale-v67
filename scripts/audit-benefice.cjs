@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LE BÉNÉFICE BRUT ET NET — UNE règle, deux écrans (19 octobre)
-//         node scripts/audit-benefice.cjs [--mutation=duplique|zero|cotis|titre|ambigu|fraiszero|port]
+//         node scripts/audit-benefice.cjs [--mutation=duplique|zero|cotis|titre|ambigu|fraiszero|port|depenses|reponse]
 // ═══════════════════════════════════════════════════════════════════════════
 // Julien : « le bénéfice brut et net ». L'écran Ventes le calculait ; l'écran
 // Comptabilité disait « ce n'est donc pas encore ton bénéfice net ». Comptabilité
@@ -51,6 +51,12 @@ if (MUT === 'duplique') {
 } else if (MUT === 'port') {
   // (20 oct.) Le total payé par l'acheteur (port compris) au lieu de l'argent reçu.
   muter('const d = lu(o && o.paymentSummary && o.paymentSummary.totalDueSeller);', 'const d = lu(o && o.pricingSummary && o.pricingSummary.total);');
+} else if (MUT === 'depenses') {
+  // (22 oct.) « Rien n'a jamais été noté » pris pour « des charges notées » : le net se dit complet.
+  muter("return d.sansDepenses ? 'aucune' : 'jamais';", "return d.sansDepenses ? 'aucune' : 'notees';");
+} else if (MUT === 'reponse') {
+  // (22 oct.) La réponse « aucune dépense » ne compte pas comme une saisie : le nuage l'écrase.
+  muter('(d.abonnements || []).length || d.sansDepenses);', '(d.abonnements || []).length);');
 } else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 let ko = 0, ok = 0;
@@ -246,6 +252,22 @@ essaie('Leboncoin et eBay par identité', () => {
   const ligne = { mois: [{ ym, ca: 300, par: { Vinted: { n: 2, ca: 200 }, Leboncoin: { n: 1, ca: 60 }, eBay: { n: 1, ca: 40 } } }] };
   const T = F.beneficePeriode({ jours: {}, compta: {}, ligneUrssaf: ligne, taux: 13.5, periode: 'mois', toutes: true });
   dit(T.caDecl === 300, 'publication à trois plateformes : les cotisations portent sur le CA déclaré des trois', `${T.caDecl}`);
+});
+
+// ── (22 oct.) LES CHARGES EN TROIS ÉTATS : « net avant tes dépenses » ────────
+// Mesuré : `vrm_compta` ABSENT de sa ligne `main` — le « bénéfice net » retirait
+// 0 € de charges et se présentait comme complet. `depensesEtat` dit 'jamais'
+// (rien noté, pas de réponse), 'aucune' (il a répondu), 'notees'.
+essaie('les charges en trois états', () => {
+  const E = (() => { const out = {}; for (const k of ['depensesEtat', 'comptaVide']) { if (!decl.has(k)) return null; } const ctx = vm.createContext({}); return vm.runInContext(decl.get('comptaVide') + '\n' + decl.get('depensesEtat') + '\n;({ depensesEtat, comptaVide })', ctx); })();
+  dit(!!E, 'la règle des charges (`depensesEtat`) existe dans App.jsx');
+  if (!E) return;
+  dit(E.depensesEtat({}) === 'jamais' && E.depensesEtat(null) === 'jamais', 'rien de noté ⇒ « jamais » (le net est AVANT ses dépenses)', `${E.depensesEtat({})} · ${E.depensesEtat(null)}`);
+  dit(E.depensesEtat({ depenses: [], sansDepenses: { at: 1 } }) === 'aucune', '« je n\'ai pas de dépenses à noter » ⇒ « aucune » (le 0 € devient vrai)');
+  dit(E.depensesEtat({ depenses: [{ montant: 12 }] }) === 'notees' && E.depensesEtat({ abonnements: [{ montant: 12.99 }] }) === 'notees', 'une dépense ou un abonnement noté ⇒ « notees »');
+  dit(E.comptaVide({ depenses: [], fixes: [], packs: [], abonnements: [], sansDepenses: { at: 1 } }) === false, 'la réponse compte comme une saisie : le rattrapage du nuage ne l\'écrase pas (§5.49)');
+  const P = F && F.beneficePeriode({ jours: {}, compta: {}, ligneUrssaf: { mois: [] }, taux: 13.5, periode: 'mois' });
+  dit(P && P.depenses === 'jamais', 'le bénéfice d\'une période porte l\'état de ses charges (une règle pour Comptabilité et Ma journée)', P && P.depenses);
 });
 
 essaie('le code', () => {

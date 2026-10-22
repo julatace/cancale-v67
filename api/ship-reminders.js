@@ -21,6 +21,7 @@
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { semainePassee, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
+import { notificationUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
 import { aExpedier } from './widget.js';
@@ -329,20 +330,22 @@ async function traiterVendeurApresRelecture() {
     // manque, le rappel mensuel ne doit pas se taire avec lui. Une seule fois
     // par mois (ligne `urssaf_reminder_dedup`), et une écriture ratée du mémo
     // n'empêche pas le reste du rappel.
+    // (22 oct.) LA RÈGLE DE L'APP ET LE MONTANT PUBLIÉ (api/_lib/rappel-urssaf.js) :
+    // le rythme, les mois déjà notés « déclarés » (plus de rappel), et « à
+    // payer » lu dans la ligne publiée par l'écran Ventes. `main` illisible ⇒ le
+    // rappel d'avant, sans montant. La réponse du cron ne porte aucun montant.
     let urssaf = null;
     try {
       const mois = today.slice(0, 7);
       if (today.endsWith('-01')) {
         const deja = (await getRow('urssaf_reminder_dedup')) || {};
         if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
-          await sendPushToAll({
-            title: '🧾 Déclaration URSSAF',
-            body: 'Nouveau mois : pense à déclarer ton chiffre d\'affaires sur autoentrepreneur.urssaf.fr.',
-            tag: 'urssaf-' + mois,
-            url: '/?tab=dashboard',
-          });
-          await ecrireDedup('urssaf_reminder_dedup', { mois });
-          urssaf = 'envoyé';
+          const n = notificationUrssaf({ today, main: await getRowProjete('main', MAIN_URSSAF) });
+          if (n.envoyer) {
+            await sendPushToAll({ title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
+            await ecrireDedup('urssaf_reminder_dedup', { mois });
+          }
+          urssaf = n.envoyer ? 'envoyé · ' + n.raison : n.raison;
         }
       }
     } catch (_) { urssaf = 'échec'; }
