@@ -17,3 +17,9 @@ test('les ventes ont leur propre date de capture, indépendante du dernier écha
  assert.match(r,/Transactions enregistrées : 2 ; ventes confirmées : 1 ; achats confirmés : 1/);assert.match(r,/2026-10-21T08:00:00.000Z/);assert.equal(r.includes('12345'),false);
  assert.match(resumeReceptionLbc({annonces:[],comptes:[],traces:[],transactions:null}),/impossible/);
 });
+
+test('les traces distinguent une réponse HTTP refusée et les dates anciennes, sans URL ni identifiant sensible',()=>{
+ const r=resumeReceptionLbc({annonces:[],comptes:[{accounts:{secret:{sessionAt:'2026-10-22T10:00:00Z'}}}],traces:[{updatedAt:'2026-10-22T10:00:00Z',paths:['GET api.leboncoin.fr/api/adfinder/v2/myads?token=SECRET → 403 [application/json]','GET api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/987654 → 200 [application/json]','POST autre.test/SECRET → 200','GET www.leboncoin.fr/_next/data/BUILD_SECRET/compte/part/mes-annonces.json → 200'],schemas:{'api.leboncoin.fr/api/consumergoods/proxy/v2/pages/transactions/987654':{at:'2026-10-07T06:28:09Z',cles:['pageProps.data.is_seller:boolean']}}}]});
+ assert.match(r,/myads → HTTP 403/);assert.match(r,/compte\/part\/mes-annonces.json → HTTP 200/);assert.match(r,/transactions\/\{id\} → HTTP 200/);assert.match(r,/2026-10-07T06:28:09.000Z/);assert.match(r,/2026-10-22T10:00:00.000Z/);
+ for(const secret of ['SECRET','BUILD_SECRET','987654','autre.test'])assert.equal(r.includes(secret),false,secret);
+});

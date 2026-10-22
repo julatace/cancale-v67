@@ -8,7 +8,7 @@ export default function DiagnosticLeboncoin({lire,couleurs}) {
       const [annonces,comptes,traces,transactions]=await Promise.all([
         lire('app_data?id=eq.lbc_listings&select=items:data->items'),
         lire('app_data?id=eq.lbc_accounts&select=accounts:data->accounts'),
-        lire('app_data?id=eq.lbc_recon&select=schemas:data->schemas'),
+        lire('app_data?id=eq.lbc_recon&select=schemas:data->schemas,paths:data->paths,updatedAt:data->>updatedAt'),
         lire('app_data?id=eq.lbc_ventes&select=ventes:data->ventes'),
       ]);
       setTexte(resumeReceptionLbc({annonces,comptes,traces,transactions}));
