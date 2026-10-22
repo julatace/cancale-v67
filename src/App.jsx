@@ -19,7 +19,7 @@ import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
-import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, tailleSuivante } from "./journeeWidgets.js";
+import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible } from "./journeeWidgets.js";
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
@@ -27748,7 +27748,6 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
                   <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>{d.nom}</span>
                   <span style={{ display: 'block', fontSize: 12, color: C.muted, lineHeight: 1.4 }}>{d.desc}</span>
                 </span>
-                <span style={{ fontSize: 11.5, color: C.muted, flexShrink: 0 }}>{d.tailles.map((t) => NOM_TAILLE[t]).join(' · ')}</span>
               </button>
             );
           })}
@@ -27761,7 +27760,7 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
 }
 
 // La grille. `rendus` : { id → élément React, ou null (rien à montrer maintenant) }.
-function GrilleJournee({ dispo, poser, rendus, edition, setEdition }) {
+function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier = true }) {
   const grilleRef = React.useRef(null);
   const elems = React.useRef(new Map());
   const drag = React.useRef(null);
@@ -27933,7 +27932,7 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition }) {
     finirTire(e.type === 'pointerup');
   };
 
-  const retirer = (id) => { memoriserPlaces(); poser(dispo.filter((w) => w.id !== id)); };
+  const retirer = (id) => { if (widgetFixe(id)) return; memoriserPlaces(); poser(retirerWidget(dispo, id)); };
   const changerTaille = (id) => { memoriserPlaces(); poser(dispo.map((w) => w.id === id ? { ...w, t: tailleSuivante(id, w.t) } : w)); };
   const clavier = (id) => (e) => {
     if (!edition || e.target !== e.currentTarget) return;
@@ -27946,13 +27945,13 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition }) {
   return (
     <>
       {edition && (
-        <div className="vrm-w-outils" data-widgets-outils="" style={{ background: C.bg }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted }}>Glisse pour déplacer · − pour retirer</span>
+        <div className="vrm-w-outils" data-widgets-outils="" data-noswipe="1" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: C.shadow || 'none' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.muted, lineHeight: 1.35 }}>Glisse pour déplacer · − pour retirer</span>
           <button type="button" className="vrm-w-btn" data-widgets-ajouter="" onClick={() => setAjout(true)} style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>+ Ajouter</button>
           <button type="button" className="vrm-w-btn" data-widgets-ok="" onClick={() => { finirTire(false); setEdition(false); }} style={{ color: '#fff', background: C.accent, border: `1px solid ${C.accent}` }}>OK</button>
         </div>
       )}
-      <div ref={grilleRef} className="vrm-widgets" data-widgets={liste.map((w) => w.id).join(',')} data-edition={edition ? '' : undefined}
+      <div ref={grilleRef} className="vrm-widgets" data-widgets={liste.map((w) => w.id).join(',')} data-edition={edition ? '' : undefined} data-noswipe={edition ? '1' : undefined}
         onClickCapture={(e) => { if (avaler.current) { avaler.current = false; e.preventDefault(); e.stopPropagation(); } }}
         onContextMenu={(e) => { if (edition || avaler.current || appui.current) e.preventDefault(); }}>
         {liste.map((w, i) => {
@@ -27962,7 +27961,8 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition }) {
           return (
             <div key={w.id} ref={(el) => { if (el) elems.current.set(w.id, el); else elems.current.delete(w.id); }}
               className="vrm-widget" data-widget={w.id} data-taille={w.t} data-vide={corps ? undefined : ''} data-tire={tire === w.id ? '' : undefined}
-              tabIndex={edition ? 0 : undefined} role={edition ? 'group' : undefined} aria-label={edition ? `${d.nom} — flèches pour déplacer, Suppr pour retirer` : undefined}
+              data-fixe={d.fixe ? '' : undefined} data-sans-carte={d.carte === false ? '' : undefined}
+              tabIndex={edition ? 0 : undefined} role={edition ? 'group' : undefined} aria-label={edition ? `${d.nom} — flèches pour déplacer${d.fixe ? '' : ', Suppr pour retirer'}` : undefined}
               onPointerDown={surDown(w.id)} onPointerMove={surMove} onPointerUp={surUp} onPointerCancel={surUp} onKeyDown={clavier(w.id)}>
               <div className="vrm-widget-in" style={{ animationDelay: `${-(i % 3) * 90}ms` }}>
                 <div className="vrm-widget-corps">
@@ -27973,13 +27973,13 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition }) {
                     </div>
                   )}
                 </div>
-                {edition && (
+                {edition && !d.fixe && (
                   <button type="button" className="vrm-w-retirer" data-widget-retirer={w.id} aria-label={`Retirer ${d.nom}`} onClick={() => retirer(w.id)}>
                     <span aria-hidden="true" style={{ background: C.text, color: C.bg }}>−</span>
                   </button>
                 )}
                 {edition && d.tailles.length > 1 && (
-                  <button type="button" className="vrm-w-taille" data-widget-taille-btn={w.id} onClick={() => changerTaille(w.id)}
+                  <button type="button" className="vrm-w-taille" data-widget-taille-btn={w.id} aria-label={`Largeur de ${d.nom} : ${NOM_TAILLE[w.t]} — changer`} onClick={() => changerTaille(w.id)}
                     style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>{NOM_TAILLE[w.t]}</button>
                 )}
               </div>
@@ -27987,14 +27987,19 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition }) {
           );
         })}
       </div>
-      {liste.length === 0 && !edition && (
-        <div className="vrm-day-card" data-widgets-aucun="" style={{ border: `1px dashed ${C.border}`, background: C.card, color: C.muted, fontSize: 13, marginBottom: 12 }}>
-          Ta journée n'a plus aucun widget. <button type="button" className="vrm-lien-action" onClick={() => { setEdition(true); setAjout(true); }} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>Ajouter des widgets</button>
+      {/* Sur téléphone la tête de l'écran (bonjour, date) est cachée pour gagner
+          de la place : « Modifier » y était donc INVISIBLE (vu au rendu à 390 px).
+          Il vit alors en bas de la grille, comme sur l'écran « Aujourd'hui » de
+          l'iPhone. Un seul des deux se voit à une largeur donnée. */}
+      {!edition && peutModifier && (
+        <div className="vrm-w-modifier-bas">
+          <button type="button" className="vrm-w-btn" data-widgets-modifier="" data-widgets-modifier-bas="" aria-label="Modifier les widgets de Ma journée" onClick={() => setEdition(true)}
+            style={{ color: C.text, background: C.card, border: `1px solid ${C.border}` }}>Modifier l'écran</button>
         </div>
       )}
       {ajout && (
         <FeuilleAjoutWidget dispo={dispo}
-          onAjout={(id) => { memoriserPlaces(); poser([...dispo, { id, t: WIDGETS_JOURNEE[id].t || WIDGETS_JOURNEE[id].tailles[0] }]); setAjout(false); }}
+          onAjout={(id) => { memoriserPlaces(); poser([...dispo, { id, t: tailleDefautWidget(id) }]); setAjout(false); }}
           onDefaut={() => { memoriserPlaces(); poser(DISPO_JOURNEE_DEFAUT); setAjout(false); }}
           onClose={() => setAjout(false)}/>
       )}
@@ -28711,6 +28716,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (21 oct.) Ma journée en widgets : la disposition (synchronisée) et le mode « Modifier ».
   const [dispoJournee, poserDispoJournee] = useDispositionJournee();
   const [editJournee, setEditJournee] = useState(false);
+  // Le bénéfice choisi dans Ma journée (`vrm_journee_benefice`) : lu ici pour
+  // ne pas ranger une case VIDE dans la grille quand il est éteint.
+  const [benefJourneeOn] = useBeneficeJournee();
   const [numeros, setNumeros] = useState(() => load('vinted_annonce_numeros', {}));
   // Dates de mise en ligne réelles, lues sur la page de l'annonce par l'extension
   // (ligne Supabase vinted_listing_dates = { idAnnonce: {ts, text} }). Seule
@@ -35793,15 +35801,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf});
         }
-        // (21 oct.) LES COLIS EN RETARD : une alerte d'argent, toujours en tête
-        // (la case « À envoyer » peut être retirée de la grille). Mêmes listes
-        // que la case (`toShip`, `colisEb`, §11).
-        { const lateE = colisEb && colisEb.aPoster ? colisEb.aPoster.filter(x => x.jours != null && x.jours < 0).length : 0;
+        // (21-22 oct.) MA JOURNÉE EN WIDGETS : les colis EN RETARD et les colis
+        // HORS DÉLAI ne sont dits que par la couleur de leur case (barre ou petite
+        // case). Si le vendeur a retiré toutes les cases qui les montrent, ils
+        // remontent ici, en alerte de tête (hors grille, non retirable) — jamais
+        // en double tant qu'une case les montre (§7). Mêmes listes que les cases
+        // (`toShip`, `colisEb`, `pickupUnion`, §11) : aucun recalcul.
+        if (!caseVisible(dispoJournee, 'envoyer')) {
+          const lateE = colisEb && colisEb.aPoster ? colisEb.aPoster.filter(x => x.jours != null && x.jours < 0).length : 0;
           const nl = late + lateE;
           if (nl > 0) jobs.push({ id:'colis-en-retard', n:nl, icon:'truck', color:C.warn, urgent:true,
             title:`${nl} colis en retard`,
             sub:`La date limite d'envoi est passée${lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
-            tab:'cat_bord', prio:0.15 }); }
+            tab:'cat_bord', prio:0.15 });
+        }
+        if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.horsDelai.length) {
+          const hd = pickupUnion.horsDelai.length, lx = pickupUnion.lieux || [];
+          jobs.push({ id:'retrait-hors-delai', n:hd, icon:'box', color:C.warn, urgent:true,
+            title:`${hd} colis hors délai à retirer`,
+            sub:`Non retiré, un colis repart chez l'expéditeur — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`,
+            tab:'cat_achats', prio:0.15 });
+        }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -35845,6 +35865,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // sont PAS des widgets : elles restent en tête, et on ne peut pas les retirer.
         const aWidget = (id) => dispoJournee.some(w => w.id === id);
         const alertesArgent = jobs.filter(j => j.urgent);
+        // Un widget « Déclaration URSSAF » sur l'écran PREND la ligne de
+        // l'échéance : elle n'est plus dans « À faire » (dite une fois, §7).
         const urssafJob = aWidget('urssaf') ? jobs.find(j => !j.urgent && j.id === 'urssaf') : null;
         const jobsAFaire = jobs.filter(j => !j.urgent && j !== urssafJob);
         const ko = nomsVentesKO.length > 0;
@@ -35912,7 +35934,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ) : null;
         W.afaire = (!loading && jobsAFaire.length>0) ? (
           <div>
-            <div className="vrm-label vrm-day-section" style={{color:C.muted}}>À faire</div>
+            <div className="vrm-label vrm-day-section vrm-w-etiquette" style={{color:C.muted}}>À faire</div>
             {listeTaches(jobsAFaire, {})}
           </div>
         ) : null;
@@ -35945,7 +35967,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {!aWidget('benefice') && <BeneficeJournee onNav={onNav} place="integre"/>}
           </div>
-        ) : (jourN>0 || (!baseKO && !premierJour && !aWidget('benefice'))) ? (<>
+        ) : (jourN>0 || (!baseKO && !premierJour && benefJourneeOn && !aWidget('benefice'))) ? (<>
           {/* Le jour seul, quand le héros n'est pas là (lecture en cours d'un
               autre bloc) : une ligne sobre, jamais un bandeau bleu. */}
           {jourN>0 && (
@@ -36004,7 +36026,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })() : null;
         W.recentes = (!loading && dernieresVentes.length>0) ? (
             <div className="vrm-day-recent">
-              <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
+              <div className="vrm-w-etiquette" style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:10,paddingLeft:2}}>
                 <div className="vrm-label" style={{color:C.muted,flex:1}}>Dernières ventes</div>
                 <button type="button" onClick={()=>onNav&&onNav('cat_ventes')}
                   style={{border:'none',background:'transparent',color:C.accent,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',padding:0}}>tout voir ›</button>
@@ -36041,7 +36063,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             </div>
         ) : null;
-        W.stock = !premierJour ? (()=>{
+        // Base injoignable : le bloc de la coque le dit déjà (une cause, une
+        // phrase, §7) — la carte « Lecture du stock indisponible » n'est plus
+        // une troisième voix.
+        W.stock = (!premierJour && !baseKO) ? (()=>{
           const lu=!baseKO && !listings.error && accountsReady && Array.isArray(listings.items);
           const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
           return <section className="vrm-day-stock vrm-day-card" aria-label="Aperçu du stock Vinted" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
@@ -36113,7 +36138,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
 
             {!premierJour && (
-              <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee}/>
+              <GrilleJournee dispo={dispoJournee} poser={poserDispoJournee} rendus={W} edition={editJournee} setEdition={setEditJournee} peutModifier={!baseKO}/>
             )}
 
             {loading && <Skeleton variant="card" count={4}/>}
