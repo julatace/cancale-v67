@@ -117,7 +117,7 @@ export async function retourDiscord(req, res, f = fetch) {
   res.setHeader('Set-Cookie', cookie('', 0));            // une seule fois, quoi qu'il arrive
   const q = req.query || {};
   const ouVu = /\.c\.(?:[0-9a-f]{32}\.)?[0-9a-f]{40}$/.test(String(q.state || '')) ? 'compte' : 'carte';   // seulement pour savoir OÙ dire l'erreur
-  if (q.error) return versApp(res, 'discord-erreur=annule', ouVu);
+  if (q.error) return versApp(res, /verif(?:y|ied|ication).*(?:email|phone|account)/i.test(String(q.error_description||''))?'discord-erreur=verification':'discord-erreur=annule', ouVu);
   if (!discordConfigure()) return versApp(res, 'discord-erreur=non-configure', ouVu);
   const etat = lireEtatComplet(q.state, nonce);
   if (!etat) return versApp(res, 'discord-erreur=lien', ouVu);
@@ -131,7 +131,7 @@ export async function retourDiscord(req, res, f = fetch) {
     if (!t.ok || !jt || typeof jt.access_token !== 'string') return versApp(res, 'discord-erreur=discord', ou);
     const u = await f('https://discord.com/api/users/@me', { signal:AbortSignal.timeout(10000), headers: { Authorization: 'Bearer ' + jt.access_token } });
     const ju = await u.json().catch(() => null);
-    if (!u.ok || !ju) return versApp(res, 'discord-erreur=discord', ou);
+    if (!u.ok || !ju) return versApp(res, ju?.code===40002?'discord-erreur=verification':'discord-erreur=discord', ou);
     const pseudo = pseudoDiscordDe(ju);
     if (!pseudo) return versApp(res, 'discord-erreur=ancien', ou);
     const frag = 'discord=' + encodeURIComponent(pseudo) + '&preuve=' + encodeURIComponent(signerIdentiteDiscord(owner,pseudo,ju)||signerPreuve(owner, pseudo));

@@ -267,3 +267,11 @@ Le capteur MAIN démarrait à `document_start`, son relais isolé seulement à `
 Le test navigateur `scripts/bancs/lbc-demarrage.cjs` échoue avec l'ancien capteur : identification reçue avant le relais perdue. Il réussit avec le nouveau, capteur avant/après relais, réinjection et accusé répété sans doublon. Aucun appel supplémentaire à Leboncoin, aucune écriture de production, aucune récupération de cookie ajoutés.
 
 Les audits de session, comptes, données restantes, compteurs de messages, détails de transactions, compatibilité navigateurs et liaison VRM sont conservés. Ils ne remplacent pas une vérification sur une vraie session Leboncoin : aucune session utilisateur Leboncoin n'est accessible dans l'environnement de développement. La mise à jour du dossier de l'extension et le rechargement des onglets Leboncoin restent nécessaires : une extension décompressée ne reçoit pas les nouveaux scripts depuis le site.
+
+## Suite 5.208.0 — session reconnue sans pseudo et reprise d'envoi
+
+Retour utilisateur : 5.207 installée mais carte « pas encore reconnu » et « rien envoyé » sur toutes les pages. Trois défauts supplémentaires corrigés : l'état de la carte exigeait un pseudo même quand un identifiant de session était connu ; les XHR `responseType=json` et les appels fetch avec un objet URL n'étaient pas lus ; la session était marquée envoyée pour six heures même après un échec de stockage. Le marqueur est maintenant posé après un succès seulement, et le prochain événement peut reprendre l'envoi.
+
+Un diagnostic local distingue relais présent / capteur MAIN actif sur l'onglet courant, sans compte, email, contenu de message ni jeton. Il propose un geste précis lorsque la session n'est toujours pas lue. Cela ne transforme pas une absence de données en succès.
+
+Périmètre constaté : comptes et annonces/photos, ventes et étapes de transactions déjà prises en charge par leurs parseurs. Le module de messages Leboncoin actuel ne collecte que les compteurs ; la lecture et la réponse aux conversations complètes ne sont pas implémentées. Les formats réels des achats/codes et messages complets doivent être vérifiés sur une session autorisée avant de promettre « tout capté ». Aucune session utilisateur Leboncoin n'est disponible ici. Ne pas annoncer cette version comme une capture exhaustive validée en production.

@@ -252,7 +252,7 @@
     else if (!e.capte) compteSite = '<div class="val gris">pas encore reconnu</div>';
     else if (e.site && e.site.nom && e.site.choix === 'non') compteSite = `<div class="val gris" data-compte-ignore>${esc(e.site.nom)} — ignoré dans ce navigateur (ton choix) : rien n'est capté pour lui.</div><button class="b sec" data-capter>Capter ce compte</button>`;
     else if (e.site && e.site.nom) compteSite = `<div class="val">${esc(e.site.nom)}${e.site.type === 'pro' ? ' · pro' : ''}</div>`;
-    else if (e.site && e.site.id) compteSite = `<div class="val">compte n° ${esc(e.site.id)}</div>`;
+    else if (e.site && e.site.id) compteSite = e.plateforme==='leboncoin' ? '<div class="val">Compte détecté · pseudo en attente</div>' : `<div class="val">compte n° ${esc(e.site.id)}</div>`;
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
@@ -267,6 +267,7 @@
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
 
+    const diagnosticLbc=e.plateforme==='leboncoin'&&!e.site?.id?`<div class="pied">${e.transport?.capteur===true?'Capteur actif. Ouvre ta messagerie Leboncoin pour lire la session de ton compte.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
     let bascule = '';
     if (e.bascule) {
       const b = e.bascule;
@@ -287,6 +288,7 @@
       <div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>
       ${e.capte ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}
       ${e.mesure ? `<div class="ligne"><div class="lib">Mesure</div><div class="val gris">VRM apprend à lire ${esc(nomSite)} : il relève la forme des pages, jamais leur contenu. Aucune vente ni annonce n'est encore captée.</div>${(() => { const f = e.flux || {}; return f.koAt && (!f.okAt || f.koAt > f.okAt) ? `<div class="val alerte">Dernier relevé refusé ${esc(depuis(f.koAt))}</div>` : f.okAt ? `<div class="val gris">Relevé envoyé ${esc(depuis(f.okAt))}</div>` : ''; })()}</div>` : ''}
+      ${diagnosticLbc}
       ${bascule}
       ${pied ? `<div class="pied">${pied}</div>` : ''}
       ${gesteDoigt}`);

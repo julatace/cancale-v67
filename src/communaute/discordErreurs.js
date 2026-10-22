@@ -2,6 +2,7 @@
 // dites de la même façon sur la carte et dans Paramètres → Mon compte (§11).
 // Un petit module à part : Mon compte ne charge pas l'écran de la carte.
 export const DISCORD_ERREURS = {
+  verification: 'Discord demande de vérifier ton compte : ouvre Discord → Mon compte et confirme ton adresse email ou suis la vérification demandée, puis réessaie ici. Ton compte VRM reste accessible.',
   annule: 'Connexion Discord annulée : rien n’a changé.',
   lien: 'Ce lien Discord a expiré ou a été ouvert dans un autre navigateur. Recommence depuis VRM, dans ce navigateur.',
   'non-configure': 'La connexion avec Discord n’est pas encore réglée sur VRM.',

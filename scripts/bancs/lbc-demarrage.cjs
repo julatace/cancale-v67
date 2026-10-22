@@ -13,5 +13,10 @@ const inject=fs.readFileSync(process.env.LBC_INJECT||path.join(root,'vinted-sync
  await p.addScriptTag({content:relay});await p.evaluate(()=>window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*'));await p.waitForTimeout(50);
  assert.equal(await p.evaluate(()=>window.relayes.filter(m=>m.action==='lbcMsgCompteur').length),1);
  await charge();assert.equal(await p.evaluate(()=>window.relayes.filter(m=>m.action==='lbcMsgCompteur').length),2);
+ await p.route('https://api.leboncoin.fr/**',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({unread:3})}));
+ await p.evaluate(async()=>{await fetch(new URL('https://api.leboncoin.fr/messaging/proxy/api/hal/aaaa1111-0000-4000-8000-000000000001/counter'));});
+ await p.waitForFunction(()=>window.relayes.filter(m=>m.action==='lbcMsgCompteur').length===3,null,{timeout:2500});
+ await p.evaluate(()=>new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open('GET','https://api.leboncoin.fr/messaging/proxy/api/hal/aaaa1111-0000-4000-8000-000000000001/counter');x.responseType='json';x.onload=resolve;x.onerror=reject;x.send();}));
+ await p.waitForFunction(()=>window.relayes.filter(m=>m.action==='lbcMsgCompteur').length===4,null,{timeout:2500});
  console.log('OK : '+ordre+', compte reçu une seule fois, capture suivante conservée.');await p.close();
 }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});

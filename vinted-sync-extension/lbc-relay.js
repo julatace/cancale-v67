@@ -2,13 +2,15 @@
 (function(){
   if(window.__vrmLbcRelayLoaded)return;window.__vrmLbcRelayLoaded=true;
   const vus=new Set();
+  const diagnostic=capteur=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur});}catch(_){}};
+  diagnostic(false);
   // L'observateur réseau MAIN world (lbc-inject.js) est injecté via le manifest
   // (content_script world:MAIN) → immunisé à la CSP de Leboncoin. Ici on ne fait
   // que RELAYER au background ce qu'il capte (window.postMessage).
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     const d = event.data;
-    if(d?.__tag==='CANCALE_LBC_CAPTEUR'&&d.kind==='pret'){window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*');return;}
+    if(d?.__tag==='CANCALE_LBC_CAPTEUR'){diagnostic(true);if(d.kind==='pret')window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*');return;}
     if (!d || d.__tag !== 'CANCALE_LBC') return;
     if(Number.isSafeInteger(d.__vrmSequence)){if(vus.has(d.__vrmSequence))return;vus.add(d.__vrmSequence);if(vus.size>256)vus.delete(vus.values().next().value);}
     if (d.kind === 'lbcraw' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcRaw', url: d.url, body: d.body, session: typeof d.session === 'string' ? d.session.slice(0, 64) : '' }); } catch (_) {} }
