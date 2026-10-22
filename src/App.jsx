@@ -1,3 +1,4 @@
+import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
@@ -42122,9 +42123,13 @@ function MessagesLeboncoin() {
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const sbGet = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
-  const reload = async () => {
+  const [erreurReception,setErreurReception]=useState(false);
+  const suiviReception=useRef(null);
+  const reload=()=>suiviReception.current?.actualiser();
+  const sbGet = q => lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth());
+  const lireDonnees = async (estActif) => {
     setLoading(true);
+    setErreurReception(false);
     // ⚠️ 197 Ko POUR EN LIRE 133 : cet écran lit `main` lui-même (c'est ce qui
     //    lui donne son propre `echecLecture`), mais il n'en utilise que QUATRE
     //    clés. Mesuré le 15 septembre : `select=data` 197 Ko / 795 ms, la
@@ -42443,16 +42448,15 @@ function LeboncoinScreen() {
     // L'annonce porte son compte dans `account` (capture du fond) ou `lbcUser`
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
+    if (!estActif()) return;
     setData({ liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
-  useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
-  // L'extension prévient quand une paire vient d'être publiée (ou marquée) :
-  // la file se relit toute seule.
   useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'lbc') reload(); };
-    window.addEventListener('vrm:ext', f);
-    return () => window.removeEventListener('vrm:ext', f);
+    const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:lireDonnees,onErreur:()=>{setErreurReception(true);setLoading(false);}});
+    suiviReception.current=suivi;
+    suivi.actualiser();
+    return ()=>{suivi.arreter();suiviReception.current=null;};
     /* eslint-disable-next-line */
   }, []);
   const marquer = async (id) => { const r = await vmrCmd({ cmd: 'lbcMarque', id: String(id), etat: 'posted' }); if (r && r.accepte) reload(); };
@@ -42478,6 +42482,7 @@ function LeboncoinScreen() {
         <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       <DiagnosticLeboncoin lire={sbGet} couleurs={C}/>
+      {erreurReception && <LignePanne>La relecture de tes données Leboncoin a échoué. Les informations précédentes restent affichées. Réessaie avec Actualiser.</LignePanne>}
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
           une deuxième fois. On le dit avec le N° et le lien ; VRM ne retire pas
