@@ -252,7 +252,7 @@
     else if (!e.capte) compteSite = '<div class="val gris">pas encore reconnu</div>';
     else if (e.site && e.site.nom && e.site.choix === 'non') compteSite = `<div class="val gris" data-compte-ignore>${esc(e.site.nom)} — ignoré dans ce navigateur (ton choix) : rien n'est capté pour lui.</div><button class="b sec" data-capter>Capter ce compte</button>`;
     else if (e.site && e.site.nom) compteSite = `<div class="val">${esc(e.site.nom)}${e.site.type === 'pro' ? ' · pro' : ''}</div>`;
-    else if (e.site && e.site.id) compteSite = e.plateforme==='leboncoin' ? '<div class="val">Compte détecté · pseudo en attente</div>' : `<div class="val">compte n° ${esc(e.site.id)}</div>`;
+    else if (e.site && e.site.id) compteSite = e.plateforme==='leboncoin' ? '<div class="val">Identifiant détecté · identité à confirmer</div>' : `<div class="val">compte n° ${esc(e.site.id)}</div>`;
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
@@ -263,11 +263,11 @@
       const f = e.flux || {};
       if (f.koAt && (!f.okAt || f.koAt > f.okAt)) {
         flux = `<div class="val alerte">Dernier envoi refusé ${esc(depuis(f.koAt))}${esc(raisonRefus(f, v))}</div>`;
-      } else if (f.okAt) flux = `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
+      } else if (f.okAt) flux = e.plateforme === 'leboncoin' ? `<div class="val">Dernier échange enregistré ${esc(depuis(f.okAt))}</div><div class="val gris">Cet échange ne confirme pas la récupération des annonces et des photos.</div>` : `<div class="val">Envoyées à VRM ${esc(depuis(f.okAt))}</div>`;
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
 
-    const diagnosticLbc=e.plateforme==='leboncoin'&&(e.transport?.erreurCapture||!e.site?.id||e.transport?.capteurVersion!==e.code)?`<div class="pied">${e.transport?.capteur===true&&e.transport?.capteurVersion!==e.code?'Le capteur de cet onglet n’a pas confirmé la dernière version. Recharge cet onglet Leboncoin après la mise à jour.':e.transport?.erreurCapture==='identite'?'VRM n’a pas confirmé l’enregistrement du compte. Les annonces restent bloquées pour éviter une mauvaise attribution.':e.transport?.erreurCapture==='taille'?'La capture dépasse la taille autorisée. Aucun gros message n’a été envoyé.':e.transport?.ambigue===true?'Plusieurs comptes ont répondu dans cet onglet. Aucune session courante n’est choisie. Recharge Leboncoin sur le compte voulu.':e.transport?.capteur===true?'Capteur actif. Ouvre ta messagerie Leboncoin pour lire la session de ton compte.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
+    const diagnosticLbc=e.plateforme==='leboncoin'&&(e.transport?.erreurCapture||!e.site?.id||e.transport?.capteurVersion!==e.code)?`<div class="pied">${e.transport?.capteur===true&&e.transport?.capteurVersion!==e.code?'Le capteur de cet onglet n’a pas confirmé la dernière version. Recharge cet onglet Leboncoin après la mise à jour.':e.transport?.erreurCapture==='identite'?'VRM n’a pas confirmé l’enregistrement du compte. Les annonces restent bloquées pour éviter une mauvaise attribution.':e.transport?.erreurCapture==='taille'?'La capture dépasse la taille autorisée. Aucun gros message n’a été envoyé.':e.transport?.ambigue===true?'Plusieurs comptes ont répondu dans cet onglet. Aucune session courante n’est choisie. Recharge Leboncoin sur le compte voulu.':e.transport?.capteur===true?'Capteur actif. Ouvre ton espace compte Leboncoin, puis « Mes annonces », pour lire ton identité et tes annonces.':e.transport?'Le relais fonctionne, mais le capteur de la page ne répond pas. Recharge Leboncoin et vérifie les autorisations de l’extension sur ce site.':'Aucune réponse du capteur sur cet onglet. Recharge la page après la mise à jour de l’extension.'}</div>`:'';
     let bascule = '';
     if (e.bascule) {
       const b = e.bascule;
