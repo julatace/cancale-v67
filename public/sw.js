@@ -171,6 +171,8 @@ self.addEventListener('fetch', event => {
   // mises en cache par la règle 3 ci-dessous — même origine, GET, non-navigation
   // — elles seraient figées pour toujours sur leur première réponse.
   if (url.pathname.startsWith('/api/')) return;
+  // Ne jamais mettre un lien de récupération en cache ni le remplacer par la coque privée.
+  if (url.pathname === '/recuperation.html' || url.pathname.startsWith('/recuperation.')) return;
 
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;

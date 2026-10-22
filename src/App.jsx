@@ -761,7 +761,7 @@ const authCall = async (path, body) => {
 //    d'aujourd'hui, rien ne casse. Régler les deux est un geste de Julien
 //    (tableau de bord Supabase), voir CLAUDE.md.
 const retourEmail = () => { try { const o = window.location.origin; return /^https?:\/\//.test(o) ? o : ''; } catch (_) { return ''; } };
-const avecRetour = (chemin) => { const r = retourEmail(); return r ? `${chemin}${chemin.includes('?') ? '&' : '?'}redirect_to=${encodeURIComponent(r)}` : chemin; };
+const avecRetour = (chemin, page = '') => { const origine = retourEmail(); const r = origine ? origine + page : ''; return r ? `${chemin}${chemin.includes('?') ? '&' : '?'}redirect_to=${encodeURIComponent(r)}` : chemin; };
 
 // Le jeton d'accès expire vite (≈1 h). On le renouvelle en silence avec le
 // jeton de renouvellement — sinon l'app se déconnecterait toute seule en
@@ -998,14 +998,14 @@ const authSignUp  = async (email, password) => {
     else if (/rate limit/i.test(r.error)) msg = MAIL_QUOTA;
     else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse email est refusée par le serveur.';
     else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
-    return { ok: false, error: msg };
+    return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un email VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
   }
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
   return { ok: true, needsConfirm: true };
 };
-const authReset   = (email) => authCall(avecRetour('recover'), { email: String(email).trim().toLowerCase() });
+const authReset   = (email) => authCall(avecRetour('recover', '/recuperation.html'), { email: String(email).trim().toLowerCase() });
 
 // ── CONNEXION AVEC GOOGLE / DISCORD (OAuth, méthode PKCE) ─────────────────
 // Comment ça marche : on n'échange JAMAIS de mot de passe. On envoie le vendeur
@@ -11666,6 +11666,7 @@ function AuthScreen() {
       } else if (mode === 'reset') {
         const rr = await authReset(email);
         if (rr && rr.captcha) { setErr(rr.error); return; }
+        if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un email, utilise le lien le plus récent.');return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
         setInfo("Si un compte existe avec cet email, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
@@ -11675,8 +11676,9 @@ function AuthScreen() {
         // on n'invente pas un prénom vide (§5 : mieux vaut un blanc qu'un faux).
         try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
-        if (!r.ok) setErr(r.error);
-        else if (r.needsConfirm) setInfo("Compte créé ! Ouvre l'email de confirmation qu'on vient de t'envoyer, puis reviens te connecter.");
+        if (!r.ok) { if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
+        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton email, puis connecte-toi ici : inutile de quitter cette page.'); }
+        else location.reload();
       } else {
         const r = await authSignIn(email, pw);
         if (!r.ok) { setErr(r.error); setNeedConfirm(!!r.needsConfirm); }
@@ -11870,6 +11872,7 @@ function AuthScreen() {
           )}
           {info && <div style={{fontSize:12.5,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
+          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Le lien ne s’ouvre pas dans Safari ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
           <button type="submit" data-auth-valider="" disabled={busy||attendCaptcha} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
             borderRadius:10,padding:'13px',fontSize:15,fontWeight:600,cursor:(busy||attendCaptcha)?'default':'pointer',opacity:(busy||attendCaptcha)?0.6:1,fontFamily:'inherit'}}>
             {busy ? '…' : attendCaptcha ? (captcha.statut==='erreur' ? 'Vérification anti-robot indisponible' : captcha.statut==='interactif' ? 'Coche la vérification ci-dessus' : 'Vérification anti-robot…') : mode==='up' ? 'Créer mon compte' : mode==='reset' ? 'Envoyer le lien' : mode==='newpw' ? 'Enregistrer' : 'Se connecter'}
