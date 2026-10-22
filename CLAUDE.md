@@ -10998,8 +10998,8 @@ Suite de l'audit du 4-5 octobre (« Pas fait : une vraie politique `script-src` 
   `connect-src`). L'extension n'a pas été touchée.
 
 ### La CSP finie (22 octobre) — la carte OpenFreeMap, le service worker, et des workers que le banc ne voyait pas
-Branche `claude/csp-app` reprise : **vrai merge** d'origin/main (3de5c8f, un seul
-conflit : ce fichier, les deux sections gardées).
+Branche `claude/csp-app` reprise : **vrais merges** d'origin/main (3de5c8f — un
+seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conflit).
 - **Mesuré d'abord, sur l'arbre fusionné** : `communaute.cjs` → **38 violations**
   `connect-src ← https://tiles.openfreemap.org/…` (style, sprite). La carte
   OpenFreeMap arrivée sur main (21 oct.) n'était pas dans la politique : passée
@@ -11061,8 +11061,13 @@ conflit : ce fichier, les deux sections gardées).
   VIGUEUR** (copie de vercel.json par `BANC_VERCEL_JSON`) : `communaute`,
   `captcha`, `abonnement`, `hors-ligne`, `imprimante`, `studio-photo` — tous
   verts, **0 violation**.
-- **Les 143 audits** (`scripts/audit-*.cjs`) : tous verts sur cette branche —
-  aucun rouge, donc rien à comparer avec main. `verif_visuel.cjs` (fixtures
+- **Les 143 audits** (`scripts/audit-*.cjs`) : tous verts sur cette branche,
+  après chacun des deux merges — aucun rouge, donc rien à comparer avec main
+  (`audit-agent-sql` est tombé une fois sur « No space left on device » : le
+  disque de la machine partagée était plein à 98 % ; vert à la relance). Après
+  le second merge : build, `audit-csp` et `csp.cjs` (109 verts, 0 rouge) relancés ;
+  les autres bancs cités ici l'ont été sur le premier (main y a changé le
+  diagnostic Leboncoin et l'extension, rien de ce qu'ils rendent). `verif_visuel.cjs` (fixtures
   réelles, hors dépôt) : 21 contrôles non conformes, **exactement la même liste
   sur un arbre `git archive origin/main`** (CA par plateforme, vente Leboncoin
   prouvée, résumé Vinted, carte héros) : rien ne vient de ce chantier.
