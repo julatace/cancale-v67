@@ -28,6 +28,17 @@ Ces 2 000 requêtes sont une simulation de concurrence logique en mémoire. Elle
 
 Les audits existants des factures, chiffres croisés, eBay, widgets, en-têtes navigateur, reprise des emails et notifications sont aussi exécutés. Les anciennes simulations sans session sont actualisées : la session simulée et sa relecture portent la même identité ; les cas volontairement sans session continuent d'exiger zéro écriture. Le test de rattrapage des bordereaux active explicitement le réglage du vendeur, conformément à sa demande. Aucune protection de production n'est assouplie pour faire passer un test.
 
+## Résultats de cette exécution
+
+- 120 tests unitaires : 120 réussis, aucun échec.
+- Compilation de production réussie après intégration de PR637 et mise à jour de Vite. L’avertissement sur les gros bundles reste une limite de performance à traiter ; il n’est pas masqué.
+- Audit npm complet, développement inclus : aucune vulnérabilité connue signalée.
+- Les 141 scripts d’audit existants sont lancés. L’audit d’abonnement est relancé avec des abonnements Web Push synthétiques conformes à la nouvelle validation.
+- PostgreSQL 17.11 est extrait localement dans `/tmp`, sans installation système ni connexion à la production, afin d’exécuter les audits SQL initialement bloqués. Agent : 221 contrôles, communauté : 206, équipe : 106, garde de numérotation : 22, sans échec.
+- Nouveau `scripts/audit-confidentialite-sql.cjs` : 45 contrôles réels sur PostgreSQL jetable, tous réussis. La vraie migration 021 est appliquée deux fois ; les politiques trop permissives ne permettent ni lecture, ni insertion, ni modification, ni suppression chez autrui. Changer owner est refusé. Les écritures propres fonctionnent. Les droits dangereux, l’anonymat, la restriction d’abonnement et la lecture d’équipe explicitement autorisée sont contrôlés. Chaque requête passe par une connexion SQL distincte.
+
+Commande de ce dernier audit : `PG_BIN=/chemin/vers/postgresql/bin node scripts/audit-confidentialite-sql.cjs`. Le script refuse de se déclarer réussi si PostgreSQL manque. Il démarre uniquement une base jetable, écoute sur une socket locale et la supprime en fin d’exécution.
+
 ## État réel des droits SQL
 
 L'utilisateur a appliqué la migration 021 et transmis le résultat du diagnostic : deux tables présentes, RLS activé, verrous restrictifs présents, aucun écart de politique et aucun droit dangereux relevé. Les règles transmises filtrent `app_data` et `vinted_accounts` sur `owner = auth.uid()`.
