@@ -5,11 +5,19 @@ import Accueil from './Accueil.jsx';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
-ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
+// ⚠️ (22 oct., revue) L'ÉCRAN SE LIT DANS L'HISTORIQUE : l'app retire `?tab=` de
+// l'adresse dès qu'elle l'a lu, et chaque écran pose `vrmTab` dans
+// `history.state` (le bouton « retour », 18 oct.). Lu dans l'adresse, le champ
+// `ecran` du journal restait vide — on ne savait pas quel écran avait parlé.
+const ecranCourant = () => {
+  try { const st = window.history.state; if (st && st.vrmTab) return String(st.vrmTab) + (st.vrmSub ? ':' + st.vrmSub : ''); } catch (_) {}
+  try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; }
+};
+ecouterPlantages(() => ({ ecran: ecranCourant(),
   version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
 // Et les violations de la politique de sécurité du contenu (Report-Only) : le
 // même journal, pour savoir sur SES appareils si elle peut passer en vigueur.
-ecouterViolationsCsp(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
+ecouterViolationsCsp(() => ({ ecran: ecranCourant(),
   version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
 // ⚠️ APRÈS UN DÉPLOIEMENT, UN ONGLET RESTÉ OUVERT DEMANDE DES MORCEAUX QUI
 // N'EXISTENT PLUS (mesuré le 15 octobre dans le journal des plantages : « Unable

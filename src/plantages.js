@@ -164,9 +164,18 @@ export function decrireViolation(e) {
   const dir = String((e && (e.effectiveDirective || e.violatedDirective)) || '?').split(' ')[0];
   return { message: `CSP ${dir} ← ${ou}${e && e.disposition === 'report' ? ' (report-only)' : ''}`, ou, dir };
 }
-export function ecouterViolationsCsp(contexte) {
+// ⚠️ (22 oct., revue) UN DOCUMENT, PAS « LE » DOCUMENT. Les fenêtres que l'app
+// ouvre elle-même (le reçu d'achat, une facture imprimable) héritent de la
+// politique de la page : leurs violations s'y déclenchent, dans LEUR document,
+// et n'arrivaient jamais au journal. `ecouterViolationsCspDans(w.document, …)`
+// s'appelle juste après `w.document.open()` (open() efface les écouteurs posés
+// avant) — et AVANT d'écrire, pour voir ce que le chargement déclenche.
+// Ce que ce journal ne voit PAS, et ne peut pas voir d'une page : un worker (la
+// carte, pdf.js), le service worker, l'onglet du bordereau PDF. Ceux-là ne sont
+// tenus que par le banc (`scripts/bancs/csp.cjs`, par `report-uri`).
+export function ecouterViolationsCspDans(doc, contexte) {
   try {
-    document.addEventListener('securitypolicyviolation', (e) => {
+    doc.addEventListener('securitypolicyviolation', (e) => {
       try {
         const src = String(e.sourceFile || '');
         const { message, ou } = decrireViolation(e);
@@ -175,5 +184,9 @@ export function ecouterViolationsCsp(contexte) {
         noterPlantage(err, Object.assign({ origine: 'csp' }, contexte && contexte()));
       } catch (_) {}
     });
-  } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
+export function ecouterViolationsCsp(contexte) {
+  try { ecouterViolationsCspDans(document, contexte); } catch (_) {}
 }
