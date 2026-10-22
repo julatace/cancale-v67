@@ -2271,6 +2271,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'publication') {
     if (msg.itemId) noterPublication(sender && sender.tab ? sender.tab.id : null, msg.itemId, msg.status);
     else noterDiag('publication_forme_inconnue');
+  } else if (msg.kind === 'fiche') {
+    // 22 oct. : la description et les codes qu'il vient d'ENREGISTRER sur Vinted
+    // (2xx, identifiant de l'adresse ou de la réponse) — voir `noterFicheVinted`.
+    noterFicheVinted(msg.itemId, msg.status, msg.corps);
   } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
     // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
     // SA propre requête. Même pause que pour les requêtes du fond. (Un message
@@ -3432,13 +3436,34 @@ const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some
 // fait à chaque visite. Le relevé a donc sa PROPRE ligne, une par mois.
 const RELEVE_MAX_PAR_VISITE = 2;
 const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
-// ⚠️ DÉBIT DES PHOTOS (Julien : « augmente le débit… les 12 photos doivent
-// transiter »). Chaque annonce est captée en UN appel API qui rend TOUTES ses
-// photos (jusqu'à 20) — la seule limite est le nombre d'annonces rattrapées par
-// visite. Monté 3 → 8 pour remplir le catalogue plus vite. Le vrai garde-fou
-// anti-blocage reste le plafond de 20 actions/h par compte (`garde`), une requête
-// à la fois : monter ce nombre front-charge le rattrapage sans jamais le dépasser.
-const PHOTOS_MAX_PAR_VISITE = 20;
+// ⚠️⚠️ 22 octobre — LES PHOTOS DE FOND ÉTAIENT LA SEULE CAUSE DES PAUSES DE VINTED.
+//    Mesuré chez Julien (`panel_diag_capture`, extension 5.211) :
+//    `vinted_frein_429` = 23 = `photos_page_refuse_429` = 23 — les 23 « trop de
+//    demandes » de Vinted venaient TOUS d'une lecture de page d'annonce pour les
+//    photos ; paliers de pause 1/2/3 atteints 24/2/1 fois ; `visite_en_pause` =
+//    119 visites sautées (ventes et colis arrivés en retard dans VRM). Cause :
+//    jusqu'à 20 pages lues d'affilée, sans aucun écart, à chaque minute
+//    (`tickPhotos`) ET à la fin de chaque visite. (Avant : « monté 3 → 8 → 20
+//    pour remplir le catalogue plus vite » — c'est ce front-chargement que Vinted
+//    refusait.)
+// ⇒ UNE page par tour (`PHOTOS_PAR_TOUR`) ; jamais deux pages de fond à moins de
+//   `PHOTOS_ECART_MS` (un écart FIXE, jamais « faussement humain », §3) ; aucune
+//   page pendant qu'il navigue sur Vinted (`PHOTOS_CALME_MS`, vu par les onglets,
+//   sans requête) — et plus aucune dans la visite ; un 429/403 sur une page photo
+//   coupe les photos de fond 24 h (`PHOTOS_FREIN_MS`), le reste de l'extension
+//   suivant la pause habituelle. Le total horaire ne bouge pas (`gardeLecture`,
+//   20 lectures/h moins les réserves) : les lectures sont ÉTALÉES, pas multipliées.
+//   Le clic « Publier » (`completerPhotos`, classe `clic`) n'est soumis ni à
+//   l'écart, ni au calme, ni au frein photos — seulement à la pause de Vinted.
+const PHOTOS_PAR_TOUR = 1;
+const PHOTOS_ECART_MS = 45 * 1000;
+const PHOTOS_CALME_MS = 2 * 60 * 1000;
+const PHOTOS_FREIN_MS = 24 * 3600 * 1000;
+const PHOTOS_FREIN = 'vrmPhotosFrein';          // { at, statut } du dernier 429/403 sur une page photo (§4.9)
+const PHOTOS_DERNIERE = 'vrmPhotosDerniere';    // ms de la dernière page photo de FOND
+const ACTIVITE_VINTED = 'vrmActiviteVinted';    // ms de sa dernière navigation sur Vinted
+const PHOTOS_PLAN = 'vrmPhotosPlan';            // { [uid]: { ids, veut, at } } — la liste à compléter, calculée une fois
+const PHOTOS_PLAN_MS = 15 * 60 * 1000;
 const PHOTOS_RETRY_MS = 6 * 60 * 60 * 1000;
 // Quand il ne manque plus aucune photo, on met une pause avant de relire la
 // base : sans elle, un onglet Vinted laissé ouvert relirait `vinted_item_details`
@@ -3867,113 +3892,149 @@ function retirerPhotosEtrangeres(carte) {
   }
   return n;
 }
-async function capterPhotosAnnonces(uid) {
+// ── LE FREIN DES PHOTOS (22 octobre) ─────────────────────────────────────────
+// Un 429/403 reçu sur une PAGE d'annonce lue pour ses photos coupe les photos de
+// FOND pendant 24 h (la relecture publique des autres comptes a le même frein,
+// `ENLIGNE_FREINS`). Rangé dans `chrome.storage.local` (§4.9). « Pas lu » le
+// stockage local ⇒ pas de frein (même règle que `pauseVinted`).
+async function freinPhotos() {
+  try {
+    const f = (await chrome.storage.local.get(PHOTOS_FREIN))[PHOTOS_FREIN];
+    const at = Number(f && f.at);
+    return (at > 0 && Date.now() - at < PHOTOS_FREIN_MS) ? f : null;
+  } catch (_) { return null; }
+}
+async function poserFreinPhotos(statut) {
+  try { await chrome.storage.local.set({ [PHOTOS_FREIN]: { at: Date.now(), statut: Number(statut) || 0 } }); } catch (_) {}
+  noterDiag(`photos_frein_${Number(statut) || 0}`);
+  logActivity(`⏸ Vinted a refusé une page photo (${statut}) — plus aucune photo lue en arrière-plan pendant 24 h`);
+}
+// Il navigue sur Vinted : un onglet Vinted vient de charger une page (vu par
+// `chrome.tabs.onUpdated`, aucune requête) ou une visite tourne. Ses propres
+// requêtes et celles de la visite suffisent : on n'y ajoute pas de page photo.
+async function noterActiviteVinted() {
+  try { await chrome.storage.local.set({ [ACTIVITE_VINTED]: Date.now() }); } catch (_) {}
+}
+
+// La LISTE des annonces à compléter, calculée UNE fois (listings + fiches) puis
+// gardée `PHOTOS_PLAN_MS` dans `chrome.storage.local` : à une page par tour, la
+// relire à chaque tour ferait redescendre la ligne `vinted_item_details`
+// (283 Ko chez Julien, mesuré le 22 oct.) pour CHAQUE page (§4.4, égress).
+// `null` = pas su (une lecture ratée) : rien n'est lu chez Vinted.
+async function planPhotos(uid) {
+  let tous = {};
+  try { tous = (await chrome.storage.local.get(PHOTOS_PLAN))[PHOTOS_PLAN] || {}; } catch (_) { tous = {}; }
+  const p = tous[String(uid)];
+  // Une liste vide ne vaut que `PHOTOS_TICK_COOLDOWN_MS` : une annonce qu'il vient
+  // de publier est prise aussi vite qu'avant.
+  const validite = (p && Array.isArray(p.ids) && p.ids.length) ? PHOTOS_PLAN_MS : PHOTOS_TICK_COOLDOWN_MS;
+  if (p && Array.isArray(p.ids) && Date.now() - Number(p.at || 0) < validite && Number(p.at || 0) <= Date.now()) return p;
+  // La liste du dressing : id + nPhotos + état. C'est SA donnée (ligne du compte).
+  let items = [];
+  let capListe = NaN;
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items,cap:data->>capturedAt`);
+    if (rows === null) return null;
+    items = (rows && rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [];
+    capListe = dateLectureDressing(rows && rows[0]);
+  } catch (_) { return null; }
+  // 5.165 : une annonce qu'il vient de SUPPRIMER n'est plus en ligne — la lire
+  // coûtait une requête Vinted pour un 404 (mesuré : `photos_annonce_refuse_404`
+  // = 96). Même règle que l'app ; suppressions illisibles ⇒ on n'écarte rien.
+  if (items.length) { const supp = await lireSupprimeesTous(); const ids = supp && supp.get(String(uid));
+    if (ids) items = items.filter((it) => !(it && supprimeeApres(ids, it.id, capListe))); }
+  // Ce qu'on a DÉJÀ capté (photos par id) — une lecture, la carte complète.
+  let dej = {};
+  if (items.length) {
+    try {
+      const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+      if (dr === null) return null;                     // pas su ≠ « rien capté » : on ne rejoue pas à l'aveugle
+      dej = (dr[0] && dr[0].data) || {};
+    } catch (_) { return null; }
+  }
+  // Les fiches lues mais pas encore rangées comptent comme captées.
+  for (const e of await lireFichesEnAttente()) if (e && e.src === 'page' && e.id && e.f) dej[String(e.id)] = Object.assign({}, dej[String(e.id)], e.f, { pageAt: e.at });
+  const maintenant = Date.now();
+  const manquants = items.filter((it) => {
+    if (!it || !it.id) return false;
+    if (it.is_closed || it.is_hidden || it.is_draft) return false;   // en ligne seulement
+    return aRelirePageAnnonce(it, dej[String(it.id)], maintenant);
+  }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
+  const plan = { ids: manquants.map((it) => String(it.id)), veut: {}, at: maintenant };
+  for (const it of manquants) plan.veut[String(it.id)] = Number(it.nPhotos || 0);
+  try { tous[String(uid)] = plan; await chrome.storage.local.set({ [PHOTOS_PLAN]: tous }); } catch (_) {}
+  return plan;
+}
+
+// ⚠️ SEUL `tickPhotos` APPELLE CETTE FONCTION (22 octobre) : c'est lui qui tient
+//    l'écart fixe, le calme et le frein. `max` vaut une page par tour.
+async function capterPhotosAnnonces(uid, max = PHOTOS_PAR_TOUR) {
   try {
     if (!uid) return 0;
+    if (await freinPhotos()) return 0;                      // 24 h après un refus de Vinted sur une page photo
     const accts = await getStoredAccounts();
     const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
     if (!acc) return 0;
-    // La liste du dressing : id + nPhotos + état. C'est SA donnée (ligne du compte).
-    let items = [];
-    let capListe = NaN;
-    try {
-      const rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items,cap:data->>capturedAt`);
-      items = (rows && rows[0] && Array.isArray(rows[0].items)) ? rows[0].items : [];
-      capListe = dateLectureDressing(rows && rows[0]);
-    } catch (_) {}
-    if (!items.length) return 0;
-    // 5.165 : une annonce qu'il vient de SUPPRIMER n'est plus en ligne — la lire
-    // coûtait une requête Vinted pour un 404 (mesuré : `photos_annonce_refuse_404`
-    // = 96). Même règle que l'app ; suppressions illisibles ⇒ on n'écarte rien.
-    { const supp = await lireSupprimeesTous(); const ids = supp && supp.get(String(uid));
-      if (ids) items = items.filter((it) => !(it && supprimeeApres(ids, it.id, capListe))); }
-    // Ce qu'on a DÉJÀ capté (photos par id) — une lecture, la carte complète.
-    let dej = {};
-    try {
-      const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-      if (dr === null) return 0;                          // pas su ≠ « rien capté » : on ne rejoue pas à l'aveugle
-      dej = (dr[0] && dr[0].data) || {};
-    } catch (_) {}
-    const maintenant = Date.now();
-    const manquants = items.filter((it) => {
-      if (!it || !it.id) return false;
-      if (it.is_closed || it.is_hidden || it.is_draft) return false;   // en ligne seulement
-      return aRelirePageAnnonce(it, dej[String(it.id)], maintenant);
-    }).sort((a, b) => Number(b.nPhotos || 0) - Number(a.nPhotos || 0));
-    if (!manquants.length) return 0;
+    const plan = await planPhotos(uid);
+    if (!plan || !plan.ids.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
-    let n = 0, dirty = false; const lues = [];
-    for (const it of manquants) {
-      if (n >= PHOTOS_MAX_PAR_VISITE) break;
-      const k = `${uid}_${it.id}`;
+    let n = 0; const lues = [];
+    for (const id of plan.ids) {
+      if (n >= Math.max(1, Number(max) || PHOTOS_PAR_TOUR)) break;
+      const k = `${uid}_${id}`;
       if (memo[k] && Date.now() - Number(memo[k]) < PHOTOS_RETRY_MS) continue;
       const refus = await gardeLecture(uid, acc, 'photos');   // s'arrête avant la réserve argent/colis
       if (refus) { if (refus.code !== 'lectures-reservees' && refus.code !== 'vinted-pause') logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
       memo[k] = Date.now();
       n++;
-      const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(it.id)}`);
+      try { await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}
+      const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
       // 5.193 : un frein de Vinted (429/403), une pause, un 401 ou une coupure ne
       // disent rien de l'annonce — le mémo de 6 h était posé quand même (mesuré :
       // `photos_page_refuse_429` ×15). Même règle que les codes de retrait et les
       // preuves de vente (`memoApresEchec`) ; un frein arrête la boucle.
-      if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); if (!rep.ok && memoApresEchec(memo, k, rep, PHOTOS_RETRY_MS)) break; continue; }
-      const det = extraireDetailPage(rep.text, it.id);
+      // 22 oct. : et un frein coupe les photos de fond 24 h (la pause habituelle,
+      // posée par `requeteVinted`, vaut pour tout le reste).
+      if (!rep.ok || !rep.text) {
+        noterDiag(`photos_page_refuse_${rep.status}`);
+        if (!rep.ok && !rep.pause && freinVinted(Number(rep.status) || 0)) await poserFreinPhotos(rep.status);
+        if (!rep.ok && memoApresEchec(memo, k, rep, PHOTOS_RETRY_MS)) break;
+        continue;
+      }
+      const det = extraireDetailPage(rep.text, id);
       const urls = det.photos;
       if (!urls.length) {
         noterDiag('photos_page_vide');
-        echantillonRate('photos_page', String(it.id), 'nextdata=' + (/__NEXT_DATA__/.test(rep.text) ? 'oui' : 'non') + ' len=' + rep.text.length);
+        echantillonRate('photos_page', String(id), 'nextdata=' + (/__NEXT_DATA__/.test(rep.text) ? 'oui' : 'non') + ' len=' + rep.text.length);
         continue;
       }
-      const it2 = { description: det.description || '' };
-      // ⚠️ ÉCRITURE GROUPÉE (§4.4, égress — « c'est pas trop coûteux pour
-      //    Supabase ? », 29 sept.). AVANT : `saveItemDetail` relisait ET
-      //    réécrivait la ligne ENTIÈRE `vinted_item_details` à CHAQUE annonce —
-      //    20 annonces = 20 réécritures d'une ligne qui grossit (coût en n²).
-      //    Ici on met à jour la carte DÉJÀ en mémoire (`dej`, lue une seule
-      //    fois plus haut) et on n'écrit qu'UNE fois, après la boucle. Même
-      //    règle de fusion que `saveItemDetail` : ne jamais écraser par du vide.
-      const kk = String(it.id);
-      const prev = dej[kk] || {};
-      const desc = String(it2.description || '').trim();
       // 5.197 : le balayage d'images de la page (`format: 'html'`) attrapait
       // aussi une image qui n'est PAS de l'annonce, toujours APRÈS les siennes
       // (mesuré : la même photo étrangère en position nPhotos+1 sur 29 de ses
       // annonces). Quand Vinted dit combien l'annonce en a, on n'en garde pas plus.
-      const veutN = Number(it.nPhotos || 0);
+      const veutN = Number(plan.veut[id] || 0);
       const photos = urls.filter(Boolean).slice(0, (det.format === 'html' && veutN > 0) ? veutN : 24);
       // MESURE (§6, « on ne prend que 5 photos », 29 sept.) : si on en récupère
-      // MOINS que Vinted n'en annonce (`nPhotos`), on note combien + les CLÉS de
-      // la réponse (jamais le corps) — pour trancher si l'API de détail limite,
-      // ou si les photos vivent dans un champ qu'on ne lit pas encore.
-      if (Number(it.nPhotos || 0) > photos.length) echantillonRate('photos_incomplet', String(it.id), 'got=' + photos.length + ' want=' + Number(it.nPhotos || 0) + ' cles=' + Object.keys(it2).slice(0, 30).join(','));
-      dej[kk] = { description: desc || prev.description || '', photos: photos.length ? photos : (prev.photos || []), readAt: new Date().toISOString(),
-        codes: det.codes || prev.codes || null, photoIds: (det.photoIds && det.photoIds.length) ? det.photoIds : (prev.photoIds || []),
-        couleur: det.couleur || prev.couleur || '', pageAt: new Date().toISOString(), pageFormat: det.format || '' };
-      dirty = true; lues.push(kk);
+      // MOINS que Vinted n'en annonce (`nPhotos`), on le note — jamais le corps.
+      if (veutN > photos.length) echantillonRate('photos_incomplet', String(id), 'got=' + photos.length + ' want=' + veutN + ' format=' + (det.format || ''));
+      // ⚠️ ÉCRITURE GROUPÉE (§4.4, égress). La fiche part dans la FILE des fiches
+      //    (`chrome.storage.local`, §4.9) : une écriture de la ligne pour
+      //    `FICHES_LOT` pages, et la fusion se fait au moment d'écrire, sur la
+      //    ligne relue (jamais sur une copie de début de boucle — 5.193).
+      lues.push({ id: String(id), src: 'page', at: new Date(Date.now()).toISOString(), f: {
+        description: String(det.description || '').trim(), photos, codes: det.codes || null,
+        photoIds: det.photoIds || [], couleur: det.couleur || '', pageFormat: det.format || '' } });
       noterDiag('photos_page_ecrit');
       // Mesure de la fiche : codes trouvés, ou non — et alors les CLÉS (jamais les valeurs).
       if (det.codes && det.codes.catalog_id != null) noterDiag('fiche_codes_ok');
-      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(it.id), 'format=' + det.format + ' next_data=' + (det.nextData ? 'oui' : 'non') + ' next_f=' + (det.nextFlux ? 'oui' : 'non') + ' id_vu=' + (det.idVu ? 'oui' : 'non') + ' cles=' + (det.cles || []).join(',').slice(0, 560)); }
+      else { noterDiag('fiche_codes_absents'); echantillonRate('fiche_codes', String(id), 'format=' + det.format + ' next_data=' + (det.nextData ? 'oui' : 'non') + ' next_f=' + (det.nextFlux ? 'oui' : 'non') + ' id_vu=' + (det.idVu ? 'oui' : 'non') + ' cles=' + (det.cles || []).join(',').slice(0, 560)); }
       noterDiag('fiche_format_' + (det.format || 'aucun'));
     }
-    // ⚠️ 5.193 — on RELIT la ligne au moment d'écrire et on n'y pose que NOS
-    //    fiches (`lues`) : une fiche rangée pendant la boucle (page d'annonce
-    //    ouverte, clic « Publier ») restait sinon écrasée par la copie lue au
-    //    début. Relecture ratée ⇒ on n'écrit pas, et ces annonces perdent leur
-    //    mémo (elles seront relues, pas dans 6 h).
-    if (dirty) {
-      const ecrit = await unItemDetailsALaFois(async () => {
-        const rr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-        if (rr === null) return false;
-        const cur = (rr[0] && rr[0].data) || {};
-        for (const kk of lues) cur[kk] = dej[kk];
-        const retirees = retirerPhotosEtrangeres(cur);
-        if (retirees) noterDiag('photos_etrangeres_retirees');
-        return supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
-      });
-      if (!ecrit) for (const kk of lues) delete memo[`${uid}_${kk}`];
-    }
+    if (lues.length) await enfilerFiches(lues);
     await chrome.storage.local.set({ vrmPhotosFaites: memo });
+    // Plus rien à lire dans la liste : on range tout de suite (sinon au lot).
+    const reste = plan.ids.some((id) => { const m = memo[`${uid}_${id}`]; return !(m && Date.now() - Number(m) < PHOTOS_RETRY_MS); });
+    await viderFiches({ force: !reste });
     return n;
   } catch (_) { return 0; }
 }
@@ -3984,6 +4045,9 @@ async function capterPhotosAnnonces(uid) {
 // déclenchée par SON clic (donc humaine), sous garde de LECTURE, dans la file
 // Vinted (une à la fois). Jamais de rafale. Il ne publie plus une annonce sans
 // ses photos, et il n'attend aucun fond.
+// 22 oct. : ni l'écart, ni le calme, ni le frein des photos de fond ne
+// s'appliquent (c'est SON clic) — la pause de Vinted, si (`requeteVinted`). Un
+// refus de Vinted ici coupe quand même les photos de FOND 24 h.
 async function completerPhotos(uid, id) {
   try {
     const accts = await getStoredAccounts();
@@ -3992,11 +4056,17 @@ async function completerPhotos(uid, id) {
     const refus = await gardeLecture(uid, acc, 'clic');      // SON clic : pas de réserve à respecter
     if (refus) { logActivity(`⚠️ Photos non captées : ${refus.error}`); return false; }
     const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
-    if (!rep.ok || !rep.text) { noterDiag(`photos_page_refuse_${rep.status}`); return false; }
+    if (!rep.ok || !rep.text) {
+      noterDiag(`photos_page_refuse_${rep.status}`);
+      if (!rep.ok && !rep.pause && freinVinted(Number(rep.status) || 0)) await poserFreinPhotos(rep.status);
+      return false;
+    }
     const det = extraireDetailPage(rep.text, id);
     if (!det || !Array.isArray(det.photos) || !det.photos.length) { noterDiag('photos_page_vide'); return false; }
     await saveItemDetail(id, { description: det.description || '', photos: det.photos, couleur: det.couleur || '' });
     noterDiag('photos_page_ecrit');
+    // Lue sur son clic : le fond ne la relit pas dans la foulée (une page Vinted de moins).
+    try { const m = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {}; m[`${uid}_${id}`] = Date.now(); await chrome.storage.local.set({ vrmPhotosFaites: m }); } catch (_) {}
     return true;
   } catch (_) { return false; }
 }
@@ -4004,6 +4074,7 @@ async function completerPhotos(uid, id) {
 async function completerPhotosSiManque(uid, id) {
   try {
     if (!uid || !id) return;
+    await viderFiches({ force: true });            // une fiche lue mais pas encore rangée compte
     const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
     if (dr === null) return;                       // pas su : on ne force rien
     const d0 = (dr[0] && dr[0].data && dr[0].data[String(id)]) || null;
@@ -4013,25 +4084,32 @@ async function completerPhotosSiManque(uid, id) {
   } catch (_) {}
 }
 
-// ⚠️ CAPTURE PLUS RAPIDE, SANS ATTENDRE UNE NAVIGATION (Julien, 29 sept. :
-// « elle doit être bcp plus rapide et pas attendre que je l'ouvre »).
-// L'extension a BESOIN d'une session Vinted (elle lit avec TES jetons) : elle
-// ne peut donc rien capter sans qu'un onglet Vinted soit ouvert. Mais tant
-// qu'UN onglet Vinted est ouvert — même sans que tu cliques — cette alarme
-// (1 min) complète les photos manquantes du compte connecté, 20 par tour, une
-// par une (§3, garde interne). Dès qu'il ne manque plus rien, on marque une
-// pause (`PHOTOS_TICK_COOLDOWN_MS`) pour ne pas relire la base en boucle
-// (§4.4). Aucun onglet Vinted ⇒ rien ne part, aucun coût.
+// ⚠️ CAPTURE SANS ATTENDRE UNE NAVIGATION (Julien, 29 sept. : « elle doit être
+// bcp plus rapide et pas attendre que je l'ouvre »). L'extension lit la page
+// avec la session d'un onglet Vinted ouvert : sans onglet Vinted, rien ne part.
+// 22 octobre : UNE page par minute au plus (l'alarme `vrm-photos`), jamais deux
+// à moins de `PHOTOS_ECART_MS`, rien pendant qu'il navigue sur Vinted
+// (`PHOTOS_CALME_MS`), rien pendant 24 h après un refus de Vinted sur une page
+// photo. Dès qu'il ne manque plus rien, une pause (`PHOTOS_TICK_COOLDOWN_MS`)
+// pour ne pas relire la base en boucle (§4.4). Aucun délai aléatoire (§3).
 async function tickPhotos() {
   try {
+    await viderFiches();                               // une fiche en attente depuis 10 min part (rien sinon)
     const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
     if (!tabs || !tabs.length) return;                 // pas d'onglet Vinted : on ne touche à rien
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                  // pas connecté : rien à capter
     if (await pauseVinted()) return;                   // 5.162 : Vinted a demandé de ralentir
-    const cd = (await chrome.storage.local.get('vrmPhotosCooldown')).vrmPhotosCooldown || {};
-    if (Date.now() - Number(cd[uid] || 0) < PHOTOS_TICK_COOLDOWN_MS) return; // fini récemment : on ne relit pas la base
-    const n = await capterPhotosAnnonces(uid);
+    if (await freinPhotos()) return;                   // 22 oct. : Vinted a refusé une page photo il y a moins de 24 h
+    const st = await chrome.storage.local.get([ACTIVITE_VINTED, PHOTOS_DERNIERE, 'vrmPhotosCooldown']);
+    const t = Date.now();
+    const depuisNav = t - Number(st[ACTIVITE_VINTED] || 0);
+    if (depuisNav >= 0 && depuisNav < PHOTOS_CALME_MS) { noterDiag('photos_attend_navigation'); return; }   // il navigue sur Vinted
+    const depuisPage = t - Number(st[PHOTOS_DERNIERE] || 0);
+    if (depuisPage >= 0 && depuisPage < PHOTOS_ECART_MS) return;                   // l'écart fixe entre deux pages
+    const cd = st.vrmPhotosCooldown || {};
+    if (t - Number(cd[uid] || 0) < PHOTOS_TICK_COOLDOWN_MS) return; // fini récemment : on ne relit pas la base
+    const n = await capterPhotosAnnonces(uid, PHOTOS_PAR_TOUR);
     // Plus rien à faire (ou garde qui refuse) → on met en pause ce compte.
     if (!n) { cd[uid] = Date.now(); await chrome.storage.local.set({ vrmPhotosCooldown: cd }); }
   } catch (_) { /* une capture ratée n'a pas à réveiller d'erreur */ }
@@ -5734,6 +5812,9 @@ async function issueVisite(uid, marque, r) {
   else noterDiag('visite_echec_repete');
 }
 async function visiteVinted() {
+  // 22 oct. : une visite, c'est lui sur Vinted — les photos de fond attendent
+  // qu'il ait fini (`PHOTOS_CALME_MS` après la fin de la visite, `finally`).
+  await noterActiviteVinted();
   try {
     const uid = await activeUidForDomain('www.vinted.fr');
     if (!uid) return;                                   // pas connecté : rien à capter
@@ -5829,17 +5910,16 @@ async function visiteVinted() {
     // lecture — ses annonces supprimées s'affichaient « en ligne » à côté des
     // republiées (« trois fois la même paire »). Voir `relireAnnoncesAutresComptes`.
     await relireAnnoncesAutresComptes(uid);
-    // ⚠️ APRÈS la moisson : la liste du dressing (id + nPhotos) vient d'être
-    // captée. On complète EN PASSIF les photos manquantes de ses annonces en
-    // ligne — une par une, compte connecté (§3). Sans ouvrir l'annonce : c'est
-    // l'extension qui lit le détail (Julien, 20 sept.). EN DERNIER : l'argent
-    // et les colis passent avant (5.162, `reserveLectures`).
-    await capterPhotosAnnonces(uid);
+    // ⛔ 22 octobre : PLUS DE PAGES PHOTO DANS LA VISITE. Elles s'ajoutaient,
+    //    jusqu'à 20 d'affilée, aux requêtes de la visite et de sa propre
+    //    navigation — les 23 « trop de demandes » mesurés venaient tous de là.
+    //    Les photos se complètent en arrière-plan (`tickPhotos`), une page par
+    //    minute, et seulement quand il ne navigue plus sur Vinted.
     // ⚠️ MÉNAGE : les PDF des bordereaux de ventes FINALISÉES (livrées depuis
     // longtemps) sont retirés — métadonnée gardée, seul le poids part. Global,
     // borné, cooldown 12 h, fail-safe par sens (voir `purgeBordereaux`).
     await purgeBordereaux(); await purgeBordereauxAnnules();
-  } catch (_) { /* une visite ratée n'a pas à casser la navigation */ }
+  } catch (_) { /* une visite ratée n'a pas à casser la navigation */ } finally { await noterActiviteVinted(); }
 }
 
 
@@ -5847,9 +5927,12 @@ async function visiteVinted() {
 
 try {
   chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
-    if (!info || info.status !== 'complete') return;
-    const u = (tab && tab.url) || '';
+    const u = (tab && tab.url) || (info && info.url) || '';
     if (!/^https:\/\/(www\.)?vinted\.(fr|com|it|de)\//.test(u)) return;
+    // 22 oct. : il navigue sur Vinted (une page charge, ou l'adresse change) —
+    // aucune page photo de fond tant qu'il est là (`PHOTOS_CALME_MS`).
+    if (info && (info.url || info.status === 'loading' || info.status === 'complete')) noterActiviteVinted();
+    if (!info || info.status !== 'complete') return;
     // Petit délai : on laisse la page finir de se charger, la capture passive
     // en profite aussi (elle observe ce que la page demande d'elle-même).
     // ⚠️ 3 s → 1,2 s → 250 ms : c'est NOTRE minuterie, pas un rythme montré à
@@ -5951,9 +6034,178 @@ async function saveItemDetailMaintenant(id, detail) {
   };
   // On garde ce que la page de l'annonce a appris (codes, date de lecture) :
   // l'écrasement par une lecture du panneau les perdait.
-  for (const k of ['codes', 'photoIds', 'pageAt', 'pageFormat']) if (prev[k] !== undefined && cur[key][k] === undefined) cur[key][k] = prev[k];
+  for (const k of ['codes', 'photoIds', 'pageAt', 'pageFormat', 'modifAt']) if (prev[k] !== undefined && cur[key][k] === undefined) cur[key][k] = prev[k];
   if (retirerPhotosEtrangeres(cur)) noterDiag('photos_etrangeres_retirees');
   await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LES FICHES EN ATTENTE D'ÊTRE RANGÉES DANS `vinted_item_details` (22 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Deux sources y passent : la page d'annonce lue pour ses photos (`src:'page'`,
+// une par minute au plus) et la fiche qu'il ENREGISTRE lui-même sur Vinted
+// (`src:'modif'`, voir `noterFicheVinted`). La file vit dans
+// `chrome.storage.local` (§4.9 : le service worker meurt, une fiche vue ne doit
+// pas mourir avec lui) ; elle est rangée en UNE écriture de la ligne, relue au
+// moment d'écrire (5.193) — par lot de `FICHES_LOT` pages, au bout de
+// `FICHES_DELAI_MS`, ou tout de suite quand il a modifié une annonce.
+// ⚠️ « Rien lu ne vaut pas rien » : ligne illisible ⇒ on n'écrit PAS (on
+//    effacerait les autres fiches), la file reste et repart au tour suivant.
+// ⚠️ On ne retire de la file que ce qui est RANGÉ, relu au dernier moment : une
+//    fiche arrivée pendant l'écriture ne disparaît pas avec les autres.
+const FICHES_FILE = 'vrmFichesAttente';     // [{ id, src: 'page'|'modif', at, f }]
+const FICHES_MAX = 300;
+const FICHES_LOT = 5;
+const FICHES_DELAI_MS = 10 * 60 * 1000;
+// Après une lecture ou une écriture ratée, le rangement AUTOMATIQUE attend
+// `FICHES_DELAI_MS` avant de réessayer : sinon une base qui refuse (ou une
+// session VRM absente) ferait redescendre la ligne entière à chaque minute pour
+// rien (§4.4). Un geste de sa part (publier, modifier) réessaie tout de suite.
+const FICHES_ECHEC = 'vrmFichesEchecAt';
+let _chaineFiches = Promise.resolve();
+function surFileFiches(fn) {
+  const p = _chaineFiches.then(fn, fn);
+  _chaineFiches = p.then(() => {}, () => {});
+  return p;
+}
+async function lireFichesEnAttente() {
+  try { const f = (await chrome.storage.local.get(FICHES_FILE))[FICHES_FILE]; return Array.isArray(f) ? f : []; } catch (_) { return []; }
+}
+function enfilerFiches(entrees) {
+  return surFileFiches(async () => {
+    try {
+      const f = await lireFichesEnAttente();
+      await chrome.storage.local.set({ [FICHES_FILE]: f.concat(entrees).slice(-FICHES_MAX) });
+      return true;
+    } catch (_) { return false; }
+  });
+}
+const cleFiche = (e) => `${e && e.id}|${e && e.src}|${e && e.at}`;
+function retirerFichesRangees(faites) {
+  const cles = new Set(faites.map(cleFiche));
+  return surFileFiches(async () => {
+    try { const f = await lireFichesEnAttente(); await chrome.storage.local.set({ [FICHES_FILE]: f.filter((e) => !cles.has(cleFiche(e))) }); } catch (_) {}
+  });
+}
+// UNE règle de fusion pour les deux sources : une valeur PLEINE remplace,
+// une valeur vide ne remplace JAMAIS (« un texte rempli n'est jamais remplacé
+// par du vide »). Les codes se fusionnent clé par clé. Ordre : la plus ancienne
+// d'abord — la dernière chose qu'il a enregistrée gagne.
+const valeurPleine = (v) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length);
+function fusionFiche(prev0, e) {
+  const prev = (prev0 && typeof prev0 === 'object') ? prev0 : {};
+  const f = (e && e.f && typeof e.f === 'object') ? e.f : {};
+  const out = Object.assign({}, prev);
+  const desc = typeof f.description === 'string' ? f.description.trim() : '';
+  if (desc) out.description = desc; else if (typeof out.description !== 'string') out.description = '';
+  if (Array.isArray(f.photos) && f.photos.length) out.photos = f.photos.filter(Boolean).slice(0, 24);
+  else if (!Array.isArray(out.photos)) out.photos = [];
+  if (f.codes && typeof f.codes === 'object') {
+    const c = Object.assign({}, (prev.codes && typeof prev.codes === 'object') ? prev.codes : {});
+    for (const k of Object.keys(f.codes)) if (valeurPleine(f.codes[k])) c[k] = f.codes[k];
+    if (Object.keys(c).length) out.codes = c;
+  }
+  if (Array.isArray(f.photoIds) && f.photoIds.length) out.photoIds = f.photoIds;
+  const coul = typeof f.couleur === 'string' ? f.couleur.trim().slice(0, 60) : '';
+  if (coul) out.couleur = coul; else if (typeof out.couleur !== 'string') out.couleur = '';
+  if (e && e.src === 'page') { out.readAt = e.at; out.pageAt = e.at; out.pageFormat = String(f.pageFormat || ''); }
+  if (e && e.src === 'modif') out.modifAt = e.at;
+  return out;
+}
+function appliquerFiches(cur, file) {
+  const ok = file.filter((e) => e && /^\d{1,15}$/.test(String(e.id || '')) && e.f && (e.src === 'page' || e.src === 'modif'));
+  ok.sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0));
+  for (const e of ok) cur[String(e.id)] = fusionFiche(cur[String(e.id)], e);
+  return ok;
+}
+// `force` : ranger maintenant. Sinon seulement s'il y a une fiche qu'il a
+// enregistrée, un lot complet, ou une fiche qui attend depuis `FICHES_DELAI_MS`.
+// Rend `true` quand la file est vide après coup.
+function viderFiches({ force = false } = {}) {
+  return unItemDetailsALaFois(async () => {
+    const file = await lireFichesEnAttente();
+    if (!file.length) return true;
+    if (!force) {
+      const plusVieille = Math.min(...file.map((e) => Date.parse(e && e.at) || Date.now()));
+      if (!(file.some((e) => e && e.src === 'modif') || file.length >= FICHES_LOT || Date.now() - plusVieille >= FICHES_DELAI_MS)) return false;
+      let echec = 0; try { echec = Number((await chrome.storage.local.get(FICHES_ECHEC))[FICHES_ECHEC] || 0); } catch (_) {}
+      const depuis = Date.now() - echec;
+      if (echec && depuis >= 0 && depuis < FICHES_DELAI_MS) return false;
+    }
+    const rate = async (diag) => { noterDiag(diag); try { await chrome.storage.local.set({ [FICHES_ECHEC]: Date.now() }); } catch (_) {} return false; };
+    if (await sansSessionPourEcrire()) return rate('fiches_sans_session');   // sans session, la base refuserait : on ne la relit pas
+    const rr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+    if (rr === null) return rate('fiches_lecture_ratee');                    // pas su : on n'écrase rien, la file reste
+    const cur = (rr[0] && rr[0].data) || {};
+    const faites = appliquerFiches(cur, file);
+    if (retirerPhotosEtrangeres(cur)) noterDiag('photos_etrangeres_retirees');
+    const ok = await supabaseUpsert('app_data', [{ id: 'vinted_item_details', data: cur }], 'id');
+    if (!ok) return rate('fiches_ecriture_ratee');
+    try { await chrome.storage.local.remove(FICHES_ECHEC); } catch (_) {}
+    await retirerFichesRangees(file);
+    for (const e of faites) noterDiag(e.src === 'modif' ? 'fiche_modif_rangee' : 'fiche_page_rangee');
+    return true;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LA FICHE QU'IL ENREGISTRE SUR VINTED (22 octobre)
+// ══════════════════════════════════════════════════════════════════════════════
+// Mesuré le 22 octobre chez Julien : sur ses 49 annonces en ligne, 4 seulement
+// ont leur description dans `vinted_item_details`, aucune n'a sa catégorie ni
+// ses couleurs (`fiche_codes_absents` = 804 : la page lue ne les livre jamais).
+// Or quand il MODIFIE une annonce, sa page envoie
+// `PUT /api/v2/item_upload/items/{id}` avec `{ item: { id, description,
+// catalog_id, brand_id, brand, color_ids, item_attributes, package_size_id… } }`
+// — mesuré sur 6 modifications : l'`id` du corps est TOUJOURS celui de
+// l'adresse. Et quand il publie, `POST /api/v2/item_upload/items` (l'identifiant
+// vient alors de la réponse de Vinted, comme pour le numéro, 5.201).
+// ⇒ `inject.js` ne poste cette fiche qu'après un 2xx de Vinted, avec
+//   l'identifiant de l'ADRESSE (ou de la réponse) ; on n'y garde que la
+//   description et les codes. Un corps dont l'`id` contredit l'adresse ne range
+//   RIEN (§5 : l'identité, jamais un titre). Jamais les photos envoyées, ni les
+//   frais de port, ni la session de dépôt.
+// ⚠️ La COULEUR affichée (« Blanc ») n'est pas dans le corps — seulement ses
+//    codes (`color_ids`) : on range les codes, on n'invente pas le libellé.
+function ficheDeCorpsVinted(corps, id) {
+  let j = null;
+  if (corps && typeof corps === 'object') j = corps;
+  else {
+    const t = String(corps == null ? '' : corps).trim();
+    if (!t || t[0] !== '{') return null;
+    try { j = JSON.parse(t); } catch (_) { return null; }
+  }
+  const it = (j && j.item && typeof j.item === 'object') ? j.item : null;
+  if (!it) return null;
+  if (it.id != null && String(it.id) !== String(id)) return { contredit: true };
+  const num = (v) => (typeof v === 'number' && isFinite(v)) ? v : ((typeof v === 'string' && /^\d{1,12}$/.test(v)) ? Number(v) : null);
+  const out = {};
+  if (typeof it.description === 'string' && it.description.trim()) out.description = it.description.trim().slice(0, 5000);
+  const c = {};
+  for (const k of ['catalog_id', 'brand_id', 'package_size_id']) if (num(it[k]) != null) c[k] = num(it[k]);
+  if (typeof it.brand === 'string' && it.brand.trim()) c.brand = it.brand.trim().slice(0, 80);
+  if (typeof it.is_unisex === 'boolean') c.is_unisex = it.is_unisex;
+  if (Array.isArray(it.color_ids)) { const ids = it.color_ids.map(num).filter((x) => x != null).slice(0, 4); if (ids.length) c.color_ids = ids; }
+  if (Array.isArray(it.item_attributes)) {
+    const a = it.item_attributes.map((x) => (x && typeof x === 'object' && typeof x.code === 'string')
+      ? { code: x.code.slice(0, 40), ids: Array.isArray(x.ids) ? x.ids.map(num).filter((v) => v != null).slice(0, 10) : [] } : null)
+      .filter((x) => x && x.code && x.ids.length).slice(0, 10);
+    if (a.length) c.item_attributes = a;
+  }
+  if (Object.keys(c).length) out.codes = c;
+  return out;
+}
+async function noterFicheVinted(itemId, status, corps) {
+  const id = String(itemId || '');
+  const st = Number(status);
+  if (!/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('fiche_modif_forme'); return false; }
+  const f = ficheDeCorpsVinted(corps, id);
+  if (!f) { noterDiag('fiche_modif_illisible'); return false; }
+  if (f.contredit) { noterDiag('fiche_modif_id_contredit'); return false; }
+  if (!f.description && !f.codes) { noterDiag('fiche_modif_vide'); return false; }
+  await enfilerFiches([{ id, src: 'modif', at: new Date(Date.now()).toISOString(), f }]);
+  noterDiag('fiche_modif_vue');
+  return viderFiches({ force: true });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -6671,6 +6923,7 @@ async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   // MAINTENANT (1 lecture, sur son clic) avant de construire l'ad — ainsi
   // l'annonce part avec ses photos, sans attendre le fond.
   try { const cu = await compteConnecte('www.vinted.fr'); if (cu) await avecVinted(() => completerPhotosSiManque(cu, id)).catch(() => {}); } catch (_) {}
+  await viderFiches({ force: true }).catch(() => {});   // 22 oct. : sa description enregistrée sur Vinted part avec l'annonce
   const r = lbc ? await buildLbcData() : await buildEbayData();
   const preuveKO = lbc ? !!(r && r.stats && r.stats.preuveKO) : !!(r && r.preuveKO);
   if (preuveKO) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };
@@ -6742,6 +6995,7 @@ async function executerCommande(msg) {
     const pause = await pauseVinted();
     if (pause) return { accepte: false, code: 'vinted-pause', raison: raisonPauseVinted(pause) };
     let ok = false;
+    try { await viderFiches({ force: true }); } catch (_) {}   // 22 oct. : une fiche en attente est rangée avant la relecture de l'app
     try { ok = await avecVinted(() => completerPhotos(uid, id)); } catch (_) { ok = false; }
     return ok ? { accepte: true, etape: 'fait' } : { accepte: true, etape: 'echec', raison: "Vinted n'a pas rendu ses photos pour l'instant" };
   }

@@ -72,6 +72,8 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [] };
   // `chrome.storage.onChanged` à état (20 octobre : la boîte aux lettres du relais de la page l'utilise).
   const ecoutesStockage = [];
+  // 22 oct. : les écouteurs de `chrome.tabs.onUpdated` (une page Vinted qui charge) — `ongletMaj` les rejoue.
+  const ecoutesOnglets = [];
   const signaler = (changes) => { if (!Object.keys(changes).length) return; for (const f of ecoutesStockage.slice()) { try { f(changes, 'local'); } catch (_) {} } };
   const rep = (status, body, ctype = 'application/json') => {
     const texte = typeof body === 'string' ? body : JSON.stringify(body == null ? null : body);
@@ -103,7 +105,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {}, onClicked: { addListener() {} }, setPopup() {} },
-      tabs: { onUpdated: { addListener() {} }, onActivated: { addListener() {} }, onRemoved: { addListener() {} }, query: async () => onglets,
+      tabs: { onUpdated: { addListener(fn) { ecoutesOnglets.push(fn); } }, onActivated: { addListener() {} }, onRemoved: { addListener() {} }, query: async () => onglets,
         get: async (id) => { const t = onglets.find((o) => o && o.id === id); if (!t) throw new Error('No tab with id: ' + id); return copie(t); },
         sendMessage: (id, m, cb) => { if (m && m.__vmrEvt) j.evts.push(m.evt); if (typeof cb === 'function') cb(); }, create: dual({}) },
       storage: { local: {
@@ -205,6 +207,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     const r = ecouteur(msg, sender || { origin: 'https://vrm.center', url: 'https://vrm.center/' }, res);
     if (r !== true) setTimeout(() => res(undefined), 5);
   });
-  return { ctx, j, store, lignes, envoyer, signaler };
+  const ongletMaj = (tabId, info, tab) => { for (const f of ecoutesOnglets.slice()) { try { f(tabId, info, tab); } catch (_) {} } };
+  return { ctx, j, store, lignes, envoyer, signaler, ongletMaj };
 }
 module.exports = { faireFond, cheminSource, projette };
