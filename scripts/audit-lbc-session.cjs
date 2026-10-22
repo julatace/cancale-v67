@@ -87,6 +87,22 @@ const compteur = (env, id) => env.envoyer({ from: 'cancale-lbc', action: 'lbcMsg
 const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', comptes: [{ id: PRO, name: 'BOUTIQUEPRO', pro: true }] });
 
 (async () => {
+  await essaie('identité privée sans compteur et annonces avec photos',async()=>{
+    const env=faire(),url='https://api.leboncoin.fr/api/account/v2/members/me/account';
+    const preuve=JSON.parse(MEMBER);
+    const r=await env.envoyer({from:'cancale-lbc',action:'lbcSessionPrivee',url,preuve});
+    dit(r?.ok===true,'la réponse privée account/member identifie le compte sans compteur');
+    const etat=await env.ctx.etatSite('https://www.leboncoin.fr/',1);
+    dit(etat.site?.id==='lbc-account:acc-1'&&etat.site.nom==='Particulier35','id de compte explicite et pseudo privé cohérents');
+    await compteur(env,PRO);
+    dit((await env.ctx.etatSite('https://www.leboncoin.fr/',1)).site?.id==='lbc-account:acc-1','un compteur d’un autre identifiant ne remplace pas l’identité privée');
+    await env.envoyer({from:'cancale-lbc',action:'lbcRaw',url:'https://api.leboncoin.fr/api/adfinder/v2/myads',body:MYADS,session:'lbc-account:acc-1'});
+    const ad=env.base.lbc_listings?.items?.['701'];
+    dit(ad?.account==='lbc-account:acc-1'&&ad.images?.[0]==='https://img.leboncoin.fr/a.jpg','les annonces et photos sont enregistrées sous ce compte privé');
+    const conflit=JSON.parse(MEMBER);conflit.member.account_id='autre';
+    dit(env.ctx.lireSessionPriveeLbc(conflit,url)===null,'des identifiants account/member différents ne prouvent rien');
+    dit(env.ctx.lireSessionPriveeLbc(preuve,'https://evil.test/api/account/v2/members/me/account')===null,'une réponse hors de l’endpoint privé Leboncoin est refusée');
+  });
   await essaie('comptes ambigus et ancien compte',async()=>{
     const env=faire();await compteur(env,PART);
     dit(!(await env.ctx.etatSite('https://www.leboncoin.fr/',2)).site?.id,'un autre onglet ne reprend pas le dernier compte global');

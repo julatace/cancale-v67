@@ -84,7 +84,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.210.0';
+const EXT_ATTENDUE = '5.211.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -24635,7 +24635,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     // L'extension l'a LU dans le profil Vinted : c'est la preuve la plus forte,
     // elle passe avant la liste locale (un refus 403 vu par cet appareil).
     if (evLu && evLu.etat === 'banni') return { etat: 'bad', source: 'extension', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: `Vinted le dit lui-même dans le profil du compte (lu par l'extension${evQuand ? ` le ${evQuand}` : ''}). Rien n'est masqué tout seul : masque-le si tu ne veux plus voir ses annonces.` };
-    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Banni par Vinted', color: C.danger, hint: 'Vinted a refusé ce compte explicitement (403) : il est bloqué ou fermé. Ses annonces/ventes sont masquées. ⚠️ Une simple session expirée (401) ne met plus un compte ici : elle se règle en repassant sur vinted.fr.' };
+    if (!evLu && blockedAccts.has(uid)) return { etat: 'bad', source: 'appareil', ic: 'alert', label: 'Accès refusé', color: C.warn, hint: 'Vinted a refusé un accès à ce compte. Ce refus ne suffit pas à confirmer un blocage : reconnecte ce compte sur Vinted pour actualiser son état.' };
     // (16 oct.) Julien : « juste s'il est actif ou banni, l'extension doit
     // évaluer l'état du compte ». Deux états sur la pastille ; la fraîcheur de
     // la capture n'est plus une alerte, seulement une ligne grise (`ago`).
@@ -24643,6 +24643,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     const ageH = cap ? (Date.now() - cap) / 3600000 : null;
     const ago = ageH == null ? 'pas encore capté' : ageH < 1 ? 'capté il y a moins d\'une heure' : ageH < 48 ? `capté il y a ${Math.round(ageH)} h` : `capté il y a ${Math.round(ageH / 24)} j`;
     const lu = evLu ? ` · état lu par l'extension${evQuand ? ` le ${evQuand}` : ''}` : '';
+    if (!evLu) return { etat: 'inconnu', source: '', ic: 'info', label: 'État non vérifié', color: C.muted, hint: `Le statut de ce compte n'a pas encore pu être confirmé. Ouvre ce compte sur Vinted avec l'extension connectée pour l'actualiser · ${ago}.`, ago };
     return { etat: 'ok', source: evLu ? 'extension' : '', ic: 'check', label: 'Actif', color: C.text, hint: `Compte actif · ${ago}${lu}.`, ago };
   };
   // Comptes exclus de la comptabilité (leurs ventes ne comptent pas).

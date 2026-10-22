@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.210.0';
+const CODE_VERSION = '5.211.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2070,11 +2070,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Ce que la page Leboncoin porte vraiment. Aucune donnée d'annonce :
           // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
           // « 0 annonce » et « je n'ai rien pu lire » sont le même silence.
+
+          if(msg.action==='lbcSessionPrivee'){
+            const compte=lireSessionPriveeLbc(msg.preuve,msg.url),tabId=sender?.tab?.id;
+            if(!compte||tabId==null||sender?.frameId>0||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
+            const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{},avant=cartes[tabId]||{};
+            const ambigue=avant.source==='prive'&&(avant.ambigue===true||!!(avant.compte&&avant.compte!==compte.id));
+            cartes[tabId]={...avant,source:'prive',compte:ambigue?'':compte.id,ambigue,at:Date.now()};
+            await chrome.storage.local.set({vrmLbcTransport:Object.fromEntries(Object.entries(cartes).sort((a,b)=>b[1].at-a[1].at).slice(0,32))});
+            if(ambigue){sendResponse({ok:false});return;}
+            const ok=await storeLbcAccount(compte);sendResponse({ok});return;
+          }
           if(msg.action==='lbcTransport'){
             const tabId=sender?.tab?.id;
             if(sender?.frameId>0||tabId==null||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
             const avant=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{};
             avant[tabId]={...(msg.capteur===true?avant[tabId]:{}),capteur:msg.capteur===true,at:Date.now()};
+            for(const cle of ['capteurVersion','relaisVersion'])if(/^\d+\.\d+\.\d+$/.test(msg[cle]||''))avant[tabId][cle]=msg[cle];
+            if(Object.prototype.hasOwnProperty.call(msg,'erreurCapture'))avant[tabId].erreurCapture=['identite','taille'].includes(msg.erreurCapture)?msg.erreurCapture:null;
             const recent=Object.fromEntries(Object.entries(avant).sort((a,b)=>b[1].at-a[1].at).slice(0,32));
             await chrome.storage.local.set({vrmLbcTransport:recent});sendResponse({ok:true});return;
           }
@@ -2191,6 +2204,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const tabId=sender?.tab?.id;
             const cartes=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{};
             const avant=cartes[tabId]||{};
+            if(avant.source==='prive'){sendResponse({ok:true});return;}
             const ambigue=avant.ambigue===true||!!(avant.compte&&avant.compte!==id);
             if(tabId!=null && !(sender?.frameId>0)){
               cartes[tabId]={...avant,compte:ambigue?'':id,ambigue,at:Date.now()};
@@ -5461,7 +5475,22 @@ async function reinjecterPont() {
     }
   } catch (_) {}
 }
-chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)) reinjecterPont(); });
+function afficherRappelLbc(version){
+  if(document.querySelector('[data-vrm-maj-lbc]'))return;
+  const bloc=document.createElement('aside');bloc.setAttribute('data-vrm-maj-lbc',version);bloc.setAttribute('role','status');
+  Object.assign(bloc.style,{position:'fixed',left:'16px',bottom:'76px',zIndex:'2147483647',maxWidth:'calc(100vw - 32px)',width:'320px',boxSizing:'border-box',padding:'14px',background:'#203d47',color:'#fff',borderRadius:'12px',boxShadow:'0 6px 24px #0004',font:'13px/1.5 system-ui,sans-serif'});
+  const titre=document.createElement('b');titre.textContent='VRM · Mise à jour '+version;
+  const texte=document.createElement('p');texte.textContent='Recharge cet onglet Leboncoin pour activer le nouveau capteur.';texte.style.margin='6px 0 10px';
+  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'8px'});
+  for(const [lib,agir]of [['Recharger Leboncoin',()=>location.reload()],['Plus tard',()=>bloc.remove()]]){
+    const b=document.createElement('button');b.type='button';b.textContent=lib;Object.assign(b.style,{minHeight:'40px',padding:'7px 10px',border:'1px solid #ffffff66',borderRadius:'8px',background:'transparent',color:'#fff',font:'600 12px system-ui,sans-serif',cursor:'pointer'});b.onclick=agir;actions.appendChild(b);
+  }
+  bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
+}
+async function rappelerMiseAJourLbc(){
+  try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
+}
+chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
 
 // ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
@@ -9625,7 +9654,7 @@ async function storeLbcAccount(acc) {
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
     try {
       if (acc.courant === true && acc.source && !LBC_URL_AUTRUI.test(String(acc.source))) {
-        await chrome.storage.local.set({ vrmLbcCompte: { v: 2, id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', at: Date.now() } });
+        await chrome.storage.local.set({ vrmLbcCompte: { v: 2, id: String(acc.id), name: String(acc.name || ''), type: acc.type || '', source:acc.source||'', at: Date.now() } });
       }
     } catch (_) {}
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
@@ -9656,6 +9685,14 @@ async function storeLbcAccount(acc) {
 //   d'une fiche dont l'`user_id` est EXACTEMENT celui de la session
 //   (`user-card/v2/{id}/infos`) ou d'une entrée déjà connue sous cet id — jamais
 //   d'un titre, jamais d'une fréquence (§5). Nom pas encore lu ⇒ id seul.
+
+function lireSessionPriveeLbc(preuve,url){
+ let u;try{u=new URL(url);}catch(_){return null;}
+ if(u.username||u.password||u.origin!=='https://api.leboncoin.fr'||!/^\/api\/account\/v\d+\/members\/me\/account\/?$/.test(u.pathname))return null;
+ const a=preuve?.account,m=preuve?.member,id=String(a?.account_id||''),nom=m?.nickname?.value;
+ if(!['string','number'].includes(typeof a?.account_id)||!['string','number'].includes(typeof m?.account_id)||!/^[a-z0-9_-]{1,64}$/i.test(id)||String(m?.account_id||'')!==id||typeof nom!=='string'||!nom.trim())return null;
+ return{id:'lbc-account:'+id,name:nom.trim().slice(0,60),type:typeLbcDe(a.type),session:true,courant:true,platform:'leboncoin',source:u.origin+u.pathname,preuveCompte:'membre-prive-v1'};
+}
 const LBC_LIES_MS = 12 * 3600e3;
 async function noterComptesLies(comptes) {
   const ids = (comptes || []).map((c) => String((c && c.id) || '')).filter(Boolean).slice(0, 10);
@@ -10403,9 +10440,11 @@ function noterPackPhoto(data, url) {
 //    (ou s'il est un compte LIÉ), on ne tague rien — jamais l'ancien.
 async function sessionDeListe(sessionPage) {
   const id = String(sessionPage || '').trim();
-  if (!/^[0-9a-f-]{8,64}$/i.test(id)) return null;
+  const prive=/^lbc-account:[a-z0-9_-]{1,64}$/i.test(id);
+  if (!prive&&!/^[0-9a-f-]{8,64}$/i.test(id)) return null;
   let local = {};
   try { local = await chrome.storage.local.get(['vrmLbcLies', 'vrmLbcCompte']); } catch (_) { return null; }
+  if(prive){const rows=await sbGet('app_data?id=eq.lbc_accounts&select=data');const a=rows?.[0]?.data?.accounts?.[id];if(!a||a.preuveCompte!=='membre-prive-v1')return null;return{id,name:a.name||'',type:a.type||'',prive:true};}
   const lies = local.vrmLbcLies;
   if (lies && Array.isArray(lies.ids) && Date.now() - Number(lies.at || 0) < LBC_LIES_MS && lies.ids.includes(id)) return null;
   const c = local.vrmLbcCompte;
@@ -10442,6 +10481,7 @@ async function handleLbcRaw(url, body, sessionPage) {
   // document), jamais `vrmLbcCompte` (le dernier vu, peut-être l'ancien).
   const sessListe = await sessionDeListe(sessionPage);
   if (sessListe) miens.add(sessListe.id);
+  if(listeMoi&&sessListe?.prive){try{const u=new URL(url);for(const[k,v]of u.searchParams)if(/^(user_id|store_id|account_id|owner_id)$/i.test(k)&&!(k==='account_id'&&v===sessListe.id.slice('lbc-account:'.length)))return;}catch(_){return;}}
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
   if (acct) await storeLbcAccount(acct);
@@ -10524,7 +10564,7 @@ async function handleLbcRaw(url, body, sessionPage) {
         //    « caché », juste pas rangé (élargir une lecture sans l'attribuer,
         //    c'est inventer des données). `miens` vide ⇒ seule la réf VRM garde.
         const ownerId = String((node.owner && (node.owner.user_id || node.owner.store_id)) || node.user_id || node.store_id || '');
-        const aMoiParSession = !!(listeMoi && sessListe && (!ownerId || ownerId === sessListe.id));
+        const aMoiParSession = !!(listeMoi && sessListe && (sessListe.prive || !ownerId || ownerId === sessListe.id));
         if (refVRM || (ownerId && miens.has(ownerId)) || aMoiParSession) found.push({
           id: sid, subject: String(title), price,
           body: bodyTxt.slice(0, 400),
@@ -10537,15 +10577,16 @@ async function handleLbcRaw(url, body, sessionPage) {
           //    annonces et le flux « découverte » d'autrui) : on prend l'owner
           //    porté par l'annonce ELLE-MÊME, jamais le compte de session (qui,
           //    ici, ne prouverait pas que le chalet d'à côté est à lui, §5).
-          account: ownerId || (aMoiParSession ? sessListe.id : null),
-          accountName: String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? sessListe.name || null : null),
+          account: aMoiParSession&&sessListe.prive?sessListe.id:ownerId || (aMoiParSession ? sessListe.id : null),
+          accountName: aMoiParSession&&sessListe.prive?sessListe.name:String((node.owner && (node.owner.name || node.owner.pseudo)) || node.owner_name || '') || (aMoiParSession ? sessListe.name || null : null),
           platform: 'leboncoin',
         });
       }
     }
     for (const k in node) { if (Object.prototype.hasOwnProperty.call(node, k)) walk(node[k], depth + 1); }
   };
-  try { walk(data, 0); } catch (_) {}
+  const racine=listeMoi&&sessListe?.prive?(Array.isArray(data?.ads)?data.ads:Array.isArray(data?.data?.ads)?data.data.ads:[]):data;
+  try { walk(racine, 0); } catch (_) {}
   // Détection auto du quota d'annonces (offre Leboncoin) → la limite s'adapte.
   const quota = detectLbcQuota(data);
   // Recon : un échantillon du corps (tronqué) + l'URL, pour inspecter la vraie forme.
