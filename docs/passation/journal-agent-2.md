@@ -611,3 +611,21 @@ Corrections : pagination du registre email (plafonds bas, frontières exactes HT
 Avant 2 000 utilisateurs : preuve de possession des adresses de réception supplémentaires, attribution historique, deux sessions réelles, quotas et débit Gmail/Vercel/Supabase, sauvegarde/restauration et supervision restent à vérifier. Ne pas transformer une simulation en certification de capacité.
 
 Bilan final local : les 141 scripts d’audit existants sont validés après correction des simulations ; les cinq audits SQL initialement bloqués sont exécutés sur PostgreSQL 17.11 jetable. Le nouveau banc SQL de confidentialité ajoute un 142e audit validé (45 contrôles). Renumérotation historique : 126 contrôles réussis après relance sans la limite initiale de 120 s. Aucun test de production chargé en données n’a été lancé. PR638 ouverte et attachée.
+
+## 22 octobre — profils Discord, photo facultative et classement
+
+PR639 est fusionnée : récupération autonome sur `/recuperation.html` et inscription avec confirmation claire. Le script de configuration Supabase est préparé, mais les réglages distants SMTP/redirects ne sont PAS appliqués faute d'accès administrateur. Ne pas annoncer l'expéditeur personnalisé comme configuré.
+
+Carte : avatars Discord provenant d'une preuve OAuth signée, puis liés au PID renvoyé par la base. Aucune URL arbitraire ni owner navigateur accepté. Les preuves de liaison mobile sont privées, bornées à une par vendeur et expirantes. Le classement affiche une position personnelle, un podium compact et une liste, sans montants financiers.
+
+Photo VRM facultative : recadrage local PNG, limites de taille, stockage privé inaccessible au client SQL, quota atomique partagé entre instances. Publication uniquement sur choix explicite et présence volontaire sur la carte. URL publique signée expirante, cache 60 secondes ; retrait interdit les prochaines lectures mais ne peut reprendre les copies téléchargées. Suppression de compte : effacement des trois enregistrements privés exacts du vendeur avant suppression de sa connexion, échec signalé sans fausse réussite.
+
+Validation locale : 130 tests unitaires, build, OAuth 32 contrôles, fermeture 32 contrôles, parcours Discord navigateur 45 contrôles, audit sans bruit 44 et en-têtes 10 ; ajout/partage/retrait de photo vérifiés dans Chromium 390 px. Aucun envoi de mail ni connexion Discord réelle ni donnée ajoutée en production. Les limites de préparation à 2 000 utilisateurs citées ci-dessus restent ouvertes ; ces tests ne certifient pas la capacité de production.
+
+## Connexions et suite Leboncoin 5.208
+
+L'utilisateur confirme 5.207 et l'absence de compte/données partout sur Leboncoin. Ne pas lui répéter que la 5.207 a tout résolu. Version5.208 corrige XHR JSON/fetch URL, la carte qui exigeait un pseudo, et le marqueur six heures posé même après refus d'écriture. Un diagnostic local par onglet (32 max, aucun contenu personnel) dit si MAIN répond au relais. Tests de reprise après refus et de session sans pseudo ajoutés ; banc démarrage élargi aux XHR JSON et fetch URL. Audits de ventes, comptes, fiches, packs, catalogue, détails, finalisation et restes validés ; les messages complets restent NON implémentés (compteurs seulement), pas d'accès à une vraie session LBC. La demande « tout capter » reste donc ouverte, ne pas certifier exhaustivité.
+
+Mon compte : cartes compactes dans Comptes associés, Google et un seul bouton Discord, groupe placé avant photo. Google utilise une vraie liaison authentifiée PKCE, vérifie l'UID du retour avant écriture de session, refuse une URL fournisseur étrangère. Fournisseur Google ET liaison manuelle Supabase doivent être activés ; aucun réglage admin distant appliqué. Discord garde son flux identify pour profil/avatar et explique les erreurs de vérification émises par Discord. Ni fusion de comptes, ni changement MFA, ni SMS payant.
+
+136 tests unitaires et compilation validés ; OAuth32, navigateur Discord47 (dernière disposition à revérifier avant publication), sessionextension29, sansbruit44/entêtes10, ZIP5.208 validés. Aucun envoi de messages réel ni donnée utilisateur créée pour tester.

@@ -23,3 +23,17 @@ Une adresse d'expédition au domaine VRM exige en plus un SMTP avec domaine vér
 ## Vérifications
 
 122 tests unitaires réussis, compilation réussie. Banc `node scripts/bancs/recuperation-auth.cjs` : navigateur Chromium à 390 px, faux service d'authentification, nettoyage du jeton, absence de stockage, refus des confirmations différentes, un seul enregistrement et champs effacés après succès. Ce test mobile ne constitue pas un test natif Safari.
+
+## Audit complémentaire de l'inscription
+
+Les requêtes d'authentification ont un délai limite de 20 secondes, y compris la lecture de la réponse. Une panne après envoi reste un résultat incertain ; elle ne prouve pas que le compte n'a pas été créé. Une réponse de création sans identifiant ni jeton est aussi incertaine. Un défi anti-robot manquant conserve son message spécifique sans supposer qu'une inscription est partie. Le formulaire bloque un second envoi pendant l'attente. Changer d'adresse efface l'ancien lien de confirmation et ses indications.
+
+Après une création confirmée par le serveur, le formulaire annonce le succès, conserve l'adresse et passe directement à la connexion. Les messages sont annoncés aux lecteurs d'écran. Tests : 4 scénarios supplémentaires sur les fonctions réellement utilisées, et assertions navigateur de l'inscription à 390 et 1512 pixels dans le banc anti-robot.
+
+Le script administrateur prépare aussi le modèle de confirmation VRM avec le lien officiel `ConfirmationURL` : il respecte la vérification Supabase et bénéficie du Site URL/allowlist corrigés une fois appliqués. Le fichier local ne change pas les emails actuellement envoyés. Sans accès administrateur et SMTP de domaine vérifié, les paramètres distants et la délivrabilité restent non validés.
+
+## Comptes associés
+
+Les actions sont regroupées dans Mon compte : un seul bouton Discord, compact, avec son identité visuelle ; Google dispose d'une liaison authentifiée via `/auth/v1/user/identities/authorize`, PKCE et retour vers Mon compte. Le retour ne remplace la session que si l'identifiant VRM correspond à celui qui a lancé la liaison. L'accès par email est conservé. Une URL fournisseur inattendue, une session expirée ou une liaison serveur indisponible sont refusées avant toute navigation.
+
+Google n'est proposé actif que si le fournisseur Supabase est activé ; la liaison manuelle doit aussi être autorisée dans Supabase. Aucune configuration administrateur distante n'a été modifiée. Discord ici associe le profil et son avatar via le flux identify existant ; ce n'est pas une activation du fournisseur de connexion Supabase Discord. Les demandes de vérification émises par Discord restent obligatoires et sont expliquées sans déclarer que VRM a été bloqué.

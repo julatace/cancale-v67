@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.206.0';
+const CODE_VERSION = '5.208.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1843,7 +1843,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // LA PETITE CARTE (vrm-badge.js) : son état, et « ouvrir VRM ». Le site est
     // celui de l'ONGLET qui demande (sender.tab), jamais ce que dit le message.
     if (msg && msg.from === 'vrm-badge' && msg.action === 'etat') {
-      etatSite(sender && sender.tab && sender.tab.url).then(sendResponse, () => sendResponse({ ok: false }));
+      etatSite(sender && sender.tab && sender.tab.url,sender?.tab?.id).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.191 : « Oui, capter ce compte » / « Non, ignorer ce compte ». Seulement
@@ -2070,6 +2070,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Ce que la page Leboncoin porte vraiment. Aucune donnée d'annonce :
           // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
           // « 0 annonce » et « je n'ai rien pu lire » sont le même silence.
+          if(msg.action==='lbcTransport'){
+            const tabId=sender?.tab?.id;
+            if(sender?.frameId>0||tabId==null||!/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url||'')){sendResponse({ok:false});return;}
+            const avant=(await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport||{};
+            avant[tabId]={capteur:msg.capteur===true,at:Date.now()};
+            const recent=Object.fromEntries(Object.entries(avant).sort((a,b)=>b[1].at-a[1].at).slice(0,32));
+            await chrome.storage.local.set({vrmLbcTransport:recent});sendResponse({ok:true});return;
+          }
           if (msg.action === 'lbcDiag') {
             await storeLbcRecon({ capture: { source: msg.source, vues: msg.vues, compte: !!msg.compte, url: msg.url, a_next_data: !!msg.a_next_data, a_next_f: !!msg.a_next_f, at: new Date().toISOString() } });
             sendResponse({ ok: true }); return;
@@ -6297,7 +6305,7 @@ async function loginDe(uid, opts) {
 // Trois états partout : une information qu'on n'a pas est `null` (« pas su »),
 // jamais un « oui » ni un « non » inventé.
 const BASCULE_VISIBLE_MS = 7 * 86400000;
-async function etatSite(url) {
+async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
   // La carte sait dire « pas su pour l'instant » (`vrm: null`) : elle lit l'état
@@ -6305,7 +6313,7 @@ async function etatSite(url) {
   const brut = await authEtatRapide(1500).catch(() => null);
   const vrm = brut && brut.connecte !== null ? brut : null;
   let local = {};
-  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte']); } catch (_) {}
+  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte','vrmLbcTransport']); } catch (_) {}
   // Le compte du SITE : sur Vinted le cookie le dit (une identité) ; sur
   // Leboncoin le dernier compte « moi » vu ; eBay et Vestiaire ne sont pas
   // encore captés par VRM — on le dit plutôt que de laisser croire.
@@ -6321,7 +6329,7 @@ async function etatSite(url) {
     // 5.186 : seul un compte vu sur l'endpoint de la SESSION (`courant`, v:2)
     // nomme le compte connecté — une ancienne valeur (le dernier « moi » vu,
     // parfois un autre compte lié ou un vendeur) n'est plus montrée.
-    site = c && c.v === 2 && c.name ? { id: c.id || null, nom: c.name, type: c.type || '' } : { id: null, nom: '' };
+    site = c && c.v === 2 && c.id ? { id: c.id, nom: c.name || '', type: c.type || '' } : { id: null, nom: '' };
   }
   const capte = plateforme === 'vinted' || plateforme === 'leboncoin';
   // Vestiaire : rien n'est capté, mais le site est MESURÉ (5.154) — la carte le
@@ -6331,7 +6339,8 @@ async function etatSite(url) {
   const flux = (capte || mesure) ? ((local.vrmFlux || {})[plateforme] || {}) : null;
   const b = local.vrmBascule;
   const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule };
+  const transport=plateforme==='leboncoin'?(local.vrmLbcTransport?.[tabId]||null):null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -9562,7 +9571,7 @@ async function storeLbcMessages(patch) {
 async function storeLbcAccount(acc) {
   try {
     const prevRows = await sbGet('app_data?id=eq.lbc_accounts&select=data');
-    if (prevRows === null) return;                 // pas su ≠ aucun compte (voir storeLbcListings)
+    if (prevRows === null) {await noterFlux('leboncoin',false);return false;}                 // pas su ≠ aucun compte (voir storeLbcListings)
     const prev = (prevRows[0] && prevRows[0].data && prevRows[0].data.accounts) || {};
     const merged = Object.assign({}, prev);
     // ⚠️ AUTO-NETTOYAGE (§5) : un correctif de la détection ne suffit pas — les
@@ -9590,8 +9599,9 @@ async function storeLbcAccount(acc) {
       }
     } catch (_) {}
     const _okFlux = await supabaseUpsert('app_data', [{ id: 'lbc_accounts', data: { accounts: merged, updatedAt: new Date().toISOString() } }], 'id');
-    noterFlux('leboncoin', _okFlux !== false);
-  } catch (_) {}
+    await noterFlux('leboncoin', _okFlux === true);
+    return _okFlux === true;
+  } catch (_) {await noterFlux('leboncoin',false);return false;}
 }
 // ══════════════════════════════════════════════════════════════════════════
 // ⚠️⚠️ LE COMPTE LEBONCOIN CONNECTÉ, ENFIN LU (20 octobre, 5.195). Julien : « il
@@ -9662,7 +9672,7 @@ async function noterSessionLbc(userId, ident) {
   const acc = { id, session: true, platform: 'leboncoin', source: 'session:messagerie' };
   if (name) acc.name = name;
   if (type) acc.type = type;
-  await storeLbcAccount(acc);
+  if(await storeLbcAccount(acc)!==true)return false;
   try { await chrome.storage.local.set({ vrmLbcSessionEcrit: { id, name, type, at: Date.now() } }); } catch (_) {}
   return true;
 }
