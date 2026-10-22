@@ -25,7 +25,7 @@ const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
 import { createPortal } from "react-dom";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
-import { noterPlantage, viderPlantages } from "./plantages.js";
+import { noterPlantage, viderPlantages, ecouterViolationsCspDans } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
@@ -3701,6 +3701,15 @@ const parseReceiptFields = (a) => {
     .join('\n');
   return { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured: !!(paid || artPrice || port || protection || vendeur || mode || trans) };
 };
+// ⚠️ (22 oct., revue) LE JOURNAL DES VIOLATIONS ÉCOUTE AUSSI LES FENÊTRES QUE
+// L'APP OUVRE (le reçu, une facture imprimable) : elles héritent de la politique
+// de la page, et leurs violations se déclenchent dans LEUR document — que
+// `ecouterViolationsCsp` (main.jsx) ne voit pas. À appeler après
+// `w.document.open()` (open() efface les écouteurs posés avant), AVANT d'écrire.
+// `ecran` dit la fenêtre (« fenetre:recu »), pas l'écran de l'app derrière.
+const ecouterFenetreCsp = (w, nom) => {
+  try { ecouterViolationsCspDans(w.document, () => ({ ecran: 'fenetre:' + nom, version: BUILD_ISO })); } catch (_) {}
+};
 // Ouvre le reçu pour IMPRESSION / PDF (nouvel onglet). L'affichage à l'écran
 // passe par la modale in-app (openReceipt n'est utilisé que pour imprimer).
 const openReceipt = (a) => {
@@ -3709,6 +3718,8 @@ const openReceipt = (a) => {
     if (bytes) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); window.open(url, '_blank'); return; }
   }
   const w = window.open('', '_blank'); if (!w) return;
+  try { w.document.open(); } catch (_) {}
+  try { ecouterFenetreCsp(w, 'recu'); } catch (_) {}
   const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
   const { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured } = parseReceiptFields(a);
   const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:14px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:14px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
@@ -3739,19 +3750,28 @@ const openReceipt = (a) => {
       <button id="vrm-recu-imprimer" type="button" style="display:block;width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;background:#111;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🖨 Imprimer / Enregistrer en PDF</button>
       <div style="text-align:center;color:#99a;font-size:11px;margin-top:12px">Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
     </div>
+    <script src="/recu-boutons.js"></script>
   </body></html>`);
   w.document.close();
   // ⚠️ AUCUN `onclick` EN LIGNE (21 octobre) : la fenêtre hérite de la politique
   // de sécurité du contenu de l'app (vercel.json), qui refuse tout script en
-  // ligne. Les deux gestes sont branchés D'ICI, depuis l'app.
+  // ligne. ⚠️⚠️ (22 oct., revue) Et les gestes ne sont plus branchés D'ICI : un
+  // écouteur posé par l'onglet de VRM meurt quand cet onglet se recharge — ce
+  // que l'app fait toute seule (version vérifiée chaque minute, nouveau service
+  // worker après un déploiement). « Imprimer » et « Fermer » ne faisaient alors
+  // plus rien. La fenêtre charge `/recu-boutons.js` (même origine, permis par
+  // script-src 'self') : ses gestes ne dépendent de personne. Ceux d'ici ne sont
+  // qu'un SECOURS si ce fichier n'a pas pu se charger (`__vrmRecuBoutons` absent
+  // au moment du clic) — jamais les deux à la fois (une impression, pas deux).
   try {
     const fermer = w.document.getElementById('vrm-recu-fermer');
     if (fermer) fermer.addEventListener('click', () => {
+      if (w.__vrmRecuBoutons) return;
       try { w.close(); } catch (_) {}
       setTimeout(() => { try { if (w.closed) return; if (w.history.length > 1) w.history.back(); else w.location.href = '/?tab=cat_achats'; } catch (_) {} }, 120);
     });
     const imprimer = w.document.getElementById('vrm-recu-imprimer');
-    if (imprimer) imprimer.addEventListener('click', () => { try { w.focus(); w.print(); } catch (_) {} });
+    if (imprimer) imprimer.addEventListener('click', () => { if (w.__vrmRecuBoutons) return; try { w.focus(); w.print(); } catch (_) {} });
   } catch (_) {}
 };
 // ⚠️ Le générateur de QR (qrcode-generator) a été RETIRÉ à dessein.
@@ -3832,11 +3852,27 @@ const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return
 // EST le code : il passe avant la liste noire, sinon un mot innocent de l'URL
 // pourrait faire disparaître le seul moyen de retirer le colis.
 const URL_QR_CERTAIN = /\/(?:api\/)?barcode\/(?:datamatrix|azteccode|aztec|qrcode|qr|pdf417|code128|code39|ean13)\b/i;
+// ⚠️⚠️ (22 oct., revue) UN QR EN `http://` S'AFFICHE EN `https://`. Mesuré dans
+// sa base (lecture seule, schéma et hôte seulement) : les 15 QR Vinted Go
+// (`p.vintedgo.com/public/v1/qr_codes/…`, le dernier reçu le 21 oct.) arrivent
+// en http — tous les autres hôtes en https. Sur vrm.center (https), le
+// navigateur monte de lui-même une image http en https (mesuré par la revue dans
+// Chromium : la demande part vers https://p.vintedgo.com) : c'est donc DÉJÀ
+// l'adresse qu'il affiche. La réécrire ici ne change rien à l'écran, mais
+// (1) la politique de sécurité du contenu (img-src https:) ne la signale plus à
+// chaque ouverture d'Achats — sinon le critère « 7 jours sans ligne csp » ne
+// pouvait jamais être tenu ; (2) Ma journée hors ligne peut enfin la mettre en
+// réserve : `rechaufferQr` et le service worker ne prennent que `https://` (un
+// service worker n'a pas le droit d'aller chercher du http depuis une page
+// https). UNE règle, ici (§11) : tous les lecteurs du QR passent par qrImage.
+// ⚠️ Non mesuré (aucun appel à Vinted d'ici) : que p.vintedgo.com réponde en
+// https — c'est ce que le navigateur lui demande déjà sur vrm.center.
+const qrEnHttps = (u) => String(u || '').replace(/^http:\/\//i, 'https://');
 const qrImage = (t) => {
   if (!t) return null;
   if (t.qrB64) return `data:${t.qrType || 'image/png'};base64,${t.qrB64}`;
-  if (t.qrUrl && URL_QR_CERTAIN.test(t.qrUrl)) return t.qrUrl;
-  if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return t.qrUrl;
+  if (t.qrUrl && URL_QR_CERTAIN.test(t.qrUrl)) return qrEnHttps(t.qrUrl);
+  if (t.qrUrl && !URL_PAS_UN_QR.test(t.qrUrl)) return qrEnHttps(t.qrUrl);
   return null;
 };
 // ⚠️ « DÉLAI DÉPASSÉ » NE DOIT PAS S'AFFICHER « DERNIER JOUR ».
@@ -12122,8 +12158,11 @@ function BandeauLiaison() {
 // (`/hl-qr?u=…`). Une image refusée ne casse rien : la vue dit d'utiliser le code.
 // ⚠️ (22 oct.) La page NE VA PLUS chercher le QR chez le transporteur : sa
 // politique de sécurité du contenu (connect-src, vercel.json) refuserait ces
-// hôtes — six mesurés dans sa base (p.vintedgo.com, tracking.network1.pickup.fr,
-// static.chronopost.fr…), et ils changent. Elle demande `/hl-qr?u=…` (même
+// hôtes, et ils changent. Mesuré (22 oct., lecture seule) : une fois les
+// mouchards écartés (URL_PAS_UN_QR), deux hôtes de vrais QR — p.vintedgo.com
+// ×15 (en http dans les emails : qrImage les rend en https, sinon ils
+// n'entraient jamais dans la réserve) et avisageng-colis-webexternal.
+// pickup-services.com ×5. Elle demande `/hl-qr?u=…` (même
 // origine) : c'est le service worker, hors de cette politique, qui va le
 // chercher et le range dans la réserve. Sans service worker aux commandes, rien
 // n'est rangé (la réserve ne sert QUE par lui) : on réessaie à l'ouverture suivante.
@@ -12140,7 +12179,8 @@ const rechaufferQr = async (photo) => {
       if (!/^https:\/\//i.test(String(u || ''))) continue;
       const k = adresseQrLocale(u);
       if (await c.match(k)) continue;
-      try { await fetch(k, { credentials: 'omit' }); } catch (_) {}
+      // `x-vrm-hl-qr` : le service worker ne range que ce que VRM lui demande (22 oct.).
+      try { await fetch(k, { credentials: 'omit', headers: { 'x-vrm-hl-qr': '1' } }); } catch (_) {}
     }
   } catch (_) {}
 };
@@ -21598,6 +21638,9 @@ function ouvrirDocumentImprimable(html) {
   const w = window.open('', '_blank'); if (!w) return null;
   const doc = String(html || '').replace(/<script[\s\S]*?<\/script>/gi, '');
   const tete = /<head(\s[^>]*)?>/i;
+  // Le journal des violations écoute ce document aussi (22 oct., revue).
+  try { w.document.open(); } catch (_) {}
+  try { ecouterFenetreCsp(w, 'facture'); } catch (_) {}
   w.document.write(tete.test(doc) ? doc.replace(tete, (m) => m + CSP_DOCUMENT) : CSP_DOCUMENT + doc);
   w.document.close();
   setTimeout(() => { try { w.focus(); w.print(); } catch (_) {} }, 400);

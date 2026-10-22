@@ -11014,10 +11014,11 @@ seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conf
   d'avant, 4 tuiles refusées (`document /assets/maplibre-gl-worker-*.js`)
   n'étaient visibles QUE par là. Contrôle positif : un worker qui contacte une
   adresse interdite DOIT être signalé — `BANC_CSP_SANS_RAPPORTS=1` ⇒ rouge.
-  ⚠️ Conséquence en production : le journal des plantages (`origine: 'csp'`) ne
-  voit que les violations de la PAGE. Celles du worker de la carte et du service
-  worker ne remontent nulle part — elles ne sont tenues que par ce banc et
-  `audit-csp.cjs`.
+  ⚠️ Conséquence en production : le journal des plantages (`origine: 'csp'`) voit
+  les violations de la PAGE et (depuis la revue du soir) des fenêtres que l'app
+  ouvre (reçu, facture). Celles du worker de la carte, du service worker et de
+  l'onglet du bordereau PDF ne remontent nulle part — elles ne sont tenues que
+  par ce banc et `audit-csp.cjs`.
 - ⚠️⚠️ **MA JOURNÉE HORS LIGNE : LA PAGE ALLAIT CHERCHER LES QR CHEZ LES
   TRANSPORTEURS** (`rechaufferQr` → `fetch(u)`). Mesuré dans sa base (lecture
   seule, hôtes seulement) : `qrUrl` sur **6 hôtes** — p.vintedgo.com ×15,
@@ -11025,6 +11026,11 @@ seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conf
   avisageng-colis-webexternal.pickup-services.com ×5,
   pickup-services.email-messaging.com ×4, static.chronopost.fr ×1. Une liste
   blanche en `connect-src` éteindrait la réserve au premier changement d'hôte.
+  ⚠️ (corrigé par la revue du soir) Ces six hôtes sont ceux des `qrUrl`, pas des
+  QR : `URL_PAS_UN_QR` écarte les mouchards et bannières, il reste **deux hôtes
+  de vrais QR** (p.vintedgo.com ×15, avisageng-…pickup-services.com ×5), et les
+  15 Vinted Go sont en **http** — ils n'entraient jamais dans la réserve (voir
+  la revue ci-dessous).
   ⇒ La page demande `/hl-qr?u=…` (même origine), **seulement quand le service
   worker la commande** ; c'est lui qui va chercher et qui **range** (`public/sw.js`).
   ⇒ `/sw.js` n'est **plus sous la politique complète** :
@@ -11072,13 +11078,26 @@ seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conf
   sur un arbre `git archive origin/main`** (CA par plateforme, vente Leboncoin
   prouvée, résumé Vinted, carte héros) : rien ne vient de ce chantier.
 - **Passer en vigueur** : les directives structurelles le sont déjà
-  (`frame-ancestors 'none'` : aucun écran ne s'encadre lui-même, vérifié). La
-  politique complète peut passer en vigueur après **7 jours sans aucune ligne
-  `plantage_*` d'origine `csp`** depuis le déploiement, à condition qu'il ait
-  ouvert pendant ces 7 jours, sur son iPhone ET sur l'ordinateur : la carte de la
-  Communauté, Ma journée avec un colis à retirer, Mon compte, un reçu d'achat,
-  une impression de bordereau, le studio photo. La vérification (lecture seule) :
-  `select data->>'message', data->>'navigateur', count(*), max(data->>'at') from app_data where id like 'plantage_%' and data->>'origine' = 'csp' group by 1, 2;`
+  (`frame-ancestors 'none'` : aucun écran ne s'encadre lui-même, vérifié). ⚠️
+  Critère RÉÉCRIT par la revue du soir (voir ci-dessous) — l'ancien demandait
+  d'ouvrir des surfaces que le journal ne pouvait pas voir, et le faux positif
+  des QR Vinted Go le rendait inatteignable. Il y a deux moitiés :
+  1. **Ce que le journal voit** (la page, le reçu d'achat, une facture) : 7 jours
+     sans aucune ligne `plantage_*` d'origine `csp` depuis le déploiement de ce
+     correctif, à condition qu'il ait ouvert pendant ces 7 jours, sur son iPhone
+     ET sur l'ordinateur : Ma journée avec un colis à retirer, Achats, Mon
+     compte, un reçu d'achat, le studio photo. Vérification (lecture seule) :
+     `select data->>'message', data->>'ecran', data->>'navigateur', count(*), max(data->>'at') from app_data where id like 'plantage_%' and data->>'origine' = 'csp' group by 1, 2, 3;`
+     (`ecran` dit où : `cat_achats`, `journee`, `fenetre:recu`, `fenetre:facture`…).
+  2. **Ce que le journal ne voit PAS, et ne peut pas voir d'une page** : le
+     worker de la carte de la Communauté (MapLibre), le worker de pdf.js
+     (aperçus d'imprimante), le service worker, l'onglet du bordereau PDF. Ils
+     ne sont tenus QUE par le banc `csp.cjs` (dans Chromium, par `report-uri`) ;
+     sur Safari iOS ils ne sont pas mesurés. Le jour de la bascule, les regarder
+     À L'ŒIL sur l'iPhone ET l'ordinateur : la carte de la Communauté montre la
+     carte (pas la liste), un bordereau s'ouvre, Réglages → Imprimante → « Voir
+     les aperçus » dessine les aperçus. Sinon : remettre la clé
+     `Content-Security-Policy-Report-Only`.
   Le geste : dans la règle `/((?!sw\\.js).*)` de vercel.json, renommer la clé
   `Content-Security-Policy-Report-Only` en `Content-Security-Policy`.
 - **Non mesuré** : les en-têtes réels de Vercel avec cette règle (aucun
@@ -11089,6 +11108,62 @@ seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conf
   et en Report-Only la violation viendrait du worker, que le journal ne voit pas) ; les
   vraies redirections Stripe et Discord (navigations pleine page, hors CSP).
   L'extension n'est pas touchée.
+
+#### Revue du chantier CSP (22 octobre, soir) — cinq défauts reproduits, cinq corrigés
+Chacun REPRODUIT d'abord sur cab152a (copie `git archive`, contrôles lancés
+depuis elle, §6.1), corrigé à la racine, rouge avant, vert après, rouge sous
+mutation. Extension non touchée.
+- ⚠️⚠️ **Reçu d'achat : « Imprimer » et « Fermer » ne faisaient plus rien dès que
+  l'onglet de VRM s'était rechargé** (régression du chantier : ses gestes étaient
+  branchés DEPUIS l'onglet de VRM, et un écouteur meurt avec l'onglet qui l'a
+  posé — or l'app se recharge toute seule : version vérifiée chaque minute,
+  nouveau service worker après chaque déploiement). ⇒ La fenêtre charge
+  `public/recu-boutons.js` (même origine, permis par `script-src 'self'`) qui
+  branche les deux gestes et pose `__vrmRecuBoutons` ; les écouteurs posés par
+  l'onglet de VRM ne restent qu'en SECOURS (si le fichier n'a pas pu se charger),
+  gardés par ce drapeau : jamais deux impressions.
+  ⚠️ **Piège de banc mesuré** : l'interception de Playwright (`ctx.route`) laisse
+  en suspens la requête d'un script chargé par une fenêtre `about:blank` —
+  jamais partie, alors qu'elle part sans interception. Le reçu se juge donc dans
+  un contexte SANS route (ouvreur : `/legal/cgv.html`, même politique).
+- **Les QR Vinted Go (http, 15 sur 15 dans sa base) faisaient signaler une
+  violation à chaque affichage d'Achats** (le critère des 7 jours était
+  inatteignable) **et n'entraient JAMAIS dans la réserve hors ligne**
+  (`rechaufferQr` et le service worker ne prennent que https — pré-existant,
+  déjà sur main). Mesuré (lecture seule) : `qrUrl` http = p.vintedgo.com ×15
+  seulement, tous les autres hôtes en https ; aucune adresse
+  `https://p.vintedgo.com` nulle part en base. ⇒ **Une règle dans `qrImage`**
+  (`qrEnHttps`, §11 : tous les lecteurs du QR passent par elle) : un QR hébergé
+  en `http://` est rendu en `https://` — ce que le navigateur fait déjà de
+  lui-même sur vrm.center (mesuré par la revue dans Chromium : la demande part
+  vers https). ⚠️ **Non mesuré** (aucun appel à Vinted d'ici) : que
+  p.vintedgo.com réponde en https — c'est l'adresse que Chrome lui demande déjà.
+- **Le journal des violations ne voyait ni le reçu ni la facture**, et ne disait
+  pas quel écran avait parlé (`ecran` vide : l'app retire `?tab=` de l'adresse).
+  ⇒ `ecouterViolationsCspDans(doc, …)` (src/plantages.js) écoute aussi le
+  document des fenêtres que l'app ouvre (`ecouterFenetreCsp`, après
+  `w.document.open()` — `open()` efface les écouteurs posés avant — et avant
+  d'écrire), `ecran` = `fenetre:recu` / `fenetre:facture` ; l'écran de la page
+  se lit dans `history.state.vrmTab` (main.jsx, `ecranCourant`). Les workers,
+  le service worker et l'onglet du bordereau PDF restent invisibles d'une page :
+  le critère de bascule est réécrit en deux moitiés (ci-dessus).
+- **Le service worker rangeait toute adresse ouverte par un lien vers
+  `/hl-qr?u=…`** (n'importe quel site, sans limite) dans le stockage de
+  vrm.center. ⇒ Une navigation vers `/hl-qr` répond 404 sans rien demander ni
+  ranger ; le service worker ne va chercher que pour une image ou pour
+  `rechaufferQr` (en-tête `x-vrm-hl-qr: 1`) ; la réserve garde au plus `QR_MAX`
+  (60) entrées, les plus anciennes partent d'abord.
+- **Preuves** (§6.1, arbre `git archive cab152a`, build refait là, scripts
+  copiés dedans) : `audit-csp.cjs` **10 rouges** sur l'avant (section « revue du
+  22 oct. »), 0 après ; `csp.cjs` **17 rouges** sur le build de cab152a (aux deux tailles : la violation `img-src ← http://p.vintedgo.com` sur Achats, le QR demandé en http, `ecran` vide, « Imprimer »/« Fermer » muets après rechargement, rien au journal pour le reçu ni la facture ; puis le QR Vinted Go hors de la réserve, 3 pages tierces rangées par 3 navigations, aucune borne), 0 après ; `hors-ligne.cjs` (un colis Vinted Go en http ajouté à ses données) **8 rouges** sur l'avant (le QR gardé vide dans la photo, jamais en réserve, absent hors ligne — aux deux tailles), 0 après.
+  Mutations (deux builds mutés, `ECRANS=cat_achats`), chacune rouge sur SON contrôle : script du reçu retiré ⇒ « Imprimer »/« Fermer » muets après rechargement (4) · journal non posé sur le reçu ⇒ rien au journal (2, la facture reste verte) · `qrEnHttps` neutralisé ⇒ violation + QR en http + hors réserve (5) · garde de navigation retirée ⇒ pages tierces rangées (1) · écran lu dans l'adresse ⇒ `ecran` vide (2) · secours non gardé ⇒ « print() appelé 2 fois » (2) · borne retirée ⇒ 67 entrées pour 60 (1).
+- Après : `csp.cjs` complet **128 verts, 0 rouge** ; en vigueur
+  (`BANC_CSP_EN_VIGUEUR=1`, `ECRANS=journee,cat_achats`) vert — le script du
+  reçu passe sous `script-src 'self'` ; `hors-ligne.cjs` vert ; `sw-cache.cjs`
+  vert ; les **143 audits** verts.
+- **Non mesuré** : un vrai Safari iOS (la fenêtre du reçu et son script, le
+  journal dans la fenêtre) ; que p.vintedgo.com réponde en https (voir plus
+  haut) ; la vraie production (aucun déploiement d'ici).
 
 ---
 

@@ -121,5 +121,34 @@ const cibles = [...rq.matchAll(/\bfetch\(\s*([A-Za-z_$][\w$]*|[^,)]*)/g)].map((m
 const locales = new Set([...rq.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*adresseQrLocale\(/g)].map((m) => m[1]));
 dit(!!rq && cibles.length > 0 && cibles.every((c) => locales.has(c) || /^adresseQrLocale\(/.test(c)), "la page ne va chercher un QR que par `/hl-qr` (même origine) — jamais chez le transporteur", rq ? 'fetch(' + cibles.join('), fetch(') + ')' : 'rechaufferQr introuvable');
 
+// (22 oct., revue du chantier) — quatre défauts reproduits, gardés ici.
+console.log('\n── les fenêtres que l\'app ouvre, le journal, la réserve des QR (revue du 22 oct.)');
+const corps = (debut, fin = '\n};\n') => { const i = appSrc.indexOf(debut); if (i < 0) return ''; const j = appSrc.indexOf(fin, i); return appSrc.slice(i, j + fin.length); };
+const recu = corps('const openReceipt = (a) => {');
+dit(/<script src="\/recu-boutons\.js"><\/script>/.test(recu) && fs.existsSync(path.join(R, 'public', 'recu-boutons.js')),
+  'le reçu charge SES gestes (`/recu-boutons.js`, même origine) — branchés depuis l\'onglet de VRM, ils mouraient quand l\'app se recharge');
+const secours = (recu.match(/addEventListener\('click'/g) || []).length;
+const gardes = (recu.match(/if \(w\.__vrmRecuBoutons\) return;/g) || []).length;
+dit(secours === gardes, 'les gestes posés depuis l\'onglet de VRM ne sont qu\'un secours (gardés par `__vrmRecuBoutons` : une impression, jamais deux)', `${secours} écouteur(s), ${gardes} gardé(s)`);
+const rb = fs.existsSync(path.join(R, 'public', 'recu-boutons.js')) ? lire('public/recu-boutons.js') : '';
+dit(/vrm-recu-imprimer/.test(rb) && /vrm-recu-fermer/.test(rb) && /print\(\)/.test(rb) && /__vrmRecuBoutons\s*=/.test(rb), '`/recu-boutons.js` branche « Imprimer » et « Fermer » et le dit (`__vrmRecuBoutons`)');
+const facture = corps('function ouvrirDocumentImprimable(html) {', '\n}\n');
+for (const [nom, c, cle] of [['le reçu', recu, 'recu'], ['la facture', facture, 'facture']]) {
+  const iOpen = c.indexOf('w.document.open()'), iEcoute = c.indexOf(`ecouterFenetreCsp(w, '${cle}')`), iWrite = c.indexOf('w.document.write(');
+  dit(iOpen >= 0 && iEcoute > iOpen && iWrite > iEcoute, `le journal des violations écoute ${nom} (après document.open, avant d'écrire)`);
+}
+const mainSrc = sansCommentaires(lire('src/main.jsx'));
+dit(/history\.state/.test(mainSrc) && /vrmTab/.test(mainSrc), 'le journal nomme l\'écran par `history.state.vrmTab` (l\'app retire `?tab=` de l\'adresse)');
+const qi = corps('const qrImage = (t) => {');
+const retours = [...qi.matchAll(/return ([^;]+);/g)].map((m) => m[1]).filter((x) => /qrUrl/.test(x));
+dit(retours.length > 0 && retours.every((x) => /^qrEnHttps\(/.test(x)) && /const qrEnHttps = \(u\) => String\(u \|\| ''\)\.replace\(\/\^http:/.test(appSrc),
+  'un QR hébergé en http (Vinted Go, 15 sur 15) est rendu en https par qrImage — la règle unique de tous les lecteurs', retours.join(' · '));
+const swCode = sansCommentaires(swSrc);
+const blocQr2 = (/url\.pathname === '\/hl-qr'[\s\S]*?\n  \}\n/.exec(swCode) || [''])[0];
+const iNav = blocQr2.indexOf("req.mode === 'navigate'"), iFetch = blocQr2.indexOf('await fetch(');
+dit(iNav >= 0 && iFetch > iNav, 'une NAVIGATION vers /hl-qr ne fait rien demander ni ranger (un lien posé par un autre site)');
+dit(/req\.destination === 'image'/.test(blocQr2) && /x-vrm-hl-qr/.test(blocQr2) && /x-vrm-hl-qr/.test(rq), 'le service worker ne va chercher que pour une image ou la mise en réserve de VRM (`x-vrm-hl-qr`)');
+dit(/const QR_MAX = \d+/.test(swCode) && /QR_MAX/.test(blocQr2), 'la réserve des QR est bornée (QR_MAX)');
+
 console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) en échec' : '✅ tout est vert'}`);
 process.exit(ko ? 1 : 0);

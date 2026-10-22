@@ -9,6 +9,8 @@ const CACHE = 'vrm-shell-v6';
 // remplie par la page pendant que le réseau est là, vidée à la déconnexion.
 // ⚠️ PAS une version de la coquille : la purge d'activation la garde.
 const CACHE_QR = 'vrm-hl-qr';
+// Au plus autant de QR dans la réserve (une journée en porte quelques-uns).
+const QR_MAX = 60;
 // Repère de la version servie : le nom du script principal de la page.
 const REPERE = '/__vrm_build';
 const pdfStore = {};
@@ -152,21 +154,38 @@ self.addEventListener('fetch', event => {
   // 1 bis) Les QR de Ma journée hors ligne : `/hl-qr?u=<adresse>`. La réserve
   //    d'abord (c'est hors ligne qu'on les demande) ; sinon le réseau, sans
   //    cookie ni référent. Rien ⇒ 404 : la page dit « donne le code ».
+  //    ⚠️⚠️ (22 oct., revue) SEULEMENT CE QUE LA PAGE DE VRM DEMANDE. Une
+  //    NAVIGATION vers `/hl-qr?u=…` (un lien ou une redirection posés par
+  //    n'importe quel site) faisait aller chercher ET RANGER durablement
+  //    n'importe quelle adresse, de n'importe quelle taille, dans le stockage
+  //    de vrm.center. Une navigation n'est jamais un QR : 404, rien n'est
+  //    demandé, rien n'est rangé. Le reste ne passe que pour une IMAGE (le QR
+  //    affiché hors ligne) ou la mise en réserve de `rechaufferQr` (en-tête
+  //    `x-vrm-hl-qr`) ; et la réserve garde au plus `QR_MAX` entrées (les plus
+  //    anciennes partent d'abord).
   if (url.pathname === '/hl-qr') {
     event.respondWith((async () => {
       try {
+        if (req.mode === 'navigate') return new Response('', { status: 404 });
         const c = await caches.open(CACHE_QR);
         const hit = await c.match(req);
         if (hit) return hit;
+        const demandeDeVrm = req.destination === 'image' || req.headers.get('x-vrm-hl-qr') === '1';
         const u = url.searchParams.get('u') || '';
-        if (/^https:\/\//i.test(u)) {
+        if (demandeDeVrm && /^https:\/\//i.test(u)) {
           const res = await fetch(u, { mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
           // (22 oct.) C'est ICI que le QR entre dans la réserve : la page ne va
           // plus le chercher elle-même. Sa politique de sécurité du contenu
           // (connect-src, vercel.json) refuserait les hôtes des transporteurs —
-          // six mesurés chez lui, et ils changent ; ce fichier-ci n'est pas sous
+          // ils changent ; ce fichier-ci n'est pas sous
           // cette politique (vercel.json l'exclut, `/((?!sw\.js).*)`).
-          if (res && (res.ok || res.type === 'opaque')) { try { await c.put(req, res.clone()); } catch (_) {} }
+          if (res && (res.ok || res.type === 'opaque')) {
+            try {
+              await c.put(req, res.clone());
+              const cles = await c.keys();
+              for (const k of cles.slice(0, Math.max(0, cles.length - QR_MAX))) await c.delete(k);
+            } catch (_) {}
+          }
           return res;
         }
       } catch (_) {}

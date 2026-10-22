@@ -32,6 +32,17 @@ require('./_porte-banc.cjs');   // l'« accès direct » est retiré de l'app (2
 //  de nouveau mot de passe (/recuperation.html, qui appelle la base), et la
 //  mise en réserve d'un QR hors ligne par le service worker.
 //
+//  (22 oct., revue du chantier) Ajoutés, chacun rouge sur cab152a :
+//    · le reçu, ses deux boutons cliqués APRÈS un rechargement de l'onglet qui
+//      l'a ouvert (l'app se recharge toute seule) — dans un contexte SANS route
+//      (l'interception de Playwright suspend le script de la fenêtre) ;
+//    · une violation DANS la fenêtre du reçu et dans la facture arrive au
+//      journal des plantages (`vrm_plantages_attente`, écran « fenetre:… »), et
+//      une violation de la page y est nommée par son écran (history.state) ;
+//    · un colis Vinted Go à retirer, son QR en http (la forme de sa base) : il
+//      est demandé en https, sans violation, et entre dans la réserve ;
+//    · une NAVIGATION vers /hl-qr ne fait rien demander ni ranger, et la réserve
+//      reste sous sa borne (QR_MAX de public/sw.js).
 //  Lancer : npm run build && node scripts/bancs/csp.cjs
 //    BANC_PORT=…                     (défaut 4993)
 //    BANC_CSP_EN_VIGUEUR=1           la Report-Only servie EN VIGUEUR (ce que
@@ -115,6 +126,14 @@ const styleOfm = (nom) => JSON.stringify({ version: 8, name: nom,
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAE0lEQVR4nGP4z8DwHwwZGP5DAABUvgr2vQeGRgAAAABJRU5ErkJggg==', 'base64');
 const SPRITE = JSON.stringify({ town: { width: 2, height: 2, x: 0, y: 0, pixelRatio: 1 } });
 const QR = { servis: 0 };
+const VG = { http: 0, https: 0 };
+const TIERS = { n: 0 };
+const QR_VG = 'http://p.vintedgo.com/public/v1/qr_codes/BANC0000000000:C49341:BANC0000000000?v=1';
+// Le journal des plantages (src/plantages.js) tel que l'app l'écrit : les
+// entrées d'origine « csp » en attente d'envoi.
+const journalCsp = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_plantages_attente') || '[]').filter((e) => e.origine === 'csp').map((e) => ({ message: e.message, ecran: e.ecran })); } catch (_) { return null; } }).catch(() => null);
+// Le VRAI src/plantages.js, rendu évaluable dans une page (sans ses `export`).
+const PLANTAGES = fs.readFileSync(path.join(RACINE, 'src', 'plantages.js'), 'utf8').replace(/^export /gm, '');
 
 async function contexte(b, vp, acces = true, { sw = false } = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), serviceWorkers: sw ? 'allow' : 'block' });
@@ -137,7 +156,15 @@ async function contexte(b, vp, acces = true, { sw = false } = {}) {
     return r.fulfill({ status: 200, contentType: 'application/x-protobuf', headers: { 'access-control-allow-origin': '*' }, body: Buffer.alloc(0) });
   });
   await ctx.route(/^https:\/\/qr\.exemple\.test\//, (r) => { QR.servis++; return r.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
+  // (22 oct., revue) Les QR Vinted Go arrivent en http (15 sur 15 dans sa base) :
+  // servis ici dans les deux schémas, et COMPTÉS par schéma (la page du banc est
+  // en http, il n'y a pas de montée automatique en https comme sur vrm.center).
+  await ctx.route(/^https?:\/\/p\.vintedgo\.com\//, (r) => { const u = r.request().url(); VG[u.startsWith('https:') ? 'https' : 'http']++; return r.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
+  // Un site tiers (la navigation vers /hl-qr ne doit jamais aller le chercher).
+  await ctx.route(/^https:\/\/autre-site\.exemple\.test\//, (r) => { TIERS.n++; return r.fulfill({ status: 200, contentType: 'text/html', body: '<b>tiers ' + 'x'.repeat(4000) + '</b>' }); });
   const base = fabriquer();
+  // Un colis Vinted Go à retirer, son QR en http — la forme réelle de sa base.
+  base.rows.push({ id: 'email_track_vinted_VGSBANC000001', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: 'C49341', lieu: 'Consigne Vinted Go Laverie du Port', carrier: 'vinted', suivi: 'VGSBANC000001', artTitle: '', qrUrl: QR_VG, receivedAt: new Date(Date.now() - 3600e3).toISOString() } });
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     if (rq.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
@@ -245,27 +272,83 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
     // ── La fenêtre du reçu d'achat : le VRAI `openReceipt`, ses deux boutons ──
     console.log(`── ${vp.width} px — reçu, facture, bordereau`);
     await pg.goto(`${ORIGINE}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' }); await calme(pg, 1500);
+    // (22 oct., revue) Le QR Vinted Go (http dans sa base) part en https, et ne
+    // fait signaler aucune violation (la tournée des écrans juge les violations).
+    dit(VG.https > 0 && VG.http === 0, 'le QR Vinted Go (http dans les emails) est demandé en https, jamais en http', `https ${VG.https} · http ${VG.http}`);
+    // (22 oct., revue) Le journal dit QUEL écran a parlé : l'app retire `?tab=`
+    // de l'adresse, l'écran se lit dans `history.state` (une violation de la
+    // page, provoquée exprès, doit porter « cat_achats »).
+    {
+      const n0 = vues.length;
+      await pg.evaluate(() => { fetch('https://interdit-page.exemple.test/journal').catch(() => {}); });
+      let j = null;
+      for (let i = 0; i < 30; i++) { j = await journalCsp(pg); if (j && j.some((e) => /interdit-page/.test(e.message))) break; await pg.waitForTimeout(100); }
+      const e = (j || []).find((x) => /interdit-page/.test(x.message));
+      dit(!!e && /^cat_achats/.test(e.ecran || ''), 'le journal nomme l\'écran d\'une violation de la page (history.state, pas l\'adresse)', e ? `écran « ${e.ecran} »` : 'rien au journal');
+      await pg.waitForTimeout(300);
+      vues.splice(n0);
+    }
     const codeRecu = [extrait('const parseReceiptFields = (a) => {'), extrait('const b64ToBytes = (b64) => {'), extrait('const openReceipt = (a) => {')];
+    // Le journal des fenêtres (22 oct.) : présent sur le code d'après, absent avant.
+    const codeJournal = [PLANTAGES, "const BUILD_ISO = 'banc';", extrait('const ecouterFenetreCsp = (w, nom) => {') || ''].join('\n');
+    const RECU = { article: 'Nike Air Max 1', prix: '42.50', transaction: '123', account: 'vendeur_1', vendeur: 'x', texte: 'Montant payé : 42,50 €\nFrais de port 3,00 €' };
+    const ouvrirRecu = (p) => Promise.all([p.context().waitForEvent('page', { timeout: 8000 }).catch(() => null),
+      p.evaluate(`(() => { ${codeJournal}\n${codeRecu.join('\n')}; openReceipt(${JSON.stringify(RECU)}); })()`)]).then(([pop]) => pop);
+    // ⚠️ Le reçu se juge dans un contexte SANS AUCUNE route : mesuré le 22 oct.,
+    // l'interception de Playwright (`ctx.route`) laisse en suspens la requête du
+    // script que la fenêtre `about:blank` charge (`/recu-boutons.js`) — jamais
+    // partie, alors qu'elle part sans interception (et chez lui). L'ouvreur est
+    // une page statique de VRM (/legal/cgv.html, même politique) : ce qui compte
+    // est que SON contexte disparaisse au rechargement, comme l'onglet de l'app.
+    // Rien d'extérieur n'est demandé par ces pages.
+    const cR = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), serviceWorkers: 'block' });
+    const vuesR = V.observer(cR);
+    const pgR = await cR.newPage();
+    await pgR.goto(`${ORIGINE}/legal/cgv.html`, { waitUntil: 'load' }).catch(() => {});
     if (codeRecu.some((x) => !x)) dit(false, 'le code du reçu se retrouve dans App.jsx');
     else {
-      const n0 = vues.length;
-      const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null),
-        pg.evaluate(`(() => { ${codeRecu.join('\n')}; openReceipt({ article: 'Nike Air Max 1', prix: '42.50', transaction: '123', account: 'vendeur_1', vendeur: 'x', texte: 'Montant payé : 42,50 €\\nFrais de port 3,00 €' }); })()`)]);
-      dit(!!pop, 'le reçu s\'ouvre dans une fenêtre');
-      if (pop) {
-        await pop.waitForTimeout(300);
-        await pop.evaluate(() => { window.__imprime = 0; window.print = () => { window.__imprime++; }; });
-        await pop.click('#vrm-recu-imprimer').catch(() => {});
-        await pop.waitForTimeout(300);
-        const imprime = await pop.evaluate(() => window.__imprime).catch(() => 0);
-        dit(imprime === 1, '« Imprimer » du reçu lance l\'impression', `print() appelé ${imprime} fois`);
-        const fermee = pop.waitForEvent('close', { timeout: 4000 }).then(() => true).catch(() => false);
-        await pop.click('#vrm-recu-fermer').catch(() => {});
-        dit(await fermee, '« Fermer » ferme la fenêtre du reçu');
+      const pg = pgR, vues = vuesR;
+      // (a) l'onglet de VRM intact, (b) RECHARGÉ entre l'ouverture et le clic —
+      // ce que l'app fait toute seule (version vérifiée chaque minute, nouveau
+      // service worker après un déploiement). Sur cab152a, (b) ne faisait plus rien.
+      for (const recharge of [false, true]) {
+        const n0 = vues.length;
+        const pop = await ouvrirRecu(pg);
+        dit(!!pop, `le reçu s'ouvre dans une fenêtre${recharge ? ' (puis l\'onglet de VRM se recharge)' : ''}`);
+        if (pop) {
+          await pop.waitForLoadState('load').catch(() => {});
+          await pop.waitForTimeout(300);
+          if (recharge) { await pg.reload({ waitUntil: 'load' }).catch(() => {}); await calme(pg, 800); }
+          await pop.evaluate(() => { window.__imprime = 0; window.print = () => { window.__imprime++; }; });
+          await pop.click('#vrm-recu-imprimer').catch(() => {});
+          await pop.waitForTimeout(300);
+          const imprime = await pop.evaluate(() => window.__imprime).catch(() => 0);
+          dit(imprime === 1, `« Imprimer » du reçu lance l'impression, une fois${recharge ? ' — onglet de VRM RECHARGÉ' : ''}`, `print() appelé ${imprime} fois`);
+          const fermee = pop.waitForEvent('close', { timeout: 4000 }).then(() => true).catch(() => false);
+          await pop.click('#vrm-recu-fermer').catch(() => {});
+          dit(await fermee, `« Fermer » ferme la fenêtre du reçu${recharge ? ' — onglet de VRM RECHARGÉ' : ''}`);
+        }
+        const v = nouvelles(vues, n0);
+        dit(v.length === 0, `reçu${recharge ? ' (onglet rechargé)' : ''} : aucune violation`, v.map((x) => x.texte).join(' | '));
       }
-      const v = nouvelles(vues, n0);
-      dit(v.length === 0, 'reçu : aucune violation', v.map((x) => x.texte).join(' | '));
+      // (c) une violation DANS la fenêtre du reçu arrive au journal, nommée.
+      {
+        const n0 = vues.length;
+        const pop = await ouvrirRecu(pg);
+        if (pop) {
+          await pop.waitForLoadState('load').catch(() => {});
+          await pop.evaluate(() => { const bt = document.createElement('button'); bt.setAttribute('onclick', 'window.__xssRecu=1'); document.body.appendChild(bt); bt.click(); bt.remove(); }).catch(() => {});
+          let j = null;
+          for (let i = 0; i < 30; i++) { j = await journalCsp(pg); if (j && j.some((e) => /^fenetre:recu/.test(e.ecran || ''))) break; await pg.waitForTimeout(100); }
+          const e = (j || []).find((x) => /^fenetre:recu/.test(x.ecran || ''));
+          dit(!!e, 'une violation DANS la fenêtre du reçu arrive au journal des plantages (écran « fenetre:recu »)', e ? e.message : 'rien au journal : ' + JSON.stringify(j));
+          await pop.close().catch(() => {});
+        } else dit(false, 'le reçu s\'ouvre (journal)');
+        await pg.waitForTimeout(300);
+        vues.splice(n0);
+      }
     }
+    await cR.close();
 
     // ── Une facture imprimable (le VRAI `ouvrirDocumentImprimable`) ──
     const codeFact = [SRC.match(/^const CSP_DOCUMENT = .*$/m)?.[0], extrait('function ouvrirDocumentImprimable(html) {', '\n}\n')];
@@ -274,16 +357,28 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
       const n0 = vues.length;
       const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Facture FA-2026-0001</title><style>body{font-family:Arial;color:#222}.t{font-weight:800}</style></head><body><div class="t" style="color:#111">Facture</div><img alt="" src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%2710%27/%3E"><table style="width:100%"><tr><td>Nike</td><td>42,50 €</td></tr></table></body></html>';
       const [pop] = await Promise.all([ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null),
-        pg.evaluate(`(() => { ${codeFact.join('\n')}; const w = ouvrirDocumentImprimable(${JSON.stringify(html)}); if (w) w.print = () => {}; })()`)]);
+        pg.evaluate(`(() => { ${codeJournal}\n${codeFact.join('\n')}; const w = ouvrirDocumentImprimable(${JSON.stringify(html)}); if (w) w.print = () => {}; })()`)]);
       dit(!!pop, 'la facture s\'ouvre');
       if (pop) {
         await pop.waitForTimeout(800);
         const ok = await pop.evaluate(() => ({ t: document.body.innerText, style: getComputedStyle(document.querySelector('.t')).fontWeight })).catch(() => null);
         dit(!!ok && /Facture/.test(ok.t) && /42,50/.test(ok.t) && String(ok.style) === '800', 'la facture est rendue, avec ses styles', ok ? `poids ${ok.style}` : 'illisible');
+        const v = nouvelles(vues, n0);
+        dit(v.length === 0, 'facture : aucune violation', v.map((x) => x.texte).join(' | '));
+        // (22 oct., revue) Une violation DANS la facture arrive au journal, nommée.
+        const n1 = vues.length;
+        await pop.evaluate(() => { const bt = document.createElement('button'); bt.setAttribute('onclick', 'window.__xssFacture=1'); document.body.appendChild(bt); bt.click(); bt.remove(); }).catch(() => {});
+        let j = null;
+        for (let i = 0; i < 30; i++) { j = await journalCsp(pg); if (j && j.some((e) => /^fenetre:facture/.test(e.ecran || ''))) break; await pg.waitForTimeout(100); }
+        const e = (j || []).find((x) => /^fenetre:facture/.test(x.ecran || ''));
+        dit(!!e, 'une violation DANS la facture arrive au journal des plantages (écran « fenetre:facture »)', e ? e.message : 'rien au journal');
         await pop.close().catch(() => {});
+        await pg.waitForTimeout(300);
+        vues.splice(n1);
+      } else {
+        const v = nouvelles(vues, n0);
+        dit(v.length === 0, 'facture : aucune violation', v.map((x) => x.texte).join(' | '));
       }
-      const v = nouvelles(vues, n0);
-      dit(v.length === 0, 'facture : aucune violation', v.map((x) => x.texte).join(' | '));
     }
 
     // ── Un bordereau PDF dans un onglet (blob:, `object-src 'none'` en vigueur) ──
@@ -356,9 +451,43 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
       let n = 0;
       for (let i = 0; i < 30 && !n; i++) { n = await pg.evaluate(async (u) => (await (await caches.open('vrm-hl-qr')).match('/hl-qr?u=' + encodeURIComponent(u))) ? 1 : 0, qr).catch(() => 0); if (!n) await pg.waitForTimeout(200); }
       dit(n === 1 && QR.servis > q0, 'le QR est dans la réserve (allé chercher une fois)', `réserve ${n} · demandes au transporteur ${QR.servis - q0}`);
+      // (22 oct., revue) Le QR Vinted Go — http dans les emails — passe par le
+      // VRAI qrImage (comme la photo de Ma journée) puis la réserve. Sur cab152a
+      // il n'y entrait JAMAIS (rechaufferQr et le service worker ne prennent
+      // que https://).
+      const declQr = [/^const URL_PAS_UN_QR = .*$/m, /^const URL_QR_CERTAIN = .*$/m, /^const qrEnHttps = .*$/m].map((re) => (SRC.match(re) || [])[0] || '');
+      const fnQr = extrait('const qrImage = (t) => {');
+      if (!fnQr || !declQr[0] || !declQr[1]) dit(false, 'le code de qrImage se retrouve dans App.jsx');
+      else {
+        const k = await pg.evaluate(`(async () => { ${decl.join('\n')}\n${declQr.join('\n')}\n${fnQr}\n${code}\n const q = qrImage({ qrUrl: ${JSON.stringify(QR_VG)} }); await rechaufferQr({ retirer: [{ qr: q }] }); return q; })()`).catch((e) => 'ERR ' + String(e).slice(0, 80));
+        let m = 0;
+        for (let i = 0; i < 30 && !m; i++) { m = await pg.evaluate(async (u) => (await (await caches.open('vrm-hl-qr')).match('/hl-qr?u=' + encodeURIComponent(u))) ? 1 : 0, String(k)).catch(() => 0); if (!m) await pg.waitForTimeout(200); }
+        dit(/^https:\/\/p\.vintedgo\.com\//.test(String(k)) && m === 1 && VG.https > 0 && VG.http === 0, 'le QR Vinted Go (http dans les emails) est rendu en https ET mis en réserve (demandé en https seulement)', `qrImage → ${String(k).slice(0, 40)} · réserve ${m} · https ${VG.https} · http ${VG.http}`);
+      }
       await calme(pg, 1500);
       const v = nouvelles(vues, n0);
       dit(v.length === 0, 'réserve des QR : aucune violation (page ET service worker)', v.map((x) => x.texte).join(' | '));
+      // (22 oct., revue) Une NAVIGATION vers /hl-qr (un lien posé par un autre
+      // site) : rien n'est demandé au site visé, rien n'est rangé. Sur cab152a,
+      // trois clics rangeaient trois pages tierces dans le stockage de vrm.center.
+      const avantNav = await pg.evaluate(async () => (await (await caches.open('vrm-hl-qr')).keys()).length).catch(() => -1);
+      const t0 = TIERS.n;
+      for (let i = 1; i <= 3; i++) {
+        const p3 = await ctx.newPage();
+        await p3.goto(`${ORIGINE}/hl-qr?u=` + encodeURIComponent('https://autre-site.exemple.test/page-' + i), { waitUntil: 'load' }).catch(() => {});
+        await p3.waitForTimeout(500); await p3.close().catch(() => {});
+      }
+      const apresNav = await pg.evaluate(async () => (await (await caches.open('vrm-hl-qr')).keys()).length).catch(() => -1);
+      dit(apresNav === avantNav && TIERS.n === t0, 'une navigation vers /hl-qr ne fait rien demander ni ranger (lien posé par un autre site)', `réserve ${avantNav} → ${apresNav} · demandes au site tiers ${TIERS.n - t0}`);
+      // Et la réserve est bornée : ce que la page demande au-delà de la borne
+      // fait partir les plus anciennes.
+      const QR_MAX = Number((/const QR_MAX = (\d+)/.exec(fs.readFileSync(path.join(RACINE, 'public', 'sw.js'), 'utf8')) || [])[1] || 0);
+      if (!QR_MAX) dit(false, 'la réserve des QR a une borne (QR_MAX dans public/sw.js)');
+      else {
+        await pg.evaluate(async (n) => { for (let i = 0; i < n; i++) { try { await fetch('/hl-qr?u=' + encodeURIComponent('https://qr.exemple.test/api/barcode/AztecCode?d=BORNE' + i), { credentials: 'omit', headers: { 'x-vrm-hl-qr': '1' } }); } catch (_) {} } }, QR_MAX + 5);
+        const nb = await pg.evaluate(async () => (await (await caches.open('vrm-hl-qr')).keys()).length).catch(() => -1);
+        dit(nb > 0 && nb <= QR_MAX, `la réserve des QR reste sous sa borne (${QR_MAX})`, `${nb} entrée(s)`);
+      }
     }
     await ctx.close();
   }
