@@ -28544,11 +28544,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    (registre ou une ligne illisible) · objet. `aucune` = aucune ligne rangée
   //    nulle part (jamais lu, ou pas d'eBay) ⇒ Ma journée se tait.
   //    (lus avec les commandes eBay, plus haut — un seul rendu).
-  useEffect(() => { (async () => {
+  useEffect(()=>{
+    const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!r.ok) { setLbcLu(null); return; }
-      const rows = await r.json();
+      const rows = await lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,sbAuth());
+      if (!estActif()) return;
+      if (!Array.isArray(rows)) { setLbcLu(null); return; }
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       const ventes = arr.filter(o => o && o.isSeller === true);
@@ -28560,8 +28561,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const inconnuesListe = inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
       setLbcVentes({ ventes, inconnues: inc.length, inconnuesListe });
       setLbcLu(true);
-    } catch (_) { setLbcLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
-  })(); }, []);
+    } catch (_) { if (!estActif()) return; setLbcLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
+
+    }});
+    suivi.actualiser();
+    return ()=>suivi.arreter();
+  }, []);
   const [usedNumeros, setUsedNumeros] = useState(() => load('vinted_used_numeros', []));
   // Prix d'achat mémorisé PAR NUMÉRO (et non par id d'annonce, qui change à la
   // vente/republication). Source de vérité durable : quand tu saisis le prix
@@ -42481,7 +42486,6 @@ function LeboncoinScreen() {
         <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
         <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
-      <DiagnosticLeboncoin lire={sbGet} couleurs={C}/>
       {erreurReception && <LignePanne>La relecture de tes données Leboncoin a échoué. Les informations précédentes restent affichées. Réessaie avec Actualiser.</LignePanne>}
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
@@ -46898,11 +46902,12 @@ function AppCoeur() {
   const [lbcVentes,setLbcVentes]=useState({ ventes:[], inconnues:0 });
   // Trois états : `undefined` pas encore lu · `null` pas su · `true` lu.
   const [lbcCoqueLu,setLbcCoqueLu]=useState(undefined);
-  useEffect(()=>{ (async()=>{
+  useEffect(()=>{
+    const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!r.ok) { setLbcCoqueLu(null); return; }
-      const rows = await r.json();
+      const rows = await lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,sbAuth());
+      if (!estActif()) return;
+      if (!Array.isArray(rows)) { setLbcCoqueLu(null); return; }
       const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
       const arr = Object.values(obj);
       // Côté pas encore su, ET non annulées (une transaction annulée est morte :
@@ -46918,8 +46923,12 @@ function AppCoeur() {
       setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
         maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
       setLbcCoqueLu(true);
-    } catch (_) { setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
-  })(); }, []);
+    } catch (_) { if (!estActif()) return; setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
+
+    }});
+    suivi.actualiser();
+    return ()=>suivi.arreter();
+  }, []);
   // CA eBay pour le Tableau de bord / le Collectif : la somme des commandes
   // PAYÉES captées (`caEbayPayees`, la MÊME règle que la carte « payées » de
   // l'écran eBay, §11). `null` tant qu'aucune vente payée n'est captée — le
@@ -48561,6 +48570,7 @@ function AppCoeur() {
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
+          <div style={{padding:'0 16px'}}><DiagnosticLeboncoin lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.

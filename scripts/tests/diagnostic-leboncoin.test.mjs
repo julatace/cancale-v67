@@ -11,3 +11,9 @@ test('seules les structures des listes privées sortent, jamais les valeurs ou i
  assert.match(r,/Liste privée observée : oui/);assert.match(r,/ads\[\].images.urls\[\]:string/);
  for(const mot of ['TITRE_SECRET','PHOTO_SECRETE','identifiant-secret','PSEUDO_SECRET','MOT_SECRET','MESSAGE_SECRET'])assert.equal(r.includes(mot),false,mot);
 });
+
+test('les ventes ont leur propre date de capture, indépendante du dernier échange du panneau',()=>{
+ const r=resumeReceptionLbc({annonces:[],comptes:[],traces:[],transactions:[{ventes:{a:{isSeller:true,at:'2026-10-20T08:00:00Z',price:12345},b:{isSeller:false,at:'2026-10-21T08:00:00Z'}}}]});
+ assert.match(r,/Transactions enregistrées : 2 ; ventes confirmées : 1 ; achats confirmés : 1/);assert.match(r,/2026-10-21T08:00:00.000Z/);assert.equal(r.includes('12345'),false);
+ assert.match(resumeReceptionLbc({annonces:[],comptes:[],traces:[],transactions:null}),/impossible/);
+});

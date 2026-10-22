@@ -1,12 +1,14 @@
 // Résumé de structure uniquement : ni corps des annonces, ni URL de photo,
 // ni identifiant de compte, ni requête vers Leboncoin.
-export function resumeReceptionLbc({ annonces, comptes, traces }) {
-  if (![annonces, comptes, traces].every(Array.isArray)) return 'Lecture du diagnostic impossible. Réessaie : aucun résultat vide ne peut être déduit de cet échec.';
+export function resumeReceptionLbc({ annonces, comptes, traces, transactions=[] }) {
+  if (![annonces, comptes, traces, transactions].every(Array.isArray)) return 'Lecture du diagnostic impossible. Réessaie : aucun résultat vide ne peut être déduit de cet échec.';
   const items = Object.values(annonces[0]?.items || {}).filter(x => x && typeof x === 'object');
   const accounts = comptes[0]?.accounts || {};
   const confirmes = new Set(Object.entries(accounts).filter(([,a]) => a?.sessionAt).map(([id,a]) => String(a.id || id)));
   const attribuees = items.filter(a => a.account && confirmes.has(String(a.account)));
   const photos = a => Array.isArray(a.images) && a.images.some(p => typeof p === 'string' && /^https:\/\//.test(p));
+  const ventes=Object.values(transactions[0]?.ventes||{}).filter(v=>v&&typeof v==='object');
+  const date=Math.max(0,...ventes.map(v=>Date.parse(v.at||'')||0));
   const schemas = traces[0]?.schemas || {};
   const listes = Object.entries(schemas).filter(([e]) => /\/adfinder\/v\d+\/myads(?:\/|$)|\/classifieds\/analysis\/list(?:\/|$)/i.test(e)).slice(-4);
   const mots = new Set('ads Ads data items results list classifieds announcements Info Id list_id ad_id id subject title price price_cents list_price owner user_id store_id account_id images urls urls_large thumb_urls urls_thumb image_urls ImageSmall url large thumbnail Status status string number boolean object array null'.split(' '));
@@ -14,6 +16,8 @@ export function resumeReceptionLbc({ annonces, comptes, traces }) {
   return [
     'Diagnostic réception Leboncoin',
     `Comptes avec session enregistrée : ${confirmes.size}`,
+    `Transactions enregistrées : ${ventes.length} ; ventes confirmées : ${ventes.filter(v=>v.isSeller===true).length} ; achats confirmés : ${ventes.filter(v=>v.isSeller===false).length}`,
+    `Dernier enregistrement de transaction : ${date?new Date(date).toISOString():'aucune date disponible'}`,
     `Annonces enregistrées : ${items.length} ; attribuées à une session connue : ${attribuees.length} ; avec photo : ${attribuees.filter(photos).length}`,
     listes.length ? 'Liste privée observée : oui' : 'Liste privée observée : aucune trace disponible (ne prouve pas que le compte est vide)',
     ...listes.map(([ep,s]) => {
