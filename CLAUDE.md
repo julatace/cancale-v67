@@ -10964,7 +10964,8 @@ Julien (21 oct.) : « une autre carte, beaucoup plus professionnelle, fiable et 
 qualité ». Une session l'avait commencée (`claude/carte-pro`, b3fe852, « EN COURS,
 non vérifié ») : Leaflet retiré (MapLibre seul), fond **VersaTiles** + secours
 OpenFreeMap. Finie ici, après un VRAI merge de main (avatars Discord de main portés
-sur les épingles MapLibre).
+sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
+**1 inscrit** sur la carte (1 ville, pseudo Discord renseigné).
 - **Tranché** : **OpenFreeMap seul**, VersaTiles retiré. Raisons : un seul domaine
   (`tiles.openfreemap.org` : style, TileJSON, tuiles, polices, icônes) — celui que
   la CSP de `claude/csp-app` prépare et que la politique de confidentialité nomme ;
