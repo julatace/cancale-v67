@@ -12103,7 +12103,8 @@ fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
 - **Une règle** `<recu-achat-regle>` (App.jsx) : `ventilationRecuAchat` (toutes les
   lignes « Libellé ±X,XX € », libellé de Vinted, en centimes, aucune jetée — une ligne
   illisible est GARDÉE ; `juste` · `ecart` · `passu`), `txRecuAchat` (le n° lu sur sa
-  ligne), `estRecuAchat` (un Montant payé, ou un sujet de reçu, ou un PDF),
+  ligne), `estRecuAchat` (⚠️ revue ci-dessous : tout email rangé comme achat SAUF les
+  trois sujets de statut mesurés, sans Montant payé ni PDF),
   `recusAchatDe` (`undefined`/`null` passés tels quels). `champsRecuAchat` sert la
   feuille ET la fenêtre PDF (§11) ; `phraseSommeRecu` dit l'écart ou le « pas su » en
   une ligne neutre, jamais un total partiel présenté comme complet.
@@ -12144,6 +12145,20 @@ fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
     contrôle de plus exige les vraies lignes dans la fenêtre (Frais Vinted, somme
     juste, « Visa •••• 4242 ») : 2 rouges sur 7ba9670, vert après, 2 rouges quand la
     fenêtre ne garde que les trois anciens libellés.
+  - **Un email que la ROUTE range comme achat disparaissait de la liste** :
+    `estRecuAchat` exigeait un Montant payé, un sujet « reçu pour la commande » ou un
+    PDF, alors que la route (branche 2b) range aussi « Merci pour ton achat », « Tu as
+    acheté », « Confirmation d'achat » (et notifie « justificatif archivé ») — ils
+    étaient comptés parmi « les mises à jour, confirmations, retours », et un reçu dont
+    Vinted changerait la tournure aurait suivi. « Pas un reçu » = les trois sujets de
+    statut MESURÉS (`SUJET_STATUT_ACHAT` : « Commande mise à jour pour » 18, « -
+    Confirmation requise » 16, « Retourne ta commande » 2 ; aucun avec un Montant payé
+    ni un PDF), rien d'autre. Sans bloc Montant payé, la feuille et la fenêtre
+    montrent le TEXTE de l'email (`hasStructured` = `v.trouve` : avant, un n° de
+    transaction suffisait à afficher un reçu vide). `audit-recu-achat.cjs` fait
+    passer ces emails par la vraie route puis par la vraie règle (§11) : 6 rouges sur
+    7ba9670 ; mutations `positif` 4, `nonrecu` 2, `texte` 1. Banc `recu-achat.cjs` :
+    « Merci pour ton achat » listé et lu en texte, 12 rouges sur le build de 7ba9670.
 
 ---
 

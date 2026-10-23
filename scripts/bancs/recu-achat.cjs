@@ -12,8 +12,9 @@
 //  seule) : aucune vraie donnée, ce banc vit dans le dépôt. La requête de l'app
 //  (`id=like.email_achat_*&select=id,data`) est servie avec SA projection.
 //  390 px tactile clair, 390 px tactile sombre, 1512 px. Il juge :
-//    A. la liste « Reçus d'achat par email » ne montre que les 4 vrais reçus,
-//       et DIT combien d'autres emails n'en sont pas (sans les lister) ;
+//    A. la liste « Reçus d'achat par email » montre les 5 reçus (dont un
+//       « Merci pour ton achat » sans Montant payé, que la route range comme
+//       achat), écarte les 2 emails de STATUT et DIT combien (sans les lister) ;
 //    B. la feuille est hors de <main>, AU-DESSUS de la barre du bas : le point
 //       au bas de la feuille est la feuille, pas la barre ;
 //    C. on fait défiler le reçu jusqu'au bout : « N° de transaction » et la
@@ -76,6 +77,11 @@ const ROWS = [
   // R4 — une somme qui ne tombe pas juste (forme inventée) : la feuille doit le DIRE
   ligneRecu('r4', { subject: 'Ton reçu pour la commande « Botte banc ecart »', article: 'Botte banc ecart', prix: '30,00', receivedAt: jour(9),
     texte: recu('Botte banc ecart', '30,00', ['Article 20,00 € ', 'Frais de port 3,23 € '], '23455556666') }),
+  // M1 — (revue du 23 oct.) un email que la route range AUSSI comme achat
+  // (« Merci pour ton achat ») sans « Montant payé » : c'est un reçu, il reste
+  // LISTÉ, et la feuille montre son texte (forme inventée, champs de la route).
+  ligneRecu('m1', { subject: 'Merci pour ton achat !', article: 'Escarpin merci banc', prix: '24,93', transaction: '23400000009', receivedAt: jour(12),
+    texte: 'Bonjour compte_banc,\n\nMerci pour ton achat « Escarpin merci banc ».\n\nTotal payé : 24,93 €\nArticle : Escarpin merci banc\nTransaction : 23400000009\n' }),
   // N1, N2 — des emails de STATUT rangés là par l'ancien tri : ce ne sont PAS des reçus
   ligneRecu('n1', { subject: 'Commande mise à jour pour Mocassin banc taille 41', article: 'Mocassin banc taille 41', prix: '', receivedAt: jour(70),
     texte: 'Bonjour,\n\nIl te reste 48 heures pour confirmer que tout est en ordre avec ta commande\n\nAller sur la commande\n' }),
@@ -200,9 +206,19 @@ async function fermerParEchap(pg) {
         await recus.locator('summary').click();
         await pg.waitForTimeout(400);
         const noms = await recus.locator('li > button strong').allInnerTexts();
-        dit(noms.length === 4 && noms.every((n) => !/Mocassin|est conforme/.test(n)), 'A. la liste montre les 4 vrais reçus — aucun email « Commande mise à jour » / « Confirmation requise »', JSON.stringify(noms));
+        dit(noms.length === 5 && noms.every((n) => !/Mocassin|est conforme/.test(n)), 'A. la liste montre les 5 reçus — aucun email « Commande mise à jour » / « Confirmation requise »', JSON.stringify(noms));
+        dit(noms.includes('Escarpin merci banc'), 'A. un « Merci pour ton achat » rangé comme achat par la route RESTE listé (il n’a pas de « Montant payé », ce n’est pas un email de statut)', JSON.stringify(noms));
         const autres = await recus.getAttribute('data-recus-autres').catch(() => null) || await recus.locator('[data-recus-autres]').getAttribute('data-recus-autres').catch(() => null);
         dit(autres === '2', 'A. la liste DIT que 2 autres emails ne sont pas des reçus (ils ne disparaissent pas en silence)', String(autres));
+      });
+
+      // ── A2. Un reçu sans « Montant payé » : la feuille montre son texte ──
+      await essaie('A2. reçu sans Montant payé', async () => {
+        await ouvrirDepuisListe(pg, /Escarpin merci banc/);
+        const f = await lireFeuille(pg);
+        dit(f && /Total payé : 24,93 €/.test(f.texte) && !/ne sont peut-être pas toutes là/.test(f.texte) && f.lignes.length === 0,
+          'A2. un reçu sans « Montant payé » montre le texte de l’email (« Total payé : 24,93 € »), sans en-tête vide ni phrase « lignes incomplètes »', f && JSON.stringify(f.texte.slice(0, 160)));
+        await fermerParEchap(pg);
       });
 
       // ── B, C, D, F. Le reçu de la capture (R1) ───────────────────────────

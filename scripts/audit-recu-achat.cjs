@@ -31,6 +31,8 @@
 // `--mutation=…` réaffaiblit la règle : chaque mutation doit faire passer au
 // moins un contrôle au rouge.
 //   connus · somme · signe · nonrecu · jete · txtexte · mode
+//   positif · texte  (23 oct., revue : la définition « positive » d'un reçu ;
+//                     une feuille structurée sans Montant payé)
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');
@@ -70,17 +72,22 @@ if (process.argv[2] === '--route') {
     maj: mail('Commande mise à jour pour Basket banc taille 42', 'Bonjour,\n\nIl te reste 48 heures pour confirmer que tout est en ordre avec ta commande\n\nAller sur la commande\n\nRejoins la communauté Vinted :\n'),
     conf: mail('Basket banc taille 42 - Confirmation requise', 'Bonjour compte_banc,\n\nIl a été indiqué que ta commande a été livrée.\n\nSi tu as bien reçu ta commande et que l’article est conforme à sa\ndescription, confirme-le en appuyant sur sur le bouton Tout est OK dans ta\nconversation avec le vendeur.\n'),
     retour: mail("Retourne ta commande d'ici le 24 oct. : Basket banc", "Assure-toi que le ou les articles sont dans leur état d'origine lorsque tu\nles retournes.\n\nRetourne la commande d'ici le 24 oct.. Sinon, tu devras la garder et ton\npaiement sera transféré au vendeur.\n"),
+    // (23 oct., revue) Des formes que la route range AUSSI comme achat (« tu as
+    // acheté », « merci pour ton achat ») sans « Montant payé » : l'app doit les
+    // garder dans la liste — ce n'est pas un email de statut.
+    merci: mail('Merci pour ton achat !', 'Bonjour,\n\nMerci pour ton achat « Basket banc taille 42 ».\n\nTotal payé : 24,93 €\nArticle : Basket banc taille 42\nTransaction : 23400000009\n'),
+    achete: mail('Tu as acheté « Basket banc »', 'Bonjour,\n\nTu as acheté Basket banc.\nTotal : 24,93 €\nN° de transaction : 23400000010\n'),
     recu: mail('Ton reçu pour la commande « Basket banc taille 42 »', 'E-mail Vinted\n\nBonjour compte_banc,\n\n*Ton paiement a été reçu. *\n\nVoici les détails de ta commande :\n*Vendeur* vendeur_banc\n*Commande*\n\nBasket banc taille 42\n*Montant payé* 24,93 € \nArticle 20,00 € \nFrais de port 3,23 € \nFrais Vinted 1,70 € \n*Mode de paiement* Visa, **********4242 (24,93 €) \n*Date du paiement* 21/10/2026 10 h 47 \n*N° de transaction* 99990000111 \n'),
   };
   (async () => {
     const out = {};
     const inbound = await import('file://' + path.join(R, 'api', 'email-inbound.js'));
     for (const [k, m] of Object.entries(EMAILS)) {
-      const avant = [...base.keys()].filter((x) => x.includes('|email_achat_')).length;
+      const avant = new Set([...base.keys()].filter((x) => x.includes('|email_achat_')));
       const res = faireRes();
       try { await inbound.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-recu' }, body: JSON.parse(JSON.stringify(m)) }, res); } catch (e) { out[k] = { erreur: String(e && e.message) }; continue; }
-      const apres = [...base.keys()].filter((x) => x.includes('|email_achat_')).length;
-      out[k] = { achats: apres - avant, code: res.code };
+      const neuves = [...base.keys()].filter((x) => x.includes('|email_achat_') && !avant.has(x));
+      out[k] = { achats: neuves.length, code: res.code, lignes: neuves.map((x) => base.get(x)) };
     }
     console.log('RESULTAT ' + JSON.stringify(out));
     process.exit(0);
@@ -98,7 +105,11 @@ const muter = (avant, apres) => { if (!src.includes(avant)) { console.log('❌ m
 if (MUT === 'connus') muter("if (m && c != null && /\\p{L}/u.test(m[1])) lignes.push(", "if (m && c != null && /^(article|frais de port|.*protection)/i.test(m[1])) lignes.push(");
 else if (MUT === 'somme') muter("else if (total === paye) somme = 'juste';", "else if (true) somme = 'juste';");
 else if (MUT === 'signe') muter("return m[1] === '-' ? -v : v;", 'return v;');
-else if (MUT === 'nonrecu') muter('const estRecuAchat = (a) => !!a && (', 'const estRecuAchat = (a) => !!a || (');
+else if (MUT === 'nonrecu') muter('const estRecuAchat = (a) => !!a && !(', 'const estRecuAchat = (a) => !!a || !(');
+// (23 oct., revue) la définition « positive » d'avant : un reçu DOIT porter un
+// Montant payé, un sujet de reçu ou un PDF — tout le reste disparaissait.
+else if (MUT === 'positif') muter('const estRecuAchat = (a) => !!a && !(', "const estRecuAchat = (a) => !!a && (ventilationRecuAchat(a.texte).trouve || /re[çc]u\\s+pour/i.test(String(a.subject || '')) || !!a.pdfB64) && !(");
+else if (MUT === 'texte') muter('hasStructured: v.trouve };', 'hasStructured: v.trouve || !!(vendeur || mode || trans) };');
 else if (MUT === 'jete') muter('else lignes.push({ libelle: l, centimes: null });', 'else continue;');
 else if (MUT === 'txtexte') muter("for (const l of lignesRecu(a && a.texte)) {\n    const m = l.match(", "for (const l of []) {\n    const m = l.match(");
 else if (MUT === 'mode') muter(".replace(/\\*{3,}\\s*(\\d{2,4})\\b/g, '•••• $1')", '');
@@ -120,7 +131,7 @@ const decl = new Map();
     for (const v of d0.declarations) if (v.id && v.id.name && !decl.has(v.id.name)) decl.set(v.id.name, `${d0.kind} ${src.slice(v.start, v.end)};`);
   }
 }
-const NOMS = ['centimesRecu', 'texteCentimesRecu', 'lignesRecu', 'MONTANT_RECU', 'RE_MONTANT_SEUL_RECU', 'RE_LIGNE_RECU', 'RE_MONTANT_PAYE_RECU', 'FIN_VENTILATION_RECU',
+const NOMS = ['centimesRecu', 'texteCentimesRecu', 'lignesRecu', 'MONTANT_RECU', 'RE_MONTANT_SEUL_RECU', 'RE_LIGNE_RECU', 'RE_MONTANT_PAYE_RECU', 'FIN_VENTILATION_RECU', 'SUJET_STATUT_ACHAT',
   'ventilationRecuAchat', 'txRecuAchat', 'estRecuAchat', 'recusAchatDe', 'modePaiementRecu', 'phraseSommeRecu', 'champsRecuAchat'];
 const manque = NOMS.filter((n) => !decl.has(n));
 dit(!manque.length, 'la règle du reçu existe dans App.jsx (une règle pour la feuille et la fenêtre PDF)', manque.length ? 'absent : ' + manque.join(', ') : '');
@@ -202,6 +213,13 @@ essaie('reçu ou pas', () => {
   dit(F.estRecuAchat({ subject: 'Ton reçu pour la commande « Basket banc »', texte: CAPTURE, pdfB64: '' }), 'un vrai reçu est un reçu');
   dit(F.estRecuAchat({ texte: 'Reçu pour la commande X\nMontant payé : 125,00 EUR\nTransaction : 7654321' }), 'un reçu sans sujet mais avec son Montant payé est un reçu');
   dit(F.estRecuAchat({ subject: 'Ton reçu pour la commande « X »', texte: 'format inconnu' }), 'un reçu dont le texte a changé de forme reste un reçu (par son sujet) — il ne disparaît pas');
+  // (23 oct., revue) « Pas un reçu » = les trois formes de STATUT mesurées (36
+  // lignes, aucune avec un Montant payé ni un PDF) — jamais « tout ce qui n'a
+  // pas la forme d'aujourd'hui ».
+  dit(F.estRecuAchat({ subject: 'Merci pour ton achat !', texte: 'Merci pour ton achat.\nTotal payé : 24,93 €\nTransaction : 23400000009\n' }), 'un email « Merci pour ton achat » sans « Montant payé » reste un reçu (la route l’a rangé comme achat)');
+  dit(F.estRecuAchat({ subject: 'Ton paiement a été reçu', texte: 'Ton paiement a été reçu.\nArticle : X\n' }), 'un sujet inconnu de Vinted (forme changée) reste un reçu — il ne disparaît pas de la liste');
+  dit(F.estRecuAchat({ subject: 'Commande mise à jour pour X', texte: CAPTURE }), 'un sujet de statut qui PORTE un Montant payé reste un reçu');
+  dit(F.estRecuAchat({ subject: 'X - Confirmation requise', texte: 'rien', pdfB64: 'JVBERi0' }), 'un sujet de statut avec un PDF joint reste un reçu');
   const liste = F.recusAchatDe([...nonRecus, { subject: 'Ton reçu pour la commande « Basket banc »', texte: CAPTURE, transaction: '' }]);
   dit(Array.isArray(liste) && liste.length === 1, 'recusAchatDe ne garde que les vrais reçus', Array.isArray(liste) ? String(liste.length) : String(liste));
   dit(F.recusAchatDe(null) === null && F.recusAchatDe(undefined) === undefined, '« pas su » (null) et « en cours » (undefined) passent tels quels — jamais une liste vide');
@@ -242,7 +260,20 @@ essaie('format des montants', () => {
     dit(o.maj && o.maj.achats === 0, 'route : « Commande mise à jour pour … » ne crée AUCUNE ligne email_achat_*', JSON.stringify(o.maj));
     dit(o.conf && o.conf.achats === 0, 'route : « … - Confirmation requise » ne crée AUCUNE ligne email_achat_*', JSON.stringify(o.conf));
     dit(o.retour && o.retour.achats === 0, 'route : « Retourne ta commande … » ne crée AUCUNE ligne email_achat_*', JSON.stringify(o.retour));
-    dit(o.recu && o.recu.achats === 1, 'route : un vrai reçu crée sa ligne (l’autre sens)', JSON.stringify(o.recu));
+    dit(o.recu && o.recu.achats === 1, 'route : un vrai reçu crée sa ligne (l’autre sens)', JSON.stringify({ achats: o.recu && o.recu.achats }));
+    // §11 — la route et l'app disent la même chose : ce que la route range comme
+    // achat, l'app le LISTE (jamais compté parmi « les autres emails » en
+    // silence), y compris sans « Montant payé ».
+    for (const k of ['merci', 'achete', 'recu']) {
+      const lignes = (o[k] && o[k].lignes) || [];
+      let liste = null; try { liste = F.recusAchatDe(lignes); } catch (_) {}
+      dit(lignes.length === 1 && Array.isArray(liste) && liste.length === 1, `route → app : l’email « ${k} » rangé comme achat par la route est LISTÉ comme reçu par l’app`, JSON.stringify({ rangees: lignes.length, listes: Array.isArray(liste) ? liste.length : String(liste) }));
+    }
+    const merci = o.merci && o.merci.lignes && o.merci.lignes[0];
+    if (merci) {
+      let c = null; try { c = F.champsRecuAchat(merci); } catch (_) {}
+      dit(c && c.hasStructured === false && /Total payé : 24,93 €/.test(c.cleaned || ''), 'sans « Montant payé », la feuille montre le TEXTE de l’email (rien d’inventé, rien de perdu)', c ? JSON.stringify({ hasStructured: c.hasStructured, phrase: c.phrase }) : 'rien');
+    }
   }
 }
 

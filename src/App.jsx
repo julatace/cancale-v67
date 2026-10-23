@@ -3929,12 +3929,23 @@ const txRecuAchat = (a) => {
   }
   return '';
 };
-// Un « reçu » est un email qui porte un Montant payé (ou dont le sujet est un
-// reçu, ou qui a un PDF joint). Les emails de statut rangés là par l'ancien tri
-// du serveur n'en ont aucun.
-const estRecuAchat = (a) => !!a && (ventilationRecuAchat(a.texte).trouve
-  || /re[çc]u\s+pour\s+(?:la\s+|ta\s+|votre\s+)?commande/i.test(String(a.subject || ''))
-  || !!a.pdfB64);
+// ⚠️ (23 oct., revue) « PAS UN REÇU » SE DÉFINIT PAR CE QUI A ÉTÉ MESURÉ, pas
+// par ce qu'un reçu doit contenir. Premier jet : un reçu DEVAIT porter un
+// Montant payé, un sujet « reçu pour la commande » ou un PDF — or la route
+// (`api/email-inbound.js`, branche 2b) range AUSSI comme achat « Merci pour ton
+// achat », « Tu as acheté », « Confirmation d'achat » (et envoie « 🛍 Achat
+// confirmé — justificatif archivé ») : ces emails disparaissaient de la liste,
+// comptés parmi « les mises à jour, confirmations, retours », et tout reçu dont
+// Vinted changerait le sujet ou la tournure « Montant payé » aurait suivi.
+// MESURÉ (lecture seule, 117 lignes `email_achat_*`) : les 36 non-reçus ont
+// EXACTEMENT ces trois sujets — « Commande mise à jour pour … » 18, « … -
+// Confirmation requise » 16, « Retourne ta commande … » 2 —, aucun avec un
+// Montant payé ni un PDF ; les 81 reçus ont tous un Montant payé. Tout le reste
+// est un reçu (« on ne jette aucun email ») : la feuille montre son texte si la
+// ventilation n'y trouve rien (`champsRecuAchat`, `hasStructured`).
+const SUJET_STATUT_ACHAT = /^\s*commande\s+mise\s+[àa]\s+jour\s+pour\b|-\s*confirmation\s+requise\s*$|^\s*retourne\s+ta\s+commande\b/i;
+const estRecuAchat = (a) => !!a && !(SUJET_STATUT_ACHAT.test(String(a.subject || ''))
+  && !a.pdfB64 && !ventilationRecuAchat(a.texte).trouve);
 // undefined = lecture en cours, null = pas su : passés tels quels.
 const recusAchatDe = (rows) => (Array.isArray(rows)
   ? rows.filter(estRecuAchat).map((r) => ({ ...r, transaction: txRecuAchat(r) }))
@@ -3979,8 +3990,13 @@ const champsRecuAchat = (a) => {
     .split('\n').map(l => l.trim())
     .filter(l => l && !/nous sommes tenus|d[ée]sabonner|politique de confidentialit|termes et conditions|pour conna[îi]tre vos droits|l['’]équipe vinted/i.test(l))
     .join('\n');
+  // (23 oct., revue) Sans bloc « Montant payé », la feuille et la fenêtre
+  // montrent le TEXTE de l'email : un en-tête « Reçu » avec seulement un n° de
+  // transaction, et la phrase « ces lignes ne sont peut-être pas toutes là »
+  // au-dessus d'aucune ligne, cachait le montant que l'email écrit autrement
+  // (« Total payé : 24,93 € »).
   return { article, vendeur, ...v, phrase: phraseSommeRecu(v), mode, datePaie, trans, compte, cleaned,
-    hasStructured: v.trouve || !!(vendeur || mode || trans) };
+    hasStructured: v.trouve };
 };
 // ⚠️ (22 oct., revue) LE JOURNAL DES VIOLATIONS ÉCOUTE AUSSI LES FENÊTRES QUE
 // L'APP OUVRE (le reçu, une facture imprimable) : elles héritent de la politique
