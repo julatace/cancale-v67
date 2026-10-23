@@ -88,6 +88,10 @@ const MUTER_MODULE = {
   'cause-perimee': (s) => s.replace("    else if (r === 'erreur') {\n      sonde = 'encours';", "    else if (r === 'erreur') {"),
   // le bilan part pendant la mesure
   'bilan-tot': (s) => s.replace("if (sondeEnCours || sonde === 'encours') { bilanTimerAt = maintenant() + 2000; bilanTimer = setTimeout(envoyerBilan, 2000); return; }", ''),
+  // (22 oct.) le retour de l'extension n'est plus un signal quand le secours ne change pas (session)
+  'ext-revenue': (s) => s.replace("  } else if (extRevenue && s === 'oui') rouvrirTout(true);\n", '  }\n'),
+  // (22 oct., revue) le retour de l'extension rouvre tout SANS le recul
+  'ext-revenue-sans-recul': (s) => s.replace("  } else if (extRevenue && s === 'oui') rouvrirTout(true);\n", "  } else if (extRevenue && s === 'oui') rouvrirTout();\n"),
   // ── seconde revue du 11 octobre ──
   // un refus de l'extension redevient DÉFINITIF (les listes retirent la photo)
   'refus-definitif': (s) => s.replace('export function estDefinitive(url) { void url; return false; }', "export function estDefinitive(url) { const e = entrees.get(url); return !!(e && e.etat === 'ko'); }"),
@@ -537,6 +541,42 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     secours = 'non'; w.m.secoursChange(); secours = 'oui'; w.m.secoursChange();
     await w.avancer(10);
     dit([U(6), U(7)].every((u) => w.m.etat(u) === 'ok'), 'l’extension revient (battement) : les photos qu’elle avait refusées lui sont redemandées', [U(6), U(7)].map((u) => w.m.etat(u)).join(','));
+    // (22 oct.) AVEC UNE SESSION, le secours vaut « oui » en permanence (la route
+    // serveur de l'app) : le retour de l'extension ne change plus `secours`. Une
+    // extension MUETTE puis de nouveau présente reste un signal neuf — les photos
+    // refusées pendant qu'elle se taisait lui sont redemandées sans attendre leur
+    // recul (banc photos-vinted, U).
+    w = monde({ sonde: () => 'erreur' });
+    x = transitoire();
+    let extEtat = 'muette';
+    w.m.configurer({ secours: () => 'oui', ext: () => extEtat, demander: x.demander, chargerImage: async () => false });
+    monterEchouer(w.m, [U(16), U(17)]);
+    await w.avancer(10);
+    const avantRetour = [U(16), U(17)].map((u) => w.m.etat(u)).join(',');
+    w.m.secoursChange();                   // battement : toujours muette
+    extEtat = 'presente'; w.m.secoursChange();
+    await w.avancer(10);
+    dit(avantRetour === 'ko,ko' && [U(16), U(17)].every((u) => w.m.etat(u) === 'ok'), 'avec une session (secours toujours « oui ») : l’extension muette qui revient se voit redemander les photos refusées, sans attendre leur recul', `avant ${avantRetour} · après ${[U(16), U(17)].map((u) => w.m.etat(u)).join(',')}`);
+    // (22 oct., revue) … mais AVEC LE RECUL : une extension qui alterne
+    // muette/présente (réseau qui change, service worker qui s'endort) ne doit
+    // pas faire redemander chaque lien MORT à chaque retour — c'est la borne
+    // « quinze retours, quinze demandes » du 11 octobre, que le retour de
+    // l'extension contournait (16 demandes par lien en 10 min, contre 3 sur
+    // main). Six liens morts, l'extension muette puis présente toutes les 22,5 s.
+    w = monde({ sonde: () => 'erreur' });
+    const parMortFlap = {};
+    let extFlap = 'presente';
+    const mortsFlap = Array.from({ length: 6 }, (_, i) => U(140 + i));
+    w.m.configurer({ secours: () => 'oui', ext: () => extFlap, chargerImage: async () => false,
+      demander: async (u) => { parMortFlap[u] = (parMortFlap[u] || 0) + 1; return { dataUrl: null, issue: 'refus' }; } });
+    monterEchouer(w.m, mortsFlap);
+    w.m.secoursChange();
+    await w.avancer(10);
+    for (let i = 0; i < 13; i++) { extFlap = 'muette'; w.m.secoursChange(); await w.avancer(22_500); extFlap = 'presente'; w.m.secoursChange(); await w.avancer(22_500); }
+    const nFlap = mortsFlap.map((u) => parMortFlap[u] || 0);
+    dit(nFlap.every((n) => n >= 1 && n <= 6),
+      'extension qui alterne muette/présente (13 retours en 10 min) : un lien mort n’est redemandé qu’après son recul — au plus 6 fois, jamais une fois par retour',
+      `demandes par lien mort ${JSON.stringify(nFlap)}`);
     // `online` : tout réessaie, et le refus tombe.
     w = monde({ sonde: () => 'erreur' });
     x = transitoire();

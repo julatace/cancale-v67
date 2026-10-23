@@ -12714,3 +12714,127 @@ contrôle lancé depuis elle, §6.1), vert après, rouge sous mutation.
 - ⚠️ **Non mesuré** : ce que fait Vinted après l'heure limite (rien n'est promis) ; l'heure réelle du cron chez Vercel ; la limite eBay garde ses jours
   calendaires (`colisEbay`, domaine eBay — une limite eBay d'aujourd'hui passée n'est pas encore « en retard ») ; le script iOS du widget (il peut lire
   `heureDemain`, rien ne l'y oblige).
+### Fiabilité laissée ouverte le 22 octobre : Ma journée relit moins, la barre des Ventes tient sur téléphone, les photos d'une extension muette (22 octobre)
+Les trois points « reste ouvert » de `docs/passation/2026-10-22.md`.
+- **Mesuré (bissection de `main`, une construction par fusion, banc `vitesse.cjs`)** :
+  Ma journée à 390 px est passée de 54 à 64 lectures et de ~13 à 15-16 rendus
+  entre le 21 et le 22 octobre. Cinq causes, toutes retirées (aucun plafond
+  touché, 62 et 13) :
+  1. #634 lisait les n° de suivi de **tous** les achats (560, six requêtes) pour
+     n'en utiliser que ceux au point relais ⇒ sur Ma journée, seulement
+     `vintedToPickup` (`demandesSuivis`, une clé stable) ;
+  2. #635 lisait `vrm_blocked_accounts` à **deux** adresses (filtrée sur le
+     vendeur et non) : le partage des lectures ne les réunit pas ⇒
+     `purgerComptesSupprimes` lit à la même adresse que `fetchVintedAccounts` ;
+  3. les brouillons eBay étaient lus pour « numéros à vérifier », qui ne vit que
+     sur Annonces ⇒ lus sur Annonces seulement ;
+  4. un signal `vrm:colis` re-rendait toute la coque (`colisTick`) puis la cloche
+     reposait une liste identique ⇒ le signal relance la passe directement, et
+     une liste, un index ou des réserves IDENTIQUES ne sont pas reposés ;
+  5. `lireReceptionLeboncoin` passait `signal` et `cache:'no-store'` : la lecture
+     sortait du partage (`lbc_ventes` lue trois fois) ⇒ attente bornée par une
+     course, plus de signal.
+  Mesuré après : **55 à 57 lectures (64 à 390 px et 63 à 1512 avant)** ;
+  rendus médiane 13, de 12 à 14 (19/16/15 avant) ; texte de Ma journée
+  **identique caractère pour caractère** à celui de `main` aux deux tailles
+  (`VITESSE_REFERENCE`). ⚠️ Les deux textes se produisent à la MÊME heure : le
+  bonjour suit l'heure (« Bon après-midi » contre « Bonsoir » a fait un faux
+  écart au premier essai).
+- ⚠️⚠️ **LE PLAFOND GLOBAL NE VOIT PAS LAQUELLE REVIENT** : les causes 1 à 4
+  remises ensemble donnent **exactement 62 lectures et une médiane de 13
+  rendus** — le banc était VERT sur la régression. D'où quatre contrôles, un par
+  cause (n° de suivi ⊆ achats au relais, une seule adresse pour la liste noire,
+  aucun brouillon eBay, 0 rendu sur le second signal) : **12 rouges** sur `main`
+  (d198bca), 8 rouges sous les quatre mutations. La cinquième est prouvée par
+  `scripts/tests/rafraichissement-leboncoin.test.mjs` (2 lectures pour 2
+  demandes sur l'ancien code, 1 après).
+- **Barre d'outils des Ventes, décidé** : sous 768 px, « Bordereaux auto » et
+  « Mes vues » passent dans « ⋯ Outils » ; sur ordinateur rien ne bouge. Mesuré
+  à 390 px : **273 → 113 px** de barre avant la première vente. Seuil du banc
+  `revendeurs.cjs` revenu à 150.
+  ⚠️ **Trouvé en le faisant, et c'était déjà cassé sur `main`** : sous 1024 px le
+  menu « ⋯ Outils » s'ouvrait DANS la rangée qui défile (`.vrm-rangee`,
+  `overflow-x:auto`) — coupé, Rapport comptable et Registre annuel
+  intouchables au doigt. Il s'ouvre sous la barre ; le bouton reste collé à
+  droite de la rangée. `revendeurs.cjs` : **8 rouges sur `main`**, 210 verts
+  après ; menu remis dans la rangée ⇒ rouge, outils remis dans la barre ⇒ rouge.
+- **`photos-vinted.cjs` : 40 rouges qui ne mesuraient aucune photo** — l'écran
+  de connexion. La porte de banc (`_porte-banc.cjs`, chargée par `_meta.cjs`) se
+  posait sur `require('playwright')` ; or le banc lance
+  `/home/user/cancale-v67/node_modules/playwright`, et dans un **worktree dont
+  `node_modules` est un lien vers un autre arbre** ce sont DEUX modules : la
+  porte sur l'un, le navigateur de l'autre. Même cause pour `rapport.cjs` (7
+  rouges) et `seuils-vinted.cjs` (13) — verts une fois la porte posée aussi sur
+  le chemin absolu (dans la porte elle-même, pas banc par banc). ⚠️ Les
+  workflows lancent leurs agents dans des worktrees : *un banc rouge en masse
+  dans un worktree, regarder d'abord l'écran capturé*. Porte posée, 6 rouges :
+  - ⚠️ **U, un vrai défaut d'app** (depuis e4a755f, 13 oct.) : avec une session,
+    le secours des photos vaut « oui » en permanence (la route serveur). Serveur
+    qui échoue + extension MUETTE ⇒ chaque photo partait en « délai », jamais
+    comptée perdue : des pictogrammes **sans aucune phrase**. Une extension
+    muette n'est plus interrogée (refus, jamais définitif), et son retour
+    redemande les photos refusées même quand le secours ne change pas
+    (`secoursChange`, contrôle ajouté à `audit-photos-vinted.cjs`, rouge sur
+    l'ancien code et sous la mutation `ext-revenue`). U : 3 rouges sur `main`
+    et sous mutation, verts après.
+  - **O et N, le banc en retard** : hors ligne, la coque remplace TOUS les écrans
+    par la copie de Ma journée (5588c02, 21 oct.) — plus de liste de photos ni de
+    navigation de sections pendant la coupure. Les deux scénarios jugent
+    maintenant ce qui existe : la coque dit « hors ligne », aucune phrase de
+    photos fausse, et au retour du réseau tout s'affiche sans phrase.
+- **« À envoyer 0 » avant la liste des comptes** (trouvé en relançant
+  `statuts-colis.cjs`, rouge sur `main`) : la tuile de Ma journée n'était « pas
+  su » que si les QUATRE lectures manquaient ET que des comptes étaient connus —
+  avant le retour de la liste des comptes, elle disait « 0 », puis « 2 » une
+  seconde plus tard. Un zéro inventé (§5) : « — » tant que les comptes, les
+  ventes (ou, pour « À retirer », les achats) ne sont pas lus. Rouge sur `main`
+  à 390 px (deux passages sur deux), et sur la mutation aux deux tailles ; vert
+  deux fois après. `ebay-colis`, `ebay-messages-journee`, `journee-premium`
+  (qui lisent la même tuile) restent verts.
+- ⚠️ **Disque plein pendant la passe** (`/` à 20 Mo libres) : Chromium mourait
+  (« No space left on device » dans ses journaux) et le banc disait seulement
+  « Target page, context or browser has been closed ». Un banc qui meurt ainsi,
+  c'est la machine : regarder `df -h /` avant d'accuser l'app.
+- **Non mesuré** : les rendus varient de 12 à 14 sous la charge de la machine
+  partagée (4 cœurs) — la médiane tient le plafond, un tirage isolé peut le
+  dépasser ; la route serveur des photos en production (le défaut U ne se voit
+  que si elle échoue) ; rien n'a été vu sur un vrai téléphone.
+- **Revue du soir (22 octobre) — trois défauts de cette passe, reproduits, corrigés.**
+  Chacun : rouge sur 204618c (copie `git archive`, contrôle lancé depuis elle),
+  vert après, rouge sous mutation.
+  1. ⚠️ **Une lecture PENDUE captait toutes les suivantes** (régression de la
+     cause 5) : sans `signal`, `lbc_ventes` entre dans le partage, qui gardait
+     une lecture EN COURS sans limite. Une requête perdue (réseau qui change,
+     iPhone qui se réveille) : « ↻ Actualiser » de l'écran Leboncoin ne
+     relançait plus rien, l'écran restait « — » jusqu'à une écriture. Une
+     lecture en cours ne se partage plus que `VOL_MAX_MS` = **8 s** (plus court
+     que les 12 s de `lireReceptionLeboncoin`) ; deux lectures simultanées
+     restent UN appel. `audit-lectures-partagees.cjs` §10 (mutation
+     `vol-sans-fin` rouge) ; `rafraichissement-leboncoin.test.mjs` 6/6 (« une
+     lecture pendue ne capte pas Actualiser », rouge sur 204618c).
+  2. **« 0 À retirer » sur un échec des achats** : la correction « — tant que
+     les achats ne sont pas lus » ne couvrait que l'attente (`items:null`) ; un
+     ÉCHEC rend `items:[]` + `error` + `failedUids`, et Achats disait
+     « Impossible de charger » au même moment (§5, §11). La tuile vaut « pas
+     su » si les achats sont en échec (`buys.error`, ou un compte non exclu
+     dans `failedUids`), comme « À envoyer » pour les ventes.
+     `statuts-colis.cjs` §3c (lecture groupée des commandes et relais en 503,
+     ventes lues) : **2 rouges sur 204618c** (« lu 0 »), 2 sous la mutation
+     « échec ignoré », vert après ; l'autre sens (achats lus ⇒ « 1 ») ajouté.
+  3. **Extension qui alterne muette/présente** : son retour rouvrait toutes les
+     photos refusées SANS le recul — chaque lien mort redemandé à chaque retour
+     (16 demandes par lien en 10 min contre 3 sur `main`, la borne « quinze
+     retours, quinze demandes » du 11 octobre contournée). `rouvrirTout(true)` :
+     une photo jamais rouverte l'est tout de suite (U reste vert), un lien mort
+     attend son recul ⇒ **4** demandes par lien. `audit-photos-vinted.cjs` :
+     contrôle « extension qui alterne », rouge sur 204618c ([16,…]) et sous
+     `ext-revenue-sans-recul` et `retour-sans-borne`.
+  Bancs relancés un par un (ports 6431-6434) : statuts-colis, photos-vinted U,
+  journee-premium (17 ✅), ebay-colis, ebay-messages-journee, vitesse (lectures
+  inchangées, 57/55). ⚠️ vitesse a donné une fois une médiane de 14 rendus sur
+  Ma journée 390 px (12/14/15) pendant le passage complet ; relancé seul deux
+  fois : 13/14/12 et 13/13/14, contre 13/14/13 et 13/13/13 sur 204618c — le
+  bruit de la machine partagée déjà noté, la tuile ne crée aucun état.
+  **Non mesuré** : la durée réelle d'une lecture lente sur un vrai téléphone
+  (une lecture de plus de 8 s n'est plus partagée : au pire une requête de
+  plus, jamais une réponse fausse).
