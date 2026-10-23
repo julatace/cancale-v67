@@ -145,3 +145,48 @@ export function ecouterPlantages(contexte) {
     });
   } catch (_) {}
 }
+
+// ── LES VIOLATIONS DE LA POLITIQUE DE SÉCURITÉ DU CONTENU (21 octobre) ─────────
+// La politique complète part d'abord en « Report-Only » (vercel.json) : elle ne
+// bloque rien, le navigateur SIGNALE seulement ce qu'elle aurait bloqué. Sans
+// fournisseur de rapports (aucun tiers, comme pour les plantages), on note ces
+// signalements dans le MÊME journal — « CSP connect-src ← https://hôte ». C'est
+// ce qui dira, sur ses vrais appareils, si la politique peut passer en vigueur.
+// Rien d'une extension (elles injectent dans la page : ce n'est pas l'app), et
+// jamais une adresse complète : l'origine seule.
+export function decrireViolation(e) {
+  const u = String((e && e.blockedURI) || '');
+  let ou = u;
+  if (!u || u === 'inline') ou = 'en ligne';
+  else if (u === 'eval' || u === 'wasm-eval') ou = u;
+  else if (/^(data|blob|chrome-extension|moz-extension|safari-web-extension|safari-extension):/i.test(u)) ou = u.split(':')[0] + ':';
+  else { try { ou = new URL(u).origin; } catch (_) { ou = u.slice(0, 60); } }
+  const dir = String((e && (e.effectiveDirective || e.violatedDirective)) || '?').split(' ')[0];
+  return { message: `CSP ${dir} ← ${ou}${e && e.disposition === 'report' ? ' (report-only)' : ''}`, ou, dir };
+}
+// ⚠️ (22 oct., revue) UN DOCUMENT, PAS « LE » DOCUMENT. Les fenêtres que l'app
+// ouvre elle-même (le reçu d'achat, une facture imprimable) héritent de la
+// politique de la page : leurs violations s'y déclenchent, dans LEUR document,
+// et n'arrivaient jamais au journal. `ecouterViolationsCspDans(w.document, …)`
+// s'appelle juste après `w.document.open()` (open() efface les écouteurs posés
+// avant) — et AVANT d'écrire, pour voir ce que le chargement déclenche.
+// Ce que ce journal ne voit PAS, et ne peut pas voir d'une page : un worker (la
+// carte, pdf.js), le service worker, l'onglet du bordereau PDF. Ceux-là ne sont
+// tenus que par le banc (`scripts/bancs/csp.cjs`, par `report-uri`).
+export function ecouterViolationsCspDans(doc, contexte) {
+  try {
+    doc.addEventListener('securitypolicyviolation', (e) => {
+      try {
+        const src = String(e.sourceFile || '');
+        const { message, ou } = decrireViolation(e);
+        if (/extension:/i.test(ou) || /extension:\/\//i.test(src)) return;
+        const err = { message, stack: src ? `Error\n    at ${src}:${e.lineNumber || 0}` : '' };
+        noterPlantage(err, Object.assign({ origine: 'csp' }, contexte && contexte()));
+      } catch (_) {}
+    });
+    return true;
+  } catch (_) { return false; }
+}
+export function ecouterViolationsCsp(contexte) {
+  try { ecouterViolationsCspDans(document, contexte); } catch (_) {}
+}

@@ -12,10 +12,21 @@
 --     reçus, compta), ni les réglages (`main` jamais en entier), ni les comptes
 --     Vinted et leurs jetons (`vinted_accounts` : aucune règle pour lui), ni
 --     `ebay_tokens*`, ni les messages des acheteurs.
---   • AUCUNE ÉCRITURE. « Coché posté » n'est pas indispensable : Vinted fait
---     sortir le colis d'« à expédier » dès qu'il est scanné au relais
---     (`transaction_user_status`), et une écriture du membre dans les lignes du
---     vendeur ouvrirait une porte qu'aucun écran ne justifie.
+--   • aucune écriture PAR RLS : les restrictives d'écriture (021) et les
+--     permissives `owner = auth.uid()` ne s'ouvrent pas pour lui. « Coché
+--     posté » n'est pas indispensable : Vinted fait sortir le colis
+--     d'« à expédier » dès qu'il est scanné au relais (`transaction_user_status`).
+--   • ⚠️ LA SEULE ÉCRITURE DU MEMBRE passe HORS RLS, et c'est CETTE migration
+--     qui la met en service : l'écran Organisation
+--     (`/api/compte?mode=operations`, api/_lib/operations.js) lit et réécrit la
+--     ligne `vrm_operations_v1` DU VENDEUR avec la clé de service, après un
+--     contrôle de `membre_de` rendu par `vrm_equipe_lister` (`acces === true`) —
+--     sans la 016, cette fonction répond 404 et la route refuse (403).
+--     src/operations/metier.js la borne à `mission.etat` et `mission.etape`, sur
+--     SES missions seulement (attribution = son invitation), sans jamais valider
+--     (en_cours, terminee, bloquee). Il y lit aussi SES missions, en projection
+--     (ni réservations, ni lots, ni l'argent, ni les autres missions).
+--     Preuve : scripts/audit-equipe-ecriture-membre.cjs.
 --
 -- Numéro : 016. La 015 est RÉSERVÉE (l'horloge de l'agent eBay, pg_cron /
 -- pg_net, sur le oui de Julien — docs/passation/README.md).
@@ -41,14 +52,20 @@
 --
 -- LE VENDEUR DOIT AVOIR ACCÈS (règle du 4 octobre, `vrm_acces_pour`) : un
 -- vendeur qui ne paie plus ne voit plus rien, son équipe non plus. L'abonnement
--- du MEMBRE n'entre pas en compte (un aide ne paie pas). D'où la seule
--- modification d'un objet existant : la restrictive `abonnement_requis` de
--- `app_data` laisse aussi passer les lignes d'un vendeur dont l'appelant est
--- membre ACTIF, DEMANDÉ par l'en-tête de la requête (et dont l'accès est
--- ouvert) — la permissive `equipe_lit` borne
--- ensuite ces lignes à la liste blanche. Texte d'avant, pour un retour arrière :
+-- du MEMBRE n'entre pas en compte (un aide ne paie pas). D'où les DEUX seules
+-- modifications d'objets existants, toutes deux sur `app_data` :
+--   • la restrictive `abonnement_requis` (006) laisse aussi passer les lignes
+--     d'un vendeur dont l'appelant est membre ACTIF, DEMANDÉ par l'en-tête de
+--     la requête (et dont l'accès est ouvert) ;
+--   • la restrictive `vrm_lecture_privee` (021, si elle existe — elle existe en
+--     production depuis le 21 octobre) reçoit la clause de l'équipe que la 021
+--     prévoit elle-même, mot pour mot (§11 bis).
+-- La permissive `equipe_lit` borne ensuite ces lignes à la liste blanche.
+-- Textes d'avant, pour un retour arrière (sans DROP) :
 --   alter policy abonnement_requis on public.app_data
 --     using ((select public.vrm_acces_ok()));
+--   alter policy vrm_lecture_privee on public.app_data
+--     using (owner = (select auth.uid()));
 -- `vinted_accounts` n'est PAS touchée.
 --
 -- LA DEMANDE EXPLICITE : les lignes du vendeur ne sont visibles au membre que
@@ -324,5 +341,39 @@ end $$;
 -- `with check` ne change pas : une écriture exige toujours l'accès de l'appelant.
 alter policy abonnement_requis on public.app_data
   using ((select public.vrm_acces_ok()) or owner = (select public.vrm_equipe_vendeur()));
+
+-- ── 11 bis. LA RESTRICTIVE DE LECTURE DE LA 021 (22 octobre) ─────────────────
+-- La 021 (confidentialité) a été appliquée en production le 21 octobre, AVANT
+-- celle-ci. Elle a posé `vrm_lecture_privee` : RESTRICTIVE, SELECT, réduite à
+-- `owner = auth.uid()` parce que les fonctions de l'équipe n'existaient pas
+-- encore (lu sur la vraie base le 22 octobre). Une restrictive s'ajoute (ET) à
+-- `equipe_lit` : sans la retoucher, le membre ne lirait RIEN (rejoué le 22
+-- octobre sur un Postgres jetable dans l'ordre de la production : 0 ligne au
+-- lieu des colis, `audit-equipe-sql.cjs`). La 021 prévoit elle-même la clause de l'équipe
+-- quand ces fonctions existent ; on pose ICI LA MÊME EXPRESSION (§11), sans
+-- DROP. Sans la 021 : rien à faire (la 021, appliquée après, l'écrira).
+do $$ begin
+  if exists (select 1 from pg_catalog.pg_policies where schemaname = 'public' and tablename = 'app_data' and policyname = 'vrm_lecture_privee') then
+    alter policy vrm_lecture_privee on public.app_data
+      using (owner = (select auth.uid()) or (owner = (select public.vrm_equipe_vendeur()) and public.vrm_equipe_id_permis(id)));
+  end if;
+end $$;
+
+-- ── 11 ter. AUCUNE AUTRE RESTRICTIVE NE DOIT FERMER LA LECTURE DU MEMBRE ─────
+-- Une restrictive de lecture (SELECT ou ALL) qui vise `authenticated` (ou tout
+-- le monde) et ne connaît pas l'équipe rendrait la fonction MORTE en silence :
+-- l'écran de l'aide dirait « aucun colis ». Plutôt que d'installer une fonction
+-- morte, on refuse tout (« rien lu ne vaut pas rien »).
+do $$ declare b text; begin
+  select pg_catalog.string_agg(p.policyname, ', ' order by p.policyname) into b
+    from pg_catalog.pg_policies p
+   where p.schemaname = 'public' and p.tablename = 'app_data' and p.permissive = 'RESTRICTIVE'
+     and p.cmd in ('SELECT', 'ALL')
+     and (p.roles @> array['authenticated']::name[] or p.roles @> array['public']::name[])
+     and coalesce(p.qual, '') not like '%vrm_equipe_vendeur%';
+  if b is not null then
+    raise exception 'vrm_equipe_lecture_bloquee : la restrictive % fermerait la lecture du membre — rien n''est installé', b;
+  end if;
+end $$;
 
 commit;

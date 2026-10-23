@@ -72,6 +72,13 @@ export function construirePhoto({ uid, at, envoyer = [], retirer = [], nePasPost
     envoyer: envoyer.slice(0, MAX_LIGNES).map((e) => ({
       titre: txt(e.titre), numero: txt(e.numero, 12), compte: txt(e.compte, 40), plateforme: e.plateforme === 'ebay' ? 'ebay' : 'vinted',
       limite: Number.isFinite(e.jours) ? jourLocal(at, e.jours) : '',
+      // (22 oct.) L'HEURE limite lue dans l'email (« avant 10 h ») et l'instant
+      // exact, pour que la ligne hors ligne dise la même chose que Colis — et
+      // passe « en retard » à l'heure, même sans réseau. Absents ⇒ le jour seul.
+      ...(Number.isFinite(e.limiteAt) && /^\d{4}-\d{2}-\d{2}$/.test(String(e.jour || '')) ? { jour: e.jour, limiteAt: e.limiteAt, heure: /^\d{2}:\d{2}$/.test(String(e.heure || '')) ? e.heure : '' } : {}),
+      // (revue du 22 oct.) Une date ESTIMÉE (vente + 7 j, pas d'email) : jamais
+      // « en retard » une fois passée, « à vérifier sur Vinted ».
+      ...(e.estimee === true ? { estimee: true } : {}),
     })),
     nEnvoyer: envoyer.length,
     retirer: retirer.slice(0, MAX_LIGNES).map((r) => ({
@@ -120,15 +127,18 @@ export function joursAvantJour(jour, maintenant = Date.now()) {
 
 // La liste du soir : ce qui est à poster DEMAIN, la règle du rappel de la
 // veille (en retard demain = date limite aujourd'hui ou avant ; limite demain).
+// (revue du 22 oct.) Une date ESTIMÉE (vente + 7 j) passée demain n'est pas
+// « déjà en retard » — la vraie tombe jusqu'à 3 jours plus tard : `aVerifier`,
+// la même règle que le rappel du soir (api/ship-reminders.js).
 export function listeDuSoir(photo, maintenant = Date.now()) {
   if (!photo) return null;
-  let enRetard = 0, demain = 0;
+  let enRetard = 0, aVerifier = 0, demain = 0;
   for (const e of photo.envoyer) {
     const j = joursAvantJour(e.limite, maintenant);
     if (j == null) continue;
-    if (j <= 0) enRetard++; else if (j === 1) demain++;
+    if (j <= 0) { if (e.estimee === true) aVerifier++; else enRetard++; } else if (j === 1) demain++;
   }
-  return { n: photo.nEnvoyer, enRetard, demain };
+  return { n: photo.nEnvoyer, enRetard, aVerifier, demain };
 }
 
 // « 14:32 », « hier 14:32 », « 12 oct. 14:32 » — l'heure de la photo.

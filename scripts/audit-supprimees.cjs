@@ -155,6 +155,12 @@ function lecteurAnnoncesApp(ligne, ids) {
   // 5.167 : le dressing passe par la règle « en ligne » LÀ OÙ IL EST LU
   // (`dressingEnLigne`, bloc <enligne-regle>) — aucune lecture publique servie ici.
   const enligne = morceau(/\/\/ <enligne-regle>[^\n]*\n([\s\S]*?)\/\/ <\/enligne-regle>/, 'enligne-regle');
+  // 22 oct. : `dressingEnLigne` rend aussi les annonces MASQUÉES (bloc
+  // <masquees-regle>). Sans ce bloc le lecteur levait (« masqueesDuCompte is not
+  // defined ») et l'écran rendait [] : la forme servie doit être celle du code (§6.3).
+  // Absent sur un code d'avant le 22 oct. : rien à charger.
+  const mq = /\/\/ <masquees-regle>[^\n]*\n([\s\S]*?)\/\/ <\/masquees-regle>/.exec(F.app);
+  const masquees = mq ? mq[1] : '';
   const dressingEnLigne = morceau(/const dressingEnLigne = async[\s\S]*?\n\};/, 'dressingEnLigne');
   const brut = morceau(/const fetchHarvestBrut = async[\s\S]*?\n\};/, 'fetchHarvestBrut');
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
@@ -166,7 +172,7 @@ function lecteurAnnoncesApp(ligne, ids) {
       return { ok: true, json: async () => projette([ligne], u) };
     } };
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${masquees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 

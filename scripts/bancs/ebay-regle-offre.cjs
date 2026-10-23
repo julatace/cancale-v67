@@ -57,7 +57,7 @@ const CAPTURES = path.join(os.tmpdir(), 'banc-ebay-regle-offre');
 fs.mkdirSync(CAPTURES, { recursive: true });
 
 // Les couleurs de la peau eBay (EBAY_SKIN), telles que le navigateur les calcule.
-const palette=require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,'../../src/themeMineral.js'),'utf8').replace('export const MINERAL','const MINERAL')+'; MINERAL;');
+const palette=require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,'../../src/themeMineral.js'),'utf8').replace(/^export /gm,'')+'; MINERAL;');
 const rgb=h=>'rgb('+[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)).join(', ')+')';
 const C_TEXT=rgb(palette.text),C_WARN=rgb(palette.warn),C_MUTED=rgb(palette.muted);
 const H = 3600000, JOUR = 86400000;

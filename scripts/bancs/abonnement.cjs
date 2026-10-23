@@ -32,13 +32,17 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4538;
+const PORT = Number(process.env.BANC_PORT) || 4538;
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : Stripe, Mon compte)
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
 const PRIX = { montant: 12.99, devise: 'eur', intervalle: 'month' };
-const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, prixConforme: true, prixStripe: null, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true };
+// ⚠️ 23 oct. — la forme du VRAI serveur : `mentionsCompletes` est TOUJOURS
+//    présent (true · false · null). L'omettre servait un état que le serveur ne
+//    rend jamais (§6.3), et l'app doit lire « absent » comme « pas su ».
+const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, prixConforme: true, prixStripe: null, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true, mentionsCompletes: true };
 const FACTURES = { ok: true,
   carte: { marque: 'visa', fin: '4242', mois: 12, annee: 2027 },
   factures: [
@@ -58,6 +62,15 @@ const ETATS = {
   // montant de Stripe, pour le corriger.
   prixDifferent: { ...base, prix: null, prixConforme: false },
   proprietairePrixDifferent: { ...base, proprietaire: true, actif: true, prix: null, prixConforme: false, prixStripe: { montant: 9.99, devise: 'eur', intervalle: 'month', texte: '9,99 € / mois' } },
+  // 22 octobre : les mentions de l'éditeur sont vides — le serveur n'ouvre pas
+  // le paiement (503 `mentions-legales`) ; la liste ne part qu'au propriétaire.
+  mentionsVides: { ...base, mentionsCompletes: false },
+  proprietaireMentionsVides: { ...base, proprietaire: true, actif: true, mentionsCompletes: false, mentionsManquantes: ['SIRET', 'médiateur de la consommation'] },
+  proprietaireMentionsPasSu: { ...base, proprietaire: true, actif: true, mentionsCompletes: null, mentionsManquantes: null, mentionsErreur: "Unexpected identifier 'Exemple'" },
+  // 23 oct. (revue) — mentions ILLISIBLES (editeur.js mal écrit : une apostrophe
+  // dans une chaîne entre apostrophes). Le serveur REFUSE le paiement (503
+  // `mentions-legales`, « pas su » = fermé) : l'écran ne doit rien proposer.
+  vendeurMentionsPasSu: { ...base, mentionsCompletes: null },
   // Revue du 11 octobre — ce que le VRAI serveur rend dans les états de la
   // transition (audit-abonnement.cjs exécute api/compte.js) :
   //  · un ANCIEN abonné (résilié, client Stripe) quand le prix diffère : ses
@@ -94,6 +107,7 @@ const srv = http.createServer((q, r) => {
 async function ouvrir(nav, { abo, tab = 'settings', checkoutUrl = 'https://checkout.stripe.com/c/pay/cs_banc', fx = FACTURES, compte = true, onglet = 'abonnement', extra = '', fermer = null, largeur = 1512 }) {
   const mobile = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile });
+  await cspBanc(ctx, `http://localhost:${PORT}`, `abonnement ${largeur}`);
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
@@ -163,7 +177,8 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
   try {
     console.log('\n── La carte suit ce que le serveur sait');
     const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire',
-      ancienPrixDifferent: 'non-branche', actifPrixDifferent: 'actif', actifAncienPrix: 'actif', proprietaireUsd: 'proprietaire', proprietairePaliers: 'proprietaire' };
+      ancienPrixDifferent: 'non-branche', actifPrixDifferent: 'actif', actifAncienPrix: 'actif', proprietaireUsd: 'proprietaire', proprietairePaliers: 'proprietaire',
+      mentionsVides: 'non-branche', proprietaireMentionsVides: 'proprietaire', proprietaireMentionsPasSu: 'proprietaire', vendeurMentionsPasSu: 'non-branche' };
     for (const [nom, rendu] of Object.entries(attendus)) {
       await essaie(nom, async () => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS[nom] });
@@ -179,6 +194,30 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
           dit(b.length === 0 && /9,99/.test(w) && /12,99/.test(w) && /vrm_mensuel/.test(w), '  propriétaire : le prix réglé chez Stripe et celui des CGV, et le geste (clé « vrm_mensuel »)', w.replace(/\n/g, ' ').slice(0, 200));
         }
         if (nom === 'proprietaire') dit(!(await pg.evaluate(() => !!document.querySelector('[data-prix-stripe]'))), '  propriétaire, prix conforme : aucune alerte de prix');
+        // ── 22 octobre : mentions de l'éditeur vides ─────────────────────────
+        if (nom === 'mentionsVides') {
+          const r = await pg.evaluate(() => { const e = document.querySelector('[data-abonnement]'); return { raison: e && e.getAttribute('data-raison'), sab: !!document.querySelector('[data-sabonner]'), cgv: !!document.querySelector('[data-case-cgv]') }; });
+          dit(r.raison === 'mentions' && !r.sab && !r.cgv && b.length === 0 && /pas encore ouvert/i.test(t) && !/SIRET|médiateur|editeur/i.test(t),
+            '  mentions vides : le paiement est dit fermé, ni case ni bouton, et aucun détail au vendeur', JSON.stringify(r) + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
+        }
+        if (nom === 'vendeurMentionsPasSu') {
+          const r = await pg.evaluate(() => { const e = document.querySelector('[data-abonnement]'); return { raison: e && e.getAttribute('data-raison'), sab: !!document.querySelector('[data-sabonner]'), cgv: !!document.querySelector('[data-case-cgv]') }; });
+          dit(r.raison === 'mentions' && !r.sab && !r.cgv && b.length === 0 && /pas encore ouvert/i.test(t) && !/12,99/.test(t) && !/editeur|apostrophe/i.test(t),
+            '  vendeur, mentions ILLISIBLES (le serveur refuse 503) : paiement dit fermé, ni case ni « S’abonner », aucun prix ni détail', JSON.stringify(r) + ' / ' + b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
+        }
+        if (nom === 'proprietaireMentionsVides') {
+          const w = await pg.evaluate(() => { const e = document.querySelector('[data-mentions-manquantes]'); return e ? { n: e.getAttribute('data-mentions-manquantes'), t: e.innerText } : null; });
+          dit(!!w && w.n === '2' && /SIRET/.test(w.t) && /médiateur/.test(w.t) && /editeur\.js/.test(w.t) && /fermé/.test(w.t), '  propriétaire : la liste de ce qui manque et où le remplir', w ? w.t.replace(/\n/g, ' ').slice(0, 200) : 'rien');
+        }
+        if (nom === 'proprietaireMentionsPasSu') {
+          const w = await pg.evaluate(() => { const e = document.querySelector('[data-mentions-manquantes]'); return e ? { n: e.getAttribute('data-mentions-manquantes'), t: e.innerText } : null; });
+          dit(!!w && w.n === 'pas-su' && /pas pu relire/.test(w.t), '  propriétaire, mentions illisibles : « pas pu relire », jamais « complet »', w ? w.t : 'rien');
+          // 23 oct. (revue) : la cause MESURÉE (l'erreur que le serveur a lue)
+          // et la plus probable, avec le fichier à corriger — pas un « pas pu » muet.
+          dit(!!w && /editeur\.js/.test(w.t) && /Unexpected identifier 'Exemple'/.test(w.t) && /apostrophe/.test(w.t),
+            '  … avec le fichier, l’erreur lue par le serveur et la cause la plus courante (une apostrophe)', w ? w.t.replace(/\n/g, ' ').slice(0, 220) : 'rien');
+        }
+        if (nom === 'proprietaire') dit(!(await pg.evaluate(() => !!document.querySelector('[data-mentions-manquantes]'))), '  propriétaire, mentions complètes ou pas dites : aucune alerte de mentions');
         // ── Revue du 11 octobre ──────────────────────────────────────────────
         if (nom === 'ancienPrixDifferent') {
           const f = await pg.evaluate(() => { const e = document.querySelector('[data-factures]'); return e ? e.getAttribute('data-factures') : null; });
@@ -220,9 +259,20 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await pg.waitForTimeout(400);
       dit(grise && !appels.some((a) => a.mode === 'checkout'), 'case des CGV non cochée : « S’abonner » est grisé et aucune demande de paiement ne part', JSON.stringify(appels));
       await pg.locator('[data-abonnement] [data-case-cgv] input').first().check();
+      // 22 octobre : la case des CGV SEULE ne suffit pas — la demande d'accès
+      // immédiat (art. L221-25) est cochée à côté, dans le même composant.
+      const griseUne = await bouton.isDisabled().catch(() => false);
+      await bouton.click({ force: true, timeout: 2000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      dit(griseUne && !appels.some((a) => a.mode === 'checkout'), 'CGV cochées SANS l’accès immédiat : « S’abonner » reste grisé, rien ne part', JSON.stringify(appels));
+      const acces = await pg.evaluate(() => { const e = document.querySelector('[data-abonnement] [data-case-acces-immediat]'); return e ? { t: e.innerText, lien: [...e.querySelectorAll('a')].map((a) => a.getAttribute('href')) } : null; });
+      dit(!!acces && /accès immédiat/.test(acces.t) && /période déjà écoulée/.test(acces.t) && acces.lien.includes('/legal/retractation.html'),
+        'la case d’accès immédiat dit ce qu’elle engage et mène au formulaire de rétractation', acces ? acces.t.replace(/\n/g, ' ').slice(0, 160) + ' · ' + acces.lien.join(',') : 'absente');
+      await pg.locator('[data-abonnement] [data-case-acces-immediat] input').first().check();
       await bouton.click();
       await pg.waitForURL(/checkout\.stripe\.com/, { timeout: 6000 }).catch(() => {});
       dit(appels.some((a) => a.mode === 'checkout' && /"cgv":true/.test(a.corps)), 'case cochée : la demande dit au serveur que les CGV sont acceptées (cgv:true)', JSON.stringify(appels));
+      dit(appels.some((a) => a.mode === 'checkout' && /"accesImmediat":true/.test(a.corps)), '… et que l’accès immédiat est demandé (accesImmediat:true)', JSON.stringify(appels));
       dit(appels.some((a) => a.mode === 'checkout' && a.auth === 'Bearer jeton-de-banc'), 'le serveur reçoit la demande AVEC le jeton de session (c’est lui qui sait qui paie)', JSON.stringify(appels));
       dit(/checkout\.stripe\.com/.test(pg.url()), 'la page s’ouvre chez Stripe', pg.url());
       await ctx.close();
@@ -230,6 +280,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     await essaie('url hostile', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.sans, checkoutUrl: 'https://site-pirate.example/payer' });
       await pg.locator('[data-abonnement] [data-case-cgv] input').first().check();
+      await pg.locator('[data-abonnement] [data-case-acces-immediat] input').first().check();
       await pg.locator('[data-abonnement] button', { hasText: /abonner/i }).first().click();
       await pg.waitForTimeout(1200);
       dit(!/site-pirate/.test(pg.url()), 'une adresse de paiement qui n’est pas Stripe n’est jamais suivie', pg.url());
@@ -323,6 +374,21 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       dit(/12,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
       await ctx.close();
     });
+    // 22 octobre : la porte vend aussi l'abonnement — les DEUX cases (CGV et
+    // accès immédiat), le même composant que la carte (§11).
+    await essaie('porte : deux cases', async () => {
+      const { ctx, pg, appels } = await ouvrir(nav, { abo: { ...ETATS.sans, obligatoire: true, acces: false }, tab: 'journee' });
+      const bouton = pg.locator('[data-abonnement-requis] [data-sabonner]').first();
+      await pg.locator('[data-abonnement-requis] [data-case-cgv] input').first().check();
+      const griseUne = await bouton.isDisabled().catch(() => false);
+      await pg.locator('[data-abonnement-requis] [data-case-acces-immediat] input').first().check();
+      const actif = !(await bouton.isDisabled().catch(() => true));
+      await bouton.click();
+      await pg.waitForURL(/checkout\.stripe\.com/, { timeout: 6000 }).catch(() => {});
+      dit(griseUne && actif && appels.some((a) => a.mode === 'checkout' && /"cgv":true/.test(a.corps) && /"accesImmediat":true/.test(a.corps)),
+        '  porte : grisé avec la seule case des CGV ; les deux cochées, la demande porte cgv ET accesImmediat', JSON.stringify(appels));
+      await ctx.close();
+    });
     // ⚠️ REVUE DU 11 OCTOBRE : la porte — second écran qui vend l'abonnement —
     //    proposait « S'abonner » (case des CGV, 12,99 € / mois) quand le paiement
     //    est FERMÉ (prix Stripe ≠ CGV) : le clic menait au refus 503 du serveur,
@@ -332,6 +398,9 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       for (const [nom, abo] of [
         ['prix Stripe ≠ CGV', { ...ETATS.prixDifferent, obligatoire: true, acces: false }],
         ['Stripe pas branché', { ...ETATS.nonBranche, obligatoire: true, acces: false }],
+        ['mentions légales vides', { ...ETATS.mentionsVides, obligatoire: true, acces: false }],
+        // 23 oct. (revue) : « pas su » côté serveur = fermé (503) ; la porte aussi.
+        ['mentions légales ILLISIBLES (pas su)', { ...ETATS.vendeurMentionsPasSu, obligatoire: true, acces: false }],
       ]) {
         await essaie(`porte paiement fermé ${nom} ${largeur}`, async () => {
           const { ctx, pg, appels, erreurs } = await ouvrir(nav, { abo, tab: 'journee', largeur });
@@ -440,6 +509,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
   finally {
     await nav.close(); srv.close();
+    ko += bilanCsp();
     console.log(ko ? `\n❌ abonnement (rendu) : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ abonnement (rendu) : ${ok} verts, 0 rouge`);
     process.exit(ko ? 1 : 0);
   }

@@ -22,9 +22,22 @@ export function suivreReceptionLeboncoin({fenetre,document,relire,onErreur=()=>{
 }
 
 // Une requête perdue ne laisse pas le bouton « Actualiser » attendre sans fin.
+// ⚠️ (22 oct.) Ni `signal` ni mode de cache passés à `fetch` : l'un comme l'autre
+// font sortir la lecture de la règle des lectures partagées (src/lecturesPartagees.js),
+// et `lbc_ventes` était alors lue TROIS fois à l'ouverture de Ma journée (la coque,
+// l'écran, le centre de notifications) au lieu d'une — mesuré au banc `vitesse.cjs`.
+// L'attente est bornée ici : passé le délai on rend « pas su » (null), la lecture
+// en vol finit sans personne pour l'attendre. Une lecture identique en vol, ou
+// finie il y a moins de 2 s, est aussi fraîche qu'une neuve ; un signal de
+// l'extension (`vrm:ext`) ou une écriture vident ce partage.
 export async function lireReceptionLeboncoin(url,headers,{transport=fetch,delai=12000}={}) {
-  const controle=new AbortController(),timer=setTimeout(()=>controle.abort(),delai);
-  try{const r=await transport(url,{headers,cache:'no-store',signal:controle.signal});return r.ok?await r.json():null;}
+  let timer;
+  const expire=new Promise(r=>{timer=setTimeout(()=>r(undefined),delai);});
+  try{
+    const lecture=(async()=>{const r=await transport(url,{headers});return r.ok?await r.json():null;})();
+    const rep=await Promise.race([lecture,expire]);
+    return rep===undefined?null:rep;
+  }
   catch(_){return null;}
   finally{clearTimeout(timer);}
 }

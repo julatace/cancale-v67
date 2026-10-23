@@ -15,8 +15,10 @@
 //   6. `invalider()` (le signal de l'extension) vide tout ;
 //   7. passé la fenêtre, on relit ;
 //   8. une autre adresse que notre base, une lecture annulable : jamais
-//      partagées.
-//  `--prouve` réaffaiblit la règle de trois façons et exige du ROUGE.
+//      partagées ;
+//   9. un POST vers nos routes `/api/` vaut une écriture ;
+//  10. une lecture PENDUE ne se partage plus au-delà de `VOL_MAX_MS` (22 oct.).
+//  `--prouve` réaffaiblit la règle (cinq mutations) et exige du ROUGE.
 //  Lancer : node scripts/audit-lectures-partagees.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os');
@@ -132,6 +134,26 @@ async function verifier(mod) {
     await lp.fetch(U, H('A'));
     dit(F.appels.filter((x) => x.url === U).length === 3, '9. une lecture GET d’une route ne vide rien', F.appels.length);
   });
+  // 10. (22 oct., revue) Une lecture PERDUE (réseau qui change, iPhone qui se
+  //     réveille) ne répond jamais. Partagée sans limite, elle captait toutes
+  //     les lectures identiques jusqu'à une écriture : « ↻ Actualiser » de
+  //     l'écran Leboncoin ne relançait plus rien. Elle se partage tant qu'elle
+  //     est jeune (deux lectures simultanées = un appel), plus au-delà de
+  //     `VOL_MAX_MS` : la suivante repart sur le réseau, et elle répond.
+  await essaie('10. lecture pendue', async () => {
+    const F = faux(); const lp = mod.creerLecturesPartagees(F.f, BASE, { maintenant });
+    const VOL = mod.VOL_MAX_MS || 8000;
+    F.servir(() => new Promise(() => {}));          // ne répond jamais
+    lp.fetch(U, H('A'));
+    t += 100;
+    lp.fetch(U, H('A'));
+    dit(F.appels.length === 1, '10. une lecture en cours, jeune : partagée (un seul appel)', F.appels.length);
+    F.servir(() => new Response('[{"id":"frais"}]', { status: 200 }));
+    t += VOL + 10;
+    const r = await Promise.race([lp.fetch(U, H('A')), new Promise((ok) => setTimeout(() => ok(null), 300))]);
+    const j = r ? await r.json() : null;
+    dit(F.appels.length === 2 && !!j && j[0].id === 'frais', '10. une lecture pendue depuis plus longtemps ne capte plus la suivante : elle repart sur le réseau et répond', `appels ${F.appels.length}, rendu ${JSON.stringify(j)}`);
+  });
   return { ko, echecs };
 }
 
@@ -145,6 +167,7 @@ async function verifier(mod) {
       'echec-garde': [/if \(!r \|\| !r\.ok \|\| monGen !== gen\) \{ cache\.delete\(cle\); return; \}/, 'if (monGen !== gen) { cache.delete(cle); return; }'],
       'sans-session': [/const cle = url \+ '\\n' \+ ENTETES_CLE\.map\(\(n\) => lireEntete\(h, n\)\)\.join\('\\n'\);/, "const cle = url;"],
       'route-ignoree': [/const versRoute = [^;]+;/, 'const versRoute = false;'],
+      'vol-sans-fin': [/e\.fin == null \? maintenant\(\) - e\.debut < volMax : /, 'e.fin == null || '],
       'ecriture-ignoree': [/      invalider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(invalider, invalider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {

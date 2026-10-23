@@ -3,10 +3,10 @@
 // reçu, colis à expédier, paires qui dorment.
 //
 // ⚠️ QUAND : LE LUNDI MATIN, PAS LE DIMANCHE SOIR — et c'est un choix assumé.
-//    Le seul cron du projet (`api/ship-reminders.js`, vercel.json) tourne une
-//    fois par jour à 08:00 UTC, et le plan Hobby de Vercel ne garantit que
-//    l'heure (± 59 min) : 10 h à Paris l'été, 9 h l'hiver. Un « bilan du
-//    dimanche soir » envoyé dimanche à 10 h serait un bilan d'une semaine pas
+//    Le cron du matin (`api/ship-reminders.js`, vercel.json) tourne une fois
+//    par jour à 05:00 UTC depuis le 22 octobre (avant : 08:00), et le plan
+//    Hobby de Vercel ne garantit que l'heure (± 59 min) : 7 h à Paris l'été,
+//    6 h l'hiver. Un « bilan du dimanche soir » envoyé dimanche matin serait un bilan d'une semaine pas
 //    finie présenté comme complet (§5). Le lundi matin, la semaine du lundi au
 //    dimanche est TERMINÉE : le bilan dit des chiffres arrêtés. Ajouter un
 //    second cron pour le dimanche soir est possible si le plan l'accepte — un

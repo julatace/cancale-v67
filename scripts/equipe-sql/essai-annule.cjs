@@ -15,8 +15,10 @@
 //     diffère. Elle regarde la FORME de la table (même expression que le
 //     fichier, relue dedans), RLS activé ET forcé, AUCUN droit de table ni de
 //     colonne pour anon/authenticated/service_role, AUCUNE règle sur la table,
-//     les deux règles d'app_data (texte exact), aucune AUTRE règle d'app_data
-//     qui parle de l'équipe, et chaque fonction (une version, SECURITY DEFINER
+//     les règles d'app_data (texte exact : les deux de la 016, plus la
+//     restrictive de lecture de la 021 quand elle existe — 22 octobre), aucune
+//     AUTRE règle d'app_data qui parle de l'équipe, aucune restrictive de
+//     lecture qui ignore l'équipe (elle rendrait l'aide aveugle), et chaque fonction (une version, SECURITY DEFINER
 //     ou non comme écrit, search_path vide, volatilité, corps md5, qui
 //     l'exécute).
 //  `scripts/audit-equipe-sql.cjs` exécute les deux sur un Postgres jetable.
@@ -63,6 +65,13 @@ const REGLES = [
   'app_data:abonnement_requis:RESTRICTIVE:ALL:authenticated:((selectvrm_acces_ok())or(owner=(selectvrm_equipe_vendeur()))):(selectvrm_acces_ok())',
   'app_data:equipe_lit:PERMISSIVE:SELECT:authenticated:((owner=(selectvrm_equipe_vendeur()))andvrm_equipe_id_permis(id)):',
 ];
+// Sur une base qui porte la 021 (la production, depuis le 21 octobre), sa
+// restrictive de lecture doit porter la clause de l'équipe (016 §11 bis) —
+// sinon le membre ne lit RIEN. Les deux listes sont triées comme `regles`.
+const REGLES_021 = [...REGLES,
+  'app_data:vrm_lecture_privee:RESTRICTIVE:SELECT:authenticated:((owner=(selectauth.uid()))or((owner=(selectvrm_equipe_vendeur()))andvrm_equipe_id_permis(id))):',
+].sort();
+const AVEC_021 = `exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'app_data' and policyname = 'vrm_lecture_privee')`;
 const norm = (x) => `regexp_replace(regexp_replace(regexp_replace(lower(coalesce(${x}, '')), '\\s+', '', 'g'), 'public\\.', '', 'g'), 'as[a-z_]+\\)', ')', 'g')`;
 const etat = `json_build_object(
   'table', to_regclass('public.vrm_equipe') is not null,
@@ -78,6 +87,9 @@ const etat = `json_build_object(
   'regles', (select coalesce(json_agg(s order by s collate "C"), '[]') from (select tablename || ':' || policyname || ':' || permissive || ':' || cmd || ':' || array_to_string(roles, ',') || ':' || ${norm('qual')} || ':' || ${norm('with_check')} s
              from pg_policies where schemaname = 'public' and tablename = 'app_data' and (policyname in ('equipe_lit', 'abonnement_requis')
                or coalesce(qual, '') like '%vrm_equipe%' or coalesce(with_check, '') like '%vrm_equipe%')) z),
+  'restrictives_bloquantes', (select json_agg(policyname order by policyname) from pg_policies where schemaname = 'public' and tablename = 'app_data'
+             and permissive = 'RESTRICTIVE' and cmd in ('SELECT', 'ALL') and (roles @> array['authenticated']::name[] or roles @> array['public']::name[])
+             and coalesce(qual, '') not like '%vrm_equipe_vendeur%'),
   'fonctions', (select json_object_agg(q, (select json_build_object('n', count(*), 'def', bool_and(p.prosecdef), 'cfg', (array_agg(to_jsonb(p.proconfig)))[1], 'vol', (array_agg(p.provolatile::text))[1], 'md5', (array_agg(md5(p.prosrc)))[1],
                                             'auth', bool_and(has_function_privilege('authenticated', p.oid, 'execute')),
                                             'sr', bool_and(has_function_privilege('service_role', p.oid, 'execute')),
@@ -95,7 +107,8 @@ if (process.argv.includes('--verifier')) {
     droits: `json_array_length(e.j -> 'droits') = 0`,
     droits_colonnes: `(e.j ->> 'droits_colonnes') is null`,
     regles_table: `(e.j ->> 'regles_table') is null`,
-    regles: `(e.j -> 'regles')::jsonb = ${lit(JSON.stringify(REGLES))}::jsonb`,
+    regles: `(e.j -> 'regles')::jsonb = case when ${AVEC_021} then ${lit(JSON.stringify(REGLES_021))}::jsonb else ${lit(JSON.stringify(REGLES))}::jsonb end`,
+    restrictives_bloquantes: `(e.j ->> 'restrictives_bloquantes') is null`,
     fonctions: `(e.j -> 'fonctions')::jsonb = ${lit(JSON.stringify(FONCTIONS_ATTENDUES))}::jsonb`,
   };
   const cas = Object.entries(parties).map(([k, c]) => `case when coalesce((${c}), false) then null else ${lit(k)} end`).join(', ');

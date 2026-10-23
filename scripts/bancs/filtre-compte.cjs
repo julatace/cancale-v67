@@ -195,17 +195,15 @@ const messagerie = (pg) => pg.evaluate(() => {
       dit(m.etat === 'nonlus' && m.nonlus === '2' && !m.toutLu, 'l’en-tête compte les non-lus de TOUTE la liste affichée — jamais « Tout est lu » au-dessus d’eux', JSON.stringify(m));
       dit(m.autres && m.autres.n === '2' && /bascule Chrome/i.test(m.autres.txt) && m.convs.includes('401') && m.convs.includes('402'), 'ceux de l’autre compte restent listés, leurs non-lus dits À CÔTÉ, avec le geste', JSON.stringify({ ailleurs: m.ailleurs, autres: m.autres, convs: m.convs }));
       dit(!m.convs.includes('501'), 'la conversation du compte EXCLU n’est ni listée ni comptée', JSON.stringify(m.convs));
-      // Les offres reçues par EMAIL : leur bloc a été RETIRÉ de Messages
-      // (13f6c89, 13 octobre, « simplifier les écrans revendeurs »). Ce qui
-      // reste à exiger : rien ne le remplace en douce — aucune offre d'un compte
-      // EXCLU (333) ou RETIRÉ (444) n'est listée ni nommée, et aucun bloc
-      // « offres à trancher » ne réapparaît sans la règle `offresAtraiter`
-      // (compte, chronologie, titre non ambigu) qui allait avec.
+      // Les offres reçues par EMAIL : leur bloc, retiré le 13 octobre (13f6c89),
+      // est REBRANCHÉ le 22 octobre avec sa règle `offresAtraiter`. Exigé :
+      // l'offre de compte_a et celle sans compte connu (pas su ≠ autre compte)
+      // sont listées ; aucune offre d'un compte EXCLU (333) ou RETIRÉ (444).
       await r.pg.waitForTimeout(600);
-      const of = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-offres-messages],[data-offre-email]'), txt: document.body.innerText }));
-      dit(!/compte_c|Nike Air Force 1 blanche 42/.test(of.txt), 'l’offre d’un compte EXCLU n’est ni listée ni nommée', of.bloc ? 'un bloc d’offres est rendu' : '');
+      const of = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-offres-messages]'), ids: [...document.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')).sort(), txt: document.body.innerText }));
+      dit(!/compte_c|Nike Air Force 1 blanche 42/.test(of.txt), 'l’offre d’un compte EXCLU n’est ni listée ni nommée', JSON.stringify(of.ids));
       dit(!/compte_retire|Salomon XT-6 noir 43/.test(of.txt), 'l’offre d’un compte RETIRÉ de l’app non plus', '');
-      dit(!of.bloc, 'aucun bloc d’offres par email ne revient sans sa règle (retiré le 13 octobre)', '');
+      dit(of.bloc && JSON.stringify(of.ids) === JSON.stringify(['email_offer_a1', 'email_offer_n1']), 'le bloc des offres par email est rendu avec sa règle : compte_a, et l’offre sans compte connu', JSON.stringify(of.ids));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.pg.screenshot({ path: path.join(os.tmpdir(), 'filtre-compte-messages-1512.png') });
       // L'autre sens : « Tous les comptes » choisi exprès ⇒ plus de flou, plus de « dont ».

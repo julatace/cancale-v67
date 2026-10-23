@@ -94,6 +94,19 @@ const fetchPartie1 = async (url, opts = {}) => {
 };
 const faireRes = () => { const x = { code: null, corps: null }; x.status = (n) => { x.code = n; return x; }; x.json = (o) => { x.corps = o; return x; }; x.setHeader = () => {}; x.end = () => x; return x; };
 
+// ── (22 octobre) LES ADRESSES PROUVÉES ──────────────────────────────────────
+// Base cloisonnée : le registre ne retient qu'une adresse PROUVÉE
+// (api/_lib/preuve-adresse.js). Ce contrôle juge la RÉCLAMATION : il sert un
+// monde où chaque adresse déclarée est prouvée par son vendeur (la preuve
+// elle-même est jugée par audit-preuve-adresse.cjs). La lecture des preuves est
+// servie à part, `Range` honoré.
+let idPreuve = null;
+const repPreuves = (rows, opts) => {
+  const tout = rows.filter((r) => r.id === 'vrm_email_owners' && r.owner).flatMap((r) => Object.keys((r.data && r.data.adresses) || {}).filter((a) => a.includes('@')).map((a) => ({ id: idPreuve(r.owner, a), owner: r.owner, adresse: a.trim().toLowerCase(), etat: 'prouvee' })));
+  const mr = /^(\d+)-(\d+)$/.exec(String((opts.headers && (opts.headers.Range || opts.headers.range)) || ''));
+  return rep(mr ? tout.slice(+mr[1], +mr[2] + 1) : tout);
+};
+
 // ── PARTIE 2 : une base à trois vendeurs, qui sert la VRAIE forme ────────────
 // `meta` : la règle de la base (`vrm_meta`) — les valeurs simples de `data`
 // dont le JSON tient en 600 octets.
@@ -116,6 +129,7 @@ const fetchPartie2 = async (url, opts = {}) => {
   const m = (opts.method || 'GET').toUpperCase();
   if (u.includes('/auth/v1/user')) { const id = authDe(opts); return id ? rep({ id }) : rep({ msg: 'invalid' }, 401); }
   if (!u.includes('/rest/v1/app_data')) return m === 'GET' ? rep([]) : rep('', 201);
+  if (m === 'GET' && u.includes('vrm_email_preuve_')) return repPreuves(base, opts);
   const q = u.split('?')[1] || '';
   const params = q.split('&').map((p) => { const i = p.indexOf('='); return [p.slice(0, i), p.slice(i + 1)]; });
   if (m === 'POST') {
@@ -190,6 +204,7 @@ const BASE_TROIS = () => [
 
 (async () => {
   process.env.VRM_OWNER_UID = J;
+  try { ({ idPreuve } = await import('file://' + path.join(RACINE, 'api', '_lib', 'preuve-adresse.js'))); } catch (_) { idPreuve = () => ''; }
   global.fetch = fetchPartie1;
   let route;
   await essaie('chargement', async () => { route = await import('file://' + path.join(RACINE, 'api', 'email-rattacher.js')); });
@@ -396,6 +411,9 @@ const BASE_TROIS = () => [
   const fetchPartie3 = async (url, opts = {}) => {
     const u = decodeURIComponent(String(url));
     const m = (opts.method || 'GET').toUpperCase();
+    // Les preuves (une lecture constante, à part) ne comptent pas dans « le tas
+    // n'est pas relu » : `req3` juge la lecture des emails mis de côté.
+    if (m === 'GET' && u.includes('/rest/v1/app_data') && u.includes('vrm_email_preuve_')) return repPreuves(base3, opts);
     if (u.includes('/rest/v1/')) req3++;
     if (u.includes('/auth/v1/user')) { const id = authDe(opts); return id ? rep({ id }) : rep({ msg: 'invalid' }, 401); }
     if (!u.includes('/rest/v1/app_data')) return m === 'GET' ? rep([]) : rep('', 201);

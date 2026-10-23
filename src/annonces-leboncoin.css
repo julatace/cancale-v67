@@ -4,7 +4,7 @@
 .vrm-lbc-catalog header p{margin:4px 0 0;color:var(--gestion-muted,#52636b);line-height:1.5;}
 .vrm-lbc-catalog header>span{font-size:11px;white-space:nowrap;color:var(--gestion-muted,#52636b);}
 .vrm-lbc-catalog>input{display:block;margin:0 16px 10px;width:calc(100% - 32px);box-sizing:border-box;border:1px solid var(--gestion-line,#dce5e1);background:transparent;color:inherit;border-radius:8px;min-height:44px;padding:10px 12px;font:inherit;}
-.vrm-lbc-catalog-filtres{display:flex;gap:6px;overflow-x:auto;padding:0 16px 12px;}
+.vrm-lbc-catalog-filtres{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px;max-width:100%;box-sizing:border-box;}
 .vrm-lbc-catalog-filtres button{display:flex;align-items:center;gap:6px;flex-shrink:0;min-height:44px;border:1px solid var(--gestion-line,#dce5e1);background:transparent;color:inherit;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer;}
 .vrm-lbc-catalog-filtres button span{font-size:10px;opacity:.8;font-variant-numeric:tabular-nums;}
 .vrm-lbc-catalog-filtres button[aria-pressed=true]{background:var(--gestion-accent,#2b4548);border-color:var(--gestion-accent,#2b4548);color:var(--gestion-on-accent,#fffefa);}

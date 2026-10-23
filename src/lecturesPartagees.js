@@ -25,6 +25,11 @@
 //     rangé »…) vide tout : l'extension écrit en base sans passer par l'app, et
 //     son signal est justement ce qui fait relire ;
 //   · une lecture avec `signal` (annulable) ou un `Request` passent tels quels ;
+//   · une lecture EN COURS ne se partage que `VOL_MAX_MS` (22 oct., revue) :
+//     une requête perdue (réseau qui change, iPhone qui se réveille) ne répond
+//     jamais, et elle captait toutes les lectures identiques jusqu'à une
+//     écriture — « ↻ Actualiser » sur l'écran Leboncoin ne relançait plus
+//     rien. Passé ce délai, la lecture suivante repart sur le réseau ;
 //   · les requêtes à Vinted ne passent JAMAIS par ici (l'app ne les fait pas, et
 //     §3 interdit de les regrouper ou paralléliser) : seule l'adresse de notre
 //     base est concernée.
@@ -34,6 +39,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 export const FENETRE_MS = 2000;
+// Plus court que l'attente de `lireReceptionLeboncoin` (12 s) : un « Actualiser »
+// fait après une lecture pendue part sur le réseau au lieu de la rejoindre.
+export const VOL_MAX_MS = 8000;
 const ENTETES_CLE = ['authorization', 'apikey', 'range', 'range-unit', 'prefer', 'accept', 'accept-profile', 'x-vrm-equipe'];
 
 const lireEntete = (h, nom) => {
@@ -50,9 +58,10 @@ const lireEntete = (h, nom) => {
 // qui la remplace, et `invalider`.
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   const fenetre = opts.fenetre != null ? opts.fenetre : FENETRE_MS;
+  const volMax = opts.volMax != null ? opts.volMax : VOL_MAX_MS;
   const maintenant = opts.maintenant || (() => Date.now());
   const prefixe = String(base).replace(/\/+$/, '') + '/rest/v1/';
-  const cache = new Map();   // clé -> { gen, p, fin }
+  const cache = new Map();   // clé -> { gen, p, debut, fin }
   let gen = 0;
   const stats = { partagees: 0, parties: 0 };
   const invalider = () => { gen++; cache.clear(); };
@@ -84,13 +93,13 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     const h = init && init.headers;
     const cle = url + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
     const e = cache.get(cle);
-    if (e && e.gen === gen && (e.fin == null || maintenant() - e.fin < fenetre)) {
+    if (e && e.gen === gen && (e.fin == null ? maintenant() - e.debut < volMax : maintenant() - e.fin < fenetre)) {
       stats.partagees++;
       return e.p.then((r) => r.clone());
     }
     const monGen = gen;
     const p = Promise.resolve(fetchOrig(input, init));
-    const ent = { gen: monGen, p, fin: null };
+    const ent = { gen: monGen, p, debut: maintenant(), fin: null };
     cache.set(cle, ent);
     stats.parties++;
     p.then((r) => {

@@ -8,6 +8,9 @@
 //  le lire EN FOND — une lecture sur SES propres annonces (§3), avec les mêmes
 //  garde-fous que `capterRetraits`/`capterReleves` : compte connecté (`garde`),
 //  N par visite, une par une, pas de nouvel essai avant 24 h.
+//  22 oct. : UNE page par tour (`PHOTOS_PAR_TOUR`) — l'écart, le calme et le
+//  frein de 24 h sont prouvés par `audit-photos-etalees.cjs` ; ici on fait
+//  tourner le fond plusieurs fois quand plusieurs annonces sont à compléter.
 //
 //  ⚠️ §4.10 : `node --check` ne voit rien. On EXÉCUTE le vrai `background.js`
 //  dans un `vm` et on COMPTE ce qui part chez Vinted. §6.1 : on prouve la RÈGLE
@@ -143,7 +146,7 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
       '444': { photos: [img(444, 0)], codes: { catalog_id: 1242 } },                                    // 1 photo, fiche déjà là
       '555': { photos: [0, 1, 2, 3, 4].map((i) => img(555, i)), codes: { catalog_id: 1242 } },          // 5/5 + fiche → complet
     } });
-    const n = await ctx.capterPhotosAnnonces(UID);
+    let n = 0; for (let tour = 0; tour < 6; tour++) n += await ctx.capterPhotosAnnonces(UID);   // une page par tour (22 oct.)
     const vus = idsVus(ctx.__journal);
     dit(vus.includes('111') && vus.includes('222'), 'elle va lire le détail des annonces à qui il MANQUE des photos', 'lues : ' + vus.join(',') || 'aucune');
     dit(!vus.includes('333'), 'une annonce FERMÉE n\'est pas touchée', vus.includes('333') ? 'elle a été lue' : 'ignorée');
@@ -168,11 +171,11 @@ const photosRangees = (j) => { let out = {}; for (const e of j.ecrits) { const l
     dit(idsVus(ctx.__journal).includes('555'), 'photos complètes mais fiche absente : elle est lue pour récupérer la fiche');
   });
 
-  // ══ 2. BORNÉ PAR VISITE (le garde-fou §3, sur NOS lectures Vinted) ══════════
-  // Le plafond suit la constante du code (PHOTOS_MAX_PAR_VISITE) — un audit
+  // ══ 2. BORNÉ PAR TOUR (le garde-fou §3, sur NOS lectures Vinted) ════════════
+  // Le plafond suit la constante du code (PHOTOS_PAR_TOUR, 22 oct.) — un audit
   // suit la RÈGLE, pas un nombre recopié (§6.5).
-  const CAP = Number((/PHOTOS_MAX_PAR_VISITE\s*=\s*(\d+)/.exec(SRC) || [])[1] || 0);
-  await essaie(`bornée à ${CAP} lectures Vinted par visite`, async () => {
+  const CAP = Number((/PHOTOS_PAR_TOUR\s*=\s*(\d+)/.exec(SRC) || [])[1] || 0);
+  await essaie(`bornée à ${CAP} lecture(s) Vinted par tour`, async () => {
     const many = Array.from({ length: CAP + 4 }, (_, i) => ({ id: 900 + i, nPhotos: 5, is_closed: false, is_hidden: false }));
     const ctx = faireCtx({ items: many });
     await ctx.capterPhotosAnnonces(UID);

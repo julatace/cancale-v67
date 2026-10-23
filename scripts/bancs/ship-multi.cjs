@@ -63,8 +63,10 @@ function poserFetch({ sonde = 200, mainKO = new Set(), vendeurs = ['A', 'B'] } =
     if (/id=eq\.push_prefs/.test(u)) return J([{ data: { expedier: true } }]);
     const v = o && (V[o] || (/^V\d+$/.test(o) ? { subs: [{ endpoint: 'https://fcm.googleapis.com/' + o }], bord: { dateLimite: limiteAuj, transaction: 'TX' + o }, txns: ['TX' + o] } : null));
     if (/id=eq\.push_subs/.test(u)) return J([{ data: { subs: v ? v.subs : [] } }]);
-    if (/id=like\.email_bord_/.test(u)) return J(v ? [v.bord] : []);
-    if (/orders_sold/.test(u)) return J(v ? [{ txns: v.txns }] : []);
+    // §6.3 (22 oct.) : la forme RÉELLE — un bordereau email porte `filename`
+    // (204/204 mesurés) ; une ligne de ventes porte son identifiant (le compte).
+    if (/id=like\.email_bord_/.test(u)) return J(v ? [{ ...v.bord, filename: 'Bordereau-Vinted-' + v.bord.transaction + '.pdf' }] : []);
+    if (/orders_sold/.test(u)) return J(v ? [{ id: 'harvest_1_orders_sold', txns: v.txns }] : []);
     return J([]);
   };
 }

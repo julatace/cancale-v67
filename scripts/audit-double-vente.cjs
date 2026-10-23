@@ -51,7 +51,7 @@ if (PROUVE) {
 // jusqu'à sa fin réelle : l'accolade fermante du corps pour une fonction, le `;`
 // de profondeur 0 pour une constante.
 function extraire(src, nom, quoi) {
-  const re = new RegExp(`^(?:async )?function ${nom}\\(|^const ${nom} = `, 'm');
+  const re = new RegExp(`^(?:async )?function ${nom}\\(|^const ${nom}\\s*=\\s*`, 'm');
   const m = re.exec(src);
   if (!m) { dit(false, `${quoi} : \`${nom}\` introuvable`); return ''; }
   let i = m.index, prof = 0, vuCorps = false;
@@ -68,7 +68,7 @@ function extraire(src, nom, quoi) {
 }
 
 // ── LES RÈGLES DE L'APP ──────────────────────────────────────────────────────
-const NOMS_APP = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'lbcAnnulee', 'motsDeTitre', 'pointureDe', 'suggestionsPaires',
+const NOMS_APP = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'numeroExterne', 'lbcAnnulee', 'KNOWN_BRANDS', 'extractBrand', 'motsDeTitre', 'pointureDe', 'familleMarque', 'MOTS_HORS_MODELE', 'motsModele', 'suggestionsPaires',
   'numDeTitreLbc', 'clesAnnonceLbc', 'comptesLbcProuves', 'annonceLbcALui', 'doublesVenteLbc'];
 const srcApp = NOMS_APP.map((n) => extraire(APP, n, 'App.jsx')).join('\n');
 const ctxApp = {};
@@ -159,6 +159,21 @@ dit(sug.length >= 2 && sug.some((s) => s.numero === '104') && sug.some((s) => s.
   'les deux paires identiques sont PROPOSÉES — c\'est son clic qui tranche', `[${sug.map((s) => s.numero)}]`);
 const sug2 = essaie('pointure différente', () => R.suggestionsPaires({ titre: 'nike air max 90 blanc taille 44', prix: 70 }, cands)) || [];
 dit(!sug2.some((s) => s.numero === '101'), 'une pointure DIFFÉRENTE n\'est pas proposée (même modèle, autre paire)', `[${sug2.map((s) => s.numero)}]`);
+// 23 oct. (capture de Julien) : une Adidas Spezial marron 40,5 vendue 45 € se
+// voyait proposer « N°65 Nike LD waffle sacai » — même pointure, prix proche,
+// AUCUN mot en commun. Une autre marque, ou aucun mot du modèle partagé, n'est
+// jamais proposée ; la vraie Spezial, elle, l'est toujours.
+const capture = [
+  { numero: '65', titre: 'Nike LD waffle sacai university blue taille 40,5', prix: 48 },
+  { numero: '66', titre: 'Adidas Samba OG marron taille 40,5', prix: 45 },
+  { numero: '67', titre: 'Adidas Spezial marron taille 40,5', prix: 45 },
+];
+const sug4 = essaie('autre marque', () => R.suggestionsPaires({ titre: 'Adidas Spezial marron taille 40,5', prix: 45 }, capture)) || [];
+dit(!sug4.some((s) => s.numero === '65'), 'une paire d\'une AUTRE marque n\'est jamais proposée (Spezial ≠ Nike sacai)', `[${sug4.map((s) => s.numero)}]`);
+dit(!sug4.some((s) => s.numero === '66'), 'même marque, même pointure, même prix, mais un autre MODÈLE (Samba) : pas proposée', `[${sug4.map((s) => s.numero)}]`);
+dit(sug4.some((s) => s.numero === '67'), 'l\'autre sens : la vraie Spezial 40,5 reste proposée', `[${sug4.map((s) => s.numero)}]`);
+const sug5 = essaie('famille Jordan', () => R.suggestionsPaires({ titre: 'Nike Air Jordan 1 mid taille 42', prix: 90 }, [{ numero: '70', titre: 'Jordan 1 mid chicago taille 42', prix: 85 }])) || [];
+dit(sug5.some((s) => s.numero === '70'), 'Jordan est de la famille Nike : une Air Jordan 1 reste proposée pour une Jordan 1', `[${sug5.map((s) => s.numero)}]`);
 const cinquante = Array.from({ length: 50 }, (_, i) => ({ numero: String(300 + i), titre: 'nike dunk low panda taille 42', prix: 90 }));
 const sug3 = essaie('50 paires identiques', () => R.suggestionsPaires({ titre: 'nike dunk low panda taille 42', prix: 90 }, cinquante)) || [];
 dit(sug3.length <= 3, 'cinquante paires identiques : au plus trois propositions, aucune décision', `${sug3.length}`);

@@ -930,12 +930,15 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       await ctx.setOffline(true);
       await pg.getByRole('button', { name: /Ma journée/ }).first().click();
       await pg.waitForTimeout(5000);
-      await pg.evaluate(() => { const c = document.querySelector('.vrm-carrousel'); const mn = document.querySelector('main[data-defile]'); if (c && mn) { mn.scrollTop += c.getBoundingClientRect().top - mn.getBoundingClientRect().top - 60; } });
-      await pg.waitForTimeout(5000);
-      const c1 = await carrousel(pg); const p1 = await pont(pg);
+      // ⚠️ (21 oct., 5588c02 — vu au rendu le 22 oct.) Hors ligne, la COQUE remplace
+      //    tous les écrans par la copie de Ma journée, en lecture seule
+      //    (`JourneeHorsLigne`, `data-hors-ligne`) : plus aucune liste de photos
+      //    n'est montée pendant la coupure, donc aucune ne peut en être RETIRÉE —
+      //    c'est le retour qui juge (plus bas : rien de retiré, tout revient).
+      //    Le scénario est réel quand la coupure est bien celle que l'app voit.
+      const hl = await pg.evaluate(() => ({ horsLigne: navigator.onLine === false, copie: (document.querySelector('[data-hors-ligne]') || {}).dataset ? document.querySelector('[data-hors-ligne]').dataset.horsLigne : null, carrousel: !!document.querySelector('.vrm-carrousel') }));
       await capture(pg, 'O-horsligne');
-      dit(!!p1 && (p1.horsLigne || 0) >= 1, 'O : le scénario est réel (hors ligne, l’extension a répondu sans image)', `${p1 && p1.horsLigne} refus hors ligne`);
-      dit(!!c1 && c1.cartes >= 3 && c1.retirees === 0, 'O hors ligne : aucune photo RETIRÉE de la liste', JSON.stringify(c1));
+      dit(hl.horsLigne && !!hl.copie && !hl.carrousel, 'O : le scénario est réel (hors ligne, la coque montre la copie de Ma journée, aucune liste de photos montée)', JSON.stringify(hl));
       await ctx.setOffline(false);
       await pg.waitForTimeout(12000);
       const c2 = await carrousel(pg);
@@ -982,15 +985,25 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
       const { ctx, pg, errs } = await preparer(b, V390, { pont: false });
       await ouvrir(pg, 'plat_vinted', 6000);
       await ctx.setOffline(true);
-      await section(pg, 'annonces', 6000);
-      await versPhotos(pg, 5000);
+      await pg.waitForTimeout(3000);
+      // ⚠️ (21 oct., 5588c02 — vu au rendu le 22 oct.) Hors ligne, la coque montre la
+      //    copie de Ma journée À LA PLACE de tous les écrans : la navigation des
+      //    sections n'existe plus pendant la coupure (le banc y cliquait encore,
+      //    et mourait sur le délai du clic). Ce que la coupure doit encore
+      //    garantir : la coque dit « hors ligne », et aucune phrase des photos ne
+      //    dit « pas pu mesurer » ni « va sur l'ordinateur ». Puis, le réseau
+      //    revenu, des photos JAMAIS chargées (Annonces) s'affichent sans phrase :
+      //    la coupure n'a rien laissé de figé.
       const m = await mesurer(pg);
       const horsLigne = await pg.evaluate(() => navigator.onLine === false);
+      const copie = await pg.evaluate(() => !!document.querySelector('[data-hors-ligne]') && /hors ligne/i.test(document.body.innerText));
       await capture(pg, 'N-horsligne');
-      dit(horsLigne && m.pictoEcran >= 2, 'N : le scénario est réel (hors ligne, des photos ne se chargent pas)', `onLine=${!horsLigne} · ${detail(m)}`);
+      dit(horsLigne && copie, 'N : le scénario est réel (hors ligne, la coque le dit)', `onLine=${!horsLigne} · copie hors ligne ${copie}`);
       dit(m.phrases === 0 || (m.sonde === 'horsligne' && m.geste === 'reseau'), 'N : hors ligne ⇒ « pas de connexion », jamais « pas pu mesurer » ni « va sur l’ordinateur »', `${m.phrases} · ${m.sonde}/${m.geste} · ${m.texte.slice(0, 180)}`);
       await ctx.setOffline(false);
-      await pg.waitForTimeout(6000);
+      await pg.waitForTimeout(3000);
+      await section(pg, 'annonces', 6000);
+      await versPhotos(pg, 3000);
       const m2 = await mesurer(pg);
       dit(m2.ecran >= 2 && m2.affichees === m2.ecran && m2.phrases === 0, 'N de nouveau en ligne : les photos reviennent, plus de phrase', detail(m2));
       dit(errs.length === 0, 'N : aucune erreur d’app', errs.join(' | ').slice(0, 160));
