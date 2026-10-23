@@ -12712,8 +12712,8 @@ contrôle lancé depuis elle, §6.1), vert après, rouge sous mutation.
   bordereau **imprimé** (`vinted_bords_printed`) comme un colis parti — l'app a décidé l'inverse — et ne partait que des bordereaux reçus par **email** (30 jours :
   angeled92 0/18, tomj606 0/8, arthuror2 1/10). Le widget faisait les deux mêmes erreurs pour son urgence. Et **204 `email_bord_*` sur 205 portent l'heure**
   (« JJ/MM/AAAA HH h MM », 90 à 10 h 00) : `api/email-inbound.js` la gardait déjà dans `dateLimite`, ce sont TOUS les lecteurs qui la jetaient (`frToIso`,
-  `joursAvantLimiteFr` à 23:59:59, `bordDeadline` « Date SEULE »). Vente → limite : jamais moins de 7 j (202 ventes reliées : 107 à +7 j pile, 89 décalées à
-  10 h 00). Les bordereaux captés par l'extension (`harvest_{uid}_label_{tx}`) ne portent **aucune** date limite (clés : url, uid, tx, item, capturedAt).
+  `joursAvantLimiteFr` à 23:59:59, `bordDeadline` « Date SEULE »). Vente → limite (202 ventes reliées, jour de Paris) : **jamais avant** vente + 7 j —
+  140 le jour même, **62 de 1 à 3 jours PLUS TARD** (+1 : 28, +2 : 30, +3 : 4 ; remesuré le 23 oct.). vente + 7 j est un PLANCHER, pas la limite. Les bordereaux captés par l'extension (`harvest_{uid}_label_{tx}`) ne portent **aucune** date limite (clés : url, uid, tx, item, capturedAt).
 - **Une règle** : `api/_lib/limite-envoi.js` (pur, importé par l'app comme `colisEbay`) — `lireDateLimite` (heure de **Paris**, Intl ; « 10 h 00 », « 10h00 »,
   « 10:00 » ; heure illisible ou inexistante ⇒ **jour seul**, fin de journée, comme avant), `limiteExpedition(o, b)` (email du bordereau, sinon vente + 7 j
   **estimée**, jour seul ; une limite dépassée vaut ≤ −1 jour **même le jour même**), `texteLimiteEnvoi` (« à poster avant demain 10 h », « en retard —
@@ -12864,3 +12864,20 @@ Les trois points « reste ouvert » de `docs/passation/2026-10-22.md`.
   **Non mesuré** : la durée réelle d'une lecture lente sur un vrai téléphone
   (une lecture de plus de 8 s n'est plus partagée : au pire une requête de
   plus, jamais une réponse fausse).
+- **Revue du 22-23 octobre — deux défauts reproduits, corrigés** :
+  1. ⚠️ **Une date ESTIMÉE (vente + 7 j, sans email) dépassée était « en retard »** : titre « ⏰ … du retard ! » du matin, « dont déjà en retard » du soir,
+     `overdue` du widget, « 1 j de retard » sur la carte de Colis — alors que la vraie limite tombe jusqu'à 3 jours plus tard (62/202). Nouveau dans les
+     notifications et le widget (ils ne lisaient que les emails), ancien dans l'app. ⇒ Le module : `retard` = dépassée **et lue dans l'email** ; une estimée
+     dépassée a sa classe (`estimeeDepassee`), sa phrase (`TEXTE_ESTIMEE_DEPASSEE`, « date estimée dépassée — vérifie la vraie limite sur Vinted »), reste
+     dans les totaux et se dit à part : matin « N à vérifier sur Vinted — date estimée dépassée » (`aVerifier`, jamais le titre ⏰), soir « N à vérifier sur
+     Vinted (date estimée passée) » (les estimées d'aujourd'hui comprises), widget `estimeeDepassee` (hors `overdue`). L'app suit la même règle (§11) :
+     tuile et notice de Ma journée, publication `vrm_colis_aposter.enRetard`, bandeau d'urgence de Colis, liste du soir hors ligne (`aVerifier`, la photo porte
+     `estimee`). Un retard LU passe devant une estimée dépassée sur la ligne `colis-limite`.
+  2. **La ligne `colis-limite` de Ma journée était ROUGE** (icône, sous-titre, « Voir › ») sur un retard — §7 : ambre, comme `data-colis-urgence`.
+  - Preuves : `audit-colis-heure.cjs` section 8 (32 contrôles) — **9 rouges sur 8d164f1** (+ « l'autre sens », vacant avant : le champ `retard` n'existait
+    pas) ; mutations « estimée = retard » (module) 7 rouges, « soir sans les estimées d'aujourd'hui » 2, « widget overdue + estimées » 1. Banc
+    `colis-heure.cjs` (+ la vente 9205, estimée dépassée ; + la teinte de la ligne) — **6 rouges sur le build de 8d164f1** (« 1 j de retard », rgb(192,57,43)),
+    vert après ; mutations « ligne rouge » 2, « estimée = retard » 4. Verts : tous les audits hors SQL, `rappel-soir`, `widget-colis`, `ship-multi`,
+    `widget-multi`, `bilan-semaine`, `serveur`, `ebay-relecture-cron`, `hors-ligne`, `poste-sans-depart`, `ebay-colis`, `comptes-sans-email`,
+    `tout-generer`. ⚠️ `statuts-colis` sort rouge (tuile « À envoyer » lue 0) — **déjà rouge sur le build d'origin/main et de 8d164f1**, pas ce lot.
+  - ⚠️ Non mesuré : le texte réel sur l'iPhone (le script du widget lit-il `estimeeDepassee` ? rien ne l'y oblige).

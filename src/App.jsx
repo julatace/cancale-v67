@@ -12697,7 +12697,7 @@ function JourneeHorsLigne({ uid, tab }) {
   const limiteTxt = (e) => {
     // (22 oct.) Une ligne qui porte sa limite exacte la dit comme Colis (l'heure
     // lue dans l'email, « en retard » passé l'heure) — `texteLimiteEnvoi`, §11.
-    if (Number.isFinite(e.limiteAt) && e.jour) return texteLimiteEnvoi({ jour: e.jour, heure: e.heure || null, at: e.limiteAt }, maintenant) || '';
+    if (Number.isFinite(e.limiteAt) && e.jour) return texteLimiteEnvoi({ jour: e.jour, heure: e.heure || null, at: e.limiteAt, limite: e.estimee ? 'estimee' : 'email' }, maintenant) || '';
     const j = joursAvantJour(e.limite, maintenant);
     if (j == null) return '';
     if (j < 0) return 'date limite passée';
@@ -12710,12 +12710,12 @@ function JourneeHorsLigne({ uid, tab }) {
       {titre}
       <LigneHorsLigne date={new Date(photo.at).toISOString()}>Hors ligne — ce que tu vois date de {quand} ; rien ne peut être envoyé.</LigneHorsLigne>
       {soir && soir.n > 0 && (
-        <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
+        <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-verif={soir.aVerifier} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
           <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>La liste du soir</div>
           <div style={{fontSize:14,color:C.text,lineHeight:1.45}}>
-            Demain : <b>{soir.n} colis</b> à poster{soir.enRetard || soir.demain ? ' — ' : ''}
-            {soir.enRetard ? `${soir.enRetard} déjà en retard` : ''}{soir.enRetard && soir.demain ? ', ' : ''}
-            {soir.demain ? `${soir.demain} avec la date limite demain` : ''}.
+            Demain : <b>{soir.n} colis</b> à poster{soir.enRetard || soir.aVerifier || soir.demain ? ' — ' : ''}
+            {[soir.enRetard ? `${soir.enRetard} déjà en retard` : '', soir.aVerifier ? `${soir.aVerifier} à vérifier sur Vinted (date estimée passée)` : '',
+              soir.demain ? `${soir.demain} avec la date limite demain` : ''].filter(Boolean).join(', ')}.
           </div>
         </div>
       )}
@@ -34789,7 +34789,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (colisEb === undefined) return;
     try {
       const eb = colisEb ? colisEb.aPoster : null;
-      const v = { total: toShip.length + (eb ? eb.length : 0), enRetard: toShip.filter(t => t.daysLeft != null && t.daysLeft < 0).length + (eb ? eb.filter(x => x.jours != null && x.jours < 0).length : 0),
+      // `enRetard` : une limite LUE et dépassée (`retard`), jamais une date
+      // estimée (revue du 22 oct.) — le même nombre que le widget (`overdue`).
+      const v = { total: toShip.length + (eb ? eb.length : 0), enRetard: toShip.filter(t => t.retard).length + (eb ? eb.filter(x => x.jours != null && x.jours < 0).length : 0),
         vinted: toShip.length, ebay: eb ? eb.length : null, nePasPoster: colisEb ? colisEb.nePasPoster.length : null, at: Date.now() };
       const avant = load('vrm_colis_aposter', null);
       if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.nePasPoster !== v.nePasPoster) {
@@ -34811,7 +34813,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const envoyer = toShip.map((t) => {
         const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
-        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at };
+        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee' };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
       const horsDelai = new Set(pickupUnion.horsDelai);
       const retirer = pickupUnion.emailList.map((t) => ({
@@ -35126,11 +35128,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Même source que la liste : les colis que Vinted attend, avec leur délai.
   const nAPoster = () => expeditions().filter(e => !(e.o && isShipDone(e.o))).length;
   const urgenceColis = () => {
-    let overdue = 0, today = 0, tomorrow = 0, pressePret = 0, presseAttente = 0;
+    let overdue = 0, aVerifier = 0, today = 0, tomorrow = 0, pressePret = 0, presseAttente = 0;
     for (const e of expeditions()) {
       if (e.o && isShipDone(e.o)) continue;
       if (e.dl == null) continue;
-      if (e.dl < 0) overdue++; else if (e.dl === 0) today++; else if (e.dl === 1) tomorrow++; else continue;
+      // (revue du 22 oct.) Une date ESTIMÉE dépassée n'est pas un retard (la
+      // vraie limite tombe jusqu'à 3 j plus tard) : « à vérifier sur Vinted ».
+      if (e.dl < 0) { if (e.lim && e.lim.depasse && !e.lim.retard) aVerifier++; else overdue++; }
+      else if (e.dl === 0) today++; else if (e.dl === 1) tomorrow++; else continue;
       // ⚠️ OÙ SONT-ILS ? La liste se groupe sur CE QU'IL PEUT FAIRE (prêts à
       //    imprimer d'abord, puis en attente de bordereau) et l'urgence n'est
       //    que le tri À L'INTÉRIEUR de chaque groupe. Le bandeau affirmait
@@ -35144,9 +35149,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     const parts = [];
     if (overdue) parts.push(`${overdue} en retard`);
+    if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted (date estimée dépassée)`);
     if (today) parts.push(`${today} aujourd'hui`);
     if (tomorrow) parts.push(`${tomorrow} demain`);
-    return { overdue, today, tomorrow, total: overdue + today + tomorrow, danger: overdue > 0 || today > 0, parts,
+    return { overdue, aVerifier, today, tomorrow, total: overdue + aVerifier + today + tomorrow, danger: overdue > 0 || aVerifier > 0 || today > 0, parts,
              pressePret, presseAttente };
   };
   // La phrase du bandeau d'urgence — elle DÉCRIT la liste, elle ne la promet
@@ -36379,7 +36385,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    pas écarté.
         const MSG_RECENT_MS = 7 * 864e5;
         const unread = (convs.items||[]).filter(c=>!acctOffOf(c) && c.unread && (Date.now() - (Date.parse(c.updated_at) || 0)) < MSG_RECENT_MS).length;
-        const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
+        // « en retard » = une limite LUE (email du bordereau) et dépassée ; une
+        // date ESTIMÉE dépassée n'en est pas une (revue du 22 oct., `retard`
+        // de api/_lib/limite-envoi.js) — la ligne « colis-limite » la dit.
+        const late = toShip.filter(t=>t.retard).length;
         const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
         let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
@@ -36454,15 +36463,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // retard, dus aujourd'hui ou demain. Une date ESTIMÉE (pas de bordereau
         // reçu par email) est dite estimée. Rien sur ce que fait Vinted après.
         {
-          const presses = toShip.filter(t => t.at != null && (t.depasse || t.daysLeft <= 1)).sort((a,b) => a.at - b.at);
+          // Un retard LU (email du bordereau) passe devant une date seulement
+          // estimée et dépassée — la première est sûre, la seconde à vérifier.
+          const presses = toShip.filter(t => t.at != null && (t.depasse || t.daysLeft <= 1)).sort((a,b) => (b.retard?1:0) - (a.retard?1:0) || a.at - b.at);
           if (presses.length) {
             const p = presses[0], o = p.o || {};
             const e = effEntry(o); const num = e && e.numero ? `N°${e.numero} · ` : '';
             const qui = o._acc ? accNameOf(o._acc) : '';
             const quand = texteLimiteEnvoi(p);
-            jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:p.depasse?C.danger:C.warn, urgent:!!p.depasse,
-              title: presses.length===1 ? `1 colis ${quand}` : `${presses.length} colis pressés — le plus urgent ${quand}`,
-              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j, pas de bordereau reçu par email)':''}`,
+            // (revue du 22 oct.) Une date ESTIMÉE dépassée n'est pas un retard :
+            // « date estimée dépassée — vérifie… » (le module le dit). Et §7 :
+            // le rouge est pour deux paires sous un même N° — ici l'ambre, comme
+            // l'urgence de Colis (`data-colis-urgence`, 21 oct.).
+            const verif = p.depasse && !p.retard;
+            jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
+              title: presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`,
+              sub: `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?(verif?' · vente + 7 j, pas de bordereau reçu par email':' · date estimée (vente + 7 j, pas de bordereau reçu par email)'):''}`,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'' });
           }
         }
@@ -37425,9 +37441,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             colis à expédier (il a son écran), argent en attente et son détail,
             vente repérée via bordereau, ventes par jour. */}
         {toShip.length>0 && (()=>{
-          const late = toShip.filter(t=>t.daysLeft!=null && t.daysLeft<0).length;
+          // (revue du 22 oct.) « en retard » : une limite LUE et dépassée ; une
+          // date estimée dépassée est « à vérifier » (`retard`, le module).
+          const late = toShip.filter(t=>t.retard).length;
+          const verif = toShip.filter(t=>t.depasse && !t.retard).length;
           const urgent = toShip.filter(t=>t.daysLeft!=null && t.daysLeft>=0 && t.daysLeft<=1).length;
-          const col = late>0 ? C.danger : urgent>0 ? C.warn : C.accent;
           const s = toShip[0];
           // ⚠️ `toShip` porte {o, daysLeft, shipBy} — il n'y a JAMAIS eu de champ
           // `title` : la ligne affichait donc « Le plus pressé : — » pour tout le
@@ -37441,10 +37459,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const when = (t)=> t.jour ? texteLimiteEnvoi(t) : '';
           return (
             <Notice
-              tone={late>0 ? 'danger' : urgent>0 ? 'warn' : 'ok'}
+              tone={late>0 ? 'danger' : (verif>0 || urgent>0) ? 'warn' : 'ok'}
               icon="truck"
               value={toShip.length}
-              title={`colis à expédier${late>0?` · ${late} en retard`:urgent>0?` · ${urgent} pour demain`:''}`}
+              title={`colis à expédier${late>0?` · ${late} en retard`:verif>0?` · ${verif} à vérifier sur Vinted (date estimée dépassée)`:urgent>0?` · ${urgent} pour demain`:''}`}
               desc={s.jour ? (()=>{ const e=effEntry(s.o); const n=e&&e.numero?`N°${e.numero} · `:'';
                 const t=(s.o&&s.o.title)||''; const q=when(s);
                 return t||n ? `Le plus pressé : ${n}${t}${q?` · ${q}`:''}` : (q?`Le plus pressé : ${q}`:null); })() : null}
