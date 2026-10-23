@@ -12159,6 +12159,14 @@ fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
     passer ces emails par la vraie route puis par la vraie règle (§11) : 6 rouges sur
     7ba9670 ; mutations `positif` 4, `nonrecu` 2, `texte` 1. Banc `recu-achat.cjs` :
     « Merci pour ton achat » listé et lu en texte, 12 rouges sur le build de 7ba9670.
+  - **Une ligne de frais au libellé « Transaction … » ou « Vendeur … » finissait le
+    bloc** (« Transaction sécurisée 0,50 € » : elle ET « Frais Vinted » qui suivait
+    étaient jetées — la feuille disait l'écart, mais la promesse « aucune ligne jetée »
+    ne tenait pas). Ces deux mots ne sont une borne que sans montant en fin de ligne
+    (`FIN_SI_SANS_MONTANT_RECU`) ; « Mode de paiement », « Date du paiement », « N° de
+    transaction » restent des bornes quoi qu'il arrive (mesuré : aucune des 81 ne finit
+    par « € »). Audit : 2 rouges avant ; mutations `borne` 2, `bornetoutes` 1. Aucun
+    reçu réel n'avait ce libellé.
 
 ---
 

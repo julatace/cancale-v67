@@ -31,8 +31,10 @@
 // `--mutation=…` réaffaiblit la règle : chaque mutation doit faire passer au
 // moins un contrôle au rouge.
 //   connus · somme · signe · nonrecu · jete · txtexte · mode
-//   positif · texte  (23 oct., revue : la définition « positive » d'un reçu ;
-//                     une feuille structurée sans Montant payé)
+//   positif · texte · borne · bornetoutes  (23 oct., revue : la définition
+//                     « positive » d'un reçu ; une feuille structurée sans
+//                     Montant payé ; une ligne de frais « Transaction … » qui
+//                     finit le bloc ; « Mode de paiement … X € » compté)
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');
@@ -109,6 +111,10 @@ else if (MUT === 'nonrecu') muter('const estRecuAchat = (a) => !!a && !(', 'cons
 // (23 oct., revue) la définition « positive » d'avant : un reçu DOIT porter un
 // Montant payé, un sujet de reçu ou un PDF — tout le reste disparaissait.
 else if (MUT === 'positif') muter('const estRecuAchat = (a) => !!a && !(', "const estRecuAchat = (a) => !!a && (ventilationRecuAchat(a.texte).trouve || /re[çc]u\\s+pour/i.test(String(a.subject || '')) || !!a.pdfB64) && !(");
+// (23 oct., revue) une ligne de frais au libellé « Transaction … » finit le bloc.
+else if (MUT === 'borne') muter('(FIN_SI_SANS_MONTANT_RECU.test(l) && !RE_LIGNE_RECU.test(l))', 'FIN_SI_SANS_MONTANT_RECU.test(l)');
+// …ou toutes les bornes deviennent « sans montant » (« Mode de paiement … 23,23 € » compté).
+else if (MUT === 'bornetoutes') muter('FIN_VENTILATION_RECU.test(l) || (FIN_SI_SANS_MONTANT_RECU.test(l) && !RE_LIGNE_RECU.test(l))', '(FIN_VENTILATION_RECU.test(l) || FIN_SI_SANS_MONTANT_RECU.test(l)) && !RE_LIGNE_RECU.test(l)');
 else if (MUT === 'texte') muter('hasStructured: v.trouve };', 'hasStructured: v.trouve || !!(vendeur || mode || trans) };');
 else if (MUT === 'jete') muter('else lignes.push({ libelle: l, centimes: null });', 'else continue;');
 else if (MUT === 'txtexte') muter("for (const l of lignesRecu(a && a.texte)) {\n    const m = l.match(", "for (const l of []) {\n    const m = l.match(");
@@ -131,7 +137,7 @@ const decl = new Map();
     for (const v of d0.declarations) if (v.id && v.id.name && !decl.has(v.id.name)) decl.set(v.id.name, `${d0.kind} ${src.slice(v.start, v.end)};`);
   }
 }
-const NOMS = ['centimesRecu', 'texteCentimesRecu', 'lignesRecu', 'MONTANT_RECU', 'RE_MONTANT_SEUL_RECU', 'RE_LIGNE_RECU', 'RE_MONTANT_PAYE_RECU', 'FIN_VENTILATION_RECU', 'SUJET_STATUT_ACHAT',
+const NOMS = ['centimesRecu', 'texteCentimesRecu', 'lignesRecu', 'MONTANT_RECU', 'RE_MONTANT_SEUL_RECU', 'RE_LIGNE_RECU', 'RE_MONTANT_PAYE_RECU', 'FIN_VENTILATION_RECU', 'FIN_SI_SANS_MONTANT_RECU', 'SUJET_STATUT_ACHAT',
   'ventilationRecuAchat', 'txRecuAchat', 'estRecuAchat', 'recusAchatDe', 'modePaiementRecu', 'phraseSommeRecu', 'champsRecuAchat'];
 const manque = NOMS.filter((n) => !decl.has(n));
 dit(!manque.length, 'la règle du reçu existe dans App.jsx (une règle pour la feuille et la fenêtre PDF)', manque.length ? 'absent : ' + manque.join(', ') : '');
@@ -175,6 +181,22 @@ essaie('cas de la capture', () => {
 essaie('libellé inconnu', () => {
   const r = v('*Montant payé* 25,43 €\nArticle 20,00 €\nFrais de port 3,23 €\nFrais de traitement 0,50 €\nFrais Vinted 1,70 €\n*Mode de paiement* Visa\n');
   dit(r.lignes.some((l) => l.libelle === 'Frais de traitement' && l.centimes === 50) && r.somme === 'juste', 'un libellé inconnu est GARDÉ et compté', dump(r));
+});
+// (23 oct., revue) Une ligne de MONTANT dont le libellé commence comme une
+// borne (« Transaction sécurisée 0,50 € », « Vendeur pro 2,00 € ») n'est pas la
+// fin du bloc : elle est gardée et comptée. Les vraies bornes ne finissent
+// jamais par « € » (mesuré : 81/81 « Mode de paiement … (X €) », « Date du
+// paiement … », « N° de transaction … ») et restent des bornes.
+essaie('libellé qui ressemble à une borne', () => {
+  const r = v('*Montant payé* 25,43 € \nArticle 20,00 € \nFrais de port 3,23 € \nTransaction sécurisée 0,50 € \nFrais Vinted 1,70 € \n*Mode de paiement* Visa, **********1111 (25,43 €) \n*Date du paiement* 21/10/2026 10 h 47 \n*N° de transaction* 23400000001 \n');
+  dit(r.lignes.length === 4 && r.lignes[2].libelle === 'Transaction sécurisée' && r.lignes[2].centimes === 50 && r.somme === 'juste' && r.total === 2543,
+    'une ligne de montant « Transaction sécurisée 0,50 € » est GARDÉE et comptée — le bloc ne finit pas sur elle', dump(r));
+  const r2 = v('*Montant payé* 22,00 € \nArticle 20,00 € \nVendeur pro 2,00 € \n*Mode de paiement* Visa\n');
+  dit(r2.lignes.length === 2 && r2.somme === 'juste', 'une ligne de montant « Vendeur pro 2,00 € » est gardée et comptée', dump(r2));
+  const r3 = v('*Montant payé* 23,23 € \nArticle 20,00 € \nFrais de port 3,23 € \nTransaction : 23400000001\nVendeur vendeur_banc\nArticle 99,00 €\n');
+  dit(r3.lignes.length === 2 && r3.somme === 'juste', '« Transaction : 2340… » (sans montant) reste une borne : rien après elle n’entre dans le bloc', dump(r3));
+  const r4 = v('*Montant payé* 23,23 € \nArticle 20,00 € \nFrais de port 3,23 € \n*Mode de paiement* porte-monnaie Vinted 23,23 €\nArticle 99,00 €\n');
+  dit(r4.lignes.length === 2 && r4.somme === 'juste', '« Mode de paiement » reste une borne, même suivi d’un montant (jamais compté comme une ligne)', dump(r4));
 });
 essaie('milliers et ligne suivante', () => {
   const r = v('Montant payé :\n1 234,56 €\nArticle 1 200,00 €\nFrais de port 34,56 €\nMode de paiement : Visa\n');

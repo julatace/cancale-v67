@@ -3887,7 +3887,14 @@ const MONTANT_RECU = '([+\\-−–]?\\s?(?:\\d{1,3}(?:[ .]\\d{3})+|\\d+)(?:[.,]\
 const RE_MONTANT_SEUL_RECU = new RegExp('^' + MONTANT_RECU + '$', 'i');
 const RE_LIGNE_RECU = new RegExp('^(.*?\\S)\\s*:?\\s+' + MONTANT_RECU + '$', 'i');
 const RE_MONTANT_PAYE_RECU = /^montant\s+pay[ée]e?s?(?![\p{L}\d])\s*:?\s*/iu;
-const FIN_VENTILATION_RECU = /^(?:mode\s+de\s+paiement|date\s+du\s+paiement|n[°º]?\s*de\s+transaction|transaction|vendeur)\b/i;
+// Les bornes du bloc. ⚠️ (23 oct., revue) « Transaction » et « Vendeur » ne
+// finissent le bloc que si la ligne ne porte PAS de montant : « Transaction
+// sécurisée 0,50 € » est une ligne de frais, pas la fin — elle était jetée avec
+// tout ce qui suivait. Les autres bornes ne sont jamais des frais (mesuré sur les
+// 81 reçus : aucune ne finit par « € » ; « Mode de paiement … (X €) » finit par
+// sa parenthèse) et finissent le bloc quoi qu'il arrive.
+const FIN_VENTILATION_RECU = /^(?:mode\s+de\s+paiement|date\s+du\s+paiement|n[°º]?\s*de\s+transaction)\b/i;
+const FIN_SI_SANS_MONTANT_RECU = /^(?:transaction|vendeur)\b/i;
 const ventilationRecuAchat = (texte) => {
   const L = lignesRecu(texte);
   const i = L.findIndex((l) => RE_MONTANT_PAYE_RECU.test(l));
@@ -3902,7 +3909,7 @@ const ventilationRecuAchat = (texte) => {
   for (; j < L.length && lignes.length <= 20; j++) {
     const l = L[j];
     if (!l) continue;
-    if (FIN_VENTILATION_RECU.test(l)) { fin = true; break; }
+    if (FIN_VENTILATION_RECU.test(l) || (FIN_SI_SANS_MONTANT_RECU.test(l) && !RE_LIGNE_RECU.test(l))) { fin = true; break; }
     const m = l.match(RE_LIGNE_RECU);
     const c = m ? centimesRecu(m[2]) : null;
     if (m && c != null && /\p{L}/u.test(m[1])) lignes.push({ libelle: m[1].replace(/\s*:$/, ''), centimes: c });
