@@ -10566,7 +10566,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 // complet, §5). Sur téléphone, douze valeurs ne tiennent pas côte à côte : on
 // n'écrit que le meilleur mois, le dernier et celui qu'on a touché ; les
 // autres sont dans l'infobulle et au toucher (`onChoisir`).
-function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
+function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
   const ref=React.useRef(null);
   const [W,setW]=React.useState(340);
   const [compact,setCompact]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
@@ -10596,13 +10596,14 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
   return <div ref={ref} className="vrm-chart-months" style={{width:'100%',minWidth:0}}>
     <svg {...{[attr]:''}} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group"
       aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${format(vals[i])}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
-      <defs><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
+      <defs><linearGradient id={`area${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} stopOpacity=".20"/><stop offset="1" stopColor={C.accent} stopOpacity=".01"/></linearGradient><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
       {[0,.5,1].map(f=><line key={f} x1={left} x2={W-right} y1={Y(max*f)} y2={Y(max*f)} stroke={C.border} strokeWidth="1" strokeDasharray={f?'3 5':undefined}/>)}
+      {presentation==='ligne'&&<g aria-hidden="true" pointerEvents="none"><path d={`M ${X(0)} ${base} L ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')} L ${X(n-1)} ${base} Z`} fill={`url(#area${uid})`}/><path d={`M ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')}`} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/></g>}
       {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${format(vals[i])}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
         <title>{label}</title>
-        {actif&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
+        {actif&&presentation!=='ligne'&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
         <rect x={X(i)-col/2} y="0" width={col} height={H} fill="transparent"/>
-        <rect data-month-bar="" x={X(i)-bar/2} y={Y(vals[i])} width={bar} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={`url(#bars${uid})`} opacity={actif||i===meilleur?1:m.enCours?.45:.65}/>
+        {presentation==='ligne'?<circle cx={X(i)} cy={Y(vals[i])} r={actif?5:3} fill={actif?C.accent:C.card} stroke={C.accent} strokeWidth="2"/>:<rect data-month-bar="" x={X(i)-bar/2} y={Y(vals[i])} width={bar} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={`url(#bars${uid})`} opacity={actif||i===meilleur?1:m.enCours?.45:.65}/>}
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
@@ -21054,7 +21055,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:11,color:C.muted,marginTop:4}}>Toutes plateformes · ventes en cours comprises</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
             <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
-            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" legende={false}/></div>
+            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
@@ -28349,12 +28350,12 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
     <p className="vrm-analyses-perimetre">Vinted · toutes périodes · données reçues</p>
     <div className="vrm-analyses-duo">{[['marques','Marques vendues'],['pays','Pays des acheteurs']].map(([cle,titre])=>{
       const bloc=R[cle];const lignes=bloc?Object.values(bloc.par).sort((a,b)=>b.n-a.n):[];
-      const top=lignes.slice(0,3);const nom=k=>cle==='pays'?nomPays(k):k;
+      const top=lignes.slice(0,5);const nom=k=>cle==='pays'?nomPays(k):k;
       const attente=cle==='pays'&&extras===undefined;
       return <div key={cle} className="vrm-analyse-mini" data-analyse={cle}><h4>{titre}</h4>
         {attente?<p>Lecture des pays…</p>:!bloc?<p>Lecture indisponible.</p>:!bloc.n?<p>{cle==='pays'?'Aucun pays reçu.':'Aucune marque identifiée.'}</p>:<>
           <RepartitionAnneau elements={top.map(e=>({...e,k:nom(e.k)}))} total={bloc.n}/>
-          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)} %</b></li>)}{lignes.length>3&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)} %</b></li>}</ul>
+          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)} %</b></li>)}{lignes.length>5&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)} %</b></li>}</ul>
           <small>{bloc.n} sur {R.total} ventes renseignées</small>
         </>}
       </div>;
@@ -38855,7 +38856,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                     </div>
                     );
           };
@@ -39027,7 +39028,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const casier = !!t.consigne || !!ident;
                     const jours = joursAvant(t.limite);
                     return (
-                      <div className="vrm-pickup-card" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
+                      <div className="vrm-pickup-card vrm-pickup-row" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
                         {thumb(photoColis(t))}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
@@ -39105,7 +39106,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             de retrait était un QR mort ne laissait RIEN à présenter
                             au comptoir — vu en capture sur 09447431562792. */}
                         {(code||ident) && (
-                          <div style={{flexShrink:0,display:'flex',gap:6}}>
+                          <div className="vrm-pickup-codes" style={{flexShrink:0,display:'flex',gap:6}}>
                             {ident && (
                               <CodeRetraitCopiable label="Identifiant" code={ident}/>
                             )}
@@ -39114,7 +39115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             )}
                           </div>
                         )}
-                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                       </div>
                     );
                   })}

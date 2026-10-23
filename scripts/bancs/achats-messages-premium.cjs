@@ -213,6 +213,16 @@ const capturer = async (pg, nom, vp) => {
           if (tel) dit(!m.petits.length, `${T} aucune cible tactile < 44 px`, m.petits.slice(0, 8).join(' | '));
           if (onglet === 'attente') dit(m.nCodes >= 3, `${T} les codes de retrait sont là (3 colis)`, String(m.nCodes));
           else dit(m.nAchats >= 6, `${T} la liste des achats est là`, String(m.nAchats));
+          if (onglet === 'attente') {
+            const lignes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-pickup-card')].map(e => {
+              const info=e.querySelector(':scope > div:first-of-type'), code=e.querySelector('.vrm-pickup-code'), bouton=e.querySelector('.vrm-pickup-collect');
+              if (!info || !code || !bouton) return null;
+              const a=info.getBoundingClientRect(), b=code.getBoundingClientRect(), c=bouton.getBoundingClientRect();
+              const chiffre=code.querySelector('strong').getBoundingClientRect(), copie=code.querySelector('small').getBoundingClientRect();
+              return {aligne:b.left>=a.right-1&&chiffre.right<=copie.left+1&&chiffre.left>=b.left&&copie.right<=b.right+1, compact:c.height<=48, code:code.querySelector('strong')?.innerText};
+            }).filter(Boolean));
+            dit(lignes.length>0 && lignes.every(x=>x.aligne&&x.compact), `${T} codes à droite des articles et confirmation compacte`, JSON.stringify(lignes));
+          }
           await ctx.close();
         });
       }

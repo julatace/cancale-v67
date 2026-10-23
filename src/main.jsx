@@ -73,6 +73,7 @@ import './styles-iphone.css';
 import './styles-mobile-studio.css';
 import './styles-gestion.css';
 import './styles-widgets.css';
+import './styles-captures.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

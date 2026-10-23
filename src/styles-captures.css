@@ -1,0 +1,102 @@
+/* Composition de la planche validée : pas de transformation du zoom,
+   aucune donnée masquée pour obtenir artificiellement la capture. */
+.vrm-statistiques-premium{gap:14px!important;}
+.vrm-statistiques-premium>[data-stats-carte=hero]{padding:14px 18px!important;}
+.vrm-statistiques-premium>[data-stats-carte=courbe]{padding:18px!important;}
+.vrm-statistiques-premium>.vrm-stats-analyses{padding:0!important;background:transparent!important;border:0!important;}
+.vrm-statistiques-premium>.vrm-stats-analyses>h3{font-size:13px;margin:0 0 8px;}
+.vrm-statistiques-premium .vrm-analyses-ventes{padding:0;border:0;margin:0;}
+.vrm-statistiques-premium .vrm-analyses-duo{gap:14px;}
+.vrm-statistiques-premium .vrm-analyse-mini{display:grid;grid-template-columns:96px minmax(0,1fr);align-content:start;align-items:center;gap:8px 14px;background:var(--vrm-surface);border:1px solid var(--vrm-line);border-radius:9px;padding:16px;}
+.vrm-statistiques-premium .vrm-analyse-mini h4{grid-column:1/-1;font-size:13px;margin:0 0 6px;}
+.vrm-statistiques-premium .vrm-analyse-mini .vrm-repartition-anneau{width:96px;margin:0;}
+.vrm-statistiques-premium .vrm-analyse-mini>small,.vrm-statistiques-premium .vrm-analyse-mini>p{grid-column:1/-1;margin:4px 0 0;}
+.vrm-statistiques-premium .vrm-analyse-mini li{font-size:11px;margin:8px 0;}
+.vrm-statistiques-premium .vrm-analyse-mini li>span:before{content:'';display:inline-block;width:6px;height:6px;margin-right:6px;border-radius:50%;background:var(--vrm-accent,#244e54);}
+.vrm-statistiques-premium .vrm-stats-analyses>details{background:var(--vrm-surface);border:1px solid var(--vrm-line);border-radius:8px;margin-top:12px;padding:0 14px;}
+.vrm-statistiques-premium .vrm-stats-analyses>details>summary{margin:0;border:0;}
+@media(min-width:1000px){
+ .vrm-statistiques-premium{display:grid!important;grid-template-columns:repeat(12,minmax(0,1fr));align-items:start;}
+ .vrm-statistiques-premium>*{grid-column:1/-1;min-width:0;}
+ .vrm-statistiques-premium>div:first-child{grid-row:1;}
+ .vrm-statistiques-premium>[data-stats-carte=hero]{grid-column:1/9;grid-row:2;}
+ .vrm-statistiques-premium>.vrm-finance-goal{grid-column:9/-1;grid-row:2;}
+ .vrm-statistiques-premium>[data-stats-carte=courbe]{grid-column:1/-1;grid-row:3;}
+ .vrm-statistiques-premium>.vrm-stats-analyses{grid-column:1/-1;grid-row:4;}
+ .vrm-statistiques-premium>[data-stats-carte=details]{grid-column:1/-1;grid-row:5;}
+ .vrm-statistiques-premium>.vrm-stats-comptes{grid-column:1/-1;grid-row:auto;grid-template-columns:repeat(2,minmax(0,1fr))!important;align-self:start;}
+}
+/* Une seule surface pour l'inbox et le fil, comme dans la référence. */
+@media(min-width:1000px){
+ .vrm-message-workspace{display:grid!important;grid-template-columns:minmax(280px,34%) minmax(0,1fr)!important;align-items:stretch;gap:0!important;}
+ .vrm-message-workspace .vrm-inbox-column{min-width:0;}
+ .vrm-message-workspace .vrm-chat-column{padding:0!important;min-width:0;}
+ .vrm-message-workspace .vrm-chat-inline{position:sticky;top:12px;}
+ .vrm-message-workspace .vrm-chat-panel{height:min(740px,calc(100dvh - 150px))!important;min-height:480px;}
+ .vrm-message-workspace .vrm-chat-head{min-height:52px;padding:8px 14px;}
+ .vrm-message-workspace .vrm-msg-ph{width:36px!important;height:36px!important;border-radius:50%!important;}
+ .vrm-message-workspace .vrm-msg-ph img{border-radius:50%!important;}
+ .vrm-message-workspace .vrm-inbox-row{padding:10px 12px!important;min-height:72px!important;}
+ .vrm-message-workspace .vrm-msg-name{font-size:12px!important;}
+ .vrm-message-workspace .vrm-msg-extrait,.vrm-message-workspace .vrm-msg-article{font-size:11px!important;}
+}
+/* Retraits : photo / article / code / confirmation, sans grande carte par colis. */
+.vrm-main .vrm-achats .vrm-pickup-point{border:0!important;background:transparent!important;border-radius:0!important;margin-bottom:18px!important;}
+.vrm-main .vrm-achats .vrm-pickup-point>.vrm-pickup-dest{background:transparent!important;padding:8px 0!important;border-bottom:1px solid var(--vrm-line);}
+.vrm-main .vrm-achats .vrm-pickup-dest>div>div:not(.vrm-pickup-location-label){font-size:13px!important;}
+.vrm-main .vrm-achats .vrm-pickup-point>div:last-child{padding:0!important;}
+.vrm-main .vrm-achats .vrm-pickup-card{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;padding:8px 0!important;gap:10px!important;background:transparent!important;}
+.vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-thumb,.vrm-main .vrm-achats .vrm-pickup-card>img{width:34px!important;height:42px!important;border-radius:5px!important;flex:0 0 34px;}
+.vrm-main .vrm-achats .vrm-pickup-card>div:first-of-type{flex:1 1 120px!important;min-width:0;}
+.vrm-main .vrm-achats .vrm-pickup-card>div:first-of-type>div:first-child{font-size:12px!important;white-space:nowrap!important;display:block!important;overflow:hidden;text-overflow:ellipsis;}
+.vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-code,.vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code){flex:0 0 auto!important;width:auto!important;margin:0!important;max-width:48%;gap:6px;}
+.vrm-main .vrm-achats .vrm-pickup-code{grid-template-areas:"code copy" "label label"!important;grid-template-columns:minmax(0,1fr) auto!important;padding:5px 8px!important;min-height:44px!important;min-width:110px;gap:0 8px!important;border-radius:5px!important;}
+.vrm-main .vrm-achats .vrm-pickup-code>strong{font-size:13px!important;}
+.vrm-main .vrm-achats .vrm-pickup-code>span{font-size:9px!important;text-transform:none!important;}
+.vrm-main .vrm-achats .vrm-pickup-code>small>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+.vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-collect{font-size:10px!important;padding:5px 8px!important;min-height:44px!important;}
+.vrm-main .vrm-achats .vrm-pickup-card>button.vrm-icon-control{margin:0!important;width:44px!important;height:44px!important;}
+@media(max-width:767px){
+ .vrm-statistiques-premium .vrm-analyse-mini{grid-template-columns:64px minmax(0,1fr);gap:6px;padding:10px;}
+ .vrm-statistiques-premium .vrm-analyse-mini .vrm-repartition-anneau{width:64px;}
+ .vrm-statistiques-premium .vrm-analyse-mini li{font-size:11px;margin:6px 0;}
+ .vrm-statistiques-premium .vrm-analyses-duo{gap:8px;}
+ .vrm-main .vrm-achats .vrm-pickup-card{flex-wrap:wrap!important;gap:4px 8px!important;padding:7px 0!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card>div:first-of-type{flex:1 1 100px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code){flex:0 0 auto!important;max-width:100%;}
+ .vrm-main .vrm-achats .vrm-pickup-code{min-width:88px;padding:4px 6px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-code>strong{font-size:12px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-collect{margin-left:auto!important;}
+ .vrm-main .vrm-achats .vrm-pickup-codes:has(>.vrm-pickup-code:nth-child(2)){flex:1 1 100%!important;max-width:100%!important;}
+}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(2)>span:before{background:#6e9989;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(3)>span:before{background:#8a9fa3;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(4)>span:before{background:#c7bda5;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(5)>span:before{background:#a7bbae;}
+.vrm-statistiques-premium .vrm-analyse-mini li:nth-child(6)>span:before{background:#738a95;}
+.vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-collect{align-self:center!important;height:44px;}
+@media(max-width:767px){
+ .vrm-statistiques-premium>*{order:7;}
+ .vrm-statistiques-premium>div:first-child{order:0;}
+ .vrm-statistiques-premium>[data-stats-carte=hero]{order:1;}
+ .vrm-statistiques-premium>.vrm-finance-goal{order:2;}
+ .vrm-statistiques-premium>[data-stats-carte=courbe]{order:3;}
+ .vrm-statistiques-premium>.vrm-stats-analyses{order:4;}
+ .vrm-statistiques-premium>[data-stats-carte=details]{order:5;}
+ .vrm-statistiques-premium>.vrm-stats-comptes{order:6;}
+ .vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-collect{width:44px;flex:0 0 44px;padding:0!important;}
+ .vrm-pickup-collect-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+ .vrm-main .vrm-achats .vrm-pickup-card:has(>.vrm-pickup-collect):not(:has(>button.vrm-icon-control)){display:grid!important;grid-template-columns:34px minmax(0,1fr) auto 44px;gap:4px 6px!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card:has(>.vrm-pickup-collect):not(:has(>button.vrm-icon-control))>div:first-of-type{grid-column:2;}
+ .vrm-main .vrm-achats .vrm-pickup-card:has(>.vrm-pickup-collect):not(:has(>button.vrm-icon-control))>.vrm-pickup-codes{grid-column:3;max-width:none!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card:has(>.vrm-pickup-collect):not(:has(>button.vrm-icon-control))>.vrm-pickup-collect{grid-column:4;}
+ .vrm-main .vrm-achats .vrm-pickup-card>div:first-of-type{font-size:11px;}
+ .vrm-main .vrm-achats .vrm-pickup-code>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+ .vrm-main .vrm-achats .vrm-pickup-code{grid-template-areas:"code copy"!important;}
+ .vrm-main .vrm-achats .vrm-pickup-codes:has(>.vrm-pickup-code:nth-child(2)){grid-column:2/4!important;grid-row:2;flex-wrap:wrap;}
+}
+.vrm-main .vrm-achats .vrm-pickup-point>div:last-child{display:block!important;}
+.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{flex:0 0 auto!important;width:max-content!important;min-width:110px!important;max-width:none!important;grid-template-columns:max-content 14px!important;}
+@media(max-width:767px){.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{min-width:88px!important;}}
+:root:not([data-theme=dark]) .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#dce9df!important;color:#213b41!important;}
+@media(min-width:1000px){.vrm-message-workspace .vrm-msg-av{width:36px!important;height:36px!important;border-radius:50%!important;}.vrm-message-workspace .vrm-msg-av img{border-radius:50%!important;}}
