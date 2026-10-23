@@ -27706,10 +27706,12 @@ function RecapComptableMensuel() {
 // plus (`compteEcarte`, comme le CA). Lecture ratée ⇒ « pas pu lire », jamais 0.
 let _repartCache = null;      // { at, txn: {tx: {cc}} | null, items: {id: {...}} | null, dates: {} | null }
 const lireExtrasRepartition = async () => {
-  if (_repartCache && Date.now() - _repartCache.at < 10 * 60 * 1000) return _repartCache;
+  const owner = AUTH.user?.id;
+  if (!owner) return {txn:null,items:null,dates:null};
+  if (_repartCache?.owner === owner && Date.now() - _repartCache.at < 10 * 60 * 1000) return _repartCache;
   const [pays, items, dates, txnItems] = await Promise.all([
     // Le pays n'est pas dans `meta` : cette lecture décompresse le détail de
-    // transaction — elle ne part qu'à l'ouverture de Statistiques, une fois
+    // transaction — partagée avec les analyses de l’accueil, une fois
     // par dix minutes (§4.4 : jamais `select=data`, on projette le seul champ).
     lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,cc:data->payload->transaction->buyer->>country_code').catch(() => null),
     lireTout('id=like.harvest_%25_listings&select=items:data->payload->items').catch(() => null),
@@ -27731,7 +27733,8 @@ const lireExtrasRepartition = async () => {
       idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id, promoted: w.promoted, views: w.views, favourites: w.favourites };
     }
   }
-  _repartCache = { at: Date.now(), txn, items: idx, dates };
+  if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
+  _repartCache = { owner, at: Date.now(), txn, items: idx, dates };
   return _repartCache;
 };
 const nomPays = (cc) => {
@@ -27775,15 +27778,14 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
   return R;
 };
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
- const [ouvert,setOuvert]=React.useState(false);
  return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
-  <div className="vrm-day-head"><h3>Performance</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
+  <div className="vrm-day-head"><h3>Analyses des ventes</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
+  <RepartitionsVentes panelOff={panelOff} apercu/>
   <div className="vrm-performance-chiffres"><div><span>Ventes ce mois</span><b>{partiel?'—':moisN}</b></div><div><span>Prix de vente moyen</span><b>{!partiel&&moisN?fmt(moisEur/moisN):'—'}</b></div></div>
   {partiel&&<p style={{fontSize:11,color:C.muted}}>Lecture partielle : les indicateurs attendent les ventes manquantes.</p>}
-  <details onToggle={e=>setOuvert(e.currentTarget.open)}><summary>Marques et pays des acheteurs <span>Vinted · toutes périodes</span></summary>{ouvert&&<RepartitionsVentes panelOff={panelOff}/>}</details>
  </section>;
 }
-function RepartitionsVentes({ panelOff }) {
+function RepartitionsVentes({ panelOff, apercu = false }) {
   const { ventes, ko } = useVentesCoque();
   const [extras, setExtras] = React.useState(undefined);
   React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
@@ -27800,6 +27802,22 @@ function RepartitionsVentes({ panelOff }) {
   const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Ce qui se vend</div>;
   if (ventes === undefined) return <div data-stats-carte="repartitions" data-repart-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes…</div></div>;
   if (!R) return <div data-stats-carte="repartitions" data-repart-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Tes ventes n'ont pas pu être lues : aucune répartition plutôt qu'une répartition fausse. Rouvre l'écran dans un moment.</div></div>;
+  if (apercu) return <section className="vrm-analyses-ventes" aria-label="Analyses des ventes">
+    <p className="vrm-analyses-perimetre">Vinted · toutes périodes · données reçues</p>
+    <div className="vrm-analyses-duo">{[['marques','Marques vendues'],['pays','Pays des acheteurs']].map(([cle,titre])=>{
+      const bloc=R[cle];const lignes=bloc?Object.values(bloc.par).sort((a,b)=>b.n-a.n):[];
+      const top=lignes.slice(0,3);const nom=k=>cle==='pays'?nomPays(k):k;
+      const attente=cle==='pays'&&extras===undefined;
+      return <div key={cle} className="vrm-analyse-mini" data-analyse={cle}><h4>{titre}</h4>
+        {attente?<p>Lecture des pays…</p>:!bloc?<p>Lecture indisponible.</p>:!bloc.n?<p>{cle==='pays'?'Aucun pays reçu.':'Aucune marque identifiée.'}</p>:<>
+          <RepartitionAnneau elements={top.map(e=>({...e,k:nom(e.k)}))} total={bloc.n}/>
+          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)} %</b></li>)}{lignes.length>3&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)} %</b></li>}</ul>
+          <small>{bloc.n} sur {R.total} ventes renseignées</small>
+        </>}
+      </div>;
+    })}</div>
+    {!!(ko||[]).length&&<p className="vrm-analyses-perimetre">Lecture partielle : certains comptes n’ont pas pu être lus.</p>}
+  </section>;
   const libelles = { marques: 'Marques', tailles: 'Tailles', modeles: 'Modèles', pays: 'Pays' };
   const bloc = R[mode];
   const lignes = bloc ? Object.values(bloc.par).sort((a, b) => b.n - a.n || b.eur - a.eur) : [];
