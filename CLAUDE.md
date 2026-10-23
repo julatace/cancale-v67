@@ -4772,8 +4772,11 @@ de l'agent eBay).
   une requête qui porte l'en-tête (PostgREST l'expose dans `request.headers`,
   déjà lu en production par `noter_ecriture`) ET si l'appelant en est membre
   actif. Sans en-tête : rien ne change pour personne.
-- **Zéro écriture pour le membre.** « Coché posté » n'est pas indispensable :
-  Vinted sort le colis d'« à expédier » dès le scan au relais.
+- **Aucune écriture du membre PAR RLS.** « Coché posté » n'est pas indispensable :
+  Vinted sort le colis d'« à expédier » dès le scan au relais. ⚠️ Mais la 016 met
+  en service UNE écriture du membre, hors RLS : l'écran Organisation
+  (`/api/compte?mode=operations`) réécrit `vrm_operations_v1` du vendeur avec la
+  clé de service — voir « Revue du 22-23 octobre » plus bas.
 - **L'abonnement est celui du VENDEUR** : `vrm_equipe_actif` exige
   `vrm_acces_pour(vendeur)`. Seul objet existant modifié : la restrictive
   `abonnement_requis` d'`app_data` (`… or owner = (select
@@ -4897,10 +4900,28 @@ identiques au fichier. **Seule la 016 manque** (aucune table, aucune fonction `v
   lecture ignore l'équipe (`vrm_equipe_lecture_bloquee`) ; `--verifier` exige la clause sur `vrm_lecture_privee`
   quand elle existe (`regles`) et aucune restrictive bloquante (`restrictives_bloquantes`).
 - **Isolation** (relue) : `abonnement_requis` ne s'ouvre que pour `owner = vrm_equipe_vendeur()` (membre ACTIF
-  d'un vendeur dont l'accès est ouvert, DEMANDÉ par l'en-tête) ; les écritures restent fermées par les
-  restrictives d'écriture de la 021 et les permissives `owner = auth.uid()` ; `vinted_accounts` n'est pas
+  d'un vendeur dont l'accès est ouvert, DEMANDÉ par l'en-tête) ; aucune écriture du membre PAR RLS
+  (restrictives d'écriture de la 021, permissives `owner = auth.uid()`) — mais la 016 met en service le
+  parcours membre d'Organisation, hors RLS (puce suivante) ; `vinted_accounts` n'est pas
   touchée ; la vérification de séparation de `api/compte.js?mode=confidentialite` n'envoie pas l'en-tête (rien ne
   change pour elle).
+- ⚠️ **Revue du 22-23 octobre — ce que la 016 OUVRE en plus, hors RLS** (le premier jet disait « les écritures
+  restent fermées » et « la migration ne change rien pour operations.js » : faux). **Mesuré** (la vraie route
+  `api/_lib/operations.js`, fetch simulé, données inventées) : sans la 016, `rpc/vrm_equipe_lister` répond 404 et
+  un membre qui poste `mission.etat` chez le vendeur reçoit 403, 0 écriture ; avec la 016 (`membre_de`,
+  `acces === true`), la route **lit et réécrit la ligne `vrm_operations_v1` DU VENDEUR avec la clé de service**
+  (`PATCH …owner=eq.<vendeur>&id=eq.vrm_operations_v1`). ⇒ **Appliquer la 016 met en service le parcours membre
+  d'Organisation** (`/api/compte?mode=operations`). Bornes, tenues par `src/operations/metier.js` et vérifiées :
+  `mission.etat` et `mission.etape` seulement, sur SES missions (attribution = son invitation), jamais valider
+  (en_cours, terminee, bloquee) ; `mission.creer`, `reservation.creer`, la mission d'un autre aide, un vendeur à
+  l'accès fermé ou dont il n'est pas membre ⇒ refusés, 0 écriture ; il ne LIT que SES missions (ni réservations,
+  ni montants). **Décidé** : rien à changer dans le SQL ni dans la route (bornée, pas une fuite) ; l'en-tête de la
+  016 et ce dossier le disent (commentaires seuls : l'essai annulé et l'essai de production produisent le même
+  texte qu'avant, md5 `eeb6e4fe…` et `69f80fe9…` — l'essai déjà joué sur la vraie base vaut toujours ; `audit-equipe-sql`
+  144 verts). **Prouvé** : `scripts/audit-equipe-ecriture-membre.cjs` (16 contrôles, sans
+  Postgres) — rouge sur 15dbcb3 (l'en-tête et la section ne nommaient pas ce chemin) ; `--prouve` : 6/6 mutations
+  au rouge (en-tête d'avant, section sans le chemin, membre qui crée, qui touche la mission d'un autre, qui
+  valide, accès fermé ignoré). **Non mesuré** : la route contre la vraie base (aucune écriture en production).
 - **Essai annulé sur la vraie base** (`scripts/equipe-sql/essai-production.cjs`, UN appel `execute_sql`, BEGIN →
   migration → contrôles par rôle joués comme PostgREST → ROLLBACK ; aide, vendeur et adresse non confirmée
   INVENTÉS dans la transaction) : propriétaire 7 840/7 840 lignes avant et après (avec l'en-tête aussi) ; un autre

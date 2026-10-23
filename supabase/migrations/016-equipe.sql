@@ -12,10 +12,21 @@
 --     reçus, compta), ni les réglages (`main` jamais en entier), ni les comptes
 --     Vinted et leurs jetons (`vinted_accounts` : aucune règle pour lui), ni
 --     `ebay_tokens*`, ni les messages des acheteurs.
---   • AUCUNE ÉCRITURE. « Coché posté » n'est pas indispensable : Vinted fait
---     sortir le colis d'« à expédier » dès qu'il est scanné au relais
---     (`transaction_user_status`), et une écriture du membre dans les lignes du
---     vendeur ouvrirait une porte qu'aucun écran ne justifie.
+--   • aucune écriture PAR RLS : les restrictives d'écriture (021) et les
+--     permissives `owner = auth.uid()` ne s'ouvrent pas pour lui. « Coché
+--     posté » n'est pas indispensable : Vinted fait sortir le colis
+--     d'« à expédier » dès qu'il est scanné au relais (`transaction_user_status`).
+--   • ⚠️ LA SEULE ÉCRITURE DU MEMBRE passe HORS RLS, et c'est CETTE migration
+--     qui la met en service : l'écran Organisation
+--     (`/api/compte?mode=operations`, api/_lib/operations.js) lit et réécrit la
+--     ligne `vrm_operations_v1` DU VENDEUR avec la clé de service, après un
+--     contrôle de `membre_de` rendu par `vrm_equipe_lister` (`acces === true`) —
+--     sans la 016, cette fonction répond 404 et la route refuse (403).
+--     src/operations/metier.js la borne à `mission.etat` et `mission.etape`, sur
+--     SES missions seulement (attribution = son invitation), sans jamais valider
+--     (en_cours, terminee, bloquee). Il y lit aussi SES missions, en projection
+--     (ni réservations, ni lots, ni l'argent, ni les autres missions).
+--     Preuve : scripts/audit-equipe-ecriture-membre.cjs.
 --
 -- Numéro : 016. La 015 est RÉSERVÉE (l'horloge de l'agent eBay, pg_cron /
 -- pg_net, sur le oui de Julien — docs/passation/README.md).
