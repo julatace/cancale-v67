@@ -1008,6 +1008,12 @@ const delaiDemandeEmail = (err) => {
   return n > 0 && n <= 3600 ? n : null;
 };
 const texteDelaiEmail = (n) => `Par sécurité, un nouvel email ne peut partir que dans ${n} seconde${n > 1 ? 's' : ''}. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.`;
+// ⚠️ 23 oct. (revue, §7) — le compte à rebours ne s'écrit qu'UNE fois. Là où un
+//    bouton grisé le porte déjà (« Réessaie dans N s », « Renvoyer dans N s »),
+//    la phrase dit la cause et le geste SANS chiffre : sinon « 57 secondes » et
+//    « 57 s » l'un sous l'autre. Là où aucun bouton ne le porte, la phrase garde
+//    le nombre (`texteDelaiEmail`).
+const TEXTE_DELAI_EMAIL_BOUTON = 'Par sécurité, un nouvel email ne peut partir que dans un instant. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.';
 const mapMailError = (err) => {
   const n = delaiDemandeEmail(err);
   if (n) return texteDelaiEmail(n);
@@ -11898,7 +11904,9 @@ function AuthScreen() {
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
           {err  && <div role="alert" style={{fontSize:12.5,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
-          {enAttenteEmail && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{texteDelaiEmail(resteAttente)}</div>}
+          {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
+              oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
+          {enAttenteEmail && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:12.5,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? TEXTE_DELAI_EMAIL_BOUTON : texteDelaiEmail(resteAttente)}</div>}
           {needConfirm && mode==='in' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
               Ton compte <b>{email}</b> attend sa confirmation.
@@ -43216,7 +43224,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
               style={{width:'100%',boxSizing:'border-box',marginTop:12,border:`1px solid ${acct.err?C.danger:C.border}`,borderRadius:10,padding:'13px 14px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
           )}
           {acct.err && <div style={{fontSize:12.5,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
-          {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:12.5,color:C.text,marginTop:8,lineHeight:1.4}}>{texteDelaiEmail(resteEmail)}</div>}
+          {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:12.5,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
           <div style={{display:'flex',gap:9,marginTop:14}}>
             <button type="button" onClick={close} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
             <button type="button" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
@@ -44072,8 +44080,13 @@ function MonAbonnement() {
           Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
         </div>
       )}
+      {/* 23 oct. (revue) : « pas pu relire » dit le fichier, l'erreur que le
+          serveur a LUE (`mentionsErreur`, au propriétaire seul) et la cause la
+          plus courante — un geste, pas un constat muet. */}
       {e.proprietaire && e.mentionsCompletes === null && (
-        <div data-mentions-manquantes="pas-su" style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Je n'ai pas pu relire les mentions légales : le paiement reste fermé tant qu'elles ne sont pas lisibles.</div>
+        <div data-mentions-manquantes="pas-su" style={{ fontSize: 12.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+          Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Julien d'Exemple' ») — écris-le entre guillemets droits (« "Julien d'Exemple" »).
+        </div>
       )}
       {prixAcorriger && (
         <div data-prix-stripe="different" style={{ fontSize: 12.5, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
@@ -44139,7 +44152,8 @@ function MonAbonnement() {
   // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
   // ⚠️ Un ANCIEN abonné garde ses factures (sa compta) : cette branche les rend
   //    comme celle du dessous — elle les perdait (revue du 11 octobre).
-  if (e.prixConforme === false || e.mentionsCompletes === false) return (<>
+  // 23 oct. (revue) : mentions ILLISIBLES (`null`) = fermé, comme le serveur.
+  if (e.prixConforme === false || e.mentionsCompletes !== true) return (<>
     <div style={carte} data-abonnement="non-branche" data-raison={e.prixConforme === false ? 'prix' : 'mentions'}>{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
     {listeFactures}
   </>);
@@ -44255,7 +44269,13 @@ function AbonnementRequis({ info }) {
   //    « Pas su » (`info` pas encore lu, `prixConforme: null`) ne ferme rien.
   // 22 oct. — et les mentions légales vides (`mentionsCompletes: false`) : même
   //    fermeture, même phrase générique (le détail n'est dit qu'au propriétaire).
-  const paiementFerme = !impaye && !!info && (info.prixConforme === false || info.configure === false || info.mentionsCompletes === false);
+  // ⚠️ 23 oct. (revue) — ET ILLISIBLES (`null`, un editeur.js mal écrit) : le
+  //    serveur traite « pas su » comme FERMÉ (503 `mentions-legales`), la porte
+  //    aussi. Elle proposait les deux cases et « S'abonner » sur un refus certain
+  //    — le défaut de la revue du 11 octobre, refait sur l'état « pas su ».
+  //    (≠ `prixConforme: null` : Stripe muet est passager et le serveur relit le
+  //    prix au clic ; un fichier illisible le reste, le refus est certain.)
+  const paiementFerme = !impaye && !!info && (info.prixConforme === false || info.configure === false || info.mentionsCompletes !== true);
   const [cases, setCases] = React.useState({ cgv: false, acces: false });
   const cgv = casesCgvCochees(cases);
   const agir = async () => {

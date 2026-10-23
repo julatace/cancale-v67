@@ -46,6 +46,8 @@ if (MUT) {
   else if (MUT === 'detail-vendeur') muter('api/compte.js', `return repondre(res, 503, { erreur: 'mentions-legales', message: "Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie plus tard." });`,
     `return repondre(res, 503, { erreur: 'mentions-legales', message: "Manque : " + (manque || []).map((x) => x.libelle).join(', ') });`);
   else if (MUT === 'passu-ouvert') muter('api/compte.js', 'if (manque === null || manque.length) {', 'if (manque && manque.length) {');
+  else if (MUT === 'erreur-a-tous') muter('api/compte.js', 'mentionsErreur: acc.proprietaire && manque === null', 'mentionsErreur: manque === null');
+  else if (MUT === 'sans-cause') muter('api/compte.js', "mentionsErreur: acc.proprietaire && manque === null ? String((lues && lues.erreur) || 'illisible') : undefined,", '');
   else if (MUT === 'sans-acces') muter('api/compte.js', 'if (corps.accesImmediat !== true) return', 'if (false) return');
   else if (MUT === 'liste-a-tous') muter('api/compte.js', 'mentionsManquantes: acc.proprietaire ? (', 'mentionsManquantes: true ? (');
   else if (MUT === 'sans-metadonnee') muter('api/compte.js', "subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe } },",
@@ -132,6 +134,36 @@ global.fetch = async (url, o = {}) => {
     globalThis.VRM_EDITEUR_OBLIGATOIRES = O;
     dit(r.code === 503 && r.corps && r.corps.erreur === 'mentions-legales' && stripeChecks() === 0, 'fichier illisible : le paiement reste FERMÉ', `HTTP ${r.code}`);
     dit(s.code === 200 && s.corps && s.corps.mentionsCompletes === null, '… et l’écran lit « pas su » (null), jamais « complet »', `mentionsCompletes=${s.corps && s.corps.mentionsCompletes}`);
+  });
+  // 23 oct. (revue) : la forme qu'il écrira VRAIMENT un jour — une apostrophe
+  // dans une chaîne entre apostrophes. Le fichier ne se charge plus du tout.
+  // Une COPIE de l'arbre (api/, public/legal/…) avec ce fichier-là : le dépôt
+  // n'est jamais touché.
+  await essaie('apostrophe', async () => {
+    const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'mentions-apos-'));
+    for (const rel of ['api', 'public/legal', 'src/communaute', 'src/operations', 'package.json']) fs.cpSync(path.join(RACINE, rel), path.join(tmp2, rel), { recursive: true });
+    fs.symlinkSync(path.join(RACINE_DEPOT, 'node_modules'), path.join(tmp2, 'node_modules'));
+    const pe = path.join(tmp2, 'public', 'legal', 'editeur.js');
+    const src = fs.readFileSync(pe, 'utf8');
+    const casse = src.replace(/(\bnom:\s*)null/, "$1'Julien d'Exemple (entrepreneur individuel)'");
+    if (casse === src) { dit(false, 'apostrophe : le champ « nom: null » est introuvable dans editeur.js'); return; }
+    fs.writeFileSync(pe, casse);
+    const compte2 = (await import('file://' + path.join(tmp2, 'api', 'compte.js'))).default;
+    const appeler2 = async (mode, jeton, body) => {
+      const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (x) => { r.corps = x; return r; }; r.setHeader = () => {};
+      const req = { method: mode === 'abonnement' ? 'GET' : 'POST', query: { mode }, headers: { authorization: 'Bearer aa.bb.' + jeton }, async *[Symbol.asyncIterator]() {} };
+      if (body) req.body = body;
+      await compte2(req, r); return r;
+    };
+    appelsStripe.length = 0;
+    const r = await appeler2('checkout', 'A', { cgv: true, accesImmediat: true });
+    const v = await appeler2('abonnement', 'A');
+    const p = await appeler2('abonnement', 'P');
+    dit(r.code === 503 && r.corps && r.corps.erreur === 'mentions-legales' && stripeChecks() === 0, 'editeur.js mal écrit (apostrophe) : le paiement reste FERMÉ, rien chez Stripe', `HTTP ${r.code} · ${stripeChecks()} session(s)`);
+    dit(v.code === 200 && v.corps && v.corps.mentionsCompletes === null && v.corps.mentionsErreur === undefined,
+      '… un vendeur lit « pas su » (null) — et rien de l’erreur', JSON.stringify({ c: v.corps && v.corps.mentionsCompletes, e: v.corps && v.corps.mentionsErreur }));
+    dit(p.code === 200 && p.corps && p.corps.mentionsCompletes === null && typeof p.corps.mentionsErreur === 'string' && /Exemple/.test(p.corps.mentionsErreur),
+      '… le propriétaire lit l’erreur MESURÉE (la ligne fautive), pour corriger le fichier', JSON.stringify(p.corps && p.corps.mentionsErreur));
   });
 
   console.log('\n── 3. Qui lit la liste de ce qui manque');

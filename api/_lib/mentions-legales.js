@@ -19,11 +19,15 @@ export async function lireMentions() {
     // que l'ouverture du paiement (le sens sûr), jamais toute la route.
     await import('../../public/legal/editeur.js');
   } catch (e) {
-    console.warn('[mentions] public/legal/editeur.js illisible —', String(e && e.message || e).slice(0, 160));
-    return null;
+    const erreur = String(e && e.message || e).slice(0, 160);
+    console.warn('[mentions] public/legal/editeur.js illisible —', erreur);
+    // 23 oct. (revue) : « pas su » garde SA cause, pour le propriétaire seul
+    // (api/compte.js, mode abonnement). `mentionsManquantes` rend toujours `null`
+    // sur cet objet (pas d'`editeur`) : le paiement reste FERMÉ.
+    return { erreur };
   }
   const E = globalThis.VRM_EDITEUR, O = globalThis.VRM_EDITEUR_OBLIGATOIRES, L = globalThis.VRM_EDITEUR_LIBELLES;
-  if (!E || typeof E !== 'object' || !Array.isArray(O) || !O.length) return null;
+  if (!E || typeof E !== 'object' || !Array.isArray(O) || !O.length) return { erreur: 'VRM_EDITEUR ou VRM_EDITEUR_OBLIGATOIRES absent du fichier' };
   return { editeur: E, obligatoires: O.map(String), libelles: (L && typeof L === 'object') ? L : {} };
 }
 
