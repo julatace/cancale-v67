@@ -12177,6 +12177,16 @@ fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
     `recu-achat.cjs` : deux vues 320 × 568 (police du banc, métriques d'Arial) et un
     reçu aux libellés les plus longs mesurés : 4 rouges sur le build de 7ba9670, 3
     sous la mutation « nowrap et insécable retirés » ; audit, mutation `nbsp` 1.
+  - **Au clavier, la feuille laissait partir le focus** (au 3ᵉ Tab sur `<body>`,
+    derrière le voile — et Échap, écouté sur le seul dialogue, ne fermait plus rien),
+    ↓ et Page bas ne faisaient pas défiler le reçu (le focus était sur le dialogue, qui
+    ne défile pas), et à la fermeture le focus tombait sur `<body>`. Déjà vrai sur
+    bf0a9c8 (pas une régression). `FeuilleRecuAchat` : focus sur la zone qui défile
+    (`data-recu-defile`, `tabIndex 0`), Tab / Maj+Tab tournent dans la feuille, Échap
+    écouté sur le document, le focus rendu à « Voir › » (le motif de `MenuEcrans`).
+    Banc `recu-achat.cjs` K (ouverture au clavier, Page bas, Tab ×5 + Maj+Tab ×4,
+    Échap après cinq Tab, focus rendu) : 10 rouges sur le build de 7ba9670 ; 10 sous
+    « piège, écoute du document et retour retirés », 3 sous « retour du focus retiré ».
 
 ---
 

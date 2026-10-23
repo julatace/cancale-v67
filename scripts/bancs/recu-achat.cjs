@@ -28,6 +28,8 @@
 //    F. « ‹ » et « PDF » font 44 px affichés ; Échap, « ‹ » et le retour du
 //       navigateur ferment la feuille ; en sombre, la feuille est sombre et le
 //       montant se lit.
+//    K. (revue du 23 oct.) au clavier : le focus reste dans la feuille, Page bas
+//       la fait défiler, Échap la ferme, le focus revient sur « Voir › » ;
 //    G. (revue du 23 oct.) à 320 px, aucun montant ne se coupe sur deux lignes,
 //       ni « •••• 9999 » ;
 //
@@ -355,6 +357,49 @@ async function fermerParEchap(pg) {
         await pg.goBack().catch(() => {});
         await pg.waitForTimeout(800);
         dit(await pg.locator(DIALOG).count() === 0 && await pg.locator('[data-recus-email]').count() === 1, 'F. le retour du navigateur ferme la feuille, et reste sur Achats');
+      });
+
+      // ── K. Au clavier (revue du 23 oct.) ─────────────────────────────────
+      // Ouverte au clavier, la feuille garde le focus (Tab et Maj+Tab tournent
+      // dedans), ↓ / Page bas font défiler le reçu, Échap la ferme même après
+      // cinq Tab, et le focus revient sur le bouton qui l'avait ouverte. Avant :
+      // au 3ᵉ Tab le focus partait sur <body> (et Échap ne fermait plus rien),
+      // Page bas ne bougeait pas, et le focus tombait sur <body> à la fermeture.
+      await essaie('K. clavier', async () => {
+        const recus = pg.locator('[data-recus-email]');
+        if (!(await recus.evaluate((e) => e.open))) await recus.locator('summary').click();
+        const ouvreur = recus.locator('li > button', { hasText: 'Basket banc taille 42' }).first();
+        await ouvreur.focus();
+        await pg.keyboard.press('Enter');
+        await pg.locator(DIALOG).waitFor({ timeout: 8000 });
+        await pg.waitForTimeout(400);
+        const zone = () => pg.evaluate((sel) => { const d = document.querySelector(sel); const z = d && d.querySelector('[data-recu-defile]'); return z ? { top: Math.round(z.scrollTop), max: z.scrollHeight - z.clientHeight } : null; }, DIALOG);
+        const z0 = await zone();
+        if (V.defile) dit(z0 && z0.max > 20, 'K. (le reçu dépasse l’écran : le contrôle de Page bas mesure quelque chose)', JSON.stringify(z0));
+        if (z0 && z0.max > 20) {
+          await pg.keyboard.press('PageDown');
+          await pg.waitForTimeout(400);
+          const z1 = await zone();
+          await pg.keyboard.press('ArrowDown');
+          await pg.waitForTimeout(300);
+          const z2 = await zone();
+          dit(z1 && z1.top > z0.top && z2 && z2.top >= z1.top, 'K. Page bas et ↓ font défiler le reçu, juste après l’ouverture', JSON.stringify({ z0, z1, z2 }));
+        }
+        const dansFeuille = () => pg.evaluate((sel) => { const d = document.querySelector(sel); const a = document.activeElement; return !!(d && a && a !== document.body && d.contains(a)); }, DIALOG);
+        const parcours = [];
+        for (let i = 0; i < 5; i++) { await pg.keyboard.press('Tab'); parcours.push(await dansFeuille()); }
+        for (let i = 0; i < 4; i++) { await pg.keyboard.press('Shift+Tab'); parcours.push(await dansFeuille()); }
+        dit(parcours.every(Boolean), 'K. Tab ×5 puis Maj+Tab ×4 : le focus ne quitte jamais la feuille', JSON.stringify(parcours));
+        // Cinq Tab : de quoi sortir de la feuille si rien ne le retient (trois
+        // suffisaient avant le correctif, la zone qui défile en ajoute un).
+        for (let i = 0; i < 5; i++) await pg.keyboard.press('Tab');
+        await pg.keyboard.press('Escape');
+        await pg.waitForTimeout(500);
+        dit(await pg.locator(DIALOG).count() === 0, 'K. après cinq Tab, Échap ferme la feuille');
+        const retour = await pg.evaluate(() => { const a = document.activeElement; return { tag: a ? a.tagName : null, texte: a ? (a.textContent || '').slice(0, 60) : '', dansListe: !!(a && a.closest && a.closest('[data-recus-email]')) }; });
+        dit(retour.tag === 'BUTTON' && retour.dansListe && /Basket banc taille 42/.test(retour.texte), 'K. à la fermeture, le focus revient sur le bouton « … Voir › » qui l’avait ouverte', JSON.stringify(retour));
+        // Une feuille restée ouverte ne doit pas faire tomber les contrôles suivants.
+        if (await pg.locator(DIALOG).count()) { await pg.locator(DIALOG).getByRole('button', { name: 'Retour', exact: true }).click().catch(() => {}); await pg.waitForTimeout(500); }
       });
 
       // ── D. L'ancienne forme (R2) et la somme fausse (R4) ─────────────────

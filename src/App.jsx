@@ -4098,10 +4098,39 @@ const openReceipt = (a) => {
 // défilement garde la zone de sécurité de l'iPhone (recus-email.css). Les
 // lignes, le total et la phrase viennent de `champsRecuAchat` — la même règle
 // que la fenêtre PDF.
+// ⚠️ (23 oct., revue) AU CLAVIER : le focus va sur la ZONE QUI DÉFILE (↓ et
+// Page bas font défiler le reçu — posé sur le dialogue, qui ne défile pas, ils
+// ne faisaient rien), Tab et Maj+Tab tournent DANS la feuille (au 3ᵉ Tab il
+// partait sur <body>, derrière le voile), Échap est écouté sur le DOCUMENT (une
+// fois le focus sorti, l'écoute du dialogue ne recevait plus rien), et le focus
+// revient à la fermeture sur ce qui l'avait ouverte (« Voir › »). Même motif que
+// le panneau des écrans (`MenuEcrans`).
 function FeuilleRecuAchat({ recu, fermer }) {
   const r = champsRecuAchat(recu);
   const boite = useRef(null);
-  useEffect(() => { try { boite.current && boite.current.focus({ preventScroll: true }); } catch (_) {} }, []);
+  const defile = useRef(null);
+  const fermerRef = useRef(fermer); fermerRef.current = fermer;
+  useEffect(() => {
+    const ouvreur = document.activeElement;
+    try { (defile.current || boite.current).focus({ preventScroll: true }); } catch (_) {}
+    const clavier = (e) => {
+      const d = boite.current; if (!d) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerRef.current(); return; }
+      if (e.key !== 'Tab') return;
+      const cibles = [...d.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => el.getClientRects().length > 0);
+      if (!cibles.length) { e.preventDefault(); return; }
+      const premier = cibles[0], dernier = cibles[cibles.length - 1], a = document.activeElement;
+      const dedans = !!a && a !== d && d.contains(a);
+      if (e.shiftKey && (!dedans || a === premier)) { e.preventDefault(); dernier.focus(); }
+      else if (!e.shiftKey && (!dedans || a === dernier)) { e.preventDefault(); premier.focus(); }
+    };
+    document.addEventListener('keydown', clavier);
+    return () => {
+      document.removeEventListener('keydown', clavier);
+      try { if (ouvreur && ouvreur !== document.body && ouvreur.isConnected && typeof ouvreur.focus === 'function') ouvreur.focus({ preventScroll: true }); } catch (_) {}
+    };
+  }, []);
   // (23 oct., revue) Un MONTANT ne se coupe jamais (`montant` : sans retour à la
   // ligne, comme dans la fenêtre PDF) : à 320 px, « 11,20 » / « € » — la valeur
   // en `overflowWrap:'anywhere'` pouvait se casser sur l'espace insécable. Le
@@ -4116,13 +4145,13 @@ function FeuilleRecuAchat({ recu, fermer }) {
   return createPortal(
     <div data-noswipe="1" data-recu-voile="" onClick={fermer} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
       <FermeAuRetour fermer={fermer}/>
-      <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();fermer();}}} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
+      <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
           <button type="button" data-recu-retour="" onClick={fermer} aria-label="Retour" style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
           <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:700,color:C.text}}>Reçu d'achat</div>
           <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title="Imprimer / PDF" style={{...cible,gap:6,padding:'0 14px',fontSize:14,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
         </div>
-        <div className="vrm-recu-defile" data-recu-defile="" style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
+        <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label="Détail du reçu" style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
           <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
             <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
               <div style={{fontSize:11,opacity:0.9,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>

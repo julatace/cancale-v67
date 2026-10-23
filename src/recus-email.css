@@ -22,3 +22,6 @@
 .vrm-recu-feuille{max-height:92vh;max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px));}
 .vrm-recu-defile{padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px));}
 @media(min-width:768px){.vrm-recu-defile{padding:16px 16px 20px;}}
+/* La zone qui défile prend le focus à l'ouverture (↓ et Page bas la font
+   défiler) : son anneau se dessine DEDANS, la feuille coupe ce qui déborde. */
+.vrm-recu-defile:focus-visible{outline-offset:-3px;border-radius:0;}
