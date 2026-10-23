@@ -1,3 +1,4 @@
+import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
@@ -94,7 +95,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.213.0';
+const EXT_ATTENDUE = '5.214.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -33759,9 +33760,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Une paire dans les favoris de plusieurs personnes mais non vendue est la
   // candidate idéale à la REMISE NATIVE de Vinted : une baisse de prix prévient
   // d'un coup TOUS ceux qui l'ont mise en favori (§3 : « la remise aux favoris
-  // touche tout le monde en un clic »). On ne connaît PAS qui a mis en favori
-  // (Vinted ne le dit pas, §3) — seulement le NOMBRE (`favourites`), jamais une
-  // identité (§5). L'action reste un LIEN vers l'annonce : VRM ne change jamais
+  // touche tout le monde en un clic »). Cette liste d'annonces ne porte que
+  // le NOMBRE (`favourites`), pas les identités. Le flux notifications est
+  // distinct et son raccordement est en préparation (23 octobre).
+  // L'action reste un LIEN vers l'annonce : VRM ne change jamais
   // le prix (§3). `annBase` = annonces en ligne (une vendue en est déjà sortie,
   // donc « pas encore vendue »). On n'en remet pas celles déjà dans le repricing
   // (un seul conseil par paire, §7).
@@ -40826,6 +40828,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
+        <DiagnosticFavoris uid={String(msgCompteActif || (compteSel && compteSel!=='*' ? compteSel : ''))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
         {/* ── LES OFFRES REÇUES PAR EMAIL, EN TÊTE (rebranché le 22 octobre) ──
             La règle `offresAtraiter` (compte, chronologie, titre non ambigu)
             écarte celles qu'une vente a réglées et le DIT ; « c'est fait » range

@@ -49,7 +49,9 @@
     // L'extension n'avait JAMAIS vu cette adresse (0 dans seen_urls). On garde
     // la réponse telle quelle quand la page la charge (ouvrir la cloche), pour
     // MESURER sa forme avant d'écrire la moindre règle dessus.
-    { re: /\/api\/v\d+\/(?:user_)?notifications(?:\?|$)/i, type: 'notifications' },
+    // Le service inbox-notifications vit hors /api/. Son comptage seul
+    // (unread_count) n'est pas une liste et ne remplace jamais la capture.
+    // Le rapprochement favoris/conversation reste à vérifier sur le vrai flux.
     // LITIGES / RÉCLAMATIONS. Quand un acheteur ouvre un litige, la paire te
     // revient (ou pas) et il faut la republier — mais Vinted ne le dit que dans
     // cet écran. On capte la LISTE et le DÉTAIL, passivement, quand tu ouvres la
@@ -81,7 +83,23 @@
     // que ce motif les avale.
     { re: /\/api\/v\d+\/shipments\/(\d+)(?:\?|$)/, type: 'shipment' },
   ];
+  const adresseNotificationsVinted = (url) => {
+    try {
+      const u = new URL(url, location.origin);
+      if (u.protocol !== 'https:' || u.username || u.password || !/^(?:(?:www|api)\.)?vinted\.(?:fr|com|it|de)$/i.test(u.hostname)) return null;
+      return u;
+    } catch (_) { return null; }
+  };
+  const listeNotificationsVinted = (url) => {
+    const u = adresseNotificationsVinted(url);
+    return !!u && /^\/(?:api\/v\d+\/(?:user_)?notifications|inbox-notifications\/v\d+\/notifications)\/?$/i.test(u.pathname);
+  };
+  const traceNotificationsVinted = (url) => {
+    const u = adresseNotificationsVinted(url);
+    return !!u && /^\/(?:api\/v\d+\/(?:user_)?notifications|inbox-notifications\/v\d+\/notifications)(?:\/|$)/i.test(u.pathname);
+  };
   const matchHarvest = (url) => {
+    if (listeNotificationsVinted(url)) return {type:'notifications',id:null};
     for (const h of HARVEST) {
       const m = h.re.exec(url);
       if (!m) continue;
@@ -159,7 +177,7 @@
       const p = chemin(url || '');
       // Hors API, on ne note que ce qui peut concerner un export ou le compte :
       // tout noter ferait une liste de bruit, et §7 vaut aussi pour un diagnostic.
-      if (!estApi && !PAGE_A_NOTER.test(p)) return;
+      if (!estApi && !PAGE_A_NOTER.test(p) && !traceNotificationsVinted(url)) return;
       if (!seenPaths.has(p)) { seenPaths.add(p); seenDirty = true; }
       if (status == null) return;
       const cle = `${String(method || 'GET').toUpperCase()} ${p}`;
@@ -177,7 +195,7 @@
       // ⇒ Ce qui est INTÉRESSANT s'envoie sur-le-champ : un appel qui ÉCHOUE
       //   (≥ 400), ou un appel sur un chemin de compte/export. C'est justement
       //   le cas où la page ne nous laisse pas le temps.
-      try { if (Number(status) >= 400 || PAGE_A_NOTER.test(p)) setTimeout(flushSeen, 0); } catch (_) {}
+      try { if (Number(status) >= 400 || PAGE_A_NOTER.test(p) || traceNotificationsVinted(url)) setTimeout(flushSeen, 0); } catch (_) {}
     } catch (_) {}
   };
   const flushSeen = () => {
@@ -198,10 +216,11 @@
   // bloqué, et sans ça on ne sait même pas qu'il y est passé.
   try { noteSeen(location.href, 'PAGE', null); } catch (_) {}
 
-  const sendHarvest = (url, text) => {
+  const sendHarvest = (url, text, method = 'GET', status = null) => {
     noteSeen(url);
     const h = matchHarvest(url);
     if (!h) return;
+    if (h.type === 'notifications' && (String(method).toUpperCase() !== 'GET' || (status != null && (status < 200 || status >= 300)))) return;
     // On limite la taille pour ne pas saturer (les reponses Vinted sont petites).
     if (text && text.length < 800000) post({ kind: 'harvest', type: h.type, id: h.id, url, body: text });
   };
@@ -378,7 +397,7 @@
             if (/application\/pdf/i.test(ct)) {
               maybeCaptureLabel(ct, url, () => res.clone().arrayBuffer());
             } else if (url && matchHarvest(url)) {
-              res.clone().text().then((t) => sendHarvest(url, t)).catch(() => {});
+              res.clone().text().then((t) => sendHarvest(url, t, method, res.status)).catch(() => {});
             }
           } catch (_) {}
         }).catch(() => {});
@@ -422,7 +441,7 @@
             if (/application\/pdf/i.test(ct) && this.response && this.response.byteLength) {
               maybeCaptureLabel(ct, url, () => Promise.resolve(this.response));
             } else if (url && matchHarvest(url) && typeof this.responseText === 'string') {
-              sendHarvest(url, this.responseText);
+              sendHarvest(url, this.responseText, this.__cancaleMethod, this.status);
             }
           } catch (_) {}
         });
