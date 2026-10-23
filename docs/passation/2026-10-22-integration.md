@@ -71,8 +71,16 @@ prouve rien. Dans le dépôt principal (`/home/user/cancale-v67`), rien à faire
   (12), `capacites` (28 — la grille d'Annonces ne se rend pas : le banc sert une base non
   cloisonnée), `carte` (4), `comptes` (5), `conflit` (2), `formes-communes` (1), `ia` (2),
   `lbc-preuve` (2), `lbc-relier` (2). Bancs en retard sur la forme actuelle, pas l'app.
-- `ebay-regle-offre` : meurt sur `Unexpected token 'export'` sur main AUSSI (il charge un module
-  ES dans un `vm` depuis la palette « Perle ») — banc à remettre à la forme, pas l'app.
+- `ebay-regle-offre` : mourait sur `Unexpected token 'export'` sur main AUSSI (il lisait la palette
+  « Perle » en ne retirant qu'un `export`) — banc réparé le 23 oct. : **342 contrôles, 0 rouge**.
+- `rappel-urssaf` : le banc servait une ligne URSSAF à 600 € SANS aucune vente ; depuis la revue
+  URSSAF, l'écran Ventes republie la ligne à partir des ventes lues (0 € — juste). Banc remis en
+  cohérence (les ventes et leurs dates de versement) : vert ici ET sur main.
+- `pont` (« Se déconnecter » d'une 5.164) et `publier` (bouton grisé hors de l'écran, cliqué sans
+  défiler) : rouges SOUS CHARGE, sur les deux versions — la section de `pont` passe 5 fois sur 5
+  seule, et `pont` entier passe depuis le dépôt (ses contrôles « bridge.js 5.164 dans git »
+  exigent l'historique git : une copie `git archive` les met au rouge).
+- `profil-avatar` : `CHROMIUM_PATH` comme les bancs Leboncoin — vert avec lui.
 - `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-revue-complete`,
   `diagnostic-leboncoin`, `extension-leboncoin-installee` : ils lancent `/usr/bin/chromium`
   (absent ici). Avec `CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, les
