@@ -5,7 +5,8 @@ import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
-import {achatDuColis,suivisAchat} from './liensColis.js';
+import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel} from '../api/_lib/suivi-colis.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {qrMfa} from './qrMfa.js';
@@ -389,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+const EXT_CAPACITES = { suivivinted: '5.214.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3611,7 +3612,10 @@ const fetchEmailTrackingBrut = async () => {
     if (!res.ok) return null;                    // pas su ≠ aucun suivi (voir fetchEmailBordereaux)
     const rows = await res.json();
     if (!Array.isArray(rows)) return null;
-    return rows.map(r => reclassifyTrack(r.data)).filter(Boolean)
+    // (23 oct.) + le n° de suivi écrit dans le SUJET après « # » (Vinted Go :
+    // « Ton colis arrive aujourd'hui ! #… ») pour une ligne qui n'en porte pas —
+    // une IDENTITÉ, jamais un statut changé (api/_lib/suivi-colis.js, §11).
+    return rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };
@@ -4238,12 +4242,10 @@ function FeuilleRecuAchat({ recu, fermer }) {
 // un QR depuis le n° de suivi donnait un carré que le comptoir ne scanne pas.
 // Ne pas le réintroduire : sans vrai QR, on affiche le code, en gros.
 // Page de suivi officielle du transporteur, n° pré-rempli.
-const trackUrl = (carrier, suivi) => {
-  const s = encodeURIComponent(String(suivi || '').trim());
-  if (/mondial/i.test(carrier || '')) return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${s}`;
-  if (/chrono/i.test(carrier || '')) return `https://www.chronopost.fr/tracking-no-cdn/suivi-page?listeNumerosLT=${s}`;
-  return `https://www.google.com/search?q=${s}+suivi+colis`;
-};
+// (23 oct.) UNE règle pour l'app et le serveur (`lienSuivi`, api/_lib/suivi-colis.js) :
+// Chronopost en « tracking-no-cms » (l'ancienne « tracking-no-cdn » était morte),
+// et le code postal pour Mondial Relay quand il est LU — jamais deviné.
+const trackUrl = (carrier, suivi, codePostal = '') => { const l = lienSuivi(carrier, suivi, codePostal); return l ? l.url : ''; };
 // Carte de ville façon Vinted, SANS dépendance ni clé : tuiles OpenStreetMap,
 // une épingle 📍 par point relais avec badge rouge = nombre de colis.
 // points = [{ key, lat, lon, count }] ; tap sur une épingle → onSelect(key).
@@ -14876,6 +14878,177 @@ function LigneArrivee({arr, style}) {
   return <div className="vrm-arrive" data-arrive-le={arr ? jourLocal(arr.ms) : 'inconnue'} data-arrive-sur={arr ? arr.sur : ''}
     title={arr && arr.sur==='borne' ? 'Le colis était déjà au point relais ce jour-là ; la date exacte de son arrivée n’est pas connue.' : undefined}
     style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.3,...(style||{})}}>{texteArrivee(arr)}</div>;
+}
+// (23 oct.) « SUIVRE SUR LE SITE DU TRANSPORTEUR ↗ » — un lien, le n° pré-rempli,
+// et pour Mondial Relay le code postal quand il est LU dans le lieu de l'e-mail
+// (`codePostalLu`, jamais deviné). Ce n'est que le site du transporteur : rien
+// n'est promis ici. Transporteur sans page de suivi connue ⇒ « Chercher ce n° de
+// suivi ↗ » (une recherche, dite comme telle). 44 px au doigt (§7).
+function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne}) {
+  const l = lienSuivi(transporteur, suivi, codePostal);
+  if (!l) return null;
+  return <a className="vrm-suivre-colis" href={l.url} target="_blank" rel="noreferrer"
+    data-suivre-colis={normaliserSuivi(suivi)} data-suivre-site={l.site ? 'transporteur' : 'recherche'} data-suivre-cp={l.codePostal || ''} {...(attrs || {})}
+    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',padding:'0 12px',marginTop:enLigne?0:6,flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,background:'transparent',fontSize:12.5,fontWeight:600,textDecoration:'none',maxWidth:'100%'}}>
+    <Icon name="truck" size={14} style={{color:C.muted,flexShrink:0}}/>{l.site ? 'Suivre sur le site du transporteur ↗' : 'Chercher ce n° de suivi ↗'}
+  </a>;
+}
+// (23 oct.) « DERNIÈRE NOUVELLE DE VINTED » — l'étape écrite par Vinted sur la
+// ligne de suivi relevée par l'extension (`harvest_{uid}_suivi_{tx}`), recopiée
+// TELLE QUELLE (jamais interprétée : « livré » chez Vinted ne coche rien ici),
+// avec sa date et l'âge de la lecture. Rendue seulement sur la carte du colis
+// relié par IDENTITÉ (la transaction ; un colis d'e-mail : son n° de suivi ou
+// son code de retrait), jamais par le titre.
+const ageCourtMs = (ms) => { if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.round(ms / 60000); if (m < 60) return `${Math.max(1, m)} min`; const h = Math.round(m / 60); return h < 48 ? `${h} h` : `${Math.round(h / 24)} j`; };
+function LigneNouvelleVinted({nv}) {
+  if (!nv || !nv.t) return null;
+  const quand = Number.isFinite(nv.at) ? new Date(nv.at).toLocaleString('fr-FR', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const lu = Number.isFinite(nv.cap) ? ageCourtMs(Date.now() - nv.cap) : '';
+  return <div className="vrm-nouvelle-vinted" data-nouvelle-vinted={nv.t} data-nouvelle-at={Number.isFinite(nv.at) ? new Date(nv.at).toISOString() : ''}
+    style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.4,overflowWrap:'anywhere'}}>
+    Vinted : « <span style={{color:C.text}}>{nv.t}</span> »{quand ? ` — ${quand}` : ''}{lu ? ` (lu il y a ${lu})` : ''}
+  </div>;
+}
+// (23 oct.) « AJOUTER UN N° DE SUIVI » — Julien : « enregistrer le numéro de
+// suivi et tracer le colis ». Un n° qu'il tape (un colis annoncé hors Vinted,
+// un e-mail qui n'est pas arrivé) : le transporteur se lit à la FORME du n°
+// (8 chiffres = Mondial Relay ; 2 lettres, 9 chiffres, 2 lettres = Chronopost ;
+// « VGS… » = Vinted Go) — ambigu ⇒ on DEMANDE, jamais deviné ; le code postal
+// est facultatif (il sert la page Mondial Relay). Rangé UNE ligne par n°
+// (`colis_suivi_{transporteur}_{n°}`, au nom du vendeur, lire-fusionner-réécrire
+// gardé : une lecture ratée n'écrit rien). Il sert d'IDENTITÉ aux e-mails qui
+// arriveront (un « disponible », un « retiré » au même n° se reconnaissent) et
+// donne « Suivre ↗ ». Relié à un achat SEULEMENT par son clic.
+// ⚠️ Ce n'est JAMAIS un colis « à retirer » : rien ne dit qu'il est arrivé. La
+// ligne dit « suivi ajouté — en attente d'une nouvelle » tant qu'aucun e-mail
+// au même n° n'est arrivé.
+const NOMS_SAISIE = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', autre: 'Autre transporteur' };
+async function lireLigneSuiviManuel(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, { headers: sbAuth() });
+    if (!r.ok) return undefined;
+    const j = await r.json(); if (!Array.isArray(j)) return undefined;
+    return (j[0] && j[0].data) || null;
+  } catch (_) { return undefined; }
+}
+async function ecrireSuiviManuel(id, patch) {
+  const avant = await lireLigneSuiviManuel(id);
+  if (avant === undefined) return { ok: false, msg: "Je n'ai pas pu relire ce suivi — rien n'est enregistré. Réessaie." };
+  const data = { ...(avant || {}), ...patch, majAt: new Date().toISOString() };
+  if (!data.at) data.at = data.majAt;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(withOwner({ id, data })),
+    });
+    return r.ok ? { ok: true } : { ok: false, msg: "La base n'a pas enregistré ce suivi — réessaie." };
+  } catch (_) { return { ok: false, msg: "La base n'a pas répondu — rien n'est enregistré." }; }
+}
+async function retirerSuiviManuel(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: sbAuth() });
+    return r.ok;
+  } catch (_) { return false; }
+}
+// Ce que les e-mails disent déjà de ce n° (le plus récent, toutes clés) —
+// jamais plus : un n° ajouté à la main n'est pas une preuve d'arrivée.
+const etapeSuiviManuel = (suivi, tracking) => {
+  if (!Array.isArray(tracking)) return null;
+  let der = null;
+  for (const t of tracking) {
+    if (!t || suiviDeLigne(t) !== suivi) continue;
+    const d = Date.parse(t.receivedAt || '') || 0;
+    if (!der || d > der.d) der = { d, st: t.status };
+  }
+  if (!der) return null;
+  return ({ available: 'arrivé au point de retrait — il est dans « à retirer »', delivered: 'retiré', retour: "reparti chez l'expéditeur", transit: 'en route', info: 'une nouvelle du transporteur' })[der.st] || 'une nouvelle du transporteur';
+};
+function SuivisManuels({ liste, tracking, achats, accName, relire }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const [n, setN] = React.useState('');
+  const [tr, setTr] = React.useState('');
+  const [cp, setCp] = React.useState('');
+  const [msg, setMsg] = React.useState('');
+  const [envoi, setEnvoi] = React.useState(false);
+  const [relierPour, setRelierPour] = React.useState('');
+  const norm = normaliserSuivi(n);
+  const deForme = transporteurDeForme(norm);
+  const choisi = tr || deForme || '';
+  const valide = suiviValide(norm);
+  const enregistrer = async () => {
+    if (!valide) { setMsg("Ce n'est pas un n° de suivi (8 à 24 lettres et chiffres, au moins un chiffre)."); return; }
+    if (!choisi) { setMsg('Choisis le transporteur : la forme de ce n° ne suffit pas à le dire.'); return; }
+    if (cp && !normaliserCodePostal(cp)) { setMsg('Le code postal fait 5 chiffres (ou laisse vide).'); return; }
+    setEnvoi(true); setMsg('');
+    const r = await ecrireSuiviManuel(idSuiviManuel(choisi, norm), { suivi: norm, transporteur: choisi, codePostal: normaliserCodePostal(cp) || null });
+    setEnvoi(false);
+    if (!r.ok) { setMsg(r.msg); return; }
+    setN(''); setTr(''); setCp(''); setOuvert(false); relire();
+  };
+  const candidats = (Array.isArray(achats) ? achats : []).filter(o => o && o.transaction_id && Date.now() - (Date.parse(o.date || '') || 0) < 45 * 86400000)
+    .sort((a, b) => (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0)).slice(0, 30);
+  const champ = { minHeight: 44, boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 12px', fontSize: 16, background: C.card, color: C.text, fontFamily: 'inherit' };
+  const bouton = { minHeight: 44, boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 14px', fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' };
+  return (
+    <div className="vrm-achats-bloc" data-suivis-manuels={Array.isArray(liste) ? liste.length : (liste === null ? 'pas-su' : 'en-cours')} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 180px', fontSize: 14, fontWeight: 700, color: C.text }}>N° de suivi ajoutés{Array.isArray(liste) && liste.length ? ` · ${liste.length}` : ''}</div>
+        <button type="button" data-suivi-ajouter="" onClick={() => { setOuvert(o => !o); setMsg(''); }} style={bouton}>{ouvert ? 'Fermer' : '+ Ajouter un n° de suivi'}</button>
+      </div>
+      {liste === null && <div data-suivis-manuels-pas-su="" style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Les n° ajoutés n'ont pas pu être lus — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={relire} style={{ ...bouton, minHeight: 44, border: 'none', padding: 0, color: C.accent }}>Réessayer</button></div>}
+      {ouvert && (
+        <div data-suivi-form="" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input aria-label="N° de suivi" data-suivi-saisie="" value={n} onChange={e => { setN(e.target.value); setTr(''); setMsg(''); }} placeholder="N° de suivi (ex. 8 chiffres pour Mondial Relay)" autoCapitalize="characters" autoComplete="off" style={champ}/>
+          {valide && (
+            <div data-suivi-transporteur={choisi || 'a-choisir'} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>
+              {deForme && !tr ? <>Transporteur reconnu à la forme du n° : <b style={{ color: C.text }}>{NOMS_SAISIE[deForme]}</b>. </> : <>Quel transporteur ? La forme de ce n° ne le dit pas.</>}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                {TRANSPORTEURS_SAISIE.map(k => <button key={k} type="button" data-suivi-choix={k} aria-pressed={choisi === k} onClick={() => setTr(k)} style={{ ...bouton, fontSize: 12.5, background: choisi === k ? C.text : 'transparent', color: choisi === k ? C.card : C.text }}>{NOMS_SAISIE[k]}</button>)}
+              </div>
+            </div>
+          )}
+          {choisi === 'mondialrelay' && <input aria-label="Code postal (facultatif)" data-suivi-cp="" value={cp} onChange={e => setCp(e.target.value)} inputMode="numeric" placeholder="Code postal du point relais (facultatif)" style={champ}/>}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" data-suivi-enregistrer="" disabled={envoi} onClick={enregistrer} style={{ ...bouton, borderColor: C.accent, color: C.accent, opacity: envoi ? .5 : 1 }}>{envoi ? 'Enregistrement…' : 'Enregistrer ce suivi'}</button>
+            <span style={{ fontSize: 11.5, color: C.muted }}>Il ne devient pas « à retirer » : il attend l'e-mail du transporteur.</span>
+          </div>
+          {msg && <div data-suivi-msg="" style={{ fontSize: 12.5, color: C.warn }}>{msg}</div>}
+        </div>
+      )}
+      {Array.isArray(liste) && liste.length > 0 && (
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {liste.map(m => {
+            const etape = etapeSuiviManuel(m.suivi, tracking);
+            const lie = m.tx ? (Array.isArray(achats) ? achats.find(o => String(o.transaction_id) === m.tx && (!m.uid || String((o._acc && o._acc.vinted_user_id) || '') === m.uid)) : null) : null;
+            return (
+              <div key={m.id} data-suivi-manuel={m.suivi} data-suivi-etape={etape ? 'nouvelle' : 'attente'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflowWrap: 'anywhere' }}>{NOMS_SAISIE[m.transporteur] || 'Transporteur'} · n° <span style={{ fontFamily: 'ui-monospace,monospace' }}>{m.suivi}</span></div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{etape ? `Dernière nouvelle par e-mail : ${etape}` : 'Suivi ajouté — en attente d’une nouvelle'}</div>
+                {m.tx && <div data-suivi-lie={m.tx} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Relié à : {lie ? `${lie.title || 'Achat'}${lie._acc ? ` (${accName(lie._acc)})` : ''}` : `l'achat ${m.tx}`}</div>}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
+                  <BoutonSuivreColis transporteur={m.transporteur} suivi={m.suivi} codePostal={m.cp} enLigne/>
+                  {!m.tx && <button type="button" data-suivi-relier={m.suivi} onClick={() => setRelierPour(p => p === m.id ? '' : m.id)} style={bouton}>Relier à un achat</button>}
+                  {m.tx && <button type="button" data-suivi-delier={m.suivi} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: null, uid: null }); if (!r.ok) setMsg(r.msg); relire(); }} style={bouton}>Délier</button>}
+                  <button type="button" data-suivi-retirer={m.suivi} onClick={async () => { if (!window.confirm(`Retirer le suivi n° ${m.suivi} ? Les e-mails déjà reçus ne changent pas.`)) return; if (!(await retirerSuiviManuel(m.id))) setMsg("Le suivi n'a pas pu être retiré — la base n'a pas répondu."); relire(); }} style={{ ...bouton, color: C.muted }}>Retirer</button>
+                </div>
+                {relierPour === m.id && (
+                  <div data-suivi-choix-achat="" style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 12, color: C.muted }}>Choisis l'achat de ce colis (c'est toi qui relies : VRM ne devine rien).</div>
+                    {!candidats.length && <div style={{ fontSize: 12, color: C.muted }}>Aucun achat des 45 derniers jours.</div>}
+                    {candidats.map(o => (
+                      <button key={String(o.transaction_id)} type="button" data-suivi-achat={String(o.transaction_id)} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: String(o.transaction_id), uid: String((o._acc && o._acc.vinted_user_id) || '') || null }); if (!r.ok) setMsg(r.msg); setRelierPour(''); relire(); }}
+                        style={{ ...bouton, textAlign: 'left', fontWeight: 500, overflowWrap: 'anywhere' }}>{o.title || 'Achat'}{o._acc ? ` · ${accName(o._acc)}` : ''}{o.date ? ` · ${new Date(o.date).toLocaleDateString('fr-FR')}` : ''}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {msg && !ouvert && <div data-suivi-msg="" style={{ fontSize: 12.5, color: C.warn, marginTop: 6 }}>{msg}</div>}
+    </div>
+  );
 }
 function CodeRetraitCopiable({label,code}) {
   const [etat,setEtat]=useState('');
@@ -26621,7 +26794,9 @@ const moyennesParModele = (commandes, ecarte) => {
 // notifications comptaient chacun à leur façon (l'un « available », l'autre avec
 // les filtres d'ancienneté/lieu) → trois nombres différents pour les mêmes colis.
 // Tout passe désormais par ces fonctions, module-level, lisibles de partout.
-const colisKey = (t) => String((t && (t.suivi || t.subject)) || '').trim();
+// ⚠️ (23 oct.) Un n° lu dans le SUJET (`suiviLuDansSujet`) ne change pas la clé :
+// une coche « J'ai retiré » posée sur ce colis avant ce jour porte son sujet.
+const colisKey = (t) => String((t && ((t.suiviLuDansSujet ? t.subject : t.suivi) || t.subject)) || '').trim();
 // (revue du 23 oct.) Au-delà de ce nombre de jours, la ligne de fraîcheur d'Achats
 // nomme le compte : ses colis ne le redisent pas (§7).
 const FRAICHEUR_ACHATS_J = 2;
@@ -26736,14 +26911,22 @@ const isColisRetirable = (t, collected, envoyes) => isColisActive(t, collected, 
 // chacun leur email. Si l'une des deux dit « livré / retiré », le colis EST
 // retiré : le laisser affiché sur l'autre ligne, c'est courir au relais pour rien.
 // Le n° de suivi est une identité, pas une ressemblance (§24) : aucun risque.
-const suivisRetires = (tracking) => {
+// ⚠️⚠️ (23 oct.) « RETIRÉ » SOUS N'IMPORTE QUELLE CLÉ, ET LE N° DU SUJET AUSSI.
+// Julien : « quand on reçoit un mail comme quoi on a retiré un colis, le numéro
+// de suivi est comparé à ceux dans les colis à retirer et ça retire les
+// concernés ». UNE règle (api/_lib/suivi-colis.js, `finsDesLignes`) pour Achats,
+// Ma journée, le widget, l'écran d'équipe et le rappel du matin (§11) : un e-mail
+// retiré (status === 'delivered', ou un sujet qui le dit — « Uw pakket is
+// afgehaald door de ontvanger » compris) ou reparti (« retour ») sort du « à
+// retirer » ET du « à vérifier » tout colis au même n° normalisé. Un retiré reste
+// retiré : un rappel ou un « disponible » traité après ne le ressuscite pas.
+const finsColis = (tracking, envoyes) => finsDesLignes(tracking || [], { estSortant: (t) => sensColis(t, envoyes) === 'sortant' });
+const suivisRetires = (tracking, envoyes) => {
   const s = new Set();
-  for (const t of (tracking || [])) {
-    if (t && t.status === 'delivered' && t.suivi) s.add(normaliserSuivi(t.suivi));
-  }
+  for (const [k, f] of finsColis(tracking, envoyes)) if (f.retire) s.add(k);
   return s;
 };
-const colisRetireAilleurs = (t, retires) => !!(t && t.suivi && retires && retires.has(normaliserSuivi(t.suivi)));
+const colisRetireAilleurs = (t, retires) => { const k = suiviDeLigne(t); return !!(k && retires && retires.has(k)); };
 
 // Nettoie un « lieu » de point relais (souvent bruité par les emails Mondial
 // Relay : « ® MAISON DE LA PRESSE 40 RUE DU PORT 35260 CANCALE SUPER PRATIQUE
@@ -31097,7 +31280,77 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la lecture a échoué — la photo hors ligne (src/journeeHorsLigne.js) attend
   // une lecture réussie.
   const [colisRelaisLu, setColisRelaisLu] = useState(false);
-  const [indexSuivisAchats,setIndexSuivisAchats]=useState({});
+  // ── LES N° DE SUIVI ET LES NOUVELLES DE VINTED, PAR IDENTITÉ (23 oct.) ────
+  // Trois sources, chacune pour ce qu'elle porte :
+  //   · la photo d'un achat, lue dans SA transaction (Achats seulement) ;
+  //   · la LIGNE DE SUIVI Vinted relevée par l'extension
+  //     (`harvest_{uid}_suivi_{tx}` : n° de suivi, transporteur, dernière étape
+  //     écrite par Vinted) — le contrat du 23 octobre, lue en SCALAIRES (§4.4) ;
+  //   · les n° qu'il a AJOUTÉS à la main (`colis_suivi_{transporteur}_{n°}`),
+  //     reliés à un achat par SON clic seulement.
+  // ⚠️ Les champs `shipment.tracking_code` / `tracking_number` de la transaction
+  //    ne sont plus lus : mesuré, 0 transaction réelle sur 1 290 n'en porte —
+  //    une lecture morte qui faisait croire à une identité.
+  // Trois états chacun : `undefined` en cours · `null` pas su · lu.
+  const [photosTxAchats,setPhotosTxAchats]=useState({});
+  const [suivisVinted,setSuivisVinted]=useState(undefined);
+  const [suivisManuels,setSuivisManuels]=useState(undefined);
+  const indexSuivisAchats = useMemo(() => {
+    const out = {};
+    // La photo, par transaction (lue dans la transaction de SON compte).
+    for (const [tx, v] of Object.entries(photosTxAchats || {})) out[tx] = { photo: (v && v.photo) || null };
+    // La ligne de suivi Vinted, sous « compte:transaction » : une transaction
+    // Vinted est vue des deux côtés (acheteur et vendeur), deux de ses comptes
+    // peuvent la porter — celle d'un autre compte ne relie jamais cet achat.
+    // Son transaction doit être celle qu'elle dit porter (sinon : rien).
+    for (const v of Object.values(suivisVinted || {})) {
+      if (!v || !v.tx || !v.uid) continue;
+      const e = out[`${v.uid}:${v.tx}`] || (out[`${v.uid}:${v.tx}`] = { uid: v.uid });
+      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null });
+    }
+    // Un n° ajouté à la main et relié à CET achat (son clic), sous le même compte.
+    for (const m of (Array.isArray(suivisManuels) ? suivisManuels : [])) {
+      if (!m || !m.tx || !m.suivi) continue;
+      const cle = m.uid ? `${m.uid}:${m.tx}` : m.tx;
+      const e = out[cle] || (out[cle] = m.uid ? { uid: m.uid } : {});
+      e.suivis = [...new Set([...(e.suivis || []), m.suivi])];
+    }
+    return out;
+  }, [photosTxAchats, suivisVinted, suivisManuels]);
+  const relireSuivisVinted = async () => {
+    try {
+      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at`, { strict: true });
+      if (!Array.isArray(rows)) { setSuivisVinted(null); return; }
+      const m = {};
+      for (const r of rows) {
+        const mm = /^harvest_(\w+?)_suivi_(\w+)$/.exec(String(r.id || '')); if (!mm) continue;
+        const uid = mm[1], txId = mm[2];
+        if (r.tx && String(r.tx) !== txId) continue;          // une ligne qui contredit son identifiant ne relie rien
+        m[`${uid}:${txId}`] = { uid, tx: txId, suivi: normaliserSuivi(r.suivi) || '', transporteur: String(r.transporteur || ''),
+          nv: nouvelleVinted({ dernier: { t: r.dt, at: r.dat }, cap: r.cap }) };
+      }
+      setSuivisVinted(prev => JSON.stringify(prev) === JSON.stringify(m) ? prev : m);
+    } catch (_) { setSuivisVinted(null); }
+  };
+  // L'entrée d'index d'UN achat, seulement si elle est du MÊME compte (identité).
+  const entreeSuiviAchat = (o) => {
+    if (!o) return null;
+    const e = entreeIndexAchat(o, indexSuivisAchats); if (!e) return null;
+    const uid = String((o._acc && o._acc.vinted_user_id) || o._acc || '');
+    if (e.uid && uid && String(e.uid) !== uid) return null;
+    return e;
+  };
+  const nouvelleDe = (o) => { const e = entreeSuiviAchat(o); return (e && e.nv) || null; };
+  const relireSuivisManuels = async () => {
+    try {
+      const rows = await lireTout(`id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at`, { strict: true });
+      if (!Array.isArray(rows)) { setSuivisManuels(null); return; }
+      const l = rows.map(r => ({ id: String(r.id), suivi: normaliserSuivi(r.suivi), transporteur: String(r.transporteur || 'autre'), cp: normaliserCodePostal(r.cp), tx: r.tx ? String(r.tx) : '', uid: r.uid ? String(r.uid) : '', at: r.at || '' }))
+        .filter(x => x.suivi && x.id === idSuiviManuel(x.transporteur, x.suivi))
+        .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      setSuivisManuels(prev => JSON.stringify(prev) === JSON.stringify(l) ? prev : l);
+    } catch (_) { setSuivisManuels(null); }
+  };
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -31308,7 +31561,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const pickupUnion = useMemo(() => {
     const maintenant = Date.now();
-    const retires = suivisRetires(tracking);
+    // (23 oct.) LA fin d'un colis par son n° de suivi (retiré · reparti), toutes
+    // lignes confondues (api/_lib/suivi-colis.js, §11 : le widget, le rappel du
+    // matin et l'écran d'équipe lisent la même).
+    const fins = finsColis(tracking, suivisEnvoyes);
+    const retires = suivisRetires(tracking, suivisEnvoyes);
     // ⚠️ LE MÊME COLIS VU DES DEUX CÔTÉS SE RECONNAÎT PAR SON CODE DE RETRAIT,
     // JAMAIS PAR SON TITRE (§5, 4 octobre). Aucun email transporteur ne porte le
     // titre de l'article (mesuré : 192 sur 192 vides). Un code de retrait, lui,
@@ -31323,7 +31580,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Seules les transactions de `txSuivisColis` servent (§11 : la même chose sur
     // Achats, qui en lit plus pour les photos, et sur Ma journée).
     const indexColis = {};
-    for (const [tx, v] of Object.entries(indexSuivisAchats || {})) if (txSuivisColis.has(String(tx))) indexColis[tx] = v;
+    for (const [cle, v] of Object.entries(indexSuivisAchats || {})) if (txSuivisColis.has(String(cle).split(':').pop())) indexColis[cle] = v;
     const txParCode = new Map();
     for (const [tx, r] of Object.entries(colisRelais || {})) { const c = r ? normCode(r.code) : ''; if (c) txParCode.set(c, txParCode.has(c) ? null : String(tx)); }
     const achatParTx = new Map((buysBase || []).map(o => [String(o.transaction_id), o]));
@@ -31338,27 +31595,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // signal CERTAIN (le transporteur l'écrit, ou la commande liée par identité
     // dit non réclamée / remboursée / annulée).
     const emailList = [], aVerifier = [], repartis = [];
-    // Le RETOUR écrit par le transporteur peut arriver sur une AUTRE ligne que
-    // l'e-mail « disponible » (mesuré au banc : « disponible » rangé chez Mondial
-    // Relay, « retourné à l'expéditeur » envoyé par shipping@relay.vinted.com ⇒
-    // `email_track_vinted_…`). Le même n° de suivi est une identité (§5) : un
-    // retour écrit APRÈS l'arrivée sort le colis de « à retirer ».
-    const retoursParSuivi = new Map();
+    // (23 oct.) La commande de chaque colis d'e-mail montré, reliée par IDENTITÉ
+    // (n° de suivi ou code de retrait) : c'est par elle seule que la carte lit
+    // la « dernière nouvelle de Vinted » (jamais par le titre).
+    const cmdParColis = new Map();
+    // Les colis d'e-mail que l'app SAIT finis (retirés ou repartis : le n° de
+    // suivi, ou la commande reliée par identité) — publiés pour le rappel du
+    // matin (api/ship-reminders.js), qui ne voit pas les commandes Vinted.
+    const finis = new Set();
+    const noterFini = (t) => { const k = suiviDeLigne(t); if (k) finis.add('e:' + k); };
+    // Le RETOUR (ou le RETRAIT) écrit par le transporteur peut arriver sur une
+    // AUTRE ligne que l'e-mail « disponible » (mesuré au banc : « disponible »
+    // rangé chez Mondial Relay, « retourné à l'expéditeur » envoyé par
+    // shipping@relay.vinted.com ⇒ `email_track_vinted_…`). Le même n° de suivi est
+    // une identité (§5) : un retiré sort le colis, toujours ; un retour écrit
+    // APRÈS l'arrivée aussi (il est rendu plus bas, dans « repartis »).
     for (const t of (tracking || [])) {
-      if (!t || t.status !== 'retour' || sensColis(t, suivisEnvoyes) === 'sortant') continue;
-      const k = normaliserSuivi(t.suivi); if (!k) continue;
-      const d = Date.parse(t.receivedAt || '') || 0;
-      if (!retoursParSuivi.has(k) || d > retoursParSuivi.get(k)) retoursParSuivi.set(k, d);
-    }
-    const repartiParRetour = (t) => { const k = normaliserSuivi(t && t.suivi); if (!k || !retoursParSuivi.has(k)) return false;
-      const d = Date.parse(t.receivedAt || '') || 0; return retoursParSuivi.get(k) >= d; };
-    for (const t of (tracking || [])) {
-      if (!isColisEnAttente(t, collected, suivisEnvoyes) || colisRetireAilleurs(t, retires)) continue;
-      if (repartiParRetour(t)) continue;   // le retour (même suivi) est rendu juste en dessous, dans « repartis »
+      if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
+      { const a = arriveeColisEmail(t); if (sortiParSuivi(t, fins, a ? a.ms : null)) { noterFini(t); continue; } }
       const cmd = commandeDuColis(t);
       const fin = finCommandeAchat(cmd);
-      if (fin === 'retire') continue;   // la commande liée dit livrée / finalisée : il l'a eu
-      if (fin === 'reparti') { repartis.push({ kind: 'email', t, o: cmd, statut: (etatTxn(cmd.transaction_id) || {}).ss || String(cmd.status || '') }); continue; }
+      if (fin === 'retire') { noterFini(t); continue; }   // la commande liée dit livrée / finalisée : il l'a eu
+      if (fin === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: (etatTxn(cmd.transaction_id) || {}).ss || String(cmd.status || '') }); continue; }
       const e = etatColisEmail(t, maintenant);
       if (estAVerifier(e)) { aVerifier.push({ kind: 'email', t, e, o: cmd }); continue; }
       // Colis RÉELLEMENT à retirer = on sait OÙ aller, ou on a un code, ou un QR
@@ -31371,6 +31629,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // une identité, et la route range « info » un « disponible » sans suivi :
       // ce n'est pas un parasite. Il est montré, « code pas lu ».
       if (!(cleanLieu(t.lieu).nom || codeRetrait(t.code) || qrImage(t) || normaliserSuivi(t.suivi))) continue;
+      if (cmd) cmdParColis.set(colisKey(t), cmd);
       emailList.push(t);
     }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
@@ -31388,7 +31647,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const txLiesEmail = new Set(); for (const t of vusEmail) { const c = commandeDuColis(t); if (c) txLiesEmail.add(String(c.transaction_id)); }
     const extra = [];
     for (const o of vintedToPickup) {
-      if (suivisAchat(o, indexColis).some(x => retires.has(x))) continue;
+      // (23 oct.) Ses n° de suivi (la ligne de suivi Vinted relevée par
+      // l'extension, `harvest_{uid}_suivi_{tx}`) : un e-mail « retiré » ou
+      // « reparti » au même n° le sort aussi (le retour est rendu par son e-mail).
+      if (sortiParSuivis(suivisAchat(o, indexColis), fins, etatColisVinted(o, maintenant).arriveeMs)) continue;
       if (txLiesEmail.has(String(o.transaction_id))) continue;     // le même colis, déjà montré par son e-mail
       const r = colisRelais[String((o && o.transaction_id) || '')]; const c = r ? normCode(r.code) : '';
       if (c && codesEmail.has(c)) continue;
@@ -31469,7 +31731,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vient de `cleanLieu(t.lieu)` (§11, la même source que les groupes de
     //    l'écran Achats), jamais deviné : un email sans lieu n'ajoute rien.
     const lieux = [...new Set(emailList.map(t => (cleanLieu(t.lieu).nom || '').trim()).filter(Boolean))];
-    return { emailList, extra, attente, attenteMail, aVerifier, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux,
+    return { emailList, extra, attente, attenteMail, aVerifier, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux, cmdParColis, finis: [...finis].sort().slice(0, 300),
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -31506,11 +31768,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // `vusTx` : les achats Vinted vus « au point relais » (quelle que soit la
       // décision) — le widget n'ajoute que ceux d'une capture POSTÉRIEURE.
       const vusTx = [...new Set(vintedToPickup.map(o => String(o.transaction_id)))].slice(0, 300);
-      const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, aVerifier: pickupUnion.aVerifier.length, urgents: pickupUnion.urgents, colis, vus, vusTx, at: Date.now() };
+      // (23 oct.) + `finis` : les colis d'e-mail que l'app sait retirés ou
+      // repartis (identité : n° de suivi) — le rappel du matin ne les annonce pas.
+      const finis = pickupUnion.finis || [];
+      const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, aVerifier: pickupUnion.aVerifier.length, urgents: pickupUnion.urgents, colis, vus, vusTx, finis, at: Date.now() };
       const avant = load('vrm_colis_retirer', null);
       const memeChose = avant && avant.total === v.total && avant.prets === v.prets && avant.sansCode === v.sansCode
         && avant.aVerifier === v.aVerifier && avant.urgents === v.urgents && JSON.stringify(avant.colis || null) === JSON.stringify(colis)
-        && JSON.stringify(avant.vus || null) === JSON.stringify(vus) && JSON.stringify(avant.vusTx || null) === JSON.stringify(vusTx);
+        && JSON.stringify(avant.vus || null) === JSON.stringify(vus) && JSON.stringify(avant.vusTx || null) === JSON.stringify(vusTx)
+        && JSON.stringify(avant.finis || []) === JSON.stringify(finis);
       if (!memeChose) {
         save('vrm_colis_retirer', v);
         // ⚠️ ET ON PRÉVIENT. Le centre de notifications lit cette ligne UNE
@@ -34499,24 +34765,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
-  // ── LES N° DE SUIVI DES ACHATS, LUS POUR CE QUE L'ÉCRAN EN FAIT (22 oct.) ──
-  // Ma journée ne s'en sert QUE pour sortir de « à retirer » un achat déjà
-  // retiré selon l'email du transporteur (`pickupUnion` → `extra`, qui ne
-  // regarde que `vintedToPickup`). Achats, lui, relie aussi une photo à chaque
-  // colis vu par email (`photoColis`) : là, tous les achats.
-  // Mesuré au banc `vitesse.cjs` (base inventée, 7 comptes) : Ma journée lisait
-  // les 560 achats en 6 lectures à la suite pour n'en utiliser que les 140 au
-  // point relais, et reposait l'index — un objet neuf, même contenu — à chaque
-  // passage : un rendu de plus pour rien. La clé ne change que si la LISTE des
-  // transactions demandées change (triée), et un index identique n'est pas reposé.
+  // ── LES PHOTOS DES ACHATS, LUES DANS LEUR TRANSACTION (Achats seulement) ──
+  // (23 oct.) Ma journée lisait ces transactions pour leurs n° de suivi
+  // (`shipment.tracking_code`) — mesuré : 0 sur 1 290 en porte. Les n° viennent
+  // maintenant de la ligne de suivi Vinted et de ceux ajoutés à la main (lus
+  // juste en dessous) : Ma journée ne décompresse plus aucune transaction ici.
+  // Achats, lui, relie toujours une photo à chaque colis vu par email
+  // (`photoColis`). La clé ne change que si la LISTE des transactions change
+  // (triée), et un index identique n'est pas reposé.
   const demandesSuivis = useMemo(() => {
-    if (curSub !== 'achats' && curSub !== 'journee') return '';
-    // (23 oct.) Ma journée lit les achats de `txSuivisColis` (au point relais,
-    // et ceux qui peuvent relier un colis d'e-mail en attente) : ce dont
-    // `pickupUnion` a besoin, comme Achats.
-    const base = curSub === 'journee' ? buysBase.filter(o => txSuivisColis.has(String(o.transaction_id))) : buysBase;
-    return [...new Set(base.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))].sort().join(',');
-  }, [curSub, buysBase, txSuivisColis]);
+    if (curSub !== 'achats') return '';
+    return [...new Set(buysBase.filter(o=>o._acc&&/^\d+$/.test(String(o.transaction_id||''))).map(o=>`harvest_${o._acc?.vinted_user_id||o._acc}_txn_${o.transaction_id}`))].sort().join(',');
+  }, [curSub, buysBase]);
   useEffect(()=>{
     if(!demandesSuivis)return;
     let stop=false;
@@ -34524,13 +34784,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const demandes=demandesSuivis.split(',');
       const resultat={};
       for(let i=0;i<demandes.length;i+=100){
-        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,suivi:data->payload->transaction->shipment->>tracking_code,suivi2:data->payload->transaction->shipment->>tracking_number,suivi3:data->payload->transaction->>tracking_code,photo:data->payload->transaction->item_photo`,{strict:true});
+        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,photo:data->payload->transaction->item_photo`,{strict:true});
         if(rows===null||stop)return;
-        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={...r,photo:photoArticle({photo:r.photo})};}
+        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={photo:photoArticle({photo:r.photo})};}
       }
-      if(!stop)setIndexSuivisAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
+      if(!stop)setPhotosTxAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
     })();return()=>{stop=true;};
   },[demandesSuivis]);
+  // ── LA LIGNE DE SUIVI VINTED ET LES N° AJOUTÉS À LA MAIN (23 oct.) ────────
+  // Sur Achats et Ma journée (les colis à retirer s'y décident), relues à
+  // l'ouverture et quand l'extension prévient (`maj suivi`). Scalaires seulement.
+  useEffect(() => {
+    if (curSub !== 'achats' && curSub !== 'journee') return;
+    relireSuivisVinted(); relireSuivisManuels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
   // §11) : Ma journée en tire la ligne « que personne ne peut récupérer ».
   const misDeCote = useMisDeCote();
@@ -34693,6 +34961,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
       else if (ev.quoi === 'retrait') relireColisRelais();
+      // (23 oct.) Le suivi d'un achat relevé sur Vinted par l'extension.
+      else if (ev.quoi === 'suivi') relireSuivisVinted();
       // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
       // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
@@ -39102,6 +39372,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                         <LigneArrivee arr={arriveeColisVinted(rel)}/>
+                        {/* (23 oct.) La dernière nouvelle de Vinted pour CETTE transaction. */}
+                        <LigneNouvelleVinted nv={nouvelleDe(o)}/>
                         {/* (23 oct.) « DÉPOSÉ EN POINT RELAIS » EST CE QUE VINTED DISAIT
                             À LA DERNIÈRE LECTURE de ce compte, pas forcément aujourd'hui :
                             au-delà d'un jour, on dit depuis quand (le compte n'est relu
@@ -39187,6 +39459,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
+                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} codePostal={codePostalLu({lieu: rel && rel.lieu})} enLigne/> : null; })()}
                       <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                     </div>
                     );
@@ -39446,6 +39719,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                 return jours<0?`délai dépassé depuis ${-jours} j (${jj})`:jours===0?`Dernier jour pour le retrait (${jj})`:jours===1?`À retirer jusqu'à demain (${jj})`:`À retirer jusqu'au ${jj}`; })()}
                             </div>
                           )}
+                          {/* (23 oct.) La dernière nouvelle de Vinted, par la commande reliée
+                              par identité (n° de suivi ou code de retrait) — jamais le titre. */}
+                          <LigneNouvelleVinted nv={nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)))}/>
+                          {/* (23 oct.) Le suivi du transporteur, sur CHAQUE colis qui a un n°. */}
+                          <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} attrs={{'data-colis-suivre':''}}/>
                         </div>
                         {/* ⚠️⚠️ LE QR MANQUAIT SUR CETTE CARTE — c'est CELLE-CI que
                             l'écran Achats utilise (groupée par point relais), pas
@@ -39482,10 +39760,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <CodeRetraitCopiable label={ident?"Code d’ouverture":"Code de retrait"} code={code}/>
                             )}
                           </div>
-                        )}
-                        {/* (revue du 23 oct.) Ni code ni QR lus : le suivi du transporteur, d'un geste. */}
-                        {!code && !ident && !qrVivant(t) && t.suivi && (
-                          <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" data-colis-suivre="" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:10,padding:'5px 10px',fontSize:12,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Suivi ↗</a>
                         )}
                         <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                       </div>
@@ -39692,6 +39966,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             vendeur, ou déjà retiré sans être coché. On ne dit jamais « perdu »,
             on ne le cache pas (code et QR restent : il est peut-être encore là),
             et il ne compte dans AUCUN total (`pickupUnion.aVerifier`, §11). */}
+        {/* (23 oct.) LE SUIVI VINTED DES ACHATS, DIT UNE FOIS (§7) : relevé par
+            l'extension sur Vinted (ligne `harvest_{uid}_suivi_{tx}`). Sur chaque
+            carte reliée : « Vinted : « … » ». Ici seulement ce qui MANQUE, et le
+            geste — la promesse « l'extension le relève » n'est faite qu'à une
+            extension qui sait le faire (`extSait('suivivinted')`). */}
+        {aFilter==='attente' && (()=>{
+          const vinted = [...pickupUnion.extra, ...pickupUnion.aVerifier.filter(x=>x.kind==='vinted').map(x=>x.o)];
+          if (!vinted.length || suivisVinted === undefined) return null;
+          if (suivisVinted === null) return <div data-suivi-vinted-etat="passu" style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>Le suivi Vinted de tes achats n'a pas pu être lu — la base n'a pas répondu ; rien n'est perdu. <button type="button" onClick={relireSuivisVinted} style={{border:'none',background:'transparent',color:C.accent,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:0,minHeight:44}}>Réessayer</button></div>;
+          const sans = vinted.filter(o=>!nouvelleDe(o)).length;
+          if (!sans) return null;
+          const cap = extSait('suivivinted');
+          return <div data-suivi-vinted-etat={cap} data-suivi-vinted-sans={sans} style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>
+            {sans>1?`${sans} colis vus par Vinted n'ont`:'1 colis vu par Vinted n’a'} pas encore de suivi Vinted relevé.{' '}
+            {cap==='ok' ? "L'extension le relève à ta prochaine visite sur Vinted, sur le compte connecté dans Chrome."
+              : cap==='retard' ? "Mets l'extension VRM à jour pour qu'elle le relève — ou touche « Suivre le colis » dans la commande sur vinted.fr."
+              : "Il se relève avec l'extension VRM, sur l'ordinateur où elle est installée — ou touche « Suivre le colis » dans la commande sur vinted.fr."}
+          </div>;
+        })()}
+        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} achats={buysBase} accName={accName} relire={relireSuivisManuels}/>}
         {aFilter==='attente' && (pickupUnion.aVerifier||[]).length>0 && (
           <div data-oublies={pickupUnion.aVerifier.length} data-a-verifier={pickupUnion.aVerifier.length} style={{border:`1px solid ${C.warn}`,background:`${C.warn}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
             <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:7}}>
@@ -39727,6 +40021,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div data-oublie-info="" style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
                           n° {t.suivi||'?'}{cpt?` · ${cpt}`:''} · <b style={{color:C.warn,fontWeight:600}}>{raison}</b> · {texteArrivee(arr)}
                         </div>
+                        <LigneNouvelleVinted nv={nouvelleDe(x.o)}/>
                       </div>
                       <div className="vrm-oublie-gestes">
                       {code && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{code}</span>}
@@ -39736,7 +40031,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <img src={qi} alt="QR de retrait" onError={()=>noterImgMorte(qi)} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                         </button>
                       ) : null; })()}
-                      {t.suivi && <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" data-oublie-verifier="" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Vérifier</a>}
+                      <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} enLigne attrs={{'data-oublie-verifier':''}}/>
                       <button type="button" title="Je l'avais récupéré" data-oublie-eu="" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
                       </div>
                     </div>
@@ -39753,8 +40048,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* (revue du 23 oct.) Un compte déjà nommé par la ligne de fraîcheur ne se redit pas ici. */}
                         {jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? ` · Vinted disait « déposé en point relais » il y a ${jCap} j (dernière lecture de ce compte)` : ''}
                       </div>
+                      <LigneNouvelleVinted nv={nouvelleDe(o)}/>
                     </div>
                     <div className="vrm-oublie-gestes">
+                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} enLigne/> : null; })()}
                       {cd && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{cd}</span>}
                       {href && <a href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Conversation ↗</a>}
                       <button type="button" title="Je l'avais récupéré" onClick={()=>markPickupDone(o)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
@@ -47150,7 +47447,7 @@ async function lireColisEquipe(vendeur) {
     retires: new Set((Array.isArray(v.retires) ? v.retires : []).map(String)),
     bords: liste(bords), labels: liste(labels),
     relais: (() => { const l = liste(relais); return l === null ? null : ((l[0] && l[0].data) || {}); })(),
-    tracks: (() => { const l = liste(tracks); return l === null ? null : l.map((r) => reclassifyTrack(r && r.data)).filter(Boolean); })(),
+    tracks: (() => { const l = liste(tracks); return l === null ? null : l.map((r) => avecSuiviDuSujet(reclassifyTrack(r && r.data))).filter(Boolean); })(),
   };
 }
 // Imprimer un bordereau de l'équipe : les octets lus AVEC l'en-tête, tamponnés
@@ -47194,13 +47491,18 @@ function ColisEquipe({ vendeur, de, onPropre }) {
     const compte = (o) => d.comptes[String(o.uid || '')] || '';
     const plusieurs = new Set([...ventes, ...achats].map(compte)).size > 1;
     // (23 oct.) La règle de l'écran Achats (§11) : à retirer, pas « à vérifier ».
-    const tracks = (d.tracks || []).filter((t) => t.status === 'available' && etatColisEmail(t).etat === 'a_retirer');
+    // (23 oct.) …et un colis RETIRÉ ou REPARTI selon un autre e-mail au même n°
+    // de suivi (autre transporteur, n° du sujet) n'y est plus — la règle de
+    // l'écran Achats (api/_lib/suivi-colis.js, §11).
+    const finsE = finsColis(d.tracks || [], null);
+    const sortiE = (t) => { const a = arriveeColisEmail(t); return !!sortiParSuivi(t, finsE, a ? a.ms : null); };
+    const tracks = (d.tracks || []).filter((t) => t.status === 'available' && etatColisEmail(t).etat === 'a_retirer' && !sortiE(t));
     // ⚠️ (revue du 23 oct.) …ET LES « À VÉRIFIER » NE DISPARAISSENT PAS. Un colis
     // dont la date limite est passée, ou gardé plus longtemps que ne le fait son
     // transporteur, était simplement filtré : l'aide ne le voyait plus du tout,
     // code compris — or il est peut-être encore au relais. Il a sa ligne, avec
     // SA raison, et ne compte dans aucun « à retirer » (§11, écran Achats).
-    const tracksAVerifier = (d.tracks || []).filter((t) => t.status === 'available' && estAVerifier(etatColisEmail(t)));
+    const tracksAVerifier = (d.tracks || []).filter((t) => t.status === 'available' && estAVerifier(etatColisEmail(t)) && !sortiE(t));
     const imprimer = async (o, row, numero) => {
       const k = String(o.transaction_id);
       setMsg((m) => ({ ...m, [k]: 'Préparation…' }));
@@ -50715,7 +51017,7 @@ function AppCoeur() {
       }
       // Colis à retirer (emails transporteurs) : source légère, module-level.
       let colisCount=0;
-      try{ const tr=await fetchEmailTracking(); const col=loadCollected(); const ret=suivisRetires(tr); colisCount=(tr||[]).filter(t=>isColisRetirable(t,col) && !colisRetireAilleurs(t,ret)).length; }catch(_){}
+      try{ const tr=await fetchEmailTracking(); const col=loadCollected(); const fins=finsColis(tr); colisCount=(tr||[]).filter(t=>{ if(!isColisRetirable(t,col)) return false; const a=arriveeColisEmail(t); return !sortiParSuivi(t,fins,a?a.ms:null); }).length; }catch(_){}
       // Leboncoin : paires publiées sur LBC mais VENDUES sur Vinted → à retirer de
       // Leboncoin pour ne pas les vendre deux fois.
       // ⚠️ « VENDUE » SE PROUVE (§5), elle ne se déduit pas d'une absence : une
