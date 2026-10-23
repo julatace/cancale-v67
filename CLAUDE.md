@@ -12208,6 +12208,109 @@ rouge sous mutation. Décision gardée : un `UnsoldList` absent vaut « pas lu �
 - **Non mesuré** : qu'eBay émette `<UnsoldList>` vide (sinon « pas encore rendue
   par eBay » reste pour un vendeur sans inactive) ; rien n'a été envoyé à eBay.
 
+### Le reçu d'achat : toutes les lignes, la somme vérifiée, au-dessus de la barre (23 octobre)
+Julien, capture iPhone (Vinted → Achats → ⋯ → « Reçu d'achat ») : « le reçu s'affiche
+mal » — la barre du bas passait par-dessus la feuille (« N° de transaction » coupé, la
+fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
+- **Mesuré (lecture seule, 117 lignes `email_achat_*`)** : 81 vrais reçus (« Ton reçu
+  pour la commande … »). Le bloc « Montant payé » → « Mode de paiement » porte Article,
+  Frais de port, puis « Frais Vinted » (55) OU « Frais de Protection acheteurs » (26),
+  et « Réduction -X,XX € » (8, négative) ; la somme vaut le Montant payé sur 81/81.
+  L'ancien parseur ne lisait que trois libellés : 55 reçus perdaient leurs frais, 8
+  leur réduction. 36 lignes ne sont PAS des reçus (« Commande mise à jour pour … » 18,
+  « … - Confirmation requise » 16, « Retourne ta commande … » 2 ; du 16 juillet au
+  3 août, aucune avec un Montant payé) : la vraie route `email-inbound` ne les crée
+  plus (prouvé). `transaction` est vide sur les 81 (l'astérisque de « *N° de
+  transaction* » casse le motif du serveur) alors que le texte porte le n° sur 81/81 :
+  61 se relient ainsi à un achat capté, 0 doublon. Toutes ont `pdfB64` vide.
+- **Une règle** `<recu-achat-regle>` (App.jsx) : `ventilationRecuAchat` (toutes les
+  lignes « Libellé ±X,XX € », libellé de Vinted, en centimes, aucune jetée — une ligne
+  illisible est GARDÉE ; `juste` · `ecart` · `passu`), `txRecuAchat` (le n° lu sur sa
+  ligne), `estRecuAchat` (⚠️ revue ci-dessous : tout email rangé comme achat SAUF les
+  trois sujets de statut mesurés, sans Montant payé ni PDF),
+  `recusAchatDe` (`undefined`/`null` passés tels quels). `champsRecuAchat` sert la
+  feuille ET la fenêtre PDF (§11) ; `phraseSommeRecu` dit l'écart ou le « pas su » en
+  une ligne neutre, jamais un total partiel présenté comme complet.
+- **Liste et menu** : « Reçus d'achat par email » ne liste que les vrais reçus et dit
+  combien d'autres emails n'en sont pas (`data-recus-autres`) ; le menu ⋯ d'un achat
+  (`receiptFor`) relie par n° de transaction, et le titre ne relie plus qu'un reçu SANS
+  n° (§5 : un reçu au même titre et à un autre n° est celui d'un autre achat).
+  `ordersFromEmailAchats` (mort depuis août, seconde règle « reçu ») est retiré.
+- **La feuille** (`FeuilleRecuAchat`) est portée sur `<body>` : sur iPhone, `<main>`
+  (qui défile) forme un contexte d'empilement et la barre du bas passait dessus. ‹ et
+  PDF à 44 px, zone de sécurité en bas, hauteur en `dvh` ; « Visa •••• 4242 » (sans
+  les étoiles de l'email, on lisait « Visa, 4242 ») ; montant payé à l'encre (§7),
+  bande à `COULEUR_PLATEFORME.vinted`. ⚠️ Le « zoom 0,8 » du téléphone (§7, 19 oct.)
+  est en réalité ANNULÉ par `styles-iphone.css` (`.vrm-app-shell .vrm-main{zoom:1}`).
+- **Preuves** : `audit-recu-achat.cjs` (la règle dans un vm + la vraie route
+  email-inbound) 43 contrôles, 18 rouges sur bf0a9c8 (la règle n'existait pas : pas
+  une preuve seule) et 7 mutations rouges (`connus` 10, `somme` 2, `signe` 6,
+  `nonrecu` 2, `jete` 2, `txtexte` 3, `mode` 1). Banc `recu-achat.cjs` (ports 9201 à
+  9210 ; 390 × 560 tactile clair, 390 × 700 sombre, 1512) 86 contrôles : **48 rouges
+  sur le build de bf0a9c8**, 0 après ; feuille rendue sans portail ⇒ 12 rouges,
+  libellés connus seulement ⇒ 21. ⚠️ Chromium ne fait pas de `<main>` un contexte
+  d'empilement : le banc l'impose sur téléphone (`.vrm-main{isolation:isolate}`) pour
+  rejouer l'iPhone — sans ça il était VERT sur le défaut.
+- **Non mesuré** : un vrai iPhone ; la propriété exacte qui fait de `<main>` un
+  contexte d'empilement dans WebKit ; un reçu à deux moyens de paiement (forme vue une
+  fois, montants gardés).
+- **Pas fait** : le serveur range toujours `transaction` vide — corriger son motif
+  changerait la CLÉ des nouveaux reçus (un email renvoyé ferait un doublon) ; l'app lit
+  le n° dans le texte.
+- **Revue du 23 octobre — défauts reproduits, corrigés** (chacun rouge avant le
+  correctif — sur 7ba9670 —, vert après, rouge sous mutation) :
+  - **Le banc `csp.cjs` ne jugeait plus la fenêtre du reçu** : il extrayait
+    `parseReceiptFields` (retiré), sortait « ❌ le code du reçu se retrouve dans
+    App.jsx » et SAUTAIT ses 18 contrôles (impression une fois, Fermer, aucune
+    violation, onglet rechargé, journal « fenetre:recu »). Il extrait ce que lit
+    `openReceipt` (`COULEUR_PLATEFORME`, `<recu-achat-regle>`, `modePaiementRecu`,
+    `phraseSommeRecu`, `champsRecuAchat`), son reçu a la forme mesurée, et un
+    contrôle de plus exige les vraies lignes dans la fenêtre (Frais Vinted, somme
+    juste, « Visa •••• 4242 ») : 2 rouges sur 7ba9670, vert après, 2 rouges quand la
+    fenêtre ne garde que les trois anciens libellés.
+  - **Un email que la ROUTE range comme achat disparaissait de la liste** :
+    `estRecuAchat` exigeait un Montant payé, un sujet « reçu pour la commande » ou un
+    PDF, alors que la route (branche 2b) range aussi « Merci pour ton achat », « Tu as
+    acheté », « Confirmation d'achat » (et notifie « justificatif archivé ») — ils
+    étaient comptés parmi « les mises à jour, confirmations, retours », et un reçu dont
+    Vinted changerait la tournure aurait suivi. « Pas un reçu » = les trois sujets de
+    statut MESURÉS (`SUJET_STATUT_ACHAT` : « Commande mise à jour pour » 18, « -
+    Confirmation requise » 16, « Retourne ta commande » 2 ; aucun avec un Montant payé
+    ni un PDF), rien d'autre. Sans bloc Montant payé, la feuille et la fenêtre
+    montrent le TEXTE de l'email (`hasStructured` = `v.trouve` : avant, un n° de
+    transaction suffisait à afficher un reçu vide). `audit-recu-achat.cjs` fait
+    passer ces emails par la vraie route puis par la vraie règle (§11) : 6 rouges sur
+    7ba9670 ; mutations `positif` 4, `nonrecu` 2, `texte` 1. Banc `recu-achat.cjs` :
+    « Merci pour ton achat » listé et lu en texte, 12 rouges sur le build de 7ba9670.
+  - **Une ligne de frais au libellé « Transaction … » ou « Vendeur … » finissait le
+    bloc** (« Transaction sécurisée 0,50 € » : elle ET « Frais Vinted » qui suivait
+    étaient jetées — la feuille disait l'écart, mais la promesse « aucune ligne jetée »
+    ne tenait pas). Ces deux mots ne sont une borne que sans montant en fin de ligne
+    (`FIN_SI_SANS_MONTANT_RECU`) ; « Mode de paiement », « Date du paiement », « N° de
+    transaction » restent des bornes quoi qu'il arrive (mesuré : aucune des 81 ne finit
+    par « € »). Audit : 2 rouges avant ; mutations `borne` 2, `bornetoutes` 1. Aucun
+    reçu réel n'avait ce libellé.
+  - **À 320 px, un montant ou la carte se coupaient** (« 11,20 » / « € » avec la
+    police du banc, « MasterCard •••• » / « 9999 » avec des métriques d'Arial, et
+    « 10 h » / « 47 ») : la valeur d'une ligne était en `overflowWrap:'anywhere'`,
+    qui casse même une espace insécable, et la fenêtre PDF, elle, posait `nowrap`.
+    Les montants de la feuille ne passent plus à la ligne (`Row montant`, comme la
+    fenêtre), et `•••• 9999` et `10 h 47` portent des espaces insécables
+    (`modePaiementRecu`, `champsRecuAchat` — la feuille ET la fenêtre). Banc
+    `recu-achat.cjs` : deux vues 320 × 568 (police du banc, métriques d'Arial) et un
+    reçu aux libellés les plus longs mesurés : 4 rouges sur le build de 7ba9670, 3
+    sous la mutation « nowrap et insécable retirés » ; audit, mutation `nbsp` 1.
+  - **Au clavier, la feuille laissait partir le focus** (au 3ᵉ Tab sur `<body>`,
+    derrière le voile — et Échap, écouté sur le seul dialogue, ne fermait plus rien),
+    ↓ et Page bas ne faisaient pas défiler le reçu (le focus était sur le dialogue, qui
+    ne défile pas), et à la fermeture le focus tombait sur `<body>`. Déjà vrai sur
+    bf0a9c8 (pas une régression). `FeuilleRecuAchat` : focus sur la zone qui défile
+    (`data-recu-defile`, `tabIndex 0`), Tab / Maj+Tab tournent dans la feuille, Échap
+    écouté sur le document, le focus rendu à « Voir › » (le motif de `MenuEcrans`).
+    Banc `recu-achat.cjs` K (ouverture au clavier, Page bas, Tab ×5 + Maj+Tab ×4,
+    Échap après cinq Tab, focus rendu) : 10 rouges sur le build de 7ba9670 ; 10 sous
+    « piège, écoute du document et retour retirés », 3 sous « retour du focus retiré ».
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -12222,8 +12325,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **98 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **89 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **156 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **201 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -12544,8 +12647,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 98 audits
-scripts/bancs/                  les 89 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 156 audits
+scripts/bancs/                  les 201 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
