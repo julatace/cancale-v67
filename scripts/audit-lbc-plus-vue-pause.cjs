@@ -45,7 +45,19 @@ if (process.argv.includes('--prouve')) {
     ['suppression', 'inject', "const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads';", "const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads';"],
     ['uneALaFois', 'src', "if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre mise en pause est en cours — une à la fois' };", ''],
     ['refusFait', 'src', 'if (statut >= 200 && statut < 300) {', 'if (statut) {'],
-    ['regleApp', 'app', "!ad.plusVueAt && !ad.pauseAt && !(vendues", '!(vendues'],
+    ['regleApp', 'app', "!lbcSortieDe(ad) && !(vendues", '!(vendues'],
+    // (22 oct., revue) — la donnée la plus récente gagne :
+    ['regleRecente', 'app', "if (ad.plusVueAt && !(isFinite(vu) && vu > Date.parse(ad.plusVueAt))) return 'plusvue';", "if (ad.plusVueAt) return 'plusvue';"],
+    ['pauseCollee', 'app', "if (ad.pauseAt && !(isFinite(vu) && vu > Date.parse(ad.pauseAt) + LBC_PAUSE_INDEX_MS)) return 'pause';", "if (ad.pauseAt) return 'pause';"],
+    ['plusVueCollee', 'src', 'delete n.plusVueAt;\n', ''],
+    ['pauseFenetre', 'src', 'if(n.pauseAt&&!(Date.now()-Date.parse(n.pauseAt)<=LBC_PAUSE_INDEX_MS))', 'if(n.pauseAt)'],
+    ['vueRecente', 'src', 'if (isFinite(vu) && maintenant - vu < LBC_PAUSE_INDEX_MS) continue;', ''],
+    ['remarque', 'src', "} else if (lbcSortieDe(ad) !== 'plusvue') {", '} else if (!ad.plusVueAt) {'],
+    // (22 oct., revue) — « à retirer » ne tombe que sur une PREUVE :
+    ['titreSortis', 'app', 'const k = numeroLbcIdentite({ itemId: ad.id }, items, liens);', 'const k = clesAnnonceLbc(ad, liens)[0];'],
+    ['sansPreuve', 'app', 'sorties.size && lbcListesCompletesDepuis(preuve, comptesSortis)', 'sorties.size'],
+    ['unCompte', 'app', 'if (!isFinite(t) || t <= depuis) return false;', 'if (isFinite(t) && t > depuis) return true;'],
+    ['comptesSortis', 'app', 'if (ad.account || ad.lbcUser) comptesSortis.add(String(ad.account || ad.lbcUser));', ''],
     ['ordreDePage', 'relay', "if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;", 'if(window.top!==window)return;'],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lbc-pause-prouve-'));
@@ -314,6 +326,51 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     dit(!!(it['302'] && it['302'].plusVueAt) && !it['301'].plusVueAt, 'de la page au fond : la vraie réponse de sa page profil sort l’annonce absente, et elle seule');
   });
 
+  console.log('\n── 2 bis. LA DONNÉE LA PLUS RÉCENTE GAGNE (revue du 22 octobre)');
+  // Reproduit par le relecteur : une liste publique complète qui ne montre pas
+  // encore l’annonce (index en retard), PUIS sa page privée « Mes annonces » qui
+  // la montre active : « plus vue » restait collée (et une pause, pareil).
+  const MYADS = `${API}/adfinder/v1/myads`;
+  const vueActive = (id) => [{ id, subject: 'Paire ' + id, status: 'active', account: MON, lbcUser: MON }];
+  const comptesS = { accounts: { [MON]: { id: MON, sessionAt: '2026-10-22T09:00:00.000Z', name: 'moi' } } };
+  await essaie('plus vue puis myads', async () => {
+    const f = fond({ lbc_listings: { items: { '1111111': { id: '1111111', subject: 'A', status: 'active', account: MON, seenAt: '2026-10-21T09:00:00.000Z' }, '2222222': { id: '2222222', subject: 'Publiée hier', status: 'active', account: MON, seenAt: '2026-10-21T09:00:00.000Z' } } }, lbc_accounts: comptesS });
+    await f.ctx.noterListeLbcComplete(MON, ['1111111'], 1);
+    const a1 = f.base.lbc_listings.items['2222222'];
+    dit(!!a1.plusVueAt && !f.ctx.annonceLbcEnVente(a1, new Set()), 'la liste publique complète ne la montre pas ⇒ « plus vue » (le point de départ du défaut)', JSON.stringify(a1.plusVueAt));
+    await attendre(5);
+    const r = await f.ctx.storeLbcListings(MYADS, vueActive('2222222'), 'vendeur_banc');
+    const a2 = f.base.lbc_listings.items['2222222'];
+    dit(r && r.etat === 'enregistre' && !a2.plusVueAt, 'sa page privée la remontre ACTIVE après ⇒ « plus vue » levée en base', JSON.stringify({ etat: r && r.etat, plusVueAt: a2.plusVueAt || null }));
+    dit(f.ctx.annonceLbcEnVente(a2, new Set()), '… et elle est de nouveau « en vente »');
+    const lu = await f.ctx.lireLbcAnnonces();
+    dit(lu.items.map((a) => a.id).includes('2222222'), '… donc la file Leboncoin la compte « déjà en ligne » (pas de seconde publication)', JSON.stringify(lu.items.map((a) => a.id)));
+  });
+  await essaie('pause ancienne puis myads', async () => {
+    const f = fond({ lbc_listings: { items: { '3333333': { id: '3333333', subject: 'Pausée il y a 5 jours', status: 'active', account: MON, pauseAt: new Date(Date.now() - 5 * 864e5).toISOString(), pauseStatut: 200 } } } });
+    await f.ctx.storeLbcListings(MYADS, vueActive('3333333'), 'vendeur_banc');
+    const a = f.base.lbc_listings.items['3333333'];
+    dit(!a.pauseAt && !a.pauseStatut && f.ctx.annonceLbcEnVente(a, new Set()), 'mise en pause il y a 5 jours, remise en ligne par lui, vue active ⇒ la pause est levée, « en vente »', JSON.stringify({ pauseAt: a.pauseAt || null }));
+  });
+  await essaie('pause récente puis myads', async () => {
+    const f = fond({ lbc_listings: { items: { '4444444': { id: '4444444', subject: 'Pausée il y a 10 min', status: 'active', account: MON, pauseAt: new Date(Date.now() - 10 * 60e3).toISOString(), pauseStatut: 200 } } } });
+    await f.ctx.storeLbcListings(MYADS, vueActive('4444444'), 'vendeur_banc');
+    const a = f.base.lbc_listings.items['4444444'];
+    dit(!!a.pauseAt && !f.ctx.annonceLbcEnVente(a, new Set()), 'mise en pause il y a 10 min, encore vue active (index en retard) ⇒ la pause reste', JSON.stringify({ pauseAt: a.pauseAt || null }));
+  });
+  await essaie('vue il y a 10 min', async () => {
+    const f = fond({ lbc_listings: { items: { '1111111': { id: '1111111', subject: 'A', status: 'active', account: MON }, '5555555': { id: '5555555', subject: 'Vue à l’instant', status: 'active', account: MON, seenAt: new Date(Date.now() - 10 * 60e3).toISOString() } } }, lbc_accounts: comptesS });
+    await f.ctx.noterListeLbcComplete(MON, ['1111111'], 1);
+    const a = f.base.lbc_listings.items['5555555'];
+    dit(!a.plusVueAt, 'vue par une autre capture il y a 10 min, absente de la liste publique ⇒ PAS « plus vue » (l’index peut ne pas la montrer encore)', JSON.stringify(a.plusVueAt || null));
+  });
+  await essaie('plus vue périmée', async () => {
+    const f = fond({ lbc_listings: { items: { '1111111': { id: '1111111', subject: 'A', status: 'active', account: MON }, '6666666': { id: '6666666', subject: 'Revue puis supprimée', status: 'active', account: MON, plusVueAt: '2026-10-19T09:00:00.000Z', seenAt: '2026-10-20T09:00:00.000Z' } } }, lbc_accounts: comptesS });
+    await f.ctx.noterListeLbcComplete(MON, ['1111111'], 1);
+    const a = f.base.lbc_listings.items['6666666'];
+    dit(!!a.plusVueAt && a.plusVueAt > '2026-10-20T09:00:00.000Z' && !f.ctx.annonceLbcEnVente(a, new Set()), 'une « plus vue » levée par une capture plus récente, de nouveau absente d’une liste complète ⇒ reposée', JSON.stringify(a.plusVueAt));
+  });
+
   console.log('\n── 3. LA RÈGLE « EN VENTE » : LA MÊME DANS L’APP, L’EXTENSION ET LE SERVEUR (§11)');
   const extraire = (src) => { const m = /\/\/ <lbc-en-vente-regle>[\s\S]*?\/\/ <\/lbc-en-vente-regle>/.exec(src); return m ? m[0] : null; };
   const rApp = extraire(APP), rExt = extraire(SRC), rSrv = extraire(SRV);
@@ -322,9 +379,15 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     if (!r) continue;
     await essaie('règle ' + nom, async () => {
       const c = {}; vm.createContext(c); vm.runInContext(r + '\n;this.f=annonceLbcEnVente;', c);
-      const ads = [{ id: '1', status: 'active' }, { id: '2', status: 'active', plusVueAt: '2026-10-22T10:00:00Z' }, { id: '3', status: 'active', pauseAt: '2026-10-22T10:00:00Z' }, { id: '4', status: 'paused' }];
+      const ads = [{ id: '1', status: 'active' }, { id: '2', status: 'active', plusVueAt: '2026-10-22T10:00:00Z' }, { id: '3', status: 'active', pauseAt: '2026-10-22T10:00:00Z' }, { id: '4', status: 'paused' },
+        { id: '5', status: 'active', plusVueAt: '2026-10-22T10:00:00Z', seenAt: '2026-10-21T10:00:00Z' },
+        { id: '6', status: 'active', pauseAt: '2026-10-22T10:00:00Z', seenAt: '2026-10-22T10:30:00Z' }];
       const en = ads.filter((a) => c.f(a, new Set())).map((a) => a.id);
       dit(JSON.stringify(en) === '["1"]', `${nom} : « plus vue », mise en pause par VRM ou en pause sur Leboncoin ⇒ plus « en vente »`, JSON.stringify(en));
+      const revues = [{ id: '7', status: 'active', plusVueAt: '2026-10-22T10:00:00Z', seenAt: '2026-10-22T10:00:01Z' },
+        { id: '8', status: 'active', pauseAt: '2026-10-22T10:00:00Z', seenAt: '2026-10-22T11:30:00Z' }];
+      const en2 = revues.filter((a) => c.f(a, new Set())).map((a) => a.id);
+      dit(JSON.stringify(en2) === '["7","8"]', `${nom} : revue APRÈS la marque (« plus vue »), ou plus d’une heure après la pause ⇒ de nouveau « en vente » (la donnée la plus récente gagne)`, JSON.stringify(en2));
     });
   }
 
@@ -439,6 +502,73 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     const e = await f.ctx.etatPourApp();
     dit(r && r.etape === 'fait', 'la commande « lbcPause » de l’app arrive à la mise en pause', JSON.stringify(r));
     dit(e && e.lbcPause === true, 'l’état de l’extension dit qu’elle SAIT mettre en pause (l’app ne montre le bouton qu’à elle)', JSON.stringify(e && e.lbcPause));
+  });
+
+  console.log('\n── 6. « À RETIRER DE LEBONCOIN » NE TOMBE QUE SUR UNE PREUVE (revue du 22 octobre)');
+  // `numerosLbcSortis` RETIRE une alerte de double vente : la vraie fonction
+  // d’App.jsx, extraite par Babel, exécutée sur des annonces INVENTÉES.
+  await essaie('numerosLbcSortis', async () => {
+    const parser = require(path.join(racine, 'node_modules', '@babel', 'parser'));
+    const ast = parser.parse(APP, { sourceType: 'module', plugins: ['jsx'] });
+    const decl = new Map();
+    for (const n of ast.program.body) {
+      const d = n.type === 'ExportNamedDeclaration' ? n.declaration : n;
+      if (!d) continue;
+      if (d.type === 'FunctionDeclaration' && d.id) decl.set(d.id.name, APP.slice(d.start, d.end));
+      if (d.type === 'VariableDeclaration') for (const v of d.declarations) if (v.id && v.id.name) decl.set(v.id.name, `${d.kind} ${APP.slice(v.start, v.end)};`);
+    }
+    const MAG = { vrm_numerotation: JSON.stringify({ version: 2, archive: 'B', coupure: '2026-10-09T00:00:00Z', lbcAnnonces: {}, ebayAnnonces: {} }) };
+    const LS = { getItem: (k) => (k in MAG ? MAG[k] : null), setItem: (k, v) => { MAG[k] = String(v); }, removeItem: (k) => { delete MAG[k]; } };
+    const noms = new Set(['numerosLbcSortis']);
+    let F = null, derniere = '';
+    for (let i = 0; i < 80 && !F; i++) {
+      const code = [...decl.keys()].filter((k) => noms.has(k)).map((k) => decl.get(k)).join('\n') + '\n;({ numerosLbcSortis })';
+      const ctx = vm.createContext({ console: silence, Date, Math, Number, String, Object, Array, JSON, isFinite, isNaN, parseInt, parseFloat, RegExp, Set, Map, localStorage: LS, window: {} });
+      try { const o = vm.runInContext(code, ctx); o.numerosLbcSortis({ a: { id: 'a', ref: '1', plusVueAt: '2026-10-22T10:00:00Z', account: 'lbc-account:x' }, b: { id: 'b', subject: 'n2', status: 'active' } }, { a: '1' }, new Set(), { lectures: { x: { at: '2026-10-23T00:00:00Z' } }, comptes: ['x'], depuis: '2026-10-01T00:00:00Z' }); F = o; }
+      catch (e) { const m = /^(\w+) is not defined/.exec(e && e.message || ''); if (m && decl.has(m[1]) && !noms.has(m[1])) noms.add(m[1]); else { derniere = e && e.message; break; } }
+    }
+    if (!F) { dit(false, 'numerosLbcSortis se charge depuis App.jsx', derniere); return; }
+    const PV = '2026-10-22T10:00:00.000Z';
+    const DEPUIS = '2026-10-17T16:36:35.585Z';                        // la marque « publiée » (vinted_lbc_posted.updatedAt)
+    const APRES = '2026-10-22T12:00:00.000Z', AVANT = '2026-10-15T12:00:00.000Z';
+    const preuve = (lectures, comptes) => ({ lectures, comptes: new Set(comptes), depuis: DEPUIS });
+    const ok = preuve({ [MON]: { at: APRES } }, [MON]);
+    // L’ancienne forme (un Set : les N° sautés) est lue telle quelle : sur le code
+    // d’avant, le contrôle juge ce qu’elle SAUTE — il ne meurt pas (§6).
+    const run = (items, liens, p) => { const r = F.numerosLbcSortis(items, liens || {}, new Set(), p); return r && r.prouves ? r : { prouves: r, sorties: new Map([...r].map((k) => [k, { quoi: '?' }])) }; };
+    // Cas 1 (reproduit) : l’annonce MORTE d’une AUTRE paire au titre « n18 », aucune identité.
+    const c1 = run({ '900000001': { id: '900000001', subject: 'Nike Air Max 1 n18 taille 42', status: 'active', plusVueAt: PV, account: MON } }, {}, ok);
+    dit(!c1.prouves.has('18') && !c1.sorties.has('18'), 'un « n18 » dans le TITRE d’une annonce morte n’efface jamais la N°18 « à retirer » (§5 : un titre n’est pas une identité)', JSON.stringify({ prouves: [...c1.prouves], sorties: [...c1.sorties.keys()] }));
+    // Cas 2 et 3 (reproduits) : annonce reliée (référence, puis lien) sortie, aucune liste complète postérieure.
+    const c2 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: MON } }, {}, null);
+    const c3 = run({ '900000003': { id: '900000003', subject: 'Salomon XT-6 blanc', status: 'active', plusVueAt: PV, account: MON } }, { '900000003': '18' }, preuve({}, [MON]));
+    dit(!c2.prouves.has('18') && c2.sorties.get('18') && c2.sorties.get('18').quoi === 'plusvue', 'référence VRM-18 sortie, pas de preuve ⇒ la ligne RESTE, avec le doute (« l’annonce reliée n’est plus dans ta liste »)', JSON.stringify({ prouves: [...c2.prouves], sortie: c2.sorties.get('18') }));
+    dit(!c3.prouves.has('18') && !!c3.sorties.get('18'), 'lien posé à la main vers 18, sortie, aucune liste complète lue ⇒ la ligne reste (une republication peut ne pas être vue)', JSON.stringify([...c3.prouves]));
+    // Cas 4 : la preuve complète — liste complète de son compte, postérieure à la marque, aucune autre annonce vivante.
+    const c4 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: MON } }, {}, ok);
+    dit(c4.prouves.has('18'), 'liste complète de CHACUN de ses comptes postérieure à la marque « publiée », aucune autre annonce de la paire ⇒ la ligne part (l’autre sens)', JSON.stringify([...c4.prouves]));
+    // Cas 5 : son second compte n’a jamais été lu en entier.
+    const c5 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: MON } }, {}, preuve({ [MON]: { at: APRES } }, [MON, 'lbc-account:' + AUTRE]));
+    dit(!c5.prouves.has('18'), 'son SECOND compte Leboncoin sans liste complète ⇒ la ligne reste', JSON.stringify([...c5.prouves]));
+    // Cas 6 : la liste complète date d’AVANT la marque « publiée ».
+    const c6 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: MON } }, {}, preuve({ [MON]: { at: AVANT } }, [MON]));
+    dit(!c6.prouves.has('18'), 'liste complète ANTÉRIEURE à la marque « publiée » ⇒ la ligne reste', JSON.stringify([...c6.prouves]));
+    // Cas 7 : une autre annonce EN VENTE porte la clé (même au titre « n18 ») ⇒ l’alerte reste.
+    const c7 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: MON },
+      '900000004': { id: '900000004', subject: 'Salomon XT-6 n18', status: 'active', account: MON, seenAt: APRES } }, {}, ok);
+    dit(!c7.prouves.has('18') && !c7.sorties.has('18'), 'une autre annonce encore EN VENTE porte la paire (ici par son titre) ⇒ l’alerte reste (dans ce sens, une ressemblance garde)', JSON.stringify([...c7.prouves]));
+    // Cas 8 : le compte de l’annonce sortie n’est pas dans la liste fournie : il compte aussi.
+    const c8 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: 'lbc-account:' + AUTRE } }, {}, ok);
+    dit(!c8.prouves.has('18'), 'le compte de l’annonce sortie, sans liste complète, compte aussi ⇒ la ligne reste', JSON.stringify([...c8.prouves]));
+    // Cas 9 : même compte écrit « lbc-account:{id} » d’un côté, nu de l’autre : une identité.
+    const c9 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: 'lbc-account:' + MON } }, {}, preuve({ [MON]: { at: APRES } }, ['lbc-account:' + MON, MON]));
+    dit(c9.prouves.has('18'), '« lbc-account:{id} » et l’identifiant nu sont le MÊME compte', JSON.stringify([...c9.prouves]));
+    // Cas 10 : marque « publiée » sans date (ancienne ligne) ⇒ pas su.
+    const c10 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, account: MON } }, {}, { lectures: { [MON]: { at: APRES } }, comptes: new Set([MON]), depuis: '' });
+    dit(!c10.prouves.has('18'), 'marque « publiée » sans date ⇒ pas su ⇒ la ligne reste', JSON.stringify([...c10.prouves]));
+    // Cas 11 : la « plus vue » levée par une capture plus récente n’est pas une sortie.
+    const c11 = run({ '900000002': { id: '900000002', subject: 'Salomon XT-6', ref: '18', status: 'active', plusVueAt: PV, seenAt: APRES, account: MON } }, {}, ok);
+    dit(!c11.prouves.has('18') && !c11.sorties.has('18'), 'revue active APRÈS la marque ⇒ pas « sortie » : la ligne reste « à retirer »', JSON.stringify([...c11.prouves]));
   });
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) au rouge` : '\n✅ Leboncoin « plus vue » et « mettre en pause » : tout est vert');

@@ -9327,6 +9327,23 @@ function estALui(ad, prouves) { return !!(ad && (ad.ref || ad.customRef || (ad.l
 // que Leboncoin a acceptée depuis VRM, sur SON clic (`pauseAt`, réponse 2xx).
 // Rien n'est effacé : ce sont des états, et une liste complète qui la remontre
 // les retire.
+// ⚠️ (22 oct., revue) LA DONNÉE LA PLUS RÉCENTE GAGNE. Ces marques restaient
+// collées : sa page privée « Mes annonces » qui la remontrait ACTIVE après coup
+// (`seenAt` plus récent) ne les levait pas — l'annonce sortait de « en vente »,
+// l'alerte « à retirer de Leboncoin » tombait et la paire pouvait être reproposée
+// à la publication. « Plus vue » ne compte que si aucune capture ne l'a revue
+// APRÈS ; une pause, que si aucune capture ne l'a revue plus d'une heure après
+// (`LBC_PAUSE_INDEX_MS` : l'index de Leboncoin peut avoir du retard — borne
+// prudente, non mesurée). Douter ⇒ « en vente » : le sens sûr (l'alerte reste,
+// la paire n'est pas reproposée).
+const LBC_PAUSE_INDEX_MS = 3600e3;
+function lbcSortieDe(ad) {
+  if (!ad) return null;
+  const vu = Date.parse(ad.seenAt || '');
+  if (ad.plusVueAt && !(isFinite(vu) && vu > Date.parse(ad.plusVueAt))) return 'plusvue';
+  if (ad.pauseAt && !(isFinite(vu) && vu > Date.parse(ad.pauseAt) + LBC_PAUSE_INDEX_MS)) return 'pause';
+  return null;
+}
 const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu|paus|inacti)/i;
 function annoncesLbcVendues(ventes) {
   const s = new Set();
@@ -9338,7 +9355,7 @@ function annoncesLbcVendues(ventes) {
   return s;
 }
 function annonceLbcEnVente(ad, vendues) {
-  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !ad.plusVueAt && !ad.pauseAt && !(vendues && vendues.has(String(ad.id))));
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !lbcSortieDe(ad) && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
 // Ses annonces Leboncoin : celles qu'on peut lui attribuer, moins celles qu'il
@@ -10049,7 +10066,16 @@ async function storeLbcListingsUneFois(url, listings,owner) {
     for (const l of listings) { if (l && l.id) {
       const ancien=merged[String(l.id)]||{};
       const images=photosAnnonceLbc(l);
-      merged[String(l.id)]=Object.assign({},ancien,l,{images:images.length?images:photosAnnonceLbc(ancien),seenAt:new Date().toISOString()});
+      const n=Object.assign({},ancien,l,{images:images.length?images:photosAnnonceLbc(ancien),seenAt:new Date().toISOString()});
+      // ⚠️ (22 oct., revue) LA CAPTURE LA PLUS RÉCENTE GAGNE : revue maintenant,
+      //    elle n'est plus « plus vue » ; une pause posée d'ici il y a plus d'une
+      //    heure est levée (sa page la remontre). La MÊME borne que la règle
+      //    partagée (`lbcSortieDe`) : une pause de moins d'une heure reste (index
+      //    en retard). Sinon ces marques survivaient à `Object.assign` et
+      //    l'annonce, revue active, restait hors de « en vente ».
+      delete n.plusVueAt;
+      if(n.pauseAt&&!(Date.now()-Date.parse(n.pauseAt)<=LBC_PAUSE_INDEX_MS)){delete n.pauseAt;delete n.pauseStatut;}
+      merged[String(l.id)]=n;
     } }
     // (22 oct.) On garde les autres clés de la ligne — `lectures`, la date de la
     // dernière liste COMPLÈTE de chaque compte — : réécrire `{items,…}` seul les
@@ -10079,8 +10105,12 @@ async function storeLbcListingsUneFois(url, listings,owner) {
 //   l'efface. Lecture ratée ⇒ rien n'est écrit (« rien lu » ne vaut pas « rien »).
 // Une pause acceptée depuis VRM (`pauseAt`) n'est effacée par une liste complète
 // qui la montre encore qu'au-delà d'une heure : l'index de recherche de
-// Leboncoin peut avoir du retard (non mesuré — borne prudente).
-const LBC_PAUSE_INDEX_MS = 3600e3;
+// Leboncoin peut avoir du retard (non mesuré — borne prudente). La borne
+// (`LBC_PAUSE_INDEX_MS`) vit dans la règle partagée `<lbc-en-vente-regle>`.
+// ⚠️ (22 oct., revue) Et l'inverse : une annonce VUE il y a moins d'une heure
+// (sa page « Mes annonces », une autre réponse) n'est pas jugée absente par une
+// liste publique — l'index peut ne pas encore montrer une annonce publiée le
+// matin. Une « plus vue » levée depuis (capture plus récente) est reposée.
 // Le compte d'une annonce s'écrit de deux façons : l'identifiant nu (captures
 // d'avant) ou `lbc-account:{id}` (la source privée, depuis le 22 octobre). Une
 // seule identité : on compare sans le préfixe.
@@ -10104,7 +10134,11 @@ async function noterListeLbcComplete(owner, ids, total) {
           if (n.plusVueAt) { delete n.plusVueAt; change = true; }
           if (n.pauseAt && maintenant - Date.parse(n.pauseAt) > LBC_PAUSE_INDEX_MS) { delete n.pauseAt; delete n.pauseStatut; change = true; }
           if (change) { items[id] = n; reviennent++; }
-        } else if (!ad.plusVueAt) { items[id] = Object.assign({}, ad, { plusVueAt: nowIso }); sortent++; }
+        } else if (lbcSortieDe(ad) !== 'plusvue') {
+          const vu = Date.parse(ad.seenAt || '');
+          if (isFinite(vu) && maintenant - vu < LBC_PAUSE_INDEX_MS) continue;
+          items[id] = Object.assign({}, ad, { plusVueAt: nowIso }); sortent++;
+        }
       }
       const lectures = Object.assign({}, data.lectures || {});
       const avant = lectures[owner];

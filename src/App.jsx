@@ -42670,6 +42670,23 @@ function annonceLbcALui(ad, prouves) {
 // que Leboncoin a acceptée depuis VRM, sur SON clic (`pauseAt`, réponse 2xx).
 // Rien n'est effacé : ce sont des états, et une liste complète qui la remontre
 // les retire.
+// ⚠️ (22 oct., revue) LA DONNÉE LA PLUS RÉCENTE GAGNE. Ces marques restaient
+// collées : sa page privée « Mes annonces » qui la remontrait ACTIVE après coup
+// (`seenAt` plus récent) ne les levait pas — l'annonce sortait de « en vente »,
+// l'alerte « à retirer de Leboncoin » tombait et la paire pouvait être reproposée
+// à la publication. « Plus vue » ne compte que si aucune capture ne l'a revue
+// APRÈS ; une pause, que si aucune capture ne l'a revue plus d'une heure après
+// (`LBC_PAUSE_INDEX_MS` : l'index de Leboncoin peut avoir du retard — borne
+// prudente, non mesurée). Douter ⇒ « en vente » : le sens sûr (l'alerte reste,
+// la paire n'est pas reproposée).
+const LBC_PAUSE_INDEX_MS = 3600e3;
+function lbcSortieDe(ad) {
+  if (!ad) return null;
+  const vu = Date.parse(ad.seenAt || '');
+  if (ad.plusVueAt && !(isFinite(vu) && vu > Date.parse(ad.plusVueAt))) return 'plusvue';
+  if (ad.pauseAt && !(isFinite(vu) && vu > Date.parse(ad.pauseAt) + LBC_PAUSE_INDEX_MS)) return 'pause';
+  return null;
+}
 const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu|paus|inacti)/i;
 function annoncesLbcVendues(ventes) {
   const s = new Set();
@@ -42681,27 +42698,62 @@ function annoncesLbcVendues(ventes) {
   return s;
 }
 function annonceLbcEnVente(ad, vendues) {
-  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !ad.plusVueAt && !ad.pauseAt && !(vendues && vendues.has(String(ad.id))));
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !lbcSortieDe(ad) && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
 // (22 oct.) Les N° (clés) dont l'annonce Leboncoin est SORTIE — plus vue dans une
-// liste COMPLÈTE de son compte (`plusVueAt`) ou mise en pause depuis VRM
-// (`pauseAt`) — et qu'AUCUNE autre annonce captée ne porte encore en vente. Ces
-// marques ne sont posées par l'extension que sur SES comptes. Une paire dont
-// l'annonce est sortie n'est plus « à retirer de Leboncoin » : il n'y a plus
-// rien à retirer. Une règle pour l'écran Leboncoin ET le tableau de bord (§11).
-// Prudente : une autre annonce en vente sous la même clé (même celle d'un
-// inconnu au « nXXX » identique) garde l'alerte.
-function numerosLbcSortis(items, liens, vendues) {
-  const sortis = new Set(), vivants = new Set();
+// liste COMPLÈTE de son compte ou mise en pause depuis VRM (`lbcSortieDe`) — et
+// qu'AUCUNE autre annonce captée ne porte encore en vente. Une règle pour l'écran
+// Leboncoin ET le tableau de bord (§11).
+// ⚠️⚠️ (22 oct., revue) CE CALCUL RETIRE UNE ALERTE DE DOUBLE VENTE : il ne
+// s'autorise que la PREUVE, jamais une ressemblance.
+//   · L'annonce sortie désigne sa paire par IDENTITÉ seulement (`numeroLbcIdentite` :
+//     le lien posé à la main, la référence VRM) — jamais le « nXXX » d'un TITRE
+//     (§5) : l'annonce MORTE d'une autre paire au titre « n18 » effaçait la
+//     ligne « à retirer » de la N°18 vendue sur Vinted.
+//   · Les annonces encore EN VENTE, elles, gardent toutes leurs clés (titre
+//     compris) : dans ce sens-là, une ressemblance GARDE l'alerte (sens sûr).
+//   · `vinted_lbc_posted` ne dit pas QUELLE annonce Leboncoin porte la paire :
+//     l'annonce sortie ne prouve pas qu'aucune autre n'est en ligne (son second
+//     compte, une republication pas encore vue). On ne saute la ligne (`prouves`)
+//     que si une liste COMPLÈTE de CHACUN de ses comptes Leboncoin
+//     (`preuve.lectures[compte]`, tous ceux de `preuve.comptes`, et ceux des
+//     annonces sorties) est POSTÉRIEURE à la marque « publiée »
+//     (`preuve.depuis`, la dernière écriture de `vinted_lbc_posted` : un majorant
+//     de chaque marque). Sinon la ligne reste, et `sorties` dit pourquoi on doute
+//     (« l'annonce reliée n'est plus vue — vérifie qu'aucune autre n'est en
+//     ligne »). Pas su (pas de preuve, date illisible, aucun compte) ⇒ rien
+//     n'est sauté.
+const idCompteLbcApp = (x) => String(x || '').replace(/^lbc-account:/i, '');
+function lbcListesCompletesDepuis(preuve, comptesEnPlus) {
+  if (!preuve) return false;
+  const depuis = Date.parse(preuve.depuis || '');
+  if (!isFinite(depuis)) return false;
+  const comptes = new Set([...(preuve.comptes || []), ...(comptesEnPlus || [])].map(idCompteLbcApp).filter(Boolean));
+  if (!comptes.size) return false;
+  for (const c of comptes) {
+    const l = preuve.lectures && preuve.lectures[c];
+    const t = Date.parse((l && l.at) || '');
+    if (!isFinite(t) || t <= depuis) return false;
+  }
+  return true;
+}
+function numerosLbcSortis(items, liens, vendues, preuve) {
+  const sorties = new Map(), vivants = new Set(), comptesSortis = new Set();
   for (const ad of Object.values(items || {})) {
     if (!ad || ad.id == null) continue;
-    const ks = clesAnnonceLbc(ad, liens);
-    if (annonceLbcEnVente(ad, vendues)) ks.forEach((k) => vivants.add(k));
-    else if (ad.plusVueAt || ad.pauseAt) ks.forEach((k) => sortis.add(k));
+    if (annonceLbcEnVente(ad, vendues)) { clesAnnonceLbc(ad, liens).forEach((k) => vivants.add(k)); continue; }
+    if (vendues && vendues.has(String(ad.id))) continue;
+    const quoi = lbcSortieDe(ad);
+    if (!quoi) continue;
+    const k = numeroLbcIdentite({ itemId: ad.id }, items, liens);
+    if (!k) continue;
+    if (ad.account || ad.lbcUser) comptesSortis.add(String(ad.account || ad.lbcUser));
+    if (!sorties.has(k)) sorties.set(k, { quoi, at: quoi === 'pause' ? ad.pauseAt : ad.plusVueAt, id: String(ad.id) });
   }
-  for (const k of vivants) sortis.delete(k);
-  return sortis;
+  for (const k of vivants) sorties.delete(k);
+  const prouves = new Set(sorties.size && lbcListesCompletesDepuis(preuve, comptesSortis) ? sorties.keys() : []);
+  return { prouves, sorties };
 }
 // Une annonce pas revue depuis plus de 7 jours : on ne sait pas si elle est
 // encore sur Leboncoin. On ne demande pas « quelle paire ? » pour elle (relier
@@ -42716,15 +42768,22 @@ const lbcPasRevue = (ad) => { const j = lbcJoursSansVoir(ad); return j != null &
 // par session au plus pour le centre de notifications. `null` = pas su.
 let _lbcAnnoncesSession = null;
 async function lbcAnnoncesSession() {
-  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession.items;
+  const l = await lbcListingsSession();
+  return l ? l.items : null;
+}
+// La même lecture, avec les dates des listes COMPLÈTES de ses comptes
+// (`lectures`, 22 oct.) : le tableau de bord en a besoin pour la même preuve que
+// l'écran Leboncoin (`numerosLbcSortis`, §11). `null` = pas su.
+async function lbcListingsSession() {
+  if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return _lbcAnnoncesSession;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=data`, { headers: sbAuth() });
     if (!r.ok) return null;
     const rows = await r.json();
     if (!Array.isArray(rows)) return null;
-    const items = (rows[0] && rows[0].data && rows[0].data.items) || {};
-    _lbcAnnoncesSession = { t: Date.now(), items };
-    return items;
+    const d = (rows[0] && rows[0].data) || {};
+    _lbcAnnoncesSession = { t: Date.now(), items: d.items || {}, lectures: d.lectures || {} };
+    return _lbcAnnoncesSession;
   } catch (_) { return null; }
 }
 
@@ -43590,9 +43649,14 @@ function LeboncoinScreen() {
     // COMPLÈTE de son compte, ou mise en pause depuis VRM. Rien n'est effacé ;
     // l'écran le dit, une fois. Et les N° dont l'annonce est sortie : plus rien
     // à retirer pour eux (même règle que le tableau de bord, §11).
-    const sortiesLbc = lbcAds.filter((ad) => aLui(ad) && !vendusLbc.has(String(ad.id)) && (ad.plusVueAt || ad.pauseAt));
+    const sortiesLbc = lbcAds.filter((ad) => aLui(ad) && !vendusLbc.has(String(ad.id)) && lbcSortieDe(ad));
     const lecturesLbc = (lbcRows && lbcRows[0] && lbcRows[0].data && lbcRows[0].data.lectures) || {};
-    const numsSortis = numerosLbcSortis(lbcItems, liens, vendusLbc);
+    // La preuve qu'aucune autre annonce de la paire n'est en ligne : une liste
+    // complète de chacun de ses comptes, postérieure à la marque « publiée ».
+    // Comptes, ventes ou annonces illisibles ⇒ pas de preuve (pas su ≠ sorti).
+    const preuveListes = (accRows === null || ventesLbcKO || lbcRows === null || postedRows === null) ? null
+      : { lectures: lecturesLbc, comptes: prouves, depuis: pd.updatedAt || '' };
+    const { prouves: numsSortis, sorties: numsSortiesDoute } = numerosLbcSortis(lbcItems, liens, vendusLbc, preuveListes);
     const pasRevues = liveAds.filter(lbcPasRevue);
     const refToAd = new Map();
     liveAds.forEach(ad => adKeys(ad).forEach(k => { if (!refToAd.has(k)) refToAd.set(k, ad); }));
@@ -43660,7 +43724,7 @@ function LeboncoinScreen() {
 
     const removals = [];
     const etatDe = (oid) => etatVinted[String(oid)] || (vendus.has(String(oid)) ? 'vendue' : 'inconnue');
-    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid) || aConfirmerIds.has(pid)) continue; const e = numeros[pid] || {}; if (e.numero && numsSortis.has(cleNum(e.numero))) continue; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid) }); }
+    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid) || aConfirmerIds.has(pid)) continue; const e = numeros[pid] || {}; const kN = e.numero ? cleNum(e.numero) : ''; if (kN && numsSortis.has(kN)) continue; const so = kN ? numsSortiesDoute.get(kN) : null; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid), ...(so ? { sortie: so.quoi } : {}) }); }
     // Détection auto : annonce LBC active dont la paire n'est plus en ligne sur
     // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
     // ⚠️ Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
@@ -43736,7 +43800,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => ({ id: String(a.id), plusVueAt: a.plusVueAt || null, pauseAt: a.pauseAt || null, compte: String(a.account || a.lbcUser || '') })), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -43956,9 +44020,10 @@ function LeboncoinScreen() {
           const doute = data.removals.filter(r => r.etat !== 'vendue' && r.etat !== 'pause');
           const pe = pauseEtat();
           const Ligne = (r, i, coul, pausable) => (
-            <div key={i} data-lbc-retirer={r.id || r.numero} style={{ fontSize: 12.5, color: C.text, padding: '3px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
+            <div key={i} data-lbc-retirer={r.id || r.numero} data-lbc-retirer-sortie={r.sortie || undefined} style={{ fontSize: 12.5, color: C.text, padding: '3px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
               <span><b>N°{r.numero}</b> · {r.title || '—'}
-              {r.url ? <> · <a href={r.url} target="_blank" rel="noreferrer" style={{ color: coul, fontWeight: 700 }}>voir sur Leboncoin</a></> : null}</span>
+              {r.url ? <> · <a href={r.url} target="_blank" rel="noreferrer" style={{ color: coul, fontWeight: 700 }}>voir sur Leboncoin</a></> : null}
+              {r.sortie ? <span style={{ color: C.muted }}> · {r.sortie === 'pause' ? "l'annonce reliée est en pause depuis VRM" : "l'annonce reliée n'est plus dans ta liste"}</span> : null}</span>
               {pausable && pe === 'ok' && r.lbc && r.id ? (
                 <button type="button" data-lbc-pause={r.id} disabled={!!pauseEnVol} onClick={() => mettreEnPause(r)}
                   style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
@@ -43968,6 +44033,17 @@ function LeboncoinScreen() {
             </div>
           );
           const pausables = vendues.some((r) => r.lbc && r.id);
+          // (22 oct., revue) Une paire dont l'annonce RELIÉE est sortie, mais sans
+          // la preuve qu'aucune autre annonce de la paire n'est en ligne : la ligne
+          // reste (sens sûr). Le pourquoi et le geste, une fois (§7).
+          const nDoute = data.removals.filter((r) => r.sortie).length;
+          // La phrase vit dans la PREMIÈRE carte qui porte une telle ligne, une fois.
+          const carteDoute = vendues.some((r) => r.sortie) ? 'vendues' : doute.some((r) => r.sortie) ? 'doute' : pause.some((r) => r.sortie) ? 'pause' : null;
+          const phraseDoute = nDoute > 0 ? (
+            <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
+              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, l'annonce Leboncoin reliée n'est plus en ligne, mais je ne peux pas encore te dire qu'<b>aucune autre</b> annonce de la paire ne l'est (ton autre compte, une annonce republiée). Vérifie, ou ouvre ta page profil Leboncoin sur chacun de tes comptes : une fois ta liste relue en entier, la ligne partira d'elle-même.
+            </div>
+          ) : null;
           return (<>
             {vendues.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
@@ -43977,6 +44053,7 @@ function LeboncoinScreen() {
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
+                {carteDoute === 'vendues' ? phraseDoute : null}
               </Card>
             )}
             {doute.length > 0 && (
@@ -43984,6 +44061,7 @@ function LeboncoinScreen() {
                 <Titre>{doute.length} plus en ligne sur Vinted — à vérifier</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Ces annonces ne sont plus sur Vinted, mais <b>je n'ai pas la preuve qu'elles sont vendues</b> : tu as peut-être simplement retiré l'annonce. Ouvre-les et décide — je ne te dis pas de les supprimer.</div>
                 {doute.slice(0, 30).map((r, i) => Ligne(r, i, C.warn))}
+                {carteDoute === 'doute' ? phraseDoute : null}
               </Card>
             )}
             {pause.length > 0 && (
@@ -43991,6 +44069,7 @@ function LeboncoinScreen() {
                 <Titre>{pause.length} en pause sur Vinted</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Tu les as masquées sur Vinted, elles ne sont pas vendues. Elles restent sur Leboncoin : <b>rien à faire</b>.</div>
                 {pause.slice(0, 20).map((r, i) => Ligne(r, i, C.muted))}
+                {carteDoute === 'pause' ? phraseDoute : null}
               </Card>
             )}
           </>);
@@ -49494,9 +49573,10 @@ function AppCoeur() {
       //    PROUVÉES ; le doute, lui, se règle sur l'écran Leboncoin.
       let lbcRemovePids=[];
       let lbcRemoveCount=0;
+      let postedDepuis='';
       try{
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
-        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
       // La MÊME règle que l'écran Leboncoin (`doublesVenteLbc`, §11). Les ventes
@@ -49528,9 +49608,18 @@ function AppCoeur() {
       // ⇒ on garde le compte (pas su ≠ retirée).
       if(lbcRemovePids.length){
         try{
-          const items=lbcItemsLu!==undefined?lbcItemsLu:await lbcAnnoncesSession();
+          const ls=await lbcListingsSession();
+          const items=ls?ls.items:null;
           if(lbcItemsLu===undefined) lbcItemsLu=items||null;
-          if(items){ const sortis=numerosLbcSortis(items, load('vrm_lbc_liens',{})||{}, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null); lbcRemoveCount=lbcRemovePids.filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return !(k && sortis.has(k)); }).length; }
+          if(items){
+            // La preuve, comme l'écran Leboncoin : ses comptes (session vue ou
+            // vente prouvée), la date de chaque liste complète, la marque
+            // « publiée ». Comptes ou ventes illisibles ⇒ pas de preuve.
+            let preuve=null;
+            if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
+            const {prouves:sortis}=numerosLbcSortis(items, load('vrm_lbc_liens',{})||{}, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve);
+            lbcRemoveCount=lbcRemovePids.filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return !(k && sortis.has(k)); }).length;
+          }
         }catch(_){}
       }
       // eBay : ventes PAYÉES pas encore expédiées — le MÊME to-do qu'un colis
