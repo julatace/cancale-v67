@@ -12348,6 +12348,10 @@ en cache la fin. Même plainte le 30 sept. (« Se déconnecter ») et le 2 oct.
 - **Non mesuré** : un vrai iPhone (pas de WebKit d'iOS ici : c'est sa règle,
   lue dans son code, que le banc applique) ; les feuilles qu'aucune donnée de
   banc n'ouvre (Stock, bordereau tamponné, fiche Leboncoin sans extension).
+- ⚠️ **`mobile.cjs` meurt parfois** (« reading 'querySelectorAll' » : l'en-tête
+  lu juste après `main`) : une course DU BANC, mesurée au même taux (environ une
+  page sur trois sous charge) sur bf0a9c8, sur ce correctif et sur ses deux
+  mutations. Le relancer seul ; ce n'est pas l'app.
 
 ---
 
