@@ -7,6 +7,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
+import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -198,16 +199,23 @@ const uidDeLigne = (id) => { const m = String(id || '').match(/^harvest_(.+?)_or
 const ligneDunCompteRetire = (vivants, id) => { const u = uidDeLigne(id); return !!(vivants && u && !vivants.has(u)); };
 async function comptesAExpedierOuRetirer(kind, vivants) {
   try {
-    const sel = 'id,txns:data->resume->txns';
+    // (23 oct.) + l'heure de la capture de chaque ligne : un achat vu « au point
+    // relais » APRÈS la dernière publication de l'app y est compté (règle partagée).
+    const sel = 'id,txns:data->resume->txns,ra:data->resume->>at,cap:data->>capturedAt';
     const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
-    const ligneDe = {};
+    const ligneDe = {}, capDe = {}, capParUid = {};
     for (const row of rows) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
       if (!Array.isArray(row.txns)) continue;
       resumeTrouve = true;
-      for (const t of row.txns) { vus.add(String(t)); if (!ligneDe[String(t)]) ligneDe[String(t)] = row.id; }
+      const cap = Date.parse(row.ra || '') || Date.parse(row.cap || '') || null;
+      // (revue du 23 oct.) L'heure de la capture de CHAQUE compte, même sans achat
+      // au point relais : un achat compté par l'app et absent d'une capture
+      // POSTÉRIEURE n'est plus au point relais.
+      { const u = uidDeLigne(row.id); if (u && Number.isFinite(cap)) capParUid[u] = Math.max(capParUid[u] || 0, cap); }
+      for (const t of row.txns) { vus.add(String(t)); if (!ligneDe[String(t)]) { ligneDe[String(t)] = row.id; capDe[String(t)] = cap; } }
     }
     // Aucune ligne n'a encore de résumé (extension pas rechargée) → on le dit à
     // l'appelant, qui retombera sur la lecture complète. Une seule fois : dès la
@@ -215,7 +223,7 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
     // `ligneDe` : la ligne (le compte) de chaque transaction — pour aller
     // chercher la DATE d'une vente sans bordereau email, et seulement elle.
     if (!resumeTrouve) return null;
-    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); return out;
+    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); Object.defineProperty(out, 'capDe', { value: capDe }); Object.defineProperty(out, 'capParUid', { value: capParUid }); return out;
   } catch (_) { return null; }
 }
 async function harvestOrders(kind, vivants) {
@@ -286,7 +294,121 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // ⚠️ (22 oct.) `vinted_bords_printed` n'est plus lu : un bordereau IMPRIMÉ
 // n'est pas un colis parti (la règle de l'app). `vinted_bords_hidden` l'est : un
 // bordereau qu'il a masqué ne donne pas la date limite (table de l'écran Colis).
-const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois'];
+// ⚠️ (23 oct.) `vrm_colis_retirer` : les colis À RETIRER que l'app PUBLIE (son
+// propriétaire, §11 — l'union e-mail + Vinted). Le widget ne comptait que les
+// achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
+// (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
+// venu d'un e-mail (le Mondial Relay du 21 octobre compris).
+const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+// (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
+// La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
+// ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est
+// exactement « nouveau colis Mondial Relay mais ce n'est pas mis à jour ». On lit
+// donc les colis d'e-mail « au point relais » (scalaires de `meta`, jamais le
+// texte, §4.4) et on ajoute ceux rangés APRÈS la photo, avec la MÊME règle
+// (`etatRetrait`) — ni un colis que l'app a déjà vu, ni un colis qu'il a coché
+// retiré, ni un colis qu'il ENVOIE (`sens`). Lecture ratée ⇒ null (« pas su ») :
+// le nombre de l'app reste, dit « au moins ».
+// ⚠️ (revue du 23 oct.) Les lignes d'e-mail sont lues UNE fois (`lireSuivisEmail`)
+// pour deux usages : les colis arrivés depuis la photo, et ce que sont devenus
+// les colis de la photo (retirés, repartis — `sortisDepuisPhoto`).
+const normSuivi = (v) => String(v || '').toUpperCase().replace(/[\s\u00a0-]+/g, '').trim();
+async function lireSuivisEmail(avecPartis) {
+  const sel = 'id,s:meta->>status,r:meta->>receivedAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier';
+  const [dispo, partis] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${sel}`)),
+    avecPartis ? fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour)&select=${sel}`)) : Promise.resolve([]),
+  ]);
+  return { dispo: Array.isArray(dispo) ? dispo : null, partis: Array.isArray(partis) ? partis.filter((x) => x && (x.s === 'delivered' || x.s === 'retour')) : null };
+}
+async function colisEmailDepuis(pub, retires, today, lu) {
+  const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
+  if (pubAt == null) return 0;
+  const vus = new Set(Array.isArray(pub.vus) ? pub.vus.map(String) : []);
+  const j = lu ? lu.dispo : null;
+  if (!Array.isArray(j)) return null;
+  const partisSuivi = new Set((lu.partis || []).map((x) => normSuivi(x.su)).filter(Boolean));
+  let n = 0;
+  for (const x of j) {
+    if (!x) continue;
+    const recu = Date.parse(x.r || '');
+    if (!Number.isFinite(recu) || recu <= pubAt) continue;          // déjà dans la photo de l'app
+    if (x.se === 'sortant') continue;                                // un colis qu'il envoie
+    const cle = String(x.su || x.sj || '').trim();
+    if (cle && retires.has(cle)) continue;                           // coché « J'ai retiré »
+    if (cle && vus.has(cle)) continue;                               // l'app l'a vu (un rappel réécrit la ligne)
+    if (x.su && partisSuivi.has(normSuivi(x.su))) continue;          // retiré ou reparti (même n° de suivi)
+    const arr = Date.parse(x.a || '') || recu;
+    const e = etatRetrait({ limite: x.l || null, arriveeMs: arr, transporteur: x.c || '' }, Date.now(), today);
+    if (e.etat === 'a_retirer') n++;
+  }
+  return n;
+}
+// (revue du 23 oct.) CE QUE SONT DEVENUS LES COLIS DE LA PHOTO. Rend la fonction
+// `sorti(identité, entrée)` de `retirerPublie` (true · false · null = pas su).
+//   · « e:<n° de suivi> » : coché « J'ai retiré » ⇒ sorti ; une ligne du même
+//     n° « retiré » (delivered), ou « reparti » (retour) écrit depuis son
+//     arrivée ⇒ sorti ; plus AUCUNE ligne « disponible » pour ce n° ⇒ sorti ;
+//     lecture ratée ⇒ pas su.
+//   · « v:<compte>:<transaction> » : coché retiré ⇒ sorti ; la capture de ce
+//     compte POSTÉRIEURE à la photo ne le dit plus au point relais ⇒ sorti ;
+//     résumé illisible ⇒ pas su ; capture pas plus récente ⇒ rien n'a changé.
+function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
+  const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
+  const retiresN = new Set([...retires].map(normSuivi).filter(Boolean));
+  const dispo = lu ? lu.dispo : null, partis = lu ? lu.partis : null;
+  const dispoSuivi = new Set((dispo || []).filter((x) => x && x.se !== 'sortant').map((x) => normSuivi(x.su)).filter(Boolean));
+  return (cle, c) => {
+    if (cle.startsWith('e:')) {
+      const k = normSuivi(cle.slice(2));
+      if (!k) return null;
+      if (retiresN.has(k)) return true;
+      if (!Array.isArray(dispo) || !Array.isArray(partis)) return null;
+      const arr = Number(c && c[1]) || 0;
+      for (const x of partis) {
+        if (normSuivi(x.su) !== k) continue;
+        if (x.s === 'delivered') return true;
+        const d = Date.parse(x.r || '');
+        if (x.s === 'retour' && (!arr || !Number.isFinite(d) || d >= arr)) return true;
+      }
+      return dispoSuivi.has(k) ? false : true;
+    }
+    if (cle.startsWith('v:')) {
+      const [, uid, tx] = cle.split(':');
+      if (!tx) return null;
+      if (pickupDone[tx]) return true;
+      if (!Array.isArray(txBuy)) return null;
+      if (txBuy.map(String).includes(tx)) return false;
+      const cap = ((txBuy.capParUid || {})[uid]);
+      return (pubAt != null && Number.isFinite(cap) && cap > pubAt) ? true : false;
+    }
+    return null;
+  };
+}
+// (23 oct.) ET LES ACHATS VINTED VUS « AU POINT RELAIS » APRÈS LA PUBLICATION.
+// L'extension range ses captures app fermée : un colis Vinted arrivé depuis la
+// dernière ouverture de l'app n'est pas dans la photo. On ajoute ceux de la
+// capture qui SUIT la photo et que l'app n'a pas vus (`vusTx` : les achats
+// qu'elle a vus au point relais, quelle que soit sa décision), avec la même
+// règle (`etatRetrait`, arrivée bornée par l'heure de la capture). Ni un compte
+// masqué, ni un coché « retiré ». Résumé illisible ⇒ null (« pas su »).
+function colisVintedDepuis(pub, txBuy, pickupDone, masques, today) {
+  const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
+  if (pubAt == null) return 0;
+  if (!Array.isArray(txBuy)) return null;
+  const vusTx = new Set(Array.isArray(pub.vusTx) ? pub.vusTx.map(String) : []);
+  let n = 0;
+  for (const t0 of txBuy) {
+    const t = String(t0);
+    if (pickupDone[t] || vusTx.has(t)) continue;
+    const u = uidDeLigne((txBuy.ligneDe || {})[t]);
+    if (u && masques.has(u)) continue;
+    const cap = (txBuy.capDe || {})[t];
+    if (!Number.isFinite(cap) || cap <= pubAt) continue;              // l'app a vu cette capture-là
+    if (etatRetrait({ arriveeMs: cap }, Date.now(), today).etat === 'a_retirer') n++;
+  }
+  return n;
+}
 async function main() {
   try {
     const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
@@ -430,9 +552,23 @@ export default async function handler(req, res) {
     const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !ventesMasquees.has(t);
     const shipTxns = new Set((txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter(pasPartie));
     const shipTotal = shipTxns.size;
-    const pickup = txBuy
+    const pickupVinted = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)]).length
       : purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)]).length;
+    // (23 oct.) LE NOMBRE DE L'APP, RELU AVEC LA RÈGLE PARTAGÉE AU MOMENT DE
+    // L'AFFICHAGE (api/_lib/retrait-colis.js) : une date limite qui passe pendant
+    // que l'app est fermée sort le colis du compte (« à vérifier »). Sans
+    // publication (appareil jamais ouvert depuis), on retombe sur les achats
+    // Vinted seuls — et on le DIT (`pickupSource: 'vinted'`, « au moins »).
+    const retiresMain = new Set(Array.isArray(m.vrm_colis_collected) ? m.vrm_colis_collected.map(String) : []);
+    const pubBrute = m.vrm_colis_retirer;
+    const avecEmail = !!(pubBrute && Array.isArray(pubBrute.colis) && pubBrute.colis.some((c) => Array.isArray(c) && typeof c[3] === 'string' && c[3].startsWith('e:')));
+    const suivisLus = (pubBrute && Array.isArray(pubBrute.colis)) ? await lireSuivisEmail(avecEmail) : null;
+    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus));
+    const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus) : 0;
+    const masques = new Set(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden.map(String) : []);
+    const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today) : 0;
+    const pickup = pubRetirer ? pubRetirer.n + (nouveauxEmail || 0) + (nouveauxVinted || 0) : pickupVinted;
     // ── URGENCE D'EXPÉDITION : LA RÈGLE DE L'APP ET DES RAPPELS (22 octobre) ──
     // ⚠️ Elle sautait un bordereau IMPRIMÉ (« imprimer ne suffit pas », a
     //    décidé l'app) et ne connaissait que les ventes dont le bordereau est
@@ -514,6 +650,18 @@ export default async function handler(req, res) {
         estimeeDepassee: ech.estimeeDepassee,
       },
       pickup,
+      pickupSource: pubRetirer ? 'app' : 'vinted',
+      pickupAuMoins: !pubRetirer || nouveauxEmail === null || nouveauxVinted === null,
+      pickupNouveaux: pubRetirer ? (nouveauxEmail === null || nouveauxVinted === null ? null : nouveauxEmail + nouveauxVinted) : null,
+      pickupAVerifier: pubRetirer ? pubRetirer.aVerifier : null,
+      pickupUrgents: pubRetirer ? pubRetirer.urgents : null,
+      pickupAt: pubRetirer && pubRetirer.at ? new Date(pubRetirer.at).toISOString() : null,
+      // (revue du 23 oct.) Les colis de la photo SORTIS depuis (retirés, repartis,
+      // plus au point relais) : retirés du compte. `pickupPhoto` : certains n'ont
+      // pas pu être relus (lecture ratée, publication d'avant) — leur part du
+      // nombre est la photo de l'app à cette heure-là, pas une relecture.
+      pickupSortis: pubRetirer ? pubRetirer.sortis : null,
+      pickupPhoto: pubRetirer && pubRetirer.nonRelus > 0 && pubRetirer.at ? new Date(pubRetirer.at).toISOString() : null,
       moneyMonth: Math.round(moneyMonth),
       salesMonth,
       moneySource, // 'app' = identique à l'écran de l'app · 'emails' = repli

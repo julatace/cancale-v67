@@ -17,7 +17,10 @@
 //   · « pas su » ≠ « rien » : sans photo, on le dit — jamais « tout est à jour ».
 // Pur (aucun React) : `scripts/audit-journee-hors-ligne.cjs` l'exécute.
 
-export const VERSION_PHOTO = 1;
+// (revue du 23 oct.) Version 2 : « à retirer » et « à vérifier » sont deux
+// listes. La v1 mêlait les colis « hors délai » aux colis à retirer (le compte
+// hors ligne disait plus que la tuile en ligne) : elle est relue convertie.
+export const VERSION_PHOTO = 2;
 export const PREFIXE_PHOTO = 'vrm_hl_photo_';
 export const CACHE_QR = 'vrm-hl-qr';            // le service worker la garde (public/sw.js)
 const MAX_LIGNES = 80;
@@ -63,9 +66,18 @@ const qrPropre = (q) => {
 // Construit la photo à partir de ce que Ma journée affiche. `envoyer` :
 // [{ titre, numero, compte, jours, plateforme }] (jours = jours avant la date
 // limite AU MOMENT de la lecture, ou null) ; `retirer` : [{ titre, lieu, code,
-// qr, compte, transporteur, suivi, horsDelai }] ; `nePasPoster` : nombre de
+// qr, compte, transporteur, suivi, limite }] — EXACTEMENT les colis que la
+// tuile « À retirer » compte en ligne (§11) ; `aVerifier` : [{ …, raison:
+// 'delai_depasse'|'trop_long', limite?, garde? }] — les colis « à vérifier »
+// qui ont encore leur code ou leur QR (peut-être encore au relais), comptés à
+// part (`nAVerifier`), JAMAIS dans « à retirer ». `nePasPoster` : nombre de
 // colis eBay dont l'acheteur a demandé l'annulation.
-export function construirePhoto({ uid, at, envoyer = [], retirer = [], nePasPoster = 0 }) {
+const jourValide = (j) => /^\d{4}-\d{2}-\d{2}$/.test(String(j || '').slice(0, 10)) ? String(j).slice(0, 10) : '';
+const ligneRetrait = (r) => ({
+  titre: txt(r.titre), lieu: txt(r.lieu, 120), code: txt(r.code, 16), qr: qrPropre(r.qr), compte: txt(r.compte, 40),
+  transporteur: txt(r.transporteur, 30), suivi: txt(r.suivi, 40), limite: jourValide(r.limite),
+});
+export function construirePhoto({ uid, at, envoyer = [], retirer = [], aVerifier = [], nAVerifier = null, nePasPoster = 0 }) {
   if (!uidValide(uid) || !Number.isFinite(at)) return null;
   return {
     v: VERSION_PHOTO, uid, at,
@@ -81,11 +93,13 @@ export function construirePhoto({ uid, at, envoyer = [], retirer = [], nePasPost
       ...(e.estimee === true ? { estimee: true } : {}),
     })),
     nEnvoyer: envoyer.length,
-    retirer: retirer.slice(0, MAX_LIGNES).map((r) => ({
-      titre: txt(r.titre), lieu: txt(r.lieu, 120), code: txt(r.code, 16), qr: qrPropre(r.qr), compte: txt(r.compte, 40),
-      transporteur: txt(r.transporteur, 30), suivi: txt(r.suivi, 40), horsDelai: !!r.horsDelai,
-    })),
+    retirer: retirer.slice(0, MAX_LIGNES).map(ligneRetrait),
     nRetirer: retirer.length,
+    aVerifier: aVerifier.slice(0, MAX_LIGNES).map((r) => ({
+      ...ligneRetrait(r), raison: r.raison === 'delai_depasse' ? 'delai_depasse' : r.raison === 'trop_long' ? 'trop_long' : '',
+      garde: Number.isFinite(r.garde) ? r.garde : null,
+    })),
+    nAVerifier: Number.isFinite(nAVerifier) ? nAVerifier : aVerifier.length,
     nePasPoster: Number.isFinite(nePasPoster) ? nePasPoster : 0,
   };
 }
@@ -111,8 +125,18 @@ export function lirePhoto(uid, stockage) {
     const brut = stockage.getItem(clePhoto(uid));
     if (!brut) return null;
     const p = JSON.parse(brut);
-    if (!p || typeof p !== 'object' || p.v !== VERSION_PHOTO || p.uid !== uid || !Number.isFinite(p.at)) return null;
+    if (!p || typeof p !== 'object' || p.uid !== uid || !Number.isFinite(p.at)) return null;
     if (!Array.isArray(p.envoyer) || !Array.isArray(p.retirer)) return null;
+    if (p.v === 1) {
+      // (revue du 23 oct.) Une photo v1 mêlait les « hors délai » aux colis à
+      // retirer : on les sort (raison pas sue), le compte « à retirer » suit.
+      const hd = p.retirer.filter((r) => r && r.horsDelai);
+      const reste = p.retirer.filter((r) => !(r && r.horsDelai));
+      return { ...p, v: VERSION_PHOTO, retirer: reste, nRetirer: Math.max(reste.length, (Number(p.nRetirer) || 0) - hd.length),
+        aVerifier: hd.map((r) => ({ ...r, raison: '', garde: null })), nAVerifier: hd.length };
+    }
+    if (p.v !== VERSION_PHOTO) return null;
+    if (!Array.isArray(p.aVerifier)) return null;
     return p;
   } catch (_) { return null; }
 }

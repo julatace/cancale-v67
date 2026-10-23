@@ -36,7 +36,10 @@ function poserFetch({ comptes, resume = true }) {
     const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
     if ((opts.method || 'GET') !== 'GET') return new Response('', { status: 201 });
     if (/select=owner&limit=1/.test(u)) return J({ message: 'column app_data.owner does not exist' }, 400); // base non cloisonnée
-    if (/vinted_accounts/.test(u)) {
+    // La TABLE des comptes, pas une clé de `main` qui contient son nom
+    // (`vinted_accounts_hidden`, lue par le widget depuis le 23 oct.) : la
+    // vraie PostgREST ne confond pas les deux (§6.3).
+    if (/\/vinted_accounts\?/.test(u)) {
       if (comptes === 'panne') return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
       return J(comptes.map((id) => ({ vinted_user_id: id })));
     }

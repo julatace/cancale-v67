@@ -200,12 +200,15 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       // Revue du 11 octobre : UNE ligne compacte, APRÈS les colis jamais retirés.
       const pos = await pg.evaluate(() => {
         const c = document.querySelector('[data-muets-compact]');
-        const o = [...document.querySelectorAll('div')].find((d) => /^\d+ colis jamais retirés$/.test((d.textContent || '').trim()));
+        // Le bloc des colis qui ne comptent plus « à retirer » : trouvé par son
+        // attribut (23 oct. : « colis à vérifier — sans doute repartis »), par son
+        // ancien titre sur un build d'avant — la règle, pas l'orthographe (§6.5).
+        const o = document.querySelector('[data-a-verifier], [data-oublies]') || [...document.querySelectorAll('div')].find((d) => /^\d+ colis jamais retirés$/.test((d.textContent || '').trim()));
         const rc = c && c.getBoundingClientRect(), ro = o && o.getBoundingClientRect();
         return { c: !!c, h: rc ? Math.round(rc.height) : null, yc: rc ? rc.top + scrollY : null, o: !!o, yo: ro ? ro.top + scrollY : null };
       });
       dit(pos.c && pos.h != null && pos.h <= 60, `${T} Achats : les comptes muets tiennent en UNE ligne repliée (≤ 60 px)`, JSON.stringify(pos));
-      dit(pos.o && pos.c && pos.yc > pos.yo, `${T} Achats : elle passe APRÈS les colis jamais retirés (de l’argent perdu d’abord)`, JSON.stringify(pos));
+      dit(pos.o && pos.c && pos.yc > pos.yo, `${T} Achats : elle passe APRÈS les colis jamais retirés / à vérifier (de l’argent perdu d’abord)`, JSON.stringify(pos));
       const compact = pg.locator('[data-muets-compact] > summary').first();
       const resumeCompact = (await compact.innerText().catch(() => '')).replace(/\s+/g, ' ');
       if (await compact.count()) { await compact.click().catch(() => {}); await pg.waitForTimeout(400); }

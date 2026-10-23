@@ -33,9 +33,11 @@
 //      NEUF la retrouve ;
 //   G. disposition abîmée : widget inconnu, doublon, taille fausse ignorés,
 //      « À faire » (fixe) remis ;
-//   H. une alerte qui ne vivait que dans une CASE (colis en retard, colis hors
-//      délai à retirer) remonte en tête dès qu'aucune case ne la montre — et
-//      jamais en double tant qu'une case la montre ;
+//   H. une alerte qui ne vivait que dans une CASE (colis en retard, colis à
+//      retirer au dernier jour) remonte en tête dès qu'aucune case ne la montre
+//      — et jamais en double tant qu'une case la montre ; un colis au délai de
+//      retrait DÉPASSÉ n'est plus « à retirer » : « à vérifier », jamais compté
+//      (23 oct., colis à retirer fiables) ;
 //   I. « réduire les animations » : aucun tremblement ;
 //   J. base injoignable : pas de « Modifier », pas de case vide de la grille ;
 //   A2. (revue du 22 oct.) une alerte qui coûte (deux paires sous un N°) : au-
@@ -110,9 +112,14 @@ for (const a of accounts) {
   rows.push({ id: `harvest_${uid}_listings`, data: { capturedAt: iso(new Date(maintenant.getTime() - 60000)), payload: { items: uid === '111' ? [annonce(8101, 50), annonce(8102, 65)] : [annonce(8201, 40)] } } });
 }
 for (const v of VENTES) if (v[5]) rows.push({ id: `harvest_${v[0]}_txn_${v[1]}`, data: { capturedAt: iso(maintenant), payload: { transaction: { id: Number(v[1]), item_id: Number(v[1]) + 500000, status: 450, status_title: 'Commande finalisée', status_updated_at: iso(v[5]) } } } });
-// Un colis à retirer HORS DÉLAI (la date limite était avant-hier) : dans Ma
-// journée d'avant, il n'est dit QUE par la couleur de la case « À retirer ».
-rows.push({ id: 'email_track_mondial_relay_MR777000222', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '4321', lieu: 'Tabac Inventé, Rennes', carrier: 'mondial_relay', suivi: 'MR777000222', artTitle: '', receivedAt: iso(ilYaJ(6)), limite: jourLocal(-2) } });
+// Un colis à retirer AU DERNIER JOUR (la date limite est aujourd'hui) : dans Ma
+// journée d'avant, il n'est dit QUE par la case « À retirer ». (23 oct.) Ce
+// banc servait un colis au délai DÉPASSÉ : il compte désormais « à vérifier »
+// (sans doute reparti), plus « à retirer » — la règle a changé exprès, et la
+// référence (le build d'avant) le comptait encore. Le dernier jour, lui, est
+// compté par les deux : la comparaison reste juste ; le délai dépassé est jugé
+// à part, section H.
+rows.push({ id: 'email_track_mondial_relay_MR777000222', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '4321', lieu: 'Tabac Inventé, Rennes', carrier: 'mondial_relay', suivi: 'MR777000222', artTitle: '', receivedAt: iso(ilYaJ(3)), limite: jourLocal(0) } });
 rows.push({ id: 'lbc_ventes', data: { ventes: {} } });
 rows.push({ id: 'ebay_orders', data: { orders: [] } });
 
@@ -557,14 +564,23 @@ if (require.main === module) (async () => {
         // (`api/_lib/limite-envoi.js`) et c'est « colis-limite » qui dit en tête
         // un colis dépassé — ici sans bordereau reçu par email : date ESTIMÉE
         // dépassée, « vérifie sur Vinted », jamais « en retard ».
-        dit(/colis-(en-retard|limite)/.test(l.alertesJobs) && /retrait-hors-delai/.test(l.alertesJobs) && l.alertesHorsGrille, 'sans aucune case : colis dépassé ET hors délai dits en tête, hors grille', l.alertesJobs || '(aucune)');
+        dit(/colis-(en-retard|limite)/.test(l.alertesJobs) && /retrait-dernier-jour/.test(l.alertesJobs) && l.alertesHorsGrille, 'sans aucune case : colis dépassé ET dernier jour de retrait dits en tête, hors grille', l.alertesJobs || '(aucune)');
         dit(l.retirerSurAlertes === 0, 'ces alertes n’ont pas de « − »');
         if (SHOTS) await s.pg.screenshot({ path: path.join(SHOTS, `widgets-${tag}-sans-cases.png`) });
         await s.ctx.close();
-        // La petite case « À envoyer » est là, pas « À retirer » : seul le hors délai remonte.
+        // La petite case « À envoyer » est là, pas « À retirer » : seul le dernier jour de retrait remonte.
         s = await page(b, T, PORT, { etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'afaire', t: 'grand' }, { id: 'envoyer', t: 'petit' }] } } } });
         l = await lire(s.pg);
-        dit(!/colis-en-retard/.test(l.jobs) && /retrait-hors-delai/.test(l.alertesJobs), 'case « À envoyer » présente : le retard n’est pas dit deux fois ; le hors délai, lui, remonte', `${l.alertesJobs} | ${l.jobs}`);
+        dit(!/colis-en-retard/.test(l.jobs) && /retrait-dernier-jour/.test(l.alertesJobs), 'case « À envoyer » présente : le retard n’est pas dit deux fois ; le dernier jour de retrait, lui, remonte', `${l.alertesJobs} | ${l.jobs}`);
+        await s.ctx.close();
+        // (23 oct.) Un colis au délai de retrait DÉPASSÉ (date limite écrite
+        // avant-hier) : « à vérifier », dit dans « À faire » quelle que soit la
+        // disposition, et JAMAIS compté dans « À retirer » (la case dit 1 : le
+        // seul colis du dernier jour), jamais une alerte « à retirer ».
+        s = await page(b, T, PORT, { lignes: [{ id: 'email_track_mondial_relay_MR777000333', data: { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '5432', lieu: 'Tabac Inventé, Rennes', carrier: 'mondial_relay', suivi: 'MR777000333', artTitle: '', receivedAt: iso(ilYaJ(6)), limite: jourLocal(-2) } }] });
+        l = await lire(s.pg);
+        const nRet = (/retirer=([^,]*)/.exec(l.tuiles) || [])[1];
+        dit(/retrait-a-verifier=1/.test(l.jobs) && nRet === '1' && !/retrait-dernier-jour/.test(l.alertesJobs), 'délai de retrait dépassé : « à vérifier » dans À faire, pas compté dans « À retirer »', `${l.tuiles} | ${l.jobs} | ${l.alertesJobs}`);
         await s.ctx.close();
         // Un VRAI retard (date limite LUE dans l'email du bordereau, avant-hier
         // 10 h), aucune case : il est dit UNE fois en tête — « colis-limite »

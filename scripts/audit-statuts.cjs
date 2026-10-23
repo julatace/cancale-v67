@@ -229,7 +229,10 @@ essaie('(h) dédoublonnage des colis à retirer', () => {
   const corps = i >= 0 ? src.slice(i, src.indexOf('\n  }, [', i)) : '';
   const code = corps.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
   const iExtra = code.indexOf('const extra');
-  const avantExtra = iExtra >= 0 ? code.slice(Math.max(0, iExtra - 600), code.indexOf('\n', iExtra)) : '';
+  // (23 oct.) `extra` se construit dans une boucle (les colis vus par Vinted
+  // passent aussi par « reparti / à vérifier ») : on lit autour de sa
+  // déclaration, AVANT et APRÈS — la règle (le CODE, jamais le titre), pas la forme.
+  const avantExtra = iExtra >= 0 ? code.slice(Math.max(0, iExtra - 600), iExtra + 1400) : '';
   dit(iExtra >= 0 && !/normTitle\(/.test(avantExtra), 'les colis à retirer ne sont jamais fusionnés sur une ressemblance de TITRE', avantExtra ? '' : 'pickupUnion introuvable');
   dit(/codeRetrait|normCode/.test(avantExtra) && /colisRelais/.test(avantExtra), '… mais sur le CODE de retrait lu des deux côtés (email et conversation Vinted)');
 });
