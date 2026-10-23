@@ -12541,6 +12541,99 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   ⚠️ Le drapeau `DEMANDE_SAISIE_PRIX` vit au niveau **module** : au moment du
   clic l'écran Annonces n'est pas monté, un `dispatchEvent` serait perdu.
 
+### Les feuilles sous la barre du bas, sur iPhone : la vraie cause (23 octobre)
+Julien, sur iPhone : la feuille « Reçu d'achat » passe SOUS la barre du bas, qui
+en cache la fin. Même plainte le 30 sept. (« Se déconnecter ») et le 2 oct.
+(« CSV / PDF introuvables »), traitée feuille par feuille par des portails.
+- **Mesuré** (code de WebKit, `StyleAdjuster.cpp`) : sur iPhone seulement
+  (`ENABLE_WEBKIT_OVERFLOW_SCROLLING_CSS_PROPERTY`), un élément qui défile et
+  porte `-webkit-overflow-scrolling: touch` reçoit un z-index 0 — un contexte
+  d'empilement. `<main className="vrm-main">` le portait depuis la coque
+  (28 sept.) : **toute** feuille rendue dans l'écran était peinte dans la couche
+  de `<main>`, sous la barre du bas (z-index 60) et l'en-tête, quel que soit son
+  z-index. Chromium ignore la propriété : aucun banc ne pouvait le voir.
+  Le zoom 0,8 n'y est pour rien (il est d'ailleurs ramené à 1 par
+  `styles-iphone.css`).
+- **Corrigé à la racine** : la propriété est retirée de `<main>` (depuis iOS 13
+  le défilement à inertie est natif, elle ne servait plus qu'à piéger). Les ~40
+  feuilles rendues dans l'écran sortent toutes d'un coup, le bloc du reçu n'est
+  pas touché. ⚠️ **Ne jamais remettre `-webkit-overflow-scrolling: touch` sur un
+  conteneur qui peut contenir une feuille** (les quelques autres qui la portent
+  — rangées défilantes, corps de feuilles — n'en contiennent aucune).
+- **Et un défaut de tous les navigateurs** : « 📦 Paires du lot » (z-index 80)
+  s'ouvrait depuis le tiroir d'une vente (`vrm-ledger-drawer-host`, z-index 150,
+  dans `document.body`)… dessous. Passée à 1300.
+- **Preuve** : banc `feuilles-coque.cjs` (ports 9211-9220, fixtures + reçus
+  inventés) — en 390 tactile il APPLIQUE la règle de WebKit (style en ligne posé
+  par React et règles de la feuille livrée), en 1512 rien. 15 feuilles ouvertes
+  comme Julien (reçu, note, outils d'Annonces, passeport, rapport comptable,
+  registre, paires du lot, « Tout imprimer », nouvelle facture, « Supprimer ce
+  compte »…) : rien par-dessus (coins et bas du panneau, haut du voile), bas du
+  contenu touchable, boutons à 44 px. **26 rouges sur le build de bf0a9c8**
+  (24 iPhone, 2 ordinateur — le lot), 0 après ; mutation « propriété remise sur
+  `<main>` » ⇒ 24 rouges, « lot à 80 » ⇒ 4.
+- **Non mesuré** : un vrai iPhone (pas de WebKit d'iOS ici : c'est sa règle,
+  lue dans son code, que le banc applique) ; les feuilles qu'aucune donnée de
+  banc n'ouvre (Stock, bordereau tamponné, fiche Leboncoin sans extension).
+- ⚠️ **`mobile.cjs` meurt parfois** (« reading 'querySelectorAll' » : l'en-tête
+  lu juste après `main`) : une course DU BANC, mesurée au même taux (environ une
+  page sur trois sous charge) sur bf0a9c8, sur ce correctif et sur ses deux
+  mutations. Le relancer seul ; ce n'est pas l'app.
+
+#### Revue du même jour — huit défauts reproduits au banc, corrigés
+Chacun ROUGE sur le build de 8a573a4 (le banc final copié dans l'arbre et lancé
+depuis lui, §6.1), vert après, rouge sous une mutation.
+- ⚠️ **L'ordre des couches est écrit une fois**, en tête de `SheetShell` : les
+  écrans et leurs feuilles (≤ 1300), le tiroir d'une vente (150), le lot
+  « Bordereaux à imprimer » (9000), « Mon compte » (10000), **une confirmation
+  `Z_CONFIRMATION` = 20000**, **les messages `Z_MESSAGES` = 30000**, le bloc
+  « Recharger » (100000). Une nouvelle couche se range dans cette liste.
+- **D1 + D8 — la confirmation s'ouvrait SOUS le lot** (« C'est la bonne paire,
+  imprimer », « Oui, c'est écrit » : `askConfirm` → `SheetShell` à 2000, le lot
+  à 9000) : on ne pouvait ni confirmer ni annuler. `ConfirmHost` (et la saisie)
+  passe par un portail dans `document.body`, à `Z_CONFIRMATION`.
+- **D7 — les messages passaient sous les feuilles** (« Échec de la suppression »
+  sous « Supprimer ce compte », « Ces bordereaux n'ont plus leur PDF » sous le
+  lot) : le `Toaster` monte à `Z_MESSAGES`, et sur téléphone il se pose **en
+  haut** quand une feuille est ouverte (le registre `_feuillesOuvertes` de
+  `FermeAuRetour` le prévient : `abonnerFeuilles`, `uneFeuilleOuverte`) — en bas
+  il cachait les boutons de la feuille. Sur ordinateur il reste en bas à droite.
+- **D2 — les feuilles de l'en-tête** (« Tous les écrans » en variante haute,
+  le panneau « État des actions ») vivaient dans l'en-tête sticky (z 50), donc
+  sous la barre du bas (z 60) en paysage et sur iPad : bas de la feuille caché,
+  barre du bas touchable derrière le voile. Portail dans `document.body` ; le
+  panneau est borné à l'écran (`100dvh` moins en-tête et zones sûres, défile).
+  ⚠️ Le panneau n'a été pris en défaut qu'en **568 × 320** (petit téléphone en
+  paysage) : en 844 × 390 il fait 212 à 224 px et tient au-dessus de la barre,
+  avec ou sans extension (mesuré, bf0a9c8 comme 8a573a4).
+- **D3 — le bas de 8 feuilles tombait dans la zone de la barre d'accueil**
+  (34 px sur iPhone en PWA) : reçu, Répartir un lot, Rapport comptable,
+  Registre, Audit, Passeport, « Supprimer ce compte », Paires du lot. Leur
+  panneau porte `env(safe-area-inset-bottom)` en bas, comme `SheetShell`.
+- **D4 — « Paires du lot » au-dessus du tiroir ne prenait pas le clavier** :
+  Échap fermait le tiroir CACHÉ, le lot restait. Le panneau est un `dialog`
+  (focus à l'ouverture), Échap le ferme sans aller plus loin, et le focus revient
+  à « Voir les paires du lot », retenu AU CLIC (Safari ne donne pas le focus à
+  un bouton cliqué). ⚠️ Ce bouton vit dans le repli « Modifier » de la vente :
+  replié, il n'est pas focalisable (le premier jet du banc le cliquait par
+  script, repli fermé, et concluait à tort que le focus ne revenait pas).
+- **D5 — les reçus du banc n'avaient pas la forme réelle** (`prix` « 40,00 € »
+  et aucun `texte` : l'écran affichait « 40,00 € € », jamais le détail).
+  Mesuré (formes seules, sans valeur) : `prix` sans « € », pas de `montant`,
+  un `texte` « *Vendeur* … · Article … · Frais de port … · Protection
+  acheteurs … · *Montant payé* … ». Le banc sert cette forme et l'exige au rendu.
+- **D6 — l'Inventaire physique et le Studio photo** n'avaient pas de
+  `FermeAuRetour` : « retour » quittait la section. Posé (la caméra du Studio se
+  coupe au démontage).
+- **Preuves** (`feuilles-coque.cjs`, 183 contrôles — parties `confirmation`,
+  `messages`, `entete` dont 568 × 320 et une extension simulée qui répond,
+  `clavier`, et la zone sûre de 34 px posée par CDP) : **32 rouges sur
+  8a573a4**, 54 sur bf0a9c8, 0 après. Mutations, chacune rouge sur SA partie :
+  confirmation remise à z 2000 ⇒ 4 · messages à 210 ⇒ 4 · feuilles de l'en-tête sans portail ⇒ 5 · reçu sans zone sûre ⇒ 1 · lot sans gestion du clavier ⇒ 3 · Inventaire sans `FermeAuRetour` ⇒ 4 · reçus du banc à l'ancienne forme ⇒ 2.
+- **Non mesuré** : un vrai iPhone (zone sûre posée par le banc, règle de WebKit
+  appliquée par lui) ; le toast en haut sous l'encoche d'un vrai téléphone ;
+  les feuilles qu'aucune donnée de banc n'ouvre.
+
 ---
 
 ### Le zip de l'extension — le défaut le plus coûteux du projet

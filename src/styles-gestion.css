@@ -298,7 +298,8 @@
 .vrm-toast>span:last-child{color:var(--message-ink)!important;min-width:0;overflow-wrap:anywhere;}
 .vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
 .vrm-toast:focus-visible{outline:2px solid var(--message-ink);outline-offset:3px;}
-@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;padding:0!important;}}
+/* Ordinateur : en bas à droite, même feuille ouverte (elle est centrée et ne va pas jusque-là). */
+@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;top:auto!important;padding:0!important;}}
 @media(prefers-reduced-motion:reduce){.vrm-toast{animation:none!important;}}
 .vrm-main .vrm-set-panneau :is(p,small){line-height:1.6;}
 .vrm-main :is(.vrm-reception,.vrm-recus-email){

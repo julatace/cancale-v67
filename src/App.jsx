@@ -1705,6 +1705,13 @@ function sheetTexte(q, defaut) {
 // Une feuille qui refuse de se fermer (envoi en cours) retrouve son entrée.
 const _feuillesOuvertes = [];
 let _idFeuille = 0;
+// Qui veut savoir qu'une feuille est ouverte (23 oct.) : les messages (Toaster)
+// passent EN HAUT de l'écran tant qu'une feuille l'est — en bas, ils couvraient
+// les boutons du pied de la feuille (« Annuler / Supprimer »).
+const _feuillesSubs = new Set();
+const _notifierFeuilles = () => { _feuillesSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
+const abonnerFeuilles = (fn) => { _feuillesSubs.add(fn); return () => _feuillesSubs.delete(fn); };
+const uneFeuilleOuverte = () => _feuillesOuvertes.length > 0;
 const _histoOnglet = { tab: null, sub: null };
 function _installerRetourFeuilles() {
   if (typeof window === 'undefined' || window.__vrmFeuillesPop) return;
@@ -1729,10 +1736,11 @@ function FermeAuRetour({ fermer }) {
   React.useEffect(() => {
     _installerRetourFeuilles();
     const f = { id: 'f' + (++_idFeuille) + '_' + Date.now().toString(36), fermer: ref, monte: true, consommee: false };
-    _feuillesOuvertes.push(f); _poserFeuille(f);
+    _feuillesOuvertes.push(f); _poserFeuille(f); _notifierFeuilles();
     return () => {
       f.monte = false;
       const j = _feuillesOuvertes.indexOf(f); if (j >= 0) _feuillesOuvertes.splice(j, 1);
+      _notifierFeuilles();
       if (f.consommee) return;
       setTimeout(() => {
         try {
@@ -1750,10 +1758,25 @@ function FermeAuRetour({ fermer }) {
   return null;
 }
 
+// ── L'ORDRE DES COUCHES QUI PASSENT AU-DESSUS DE TOUT (23 oct.) ─────────────
+// Une confirmation (askConfirm / askText) est posée PAR une feuille ouverte —
+// « Tout imprimer » (z 9000) demande « As-tu écrit le N° sur le carton ? »,
+// la garde du §5 contre le seul défaut irréversible. Elle était à 2000, sur la
+// coque : SOUS cette feuille (sur ordinateur et Android depuis toujours, sur
+// iPhone depuis que <main> n'enferme plus ses feuilles, voir la coque), la
+// question était grisée sous le voile et le toucher fermait la liste. Une
+// confirmation passe donc au-dessus de TOUTE feuille (la plus haute est le
+// panneau « Mon compte », 10000), et les messages (toasts) encore au-dessus :
+// un « Échec de la suppression — réessaie » dit depuis une feuille doit se lire.
+// Seul le bloc « Recharger » des numéros périmés (100000) reste plus haut : il
+// couvre l'écran exprès. Banc `feuilles-coque.cjs`.
+const Z_CONFIRMATION = 20000;
+const Z_MESSAGES = 30000;
+
 // Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
-function SheetShell({ onClose, children, maxWidth = 460 }) {
+function SheetShell({ onClose, children, maxWidth = 460, z = 2000 }) {
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:z,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
         <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
@@ -1876,7 +1899,7 @@ function AskTextSheet({ q, close }) {
   React.useEffect(() => { const t = setTimeout(() => { try { ref.current.focus(); ref.current.select(); } catch (_) {} }, 60); return () => clearTimeout(t); }, []);
   const { titre, corps } = sheetTexte(q, 'Saisir');
   return (
-    <SheetShell onClose={() => close(null)}>
+    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -1906,12 +1929,13 @@ function ConfirmHost() {
   React.useEffect(() => onAsk(setQ), []);
   if (!q) return null;
   const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
-  if (q.kind === 'text') return <AskTextSheet q={q} close={close}/>;
+  // Dans document.body, posée en dernier, au-dessus de toute feuille (Z_CONFIRMATION).
+  if (q.kind === 'text') return createPortal(<AskTextSheet q={q} close={close}/>, document.body);
   // Le premier paragraphe du message sert de titre : les anciens messages
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
-  return (
-    <SheetShell onClose={() => close(false)}>
+  return createPortal(
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
       <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -1926,7 +1950,7 @@ function ConfirmHost() {
           {q.ok || 'Confirmer'}
         </button>
       </div>
-    </SheetShell>
+    </SheetShell>, document.body
   );
 }
 
@@ -11681,9 +11705,15 @@ function DefilementPartout() {
 function Toaster() {
   const [list, setList] = React.useState([]);
   React.useEffect(() => onToasts(setList), []);
+  // (23 oct.) AU-DESSUS de toute feuille, et EN HAUT de l'écran quand une feuille
+  // est ouverte. À 210 sous la coque, un message dit depuis une feuille (« Échec
+  // de la suppression — réessaie », « Ces bordereaux n'ont plus leur PDF… »)
+  // passait SOUS elle : rien n'était dit. Et en bas il couvrirait le pied de la
+  // feuille (« Annuler / Supprimer »). Banc `feuilles-coque.cjs`.
+  const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
   if (!list.length) return null;
   return (
-    <div className="vrm-toasts" role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,bottom:'calc(92px + env(safe-area-inset-bottom))',zIndex:210,
+    <div className="vrm-toasts" data-toasts-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'calc(92px + env(safe-area-inset-bottom))'}),zIndex:Z_MESSAGES,
       display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}>
       {list.map(t => {
         const col = t.type==='err' ? C.danger : t.type==='ok' ? INV_STATUS.online.color : C.text;
@@ -11828,6 +11858,9 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
   // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
   // L'écran courant porte la teinte d'accent et une coche — plus d'aplat bleu.
   // Le dessin vit dans `.vrm-sheet` (styles-coque.css).
+  // L'en-tête pose sa feuille dans document.body (voir plus bas) ; celle de la
+  // barre du bas reste où elle est.
+  const poserFeuille = bottom ? (x) => x : (x) => createPortal(x, document.body);
   const rangee = (t, on, onClick) => (
     <button key={t.id} type="button" role="menuitem" className="vrm-sheet-row" onClick={onClick} aria-current={on?'page':undefined}>
       <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
@@ -11841,7 +11874,12 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
       <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}>
         <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex'}}><Icon name={open&&!bottom?'close':'menu'} size={bottom?24:22} style={{strokeWidth:1.6}}/></span>{bottom && <span className="vrm-nav-label">Gestion</span>}
       </button>
-      {open && (
+      {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
+          l'en-tête (sticky, z-index 50 — un contexte d'empilement), elle restait
+          SOUS la barre du bas (z-index 60) en paysage et sur iPad — ses dernières
+          entrées cachées, la barre non assombrie et touchable. Celle de la barre
+          du bas vit déjà au bon étage. Banc `feuilles-coque.cjs`. */}
+      {open && poserFeuille(
         <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
           {/* Depuis la barre du bas, la feuille MONTE du bas ; depuis l'en-tête,
               elle descend du haut : le geste et le mouvement vont dans le même sens. */}
@@ -13859,9 +13897,10 @@ function EtatActions({ onNav, ordi, sombre }) {
     lireDerniereCaptureExt().then((d) => { if (!stop) setDerniere(d); });
     return () => { stop = true; }; }, [ouvert]);
   const boite = React.useRef(null);
+  const panneauEtat = React.useRef(null);   // sur téléphone, le panneau vit dans document.body
   React.useEffect(() => {
     if (!ouvert) return undefined;
-    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target)) setOuvert(false); };
+    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target) && !(panneauEtat.current && panneauEtat.current.contains(ev.target))) setOuvert(false); };
     const echap = (ev) => { if (ev.key === 'Escape') setOuvert(false); };
     document.addEventListener('mousedown', dehors); document.addEventListener('touchstart', dehors); document.addEventListener('keydown', echap);
     return () => { document.removeEventListener('mousedown', dehors); document.removeEventListener('touchstart', dehors); document.removeEventListener('keydown', echap); };
@@ -13971,6 +14010,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
+  const poserPanneau = ordi ? (x) => x : (x) => createPortal(x, document.body);
   const Ligne = ({ nom, l }) => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
       <span style={{ width: 14, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
@@ -13989,9 +14029,14 @@ function EtatActions({ onNav, ordi, sombre }) {
         <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
         {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
       </button>
-      {ouvert && (
-        <div data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
-          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 64,
+      {/* (23 oct.) Sur téléphone le panneau part dans document.body : posé dans
+          l'en-tête (sticky, z-index 50), il restait SOUS la barre du bas (60) en
+          paysage et sur iPad. Il tient dans l'écran et défile. Sur ordinateur il
+          reste accroché à l'île (pas de barre du bas). */}
+      {ouvert && poserPanneau(
+        <div ref={panneauEtat} data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
+          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
+            ...(ordi ? {} : { maxHeight: 'calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', overscrollBehavior: 'contain' }),
             width: ordi ? 360 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
             borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
@@ -25923,7 +25968,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         return (
         <div onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
           <FermeAuRetour fermer={()=>!delBusy&&setDelCible(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
               <span style={{flexShrink:0,width:34,height:34,borderRadius:8,background:`${C.danger}14`,color:C.danger,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={17}/></span>
               <div style={{flex:1,minWidth:0}}>
@@ -30271,6 +30316,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const nonRecusAchat = Array.isArray(achEmails) && Array.isArray(recusAchat) ? achEmails.length - recusAchat.length : 0;
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
+  // (23 oct.) « Paires du lot » s'ouvre PAR-DESSUS le tiroir d'une vente : elle
+  // prend le clavier à l'ouverture (Échap ferme la feuille qu'on voit, pas le
+  // tiroir caché sous son voile) et le rend au bouton qui l'a ouverte.
+  const lotPanneauRef = React.useRef(null);
+  const lotOrigineRef = React.useRef(null);   // le bouton « Voir les paires du lot » (posé à son clic : Safari ne donne pas le focus à un bouton cliqué)
+  const lotOuvert = !!lotView;
+  React.useEffect(() => {
+    if (!lotOuvert) return undefined;
+    if (!lotOrigineRef.current) lotOrigineRef.current = document.activeElement;
+    try { if (lotPanneauRef.current) lotPanneauRef.current.focus({ preventScroll: true }); } catch (_) {}
+    return () => {
+      const o = lotOrigineRef.current; lotOrigineRef.current = null;
+      try { if (o && o.isConnected && typeof o.focus === 'function') o.focus({ preventScroll: true }); } catch (_) {}
+    };
+  }, [lotOuvert]);
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
   const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
@@ -37937,7 +37997,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
                 {isLotTitle(o.title) && (
-                  <button className="vrm-icon-control" type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
                 )}
                 {hidden ? (
                   <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
@@ -41576,7 +41636,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {showAnnual && (
         <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowAnnual(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📚 Registre comptable {annual.year}</div>
@@ -41786,10 +41846,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {/* Reçu d'achat DANS l'app (pas de nouvel onglet à fermer) */}
       {/* Détail d'un LOT : les paires vendues ensemble, avec leur N° si connu. */}
+      {/* zIndex 1300 (et plus 80) : elle s'ouvre depuis le tiroir d'une vente
+          (`vrm-ledger-drawer-host`, z-index 150, dans document.body) — à 80 elle
+          s'ouvrait DESSOUS, sur tous les navigateurs (banc feuilles-coque.cjs). */}
       {lotView && (
-        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:1300,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotView(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
+          <div ref={lotPanneauRef} role="dialog" aria-modal="true" aria-label="Paires du lot" tabIndex={-1} data-lot-paires=""
+            onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); setLotView(null); } }}
+            onClick={e=>e.stopPropagation()} style={{outline:'none',width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px calc(28px + env(safe-area-inset-bottom))'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
               <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
               <button className="vrm-icon-control" type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
@@ -42122,7 +42187,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowReport(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
@@ -42775,6 +42840,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           (§11) : on ne recalcule rien ici.
           ⚠️ Tous les comptes, MÊME MASQUÉS : masquer un compte cache sa
           comptabilité, ça ne sort pas le carton de l'étagère. */}
+      {/* (23 oct.) « Retour » ferme le studio (et coupe la caméra, au démontage)
+          au lieu de changer de section sous lui. */}
+      {studioOpen && <FermeAuRetour fermer={()=>setStudioOpen(false)}/>}
       {studioOpen && (
         <React.Suspense fallback={null}>
           <StudioPhoto C={C} base={STUDIO_BASE} onClose={()=>setStudioOpen(false)}
@@ -42806,6 +42874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           : t === 'annulee' ? 'vente annulée — la paire est restée' : 'au garage';
         return (
           <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+            <FermeAuRetour fermer={()=>setInventOpen(false)}/>
             <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:620,maxHeight:'88vh',overflowY:'auto',padding:'16px 14px calc(20px + env(safe-area-inset-bottom))'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
                 <span style={{flex:1,fontSize:17,fontWeight:700,color:C.text}}>Inventaire physique</span>
@@ -42879,7 +42948,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setAuditOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setAuditOpen(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🔎 Audit d'inventaire</div><div style={{fontSize:12,color:C.muted}}>Réconcilie tes numéros avec le garage, les annonces et les ventes.</div></div>
               <button type="button" onClick={()=>setAuditOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
@@ -42911,7 +42980,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setLotOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotOpen(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les paires choisies → marge juste sur chacune.</div></div>
@@ -42984,7 +43053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPassportFor(null)}/>
-          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
@@ -50726,7 +50795,17 @@ function AppCoeur() {
         // `minHeight:0` est indispensable : sans lui, un enfant de flex refuse
         // de rétrécir et le conteneur ne défile pas (il s'étire).
         flex:'1 1 auto', minHeight:0, overflowY:'auto', overflowX:'hidden',
-        WebkitOverflowScrolling:'touch', overscrollBehaviorY:'contain',
+        // ⚠️⚠️ JAMAIS `WebkitOverflowScrolling:'touch'` ICI (23 oct.). Sur iPhone,
+        // WebKit donne un z-index 0 — un contexte d'empilement — à tout élément
+        // qui défile et porte cette propriété (StyleAdjuster.cpp, « Touch
+        // overflow scrolling creates a stacking context », iOS seulement). Posée
+        // sur <main> depuis la coque (28 sept.), elle enfermait TOUTES les
+        // feuilles de l'écran sous la barre du bas (z-index 60), quel que soit
+        // leur z-index : le « Reçu d'achat », « Supprimer ce compte », le rapport
+        // comptable… dont la fin et les boutons passaient dessous. Depuis iOS 13
+        // le défilement à inertie est natif : elle ne servait plus qu'à piéger.
+        // Banc `feuilles-coque.cjs`, qui applique la règle de WebKit.
+        overscrollBehaviorY:'contain',
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
