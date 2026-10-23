@@ -1705,6 +1705,13 @@ function sheetTexte(q, defaut) {
 // Une feuille qui refuse de se fermer (envoi en cours) retrouve son entrée.
 const _feuillesOuvertes = [];
 let _idFeuille = 0;
+// Qui veut savoir qu'une feuille est ouverte (23 oct.) : les messages (Toaster)
+// passent EN HAUT de l'écran tant qu'une feuille l'est — en bas, ils couvraient
+// les boutons du pied de la feuille (« Annuler / Supprimer »).
+const _feuillesSubs = new Set();
+const _notifierFeuilles = () => { _feuillesSubs.forEach((fn) => { try { fn(); } catch (_) {} }); };
+const abonnerFeuilles = (fn) => { _feuillesSubs.add(fn); return () => _feuillesSubs.delete(fn); };
+const uneFeuilleOuverte = () => _feuillesOuvertes.length > 0;
 const _histoOnglet = { tab: null, sub: null };
 function _installerRetourFeuilles() {
   if (typeof window === 'undefined' || window.__vrmFeuillesPop) return;
@@ -1729,10 +1736,11 @@ function FermeAuRetour({ fermer }) {
   React.useEffect(() => {
     _installerRetourFeuilles();
     const f = { id: 'f' + (++_idFeuille) + '_' + Date.now().toString(36), fermer: ref, monte: true, consommee: false };
-    _feuillesOuvertes.push(f); _poserFeuille(f);
+    _feuillesOuvertes.push(f); _poserFeuille(f); _notifierFeuilles();
     return () => {
       f.monte = false;
       const j = _feuillesOuvertes.indexOf(f); if (j >= 0) _feuillesOuvertes.splice(j, 1);
+      _notifierFeuilles();
       if (f.consommee) return;
       setTimeout(() => {
         try {
@@ -1750,10 +1758,25 @@ function FermeAuRetour({ fermer }) {
   return null;
 }
 
+// ── L'ORDRE DES COUCHES QUI PASSENT AU-DESSUS DE TOUT (23 oct.) ─────────────
+// Une confirmation (askConfirm / askText) est posée PAR une feuille ouverte —
+// « Tout imprimer » (z 9000) demande « As-tu écrit le N° sur le carton ? »,
+// la garde du §5 contre le seul défaut irréversible. Elle était à 2000, sur la
+// coque : SOUS cette feuille (sur ordinateur et Android depuis toujours, sur
+// iPhone depuis que <main> n'enferme plus ses feuilles, voir la coque), la
+// question était grisée sous le voile et le toucher fermait la liste. Une
+// confirmation passe donc au-dessus de TOUTE feuille (la plus haute est le
+// panneau « Mon compte », 10000), et les messages (toasts) encore au-dessus :
+// un « Échec de la suppression — réessaie » dit depuis une feuille doit se lire.
+// Seul le bloc « Recharger » des numéros périmés (100000) reste plus haut : il
+// couvre l'écran exprès. Banc `feuilles-coque.cjs`.
+const Z_CONFIRMATION = 20000;
+const Z_MESSAGES = 30000;
+
 // Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
-function SheetShell({ onClose, children, maxWidth = 460 }) {
+function SheetShell({ onClose, children, maxWidth = 460, z = 2000 }) {
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:2000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(8,16,13,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:z,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
         <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
@@ -1876,7 +1899,7 @@ function AskTextSheet({ q, close }) {
   React.useEffect(() => { const t = setTimeout(() => { try { ref.current.focus(); ref.current.select(); } catch (_) {} }, 60); return () => clearTimeout(t); }, []);
   const { titre, corps } = sheetTexte(q, 'Saisir');
   return (
-    <SheetShell onClose={() => close(null)}>
+    <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -1906,12 +1929,13 @@ function ConfirmHost() {
   React.useEffect(() => onAsk(setQ), []);
   if (!q) return null;
   const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
-  if (q.kind === 'text') return <AskTextSheet q={q} close={close}/>;
+  // Dans document.body, posée en dernier, au-dessus de toute feuille (Z_CONFIRMATION).
+  if (q.kind === 'text') return createPortal(<AskTextSheet q={q} close={close}/>, document.body);
   // Le premier paragraphe du message sert de titre : les anciens messages
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
-  return (
-    <SheetShell onClose={() => close(false)}>
+  return createPortal(
+    <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
       <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -1926,7 +1950,7 @@ function ConfirmHost() {
           {q.ok || 'Confirmer'}
         </button>
       </div>
-    </SheetShell>
+    </SheetShell>, document.body
   );
 }
 
@@ -3835,72 +3859,180 @@ const ordersFromEmailSales = (mails, accounts) => {
     };
   }).filter(Boolean);
 };
-// Même filet pour les ACHATS : les reçus d'achat `email_achat_*` (46 en base)
-// portent article, prix, transaction et date. Ils prennent le relais quand la
-// moisson des achats est vide, sans aller déranger Vinted.
-const ordersFromEmailAchats = (mails, accounts) => {
-  const parCle = new Map();
-  (accounts || []).forEach(a => {
-    parCle.set(String(a.vinted_user_id), a);
-    if (a.login) parCle.set(String(a.login).toLowerCase(), a);
-  });
-  // ⚠️ VÉRIFIÉ SUR LES VRAIES DONNÉES (47 lignes email_achat en base) : seules
-  // 11 sont de VRAIS achats (« Ton reçu pour la commande … »). Les 36 autres
-  // sont des emails de STATUT mal classés par l'ancien tri, et qui polluaient
-  // les Achats :
-  //   • « … - Confirmation requise » (Vinted demande de confirmer la conformité —
-  //     c'est un email lié à une VENTE, pas un achat) ;
-  //   • « Commande mise à jour pour … » (simple changement de statut) ;
-  //   • « Retourne ta commande d'ici … » (retour).
-  // On ne garde donc QUE les lignes dont le sujet est un vrai reçu d'achat. Le
-  // tri à la source (email-inbound) ne les crée plus, mais les anciennes lignes
-  // restent en base : ce filtre les écarte à l'affichage.
-  const estVraiAchat = (m) => {
-    const s = String(m.subject || '').toLowerCase();
-    if (/confirmation requise|mise à jour|mis à jour|retourne ta commande|à expédier|pr[ée]pare ta commande|vendu/i.test(s)) return false;
-    return /re[çc]u pour (?:la |ta |votre )?commande|tu as achet|as achet[ée]|merci pour (?:ton|votre) achat|confirmation d['']achat/i.test(s);
-  };
-  return (mails || []).filter(estVraiAchat).map(m => {
-    const titre = String(m.article || '').trim();
-    if (!titre) return null;
-    const montant = parseFloat(String(m.prix || '').replace(',', '.'));
-    const acc = parCle.get(String(m.uid || '')) || parCle.get(String(m.account || '').toLowerCase())
-      || { vinted_user_id: m.uid || '', login: m.account || '' };
-    return {
-      transaction_id: m.transaction || ('mail:' + (m.uid || '') + ':' + (m.receivedAt || '')),
-      title: titre,
-      price: { amount: isNaN(montant) ? null : montant, currency_code: 'EUR' },
-      date: m.receivedAt || null,
-      status: 'Achat confirmé',
-      _fromEmail: true,
-      _acc: acc,
-    };
-  }).filter(Boolean);
-};
+// (23 oct.) `ordersFromEmailAchats` est RETIRÉ : plus aucun appelant depuis
+// août (la moisson de l'extension est la seule source des achats, voir
+// `loadOrders`), et il portait une SECONDE règle de « ce qui est un reçu »
+// (`estVraiAchat`, par le sujet). Une seule règle vit maintenant :
+// `estRecuAchat`, ci-dessous (§11). Ne pas le rebrancher.
 
-// Extrait les champs propres d'un reçu d'achat depuis l'email Vinted (montant,
-// détail, vendeur, date, transaction). Sert à la fois à la modale in-app et à
-// l'impression PDF. On retire les astérisques de mise en forme de Vinted.
-const parseReceiptFields = (a) => {
-  const txt = String(a.texte || '').replace(/\*/g, ' ');
-  const grab = (re) => { const m = txt.match(re); return m ? m[1].trim().replace(/\s{2,}/g, ' ') : ''; };
-  const eur = (re) => { const m = txt.match(re); return m ? m[1].replace('.', ',') + ' €' : ''; };
-  const article = a.article || grab(/commande\s*[«"“]\s*([^»"”\n]+)/i) || 'Article';
-  const vendeur = grab(/vendeur\s*:?\s*([^\n]+)/i);
-  const paid = a.prix ? (String(a.prix).replace('.', ',') + ' €') : eur(/montant\s*pay[ée]s?\s*:?\s*([\d.,]+)\s*€/i);
-  const artPrice = eur(/(?:^|\n)\s*article\s+([\d.,]+)\s*€/i);
-  const port = eur(/frais\s+de\s+port\s+([\d.,]+)\s*€/i);
-  const protection = eur(/protection\s+acheteurs?\s+([\d.,]+)\s*€/i);
-  const mode = grab(/mode\s+de\s+paiement\s*:?\s*([^\n]+)/i);
-  const datePaie = grab(/date\s+du\s+paiement\s*:?\s*([^\n]+)/i) || (a.receivedAt ? new Date(a.receivedAt).toLocaleString('fr-FR') : '');
-  const trans = a.transaction || grab(/transaction\s*:?\s*(\d+)/i);
-  const compte = a.account || '';
-  const cleaned = txt
+// ── LE REÇU D'ACHAT VINTED (23 octobre) ─────────────────────────────────────
+// Julien, capture iPhone : « le reçu s'affiche mal » — Montant payé 24,93 €,
+// Article 20,00 €, Frais de port 3,23 €, et rien d'autre : il manquait 1,70 €.
+// MESURÉ (lecture seule, 117 lignes `email_achat_*`) : 81 vrais reçus. Le bloc
+// « Montant payé » → « Mode de paiement » porte, une par ligne, « Article »,
+// « Frais de port », puis SOIT « Frais Vinted » (55 reçus, la forme récente)
+// SOIT « Frais de Protection acheteurs » (26, l'ancienne), et parfois
+// « Réduction -3,79 € » (8, NÉGATIVE). Avec toutes ses lignes, la somme vaut le
+// Montant payé sur les 81. L'ancien parseur ne connaissait que « protection
+// acheteurs » : 55 reçus perdaient leurs frais, 8 leur réduction.
+// ⇒ UNE règle (§11) pour la feuille de l'app ET la fenêtre imprimable : toutes
+//   les lignes « Libellé ±X,XX € » du bloc, libellé tel que Vinted l'écrit,
+//   aucune jetée, même inconnue ; la somme se vérifie EN CENTIMES contre le
+//   Montant payé : `juste` · `ecart` · `passu` — et la feuille le DIT (§5 : un
+//   total partiel ne se présente pas comme complet).
+// ⇒ Les 36 autres lignes (« Commande mise à jour pour … », « … - Confirmation
+//   requise », « Retourne ta commande … », juillet-août) n'ont NI Montant payé
+//   NI lignes : ce ne sont PAS des reçus (`estRecuAchat`). Rien n'est supprimé
+//   en base (« on ne jette aucun email ») ; l'app ne les présente plus comme
+//   « Reçu d'achat ».
+// ⇒ Le n° de transaction est écrit dans CHAQUE reçu (« N° de transaction … »,
+//   81 sur 81), mais le serveur ne le rangeait pas (l'astérisque entre le
+//   libellé et le nombre cassait son motif) : `transaction` est vide sur les 81.
+//   `txRecuAchat` le lit dans le texte — c'est une IDENTITÉ (§5) : 61 reçus se
+//   relient ainsi à leur achat capté, 0 doublon.
+// <recu-achat-regle>
+const centimesRecu = (s) => {
+  const t = String(s == null ? '' : s).replace(/[\s  ]/g, '').replace(/[−–]/g, '-');
+  const m = t.match(/^([+-])?(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,](\d{1,2}))?$/);
+  if (!m) return null;
+  const v = parseInt(m[2].replace(/[.,]/g, ''), 10) * 100 + (m[3] ? (m[3].length === 1 ? Number(m[3]) * 10 : Number(m[3])) : 0);
+  if (!Number.isSafeInteger(v)) return null;
+  return m[1] === '-' ? -v : v;
+};
+const texteCentimesRecu = (c) => {
+  if (!Number.isSafeInteger(c)) return '';
+  const n = Math.abs(c);
+  const e = String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (c < 0 ? '−' : '') + e + ',' + String(n % 100).padStart(2, '0') + ' €';
+};
+const lignesRecu = (texte) => String(texte == null ? '' : texte).replace(/\r/g, '').split('\n')
+  .map((l) => l.replace(/\*+/g, ' ').replace(/[\t  ]/g, ' ').replace(/ {2,}/g, ' ').trim());
+const MONTANT_RECU = '([+\\-−–]?\\s?(?:\\d{1,3}(?:[ .]\\d{3})+|\\d+)(?:[.,]\\d{1,2})?)\\s*(?:€|eur(?:os?)?)';
+const RE_MONTANT_SEUL_RECU = new RegExp('^' + MONTANT_RECU + '$', 'i');
+const RE_LIGNE_RECU = new RegExp('^(.*?\\S)\\s*:?\\s+' + MONTANT_RECU + '$', 'i');
+const RE_MONTANT_PAYE_RECU = /^montant\s+pay[ée]e?s?(?![\p{L}\d])\s*:?\s*/iu;
+// Les bornes du bloc. ⚠️ (23 oct., revue) « Transaction » et « Vendeur » ne
+// finissent le bloc que si la ligne ne porte PAS de montant : « Transaction
+// sécurisée 0,50 € » est une ligne de frais, pas la fin — elle était jetée avec
+// tout ce qui suivait. Les autres bornes ne sont jamais des frais (mesuré sur les
+// 81 reçus : aucune ne finit par « € » ; « Mode de paiement … (X €) » finit par
+// sa parenthèse) et finissent le bloc quoi qu'il arrive.
+const FIN_VENTILATION_RECU = /^(?:mode\s+de\s+paiement|date\s+du\s+paiement|n[°º]?\s*de\s+transaction)\b/i;
+const FIN_SI_SANS_MONTANT_RECU = /^(?:transaction|vendeur)\b/i;
+const ventilationRecuAchat = (texte) => {
+  const L = lignesRecu(texte);
+  const i = L.findIndex((l) => RE_MONTANT_PAYE_RECU.test(l));
+  if (i < 0) return { trouve: false, paye: null, lignes: [], somme: 'passu', total: null, ecart: null, raison: 'sans-montant' };
+  let reste = L[i].replace(RE_MONTANT_PAYE_RECU, '');
+  let j = i + 1;
+  if (!reste) { while (j < L.length && !L[j]) j++; if (j < L.length && RE_MONTANT_SEUL_RECU.test(L[j])) reste = L[j++]; }
+  const ms = reste.match(RE_MONTANT_SEUL_RECU);
+  const paye = ms ? centimesRecu(ms[1]) : null;
+  const lignes = [];
+  let fin = false;
+  for (; j < L.length && lignes.length <= 20; j++) {
+    const l = L[j];
+    if (!l) continue;
+    if (FIN_VENTILATION_RECU.test(l) || (FIN_SI_SANS_MONTANT_RECU.test(l) && !RE_LIGNE_RECU.test(l))) { fin = true; break; }
+    const m = l.match(RE_LIGNE_RECU);
+    const c = m ? centimesRecu(m[2]) : null;
+    if (m && c != null && /\p{L}/u.test(m[1])) lignes.push({ libelle: m[1].replace(/\s*:$/, ''), centimes: c });
+    else if (l.length > 60) break;                       // de la prose : le bloc est fini, sans sa borne
+    else lignes.push({ libelle: l, centimes: null });   // une ligne du bloc qu'on ne sait pas lire : gardée, jamais jetée
+  }
+  const lisibles = lignes.length > 0 && lignes.every((x) => x.centimes != null);
+  const total = lisibles ? lignes.reduce((s, x) => s + x.centimes, 0) : null;
+  let somme = 'passu', ecart = null, raison = null;
+  if (paye == null) raison = 'montant-illisible';
+  else if (!lignes.length) raison = 'sans-detail';
+  else if (!lisibles) raison = 'ligne-illisible';
+  else if (total === paye) somme = 'juste';
+  else if (!fin) raison = 'fin-introuvable';
+  else { somme = 'ecart'; ecart = paye - total; }
+  return { trouve: true, paye, lignes, somme, total, ecart, raison };
+};
+const txRecuAchat = (a) => {
+  const t = String((a && a.transaction) || '').trim();
+  if (/^\d{6,}$/.test(t)) return t;
+  for (const l of lignesRecu(a && a.texte)) {
+    const m = l.match(/^(?:n[°º]?\s*de\s+)?transaction\s*:?\s*#?\s*(\d{6,})$/i);
+    if (m) return m[1];
+  }
+  return '';
+};
+// ⚠️ (23 oct., revue) « PAS UN REÇU » SE DÉFINIT PAR CE QUI A ÉTÉ MESURÉ, pas
+// par ce qu'un reçu doit contenir. Premier jet : un reçu DEVAIT porter un
+// Montant payé, un sujet « reçu pour la commande » ou un PDF — or la route
+// (`api/email-inbound.js`, branche 2b) range AUSSI comme achat « Merci pour ton
+// achat », « Tu as acheté », « Confirmation d'achat » (et envoie « 🛍 Achat
+// confirmé — justificatif archivé ») : ces emails disparaissaient de la liste,
+// comptés parmi « les mises à jour, confirmations, retours », et tout reçu dont
+// Vinted changerait le sujet ou la tournure « Montant payé » aurait suivi.
+// MESURÉ (lecture seule, 117 lignes `email_achat_*`) : les 36 non-reçus ont
+// EXACTEMENT ces trois sujets — « Commande mise à jour pour … » 18, « … -
+// Confirmation requise » 16, « Retourne ta commande … » 2 —, aucun avec un
+// Montant payé ni un PDF ; les 81 reçus ont tous un Montant payé. Tout le reste
+// est un reçu (« on ne jette aucun email ») : la feuille montre son texte si la
+// ventilation n'y trouve rien (`champsRecuAchat`, `hasStructured`).
+const SUJET_STATUT_ACHAT = /^\s*commande\s+mise\s+[àa]\s+jour\s+pour\b|-\s*confirmation\s+requise\s*$|^\s*retourne\s+ta\s+commande\b/i;
+const estRecuAchat = (a) => !!a && !(SUJET_STATUT_ACHAT.test(String(a.subject || ''))
+  && !a.pdfB64 && !ventilationRecuAchat(a.texte).trouve);
+// undefined = lecture en cours, null = pas su : passés tels quels.
+const recusAchatDe = (rows) => (Array.isArray(rows)
+  ? rows.filter(estRecuAchat).map((r) => ({ ...r, transaction: txRecuAchat(r) }))
+  : rows);
+// </recu-achat-regle>
+// Le mode de paiement tel qu'on le lit : « Visa •••• 4242 » (l'email écrit
+// « Visa, **********4242 (24,93 €) » ; sans les étoiles il devenait « Visa,
+// 4242 », un nombre qui n'en est pas un). Le montant entre parenthèses n'est
+// gardé que s'il en dit plus que le Montant payé (deux moyens de paiement).
+const modePaiementRecu = (texte, paye) => {
+  const brut = String(texte == null ? '' : texte).replace(/\r/g, '').split('\n').find((l) => /^[\s*]*mode\s+de\s+paiement\b/i.test(l));
+  if (!brut) return '';
+  let m = brut.replace(/\*{3,}\s*(\d{2,4})\b/g, '•••• $1').replace(/\*+/g, ' ').replace(/[\t  ]/g, ' ').replace(/ {2,}/g, ' ').trim()
+    .replace(/^mode\s+de\s+paiement\s*:?\s*/i, '').replace(/,\s*(?=••••)/g, ' ');
+  const montants = [...m.matchAll(/\(\s*([^()]*?)\s*(?:€|eur)\s*\)/gi)];
+  if (montants.length === 1 && paye != null && centimesRecu(montants[0][1]) === paye) m = m.replace(montants[0][0], '').trim();
+  else m = m.replace(/\)\s+(?=\S)/g, ') · ');
+  // (23 oct., revue) Une espace INSÉCABLE entre les points et les chiffres : à
+  // 320 px, « MasterCard •••• » restait sur une ligne et « 9999 » passait à la
+  // suivante — un numéro de carte coupé en deux.
+  m = m.replace(/•••• (?=\d)/g, '••••\u00a0');
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : '';
+};
+// La phrase qui accompagne le détail — venue de la même source que les lignes.
+const phraseSommeRecu = (v) => {
+  if (!v || v.somme === 'juste') return '';
+  if (v.somme === 'ecart') return `Ces lignes font ${texteCentimesRecu(v.total)}, pas le montant payé (${texteCentimesRecu(v.paye)}) — regarde l'email de Vinted.`;
+  if (v.raison === 'sans-detail') return 'Le détail (article, port, frais) n\'est pas dans cet email — regarde l\'email de Vinted.';
+  if (v.raison === 'montant-illisible') return 'Le montant payé n\'a pas pu être lu — regarde l\'email de Vinted.';
+  return 'Le détail n\'a pas pu être lu en entier : ces lignes ne sont peut-être pas toutes là — regarde l\'email de Vinted.';
+};
+// Les champs d'un reçu pour la feuille de l'app ET la fenêtre imprimable.
+const champsRecuAchat = (a) => {
+  const L = lignesRecu(a && a.texte);
+  const val = (re) => { for (const l of L) { const m = l.match(re); if (m && m[1].trim()) return m[1].trim(); } return ''; };
+  const v = ventilationRecuAchat(a && a.texte);
+  const article = String((a && a.article) || '').trim() || (String((a && a.subject) || '').match(/commande\s*[«"“]\s*([^»"”]+?)\s*[»"”]/i) || [])[1] || 'Article';
+  const vendeur = val(/^vendeur\s*:?\s*(.+)$/i);
+  const mode = modePaiementRecu(a && a.texte, v.paye);
+  const recuLe = a && a.receivedAt && Number.isFinite(Date.parse(a.receivedAt)) ? new Date(a.receivedAt).toLocaleString('fr-FR') : '';
+  // L'heure « 10 h 47 » ne se coupe pas (« 10 h » / « 47 » à 320 px).
+  const datePaie = (val(/^date\s+du\s+paiement\s*:?\s*(.+)$/i) || recuLe).replace(/(\d) h (\d)/g, '$1\u00a0h\u00a0$2');
+  const trans = txRecuAchat(a);
+  const compte = String((a && a.account) || '');
+  const cleaned = String((a && a.texte) || '').replace(/\*/g, ' ')
     .replace(/<https?:\/\/[^>]+>/g, '').replace(/https?:\/\/links\.vinted\.com\/\S+/gi, '')
     .split('\n').map(l => l.trim())
     .filter(l => l && !/nous sommes tenus|d[ée]sabonner|politique de confidentialit|termes et conditions|pour conna[îi]tre vos droits|l['’]équipe vinted/i.test(l))
     .join('\n');
-  return { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured: !!(paid || artPrice || port || protection || vendeur || mode || trans) };
+  // (23 oct., revue) Sans bloc « Montant payé », la feuille et la fenêtre
+  // montrent le TEXTE de l'email : un en-tête « Reçu » avec seulement un n° de
+  // transaction, et la phrase « ces lignes ne sont peut-être pas toutes là »
+  // au-dessus d'aucune ligne, cachait le montant que l'email écrit autrement
+  // (« Total payé : 24,93 € »).
+  return { article, vendeur, ...v, phrase: phraseSommeRecu(v), mode, datePaie, trans, compte, cleaned,
+    hasStructured: v.trouve };
 };
 // ⚠️ (22 oct., revue) LE JOURNAL DES VIOLATIONS ÉCOUTE AUSSI LES FENÊTRES QUE
 // L'APP OUVRE (le reçu, une facture imprimable) : elles héritent de la politique
@@ -3921,10 +4053,13 @@ const openReceipt = (a) => {
   const w = window.open('', '_blank'); if (!w) return;
   try { w.document.open(); } catch (_) {}
   try { ecouterFenetreCsp(w, 'recu'); } catch (_) {}
-  const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-  const { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured } = parseReceiptFields(a);
+  const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  // (23 oct.) Les MÊMES lignes que la feuille de l'app : `champsRecuAchat` (§11).
+  const r = champsRecuAchat(a);
+  const { article, vendeur, mode, datePaie, trans, compte, cleaned, hasStructured } = r;
+  const paid = texteCentimesRecu(r.paye);
   const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:14px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:14px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
-  const breakdown = [line('Article', artPrice), line('Frais de port', port), line('Protection acheteurs', protection)].join('');
+  const breakdown = r.lignes.map((l) => `<tr data-recu-ligne="${esc(l.libelle)}" data-recu-centimes="${l.centimes == null ? '' : l.centimes}"><td style="padding:9px 0;color:#667;font-size:14px">${esc(l.libelle)}</td><td style="padding:9px 0;text-align:right;font-size:14px;color:#111;white-space:nowrap">${l.centimes == null ? '—' : esc(texteCentimesRecu(l.centimes))}</td></tr>`).join('');
   const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
   <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
@@ -3934,16 +4069,17 @@ const openReceipt = (a) => {
     </div>
     <div style="max-width:520px;margin:0 auto;padding:4px 16px 40px">
       <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.07)">
-        <div style="background:#007782;color:#fff;padding:18px 20px">
+        <div style="background:${COULEUR_PLATEFORME.vinted};color:#fff;padding:18px 20px">
           <div style="font-size:12px;opacity:.85;font-weight:700;letter-spacing:.4px;text-transform:uppercase">Reçu d'achat Vinted</div>
           <div style="font-size:19px;font-weight:800;margin-top:3px">${esc(article)}</div>
         </div>
         ${hasStructured ? `
         <div style="padding:18px 20px">
-          ${paid ? `<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #eef1f0;margin-bottom:6px">
+          ${paid ? `<div data-recu-total="${r.paye}" style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #eef1f0;margin-bottom:6px">
             <span style="font-size:14px;color:#667;font-weight:700">Montant payé</span>
-            <span style="font-size:26px;font-weight:900;color:#007782">${esc(paid)}</span></div>` : ''}
-          ${breakdown ? `<table style="width:100%;border-collapse:collapse">${breakdown}</table>` : ''}
+            <span style="font-size:26px;font-weight:900;color:#111">${esc(paid)}</span></div>` : ''}
+          ${breakdown ? `<table data-recu-lignes="" style="width:100%;border-collapse:collapse">${breakdown}</table>` : ''}
+          <div data-recu-somme="${r.somme}"${r.phrase ? ' style="font-size:13px;color:#556;line-height:1.5;padding:8px 0 2px"' : ' hidden'}>${esc(r.phrase)}</div>
           ${meta ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;border-top:1px solid #eef1f0">${meta}</table>` : ''}
         </div>` : `
         <div style="padding:18px 20px;white-space:pre-wrap;line-height:1.6;font-size:14px;color:#333">${esc(cleaned)}</div>`}
@@ -3975,6 +4111,102 @@ const openReceipt = (a) => {
     if (imprimer) imprimer.addEventListener('click', () => { if (w.__vrmRecuBoutons) return; try { w.focus(); w.print(); } catch (_) {} });
   } catch (_) {}
 };
+// ── LA FEUILLE « REÇU D'ACHAT » (23 octobre) ───────────────────────────────
+// Capture iPhone de Julien : la barre du bas passait PAR-DESSUS la feuille —
+// « N° de transaction » coupé, et la fin du reçu inatteignable. Rendue dans
+// <main>, la feuille restait dans son contexte d'empilement (le z-index n'y
+// change rien : sur iPhone, `<main>` qui défile forme un contexte d'empilement).
+// Elle est PORTÉE sur <body>, comme l'aperçu des widgets ou le récap de
+// l'année. Hors de <main> elle ne profite plus des règles de taille de
+// `.vrm-main` : ses cibles sont donc posées à 44 px ICI, et le bas du
+// défilement garde la zone de sécurité de l'iPhone (recus-email.css). Les
+// lignes, le total et la phrase viennent de `champsRecuAchat` — la même règle
+// que la fenêtre PDF.
+// ⚠️ (23 oct., revue) AU CLAVIER : le focus va sur la ZONE QUI DÉFILE (↓ et
+// Page bas font défiler le reçu — posé sur le dialogue, qui ne défile pas, ils
+// ne faisaient rien), Tab et Maj+Tab tournent DANS la feuille (au 3ᵉ Tab il
+// partait sur <body>, derrière le voile), Échap est écouté sur le DOCUMENT (une
+// fois le focus sorti, l'écoute du dialogue ne recevait plus rien), et le focus
+// revient à la fermeture sur ce qui l'avait ouverte (« Voir › »). Même motif que
+// le panneau des écrans (`MenuEcrans`).
+function FeuilleRecuAchat({ recu, fermer }) {
+  const r = champsRecuAchat(recu);
+  const boite = useRef(null);
+  const defile = useRef(null);
+  const fermerRef = useRef(fermer); fermerRef.current = fermer;
+  useEffect(() => {
+    const ouvreur = document.activeElement;
+    try { (defile.current || boite.current).focus({ preventScroll: true }); } catch (_) {}
+    const clavier = (e) => {
+      const d = boite.current; if (!d) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerRef.current(); return; }
+      if (e.key !== 'Tab') return;
+      const cibles = [...d.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => el.getClientRects().length > 0);
+      if (!cibles.length) { e.preventDefault(); return; }
+      const premier = cibles[0], dernier = cibles[cibles.length - 1], a = document.activeElement;
+      const dedans = !!a && a !== d && d.contains(a);
+      if (e.shiftKey && (!dedans || a === premier)) { e.preventDefault(); dernier.focus(); }
+      else if (!e.shiftKey && (!dedans || a === dernier)) { e.preventDefault(); premier.focus(); }
+    };
+    document.addEventListener('keydown', clavier);
+    return () => {
+      document.removeEventListener('keydown', clavier);
+      try { if (ouvreur && ouvreur !== document.body && ouvreur.isConnected && typeof ouvreur.focus === 'function') ouvreur.focus({ preventScroll: true }); } catch (_) {}
+    };
+  }, []);
+  // (23 oct., revue) Un MONTANT ne se coupe jamais (`montant` : sans retour à la
+  // ligne, comme dans la fenêtre PDF) : à 320 px, « 11,20 » / « € » — la valeur
+  // en `overflowWrap:'anywhere'` pouvait se casser sur l'espace insécable. Le
+  // libellé, lui, passe à la ligne. Les autres valeurs (un pseudo très long)
+  // gardent `anywhere` : jamais de débordement.
+  const Row = ({ label, val, attrs, montant }) => val ? (
+    <div {...(attrs || {})} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
+      <span style={{fontSize:14,color:C.muted,fontWeight:500,minWidth:0}}>{label}</span>
+      <span style={{fontSize:14,color:C.text,fontWeight:500,textAlign:'right',...(montant ? { whiteSpace:'nowrap', flexShrink:0 } : { overflowWrap:'anywhere' })}}>{val}</span>
+    </div>) : null;
+  const cible = { minWidth:44, minHeight:44, boxSizing:'border-box', display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:10, border:`1px solid ${C.border}`, background:C.card, color:C.text, cursor:'pointer', fontFamily:'inherit', flexShrink:0 };
+  return createPortal(
+    <div data-noswipe="1" data-recu-voile="" onClick={fermer} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      <FermeAuRetour fermer={fermer}/>
+      <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+          <button type="button" data-recu-retour="" onClick={fermer} aria-label="Retour" style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
+          <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:700,color:C.text}}>Reçu d'achat</div>
+          <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title="Imprimer / PDF" style={{...cible,gap:6,padding:'0 14px',fontSize:14,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
+        </div>
+        <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label="Détail du reçu" style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
+          <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
+            <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
+              <div style={{fontSize:11,opacity:0.9,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
+              <div style={{fontSize:19,fontWeight:600,marginTop:3,lineHeight:1.3,overflowWrap:'anywhere'}}>{r.article}</div>
+            </div>
+            {r.hasStructured ? (
+              <div style={{padding:'14px 18px 16px'}}>
+                {r.paye != null && (
+                  <div data-recu-total={r.paye} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
+                    <span style={{fontSize:14,color:C.muted,fontWeight:500}}>Montant payé</span>
+                    <span style={{fontSize:26,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{texteCentimesRecu(r.paye)}</span>
+                  </div>
+                )}
+                {r.lignes.map((l, i) => <Row key={i} montant label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
+                <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.phrase}</div>
+                <div style={{height:10}}/>
+                <Row label="Vendeur" val={r.vendeur}/>
+                <Row label="Mode de paiement" val={r.mode}/>
+                <Row label="Date du paiement" val={r.datePaie}/>
+                <Row label="N° de transaction" val={r.trans} attrs={{ 'data-recu-transaction': r.trans }}/>
+                <Row label="Compte" val={r.compte}/>
+              </div>
+            ) : (
+              <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:14,color:C.text}}>{r.cleaned}</div>
+            )}
+          </div>
+          <div data-recu-fin="" style={{textAlign:'center',color:C.muted,fontSize:12,marginTop:12,lineHeight:1.5}}>Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
+        </div>
+      </div>
+    </div>, document.body);
+}
 // ⚠️ Le générateur de QR (qrcode-generator) a été RETIRÉ à dessein.
 // Vérifié sur 61 colis : le QR n'existe que chez Chronopost (image hébergée).
 // Mondial Relay — 39 colis, zéro QR — fonctionne au CODE DE RETRAIT. Fabriquer
@@ -11473,9 +11705,15 @@ function DefilementPartout() {
 function Toaster() {
   const [list, setList] = React.useState([]);
   React.useEffect(() => onToasts(setList), []);
+  // (23 oct.) AU-DESSUS de toute feuille, et EN HAUT de l'écran quand une feuille
+  // est ouverte. À 210 sous la coque, un message dit depuis une feuille (« Échec
+  // de la suppression — réessaie », « Ces bordereaux n'ont plus leur PDF… »)
+  // passait SOUS elle : rien n'était dit. Et en bas il couvrirait le pied de la
+  // feuille (« Annuler / Supprimer »). Banc `feuilles-coque.cjs`.
+  const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
   if (!list.length) return null;
   return (
-    <div className="vrm-toasts" role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,bottom:'calc(92px + env(safe-area-inset-bottom))',zIndex:210,
+    <div className="vrm-toasts" data-toasts-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'calc(92px + env(safe-area-inset-bottom))'}),zIndex:Z_MESSAGES,
       display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}>
       {list.map(t => {
         const col = t.type==='err' ? C.danger : t.type==='ok' ? INV_STATUS.online.color : C.text;
@@ -11620,6 +11858,9 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
   // rangée par écran (icône neutre · libellé · chevron), filets fins en retrait.
   // L'écran courant porte la teinte d'accent et une coche — plus d'aplat bleu.
   // Le dessin vit dans `.vrm-sheet` (styles-coque.css).
+  // L'en-tête pose sa feuille dans document.body (voir plus bas) ; celle de la
+  // barre du bas reste où elle est.
+  const poserFeuille = bottom ? (x) => x : (x) => createPortal(x, document.body);
   const rangee = (t, on, onClick) => (
     <button key={t.id} type="button" role="menuitem" className="vrm-sheet-row" onClick={onClick} aria-current={on?'page':undefined}>
       <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
@@ -11633,7 +11874,12 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false }) {
       <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Gestion":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&! ['journee','plat_vinted','plat_leboncoin','plat_ebay'].includes(BAR_GROUPE[tab]||tab)?'page':undefined}>
         <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex'}}><Icon name={open&&!bottom?'close':'menu'} size={bottom?24:22} style={{strokeWidth:1.6}}/></span>{bottom && <span className="vrm-nav-label">Gestion</span>}
       </button>
-      {open && (
+      {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
+          l'en-tête (sticky, z-index 50 — un contexte d'empilement), elle restait
+          SOUS la barre du bas (z-index 60) en paysage et sur iPad — ses dernières
+          entrées cachées, la barre non assombrie et touchable. Celle de la barre
+          du bas vit déjà au bon étage. Banc `feuilles-coque.cjs`. */}
+      {open && poserFeuille(
         <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
           {/* Depuis la barre du bas, la feuille MONTE du bas ; depuis l'en-tête,
               elle descend du haut : le geste et le mouvement vont dans le même sens. */}
@@ -13651,9 +13897,10 @@ function EtatActions({ onNav, ordi, sombre }) {
     lireDerniereCaptureExt().then((d) => { if (!stop) setDerniere(d); });
     return () => { stop = true; }; }, [ouvert]);
   const boite = React.useRef(null);
+  const panneauEtat = React.useRef(null);   // sur téléphone, le panneau vit dans document.body
   React.useEffect(() => {
     if (!ouvert) return undefined;
-    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target)) setOuvert(false); };
+    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target) && !(panneauEtat.current && panneauEtat.current.contains(ev.target))) setOuvert(false); };
     const echap = (ev) => { if (ev.key === 'Escape') setOuvert(false); };
     document.addEventListener('mousedown', dehors); document.addEventListener('touchstart', dehors); document.addEventListener('keydown', echap);
     return () => { document.removeEventListener('mousedown', dehors); document.removeEventListener('touchstart', dehors); document.removeEventListener('keydown', echap); };
@@ -13763,6 +14010,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
+  const poserPanneau = ordi ? (x) => x : (x) => createPortal(x, document.body);
   const Ligne = ({ nom, l }) => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
       <span style={{ width: 14, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
@@ -13781,9 +14029,14 @@ function EtatActions({ onNav, ordi, sombre }) {
         <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
         {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
       </button>
-      {ouvert && (
-        <div data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
-          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 64,
+      {/* (23 oct.) Sur téléphone le panneau part dans document.body : posé dans
+          l'en-tête (sticky, z-index 50), il restait SOUS la barre du bas (60) en
+          paysage et sur iPad. Il tient dans l'écran et défile. Sur ordinateur il
+          reste accroché à l'île (pas de barre du bas). */}
+      {ouvert && poserPanneau(
+        <div ref={panneauEtat} data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
+          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
+            ...(ordi ? {} : { maxHeight: 'calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', overscrollBehavior: 'contain' }),
             width: ordi ? 360 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
             borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
@@ -15332,6 +15585,10 @@ function departDePreregle(p, maintenant) {
 // qu'on ne connaît pas s'affiche tel quel plutôt que d'être deviné.
 const NOMS_FRAIS_EBAY = { InsertionFee: 'mise en vente', SchedulingFee: 'programmation', GalleryFee: 'galerie', GalleryPlusFee: 'galerie plus', SubtitleFee: 'sous-titre', BoldFee: 'gras', FeaturedFee: 'mise en avant', InternationalInsertionFee: 'mise en vente internationale', ListingDesignerFee: 'modèle d\'annonce' };
 const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+// (23 octobre, revue) Un prix eBay avec SA devise : « 95,00 € », « 95,00 USD »,
+// devise inconnue ⇒ aucun symbole. UNE règle pour la carte des annonces et les
+// inactives (§11) — `eurEbay` ajoutait « € » à un prix en dollars (« 95,00 € USD »).
+const prixEbayTexte = (n, c) => Number(n).toFixed(2).replace('.', ',') + (c ? ` ${c === 'EUR' ? '€' : c}` : '');
 // Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
 // montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
 // programmée), la mise en vente, puis tout autre frais non nul.
@@ -17633,7 +17890,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce terminée sur eBay.');if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
-  const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?n.toFixed(2).replace('.',',')+(c?` ${c==='EUR'?'€':c}`:''):'';};
+  const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?prixEbayTexte(n,c):'';};
   const j = (() => { const t = Date.parse(it.depuis || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); })();
   const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
   const d = it.detail || {};
@@ -18531,6 +18788,216 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
   );
 }
 
+// ── eBay · INACTIVES : terminées SANS vente (23 octobre) ─────────────────────
+// Julien demandait si les onglets de l'app eBay sont dans VRM : il manquait
+// « Inactives » — les annonces terminées sans vente, qu'eBay garde 60 à 90 jours.
+// LECTURE SEULE : VRM ne remet RIEN en vente (une remise en vente peut coûter des
+// frais d'insertion chez eBay — §2, §3) ; chaque ligne mène à SA page eBay.
+// La liste vient de `ebay_inactives{_clé}`, rangée par la synchro et la relecture
+// sans geste, dans le MÊME GetMyeBaySelling que les annonces en ligne (aucun
+// appel de plus). TROIS états — jamais lue · lue vide · lue — et « pas su » ;
+// plus (revue du 23 octobre) « ancienne ».
+// ⚠️ Rien de ce qui PROTÈGE ne lit cette liste (garde de publication, anti
+//    double vente, règles d'offre) : une inactive n'est pas en vente.
+// ⚠️ Le N° seulement par le SKU (`numEbayLu`), lu avec la date de PUBLICATION :
+//    une annonce d'avant la remise à zéro (013) parle de l'ancienne série (§5).
+// ⚠️ « Retirer d'eBay » une paire vendue sur Vinted l'envoie ICI. « Remettre en
+//    vente » n'est donc pas proposé pour une paire vendue ailleurs (`ventes`), ni
+//    pour une paire déjà de retour sur eBay sous une AUTRE annonce (`dejaSurEbay`,
+//    `relanceeEn`), ni tant que ses ventes n'ont pas pu être vérifiées : le lien
+//    reste, il dit « Voir sur eBay ».
+// ⚠️⚠️ (revue du 23 octobre) UNE CAPTURE ANCIENNE N'EST PAS LA LISTE DU JOUR. Un
+//    conteneur `UnsoldList` absent vaut « pas lu » (décision : la dernière
+//    capture n'est jamais écrasée par une liste vide) — mais alors rien ne la
+//    remplaçait ni ne la vieillissait : rangée il y a 95 jours, elle s'affichait
+//    « Inactives (1) · ces 60 derniers jours » au-dessus d'une annonce terminée il
+//    y a 100 jours, avec « Remettre en vente ». Une capture est ANCIENNE quand
+//    elle n'a pas été relue depuis 24 h, ou quand les annonces EN LIGNE du même
+//    compte ont été relues APRÈS elle (plus de 15 min d'écart : la route les
+//    range dans le MÊME appel — eBay ne l'a donc pas rendue à cette relecture).
+//    Ancienne ⇒ l'âge est dit (« lue le … »), aucun « (N) », « Voir sur eBay »
+//    seulement. Et une annonce terminée hors de la fenêtre de 60 jours n'est
+//    jamais montrée (la route ne la range plus non plus).
+// ⚠️ (revue) « La liste se lit à la prochaine relecture » n'est pas promis quand
+//    une relecture des annonces a DÉJÀ eu lieu sans rendre la liste : eBay ne la
+//    rend peut-être pas quand il n'y a rien (non mesuré) — on dit ce qui est su.
+// ⚠️ (revue, §7) Une panne déjà dite sur l'écran (ventes illisibles, registre
+//    eBay illisible) n'est pas redite ici : `dejaDit` porte ce que l'écran a
+//    déjà écrit ; la section garde ses `data-*` (le banc les lit).
+const INACTIVES_PAGE = 20;
+const INACTIVES_JOURS = 60;   // la fenêtre demandée à eBay (`DurationInDays`, api/ebay.js)
+const INACTIVES_FRAICHE_MS = 24 * 3600000;   // au-delà, une capture est « ancienne »
+const INACTIVES_ECART_MS = 15 * 60000;       // annonces en ligne relues plus tard que ça ⇒ eBay n'a pas rendu les inactives
+const URL_ITEM_EBAY = (id) => /^\d{1,19}$/.test(String(id || '')) ? `https://www.ebay.fr/itm/${id}` : '';
+// « Terminée dans la fenêtre » : une fin illisible est GARDÉE (eBay l'a mise
+// dans sa liste des 60 jours — mieux vaut un blanc qu'un faux).
+const dansFenetreInactives = (fin, maintenant) => { const t = Date.parse(fin || ''); return !Number.isFinite(t) || t >= maintenant - INACTIVES_JOURS * 86400000; };
+function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku }) {
+  const E = EBAY_SKIN;
+  // undefined en cours · null registre illisible · { lignes: [{compte, ligne}] }
+  const [lu, setLu] = React.useState(undefined);
+  const [voirTout, setVoirTout] = React.useState(false);
+  React.useEffect(() => {
+    if (comptesEbay === undefined) return undefined;
+    if (comptesEbay === null) { setLu(null); return undefined; }
+    let stop = false;
+    lireEbayParCompte('ebay_inactives', 'items:data->items,complet:data->>complet,capturedAt:data->>capturedAt', comptesEbay)
+      .then((r) => { if (!stop) setLu(r || null); }, () => { if (!stop) setLu(null); });
+    return () => { stop = true; };
+  }, [comptesEbay, tick]);
+  const maintenant = Date.now();
+  const comptesVue = lu && Array.isArray(lu.lignes) ? lu.lignes.filter((x) => !vue || vue === '*' || (x.compte && x.compte.ref === vue)) : [];
+  const illisibles = comptesVue.filter((x) => x.ligne === undefined).map((x) => x.compte);
+  const jamais = comptesVue.filter((x) => x.ligne === null).map((x) => x.compte);
+  // Les comptes LUS, chacun avec l'âge de SA capture.
+  const lues = comptesVue.filter((x) => x.ligne && typeof x.ligne === 'object').map((x) => {
+    const cap = Number(x.ligne.capturedAt);
+    const ann = annoncesLuesA && typeof annoncesLuesA.get === 'function' ? annoncesLuesA.get(x.compte && x.compte.ref) : undefined;
+    const ancienne = !(cap > 0) || maintenant - cap > INACTIVES_FRAICHE_MS || (Number.isFinite(ann) && ann - cap > INACTIVES_ECART_MS);
+    return { ...x, cap: cap > 0 ? cap : null, ancienne };
+  });
+  const fraiches = lues.filter((x) => !x.ancienne), anciennes = lues.filter((x) => x.ancienne);
+  const lignes = lues.flatMap((x) => marquerEbay(Array.isArray(x.ligne.items) ? x.ligne.items : [], x.compte).map((l) => (l && typeof l === 'object' ? { ...l, _ancienne: x.ancienne } : l)))
+    .filter((l) => l && /^\d{1,19}$/.test(String(l.itemId || '')) && dansFenetreInactives(l.fin, maintenant))
+    .sort((a, b) => (Date.parse(b.fin || '') || 0) - (Date.parse(a.fin || '') || 0));
+  const etat = lu === undefined ? 'charge'
+    : (lu === null || illisibles.length) ? 'pas-su'
+    : !lues.length ? 'jamais'
+    : !fraiches.length ? 'ancienne'
+    : lignes.length ? 'lu' : 'vide';
+  // Le CHIFFRE seulement quand la liste est entière ET du jour (§5 : un total
+  // partiel présenté comme complet est pire qu'un total absent).
+  const entiere = etat === 'lu' && !jamais.length && !anciennes.length && fraiches.every((x) => String(x.ligne.complet) !== 'false');
+  const plafond = etat === 'lu' && !jamais.length && !anciennes.length && !entiere;   // eBay en a plus que la page lue
+  const melange = Array.isArray(comptesEbay) && comptesEbay.length >= 2 && new Set(lignes.map((l) => l._compte)).size > 1;
+  const plusieurs = comptesVue.length >= 2;
+  const nomsDe = (l) => l.map((c) => nomCompteEbay(c)).join(', ');
+  // Une relecture des annonces a-t-elle déjà eu lieu pour ces comptes jamais lus ?
+  const relusSansListe = jamais.filter((c) => { const ann = annoncesLuesA && typeof annoncesLuesA.get === 'function' ? annoncesLuesA.get(c.ref) : undefined; return Number.isFinite(ann) && ann > 0; });
+  const sousEtatJamais = jamais.length && relusSansListe.length === jamais.length ? 'non-rendue' : 'pas-relue';
+  const vendus = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
+  // Ventes pas vérifiées : « pas su » (une source illisible) ou en cours (on
+  // attend, sans rien dire). Dans les deux cas, pas de « Remettre en vente ».
+  const pasSuVentes = ventes && Array.isArray(ventes.pasSu) ? ventes.pasSu : [];
+  const ventesPasSu = !vendus || pasSuVentes.length > 0;
+  const ventesEnCours = !!(ventes && ventes.enCours);
+  // §7 : ce que l'écran a DÉJÀ dit de cette panne n'est pas redit ici.
+  const dits = new Set(Array.isArray(dejaDit) ? dejaDit : []);
+  const nonDits = pasSuVentes.filter((l) => !dits.has(l) && !(l === 'tes annonces Leboncoin' && dits.has('tes ventes Leboncoin')));
+  const verifDiteAilleurs = dits.size > 0 && nonDits.length === 0;
+  const enLigneVinted = enLigne && typeof enLigne.has === 'function' && Array.isArray(paires);
+  const idsSurEbay = surEbay && surEbay.ids && typeof surEbay.ids.has === 'function' ? surEbay.ids : null;
+  const parNumSurEbay = surEbay && surEbay.parNum && typeof surEbay.parNum.get === 'function' ? surEbay.parNum : null;
+  // Une inactive reliée par son SKU a besoin du verdict « vendue ailleurs ? » :
+  // l'écran le fait lire (`aVerifier`) même sans aucune annonce en ligne.
+  const avecSku = lignes.some((l) => numDeSkuEbay(l.sku));
+  React.useEffect(() => { if (onSku) onSku(avecSku); }, [avecSku]);
+  const vues = voirTout ? lignes : lignes.slice(0, INACTIVES_PAGE);
+  let attenteVerif = 0;
+  const lienS = { flexShrink: 0, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 2px', fontSize: 12.5, fontWeight: 700, color: E.accentSoft, textDecoration: 'none', whiteSpace: 'nowrap' };
+  const rendues = vues.map((l) => {
+    const t = Date.parse(l.fin || '');
+    const finJour = Number.isFinite(t) ? partsParis(t).date : '';
+    const pub = Date.parse(l.depuis || '');
+    const n = numEbayLu(l.sku, l.itemId, Number.isFinite(pub) ? pub : null, l.depuis);
+    const vendue = n && vendus ? vendus.get(n) : null;
+    // (revue) La MÊME annonce vue en ligne (ou programmée) ET inactive : les deux
+    // captures se contredisent — « à relire », jamais « de nouveau en vente ».
+    const memeEnLigne = !!(idsSurEbay && idsSurEbay.has(String(l.itemId)));
+    // « Déjà de nouveau en vente » seulement sous une AUTRE annonce (ou la même
+    // paire sous un autre N°, `via`) — une identité d'annonce, §5.
+    const d = !memeEnLigne && n && dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(n) : null;
+    const autres = n && parNumSurEbay ? parNumSurEbay.get(n) : null;
+    const deja = d && (d.via || !autres || [...autres].some((id) => id !== String(l.itemId))) ? d : null;
+    const relancee = /^\d{1,19}$/.test(String(l.relanceeEn || '')) ? String(l.relanceeEn) : '';
+    const surVinted = !!(n && enLigneVinted && paires.some((p) => cleNum(p.num) === n));
+    const verifManque = !!(n && !vendue && (ventesPasSu || ventesEnCours));
+    if (n && !vendue && ventesPasSu) attenteVerif++;
+    const relancer = !l._ancienne && !vendue && !deja && !relancee && !memeEnLigne && !verifManque;
+    const url = URL_ITEM_EBAY(l.itemId);
+    const prix = Number(String(l.price || '').replace(',', '.'));
+    const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
+      : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
+      : relancee ? 'déjà remise en vente sur eBay'
+      : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
+      : surVinted ? 'encore en ligne sur Vinted' : '';
+    return (
+      <div key={(l._compte || '') + l.itemId} data-ebay-inactive={l.itemId} data-inactive-num={n || ''} data-inactive-fin={finJour}
+        data-inactive-compte={l._compte || ''}
+        {...(l._ancienne ? { 'data-inactive-ancienne': '1' } : {})}
+        {...(vendue ? { 'data-inactive-vendue': vendue } : {})}
+        {...(memeEnLigne || relancee || deja ? { 'data-inactive-deja': memeEnLigne ? 'a-relire' : relancee ? 'relancee' : (deja.etat || 'en-vente') } : {})}
+        {...(surVinted ? { 'data-inactive-vinted': 'en-ligne' } : {})}
+        style={{ display: 'flex', flexWrap: 'wrap', gap: '0 10px', alignItems: 'center', padding: '6px 0', borderTop: `1px solid ${E.border}` }}>
+        <PhotoVente src={l.photo || null} size={44} />
+        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{ color: n ? E.text : E.muted, fontWeight: 700 }}>{n ? `N°${n}` : 'pas reliée'}</span> · {l.title || l.itemId}</div>
+          <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
+            {/* (revue) Le prix avec SA devise, la règle de la carte des annonces (§11). */}
+            {Number.isFinite(prix) && prix > 0 ? <><span data-inactive-prix="1">{prixEbayTexte(prix, l.currency)}</span>{' · '}</> : ''}
+            {finJour ? `terminée le ${jourParisTexte(finJour)}` : 'date de fin inconnue'}
+            {Number.isInteger(l.observateurs) && l.observateurs > 0 ? ` · ${l.observateurs} observateur${l.observateurs > 1 ? 's' : ''}` : ''}
+            {melange ? ` · ${nomCompteEbay((comptesEbay || []).find((c) => c.ref === l._compte) || { pseudo: l._pseudo })}` : ''}
+            {etatLigne ? <span data-inactive-etat="1">{` · ${etatLigne}`}</span> : null}
+          </div>
+        </div>
+        {url && (relancer
+          ? <a href={url} target="_blank" rel="noreferrer" data-inactive-relancer={url} style={lienS}>Remettre en vente sur eBay ↗</a>
+          : <a href={url} target="_blank" rel="noreferrer" data-inactive-voir={url} style={lienS}>Voir sur eBay ↗</a>)}
+      </div>
+    );
+  });
+  // Pas d'eBay relié (ou pas encore su) et rien de rangé : on ne promet pas une
+  // relecture qui n'aura pas lieu. (Après les crochets : un retour anticipé
+  // avant eux changerait leur nombre d'un rendu à l'autre.)
+  if (connected !== true && (etat === 'charge' || etat === 'jamais')) return null;
+  // §7 : le registre eBay illisible est déjà dit par l'écran (« Je n'ai pas pu
+  // lire tes annonces eBay ») — ici, une pastille, pas une phrase de plus.
+  const pasSuDitAilleurs = etat === 'pas-su' && comptesEbay === null;
+  const fraichesVides = fraiches.filter((x) => !lignes.some((l) => l._compte === x.compte.ref));
+  const noteVide = fraichesVides.length > 0 && (etat === 'vide' || anciennes.length > 0 || jamais.length > 0);
+  const quandCap = (c) => (c ? 'le ' + quandParisTexte(c) : 'à une date inconnue');
+  const plusVieille = anciennes.reduce((m, x) => (x.cap != null && (m == null || x.cap < m) ? x.cap : m), null);
+  const petit = { fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 4 };
+  return (
+    <div data-ebay-inactives={etat}
+      {...(entiere ? { 'data-ebay-inactives-n': lignes.length } : {})}
+      {...(plafond ? { 'data-ebay-inactives-aumoins': lignes.length } : {})}
+      {...(jamais.length ? { 'data-inactives-jamais': sousEtatJamais, 'data-inactives-jamais-comptes': jamais.map((c) => c.ref).join(',') } : {})}
+      {...(anciennes.length ? { 'data-inactives-anciennes': anciennes.map((x) => x.compte.ref).join(','), ...(plusVieille != null ? { 'data-inactives-lue-le': partsParis(plusVieille).date } : {}) } : {})}
+      {...(attenteVerif > 0 ? { 'data-inactives-verif': attenteVerif } : {})}
+      {...(pasSuDitAilleurs || (attenteVerif > 0 && verifDiteAilleurs) ? { 'data-inactives-dit': 'ecran' } : {})}
+      style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 auto', fontSize: 16, fontWeight: 800, color: E.text }}>
+          Inactives sur eBay{entiere ? ` (${lignes.length})` : plafond ? ` (au moins ${lignes.length})` : ''}{' '}
+          <Pourquoi label="Inactives : pourquoi VRM ne remet rien en vente">Les annonces terminées sans vente ces {INACTIVES_JOURS} derniers jours, telles qu'eBay les garde. VRM ne les remet pas en vente lui-même : une remise en vente peut coûter des frais d'insertion chez eBay — c'est toi qui décides, sur eBay.</Pourquoi>
+        </div>
+        {pasSuDitAilleurs && <span data-inactives-pastille="pas-lue" style={{ fontSize: 11.5, fontWeight: 700, color: E.muted, border: `1px solid ${E.border}`, borderRadius: 999, padding: '2px 8px' }}>pas lue</span>}
+      </div>
+      {etat === 'charge' && <div style={{ fontSize: 12.5, color: E.muted }}>Chargement…</div>}
+      {etat === 'jamais' && <div data-inactives-note="jamais" style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5 }}>{sousEtatJamais === 'non-rendue'
+        ? `Pas encore rendue par eBay${plusieurs ? ` (${nomsDe(jamais)})` : ''} : VRM la demande à chaque relecture eBay (toute seule, l'app ouverte) ; eBay ne la rend peut-être pas tant qu'il n'y a aucune annonce terminée sans vente.`
+        : 'Pas encore lue — elle se lit avec la relecture eBay (toute seule, l\'app ouverte).'}</div>}
+      {etat === 'pas-su' && !pasSuDitAilleurs && <div data-inactives-note="pas-su" data-inactives-illisibles={illisibles.map((c) => c.ref).join(',')} style={{ fontSize: 12.5, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces inactives{illisibles.length && Array.isArray(comptesEbay) && comptesEbay.length >= 2 ? ` (${nomsDe(illisibles)})` : ''} — rien n'est perdu, réessaie dans un instant.</div>}
+      {noteVide && <div data-inactives-note="vide" style={{ ...petit, fontSize: 12.5 }}>Aucune annonce terminée sans vente ces {INACTIVES_JOURS} derniers jours{plusieurs && fraichesVides.length < comptesVue.length ? ` sur ${nomsDe(fraichesVides.map((x) => x.compte))}` : ''}.</div>}
+      {anciennes.length > 0 && <div data-inactives-note="ancienne" style={petit}>{anciennes.length === 1
+        ? `Lue ${quandCap(anciennes[0].cap)}${plusieurs ? ` (${nomCompteEbay(anciennes[0].compte)})` : ''} — pas relue depuis : elle a pu changer sur eBay. La remise en vente se fait sur eBay.`
+        : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis : elles ont pu changer sur eBay. La remise en vente se fait sur eBay.`}</div>}
+      {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours · la remise en vente se fait sur eBay.</div>}
+      {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
+      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces paires sont vendues` : 'une de ces paires est vendue'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
+      {rendues}
+      {!voirTout && lignes.length > INACTIVES_PAGE && (
+        <button type="button" data-inactives-plus="1" onClick={() => setVoirTout(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 4, border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '0 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Voir plus — {INACTIVES_PAGE} affichées sur {lignes.length}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
 // Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
 // elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
@@ -18858,6 +19325,15 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // retrait automatique et la garde de publication — le sélecteur ne change que
   // ce qu'on VOIT (`vue`), jamais ce qui protège.
   const [items, setItems] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
+  // (23 octobre) Les INACTIVES se chargent seules ; ce compteur les fait relire
+  // à chaque rechargement de l'écran (après une synchro, une publication).
+  const [inactivesTick, setInactivesTick] = React.useState(0);
+  const [inactivesSku, setInactivesSku] = React.useState(false);   // une inactive reliée par son SKU ⇒ vérifier les ventes
+  // (23 octobre, revue) QUAND les annonces en ligne de chaque compte ont été
+  // rangées (ref → ms · null jamais · undefined illisible) : la route range les
+  // inactives dans le MÊME appel ; des annonces relues plus tard qu'elles disent
+  // qu'eBay ne les a pas rendues à cette relecture (`EbayInactives`).
+  const [annoncesLuesA, setAnnoncesLuesA] = React.useState(null);
   // ── LA RÈGLE D'OFFRE (9 octobre) : `ebay_offres{_clé}` de chaque compte. ──
   // `regles` : undefined en cours · { map, illisibles }. Les gestes posent un
   // état LOCAL (`reglesLocales`, même clé `${ref}:${itemId}`) qui prime sur la
@@ -18984,10 +19460,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const charger = React.useCallback(async () => {
     lireBrouillonsEbay().then((b) => setBrouillons(b));
     if (comptesEbay === undefined) return;
+    setInactivesTick((t) => t + 1);
     chargerProgrammees();
     if (comptesEbay === null) { setItems(null); setCommandes(null); setRegles({ map: new Map(), illisibles: new Set(['*']) }); setVentesEbayLues(null); return; }
     const [L, O, RG] = await Promise.all([
-      lireEbayTous('ebay_listings', 'items:data->items', 'items', comptesEbay),
+      lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesEbay),
       // Les commandes eBay : seulement la liste (§4.4), pour « vendue sur eBay » —
       // et (9 octobre) QUAND elles ont été relues (la fenêtre où eBay vend
       // sans que VRM le voie, dite à côté des règles d'offre).
@@ -18995,6 +19472,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       lireReglesEbay(comptesEbay),
     ]);
     setRegles(RG); setReglesLocales(new Map()); setPrixLocaux(new Map());
+    setAnnoncesLuesA(L && Array.isArray(L.lignes) ? new Map(L.lignes.map(({ compte, ligne }) => [compte.ref, ligne === undefined ? undefined : (ligne && Number(ligne.capturedAt) > 0 ? Number(ligne.capturedAt) : null)])) : null);
     setVentesEbayLues(O ? new Map(O.lignes.map(({ compte, ligne }) => [compte.ref, ligne === undefined ? undefined : (ligne && Number(ligne.capturedAt) > 0 ? Number(ligne.capturedAt) : null)])) : null);
     // Annonces : les comptes lisibles sont montrés, l'illisible est NOMMÉ ;
     // tous illisibles ⇒ « pas su » (comme avant).
@@ -19054,7 +19532,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     || (Array.isArray(commandes) && commandes.some((o) => o && Array.isArray(o.lineItems) && o.lineItems.some((li) => li && numDeSkuEbay(li.sku))))
     || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku))
     || !!(brouillons && typeof brouillons === 'object' && Object.keys(brouillons).length)
-    || connected === true || !!ouvrirBrouillon;
+    || connected === true || !!ouvrirBrouillon || inactivesSku;
   // Les ventes Leboncoin (5 Ko, projetées §4.4) : une paire vendue LÀ-BAS ne se
   // programme pas sur eBay. TROIS états : `undefined` en cours · `null` pas su
   // (la base n'a pas répondu) · objet lu (`{}` = aucune vente captée).
@@ -19324,6 +19802,22 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     }
     return m;
   }, [pris, programmees, listeProgrammees, paires]);
+  // (23 octobre, revue) Les annonces eBay EN LIGNE ou PROGRAMMÉES, par
+  // identifiant et par N° : une inactive n'est « déjà de nouveau en vente » que
+  // sous une AUTRE annonce, et la MÊME annonce vue des deux côtés est « à relire ».
+  const surEbayIds = React.useMemo(() => {
+    const ids = new Set(), parNum = new Map();
+    const ajoute = (x) => {
+      if (!x || x.itemId == null) return;
+      const id = String(x.itemId); ids.add(id);
+      const k = numEbayLu(x.sku, x.itemId, null, x.depuis);
+      if (k) { if (!parNum.has(k)) parNum.set(k, new Set()); parNum.get(k).add(id); }
+    };
+    for (const a of (Array.isArray(items) ? items : [])) ajoute(a);
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) ajoute(x);
+    for (const p of listeProgrammees) ajoute(p);
+    return { ids, parNum };
+  }, [items, programmees, listeProgrammees]);
   const surSku = React.useCallback((itemId, sku) => {
     setItems((l) => Array.isArray(l) ? l.map((a) => String(a.itemId) === String(itemId) ? { ...a, sku } : a) : l);
   }, []);
@@ -19388,7 +19882,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // (16 oct., « premium » au téléphone) La LISTE des annonces est l'information
   // principale de l'écran : la mise en vente reste en haut, les brouillons et les
   // programmées passent SOUS la liste (`outilsSuite`), les notes aussi.
-  const outilsSuite = (<>
+  // (23 octobre, revue) Une FONCTION de ce que l'écran a déjà dit d'une panne
+  // (`dits`, les sources de `lignePasSu` et du bloc des règles) : les inactives
+  // ne la redisent pas (§7). Appelée là où ces lignes sont calculées.
+  const outilsSuite = (dits) => (<>
     <EbayBrouillons brouillons={brouillons} connected={connected} paires={paires} vue={vueSeule ? vue : '*'} comptesPub={comptesPub}
       onModifier={(d) => setOuvrirBrouillon({ ...d })}
       onPlanifier={(ids) => setPlanif(ids)}
@@ -19409,10 +19906,13 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         setProgrammees((p) => (p && typeof p === 'object' ? { ...p, items: (p.items || []).filter((x) => String(x.itemId) !== itemId) } : p));
         remettreBrouillon(itemId);
       }} />
+    {/* (23 octobre) Les annonces terminées SANS vente — lecture seule. */}
+    <EbayInactives comptesEbay={comptesEbay} tick={inactivesTick} vue={vueSeule ? vue : '*'} connected={connected}
+      ventes={ventesConnues} dejaSurEbay={dejaSurEbay} surEbay={surEbayIds} annoncesLuesA={annoncesLuesA} dejaDit={dits}
+      paires={paires} enLigne={enLigne} onSku={setInactivesSku} />
   </>);
   // (16 octobre, revue) « Vendre une paire » vient EN PREMIER, avant les
   // alertes : c'est le geste qu'on vient faire ici. `outils` ne garde que la suite.
-  const outils = outilsSuite;
   // Annuler la programmation d'une paire vendue sur Vinted : la réponse d'eBay
   // est dite telle quelle (l'annulation par l'API n'est pas garantie).
   const annulerVendue = async (d) => {
@@ -19693,15 +20193,15 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     );
   })();
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
   // Les annonces du compte affiché (ou de tous) — l'union reste derrière pour
   // ce qui protège (`dv`, `pris`, `dejaSurEbay`).
   const itemsVue = items.filter((a) => dansVue(a));
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (section « Compte ») et synchronise.'}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (section « Compte ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -19922,7 +20422,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux paires : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
       </div>
     )}
-      {outilsSuite}
+      {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
     </div>
   </>);
 }
@@ -25468,7 +25968,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         return (
         <div onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
           <FermeAuRetour fermer={()=>!delBusy&&setDelCible(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
               <span style={{flexShrink:0,width:34,height:34,borderRadius:8,background:`${C.danger}14`,color:C.danger,display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={17}/></span>
               <div style={{flex:1,minWidth:0}}>
@@ -29809,8 +30309,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
+  // (23 oct.) Seuls les VRAIS reçus (un Montant payé) — les emails de statut
+  // rangés là par l'ancien tri ne s'appellent plus « Reçu d'achat » — et leur n°
+  // de transaction lu dans le texte (une identité). Rien n'est retiré en base.
+  const recusAchat = useMemo(() => recusAchatDe(achEmails), [achEmails]);
+  const nonRecusAchat = Array.isArray(achEmails) && Array.isArray(recusAchat) ? achEmails.length - recusAchat.length : 0;
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
+  // (23 oct.) « Paires du lot » s'ouvre PAR-DESSUS le tiroir d'une vente : elle
+  // prend le clavier à l'ouverture (Échap ferme la feuille qu'on voit, pas le
+  // tiroir caché sous son voile) et le rend au bouton qui l'a ouverte.
+  const lotPanneauRef = React.useRef(null);
+  const lotOrigineRef = React.useRef(null);   // le bouton « Voir les paires du lot » (posé à son clic : Safari ne donne pas le focus à un bouton cliqué)
+  const lotOuvert = !!lotView;
+  React.useEffect(() => {
+    if (!lotOuvert) return undefined;
+    if (!lotOrigineRef.current) lotOrigineRef.current = document.activeElement;
+    try { if (lotPanneauRef.current) lotPanneauRef.current.focus({ preventScroll: true }); } catch (_) {}
+    return () => {
+      const o = lotOrigineRef.current; lotOrigineRef.current = null;
+      try { if (o && o.isConnected && typeof o.focus === 'function') o.focus({ preventScroll: true }); } catch (_) {}
+    };
+  }, [lotOuvert]);
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useState(() => new Set(load('vrm_colis_collected', [])));
   const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
@@ -29892,8 +30412,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (« est conforme à sa », 16 fois). La voie certaine ne fonctionne donc jamais
   // aujourd'hui, et le titre ne vaut rien — d'où la sévérité assumée : on rend
   // `null` plutôt que le reçu d'un autre achat.
+  // (23 oct.) La voie certaine MARCHE enfin : le n° de transaction est lu dans
+  // le texte du reçu (`txRecuAchat`) — mesuré, 61 reçus sur 81 se relient ainsi
+  // à leur achat capté, 0 doublon. Et seuls les VRAIS reçus sont candidats
+  // (`recusAchat`) : un email « Commande mise à jour pour … » au titre de
+  // l'achat ne s'appelle plus « Reçu d'achat ».
   const receiptFor = (o) => {
-    const list = achEmails || [];
+    const list = Array.isArray(recusAchat) ? recusAchat : [];
     if (!list.length) return null;
     // 1) n° de transaction = identité certaine.
     const tx = String(o.transaction_id || '');
@@ -29903,11 +30428,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (n === 1) return seul;
       if (n > 1) return null;   // deux reçus pour une transaction : on ne tranche pas
     }
-    // 2) titre STRICTEMENT égal, et un seul candidat DES DEUX CÔTÉS.
+    // 2) titre STRICTEMENT égal, et un seul candidat DES DEUX CÔTÉS — parmi les
+    // reçus SANS n° de transaction seulement : un reçu qui porte un AUTRE n°
+    // est celui d'un autre achat, même au titre identique (§5).
     const ot = normTitle(o.title);
     if (!ot) return null;
     let seul = null, n = 0;
-    for (const a of list) if (a.article && normTitle(a.article) === ot) { n++; seul = a; }
+    for (const a of list) if (!a.transaction && a.article && normTitle(a.article) === ot) { n++; seul = a; }
     return n === 1 ? seul : null;
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
@@ -37470,7 +37997,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
                 )}
                 {isLotTitle(o.title) && (
-                  <button className="vrm-icon-control" type="button" onClick={async()=>{ setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
                 )}
                 {hidden ? (
                   <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
@@ -38042,7 +38569,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='achats' && (<div className="vrm-achats">
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
-        <RecusEmail recus={achEmails} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
+        <RecusEmail recus={recusAchat} autres={nonRecusAchat} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -41109,7 +41636,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {showAnnual && (
         <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowAnnual(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📚 Registre comptable {annual.year}</div>
@@ -41319,10 +41846,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {/* Reçu d'achat DANS l'app (pas de nouvel onglet à fermer) */}
       {/* Détail d'un LOT : les paires vendues ensemble, avec leur N° si connu. */}
+      {/* zIndex 1300 (et plus 80) : elle s'ouvre depuis le tiroir d'une vente
+          (`vrm-ledger-drawer-host`, z-index 150, dans document.body) — à 80 elle
+          s'ouvrait DESSOUS, sur tous les navigateurs (banc feuilles-coque.cjs). */}
       {lotView && (
-        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:1300,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotView(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
+          <div ref={lotPanneauRef} role="dialog" aria-modal="true" aria-label="Paires du lot" tabIndex={-1} data-lot-paires=""
+            onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); setLotView(null); } }}
+            onClick={e=>e.stopPropagation()} style={{outline:'none',width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px calc(28px + env(safe-area-inset-bottom))'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
               <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
               <button className="vrm-icon-control" type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
@@ -41357,52 +41889,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         </div>
       )}
-      {receiptView && (()=>{ const r=parseReceiptFields(receiptView); const Row=({label,val,strong})=> val ? (
-          <div style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:`1px solid ${C.border}`}}>
-            <span style={{fontSize:13,color:C.muted,fontWeight:600}}>{label}</span>
-            <span style={{fontSize:13,color:C.text,fontWeight:strong?600:500,textAlign:'right'}}>{val}</span>
-          </div>) : null;
-        return (
-        <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <FermeAuRetour fermer={()=>setReceiptView(null)}/>
-          <div role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} ref={el=>el?.focus()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setReceiptView(null);}}} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <button className="vrm-icon-control" type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
-              <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>Reçu d'achat</div>
-              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>PDF</button>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:16}}>
-              <div style={{background:C.card,borderRadius:10,overflow:'hidden',border:`1px solid ${C.border}`}}>
-                <div style={{background:'#007782',color:'#fff',padding:'16px 18px'}}>
-                  <div style={{fontSize:11,opacity:0.85,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
-                  <div style={{fontSize:20,fontWeight:600,marginTop:3}}>{r.article}</div>
-                </div>
-                {r.hasStructured ? (
-                  <div style={{padding:'16px 18px'}}>
-                    {r.paid && (
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:4}}>
-                        <span style={{fontSize:13,color:C.muted,fontWeight:500}}>Montant payé</span>
-                        <span style={{fontSize:26,fontWeight:700,color:'#007782'}}>{r.paid}</span>
-                      </div>
-                    )}
-                    <Row label="Article" val={r.artPrice}/>
-                    <Row label="Frais de port" val={r.port}/>
-                    <Row label="Protection acheteurs" val={r.protection}/>
-                    <div style={{height:8}}/>
-                    <Row label="Vendeur" val={r.vendeur}/>
-                    <Row label="Mode de paiement" val={r.mode}/>
-                    <Row label="Date du paiement" val={r.datePaie}/>
-                    <Row label="N° de transaction" val={r.trans}/>
-                    <Row label="Compte" val={r.compte}/>
-                  </div>
-                ) : (
-                  <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:13,color:C.text}}>{r.cleaned}</div>
-                )}
-              </div>
-              <div style={{textAlign:'center',color:C.muted,fontSize:11,marginTop:12,lineHeight:1.5}}>Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
-            </div>
-          </div>
-        </div>); })()}
+      {receiptView && <FeuilleRecuAchat recu={receiptView} fermer={()=>setReceiptView(null)}/>}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowSourcing(false)}/>
@@ -41700,7 +42187,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {showReport && (
         <div onClick={()=>setShowReport(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowReport(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
@@ -42353,6 +42840,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           (§11) : on ne recalcule rien ici.
           ⚠️ Tous les comptes, MÊME MASQUÉS : masquer un compte cache sa
           comptabilité, ça ne sort pas le carton de l'étagère. */}
+      {/* (23 oct.) « Retour » ferme le studio (et coupe la caméra, au démontage)
+          au lieu de changer de section sous lui. */}
+      {studioOpen && <FermeAuRetour fermer={()=>setStudioOpen(false)}/>}
       {studioOpen && (
         <React.Suspense fallback={null}>
           <StudioPhoto C={C} base={STUDIO_BASE} onClose={()=>setStudioOpen(false)}
@@ -42384,6 +42874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           : t === 'annulee' ? 'vente annulée — la paire est restée' : 'au garage';
         return (
           <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+            <FermeAuRetour fermer={()=>setInventOpen(false)}/>
             <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:620,maxHeight:'88vh',overflowY:'auto',padding:'16px 14px calc(20px + env(safe-area-inset-bottom))'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
                 <span style={{flex:1,fontSize:17,fontWeight:700,color:C.text}}>Inventaire physique</span>
@@ -42457,7 +42948,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setAuditOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setAuditOpen(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',alignItems:'center',gap:8,padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🔎 Audit d'inventaire</div><div style={{fontSize:12,color:C.muted}}>Réconcilie tes numéros avec le garage, les annonces et les ventes.</div></div>
               <button type="button" onClick={()=>setAuditOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
@@ -42489,7 +42980,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setLotOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotOpen(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les paires choisies → marge juste sur chacune.</div></div>
@@ -42562,7 +43053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return (
         <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPassportFor(null)}/>
-          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div onClick={ev=>ev.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{width:52,height:52,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {photo?<PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:22}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
@@ -50304,7 +50795,17 @@ function AppCoeur() {
         // `minHeight:0` est indispensable : sans lui, un enfant de flex refuse
         // de rétrécir et le conteneur ne défile pas (il s'étire).
         flex:'1 1 auto', minHeight:0, overflowY:'auto', overflowX:'hidden',
-        WebkitOverflowScrolling:'touch', overscrollBehaviorY:'contain',
+        // ⚠️⚠️ JAMAIS `WebkitOverflowScrolling:'touch'` ICI (23 oct.). Sur iPhone,
+        // WebKit donne un z-index 0 — un contexte d'empilement — à tout élément
+        // qui défile et porte cette propriété (StyleAdjuster.cpp, « Touch
+        // overflow scrolling creates a stacking context », iOS seulement). Posée
+        // sur <main> depuis la coque (28 sept.), elle enfermait TOUTES les
+        // feuilles de l'écran sous la barre du bas (z-index 60), quel que soit
+        // leur z-index : le « Reçu d'achat », « Supprimer ce compte », le rapport
+        // comptable… dont la fin et les boutons passaient dessous. Depuis iOS 13
+        // le défilement à inertie est natif : elle ne servait plus qu'à piéger.
+        // Banc `feuilles-coque.cjs`, qui applique la règle de WebKit.
+        overscrollBehaviorY:'contain',
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',

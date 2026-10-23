@@ -12084,6 +12084,233 @@ mutation. Extension non touchée.
   « publiée » part quand sa page profil a été relue APRÈS (sinon elle reste, avec
   le doute dit une fois).
 
+### eBay → Annonces → « Inactives » : les annonces terminées sans vente (23 octobre)
+Julien : « est-ce que les onglets de l'app eBay sont dans VRM ? ». Il manquait les
+INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
+- **Décidé (ne pas rediscuter)** : LECTURE SEULE. VRM ne remet RIEN en vente
+  (`RelistFixedPriceItem` peut coûter des frais d'insertion, §2-§3) ; chaque ligne
+  mène à SA page eBay (`https://www.ebay.fr/itm/{ItemID}`, ItemID validé).
+- **Route, aucun appel de plus** : `<UnsoldList>` (Include, `DurationInDays` 60,
+  page 1 de 200) part dans le MÊME `GetMyeBaySelling` que la page 1 des annonces en
+  ligne, et seulement pour la synchro et la relecture sans geste
+  (`listeVendeur(token, {invendues:true})`) ; `dejaChezEbay`, les règles d'offre,
+  les programmées : inchangés — une inactive n'entre JAMAIS dans `actives`.
+  Rangée dans une ligne DÉDIÉE par compte, `ebay_inactives{_clé}` (⚠️ pas
+  `ebay_listings_*` : deux lecteurs balaient cette famille), chez le vendeur de la
+  session (`modifierDonnee` → `portee(owner)`, comparer-et-échanger), projetée (`resumeInactive` : ItemID, SKU
+  hors variantes, titre, prix + devise, fin, début, observateurs, photo
+  `i.ebayimg.com` seulement, `RelistedItemID`), `{items, complet, jours, capturedAt}`.
+  ⚠️ **À L'INVERSE des deux autres listes, un `UnsoldList` ABSENT vaut « pas lu »**
+  (`invendues: null`) : rien n'est écrit, la dernière capture reste ; une réponse
+  ratée aussi. `<UnsoldList/>` ou un conteneur à 0 entrée = « lue vide ».
+  `lu.inactives` dans la réponse (l'app n'en juge pas la synchro).
+- **Écran** : une section « Inactives sur eBay » SOUS les programmées
+  (`EbayInactives`, `outilsSuite` : visible même sans annonce en ligne), chargée
+  seule (`lireEbayParCompte`, `select` scalaires, `->>` en texte). États
+  `data-ebay-inactives` = `charge · jamais · vide · ancienne · lu · pas-su` ; « Inactives (N) »
+  (`data-ebay-inactives-n`) seulement si TOUS les comptes de la vue sont lus et la
+  liste entière, « au moins N » si eBay en a plus (`data-ebay-inactives-aumoins`),
+  un compte illisible nommé (`data-inactives-illisibles`) sans aucun nombre. Pas
+  d'eBay relié et rien de rangé ⇒ pas de section. La vue suit le compte choisi
+  (`vue`), le compte nommé sur la ligne seulement si la liste en mélange (§7).
+  Ligne : photo, N° SEULEMENT par le SKU (`numEbayLu` avec la date de PUBLICATION :
+  avant la remise à zéro ⇒ série B ; sinon « pas reliée », jamais par titre),
+  prix, « terminée le … » (`data-inactive-fin`, jour de Paris), observateurs.
+  ⚠️ « Retirer d'eBay » une paire vendue sur Vinted l'envoie DANS cette liste :
+  « Remettre en vente sur eBay ↗ » (`data-inactive-relancer`) n'est proposé ni pour
+  une paire vendue ailleurs (`numerosDejaVendus`, `data-inactive-vendue`), ni déjà
+  de retour sur eBay (`dejaSurEbay` ou `RelistedItemID`, `data-inactive-deja`), ni
+  tant que les ventes ne sont pas vérifiées (dit une fois, `data-inactives-verif`) —
+  le lien devient « Voir sur eBay » (`data-inactive-voir`). « encore en ligne sur
+  Vinted » par identité (`data-inactive-vinted`). Une inactive reliée fait lire la
+  preuve de vente (`aVerifier`). Aucune couleur rouge.
+- **Preuves** : `audit-ebay-route.cjs` section 14 « [INA] » (même appel, ligne
+  dédiée, vendeur et compte, « pas lu » n'écrase rien sous trois formes, page 2 non
+  demandée, une inactive ne bloque pas publier/programmer, ni `programmees` ni
+  `regleoffrelire` ne la demandent, aucun Relist/AddItem envoyé ni écrit dans
+  `api/`) : **14 rouges sur 789401d**, 10 mutations de la route toutes rouges
+  (absent = vide, appel séparé, ligne sans suffixe, fusion dans `actives`, tous les
+  appelants, photo non filtrée, owner de l'installation, remise en vente glissée,
+  détail brut, « pas lu » rangé vide). Banc `bancs/ebay-inactives.cjs` (port
+  `BANC_PORT`, 390 tactile + 1512, données inventées, 44 contrôles) : **43 rouges
+  sur le build de 789401d** (le 44ᵉ y lève), et 8 mutations de l'écran rouges.
+  ⚠️ §6.3 : `ebay-parcours.mjs` exécute `handleSync` dans un `vm` avec ses
+  dépendances injectées — il sert maintenant `rangerInactives` (sinon
+  `ReferenceError`, sur une route intacte).
+- ⚠️ **Non mesuré — rien n'a été envoyé à eBay** : la forme de `UnsoldList` vient
+  de la doc d'eBay (présence de `WatchCount`, `GalleryURL`, `EndTime`, `SKU`,
+  `RelistedItemID`, la limite réelle de `DurationInDays`) ; surtout, qu'eBay émette
+  `<UnsoldList>` quand il n'y a AUCUNE inactive — s'il l'omet, la section reste
+  « jamais lue » (« se lit à la prochaine relecture ») pour un vendeur sans
+  inactive. Le cron du matin ne relit pas les annonces : la liste se rafraîchit
+  avec la synchro et la relecture (≤ 10 min, app ouverte).
+- **Julien** : rien. La section se remplit à la prochaine relecture eBay.
+
+#### Revue du 23 octobre — treize constats, tous reproduits, corrigés
+Chaque constat REPRODUIT d'abord (la vraie route dans le harnais
+d'`audit-ebay-route`, l'écran rendu sur données inventées), puis corrigé ; rouge
+sur a9115c0 (copie `git archive`, contrôle lancé DEPUIS elle, §6.1), vert après,
+rouge sous mutation. Décision gardée : un `UnsoldList` absent vaut « pas lu »
+(on ne range jamais du vide) — c'est l'ÉCRAN qui dit l'âge de la capture.
+- ⚠️⚠️ **Une capture figée se présentait comme la liste du jour** (n° 1 et 3) :
+  95 jours, une annonce finie il y a 100 jours sous « ces 60 derniers jours »,
+  « Inactives (1) » et « Remettre en vente ». Route : `rangerInactives` ne range
+  que les fins dans les 60 jours (fin illisible gardée). Écran : une capture de
+  plus de 24 h (`INACTIVES_FRAICHE_MS`), ou plus vieille de 15 min
+  (`INACTIVES_ECART_MS`) que les annonces en ligne du même compte (la route les
+  range dans le MÊME appel : eBay ne l'a pas rendue), est `ancienne` :
+  « Lue le … — pas relue depuis » (`data-inactives-anciennes`,
+  `data-inactives-lue-le`, jour de Paris), aucun « (N) », « Voir sur eBay »
+  seulement, ni « ces 60 derniers jours » ; une ligne hors fenêtre n'est jamais
+  montrée (`dansFenetreInactives`). « Jamais lue » se dédouble
+  (`data-inactives-jamais` = `pas-relue` · `non-rendue`) : une relecture des
+  annonces DÉJÀ faite sans la liste ne promet plus « la prochaine relecture »
+  (eBay ne l'émet peut-être pas sans inactive — non mesuré).
+- **Course synchro / relecture** (n° 2) : la capture est datée au DÉPART de la
+  question (`tListe`, `t0`), écrite par `modifierDonnee` qui refuse de remplacer
+  une capture plus récente (la règle du `lueA` des règles d'offre).
+- **La même ItemID en ligne ET inactive** (n° 4) : sa ligne dit « état à relire
+  chez eBay » (`data-inactive-deja="a-relire"`), plus « déjà de nouveau en
+  vente » ; `deja` n'est retenu que pour une AUTRE ItemID ou un `via`. Route : la
+  relecture ne range les inactives que si `ebay_listings` a été rangée par le
+  même appel.
+- **« 95,00 € USD »** (n° 5) : `prixEbayTexte` (la règle de la carte des
+  annonces, §11) — « 95,00 USD », aucune devise ⇒ aucun symbole.
+- **§7** (n° 6) : une panne déjà dite par l'écran (ventes : `pasSu` de la ligne
+  du haut, `pasSuVentes` de `bloqueCommun` ; registre eBay illisible) n'est pas
+  redite — `dejaDit`, une pastille « pas lue », `data-inactives-dit="ecran"`.
+- **Un compte lu vide + un jamais lu** (n° 7) : `vide` (« aucune … sur X ») +
+  « pas encore lue pour Y » — plus « Pas encore lue » pour tout.
+- **Cinq trous de banc** (n° 8 à 12, le code était juste) : marqueur 013 (VRM-21
+  publiée avant la coupure ⇒ B21, jamais 21) et `numberedAt` après publication
+  (« pas reliée ») ; ventes EN COURS de lecture (requêtes retenues : aucun
+  « Remettre en vente ») ; un compte jamais lu ⇒ aucun « (N) » ; une paire à
+  l'annonce Vinted FERMÉE n'est pas « encore en ligne sur Vinted » ; une fin à
+  23 h 30 UTC = le lendemain à Paris. **n° 13** (audit) : photos
+  `i.ebayimg.com.evil.test`, `http://i.ebayimg.com/…`, `evil.test/?u=i.ebayimg.com`
+  doivent être vidées.
+- **Preuves** : `audit-ebay-route.cjs` **502 contrôles, 5 rouges sur a9115c0**
+  ([INA-fenetre], [INA-course], [INA-coherence], et l'écriture par
+  comparer-et-échanger, sync et relire) ; cinq mutations de la route, chacune
+  rouge : fenêtre retirée (1), garde « plus récente » retirée (1), date prise à
+  l'ÉCRITURE (1, [INA-course2] : la relecture partie avant une synchro, écrite
+  avant elle), couplage retiré (1), regex photo non ancrée (4) ; l'ANCIEN audit
+  sous la regex non ancrée : les mêmes rouges que sur la route juste (le trou
+  n° 13 reproduit). Banc `bancs/ebay-inactives.cjs` (`BANC_SEUL=A,H,…`)
+  **80 contrôles, 28 rouges sur le build de a9115c0** ; quatorze mutations de
+  l'écran, chacune rouge sur SON scénario (capture jamais ancienne 6 · écart de
+  15 min retiré 2 · fenêtre retirée 2 · même ItemID ignorée 2 · prix « € USD » 2 ·
+  §7 ventes 2 · §7 registre 2 · mixte rabattu sur « jamais » 2 · N° sans date 4 ·
+  ventes en cours ignorées 2 · « (N) » avec un compte jamais lu 2 · « sur
+  Vinted » sans identité 4 · jour UTC 2 · sous-état unique 2) ; l'ANCIEN banc
+  sous les mutations des trous n° 8 à 12 : exactement le même verdict que sur
+  l'écran juste (42 OK, 2 KO dus à un attribut déplacé) — le trou reproduit.
+- **Non mesuré** : qu'eBay émette `<UnsoldList>` vide (sinon « pas encore rendue
+  par eBay » reste pour un vendeur sans inactive) ; rien n'a été envoyé à eBay.
+
+### Le reçu d'achat : toutes les lignes, la somme vérifiée, au-dessus de la barre (23 octobre)
+Julien, capture iPhone (Vinted → Achats → ⋯ → « Reçu d'achat ») : « le reçu s'affiche
+mal » — la barre du bas passait par-dessus la feuille (« N° de transaction » coupé, la
+fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
+- **Mesuré (lecture seule, 117 lignes `email_achat_*`)** : 81 vrais reçus (« Ton reçu
+  pour la commande … »). Le bloc « Montant payé » → « Mode de paiement » porte Article,
+  Frais de port, puis « Frais Vinted » (55) OU « Frais de Protection acheteurs » (26),
+  et « Réduction -X,XX € » (8, négative) ; la somme vaut le Montant payé sur 81/81.
+  L'ancien parseur ne lisait que trois libellés : 55 reçus perdaient leurs frais, 8
+  leur réduction. 36 lignes ne sont PAS des reçus (« Commande mise à jour pour … » 18,
+  « … - Confirmation requise » 16, « Retourne ta commande … » 2 ; du 16 juillet au
+  3 août, aucune avec un Montant payé) : la vraie route `email-inbound` ne les crée
+  plus (prouvé). `transaction` est vide sur les 81 (l'astérisque de « *N° de
+  transaction* » casse le motif du serveur) alors que le texte porte le n° sur 81/81 :
+  61 se relient ainsi à un achat capté, 0 doublon. Toutes ont `pdfB64` vide.
+- **Une règle** `<recu-achat-regle>` (App.jsx) : `ventilationRecuAchat` (toutes les
+  lignes « Libellé ±X,XX € », libellé de Vinted, en centimes, aucune jetée — une ligne
+  illisible est GARDÉE ; `juste` · `ecart` · `passu`), `txRecuAchat` (le n° lu sur sa
+  ligne), `estRecuAchat` (⚠️ revue ci-dessous : tout email rangé comme achat SAUF les
+  trois sujets de statut mesurés, sans Montant payé ni PDF),
+  `recusAchatDe` (`undefined`/`null` passés tels quels). `champsRecuAchat` sert la
+  feuille ET la fenêtre PDF (§11) ; `phraseSommeRecu` dit l'écart ou le « pas su » en
+  une ligne neutre, jamais un total partiel présenté comme complet.
+- **Liste et menu** : « Reçus d'achat par email » ne liste que les vrais reçus et dit
+  combien d'autres emails n'en sont pas (`data-recus-autres`) ; le menu ⋯ d'un achat
+  (`receiptFor`) relie par n° de transaction, et le titre ne relie plus qu'un reçu SANS
+  n° (§5 : un reçu au même titre et à un autre n° est celui d'un autre achat).
+  `ordersFromEmailAchats` (mort depuis août, seconde règle « reçu ») est retiré.
+- **La feuille** (`FeuilleRecuAchat`) est portée sur `<body>` : sur iPhone, `<main>`
+  (qui défile) forme un contexte d'empilement et la barre du bas passait dessus. ‹ et
+  PDF à 44 px, zone de sécurité en bas, hauteur en `dvh` ; « Visa •••• 4242 » (sans
+  les étoiles de l'email, on lisait « Visa, 4242 ») ; montant payé à l'encre (§7),
+  bande à `COULEUR_PLATEFORME.vinted`. ⚠️ Le « zoom 0,8 » du téléphone (§7, 19 oct.)
+  est en réalité ANNULÉ par `styles-iphone.css` (`.vrm-app-shell .vrm-main{zoom:1}`).
+- **Preuves** : `audit-recu-achat.cjs` (la règle dans un vm + la vraie route
+  email-inbound) 43 contrôles, 18 rouges sur bf0a9c8 (la règle n'existait pas : pas
+  une preuve seule) et 7 mutations rouges (`connus` 10, `somme` 2, `signe` 6,
+  `nonrecu` 2, `jete` 2, `txtexte` 3, `mode` 1). Banc `recu-achat.cjs` (ports 9201 à
+  9210 ; 390 × 560 tactile clair, 390 × 700 sombre, 1512) 86 contrôles : **48 rouges
+  sur le build de bf0a9c8**, 0 après ; feuille rendue sans portail ⇒ 12 rouges,
+  libellés connus seulement ⇒ 21. ⚠️ Chromium ne fait pas de `<main>` un contexte
+  d'empilement : le banc l'impose sur téléphone (`.vrm-main{isolation:isolate}`) pour
+  rejouer l'iPhone — sans ça il était VERT sur le défaut.
+- **Non mesuré** : un vrai iPhone ; la propriété exacte qui fait de `<main>` un
+  contexte d'empilement dans WebKit ; un reçu à deux moyens de paiement (forme vue une
+  fois, montants gardés).
+- **Pas fait** : le serveur range toujours `transaction` vide — corriger son motif
+  changerait la CLÉ des nouveaux reçus (un email renvoyé ferait un doublon) ; l'app lit
+  le n° dans le texte.
+- **Revue du 23 octobre — défauts reproduits, corrigés** (chacun rouge avant le
+  correctif — sur 7ba9670 —, vert après, rouge sous mutation) :
+  - **Le banc `csp.cjs` ne jugeait plus la fenêtre du reçu** : il extrayait
+    `parseReceiptFields` (retiré), sortait « ❌ le code du reçu se retrouve dans
+    App.jsx » et SAUTAIT ses 18 contrôles (impression une fois, Fermer, aucune
+    violation, onglet rechargé, journal « fenetre:recu »). Il extrait ce que lit
+    `openReceipt` (`COULEUR_PLATEFORME`, `<recu-achat-regle>`, `modePaiementRecu`,
+    `phraseSommeRecu`, `champsRecuAchat`), son reçu a la forme mesurée, et un
+    contrôle de plus exige les vraies lignes dans la fenêtre (Frais Vinted, somme
+    juste, « Visa •••• 4242 ») : 2 rouges sur 7ba9670, vert après, 2 rouges quand la
+    fenêtre ne garde que les trois anciens libellés.
+  - **Un email que la ROUTE range comme achat disparaissait de la liste** :
+    `estRecuAchat` exigeait un Montant payé, un sujet « reçu pour la commande » ou un
+    PDF, alors que la route (branche 2b) range aussi « Merci pour ton achat », « Tu as
+    acheté », « Confirmation d'achat » (et notifie « justificatif archivé ») — ils
+    étaient comptés parmi « les mises à jour, confirmations, retours », et un reçu dont
+    Vinted changerait la tournure aurait suivi. « Pas un reçu » = les trois sujets de
+    statut MESURÉS (`SUJET_STATUT_ACHAT` : « Commande mise à jour pour » 18, « -
+    Confirmation requise » 16, « Retourne ta commande » 2 ; aucun avec un Montant payé
+    ni un PDF), rien d'autre. Sans bloc Montant payé, la feuille et la fenêtre
+    montrent le TEXTE de l'email (`hasStructured` = `v.trouve` : avant, un n° de
+    transaction suffisait à afficher un reçu vide). `audit-recu-achat.cjs` fait
+    passer ces emails par la vraie route puis par la vraie règle (§11) : 6 rouges sur
+    7ba9670 ; mutations `positif` 4, `nonrecu` 2, `texte` 1. Banc `recu-achat.cjs` :
+    « Merci pour ton achat » listé et lu en texte, 12 rouges sur le build de 7ba9670.
+  - **Une ligne de frais au libellé « Transaction … » ou « Vendeur … » finissait le
+    bloc** (« Transaction sécurisée 0,50 € » : elle ET « Frais Vinted » qui suivait
+    étaient jetées — la feuille disait l'écart, mais la promesse « aucune ligne jetée »
+    ne tenait pas). Ces deux mots ne sont une borne que sans montant en fin de ligne
+    (`FIN_SI_SANS_MONTANT_RECU`) ; « Mode de paiement », « Date du paiement », « N° de
+    transaction » restent des bornes quoi qu'il arrive (mesuré : aucune des 81 ne finit
+    par « € »). Audit : 2 rouges avant ; mutations `borne` 2, `bornetoutes` 1. Aucun
+    reçu réel n'avait ce libellé.
+  - **À 320 px, un montant ou la carte se coupaient** (« 11,20 » / « € » avec la
+    police du banc, « MasterCard •••• » / « 9999 » avec des métriques d'Arial, et
+    « 10 h » / « 47 ») : la valeur d'une ligne était en `overflowWrap:'anywhere'`,
+    qui casse même une espace insécable, et la fenêtre PDF, elle, posait `nowrap`.
+    Les montants de la feuille ne passent plus à la ligne (`Row montant`, comme la
+    fenêtre), et `•••• 9999` et `10 h 47` portent des espaces insécables
+    (`modePaiementRecu`, `champsRecuAchat` — la feuille ET la fenêtre). Banc
+    `recu-achat.cjs` : deux vues 320 × 568 (police du banc, métriques d'Arial) et un
+    reçu aux libellés les plus longs mesurés : 4 rouges sur le build de 7ba9670, 3
+    sous la mutation « nowrap et insécable retirés » ; audit, mutation `nbsp` 1.
+  - **Au clavier, la feuille laissait partir le focus** (au 3ᵉ Tab sur `<body>`,
+    derrière le voile — et Échap, écouté sur le seul dialogue, ne fermait plus rien),
+    ↓ et Page bas ne faisaient pas défiler le reçu (le focus était sur le dialogue, qui
+    ne défile pas), et à la fermeture le focus tombait sur `<body>`. Déjà vrai sur
+    bf0a9c8 (pas une régression). `FeuilleRecuAchat` : focus sur la zone qui défile
+    (`data-recu-defile`, `tabIndex 0`), Tab / Maj+Tab tournent dans la feuille, Échap
+    écouté sur le document, le focus rendu à « Voir › » (le motif de `MenuEcrans`).
+    Banc `recu-achat.cjs` K (ouverture au clavier, Page bas, Tab ×5 + Maj+Tab ×4,
+    Échap après cinq Tab, focus rendu) : 10 rouges sur le build de 7ba9670 ; 10 sous
+    « piège, écoute du document et retour retirés », 3 sous « retour du focus retiré ».
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)
@@ -12098,8 +12325,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **98 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **89 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **156 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **201 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -12314,6 +12541,99 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   ⚠️ Le drapeau `DEMANDE_SAISIE_PRIX` vit au niveau **module** : au moment du
   clic l'écran Annonces n'est pas monté, un `dispatchEvent` serait perdu.
 
+### Les feuilles sous la barre du bas, sur iPhone : la vraie cause (23 octobre)
+Julien, sur iPhone : la feuille « Reçu d'achat » passe SOUS la barre du bas, qui
+en cache la fin. Même plainte le 30 sept. (« Se déconnecter ») et le 2 oct.
+(« CSV / PDF introuvables »), traitée feuille par feuille par des portails.
+- **Mesuré** (code de WebKit, `StyleAdjuster.cpp`) : sur iPhone seulement
+  (`ENABLE_WEBKIT_OVERFLOW_SCROLLING_CSS_PROPERTY`), un élément qui défile et
+  porte `-webkit-overflow-scrolling: touch` reçoit un z-index 0 — un contexte
+  d'empilement. `<main className="vrm-main">` le portait depuis la coque
+  (28 sept.) : **toute** feuille rendue dans l'écran était peinte dans la couche
+  de `<main>`, sous la barre du bas (z-index 60) et l'en-tête, quel que soit son
+  z-index. Chromium ignore la propriété : aucun banc ne pouvait le voir.
+  Le zoom 0,8 n'y est pour rien (il est d'ailleurs ramené à 1 par
+  `styles-iphone.css`).
+- **Corrigé à la racine** : la propriété est retirée de `<main>` (depuis iOS 13
+  le défilement à inertie est natif, elle ne servait plus qu'à piéger). Les ~40
+  feuilles rendues dans l'écran sortent toutes d'un coup, le bloc du reçu n'est
+  pas touché. ⚠️ **Ne jamais remettre `-webkit-overflow-scrolling: touch` sur un
+  conteneur qui peut contenir une feuille** (les quelques autres qui la portent
+  — rangées défilantes, corps de feuilles — n'en contiennent aucune).
+- **Et un défaut de tous les navigateurs** : « 📦 Paires du lot » (z-index 80)
+  s'ouvrait depuis le tiroir d'une vente (`vrm-ledger-drawer-host`, z-index 150,
+  dans `document.body`)… dessous. Passée à 1300.
+- **Preuve** : banc `feuilles-coque.cjs` (ports 9211-9220, fixtures + reçus
+  inventés) — en 390 tactile il APPLIQUE la règle de WebKit (style en ligne posé
+  par React et règles de la feuille livrée), en 1512 rien. 15 feuilles ouvertes
+  comme Julien (reçu, note, outils d'Annonces, passeport, rapport comptable,
+  registre, paires du lot, « Tout imprimer », nouvelle facture, « Supprimer ce
+  compte »…) : rien par-dessus (coins et bas du panneau, haut du voile), bas du
+  contenu touchable, boutons à 44 px. **26 rouges sur le build de bf0a9c8**
+  (24 iPhone, 2 ordinateur — le lot), 0 après ; mutation « propriété remise sur
+  `<main>` » ⇒ 24 rouges, « lot à 80 » ⇒ 4.
+- **Non mesuré** : un vrai iPhone (pas de WebKit d'iOS ici : c'est sa règle,
+  lue dans son code, que le banc applique) ; les feuilles qu'aucune donnée de
+  banc n'ouvre (Stock, bordereau tamponné, fiche Leboncoin sans extension).
+- ⚠️ **`mobile.cjs` meurt parfois** (« reading 'querySelectorAll' » : l'en-tête
+  lu juste après `main`) : une course DU BANC, mesurée au même taux (environ une
+  page sur trois sous charge) sur bf0a9c8, sur ce correctif et sur ses deux
+  mutations. Le relancer seul ; ce n'est pas l'app.
+
+#### Revue du même jour — huit défauts reproduits au banc, corrigés
+Chacun ROUGE sur le build de 8a573a4 (le banc final copié dans l'arbre et lancé
+depuis lui, §6.1), vert après, rouge sous une mutation.
+- ⚠️ **L'ordre des couches est écrit une fois**, en tête de `SheetShell` : les
+  écrans et leurs feuilles (≤ 1300), le tiroir d'une vente (150), le lot
+  « Bordereaux à imprimer » (9000), « Mon compte » (10000), **une confirmation
+  `Z_CONFIRMATION` = 20000**, **les messages `Z_MESSAGES` = 30000**, le bloc
+  « Recharger » (100000). Une nouvelle couche se range dans cette liste.
+- **D1 + D8 — la confirmation s'ouvrait SOUS le lot** (« C'est la bonne paire,
+  imprimer », « Oui, c'est écrit » : `askConfirm` → `SheetShell` à 2000, le lot
+  à 9000) : on ne pouvait ni confirmer ni annuler. `ConfirmHost` (et la saisie)
+  passe par un portail dans `document.body`, à `Z_CONFIRMATION`.
+- **D7 — les messages passaient sous les feuilles** (« Échec de la suppression »
+  sous « Supprimer ce compte », « Ces bordereaux n'ont plus leur PDF » sous le
+  lot) : le `Toaster` monte à `Z_MESSAGES`, et sur téléphone il se pose **en
+  haut** quand une feuille est ouverte (le registre `_feuillesOuvertes` de
+  `FermeAuRetour` le prévient : `abonnerFeuilles`, `uneFeuilleOuverte`) — en bas
+  il cachait les boutons de la feuille. Sur ordinateur il reste en bas à droite.
+- **D2 — les feuilles de l'en-tête** (« Tous les écrans » en variante haute,
+  le panneau « État des actions ») vivaient dans l'en-tête sticky (z 50), donc
+  sous la barre du bas (z 60) en paysage et sur iPad : bas de la feuille caché,
+  barre du bas touchable derrière le voile. Portail dans `document.body` ; le
+  panneau est borné à l'écran (`100dvh` moins en-tête et zones sûres, défile).
+  ⚠️ Le panneau n'a été pris en défaut qu'en **568 × 320** (petit téléphone en
+  paysage) : en 844 × 390 il fait 212 à 224 px et tient au-dessus de la barre,
+  avec ou sans extension (mesuré, bf0a9c8 comme 8a573a4).
+- **D3 — le bas de 8 feuilles tombait dans la zone de la barre d'accueil**
+  (34 px sur iPhone en PWA) : reçu, Répartir un lot, Rapport comptable,
+  Registre, Audit, Passeport, « Supprimer ce compte », Paires du lot. Leur
+  panneau porte `env(safe-area-inset-bottom)` en bas, comme `SheetShell`.
+- **D4 — « Paires du lot » au-dessus du tiroir ne prenait pas le clavier** :
+  Échap fermait le tiroir CACHÉ, le lot restait. Le panneau est un `dialog`
+  (focus à l'ouverture), Échap le ferme sans aller plus loin, et le focus revient
+  à « Voir les paires du lot », retenu AU CLIC (Safari ne donne pas le focus à
+  un bouton cliqué). ⚠️ Ce bouton vit dans le repli « Modifier » de la vente :
+  replié, il n'est pas focalisable (le premier jet du banc le cliquait par
+  script, repli fermé, et concluait à tort que le focus ne revenait pas).
+- **D5 — les reçus du banc n'avaient pas la forme réelle** (`prix` « 40,00 € »
+  et aucun `texte` : l'écran affichait « 40,00 € € », jamais le détail).
+  Mesuré (formes seules, sans valeur) : `prix` sans « € », pas de `montant`,
+  un `texte` « *Vendeur* … · Article … · Frais de port … · Protection
+  acheteurs … · *Montant payé* … ». Le banc sert cette forme et l'exige au rendu.
+- **D6 — l'Inventaire physique et le Studio photo** n'avaient pas de
+  `FermeAuRetour` : « retour » quittait la section. Posé (la caméra du Studio se
+  coupe au démontage).
+- **Preuves** (`feuilles-coque.cjs`, 183 contrôles — parties `confirmation`,
+  `messages`, `entete` dont 568 × 320 et une extension simulée qui répond,
+  `clavier`, et la zone sûre de 34 px posée par CDP) : **32 rouges sur
+  8a573a4**, 54 sur bf0a9c8, 0 après. Mutations, chacune rouge sur SA partie :
+  confirmation remise à z 2000 ⇒ 4 · messages à 210 ⇒ 4 · feuilles de l'en-tête sans portail ⇒ 5 · reçu sans zone sûre ⇒ 1 · lot sans gestion du clavier ⇒ 3 · Inventaire sans `FermeAuRetour` ⇒ 4 · reçus du banc à l'ancienne forme ⇒ 2.
+- **Non mesuré** : un vrai iPhone (zone sûre posée par le banc, règle de WebKit
+  appliquée par lui) ; le toast en haut sous l'encoche d'un vrai téléphone ;
+  les feuilles qu'aucune donnée de banc n'ouvre.
+
 ---
 
 ### Le zip de l'extension — le défaut le plus coûteux du projet
@@ -12420,8 +12740,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 98 audits
-scripts/bancs/                  les 89 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 156 audits
+scripts/bancs/                  les 201 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
