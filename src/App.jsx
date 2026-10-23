@@ -42797,12 +42797,14 @@ function LeboncoinScreen() {
           // la preuve qu'aucune autre annonce de la paire n'est en ligne : la ligne
           // reste (sens sûr). Le pourquoi et le geste, une fois (§7).
           const nDoute = data.removals.filter((r) => r.sortie).length;
+          // La phrase vit dans la PREMIÈRE carte qui porte une telle ligne, une fois.
+          const carteDoute = vendues.some((r) => r.sortie) ? 'vendues' : doute.some((r) => r.sortie) ? 'doute' : pause.some((r) => r.sortie) ? 'pause' : null;
+          const phraseDoute = nDoute > 0 ? (
+            <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>
+              {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, l'annonce Leboncoin reliée n'est plus en ligne, mais je ne peux pas encore te dire qu'<b>aucune autre</b> annonce de la paire ne l'est (ton autre compte, une annonce republiée). Vérifie, ou ouvre ta page profil Leboncoin sur chacun de tes comptes : une fois ta liste relue en entier, la ligne partira d'elle-même.
+            </div>
+          ) : null;
           return (<>
-            {nDoute > 0 && (
-              <div data-lbc-retirer-doute={nDoute} style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: '4px 0 8px' }}>
-                {nDoute > 1 ? `Pour ${nDoute} de ces paires` : 'Pour une de ces paires'}, l'annonce Leboncoin reliée n'est plus en ligne, mais je ne peux pas encore te dire qu'<b>aucune autre</b> annonce de la paire ne l'est (ton autre compte, une annonce republiée). Vérifie, ou ouvre ta page profil Leboncoin sur chacun de tes comptes : une fois ta liste relue en entier, la ligne partira d'elle-même.
-              </div>
-            )}
             {vendues.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
@@ -42811,6 +42813,7 @@ function LeboncoinScreen() {
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
+                {carteDoute === 'vendues' ? phraseDoute : null}
               </Card>
             )}
             {doute.length > 0 && (
@@ -42818,6 +42821,7 @@ function LeboncoinScreen() {
                 <Titre>{doute.length} plus en ligne sur Vinted — à vérifier</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Ces annonces ne sont plus sur Vinted, mais <b>je n'ai pas la preuve qu'elles sont vendues</b> : tu as peut-être simplement retiré l'annonce. Ouvre-les et décide — je ne te dis pas de les supprimer.</div>
                 {doute.slice(0, 30).map((r, i) => Ligne(r, i, C.warn))}
+                {carteDoute === 'doute' ? phraseDoute : null}
               </Card>
             )}
             {pause.length > 0 && (
@@ -42825,6 +42829,7 @@ function LeboncoinScreen() {
                 <Titre>{pause.length} en pause sur Vinted</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Tu les as masquées sur Vinted, elles ne sont pas vendues. Elles restent sur Leboncoin : <b>rien à faire</b>.</div>
                 {pause.slice(0, 20).map((r, i) => Ligne(r, i, C.muted))}
+                {carteDoute === 'pause' ? phraseDoute : null}
               </Card>
             )}
           </>);

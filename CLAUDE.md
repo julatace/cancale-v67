@@ -10983,12 +10983,11 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   « supprimée », rien d'effacé), une liste complète qui la remontre l'efface ;
   lecture ratée ⇒ rien n'est écrit ; `lectures[compte]` date la lecture.
 - **La règle partagée** `<lbc-en-vente-regle>` (app = extension = serveur, §11) :
-  plus « en vente » si `plusVueAt`, `pauseAt`, ou un état `paus|inacti`. Elle sort
-  donc l'annonce de « à retirer », « à vérifier », « non reliée », du compteur, de
-  la double vente serveur. `numerosLbcSortis` (une règle, écran Leboncoin + Ma
-  journée) : un N° dont l'annonce est sortie n'est plus « à retirer » — même par la
-  marque « publiée » (`vinted_lbc_posted`) — sauf si une autre annonce en vente le
-  porte. Une annonce pas revue depuis plus de 7 jours ne demande plus « quelle
+  plus « en vente » si `lbcSortieDe(ad)` (`plusVueAt` ou `pauseAt` EFFECTIFS, voir
+  la revue ci-dessous) ou un état `paus|inacti`. Elle sort donc l'annonce de « à
+  retirer », « à vérifier », « non reliée », du compteur, de la double vente
+  serveur. `numerosLbcSortis` (une règle, écran Leboncoin + Ma journée) : voir la
+  revue — la ligne venue de `vinted_lbc_posted` ne part que sur une PREUVE. Une annonce pas revue depuis plus de 7 jours ne demande plus « quelle
   paire ? » ; une ligne dit le geste (sa page profil Leboncoin). Sans `seenAt` :
   rien ne change (on ne sait pas qu'elle est vieille).
 - **(6) « Mettre en pause sur Leboncoin »** : sur la ligne « vendue sur Vinted — à
@@ -11021,8 +11020,10 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   builds réaffaiblis, chacun rouge : règle sans `plusVueAt`/`pauseAt` (8),
   pause sans confirmation (4), « quelle paire ? » sur une annonce périmée (2).
   `audit-double-vente` lit encore `let lbcRemoveCount=0;` (orthographe gardée).
-  `double-vente.cjs` (30) et `lbc-relier.cjs` (8) sont rouges À L'IDENTIQUE sur
-  main 6056c7d (mêmes contrôles, comparés ligne à ligne pour le premier).
+  ⚠️ Relancés le 23 oct. AVEC la porte des bancs (`NODE_OPTIONS="--require
+  /tmp/claude-0/redir-pw.cjs"`, sinon l'app reste sur la connexion) :
+  `lbc-relier.cjs` 18/18 vert ; `double-vente.cjs` 6 rouges À L'IDENTIQUE sur le
+  build de 0d68493 et après la revue (listes comparées ligne à ligne).
 - **Extension touchée** (`background.js`, `lbc-inject.js`, `lbc-relay.js`), **version
   NON montée** (5.212.0 de main, `audit-extension-zip` rouge jusqu'à l'intégration) ; aucune
   entrée d'`EXT_CAPACITES` (capacité par présence).
@@ -11037,9 +11038,69 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   Non fait : la pastille « Aussi sur Leboncoin » (écran Annonces) suit
   `vinted_lbc_posted`, pas les captures — la relier coûterait 235 Ko par
   ouverture (§4.4).
+- **Revue du 22 octobre (relue le 23), deux défauts REPRODUITS par le relecteur,
+  corrigés** :
+  - ⚠️⚠️ **« Plus vue » et « mise en pause » restaient collées** (haute) : une
+    capture privée PLUS RÉCENTE (« Mes annonces », `myads`) qui remontrait
+    l'annonce ACTIVE ne les levait pas (`Object.assign(ancien, l)` les gardait, la
+    règle ne regardait pas `seenAt`) — reproduit : `en vente = false` après la
+    capture, `lireLbcAnnonces` ne la voyait plus ⇒ alerte « à retirer » tombée,
+    paire reproposée à la publication. **La donnée la plus récente gagne** :
+    `lbcSortieDe` (dans la règle partagée, texte identique ×3, avec
+    `LBC_PAUSE_INDEX_MS` = 1 h qui y vit désormais) — « plus vue » ne compte que si
+    aucune capture ne l'a revue APRÈS ; une pause, que si aucune ne l'a revue plus
+    d'une heure après. Douter ⇒ « en vente » (l'alerte reste, la paire n'est pas
+    reproposée : le sens sûr). En base aussi : `storeLbcListings` lève
+    `plusVueAt` (et `pauseAt` passé l'heure) sur une capture neuve. Et
+    `noterListeLbcComplete` ne marque plus une annonce VUE il y a moins d'une heure
+    (l'index public peut ne pas montrer une annonce publiée le matin — l'ordre
+    inverse du cas reproduit), et repose une marque levée si une liste complète ne
+    la montre toujours pas. Décision : toute capture compte (pas seulement la
+    liste privée) — une capture qui revoit une annonce à tort la remet « en
+    vente », le sens sûr.
+  - **`numerosLbcSortis` retirait l'alerte par ressemblance** (moyenne) : le
+    « nXXX » d'un TITRE d'annonce morte effaçait la N°18 « à retirer » (§5), et une
+    annonce reliée sortie suffisait alors que `vinted_lbc_posted` ne dit pas QUELLE
+    annonce porte la paire (second compte, republication pas encore vue). Les
+    annonces sorties désignent leur paire par IDENTITÉ seulement
+    (`numeroLbcIdentite` : lien posé à la main, référence VRM) ; les annonces EN
+    VENTE gardent toutes leurs clés, titre compris (une ressemblance GARDE
+    l'alerte). La ligne ne part (`prouves`) que si une liste COMPLÈTE de CHACUN de
+    ses comptes (session vue ou vente prouvée, plus le compte de l'annonce sortie ;
+    `lbc-account:{id}` = l'id nu) est POSTÉRIEURE à la marque « publiée »
+    (`vinted_lbc_posted.updatedAt`, la dernière écriture : un majorant de chaque
+    marque) ; comptes, ventes, annonces ou marque illisibles ⇒ pas de preuve.
+    Sinon elle reste, avec « l'annonce reliée n'est plus dans ta liste / est en
+    pause depuis VRM » sur la ligne et, UNE fois dans sa carte, le doute et le
+    geste (ouvrir sa page profil sur chacun de ses comptes). Même règle dans Ma
+    journée (`lbcListingsSession` garde `lectures` ; `lbc_accounts` n'y est lu que
+    s'il y a quelque chose à retirer).
+  - **Mesuré (lecture seule, 23 oct.)** : `vinted_lbc_posted.updatedAt` existe
+    (17/10, 3 paires) ; un seul compte à session vue (`8442c3e8…`, sous ses deux
+    écritures) — SHOPCANCALE (`faf3fbba…`) n'a pas de `sessionAt`, il n'est donc
+    pas exigé ; aucune `lectures` en base (la fonction n'est pas en production).
+  - **Preuves** : `audit-lbc-plus-vue-pause.cjs` **71 contrôles** (sections 2 bis
+    et 6, et 2 contrôles de plus par copie de la règle) — **17 rouges sur
+    0d68493** (audit copié dans `git archive 0d68493`, lancé depuis la copie ;
+    l'ancienne forme de `numerosLbcSortis`, un Set, est lue telle quelle) ;
+    `--prouve` **22/22** mutations rouges, dont 10 neuves (`regleRecente`,
+    `pauseCollee`, `plusVueCollee`, `pauseFenetre`, `vueRecente`, `remarque`,
+    `titreSortis`, `sansPreuve`, `unCompte`, `comptesSortis`), chacune sur SON
+    contrôle de comportement (pas seulement l'égalité de texte). Banc
+    `lbc-pause.cjs` **50 contrôles** (N°18 marquée « plus vue » puis revue active ;
+    scénario « marque publiée après la liste complète » aux deux tailles, Ma
+    journée « 2 ») — **32 rouges sur le build de 0d68493** ; builds réaffaiblis :
+    preuve ignorée ⇒ 6 rouges, marque collée ⇒ 30 rouges (mutations posées sur bbe1f17).
+  - ⚠️ **Non mesuré** : qu'une page publique de Leboncoin ne remontre jamais une
+    annonce supprimée (si oui, elle redevient « en vente » jusqu'à la liste
+    complète suivante : sens sûr) ; une republication FAITE À LA MAIN après la
+    dernière liste complète, hors VRM, ne se voit qu'à la capture suivante (aucune
+    marque « publiée » ne bouge).
 - **Geste de Julien** : installer l'extension de l'intégration, ouvrir sa page
   profil Leboncoin (les 7 annonces fantômes sortent), puis « Mettre en pause » la
-  N°18 depuis VRM → Leboncoin → Annonces.
+  N°18 depuis VRM → Leboncoin → Annonces. La ligne de la N°18 venue de sa marque
+  « publiée » part quand sa page profil a été relue APRÈS (sinon elle reste, avec
+  le doute dit une fois).
 
 ---
 
