@@ -14,6 +14,12 @@
 > au 22 octobre : ne pas les livrer. Jamais rien de payant, jamais une invitation forcée au
 > démarrage (retirée à sa demande).
 
+> ⚠️⚠️ **PASSATION DU 22-23 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-22-integration.md`** :
+> treize chantiers finis, relus et fusionnés (CSP, Ma journée en widgets, carte, offres + adresse
+> prouvée, double vérification gratuite, fiabilité, colis à l'heure, numéros et annonces masquées,
+> photos, Leboncoin « plus vue » et pause, URSSAF, petits correctifs, migration 016), l'extension
+> **5.213.0**, le piège de banc des worktrees, et les gestes de Julien.
+
 > ⚠️⚠️ **PASSATION DU 21 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-21.md`** : ce qui est
 > en ligne, `claude/lot-21oct` (hors ligne, retours, 5.204, carte OpenFreeMap), les branches
 > non déployées (`csp-app`, `app-rapide`, et INACHEVÉE `carte-pro`), les gestes de Julien.

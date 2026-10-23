@@ -55,6 +55,15 @@ prouve rien. Dans le dépôt principal (`/home/user/cancale-v67`), rien à faire
 - `colis` et `verif_visuel` : rouges À L'IDENTIQUE sur main (cause à part, déjà notée).
 - `benefice-journee` section D (« éteint ⇒ plus de carte ») : rouge identique sur main — le banc
   sert la sonde de schéma en 400, la synchro ne part pas.
+- `double-vente` : 3 rouges (×2 tailles) À L'IDENTIQUE sur main 6798b0a — le banc sert une base
+  NON cloisonnée (sonde `select=owner` en 400) ; or depuis `439081d` (main) `cloudPush` ne pousse
+  plus rien sur une base non cloisonnée, donc le lien Leboncoin posé disparaît au rechargement DU
+  BANC (en production la base est cloisonnée, l'écriture part). Banc à remettre à la forme
+  cloisonnée (session + `select=owner` 200), pas l'app.
+- Corrigés pendant l'intégration : `lbc-pause` (la carte du compteur Leboncoin disparaissait sans
+  limite ni offre, et le filtre « Autres états » était coupé à 390 px — aussi sur main) ;
+  `colis-heure` (le banc attendait l'ambre de l'ancienne palette ; il lit maintenant `danger` et
+  `warn` dans `App.jsx` et `themeMineral.js`).
 - `vitesse` : sous la charge de la machine partagée (load > 10), Ma journée à 390 px mesure
   14 rendus (plafond 13) et Ventes 9 lectures identiques (plafond 8) — bruit déjà noté par le
   chantier fiabilité ; à remesurer seul, machine calme.
