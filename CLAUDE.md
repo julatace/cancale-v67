@@ -12084,6 +12084,65 @@ mutation. Extension non touchée.
   « publiée » part quand sa page profil a été relue APRÈS (sinon elle reste, avec
   le doute dit une fois).
 
+### eBay → Annonces → « Inactives » : les annonces terminées sans vente (23 octobre)
+Julien : « est-ce que les onglets de l'app eBay sont dans VRM ? ». Il manquait les
+INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
+- **Décidé (ne pas rediscuter)** : LECTURE SEULE. VRM ne remet RIEN en vente
+  (`RelistFixedPriceItem` peut coûter des frais d'insertion, §2-§3) ; chaque ligne
+  mène à SA page eBay (`https://www.ebay.fr/itm/{ItemID}`, ItemID validé).
+- **Route, aucun appel de plus** : `<UnsoldList>` (Include, `DurationInDays` 60,
+  page 1 de 200) part dans le MÊME `GetMyeBaySelling` que la page 1 des annonces en
+  ligne, et seulement pour la synchro et la relecture sans geste
+  (`listeVendeur(token, {invendues:true})`) ; `dejaChezEbay`, les règles d'offre,
+  les programmées : inchangés — une inactive n'entre JAMAIS dans `actives`.
+  Rangée dans une ligne DÉDIÉE par compte, `ebay_inactives{_clé}` (⚠️ pas
+  `ebay_listings_*` : deux lecteurs balaient cette famille), chez le vendeur de la
+  session (`storeData` → `portee(owner)`), projetée (`resumeInactive` : ItemID, SKU
+  hors variantes, titre, prix + devise, fin, début, observateurs, photo
+  `i.ebayimg.com` seulement, `RelistedItemID`), `{items, complet, jours, capturedAt}`.
+  ⚠️ **À L'INVERSE des deux autres listes, un `UnsoldList` ABSENT vaut « pas lu »**
+  (`invendues: null`) : rien n'est écrit, la dernière capture reste ; une réponse
+  ratée aussi. `<UnsoldList/>` ou un conteneur à 0 entrée = « lue vide ».
+  `lu.inactives` dans la réponse (l'app n'en juge pas la synchro).
+- **Écran** : une section « Inactives sur eBay » SOUS les programmées
+  (`EbayInactives`, `outilsSuite` : visible même sans annonce en ligne), chargée
+  seule (`lireEbayParCompte`, `select` scalaires, `->>` en texte). États
+  `data-ebay-inactives` = `charge · jamais · vide · lu · pas-su` ; « Inactives (N) »
+  (`data-ebay-inactives-n`) seulement si TOUS les comptes de la vue sont lus et la
+  liste entière, « au moins N » si eBay en a plus (`data-ebay-inactives-aumoins`),
+  un compte illisible nommé (`data-inactives-illisibles`) sans aucun nombre. Pas
+  d'eBay relié et rien de rangé ⇒ pas de section. La vue suit le compte choisi
+  (`vue`), le compte nommé sur la ligne seulement si la liste en mélange (§7).
+  Ligne : photo, N° SEULEMENT par le SKU (`numEbayLu` avec la date de PUBLICATION :
+  avant la remise à zéro ⇒ série B ; sinon « pas reliée », jamais par titre),
+  prix, « terminée le … » (`data-inactive-fin`, jour de Paris), observateurs.
+  ⚠️ « Retirer d'eBay » une paire vendue sur Vinted l'envoie DANS cette liste :
+  « Remettre en vente sur eBay ↗ » (`data-inactive-relancer`) n'est proposé ni pour
+  une paire vendue ailleurs (`numerosDejaVendus`, `data-inactive-vendue`), ni déjà
+  de retour sur eBay (`dejaSurEbay` ou `RelistedItemID`, `data-inactive-deja`), ni
+  tant que les ventes ne sont pas vérifiées (dit une fois, `data-inactives-verif`) —
+  le lien devient « Voir sur eBay » (`data-inactive-voir`). « encore en ligne sur
+  Vinted » par identité (`data-inactive-vinted`). Une inactive reliée fait lire la
+  preuve de vente (`aVerifier`). Aucune couleur rouge.
+- **Preuves** : `audit-ebay-route.cjs` section 14 « [INA] » (même appel, ligne
+  dédiée, vendeur et compte, « pas lu » n'écrase rien sous trois formes, page 2 non
+  demandée, une inactive ne bloque pas publier/programmer, ni `programmees` ni
+  `regleoffrelire` ne la demandent, aucun Relist/AddItem envoyé ni écrit dans
+  `api/`) : **14 rouges sur 789401d**, 10 mutations de la route toutes rouges
+  (absent = vide, appel séparé, ligne sans suffixe, fusion dans `actives`, tous les
+  appelants, photo non filtrée, owner de l'installation, remise en vente glissée,
+  détail brut, « pas lu » rangé vide). Banc `bancs/ebay-inactives.cjs` (port
+  `BANC_PORT`, 390 tactile + 1512, données inventées, 44 contrôles) : **43 rouges
+  sur le build de 789401d** (le 44ᵉ y lève), et 8 mutations de l'écran rouges.
+- ⚠️ **Non mesuré — rien n'a été envoyé à eBay** : la forme de `UnsoldList` vient
+  de la doc d'eBay (présence de `WatchCount`, `GalleryURL`, `EndTime`, `SKU`,
+  `RelistedItemID`, la limite réelle de `DurationInDays`) ; surtout, qu'eBay émette
+  `<UnsoldList>` quand il n'y a AUCUNE inactive — s'il l'omet, la section reste
+  « jamais lue » (« se lit à la prochaine relecture ») pour un vendeur sans
+  inactive. Le cron du matin ne relit pas les annonces : la liste se rafraîchit
+  avec la synchro et la relecture (≤ 10 min, app ouverte).
+- **Julien** : rien. La section se remplit à la prochaine relecture eBay.
+
 ---
 
 ## 6. Comment on vérifie (et pourquoi ça compte)

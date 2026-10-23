@@ -216,23 +216,58 @@ const pagesDe = (bloc) => { const n = Number((/<TotalNumberOfPages>(\d+)<\/Total
 // Pagination : 200 par page, 5 pages au plus par liste ; au-delà
 // `complet:false` (une identité absente d'une liste incomplète n'est PAS
 // prouvée absente).
-async function listeVendeur(token) {
+// ── (23 octobre) LES ANNONCES INACTIVES : terminées SANS vente ───────────────
+// Julien demandait si les onglets de l'app eBay sont dans VRM : il manquait
+// « Inactives » (eBay garde 60 à 90 jours une annonce terminée sans vente).
+// LECTURE SEULE : VRM ne remet RIEN en vente (RelistFixedPriceItem peut coûter
+// des frais d'insertion — §2, §3) ; l'écran mène à la page de l'annonce sur eBay.
+// ⚠️ AUCUN APPEL DE PLUS : `<UnsoldList>` est demandé dans le MÊME
+//    GetMyeBaySelling que la page 1 des annonces en ligne, et seulement par les
+//    deux appelants qui le RANGENT (la synchro et la relecture sans geste :
+//    `{invendues:true}`). La garde de publication (`dejaChezEbay`), les règles
+//    d'offre, les programmées : inchangés — une inactive n'entre JAMAIS dans
+//    `actives` (elle n'est pas en vente, elle ne protège rien).
+// ⚠️ À L'INVERSE DES DEUX AUTRES LISTES, un conteneur `UnsoldList` ABSENT d'une
+//    réponse « Success » vaut « PAS LU » (`invendues: null`) : la dernière
+//    capture rangée reste, jamais écrasée par une liste vide. NON MESURÉ : qu'eBay
+//    émette `<UnsoldList>` sans entrée quand il n'y a rien (la forme vient de la
+//    doc d'eBay) — s'il l'omet, la ligne reste « jamais lue » (l'écran le dit).
+//    `<UnsoldList/>` (vide, auto-fermé) est LU vide.
+// Une seule page (200 entrées) : au-delà, `invenduesComplet: false`.
+const JOURS_INACTIVES = 60;
+const conteneurInvendues = (xml) => { const c = conteneur(xml, 'UnsoldList'); if (c != null) return c; return /<UnsoldList\s*\/>/.test(String(xml || '')) ? '' : null; };
+const itemsInactifsDe = (bloc) => {
+  const out = []; const re = /<Item>([\s\S]*?)<\/Item>/g; let m;
+  while ((m = re.exec(bloc || '')) && out.length < 200) {
+    // Remise en vente déjà faite (sur eBay) : eBay peut le dire par
+    // `ListingDetails/RelistedItemID` (non mesuré) — une identité, jamais un titre.
+    const rel = (/<RelistedItemID>(\d{1,19})<\/RelistedItemID>/.exec(m[1]) || [])[1] || '';
+    out.push({ ...extraireItem(m[1]), relanceeEn: rel });
+  }
+  return out;
+};
+async function listeVendeur(token, opts) {
+  const avecInvendues = !!(opts && opts.invendues === true);
   const actives = [], programmees = [];
+  let invendues = null, pagesU = 0;
   let pagesA = 1, pagesS = 1, ack = '', status = 0;
   for (let p = 1; p <= 5; p++) {
-    const vouluA = p <= pagesA, vouluS = p <= pagesS;
+    const vouluA = p <= pagesA, vouluS = p <= pagesS, vouluU = avecInvendues && p === 1;
     if (!vouluA && !vouluS) break;
     const pagination = `<Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>${p}</PageNumber></Pagination>`;
     const inner = (vouluA ? `<ActiveList><Include>true</Include>${pagination}</ActiveList>` : '')
-      + (vouluS ? `<ScheduledList><Include>true</Include>${pagination}</ScheduledList>` : '');
+      + (vouluS ? `<ScheduledList><Include>true</Include>${pagination}</ScheduledList>` : '')
+      + (vouluU ? `<UnsoldList><Include>true</Include><DurationInDays>${JOURS_INACTIVES}</DurationInDays><Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>1</PageNumber></Pagination></UnsoldList>` : '');
     const r = await tradingCall(token, 'GetMyeBaySelling', inner);
     status = r.status; ack = r.ack || ack;
     if (r.status === 0) return { ok: false, status: 503, error: 'eBay injoignable' };
     if (!r.ok) return { ok: false, status: r.status >= 400 ? r.status : 502, error: r.err || 'eBay n\'a pas rendu tes annonces.' };
     if (vouluA) { const c = conteneur(r.xml, 'ActiveList'); if (c == null) pagesA = 0; else { actives.push(...itemsDe(c)); pagesA = pagesDe(c); } }
     if (vouluS) { const c = conteneur(r.xml, 'ScheduledList'); if (c == null) pagesS = 0; else { programmees.push(...itemsDe(c)); pagesS = pagesDe(c); } }
+    if (vouluU) { const c = conteneurInvendues(r.xml); if (c != null) { invendues = itemsInactifsDe(c); pagesU = pagesDe(c); } }
   }
-  return { ok: true, status, ack, actives, programmees, complet: pagesA <= 5 && pagesS <= 5 };
+  return { ok: true, status, ack, actives, programmees, complet: pagesA <= 5 && pagesS <= 5,
+    ...(avecInvendues ? { invendues, invenduesComplet: invendues ? pagesU <= 1 : null } : {}) };
 }
 
 // Détail COMPLET d'une annonce (description, catégorie, état, photos,
@@ -1136,6 +1171,29 @@ async function confirmerDoublon(token, a, it, quand) {
 // réponse rend aussi les identités EN LIGNE (ItemID + SKU) : c'est ce qui dit
 // qu'une programmée est bien partie à l'heure.
 const resumeProgrammee = (x) => ({ itemId: x.itemId, sku: x.sku, title: x.title, price: x.price, debut: x.depuis || null, fin: x.fin || null, photo: x.photo, url: x.url || (x.itemId ? `https://www.ebay.fr/itm/${x.itemId}` : '') });
+// (23 octobre) Une annonce INACTIVE rangée : les seuls scalaires que l'écran lit
+// (§4.4) — ni `detail`, ni `vues` brut, ni adresse de photo hors d'eBay
+// (`i.ebayimg.com` seulement, la règle des achats). L'adresse de la page se
+// RECONSTRUIT à l'écran depuis l'ItemID validé : rien d'autre n'est cru.
+const PHOTO_EBAY = /^https:\/\/i\.ebayimg\.com\//;
+const resumeInactive = (x) => ({
+  itemId: String(x.itemId || ''), sku: String(x.sku || ''), title: String(x.title || '').slice(0, 200),
+  price: String(x.price || ''), currency: x.currency || null,
+  fin: x.fin || null, depuis: x.depuis || null,
+  observateurs: Number.isInteger(x.observateurs) ? x.observateurs : null,
+  photo: PHOTO_EBAY.test(String(x.photo || '')) ? String(x.photo) : '',
+  relanceeEn: ID_EBAY.test(String(x.relanceeEn || '')) ? String(x.relanceeEn) : '',
+});
+// Rangée dans `ebay_inactives{_clé}` — UNE ligne dédiée par compte eBay, chez
+// CE vendeur (`storeData` passe par `portee(owner)`) — et SEULEMENT si eBay a
+// rendu le conteneur : « pas lu » (réponse ratée, conteneur absent) n'écrit
+// RIEN, la capture d'avant reste. ⚠️ Pas `ebay_listings_*` : deux lecteurs
+// balaient cette famille (« sur eBay », double vente) — une inactive n'y est pas.
+async function rangerInactives(ctx, liste) {
+  if (!liste || liste.ok !== true || !Array.isArray(liste.invendues)) return false;
+  const items = liste.invendues.map(resumeInactive).filter((x) => ID_EBAY.test(x.itemId)).slice(0, 200);
+  try { return await storeData(ligneDe('ebay_inactives', ctx), { items, complet: liste.invenduesComplet === true, jours: JOURS_INACTIVES, capturedAt: Date.now() }, ctx.owner) === true; } catch (_) { return false; }
+}
 async function handleProgrammees(ctx) {
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
@@ -1530,7 +1588,8 @@ async function handleSync(ctx) {
     // L'Inventory API exige un Accept-Language (sinon 400 « Invalid value for
     // header Accept-Language »). Ne concerne que les annonces créées par API.
     ebayJson(`${EBAY_API}/sell/inventory/v1/inventory_item?limit=100`, token, { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' }),
-    listeVendeur(token),
+    // (23 octobre) + les INACTIVES, dans le MÊME appel (`UnsoldList`).
+    listeVendeur(token, { invendues: true }),
   ]);
   // ── DÉTAIL COMPLET par annonce (photos, description, catégorie, état,
   //    caractéristiques) : « capter tout ». On borne à 20 GetItem par sync
@@ -1572,6 +1631,8 @@ async function handleSync(ctx) {
     const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
+  // (23 octobre) Les inactives : rangées seulement si eBay a rendu leur liste.
+  const inactivesRange = await rangerInactives(ctx, liste);
   const lectureCommandesId=crypto.randomUUID();
   const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2,lectureCommandesId):null;
   if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2,lectureCommandesId),status:orders.status}))===true;
@@ -1584,10 +1645,11 @@ async function handleSync(ctx) {
   return { status: 200, body: {
     ok: true,
     // Ce qui a VRAIMENT été lu (et donc rangé) — le reste garde sa dernière capture.
-    lu: { annonces: annoncesRange, programmees: programmeesRange, commandes: commandesRange, stock: stockRange, regles: rangeRegles === true },
+    lu: { annonces: annoncesRange, programmees: programmeesRange, commandes: commandesRange, stock: stockRange, regles: rangeRegles === true, inactives: inactivesRange },
     complet: {annonces:annoncesRange && liste.complet===true,commandes:commandesRange && captureCommandes?.complet===true},
     listings: { status: liste.status, ack: liste.ack, count: lst.length, sample: lst.slice(0, 3), detailDiag, error: liste.ok ? undefined : liste.error },
     programmees: { count: liste.ok ? liste.programmees.length : null, complet: liste.ok ? liste.complet : null },
+    inactives: { count: liste.ok && Array.isArray(liste.invendues) ? liste.invendues.length : null, complet: liste.ok && Array.isArray(liste.invendues) ? liste.invenduesComplet === true : null },
     orders: { status: orders.status, count: ((orders.data && orders.data.orders) || []).length, total: (orders.data && orders.data.total), sample: (((orders.data && orders.data.orders) || []).slice(0, 1)), raw: orders.ok ? undefined : orders.raw },
     inventory: { status: inv.status, count: ((inv.data && inv.data.inventoryItems) || []).length, total: (inv.data && inv.data.total), raw: inv.ok ? undefined : inv.raw },
   } };
@@ -1626,10 +1688,14 @@ async function handleRelire(ctx) {
   // borne la lecture des messages, aucun appel de plus à l'ouverture.
   const [cmd, liste, msgs] = await Promise.all([
     relireCommandesCompte({ owner: ctx.owner, compte: ctx.compte, token }),
-    listeVendeur(token),
+    // (23 octobre) + les INACTIVES, dans le MÊME GetMyeBaySelling.
+    listeVendeur(token, { invendues: true }),
     gestionEbay.messages({ page: 1 }, ctx).catch(() => null),
   ]);
   const messagesRange = await rangerResumeMessages(ctx, msgs);
+  // Rangées HORS de la garde de `ebay_listings` (qui protège le détail des
+  // annonces en ligne) : la liste d'eBay fait foi, rien n'est à fusionner.
+  const inactivesRange = await rangerInactives(ctx, liste);
   let annoncesRange = false, programmeesRange = false;
   if (liste.ok) {
     const avant = await lireDonnee(ligneDe('ebay_listings', ctx), ctx.owner);
@@ -1650,7 +1716,7 @@ async function handleRelire(ctx) {
   const ok = cmd.ok === true;
   return { status: ok ? 200 : (cmd.status || 502), body: {
     ok, reason: ok ? undefined : cmd.reason,
-    lu: { commandes: cmd.range === true, annonces: annoncesRange, programmees: programmeesRange, messages: messagesRange },
+    lu: { commandes: cmd.range === true, annonces: annoncesRange, programmees: programmeesRange, messages: messagesRange, inactives: inactivesRange },
     commandes: { lues: cmd.lues == null ? null : cmd.lues },
     ...(ok ? {} : { error: cmd.reason === 'base' ? 'La base n\'a pas répondu — la dernière capture reste.' : 'eBay n\'a pas rendu tes commandes — la dernière capture reste.' }),
   } };

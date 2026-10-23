@@ -113,7 +113,7 @@ const ANNONCES_J = () => [
   annonce('110000000002', 'Nike Dunk Low panda taille 42', '', '100.0', '2026-09-21T10:00:00.000Z', { variantes: '<Variations><Variation><SKU>VAR-42</SKU></Variation></Variations>' }),
 ];
 let ebay = {};
-const remettreEbay = () => { ebay = { 'at-J': { actives: ANNONCES_J(), programmees: [], pagesProg: 1 }, 'at-B': { actives: [], programmees: [], pagesProg: 1 }, 'at-A2': { actives: [], programmees: [], pagesProg: 1 }, 'at-A3': { actives: [], programmees: [], pagesProg: 1 } }; };
+const remettreEbay = () => { ebay = { 'at-J': { actives: ANNONCES_J(), programmees: [], invendues: [], pagesProg: 1 }, 'at-B': { actives: [], programmees: [], invendues: [], pagesProg: 1 }, 'at-A2': { actives: [], programmees: [], invendues: [], pagesProg: 1 }, 'at-A3': { actives: [], programmees: [], invendues: [], pagesProg: 1 } }; };
 // ── QUI EST DERRIÈRE CHAQUE JETON (9 octobre, plusieurs comptes eBay) ────────
 // GetUser rend le compte APPELANT : son pseudo et son identifiant stable
 // (EIASToken). Julien a DEUX comptes eBay (particulier `at-J`, pro `at-A2`) ;
@@ -121,7 +121,10 @@ const remettreEbay = () => { ebay = { 'at-J': { actives: ANNONCES_J(), programme
 const IDENTITES = { 'at-J': ['julien_part', 'EIAS-JULIEN-PART-000000001'], 'at-A2': ['julien_pro', 'EIAS-JULIEN-PRO-000000002'], 'at-A3': ['julien_trois', 'EIAS-JULIEN-TROIS-00000003'], 'at-B': ['vendeur_b', 'EIAS-VENDEUR-B-0000000004'] };
 remettreEbay();
 let prochainId = 110000000777;
-const itemFake = (a) => `<Item><ItemID>${a.itemId}</ItemID><Title>${a.title}</Title>${a.sku ? `<SKU>${a.sku}</SKU>` : ''}${a.watch != null ? `<WatchCount>${a.watch}</WatchCount>` : ''}<QuantityAvailable>1</QuantityAvailable>${a.variantes || ''}<SellingStatus><CurrentPrice currencyID="EUR">${a.prix}</CurrentPrice><QuantitySold>0</QuantitySold></SellingStatus><ListingDetails><StartTime>${a.debut}</StartTime>${a.fin ? `<EndTime>${a.fin}</EndTime>` : ''}<ViewItemURL>https://www.ebay.fr/itm/${a.itemId}</ViewItemURL></ListingDetails></Item>`;
+// (23 octobre) `photo` (PictureDetails/GalleryURL) et `relist`
+// (ListingDetails/RelistedItemID) : seulement quand l'annonce inventée les porte —
+// les annonces d'avant rendent exactement le même XML.
+const itemFake = (a) => `<Item><ItemID>${a.itemId}</ItemID><Title>${a.title}</Title>${a.sku ? `<SKU>${a.sku}</SKU>` : ''}${a.watch != null ? `<WatchCount>${a.watch}</WatchCount>` : ''}<QuantityAvailable>1</QuantityAvailable>${a.variantes || ''}<SellingStatus><CurrentPrice currencyID="EUR">${a.prix}</CurrentPrice><QuantitySold>0</QuantitySold></SellingStatus>${a.photo ? `<PictureDetails><GalleryURL>${a.photo}</GalleryURL></PictureDetails>` : ''}<ListingDetails><StartTime>${a.debut}</StartTime>${a.fin ? `<EndTime>${a.fin}</EndTime>` : ''}${a.relist ? `<RelistedItemID>${a.relist}</RelistedItemID>` : ''}<ViewItemURL>https://www.ebay.fr/itm/${a.itemId}</ViewItemURL></ListingDetails></Item>`;
 function repListe(compte, corps) {
   const veutA = /<ActiveList>/.test(corps), veutS = /<ScheduledList>/.test(corps);
   const pageS = Number((/<ScheduledList>[\s\S]*?<PageNumber>(\d+)<\/PageNumber>/.exec(corps) || [])[1] || 1);
@@ -133,6 +136,17 @@ function repListe(compte, corps) {
     const n = compte.pagesProg, par = Math.ceil(compte.programmees.length / n);
     const page = compte.programmees.slice((pageS - 1) * par, pageS * par);
     x += `<ScheduledList><ItemArray>${page.map(itemFake).join('')}</ItemArray><PaginationResult><TotalNumberOfPages>${n}</TotalNumberOfPages></PaginationResult></ScheduledList>`;
+  }
+  // (23 octobre) Les INACTIVES (`UnsoldList`), seulement si elles sont DEMANDÉES.
+  // Les DEUX formes d'une liste sans entrée (non mesurées chez eBay) sont servies :
+  // `mode.invendues` = 'ok' (conteneur seulement s'il y a des entrées, comme les
+  // deux autres listes) · 'vide' (conteneur présent, 0 entrée) · 'autoferme'
+  // (`<UnsoldList/>`) · 'absent' (jamais émis) · 'pages2' (eBay en a une 2ᵉ page).
+  const veutU = /<UnsoldList>/.test(corps);
+  const inv = compte.invendues || [];
+  if (veutU && mode.invendues !== 'absent') {
+    if (mode.invendues === 'autoferme' && !inv.length) x += '<UnsoldList/>';
+    else if (inv.length || mode.invendues === 'vide' || mode.invendues === 'pages2') x += `<UnsoldList><ItemArray>${inv.map(itemFake).join('')}</ItemArray><PaginationResult><TotalNumberOfPages>${mode.invendues === 'pages2' ? 2 : 1}</TotalNumberOfPages><TotalNumberOfEntries>${inv.length}</TotalNumberOfEntries></PaginationResult></UnsoldList>`;
   }
   return x + '</GetMyeBaySellingResponse>';
 }
@@ -151,7 +165,7 @@ const uuidsVus = new Map();       // UUID déjà utilisé → ItemID (comme eBay
 const avantRevision = new Map();
 let ecrituresOffres = 0, getEnVol = 0, maxGetEnVol = 0;
 const remettre = () => { mode = { liste: 'ok', commandes: 'ok', eligibles: 'ok', envoi: 'ok', trading: 'ok', verif: 'ok', add: 'ok', end: 'ok', revise: 'ok', priv: 'ok', getitem: 'ok', mainKo: false, journalKo: false, listingsKo: false, getuser: 'ok', listeKoPour: '', comptesKo: false,
-  regle: 'ok', getitemApres: '', prix: 'efface', offresKo: false, offresEcritureKo: false, offresEcritureKoApres: false, getitemKoPour: '', getitemLent: false }; remettreEbay(); uuidsVus.clear(); avantRevision.clear(); ecrituresOffres = 0; getEnVol = 0; maxGetEnVol = 0; };
+  regle: 'ok', getitemApres: '', prix: 'efface', offresKo: false, offresEcritureKo: false, offresEcritureKoApres: false, getitemKoPour: '', getitemLent: false, invendues: 'ok' }; remettreEbay(); uuidsVus.clear(); avantRevision.clear(); ecrituresOffres = 0; getEnVol = 0; maxGetEnVol = 0; };
 remettre();
 // ── LA RÈGLE D'OFFRE CHEZ LE FAUX eBAY (9 octobre) ──────────────────────────
 // Une annonce peut porter `regle: { actives: true|false|null, accepte, refuse,
@@ -211,7 +225,7 @@ global.fetch = async (url, opts = {}) => {
     }
     if (u.includes('/ws/api.dll')) {
       const xml=s=>new Response(s.replace(/<R(?=\s|>)/,'<'+appel+'Response').replace(/<\/R>/,'</'+appel+'Response>'),{status:200,headers:{'content-type':'text/xml'}});
-      const compte = ebay[jeton] || { actives: [], programmees: [], pagesProg: 1 };
+      const compte = ebay[jeton] || { actives: [], programmees: [], invendues: [], pagesProg: 1 };
       if (appel === 'GetUser') {
         const idn = IDENTITES[jeton];
         if (mode.getuser === 'ko' || !idn) return xml(mode.getuser === 'ko' ? XML_REFUS : XML_OK(''));
@@ -2402,6 +2416,136 @@ const RA = {};
     const ids = (l) => (l || []).map((x) => x.orderId).join(',');
     dit(ids(c.aPoster) === 'A' && Array.isArray(c.aVerifier) && ids(c.aVerifier) === 'B,C',
       '[ARG-colis] une commande payée qui n\'est pas partie n\'est jamais cachée : remboursée en partie (B) ou d\'état d\'expédition inconnu (C) ⇒ « à vérifier » ; annulée, remboursée en entier ou déjà partie ⇒ nulle part', `aPoster=${ids(c.aPoster)} · aVerifier=${ids(c.aVerifier)}`);
+  });
+
+  // ── 14. INACTIVES : les annonces TERMINÉES SANS VENTE (23 octobre) ──────────
+  //    Lecture seule. `UnsoldList` est demandé dans le MÊME GetMyeBaySelling que
+  //    les annonces en ligne, par la synchro et la relecture SEULEMENT ; rangé
+  //    dans une ligne DÉDIÉE par compte (`ebay_inactives{_clé}`), chez le vendeur
+  //    de la session ; un conteneur absent ou une réponse ratée n'écrit RIEN ;
+  //    aucune remise en vente (Relist*, AddItem) n'est jamais envoyée ; une
+  //    inactive ne bloque jamais une publication (elle n'est pas en vente).
+  const INACTIVE_A = () => ({ ...annonce('110000000930', 'Asics Gel 1130 argent T39', 'VRM-30', '75.0', '2026-09-01T10:00:00.000Z', { watch: 2, fin: '2026-10-01T10:00:00.000Z', photo: 'https://i.ebayimg.com/images/g/aaa/s-l225.jpg' }) });
+  const INACTIVE_B = () => ({ ...annonce('110000000931', 'Puma Suede rouge T42', '', '60.0', '2026-09-02T10:00:00.000Z', { fin: '2026-10-02T10:00:00.000Z', photo: 'https://evil.test/traceur.gif', relist: '110000000999', variantes: '<Variations><Variation><SKU>VAR-1</SKU></Variation></Variations>' }) });
+  const CLES_INACTIVE = ['itemId', 'sku', 'title', 'price', 'currency', 'fin', 'depuis', 'observateurs', 'photo', 'relanceeEn'];
+  const listesDe = (j) => auCompte(j).filter((x) => x.appel === 'GetMyeBaySelling');
+  await essaie('[INA] la synchro demande les inactives dans le MÊME appel', async () => {
+    for (const action of ['sync', 'relire']) {
+      remettre(); remettreBase();
+      ebay['at-J'].invendues = [INACTIVE_A(), INACTIVE_B()];
+      const o = await app(JWT_J, { action });
+      const ls = listesDe(o.journal);
+      const corps = ls[0] ? ls[0].corps : '';
+      const jours = Number((/<UnsoldList>[\s\S]*?<DurationInDays>(\d+)<\/DurationInDays>/.exec(corps) || [])[1]);
+      dit(ls.length === 1 && /<ActiveList>/.test(corps) && /<ScheduledList>/.test(corps) && /<UnsoldList><Include>true<\/Include>/.test(corps) && jours > 0 && jours <= 60,
+        `[INA] « ${action} » : UN SEUL GetMyeBaySelling, qui demande en ligne + programmées + INACTIVES (UnsoldList, DurationInDays ≤ 60) — aucun appel eBay de plus`, `${ls.length} appel(s) · jours=${jours}`);
+      const w = ecrit(o.journal, 'ebay_inactives');
+      const wb = o.journal.filter((x) => x.ou === 'base' && x.corps.includes('"id":"ebay_inactives"'));
+      dit(o.code === 200 && !!w && w.owner === J && wb.length === 1 && /on_conflict=owner,id/.test(wb[0].u) && Array.isArray(w.data.items) && w.data.items.length === 2 && w.data.complet === true && w.data.jours === 60 && Number(w.data.capturedAt) > 0,
+        `[INA] « ${action} » : les 2 inactives sont rangées dans la ligne DÉDIÉE ebay_inactives, chez le vendeur de la session (owner, on_conflict=owner,id), avec complet/jours/capturedAt`, w ? `owner=${w.owner} · ${w.data.items && w.data.items.length} · ${wb[0] && wb[0].u}` : `rien rangé · HTTP ${o.code}`);
+      const a = w && w.data.items.find((x) => x.itemId === '110000000930'), b = w && w.data.items.find((x) => x.itemId === '110000000931');
+      const clesOk = !!w && w.data.items.every((x) => Object.keys(x).every((k) => CLES_INACTIVE.includes(k)));
+      dit(clesOk && a && a.sku === 'VRM-30' && a.price === '75.0' && a.currency === 'EUR' && a.fin === '2026-10-01T10:00:00.000Z' && a.observateurs === 2 && a.photo === 'https://i.ebayimg.com/images/g/aaa/s-l225.jpg'
+        && b && b.sku === '' && b.photo === '' && b.relanceeEn === '110000000999' && b.observateurs === null,
+        `[INA] « ${action} » : seuls les scalaires utiles sont rangés (§4.4 — ni détail, ni « vues » brut), la photo hors i.ebayimg.com est VIDÉE, le SKU d'une variante n'est pas celui de l'annonce, la remise en vente déjà faite (RelistedItemID) est gardée`, w ? JSON.stringify(w.data.items) : '∅');
+      dit(o.corps && o.corps.lu && o.corps.lu.inactives === true, `[INA] « ${action} » : la réponse dit les inactives LUES (lu.inactives)`, JSON.stringify(o.corps && o.corps.lu));
+      const L = ecrit(o.journal, 'ebay_listings');
+      dit(!L || !L.data.items.some((x) => /^11000000093[01]$/.test(String(x.itemId))), `[INA] « ${action} » : aucune inactive dans ebay_listings (elles ne sont pas en vente)`, L ? L.data.items.map((x) => x.itemId).join(',') : 'ebay_listings non réécrite');
+      const P = ecrit(o.journal, 'ebay_programmees');
+      dit(!P || !JSON.stringify(P.data).includes('11000000093'), `[INA] « ${action} » : ni dans ebay_programmees (en ligne / programmées)`);
+    }
+  });
+  await essaie('[INA] liste lue VIDE (deux formes) ⇒ rangée vide', async () => {
+    for (const forme of ['vide', 'autoferme']) {
+      remettre(); remettreBase(); mode.invendues = forme;
+      lignes.push({ owner: J, id: 'ebay_inactives', data: { items: [{ itemId: '110000000111' }], complet: true, jours: 60, capturedAt: 1 } });
+      const o = await app(JWT_J, { action: 'sync' });
+      const w = ecrit(o.journal, 'ebay_inactives');
+      dit(!!w && Array.isArray(w.data.items) && w.data.items.length === 0 && w.data.complet === true,
+        `[INA] eBay rend la liste sans entrée (${forme === 'vide' ? '<UnsoldList> présent, 0 entrée' : '<UnsoldList/>'}) ⇒ « lue vide » est rangée (l'ancienne capture remplacée par la vraie liste)`, w ? JSON.stringify(w.data) : 'rien rangé');
+    }
+  });
+  await essaie('[INA] pas lu ⇒ rien n\'est écrasé', async () => {
+    const seme = () => lignes.push({ owner: J, id: 'ebay_inactives', data: { items: [{ itemId: '110000000111', title: 'Capture d\'avant' }], complet: true, jours: 60, capturedAt: 1 } });
+    const cas = [
+      ['conteneur ABSENT de la réponse', () => { mode.invendues = 'absent'; ebay['at-J'].invendues = [INACTIVE_A()]; }, 'sync'],
+      ['conteneur ABSENT (relecture)', () => { mode.invendues = 'absent'; }, 'relire'],
+      ['GetMyeBaySelling refusé', () => { mode.liste = 'ko'; }, 'sync'],
+      ['GetMyeBaySelling refusé (relecture)', () => { mode.liste = 'ko'; }, 'relire'],
+      ['réseau coupé', () => { mode.liste = 'reseau'; }, 'sync'],
+    ];
+    for (const [nom, poser, action] of cas) {
+      remettre(); remettreBase(); seme(); poser();
+      const avant = JSON.stringify(lignes.find((x) => x.owner === J && x.id === 'ebay_inactives'));
+      const o = await app(JWT_J, { action });
+      const apres = JSON.stringify(lignes.find((x) => x.owner === J && x.id === 'ebay_inactives'));
+      dit(ecrit(o.journal, 'ebay_inactives') === null && avant === apres && !(o.corps && o.corps.lu && o.corps.lu.inactives === true),
+        `[INA] ${nom} (« ${action} ») ⇒ AUCUNE écriture, la dernière capture reste (« pas lu » ne vaut pas « aucune »)`, `HTTP ${o.code} · ${apres && apres.slice(0, 80)}`);
+    }
+  });
+  await essaie('[INA] une seule page lue', async () => {
+    remettre(); remettreBase(); mode.invendues = 'pages2';
+    ebay['at-J'].invendues = [INACTIVE_A()];
+    const o = await app(JWT_J, { action: 'sync' });
+    const ls = listesDe(o.journal);
+    const w = ecrit(o.journal, 'ebay_inactives');
+    dit(ls.length === 1 && w && w.data.complet === false && w.data.items.length === 1,
+      '[INA] eBay a une 2ᵉ page d\'inactives ⇒ toujours UN appel (pas de page 2 demandée), rangée avec complet:false (jamais présentée comme entière)', `${ls.length} appel(s) · complet=${w && w.data.complet}`);
+  });
+  await essaie('[INA] chaque compte eBay, chaque vendeur, sa ligne', async () => {
+    await avecDeuxComptes();
+    ebay['at-A2'].invendues = [INACTIVE_A()];
+    const o = await app(JWT_J, { action: 'sync', compte: CLE_A2 });
+    const w = ecrit(o.journal, 'ebay_inactives_' + CLE_A2);
+    const ls = listesDe(o.journal);
+    dit(!!w && w.owner === J && w.data.items.length === 1 && ecrit(o.journal, 'ebay_inactives') === null && ls.length === 1 && ls.every((x) => x.jeton === 'at-A2'),
+      '[INA] compte julien_pro : lu avec SON jeton, rangé dans ebay_inactives_{clé} — rien dans la ligne du premier compte', w ? `ebay_inactives_${CLE_A2} · ${ls.map((x) => x.jeton).join(',')}` : 'rien rangé');
+    const o2 = await app(JWT_J, { action: 'relire', compte: CLE_A2 });
+    const w2 = ecrit(o2.journal, 'ebay_inactives_' + CLE_A2);
+    dit(!!w2 && w2.owner === J && ecrit(o2.journal, 'ebay_inactives') === null, '[INA] la relecture du compte julien_pro range aussi dans SA ligne', w2 ? 'ok' : 'rien');
+    remettre(); remettreBase();
+    lignes.push({ owner: J, id: 'ebay_inactives', data: { items: [{ itemId: '110000000111' }], complet: true, jours: 60, capturedAt: 1 } });
+    lignes.push({ owner: B, id: 'ebay_tokens', data: { refresh_token: 'rt-de-B', saved_at: 1 } });
+    ebay['at-B'].invendues = [INACTIVE_A()];
+    const avantJ = JSON.stringify(lignes.find((x) => x.owner === J && x.id === 'ebay_inactives'));
+    const o3 = await app(JWT_B, { action: 'sync' });
+    const ecritures = o3.journal.filter((x) => x.ou === 'base' && /ebay_inactives/.test(x.corps));
+    const lectures = o3.journal.filter((x) => x.ou === 'lecture' && /id=eq\.ebay_/.test(x.u));
+    dit(ecritures.length === 1 && [].concat(JSON.parse(ecritures[0].corps)).every((r) => r.owner === B) && JSON.stringify(lignes.find((x) => x.owner === J && x.id === 'ebay_inactives')) === avantJ
+      && lectures.every((x) => x.u.includes('owner=eq.' + B)) && listesDe(o3.journal).every((x) => x.jeton === 'at-B'),
+      '[INA] la synchro du vendeur B range SES inactives chez B (owner=B), lit filtré owner=eq.B, avec SON jeton — la ligne de Julien n\'est pas touchée', `${ecritures.length} écriture(s) · lectures ${lectures.length}`);
+  });
+  await essaie('[INA] une inactive ne bloque jamais une publication', async () => {
+    remettre(); remettreBase();
+    ebay['at-J'].invendues = [INACTIVE_A()];          // VRM-30, terminée sans vente
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '30' } });
+    dit(o.code === 200 && o.corps.ok === true && !listesDe(o.journal).some((x) => /<UnsoldList>/.test(x.corps)),
+      '[INA] la N°30 n\'existe chez eBay QUE terminée sans vente ⇒ la publier part (200) — la garde ne demande même pas les inactives', `HTTP ${o.code} · ${o.corps && o.corps.reason}`);
+    remettre(); remettreBase();
+    ebay['at-J'].invendues = [INACTIVE_A()];          // (la publication ci-dessus l'a mise en ligne : on repart de zéro)
+    const o2 = await app(JWT_J, prog());
+    dit(o2.code === 200 && !listesDe(o2.journal).some((x) => /<UnsoldList>/.test(x.corps)), '[INA] la programmer aussi', `HTTP ${o2.code} · ${o2.corps && o2.corps.reason}`);
+  });
+  await essaie('[INA] aucune charge de plus ailleurs', async () => {
+    remettre(); remettreBase();
+    ebay['at-J'].invendues = [INACTIVE_A()];
+    for (const corps of [{ action: 'programmees' }, { action: 'regleoffrelire', itemIds: ['110000000001'] }]) {
+      const o = await app(JWT_J, corps);
+      dit(!listesDe(o.journal).some((x) => /<UnsoldList>/.test(x.corps)) && ecrit(o.journal, 'ebay_inactives') === null,
+        `[INA] « ${corps.action} » ne demande pas les inactives (aucune charge en plus, rien d'écrit)`, listesDe(o.journal).length + ' appel(s)');
+    }
+  });
+  await essaie('[INA] jamais de remise en vente', async () => {
+    remettre(); remettreBase();
+    ebay['at-J'].invendues = [INACTIVE_A(), INACTIVE_B()];
+    const j1 = (await app(JWT_J, { action: 'sync' })).journal, j2 = (await app(JWT_J, { action: 'relire' })).journal;
+    const tous = [...auCompte(j1), ...auCompte(j2)];
+    dit(tous.length > 0 && !tous.some((x) => /Relist|^AddItem$/.test(x.appel || '') || /<RelistFixedPriceItem|<RelistItem|<AddItem/.test(x.corps || '')),
+      '[INA] synchro + relecture : aucune remise en vente envoyée à eBay (ni Relist*, ni AddItem)', tous.map((x) => x.appel).filter(Boolean).join(','));
+    const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+    const fichiers = [path.join(RACINE, 'api', 'ebay.js'), ...fs.readdirSync(path.join(RACINE, 'api', '_lib')).filter((f) => /\.js$/.test(f)).map((f) => path.join(RACINE, 'api', '_lib', f))];
+    const fautifs = fichiers.filter((f) => /['"`](?:Relist\w*|AddItem)['"`]/.test(sansCommentaires(fs.readFileSync(f, 'utf8'))));
+    dit(fautifs.length === 0, '[INA] aucun appel Relist*/AddItem dans api/ (lu sans les commentaires)', fautifs.map((f) => path.basename(f)).join(','));
   });
 
   // ── 11. BASE PAS ENCORE CLOISONNÉE : rejouée dans un processus neuf ─────────
