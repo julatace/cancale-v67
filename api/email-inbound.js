@@ -1,5 +1,5 @@
 import './_lib/sans-bruit.js';
-import {etatColisDepuisTexte,conserverRetrait} from './_lib/etat-colis-email.js';
+import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
@@ -34,7 +34,9 @@ import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from '
 import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
+import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
+import { decoderEntitesHtml } from './_lib/entites-html.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -60,15 +62,17 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KE
 //    mains ») — d'où `texteUtile()` plus bas, qui choisit la meilleure source.
 function htmlToText(html) {
   if (!html) return '';
-  return String(html)
+  const t = String(html)
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n')
     .replace(/<\/li>/gi, '\n').replace(/<\/tr>/gi, '\n').replace(/<\/td>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&euro;/g, '€')
-    .replace(/&#8364;/g, '€').replace(/&#\d+;/g, ' ');
+    // (23 oct.) Les entités (accents, apostrophes) se DÉCODENT au lieu de
+    // devenir une espace — une règle partagée avec l'app (api/_lib/entites-html.js).
+    .replace(/&nbsp;/g, ' ');
+  return decoderEntitesHtml(t);
 }
 
 // Du CSS n'est pas un message. Un `text` qui porte les marqueurs d'une feuille
@@ -792,7 +796,7 @@ async function findBuyPriceByTitle(title) {
 }
 
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
-export function parseCarrierEmail(mail, carrier) {
+export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString()) {
   const txt = texteUtile(mail);
   const all = (mail.subject || '') + '\n' + txt;
 
@@ -831,6 +835,9 @@ export function parseCarrierEmail(mail, carrier) {
   // Sans suivi (emails pub « ton compte évolue », newsletters…), on ne compte
   // PAS comme un colis à retirer.
   if (status === 'available' && !suivi) { status = 'info'; label = 'Info'; }
+  // (23 oct.) Un colis reparti chez l'expéditeur, dit par le transporteur pour
+  // CE n° de suivi (une identité). Sans n° de suivi, il ne désigne rien.
+  if (status === 'retour') { if (suivi) label = 'Reparti chez l’expéditeur'; else { status = 'info'; label = 'Info'; } }
 
   // Code de retrait (PIN) : « code de retrait : 123456 », « PIN : 1234 »...
   // ⚠️ UN CODE DE RETRAIT EST NUMÉRIQUE. L'ancien motif acceptait des LETTRES
@@ -895,7 +902,12 @@ export function parseCarrierEmail(mail, carrier) {
     // ⚠️ « Adresse » seule sur sa ligne AUSSI (Vinted Go, 2 oct. : « Adresse » puis
     //    « Consigne Vinted Go / Speed Queen - Vannes / 24 Rue Hoche »). `^adresse$`
     //    strict : « Adresse de livraison » (email d'envoi) ne matche pas.
-    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(l));
+    // ⚠️ (23 oct.) « POINT RELAIS® » : le ® en fin de ligne faisait échouer le
+    //    test (mesuré sur le Mondial Relay du 21 octobre : lieu vide, alors que
+    //    « TABA'VAP / 29 Rue Hoche / 56000 Vannes » suivaient). On retire ®™©
+    //    et le gras AVANT de tester l'en-tête.
+    const enTete = (l) => l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(enTete(l)));
     if (idx >= 0) {
       const parts = [];
       // 4 lignes : nom, rue, code postal + ville (la consigne Vinted Go en a 3
@@ -903,7 +915,10 @@ export function parseCarrierEmail(mail, carrier) {
       for (let i = idx + 1; i < lines.length && parts.length < 4; i++) {
         const l = lines[i];
         if (!l) { if (parts.length) break; else continue; }
-        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis/i.test(l)) break;
+        // (23 oct.) La date limite (« RETRAIT JUSQU'AU 26/10 ») et le pied de
+        // l'e-mail (« Avec 19 000 points de proximité… », l'adresse du siège
+        // MONDIAL RELAY) ne sont pas le lieu : on s'arrête là.
+        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis|retrait|jusqu|avec\s+\d|mondial\s*relay|chronopost|villeneuve\s+d/i.test(l)) break;
         // (17 oct.) Le gras de la version texte (« *Kusmi Tea* ») n'est pas le lieu.
         const propre = l.replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
         if (propre) parts.push(propre);
@@ -920,6 +935,10 @@ export function parseCarrierEmail(mail, carrier) {
     /\bchez\s+([A-Z][^\n]{4,80})/,
   ]) {
     const m = all.match(pat);
+    // (23 oct.) « disponible dans les prochains jours dans votre Relais Pickup »
+    // donnait le lieu « les prochains jours dans votre Relais Pickup » : le
+    // FUTUR n'est pas un endroit.
+    if (m && LIEU_AU_FUTUR.test(m[1])) continue;
     if (m) { lieu = m[1].trim().replace(/\s+/g, ' ').replace(/[.,;]\s*$/, ''); break; }
   }
   // Consigne Pickup (casier automatique) : « Consigne Pickup <enseigne> » + adresse
@@ -954,22 +973,11 @@ export function parseCarrierEmail(mail, carrier) {
   // manquait : passé cette date le colis repart chez l'expéditeur, et rien dans
   // l'app ne le disait. On ne la déduit jamais — si l'email ne la donne pas, on
   // ne met rien (une fausse échéance ferait courir pour rien, ou rater le colis).
-  let limite = null;
-  {
-    const MOIS = { janvier:1, février:2, fevrier:2, mars:3, avril:4, mai:5, juin:6, juillet:7,
-                   août:8, aout:8, septembre:9, octobre:10, novembre:11, décembre:12, decembre:12 };
-    // ⚠️ « À retirer avant le 29/09/2026 » AUSSI (Vinted Go, mesuré 2 oct.) — pas
-    //    seulement « jusqu'au … ». Sans ça la date limite Vinted Go était perdue.
-    const AV = "(?:jusqu['’]au|(?:[àa]\\s+retirer\\s+)?avant\\s+le|[àa]\\s+r[ée]cup[ée]rer\\s+avant\\s+le)";
-    const mTxt = all.match(new RegExp(`${AV}\\s+(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)\\s+(\\d{4})`, 'i'));
-    const mNum = all.match(new RegExp(`${AV}\\s+(\\d{1,2})[\\/.](\\d{1,2})[\\/.](\\d{4})`, 'i'));
-    if (mTxt) {
-      const mo = MOIS[mTxt[2].toLowerCase()];
-      if (mo) limite = `${mTxt[3]}-${String(mo).padStart(2,'0')}-${String(+mTxt[1]).padStart(2,'0')}`;
-    } else if (mNum) {
-      limite = `${mNum[3]}-${String(+mNum[2]).padStart(2,'0')}-${String(+mNum[1]).padStart(2,'0')}`;
-    }
-  }
+  // (23 oct.) LA règle vit dans api/_lib/retrait-colis.js, partagée avec l'app
+  // (§11) : elle lit aussi une date SANS année (Mondial Relay « RETRAIT
+  // JUSQU'AU 26/10 », mesuré : 22 colis sur 22 sans date limite), l'année étant
+  // celle de la réception, bornée à [veille, +30 jours].
+  const limite = limiteRetraitDepuisTexte(all, recuLe);
   // Consigne automatique (casier Pickup) ou point relais avec comptoir ? Le geste
   // n'est pas le même : au casier on saisit identifiant + code d'ouverture (ou on
   // scanne), au comptoir on présente un code et une pièce d'identité.
@@ -998,7 +1006,21 @@ export function parseCarrierEmail(mail, carrier) {
     L.forEach((l, i) => { if (/\b\d{5}\b\s+[A-Za-zÀ-ÿ]/.test(l)) { garde.add(i - 2); garde.add(i - 1); garde.add(i); } });
     const bouts = [...garde].filter(i => i >= 0).sort((a, b) => a - b).map(i => L[i]);
     if (bouts.length) extraitLieu = bouts.join(' | ').slice(0, 600);
+    // (23 oct.) Ces lignes portent le lieu quand elles ont la forme EXACTE
+    // « NOM | rue | CP Ville » (mesuré : Chronopost « TERRA CBD | 11 RUE HOCHE |
+    // 56000 VANNES », Mondial Relay « TABA'VAP | 29 Rue Hoche | 56000 Vannes »).
+    // La même règle relit les lignes déjà rangées dans l'app (§11).
+    const l2 = lieuDepuisExtrait(extraitLieu);
+    if (l2) lieu = l2;
   }
+
+  // (23 oct.) « Information sur votre colis : il sera disponible dans les
+  // prochains jours dans votre Relais Pickup » était rangé « disponible », avec
+  // ce futur pour lieu (mesuré : 2 lignes Chronopost, une notification « 📍 à
+  // retirer » partie le 23 au matin). Un e-mail d'ARRIVÉE porte toujours un code
+  // (Mondial Relay) ou un code et un QR (Chronopost, Vinted Go) ; l'annonce d'une
+  // arrivée à venir, sans code, n'est pas un colis à retirer.
+  if (status === 'available' && !code && annonceArriveeFuture(all)) { status = 'transit'; label = 'En transit'; lieu = null; }
 
   // ── MESURE : code introuvable sur un colis À RETIRER (17 oct.) ─────────
   // Julien : « des fois tu me mets juste un colis dans un point relais sans le
@@ -1429,6 +1451,9 @@ const dateBref = (d) => { const m = String(d || '').match(/(\d{4})-(\d{2})-(\d{2
 export function cleNotifColis(track, rowId) {
   const t = track || {};
   const id = t.suivi || rowId || '';
+  // (23 oct.) Un colis REPARTI chez l'expéditeur a sa clé : sinon le premier
+  // « en transit » (`track-…`) l'aurait consommée et le retour ne sonnerait jamais.
+  if (t.status === 'retour') return `retour-${id}`;
   if (t.status !== 'available') return `track-${id}`;
   return `relais-${id}-${codeNotif(t.code) ? 'code' : 'sans'}`;
 }
@@ -1455,9 +1480,13 @@ export function bodyNotifColis(track, carrier) {
     const code = codeNotif(t.code);
     if (code) parts.push(`Code : ${code}${codeNotif(t.code2) ? ' + ' + codeNotif(t.code2) : ''}`);
     const lim = dateBref(t.limite);
-    if (lim) parts.push(`à retirer avant le ${lim}`);
+    // (23 oct.) « jusqu'au » : c'est le mot du transporteur, le jour est compris.
+    if (lim) parts.push(`à retirer jusqu'au ${lim}`);
     return parts.join('. ') + '.';
   }
+  // (23 oct.) Le transporteur ÉCRIT que le colis repart : on le dit, sans dire
+  // « perdu » (Vinted rembourse souvent tout seul), avec le geste.
+  if (t.status === 'retour') return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : le transporteur écrit qu'il repart chez l'expéditeur. Vérifie le remboursement dans la conversation Vinted.`;
   // Livré / en transit / info : le message court d'avant, sans changement.
   return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : ${t.label || ''}.`;
 }
@@ -1796,7 +1825,7 @@ export async function traiterEmail(req, res) {
     // bordereau (traité au point 1, prioritaire).
     const carrier = detecterTransporteur(mail);
     if (carrier) {
-      const track = parseCarrierEmail(mail, carrier);
+      const track = parseCarrierEmail(mail, carrier, now);
       // QR / code-barres de retrait : cherché dans les pièces jointes ET dans le
       // HTML embarqué (là où Vinted / Mondial Relay le mettent le plus souvent).
       const qr = extractPickupQr(mail, track.status);
@@ -1836,15 +1865,27 @@ export async function traiterEmail(req, res) {
         ...(track.extraitCode && !track.code ? { extraitCode: track.extraitCode } : {}),
         qrB64: qr.qrB64, qrType: qr.qrType, qrUrl: qr.qrUrl || null,
         account: acc.login || '',
+        // (23 oct.) L'ADRESSE DE RÉCEPTION quand aucun compte n'est reconnu :
+        // mesuré, le Mondial Relay du 21 octobre est arrivé le 21 sur une adresse
+        // reliée à un compte Vinted le LENDEMAIN — la ligne restait sans compte
+        // pour toujours. Avec l'adresse (une identité, la sienne), l'app relie
+        // le colis au compte dès que l'adresse est déclarée. Jamais celle d'un
+        // acheteur : ce sont SES adresses de réception (le routage, §5).
+        ...((() => { if (acc.login) return {};
+          const st = contexteVendeur.getStore();
+          const a = (st && st.reception && Array.isArray(st.reception.adresses) && st.reception.adresses.length) ? st.reception.adresses : adresses;
+          if (Array.isArray(a) && a.length) return { recuSur: a.map((x) => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 3) };
+          return (prevLigne && Array.isArray(prevLigne.recuSur)) ? { recuSur: prevLigne.recuSur } : {}; })()),
       } }]);
       // Notif push selon l'étape du colis.
-      const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦' };
-      const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis' };
+      // (23 oct.) Un colis reparti chez l'expéditeur ne sonne JAMAIS « 📍 à retirer ».
+      const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦', retour: '↩️' };
+      const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis', retour: 'Colis reparti chez l’expéditeur' };
       try { await pushOnce({
         title: `${icons[track.status]} ${titles[track.status]}`,
         body: bodyNotifColis(track, carrier),
         tag: cleNotifColis(track, rowId), url: '/?tab=cat_achats',
-      }, track.status === 'available' ? 'colis' : 'suivi', [],
+      }, (track.status === 'available' || track.status === 'retour') ? 'colis' : 'suivi', [],
       track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       await repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
