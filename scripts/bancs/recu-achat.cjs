@@ -28,6 +28,8 @@
 //    F. « ‹ » et « PDF » font 44 px affichés ; Échap, « ‹ » et le retour du
 //       navigateur ferment la feuille ; en sombre, la feuille est sombre et le
 //       montant se lit.
+//    G. (revue du 23 oct.) à 320 px, aucun montant ne se coupe sur deux lignes,
+//       ni « •••• 9999 » ;
 //
 //  Lancer : npm run build && NODE_OPTIONS="--require /tmp/claude-0/redir-pw.cjs" \
 //           BANC_PORT=9201 node scripts/bancs/recu-achat.cjs
@@ -77,6 +79,11 @@ const ROWS = [
   // R4 — une somme qui ne tombe pas juste (forme inventée) : la feuille doit le DIRE
   ligneRecu('r4', { subject: 'Ton reçu pour la commande « Botte banc ecart »', article: 'Botte banc ecart', prix: '30,00', receivedAt: jour(9),
     texte: recu('Botte banc ecart', '30,00', ['Article 20,00 € ', 'Frais de port 3,23 € '], '23455556666') }),
+  // R5 — (revue du 23 oct.) les libellés et montants les plus LONGS de la forme
+  // mesurée (« Frais de Protection acheteurs 11,20 € », « MasterCard,
+  // **********9999 ») : c'est sur eux que 320 px coupait un montant ou la carte.
+  ligneRecu('r5', { subject: 'Ton reçu pour la commande « Bottine longue banc »', article: 'Bottine longue banc', prix: '227,69', receivedAt: jour(20),
+    texte: recu('Bottine longue banc', '227,69', ['Article 210,00 € ', 'Frais de port 6,49 € ', 'Frais de Protection acheteurs 11,20 € '], '23477778888', 'MasterCard, **********9999') }),
   // M1 — (revue du 23 oct.) un email que la route range AUSSI comme achat
   // (« Merci pour ton achat ») sans « Montant payé » : c'est un reçu, il reste
   // LISTÉ, et la feuille montre son texte (forme inventée, champs de la route).
@@ -116,7 +123,7 @@ let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 180)); } };
 
-async function preparer(b, vp, sombre) {
+async function preparer(b, vp, sombre, police) {
   const mobile = vp.width < 600;
   const ctx = await b.newContext({ viewport: vp, ...(mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
@@ -129,6 +136,8 @@ async function preparer(b, vp, sombre) {
   // Chromium ne le fait pas : sans cette ligne, le banc serait vert sur le
   // défaut. On impose donc à `<main>` le contexte d'empilement que WebKit lui
   // donne — sur téléphone seulement (sur ordinateur, il n'y a pas de barre).
+  // Une police imposée (métriques d'Arial) pour la vue étroite.
+  if (police) await pg.addInitScript((f) => { const poser = () => { const st = document.createElement('style'); st.textContent = `*{font-family:${f},sans-serif!important}`; document.head.appendChild(st); }; if (document.head) poser(); else document.addEventListener('DOMContentLoaded', poser); }, police);
   if (mobile) await pg.addInitScript(() => { const poser = () => { const st = document.createElement('style'); st.textContent = '.vrm-main{isolation:isolate}'; document.head.appendChild(st); }; if (document.head) poser(); else document.addEventListener('DOMContentLoaded', poser); });
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await ctx.route('**/rest/v1/**', (route) => {
@@ -194,11 +203,52 @@ async function fermerParEchap(pg) {
       { nom: '390 tactile clair', vp: { width: 390, height: 560 }, sombre: false, defile: true },
       { nom: '390 tactile sombre', vp: { width: 390, height: 700 }, sombre: true },
       { nom: '1512 clair', vp: { width: 1512, height: 950 }, sombre: false },
+      // (revue du 23 oct.) Le plus petit iPhone (320 px de large) : un montant ne
+      // se coupe jamais (« 11,20 » / « € »), ni la carte (« MasterCard •••• » /
+      // « 9999 »). Deux polices : celle du banc (DejaVu Sans, large) et des
+      // métriques d'Arial (Liberation Sans, proches de l'iPhone) — un défaut ne se
+      // voit qu'avec l'une ou l'autre.
+      { nom: '320 tactile (police du banc)', vp: { width: 320, height: 568 }, sombre: false, etroit: true },
+      { nom: '320 tactile (métriques d’Arial)', vp: { width: 320, height: 568 }, sombre: false, etroit: true, police: "'Liberation Sans'" },
     ];
     for (const V of VUES) {
       console.log(`── ${V.nom}`);
-      const { ctx, pg, errs } = await preparer(b, V.vp, V.sombre);
+      const { ctx, pg, errs } = await preparer(b, V.vp, V.sombre, V.police);
       const mobile = V.vp.width < 600;
+      if (V.etroit) {
+        // ── G. Écran étroit : rien ne se coupe au mauvais endroit ───────────
+        await essaie('G. étroit', async () => {
+          await ouvrirDepuisListe(pg, /Bottine longue banc/);
+          const m = await pg.evaluate((sel) => {
+            const d = document.querySelector(sel); if (!d) return null;
+            const lignesDe = (n) => { if (!n) return -1; const r = document.createRange(); r.selectNodeContents(n); return new Set([...r.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top))).size; };
+            const montants = [...d.querySelectorAll('[data-recu-ligne], [data-recu-total]')].map((e) => ({ quoi: e.getAttribute('data-recu-ligne') || 'Montant payé', texte: (e.lastElementChild || e).textContent, lignes: lignesDe(e.lastElementChild) }));
+            const rangee = [...d.querySelectorAll('div')].find((e) => e.firstElementChild && e.firstElementChild.textContent === 'Mode de paiement' && e.children.length === 2);
+            let carte = null;
+            if (rangee) {
+              const v = rangee.lastElementChild; const tn = [...v.childNodes].find((n) => n.nodeType === 3 && n.data.includes('••••'));
+              if (tn) { const i = tn.data.indexOf('••••'); const r = document.createRange(); r.setStart(tn, i); r.setEnd(tn, Math.min(tn.data.length, i + 9)); carte = { texte: tn.data.slice(i, i + 9), lignes: new Set([...r.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top))).size }; }
+            }
+            // L'heure « 10 h 47 » de la date du paiement ne se coupe pas non plus.
+            const rDate = [...d.querySelectorAll('div')].find((e) => e.firstElementChild && e.firstElementChild.textContent === 'Date du paiement' && e.children.length === 2);
+            let heure = null;
+            if (rDate) {
+              const tn = [...rDate.lastElementChild.childNodes].find((n) => n.nodeType === 3 && /\d\s+h\s+\d/.test(n.data));
+              if (tn) { const mm = /\d+\s+h\s+\d+/.exec(tn.data); const r = document.createRange(); r.setStart(tn, mm.index); r.setEnd(tn, mm.index + mm[0].length); heure = { texte: mm[0], lignes: new Set([...r.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top))).size }; }
+            }
+            return { montants, carte, heure, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
+          }, DIALOG);
+          const coupes = m ? m.montants.filter((x) => x.lignes !== 1) : null;
+          dit(m && m.montants.length === 4 && coupes.length === 0, 'G. à 320 px, aucun montant ne se coupe sur deux lignes (« 11,20 » / « € »)', m && JSON.stringify(m.montants.map((x) => `${x.quoi}=${x.texte}→${x.lignes} ligne(s)`)));
+          dit(m && m.carte && m.carte.lignes === 1 && /^••••\s9999$/.test(m.carte.texte), 'G. à 320 px, « •••• 9999 » tient sur une ligne (jamais « MasterCard •••• » / « 9999 »)', m && JSON.stringify(m.carte));
+          dit(m && m.heure && m.heure.lignes === 1, 'G. à 320 px, l’heure du paiement « 10 h 47 » tient sur une ligne', m && JSON.stringify(m.heure));
+          dit(m && m.sw <= m.cw + 1, 'G. à 320 px, aucun débordement horizontal', m && `${m.sw} > ${m.cw}`);
+          if (process.env.CAPTURES) { fs.mkdirSync(process.env.CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.CAPTURES, `recu-320${V.police ? '-arial' : ''}.png`) }).catch(() => {}); }
+          await fermerParEchap(pg);
+        });
+        await ctx.close();
+        continue;
+      }
 
       // ── A. La liste ──────────────────────────────────────────────────────
       await essaie('A. liste', async () => {
@@ -206,7 +256,7 @@ async function fermerParEchap(pg) {
         await recus.locator('summary').click();
         await pg.waitForTimeout(400);
         const noms = await recus.locator('li > button strong').allInnerTexts();
-        dit(noms.length === 5 && noms.every((n) => !/Mocassin|est conforme/.test(n)), 'A. la liste montre les 5 reçus — aucun email « Commande mise à jour » / « Confirmation requise »', JSON.stringify(noms));
+        dit(noms.length === 6 && noms.every((n) => !/Mocassin|est conforme/.test(n)), 'A. la liste montre les 6 reçus — aucun email « Commande mise à jour » / « Confirmation requise »', JSON.stringify(noms));
         dit(noms.includes('Escarpin merci banc'), 'A. un « Merci pour ton achat » rangé comme achat par la route RESTE listé (il n’a pas de « Montant payé », ce n’est pas un email de statut)', JSON.stringify(noms));
         const autres = await recus.getAttribute('data-recus-autres').catch(() => null) || await recus.locator('[data-recus-autres]').getAttribute('data-recus-autres').catch(() => null);
         dit(autres === '2', 'A. la liste DIT que 2 autres emails ne sont pas des reçus (ils ne disparaissent pas en silence)', String(autres));
@@ -237,7 +287,7 @@ async function fermerParEchap(pg) {
         dit(f && f.total === 2493 && somme === 2493 && f.somme === 'juste', 'D. 20,00 + 3,23 + 1,70 = 24,93 € (les lignes font le Montant payé)', f && `total=${f.total} somme=${somme} ${f.somme}`);
         dit(f && /Frais Vinted/.test(f.texte) && /1,70/.test(f.texte), 'D. « Frais Vinted 1,70 € » se lit dans la feuille', '');
         dit(f && !f.phraseVisible, 'D. aucune phrase d’écart quand tout tombe juste');
-        dit(f && /Visa •••• 4242/.test(f.texte) && !/Visa, 4242/.test(f.texte), 'la carte se lit « Visa •••• 4242 » (plus « Visa, 4242 »)');
+        dit(f && /Visa ••••\s4242/.test(f.texte) && !/Visa, 4242/.test(f.texte), 'la carte se lit « Visa •••• 4242 » (plus « Visa, 4242 »)');
         // C. défiler jusqu'au bout
         const fin = await pg.evaluate((sel) => {
           const d = document.querySelector(sel); if (!d) return null;

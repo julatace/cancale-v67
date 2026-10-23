@@ -3970,6 +3970,10 @@ const modePaiementRecu = (texte, paye) => {
   const montants = [...m.matchAll(/\(\s*([^()]*?)\s*(?:€|eur)\s*\)/gi)];
   if (montants.length === 1 && paye != null && centimesRecu(montants[0][1]) === paye) m = m.replace(montants[0][0], '').trim();
   else m = m.replace(/\)\s+(?=\S)/g, ') · ');
+  // (23 oct., revue) Une espace INSÉCABLE entre les points et les chiffres : à
+  // 320 px, « MasterCard •••• » restait sur une ligne et « 9999 » passait à la
+  // suivante — un numéro de carte coupé en deux.
+  m = m.replace(/•••• (?=\d)/g, '••••\u00a0');
   return m ? m.charAt(0).toUpperCase() + m.slice(1) : '';
 };
 // La phrase qui accompagne le détail — venue de la même source que les lignes.
@@ -3989,7 +3993,8 @@ const champsRecuAchat = (a) => {
   const vendeur = val(/^vendeur\s*:?\s*(.+)$/i);
   const mode = modePaiementRecu(a && a.texte, v.paye);
   const recuLe = a && a.receivedAt && Number.isFinite(Date.parse(a.receivedAt)) ? new Date(a.receivedAt).toLocaleString('fr-FR') : '';
-  const datePaie = val(/^date\s+du\s+paiement\s*:?\s*(.+)$/i) || recuLe;
+  // L'heure « 10 h 47 » ne se coupe pas (« 10 h » / « 47 » à 320 px).
+  const datePaie = (val(/^date\s+du\s+paiement\s*:?\s*(.+)$/i) || recuLe).replace(/(\d) h (\d)/g, '$1\u00a0h\u00a0$2');
   const trans = txRecuAchat(a);
   const compte = String((a && a.account) || '');
   const cleaned = String((a && a.texte) || '').replace(/\*/g, ' ')
@@ -4097,10 +4102,15 @@ function FeuilleRecuAchat({ recu, fermer }) {
   const r = champsRecuAchat(recu);
   const boite = useRef(null);
   useEffect(() => { try { boite.current && boite.current.focus({ preventScroll: true }); } catch (_) {} }, []);
-  const Row = ({ label, val, attrs }) => val ? (
+  // (23 oct., revue) Un MONTANT ne se coupe jamais (`montant` : sans retour à la
+  // ligne, comme dans la fenêtre PDF) : à 320 px, « 11,20 » / « € » — la valeur
+  // en `overflowWrap:'anywhere'` pouvait se casser sur l'espace insécable. Le
+  // libellé, lui, passe à la ligne. Les autres valeurs (un pseudo très long)
+  // gardent `anywhere` : jamais de débordement.
+  const Row = ({ label, val, attrs, montant }) => val ? (
     <div {...(attrs || {})} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
       <span style={{fontSize:14,color:C.muted,fontWeight:500,minWidth:0}}>{label}</span>
-      <span style={{fontSize:14,color:C.text,fontWeight:500,textAlign:'right',overflowWrap:'anywhere'}}>{val}</span>
+      <span style={{fontSize:14,color:C.text,fontWeight:500,textAlign:'right',...(montant ? { whiteSpace:'nowrap', flexShrink:0 } : { overflowWrap:'anywhere' })}}>{val}</span>
     </div>) : null;
   const cible = { minWidth:44, minHeight:44, boxSizing:'border-box', display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:10, border:`1px solid ${C.border}`, background:C.card, color:C.text, cursor:'pointer', fontFamily:'inherit', flexShrink:0 };
   return createPortal(
@@ -4126,7 +4136,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
                     <span style={{fontSize:26,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{texteCentimesRecu(r.paye)}</span>
                   </div>
                 )}
-                {r.lignes.map((l, i) => <Row key={i} label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
+                {r.lignes.map((l, i) => <Row key={i} montant label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
                 <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.phrase}</div>
                 <div style={{height:10}}/>
                 <Row label="Vendeur" val={r.vendeur}/>

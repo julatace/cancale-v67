@@ -34,7 +34,8 @@
 //   positif · texte · borne · bornetoutes  (23 oct., revue : la définition
 //                     « positive » d'un reçu ; une feuille structurée sans
 //                     Montant payé ; une ligne de frais « Transaction … » qui
-//                     finit le bloc ; « Mode de paiement … X € » compté)
+//                     finit le bloc ; « Mode de paiement … X € » compté) · nbsp
+//                     (la carte coupée en deux à 320 px)
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');
@@ -115,6 +116,8 @@ else if (MUT === 'positif') muter('const estRecuAchat = (a) => !!a && !(', "cons
 else if (MUT === 'borne') muter('(FIN_SI_SANS_MONTANT_RECU.test(l) && !RE_LIGNE_RECU.test(l))', 'FIN_SI_SANS_MONTANT_RECU.test(l)');
 // …ou toutes les bornes deviennent « sans montant » (« Mode de paiement … 23,23 € » compté).
 else if (MUT === 'bornetoutes') muter('FIN_VENTILATION_RECU.test(l) || (FIN_SI_SANS_MONTANT_RECU.test(l) && !RE_LIGNE_RECU.test(l))', '(FIN_VENTILATION_RECU.test(l) || FIN_SI_SANS_MONTANT_RECU.test(l)) && !RE_LIGNE_RECU.test(l)');
+// (23 oct., revue) la carte coupée à 320 px (« MasterCard •••• » / « 9999 »).
+else if (MUT === 'nbsp') muter("m = m.replace(/•••• (?=\\d)/g, '••••\\u00a0');", '');
 else if (MUT === 'texte') muter('hasStructured: v.trouve };', 'hasStructured: v.trouve || !!(vendeur || mode || trans) };');
 else if (MUT === 'jete') muter('else lignes.push({ libelle: l, centimes: null });', 'else continue;');
 else if (MUT === 'txtexte') muter("for (const l of lignesRecu(a && a.texte)) {\n    const m = l.match(", "for (const l of []) {\n    const m = l.match(");
@@ -261,10 +264,10 @@ dit(/!a\.transaction && a\.article && normTitle\(a\.article\) === ot/.test(src) 
 // ── 5. Le mode de paiement ────────────────────────────────────────────────
 essaie('mode de paiement', () => {
   const c = F.champsRecuAchat({ texte: CAPTURE });
-  dit(c.mode === 'Visa •••• 4242', 'le mode de paiement se lit « Visa •••• 4242 » (plus « Visa, 4242 »)', JSON.stringify(c.mode));
+  dit(c.mode === 'Visa ••••\u00a04242', 'le mode de paiement se lit « Visa •••• 4242 » (plus « Visa, 4242 »), une espace INSÉCABLE avant les chiffres (jamais « Visa •••• » / « 4242 » sur un petit écran)', JSON.stringify(c.mode));
   const d = F.champsRecuAchat({ texte: '*Montant payé* 15,00 €\nArticle 15,00 €\n*Mode de paiement* porte-monnaie Vinted (12,00 €) Apple Pay (3,00 €)\n' });
   dit(/12,00/.test(d.mode) && /3,00/.test(d.mode), 'deux moyens de paiement : leurs montants restent', JSON.stringify(d.mode));
-  dit(c.vendeur === 'vendeur_banc' && c.trans === '23400000001' && c.datePaie === '21/10/2026 10 h 47', 'vendeur, n° de transaction et date du paiement lus sur LEUR ligne', JSON.stringify([c.vendeur, c.trans, c.datePaie]));
+  dit(c.vendeur === 'vendeur_banc' && c.trans === '23400000001' && c.datePaie === '21/10/2026 10\u00a0h\u00a047', 'vendeur, n° de transaction et date du paiement lus sur LEUR ligne (« 10 h 47 » insécable)', JSON.stringify([c.vendeur, c.trans, c.datePaie]));
   const e = F.champsRecuAchat({ texte: 'Bonjour\n*Vendeur* vendeur_banc\nLe vendeur a jusqu’à 5 jours pour envoyer le colis.\n' });
   dit(e.vendeur === 'vendeur_banc', 'le vendeur n’est pas une phrase (« a jusqu’à 5 jours… »)', JSON.stringify(e.vendeur));
 });

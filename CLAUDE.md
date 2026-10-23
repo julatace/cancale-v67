@@ -12167,6 +12167,16 @@ fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
     transaction » restent des bornes quoi qu'il arrive (mesuré : aucune des 81 ne finit
     par « € »). Audit : 2 rouges avant ; mutations `borne` 2, `bornetoutes` 1. Aucun
     reçu réel n'avait ce libellé.
+  - **À 320 px, un montant ou la carte se coupaient** (« 11,20 » / « € » avec la
+    police du banc, « MasterCard •••• » / « 9999 » avec des métriques d'Arial, et
+    « 10 h » / « 47 ») : la valeur d'une ligne était en `overflowWrap:'anywhere'`,
+    qui casse même une espace insécable, et la fenêtre PDF, elle, posait `nowrap`.
+    Les montants de la feuille ne passent plus à la ligne (`Row montant`, comme la
+    fenêtre), et `•••• 9999` et `10 h 47` portent des espaces insécables
+    (`modePaiementRecu`, `champsRecuAchat` — la feuille ET la fenêtre). Banc
+    `recu-achat.cjs` : deux vues 320 × 568 (police du banc, métriques d'Arial) et un
+    reçu aux libellés les plus longs mesurés : 4 rouges sur le build de 7ba9670, 3
+    sous la mutation « nowrap et insécable retirés » ; audit, mutation `nbsp` 1.
 
 ---
 
