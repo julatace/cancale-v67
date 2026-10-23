@@ -24,7 +24,12 @@
 //   6. le cron du matin est avancé (05:00 UTC), sans cron de plus ;
 //   7. la règle est UNE : l'app, le matin, le soir et le widget importent
 //      api/_lib/limite-envoi.js, et le module lit l'heure de PARIS (changement
-//      d'heure du 25 octobre compris).
+//      d'heure du 25 octobre compris) ;
+//   8. (revue du 22 oct.) une date ESTIMÉE dépassée (vente + 7 j, pas d'email)
+//      n'est JAMAIS « en retard » — ni le titre « du retard ! » du matin, ni le
+//      « déjà en retard » du soir, ni `overdue` du widget : la vraie limite tombe
+//      1 à 3 jours plus tard pour 62 ventes sur 202 (mesuré). Elle est comptée
+//      et dite à part : « à vérifier sur Vinted ».
 // `--src <dossier>` : lance l'audit sur une autre copie du dépôt (preuve §6.1).
 const path = require('path'), fs = require('fs');
 const iSrc = process.argv.indexOf('--src');
@@ -165,6 +170,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(w.code === 200 && s.total === 4, 'le widget : 4 colis à expédier (ni le coché « posté », ni la masquée, ni le compte retiré)', `HTTP ${w.code} · total=${s.total}`);
     dit(s.overdue === 1 && s.today === 1 && s.tomorrow === 1, 'le widget : 1 en retard · 1 aujourd’hui · 1 demain — comme le matin (l’imprimé et la vente sans email comptent)', JSON.stringify({ o: s.overdue, a: s.today, d: s.tomorrow }));
     dit(s.heureDemain === '10:00', 'le widget rend l’heure limite de demain (« 10:00 »)', String(s.heureDemain));
+    dit(s.estimeeDepassee === 0, 'le widget : aucune date estimée dépassée ce matin-là', String(s.estimeeDepassee));
   });
 
   console.log('\n── 3. Le soir (22 oct., 20 h 05) : la même règle');
@@ -174,7 +180,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const p = pushes.find((x) => /^soir-/.test(x.tag || '')) || {};
     console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(/Demain : 4 colis à poster/.test(p.title || ''), 'le soir : « Demain : 4 colis à poster »', p.title);
-    dit(/2 déjà en retard/.test(p.body || '') && /1 avec la date limite demain à 10 h/.test(p.body || ''), 'le « dont » : 2 déjà en retard (dont la vente sans email), 1 avant demain 10 h — l’heure écrite', p.body);
+    dit(/1 déjà en retard/.test(p.body || '') && /1 à vérifier sur Vinted/.test(p.body || '') && /1 avec la date limite demain à 10 h/.test(p.body || ''), 'le « dont » : 1 déjà en retard (limite lue), 1 à vérifier (la vente sans email : date estimée), 1 avant demain 10 h — l’heure écrite', p.body);
   });
 
   console.log('\n── 4. Heure illisible : le jour seul, comme avant');
@@ -231,6 +237,43 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const imp = (src, nom) => new RegExp(`import\\s*\\{[^}]*\\b${nom}\\b[^}]*\\}\\s*from\\s*['"][./]*(?:api/)?_lib/limite-envoi\\.js['"]`).test(src);
     dit(imp(app, 'limiteExpedition') && !/\n\s*const\s+limiteExpedition\s*=/.test(app), 'l’app prend `limiteExpedition` dans api/_lib/limite-envoi.js et n’en a pas de seconde', '');
     dit(imp(matin, 'compterEcheances') && imp(wid, 'compterEcheances'), 'le rappel (matin et soir) et le widget comptent avec la MÊME fonction', '');
+  });
+
+  console.log('\n── 8. Une date ESTIMÉE dépassée n’est jamais « en retard » (revue du 22 oct.)');
+  // 902 : vendue le 14 à 7 h (Paris), AUCUN email de bordereau ⇒ limite
+  // estimée le 21, dépassée le 22 ; la vraie peut tomber le 22, 23 ou 24.
+  const sansEmail902 = () => { reset(); V.A.bords = V.A.bords.filter((b) => b.data.transaction !== '902'); };
+  await essaie('matin, estimée dépassée', async () => {
+    sansEmail902();
+    const r = await lancer(MATIN);
+    const b = bilanA(r), p = matinDe()[0] || {};
+    console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
+    dit(b.overdue === 0 && b.aVerifier === 1 && b.total === 3, 'le matin : la vente sans email vendue il y a 8 jours n’est PAS « en retard » — comptée à part (à vérifier), toujours dans le total', JSON.stringify({ o: b.overdue, v: b.aVerifier, t: b.total }));
+    dit(!/retard/i.test(p.title || '') && !/^⏰/.test(p.title || ''), 'le titre du matin ne dit pas « du retard ! » sur une date estimée', p.title);
+    dit(!/en retard/.test(p.body || '') && /1 à vérifier sur Vinted — date estimée dépassée/.test(p.body || ''), 'le corps dit « 1 à vérifier sur Vinted — date estimée dépassée », jamais « en retard »', p.body);
+  });
+  await essaie('widget, estimée dépassée', async () => {
+    sansEmail902();
+    const w = await appelerWidget(MATIN);
+    const s = (w.corps && w.corps.ship) || {};
+    dit(w.code === 200 && s.overdue === 0 && s.estimeeDepassee === 1 && s.total === 4, 'le widget : `overdue` 0, `estimeeDepassee` 1 — la vente reste dans le total', JSON.stringify({ code: w.code, o: s.overdue, e: s.estimeeDepassee, t: s.total }));
+  });
+  await essaie('soir, estimée dépassée', async () => {
+    sansEmail902();
+    await lancer(SOIR, { moment: 'soir' });
+    const p = pushes.find((x) => /^soir-/.test(x.tag || '')) || {};
+    console.log(`     sur le téléphone : « ${p.title} » / « ${p.body} »`);
+    dit(!/déjà en retard/.test(p.body || '') && /^📮/.test(p.title || '') && /2 à vérifier sur Vinted/.test(p.body || ''), 'le soir : ni « déjà en retard » ni ⏰ — « 2 à vérifier sur Vinted » (la vente du 14 et celle du 15, estimées)', `${p.title} / ${p.body}`);
+  });
+  await essaie('module, estimée dépassée', async () => {
+    if (!L) throw new Error('module absent');
+    const l = L.limiteExpedition({ date: '2026-10-14T13:00:00Z' }, null, MATIN);
+    const c = L.compterEcheances({ txs: ['1'], ventes: { 1: { date: '2026-10-14T13:00:00Z' } }, bords: {}, maintenant: MATIN });
+    const t = L.texteLimiteEnvoi(l, MATIN);
+    dit(l.limite === 'estimee' && l.depasse === true && l.retard === false && c.retard === 0 && c.estimeeDepassee === 1, 'le module : estimée dépassée ⇒ `retard` faux, classe `estimeeDepassee`', JSON.stringify({ retard: l.retard, c: { r: c.retard, e: c.estimeeDepassee } }));
+    dit(!/retard/.test(t || '') && /vérifie/.test(t || ''), 'la ligne du colis ne dit pas « j de retard » sur une date estimée', t);
+    const lu = L.limiteExpedition({ date: '2026-10-14T13:00:00Z' }, { dateLimite: '21/10/2026 10 h 00' }, MATIN);
+    dit(lu.retard === true && /de retard/.test(L.texteLimiteEnvoi(lu, MATIN) || ''), 'l’autre sens : une limite LUE dans l’email et dépassée reste « en retard »', L.texteLimiteEnvoi(lu, MATIN));
   });
 
   console.log(ko ? `\n❌ colis à l’heure : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ colis à l’heure : tout est vert (${ok})`);

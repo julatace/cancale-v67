@@ -461,6 +461,9 @@ export default async function handler(req, res) {
       }
     }
     const ech = compterEcheances({ txs: [...shipTxns], ventes: ventesTx, bords: bordsTx, maintenant: Date.now() });
+    // ⚠️ (revue du 22 oct.) `overdue` ne compte qu'une limite LUE et dépassée ;
+    // une date ESTIMÉE dépassée (vente + 7 j, pas d'email) va dans
+    // `estimeeDepassee` — la vraie limite tombe jusqu'à 3 jours plus tard.
     const shipOverdue = ech.retard, shipToday = ech.aujourdhui, shipTomorrow = ech.demain;
 
     // ── CA + VENTES DU MOIS : LA MÊME SOURCE QUE L'APP ────────────────────────
@@ -506,6 +509,9 @@ export default async function handler(req, res) {
         heureAujourdhui: ech.premier.aujourdhui ? ech.premier.aujourdhui.heure : null,
         heureDemain: ech.premier.demain ? ech.premier.demain.heure : null,
         sansLimite: ech.sansLimite, datesPasSu,
+        // Les ventes Vinted dont seule une date ESTIMÉE (vente + 7 j) est
+        // dépassée : à vérifier sur Vinted, jamais comptées dans `overdue`.
+        estimeeDepassee: ech.estimeeDepassee,
       },
       pickup,
       moneyMonth: Math.round(moneyMonth),

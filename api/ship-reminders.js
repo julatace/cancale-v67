@@ -350,8 +350,8 @@ async function traiterVendeurApresRelecture() {
     try { eb = resumeColisEbay(colisEbay(d.ebay)); } catch (_) { eb = null; }
     // ⚠️ « Pas su » se tait pour Vinted, jamais « 0 » : ventes, comptes ou
     //    réglages (colis cochés « posté », masqués) illisibles ; ou les
-    //    bordereaux illisibles (leur heure limite manquerait : une date estimée
-    //    prendrait sa place et pourrait crier « en retard » à tort).
+    //    bordereaux illisibles (leur heure limite manquerait : une date estimée,
+    //    jour seul, prendrait la place de l'heure lue dans l'email).
     let vintedSkip = null;
     if (!t) vintedSkip = 'ventes ou réglages illisibles';
     else if (!Object.keys(d.commandes).length) vintedSkip = 'aucune vente Vinted captée';
@@ -361,10 +361,16 @@ async function traiterVendeurApresRelecture() {
     if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
+    // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
+    // la date d'eBay) et dépassée. Une limite ESTIMÉE dépassée (vente + 7 j,
+    // pas d'email) n'est PAS un retard — la vraie tombe jusqu'à 3 jours plus
+    // tard (62 ventes sur 202, mesuré) : elle est comptée à part
+    // (`aVerifier`), dans le total, et dite « à vérifier sur Vinted ».
     let overdue = c ? c.retard : 0, dueToday = c ? c.aujourdhui : 0, dueTomorrow = c ? c.demain : 0;
+    const aVerifier = c ? c.estimeeDepassee : 0;
     const ebayDus = eb ? eb.overdue + eb.today + eb.tomorrow : 0;
     if (eb) { overdue += eb.overdue; dueToday += eb.today; dueTomorrow += eb.tomorrow; }
-    const total = overdue + dueToday + dueTomorrow;
+    const total = overdue + aVerifier + dueToday + dueTomorrow;
     const nePasPoster = eb ? eb.nePasPoster : 0;
 
     // Anti-doublon : une seule notification par jour pour un même total.
@@ -372,11 +378,11 @@ async function traiterVendeurApresRelecture() {
     if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
-      const txt = texteMatin({ overdue, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
+      const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
       await sendPushToAll({ ...txt, tag: 'ship-reminder', url: '/?tab=cat_bord' });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, overdue, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
@@ -385,8 +391,11 @@ async function traiterVendeurApresRelecture() {
 // route). L'HEURE limite est écrite quand l'email la donne (« 1 demain avant
 // 10 h ») ; une date ESTIMÉE (pas de bordereau reçu) est dite estimée. Rien
 // sur ce que fait Vinted après l'heure : on ne l'a pas mesuré.
-export function texteMatin({ overdue, dueToday, dueTomorrow, ebayDus = 0, nePasPoster = 0, vinted = null }) {
-  const total = overdue + dueToday + dueTomorrow;
+// « du retard ! » ne part QUE sur une limite LUE et dépassée (`overdue`) ; une
+// date ESTIMÉE dépassée est « à vérifier sur Vinted » (`aVerifier`), jamais un
+// retard (revue du 22 octobre).
+export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebayDus = 0, nePasPoster = 0, vinted = null }) {
+  const total = overdue + aVerifier + dueToday + dueTomorrow;
   const premier = (vinted && vinted.premier) || {};
   const avec = (n, mot, p) => {
     const H = p && p.heure ? heureCourte(p.heure) : '';
@@ -395,6 +404,7 @@ export function texteMatin({ overdue, dueToday, dueTomorrow, ebayDus = 0, nePasP
   };
   const parts = [];
   if (overdue) parts.push(`${overdue} en retard`);
+  if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted — date estimée dépassée`);
   if (dueToday) parts.push(avec(dueToday, "aujourd'hui", premier.aujourdhui));
   if (dueTomorrow) parts.push(avec(dueTomorrow, 'demain', premier.demain));
   // Le mot suit la donnée : une étiquette eBay se prend DANS eBay (l'acheteur
@@ -404,8 +414,10 @@ export function texteMatin({ overdue, dueToday, dueTomorrow, ebayDus = 0, nePasP
     : ebayDus === total ? `${total} colis eBay à envoyer`
     : `${total} colis à envoyer, dont ${ebayDus} eBay`;
   const corps = total > 0 ? `${quoi} (${parts.join(' · ')}).` : '';
-  const est = vinted && vinted.estimees ? vinted.estimees.retard + vinted.estimees.aujourdhui + vinted.estimees.demain : 0;
-  const estime = est ? ` Date estimée pour ${est} (vente + 7 j : bordereau pas reçu par email).` : '';
+  // La date estimée : dite pour celles d'aujourd'hui et de demain, et pour
+  // celles « à vérifier » (une phrase, §7 : leur part le dit déjà « estimée »).
+  const est = vinted && vinted.estimees ? vinted.estimees.estimeeDepassee + vinted.estimees.aujourdhui + vinted.estimees.demain : 0;
+  const estime = est ? ` Date estimée pour ${est} (vente + 7 j : bordereau pas reçu par email ; la vraie limite peut tomber jusqu'à 3 j plus tard).` : '';
   const stop = nePasPoster ? ` ${nePasPoster > 1 ? `${nePasPoster} acheteurs eBay ont` : 'Un acheteur eBay a'} demandé l'annulation : ne poste pas ${nePasPoster > 1 ? 'ces colis' : 'ce colis'}.` : '';
   return {
     title: nePasPoster && !total ? '✋ Commande eBay : ne poste pas' : overdue ? '⏰ Colis à expédier — du retard !' : '📮 Colis à expédier',
@@ -474,11 +486,14 @@ function bordsDuVendeur(d) {
 // (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
 // ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
 // Le texte : une fonction pure (le banc la juge par la sortie de la route).
-export function texteSoir({ n, auMoins, retard, demain, heureDemain = null }) {
+// `aVerifier` : les dates ESTIMÉES (pas d'email de bordereau) qui seront
+// passées demain — jamais « déjà en retard » (revue du 22 octobre).
+export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDemain = null }) {
   const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
   const H = heureDemain ? heureCourte(heureDemain) : '';
   const parts = [];
   if (retard) parts.push(`${retard} déjà en retard`);
+  if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted (date estimée passée)`);
   if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
   return {
     title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
@@ -500,18 +515,22 @@ async function rappelDuSoir() {
   // Le « dont » : seulement CES ventes (sous-ensemble de N). Demain, une limite
   // d'aujourd'hui (ou d'avant) est déjà passée : elle compte « en retard ».
   // Bordereaux illisibles ⇒ pas de « dont » Vinted (une date estimée prendrait
-  // la place de l'heure lue, et pourrait dire « en retard » à tort).
-  let retard = 0, demain = 0, heureDemain = null;
+  // la place de l'heure lue dans l'email).
+  // ⚠️ (revue du 22 oct.) Une limite ESTIMÉE (vente + 7 j) passée demain n'est
+  // pas « déjà en retard » : `aVerifier`, dite à part.
+  let retard = 0, aVerifier = 0, demain = 0, heureDemain = null;
   if (Array.isArray(d.bords)) {
     const c = compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
-    retard = c.retard + c.aujourdhui; demain = c.demain;
+    retard = c.retard + (c.aujourdhui - c.estimees.aujourdhui);
+    aVerifier = c.estimeeDepassee + c.estimees.aujourdhui;
+    demain = c.demain;
     heureDemain = c.premier.demain ? c.premier.demain.heure : null;
   }
   if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
   if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
-  const txt = texteSoir({ n, auMoins, retard, demain, heureDemain: t.ebay && t.ebay.tomorrow ? null : heureDemain });
+  const txt = texteSoir({ n, auMoins, retard, aVerifier, demain, heureDemain: t.ebay && t.ebay.tomorrow ? null : heureDemain });
   const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: '/?tab=cat_bord' });
-  return { soir: 'envoyé', n, retard, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 async function traiterVendeurSoir() {
   const relu = await relireEbayDuVendeur();

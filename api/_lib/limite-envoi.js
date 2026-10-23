@@ -22,9 +22,15 @@
 //   · l'heure est celle de PARIS (Vinted France), jamais celle de l'appareil ni
 //     celle du serveur (UTC) — le passage à l'heure d'hiver est géré par Intl ;
 //   · sans email de bordereau, la limite est ESTIMÉE : vente + 7 jours, jour
-//     seul (mesuré : jamais moins de 7 jours sur 202 ventes reliées à leur
-//     bordereau). On ne dit rien de ce que fait Vinted après l'heure limite :
-//     on ne l'a pas mesuré.
+//     seul. C'est un PLANCHER, pas la limite : mesuré le 22-23 octobre sur 202
+//     ventes reliées à leur bordereau, la vraie limite tombe le jour estimé 140
+//     fois, et 1 à 3 jours PLUS TARD 62 fois (+1 : 28, +2 : 30, +3 : 4) —
+//     jamais avant. ⇒ Une date ESTIMÉE dépassée ne prouve AUCUN retard
+//     (`estimeeDepassee`, jamais la classe `retard`) : « vérifie sur Vinted ».
+//     « En retard » ne se dit que d'une limite LUE dans l'email (revue du
+//     22 octobre : le rappel du matin titrait « du retard ! » sur une estimée).
+//     On ne dit rien de ce que fait Vinted après l'heure limite : on ne l'a
+//     pas mesuré.
 
 export const DELAI_EXPEDITION_J = 7;
 const FUSEAU = 'Europe/Paris';
@@ -103,18 +109,26 @@ export function limiteExpedition(o, b, maintenant = Date.now()) {
     lim = { jour, heure: null, at: finDuJour(jour) };
     limite = 'estimee';
   }
-  const e = echeanceLimite(lim, maintenant);
-  return { daysLeft: e.jours, shipBy, limite, jour: lim.jour, heure: lim.heure, at: lim.at, depasse: e.depasse };
+  const e = echeanceLimite({ ...lim, limite }, maintenant);
+  return { daysLeft: e.jours, shipBy, limite, jour: lim.jour, heure: lim.heure, at: lim.at, depasse: e.depasse, retard: e.retard };
 }
 
 // Où en est une limite à `maintenant` : jours de calendrier, dépassée ou non,
-// et la classe que comptent les rappels (retard · aujourdhui · demain · plus).
+// et la classe que comptent les rappels (retard · estimeeDepassee · aujourdhui
+// · demain · plus). `retard` : dépassée ET lue dans l'email — une limite
+// ESTIMÉE (`lim.limite === 'estimee'`) dépassée n'est jamais un retard
+// (la vraie limite tombe jusqu'à 3 jours plus tard, mesuré) : classe
+// `estimeeDepassee`, « vérifie sur Vinted ».
 export function echeanceLimite(lim, maintenant = Date.now()) {
   const ecart = ecartJours(jourParis(maintenant), lim.jour);
   const depasse = maintenant >= lim.at;
+  const retard = depasse && lim.limite !== 'estimee';
   const jours = depasse ? Math.min(ecart, -1) : ecart;
-  return { jours, ecart, depasse, classe: depasse ? 'retard' : ecart === 0 ? 'aujourdhui' : ecart === 1 ? 'demain' : 'plus' };
+  return { jours, ecart, depasse, retard, classe: depasse ? (retard ? 'retard' : 'estimeeDepassee') : ecart === 0 ? 'aujourdhui' : ecart === 1 ? 'demain' : 'plus' };
 }
+// La phrase d'une date ESTIMÉE dépassée (une, pour Colis, Ma journée, le matin,
+// le soir et le widget) : jamais « en retard », le geste.
+export const TEXTE_ESTIMEE_DEPASSEE = 'date estimée dépassée — vérifie la vraie limite sur Vinted';
 
 // « 10:00 » → « 10 h » ; « 13:37 » → « 13 h 37 ».
 export const heureCourte = (hhmm) => {
@@ -131,6 +145,7 @@ export function texteLimiteEnvoi(l, maintenant = Date.now()) {
   if (!l || !l.jour) return null;
   const e = echeanceLimite(l, maintenant);
   const H = l.heure ? heureCourte(l.heure) : '';
+  if (e.depasse && !e.retard) return TEXTE_ESTIMEE_DEPASSEE;
   if (e.depasse) return e.ecart === 0 && H ? `en retard — c'était avant ${H} aujourd'hui` : `${-e.jours} j de retard`;
   if (e.ecart === 0) return H ? `à poster avant ${H} aujourd'hui` : "à poster aujourd'hui";
   if (e.ecart === 1) return H ? `à poster avant demain ${H}` : 'à poster demain';
@@ -159,8 +174,10 @@ export function bordsParTransaction(bords, estCache) {
 // connaît ni le bordereau ni la date n'est classée nulle part (`sansLimite`).
 // `premier` : la limite la plus proche de chaque classe (son heure, si lue) ;
 // `estimees` : combien, dans chaque classe, n'ont qu'une date ESTIMÉE.
+// `retard` ne compte QUE des limites lues dans l'email ; une estimée dépassée
+// va dans `estimeeDepassee` (comptée, dite à part : « vérifie sur Vinted »).
 export function compterEcheances({ txs, ventes, bords, maintenant = Date.now() }) {
-  const out = { retard: 0, aujourdhui: 0, demain: 0, plus: 0, sansLimite: 0, premier: {}, estimees: { retard: 0, aujourdhui: 0, demain: 0, plus: 0 } };
+  const out = { retard: 0, estimeeDepassee: 0, aujourdhui: 0, demain: 0, plus: 0, sansLimite: 0, premier: {}, estimees: { estimeeDepassee: 0, aujourdhui: 0, demain: 0, plus: 0 } };
   for (const tx of (txs || [])) {
     const k = String(tx);
     const l = limiteExpedition((ventes && ventes[k]) || null, (bords && bords[k]) || null, maintenant);

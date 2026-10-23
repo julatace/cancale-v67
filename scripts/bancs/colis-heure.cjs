@@ -13,6 +13,11 @@
 //   9202 bordereau « 22/10/2026 07 h 00 »  → EN RETARD (passé à 7 h)
 //   9203 bordereau « 22/10/2026 » (sans heure) → « à poster aujourd'hui » (jour seul)
 //   9204 aucun bordereau, vendue le 20     → limite ESTIMÉE (vente + 7 j)
+//   9205 aucun bordereau, vendue le 14     → ESTIMÉE et dépassée (le 21) :
+//        « date estimée dépassée — vérifie… », JAMAIS « j de retard » (revue
+//        du 22 oct. : la vraie limite tombe jusqu'à 3 j plus tard, mesuré)
+// Et §7 : la ligne « colis-limite » de Ma journée n'est jamais ROUGE (le rouge
+// est pour deux paires sous un même N°) — l'ambre, comme l'urgence de Colis.
 // Il exige : sur Colis, la phrase de chaque carte et l'état porté (heure,
 // limite estimée, jours) ; sur Ma journée, une ligne qui dit l'heure du plus
 // pressé (« en retard — c'était avant 7 h aujourd'hui ») et compte les 3
@@ -35,6 +40,7 @@ const V = {
   9202: { titre: 'Lima Runner taille 41', date: '2026-10-15T05:00:00Z', limite: '22/10/2026 07 h 00' },
   9203: { titre: 'Mike Runner taille 40', date: '2026-10-15T08:00:00Z', limite: '22/10/2026' },
   9204: { titre: 'November Runner taille 43', date: '2026-10-20T09:00:00Z', limite: null },
+  9205: { titre: 'Oscar Runner taille 44', date: '2026-10-14T05:00:00Z', limite: null },
 };
 const VENTES = Object.entries(V).map(([tx, v], i) => ({
   transaction_id: Number(tx), title: v.titre, price: { amount: String(40 + i * 5), currency_code: 'EUR' },
@@ -123,7 +129,7 @@ async function sain(pg, ecran) {
 
       await essaie('Colis', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForFunction((n) => document.querySelectorAll('[data-bord-card]').length >= n, 4, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction((n) => document.querySelectorAll('[data-bord-card]').length >= n, 5, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
         const c = await pg.evaluate((V) => {
           const out = {};
@@ -135,11 +141,12 @@ async function sain(pg, ecran) {
           return out;
         }, V);
         const t = (tx) => (c[tx] ? c[tx].txt.replace(/\s+/g, ' ') : '');
-        dit(Object.keys(c).length === 4, 'Colis : les 4 ventes à poster ont leur carte', JSON.stringify(Object.keys(c)));
+        dit(Object.keys(c).length === 5, 'Colis : les 5 ventes à poster ont leur carte', JSON.stringify(Object.keys(c)));
         dit(!!c[9201] && c[9201].heure === '10:00' && /à poster avant demain 10 h/.test(t(9201)), '9201 : « à poster avant demain 10 h » (l’heure lue dans l’email)', c[9201] ? `${c[9201].heure} · ${(t(9201).match(/à poster[^·]*/) || [''])[0]}` : 'carte absente');
         dit(!!c[9202] && c[9202].jours !== '' && Number(c[9202].jours) < 0 && /en retard — c'était avant 7 h aujourd'hui/.test(t(9202)), '9202 : limite « aujourd’hui 7 h » passée à 8 h 10 ⇒ EN RETARD, et l’heure est dite', c[9202] ? `jours=${c[9202].jours} · ${(t(9202).match(/(en retard[^·]*|à poster[^·]*|\d+ j de retard)/) || [''])[0]}` : 'carte absente');
         dit(!!c[9203] && c[9203].heure === '' && c[9203].jours === '0' && /à poster aujourd'hui/.test(t(9203)) && !/avant \d+ h/.test(t(9203)), '9203 : sans heure ⇒ le jour seul, « à poster aujourd’hui » (comme avant)', c[9203] ? `jours=${c[9203].jours} · heure=${c[9203].heure}` : 'carte absente');
         dit(!!c[9204] && c[9204].limite === 'estimee' && c[9204].jours === '5', '9204 : sans bordereau, limite ESTIMÉE (vendue le 20 ⇒ le 27, dans 5 jours)', c[9204] ? `limite=${c[9204].limite} · jours=${c[9204].jours}` : 'carte absente');
+        dit(!!c[9205] && c[9205].limite === 'estimee' && /date estimée dépassée/.test(t(9205)) && !/de retard|en retard/.test(t(9205)), '9205 : vendue le 14, sans bordereau ⇒ « date estimée dépassée — vérifie… », jamais « j de retard »', c[9205] ? `limite=${c[9205].limite} · ${(t(9205).match(/(date estimée[^·]*|\d+ j de retard|en retard[^·]*)/) || [''])[0]}` : 'carte absente');
         await pg.screenshot({ path: path.join(os.tmpdir(), 'colis-heure-colis-' + vp.width + '.png'), fullPage: true }).catch(() => {});
         await sain(pg, 'Colis');
       });
@@ -151,10 +158,15 @@ async function sain(pg, ecran) {
         const j = await pg.evaluate(() => {
           const t = document.querySelector('[data-tuile="envoyer"]');
           const l = document.querySelector('[data-job="colis-limite"]');
-          return { n: t ? t.getAttribute('data-n') : null, job: l ? { n: l.getAttribute('data-n'), heure: l.getAttribute('data-limite-heure'), txt: (l.innerText || '').replace(/\s+/g, ' ') } : null };
+          // Les teintes portées par la ligne (texte et icône au trait).
+          const teintes = l ? [...new Set([l, ...l.querySelectorAll('*')].flatMap((e) => { const cs = getComputedStyle(e); return [cs.color, cs.stroke]; }))] : [];
+          return { n: t ? t.getAttribute('data-n') : null, teintes, job: l ? { n: l.getAttribute('data-n'), heure: l.getAttribute('data-limite-heure'), txt: (l.innerText || '').replace(/\s+/g, ' ') } : null };
         });
-        dit(j.n === '4', 'Ma journée : « À envoyer » vaut 4', 'lu ' + j.n);
-        dit(!!j.job && j.job.n === '3', 'Ma journée : une ligne compte les 3 colis pressés (en retard, aujourd’hui, demain) — pas le 4ᵉ, dû dans 5 jours', JSON.stringify(j.job));
+        dit(j.n === '5', 'Ma journée : « À envoyer » vaut 5', 'lu ' + j.n);
+        dit(!!j.job && j.job.n === '4', 'Ma journée : une ligne compte les 4 colis pressés (en retard, estimée dépassée, aujourd’hui, demain) — pas celui dû dans 5 jours', JSON.stringify(j.job));
+        // §7 : danger = #C0392B (clair) / #FF6B6B (sombre) ; avertissement = #A15C00 / #FFB23E.
+        const ROUGE = ['rgb(192, 57, 43)', 'rgb(255, 107, 107)'], AMBRE = ['rgb(161, 92, 0)', 'rgb(255, 178, 62)'];
+        dit(!!j.job && !j.teintes.some((x) => ROUGE.includes(x)) && j.teintes.some((x) => AMBRE.includes(x)), 'Ma journée : la ligne « colis-limite » est AMBRE, jamais rouge (§7 : le rouge est pour deux paires sous un même N°)', j.teintes.filter((x) => ROUGE.includes(x) || AMBRE.includes(x)).join(' · ') || 'ni rouge ni ambre');
         dit(!!j.job && j.job.heure === '07:00' && /en retard — c'était avant 7 h aujourd'hui/.test(j.job.txt) && /Lima Runner/.test(j.job.txt), 'Ma journée : la ligne dit l’heure du plus pressé et le nomme (« en retard — c’était avant 7 h aujourd’hui »)', j.job ? j.job.txt.slice(0, 160) : 'ligne absente');
         await pg.screenshot({ path: path.join(os.tmpdir(), 'colis-heure-journee-' + vp.width + '.png'), fullPage: true }).catch(() => {});
         await sain(pg, 'Ma journée');
