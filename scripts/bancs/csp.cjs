@@ -288,10 +288,20 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
       await pg.waitForTimeout(300);
       vues.splice(n0);
     }
-    const codeRecu = [extrait('const parseReceiptFields = (a) => {'), extrait('const b64ToBytes = (b64) => {'), extrait('const openReceipt = (a) => {')];
+    // (23 oct.) La fenêtre lit la règle du reçu (`<recu-achat-regle>`) et les
+    // champs de la feuille (`champsRecuAchat`) : on extrait CE que lit
+    // `openReceipt` aujourd'hui. L'ancien `parseReceiptFields` a été retiré —
+    // l'extraire laissait ce bloc entier SAUTÉ (rouge « le code du reçu se
+    // retrouve », mais aucun contrôle de la fenêtre ne tournait plus).
+    const codeRecu = [extrait('const COULEUR_PLATEFORME =', ';\n'), extrait('// <recu-achat-regle>', '// </recu-achat-regle>\n'),
+      extrait('const modePaiementRecu = (texte, paye) => {'), extrait('const phraseSommeRecu = (v) => {'), extrait('const champsRecuAchat = (a) => {'),
+      extrait('const b64ToBytes = (b64) => {'), extrait('const openReceipt = (a) => {')];
     // Le journal des fenêtres (22 oct.) : présent sur le code d'après, absent avant.
     const codeJournal = [PLANTAGES, "const BUILD_ISO = 'banc';", extrait('const ecouterFenetreCsp = (w, nom) => {') || ''].join('\n');
-    const RECU = { article: 'Nike Air Max 1', prix: '42.50', transaction: '123', account: 'vendeur_1', vendeur: 'x', texte: 'Montant payé : 42,50 €\nFrais de port 3,00 €' };
+    // Un reçu INVENTÉ à la forme mesurée (astérisques, « Frais Vinted », la
+    // carte masquée, « *N° de transaction* ») : la fenêtre rend de vraies lignes.
+    const RECU = { article: 'Nike Air Max 1', prix: '24,93', transaction: '', account: 'vendeur_1',
+      texte: 'Voici les détails de ta commande :\n*Vendeur* vendeur_banc\n*Commande*\n\nNike Air Max 1\n*Montant payé* 24,93 € \nArticle 20,00 € \nFrais de port 3,23 € \nFrais Vinted 1,70 € \n*Mode de paiement* Visa, **********4242 (24,93 €) \n*Date du paiement* 21/10/2026 10 h 47 \n*N° de transaction* 23400000001 \n' };
     const ouvrirRecu = (p) => Promise.all([p.context().waitForEvent('page', { timeout: 8000 }).catch(() => null),
       p.evaluate(`(() => { ${codeJournal}\n${codeRecu.join('\n')}; openReceipt(${JSON.stringify(RECU)}); })()`)]).then(([pop]) => pop);
     // ⚠️ Le reçu se juge dans un contexte SANS AUCUNE route : mesuré le 22 oct.,
@@ -318,6 +328,12 @@ const nouvelles = (vues, depuis) => vues.slice(depuis);
         if (pop) {
           await pop.waitForLoadState('load').catch(() => {});
           await pop.waitForTimeout(300);
+          if (!recharge) {
+            const rendu = await pop.evaluate(() => ({ lignes: [...document.querySelectorAll('[data-recu-ligne]')].map((e) => e.getAttribute('data-recu-ligne') + '=' + e.getAttribute('data-recu-centimes')),
+              somme: (document.querySelector('[data-recu-somme]') || { getAttribute: () => null }).getAttribute('data-recu-somme'), texte: document.body.innerText })).catch(() => null);
+            dit(!!rendu && JSON.stringify(rendu.lignes) === JSON.stringify(['Article=2000', 'Frais de port=323', 'Frais Vinted=170']) && rendu.somme === 'juste' && /Visa ••••\s4242/.test(rendu.texte),
+              'la fenêtre du reçu rend ses vraies lignes (Frais Vinted compris, somme juste, « Visa •••• 4242 »)', rendu ? JSON.stringify([rendu.lignes, rendu.somme]) : 'illisible');
+          }
           if (recharge) { await pg.reload({ waitUntil: 'load' }).catch(() => {}); await calme(pg, 800); }
           await pop.evaluate(() => { window.__imprime = 0; window.print = () => { window.__imprime++; }; });
           await pop.click('#vrm-recu-imprimer').catch(() => {});

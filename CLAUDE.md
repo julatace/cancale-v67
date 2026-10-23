@@ -12133,6 +12133,17 @@ fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
 - **Pas fait** : le serveur range toujours `transaction` vide — corriger son motif
   changerait la CLÉ des nouveaux reçus (un email renvoyé ferait un doublon) ; l'app lit
   le n° dans le texte.
+- **Revue du 23 octobre — défauts reproduits, corrigés** (chacun rouge avant le
+  correctif — sur 7ba9670 —, vert après, rouge sous mutation) :
+  - **Le banc `csp.cjs` ne jugeait plus la fenêtre du reçu** : il extrayait
+    `parseReceiptFields` (retiré), sortait « ❌ le code du reçu se retrouve dans
+    App.jsx » et SAUTAIT ses 18 contrôles (impression une fois, Fermer, aucune
+    violation, onglet rechargé, journal « fenetre:recu »). Il extrait ce que lit
+    `openReceipt` (`COULEUR_PLATEFORME`, `<recu-achat-regle>`, `modePaiementRecu`,
+    `phraseSommeRecu`, `champsRecuAchat`), son reçu a la forme mesurée, et un
+    contrôle de plus exige les vraies lignes dans la fenêtre (Frais Vinted, somme
+    juste, « Visa •••• 4242 ») : 2 rouges sur 7ba9670, vert après, 2 rouges quand la
+    fenêtre ne garde que les trois anciens libellés.
 
 ---
 
