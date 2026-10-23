@@ -43953,7 +43953,11 @@ function LeboncoinScreen() {
       })()}
       {loading && !data ? <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '30px 16px' }}>Chargement…</div> : (<>
         {/* Compteur / offre */}
-        {(lim || data.plan) && <Card className="vrm-lbc-compteur">
+        {/* (23 oct., intégration) La carte ne s'affiche que s'il y a une limite ou
+            une offre (main) — mais elle porte aussi « plus comptées en ligne » et
+            « pas revues » (lot Leboncoin) : sans limite connue, ces deux lignes
+            disparaissaient. Elle s'affiche dès que l'une des quatre a quelque chose à dire. */}
+        {(lim || data.plan || (data.sortiesLbc || []).length > 0 || data.pasRevues > 0) && <Card className="vrm-lbc-compteur">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
             <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
