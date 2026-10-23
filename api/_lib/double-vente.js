@@ -112,6 +112,23 @@ export function annoncesEbayParNumero(lignes, idsActifs, mk, fiches, liensEbay) 
 // que Leboncoin a acceptée depuis VRM, sur SON clic (`pauseAt`, réponse 2xx).
 // Rien n'est effacé : ce sont des états, et une liste complète qui la remontre
 // les retire.
+// ⚠️ (22 oct., revue) LA DONNÉE LA PLUS RÉCENTE GAGNE. Ces marques restaient
+// collées : sa page privée « Mes annonces » qui la remontrait ACTIVE après coup
+// (`seenAt` plus récent) ne les levait pas — l'annonce sortait de « en vente »,
+// l'alerte « à retirer de Leboncoin » tombait et la paire pouvait être reproposée
+// à la publication. « Plus vue » ne compte que si aucune capture ne l'a revue
+// APRÈS ; une pause, que si aucune capture ne l'a revue plus d'une heure après
+// (`LBC_PAUSE_INDEX_MS` : l'index de Leboncoin peut avoir du retard — borne
+// prudente, non mesurée). Douter ⇒ « en vente » : le sens sûr (l'alerte reste,
+// la paire n'est pas reproposée).
+const LBC_PAUSE_INDEX_MS = 3600e3;
+function lbcSortieDe(ad) {
+  if (!ad) return null;
+  const vu = Date.parse(ad.seenAt || '');
+  if (ad.plusVueAt && !(isFinite(vu) && vu > Date.parse(ad.plusVueAt))) return 'plusvue';
+  if (ad.pauseAt && !(isFinite(vu) && vu > Date.parse(ad.pauseAt) + LBC_PAUSE_INDEX_MS)) return 'pause';
+  return null;
+}
 const LBC_ANNONCE_MORTE = /(supprim|delete|expir|refus|sold|vendu|paus|inacti)/i;
 function annoncesLbcVendues(ventes) {
   const s = new Set();
@@ -123,7 +140,7 @@ function annoncesLbcVendues(ventes) {
   return s;
 }
 function annonceLbcEnVente(ad, vendues) {
-  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !ad.plusVueAt && !ad.pauseAt && !(vendues && vendues.has(String(ad.id))));
+  return !!(ad && ad.id != null && !LBC_ANNONCE_MORTE.test(String(ad.status || '')) && !lbcSortieDe(ad) && !(vendues && vendues.has(String(ad.id))));
 }
 // </lbc-en-vente-regle>
 export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {

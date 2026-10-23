@@ -15,6 +15,13 @@
 //     « plus comptée en ligne » le dit, une fois, sans rien effacer ;
 //   · une annonce pas revue depuis 32 jours ne demande pas « quelle paire ? »
 //     (la ligne « pas revues » dit le geste) — une annonce fraîche, si ;
+//   · (revue du 22 oct.) la donnée la plus récente gagne : une annonce marquée
+//     « plus vue » puis REVUE active après (`seenAt` plus récent) reste en vente,
+//     donc « à retirer » avec son bouton ;
+//   · (revue du 22 oct.) la ligne venue de `vinted_lbc_posted` ne part que sur
+//     une PREUVE (liste complète de chacun de ses comptes postérieure à la marque
+//     « publiée ») : sans elle, la N°14 reste « à retirer », avec le doute dit
+//     une fois — ici et dans Ma journée ;
 //   · aucun débordement, aucune erreur.
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
@@ -43,7 +50,8 @@ const MAIN = {
   },
 };
 const ITEMS = {
-  '3290000001': { id: '3290000001', subject: 'Nike shox TL noir et bleu marine taille 40', price: 55, ref: '18', account: MON, platform: 'leboncoin', status: 'active', seenAt: auj.toISOString(), url: 'https://www.leboncoin.fr/ad/chaussures/3290000001', images: ['https://img.test/l1.jpg'] },
+  // « plus vue » il y a un jour, REVUE active depuis (sa page « Mes annonces ») : la donnée la plus récente gagne.
+  '3290000001': { id: '3290000001', subject: 'Nike shox TL noir et bleu marine taille 40', price: 55, ref: '18', account: MON, platform: 'leboncoin', status: 'active', seenAt: auj.toISOString(), plusVueAt: ilYa(1), url: 'https://www.leboncoin.fr/ad/chaussures/3290000001', images: ['https://img.test/l1.jpg'] },
   '3290000002': { id: '3290000002', subject: 'Nike air max 1 Treeline T42', price: 100, ref: '13', account: MON, platform: 'leboncoin', status: 'active', seenAt: auj.toISOString(), images: [] },
   '3270000004': { id: '3270000004', subject: 'Air jordan 3 Fear pack T44', price: 80, ref: '14', account: MON, platform: 'leboncoin', status: 'active', seenAt: ilYa(32), plusVueAt: ilYa(0.05), images: [] },
   '3270000003': { id: '3270000003', subject: 'Adidas Spezial noir taille 38,5', price: 44, account: MON, platform: 'leboncoin', status: 'active', seenAt: ilYa(32), images: ['https://img.test/l3.jpg'] },
@@ -53,7 +61,8 @@ const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: LISTINGS },
   txn(9001, 5001), txn(9003, 5003),
-  { id: 'vinted_lbc_posted', data: { ids: ['5001', '5003'] } },
+  // La marque « publiée » (sa dernière écriture) : AVANT la liste complète lue il y a 72 min.
+  { id: 'vinted_lbc_posted', data: { ids: ['5001', '5003'], updatedAt: ilYa(3) } },
   { id: 'lbc_listings', data: { items: ITEMS, lectures: { [MON]: { at: ilYa(0.05), total: 3, n: 3 } } } },
   { id: 'lbc_accounts', data: { accounts: { [MON]: { id: MON, name: 'Totomondu', sessionAt: auj.toISOString(), source: 'session:messagerie' } } } },
   { id: 'lbc_ventes', data: { ventes: {} } },
@@ -144,6 +153,9 @@ const lire = (pg) => pg.evaluate(() => ({
   pasRevuesTxt: (document.querySelector('[data-lbc-pas-revues]') || {}).innerText || '',
   relier: [...document.querySelectorAll('[data-lbc-relier]')].map((e) => e.getAttribute('data-lbc-relier')),
   liens: [...document.querySelectorAll('[data-lbc-retirer] a[href*="leboncoin.fr"]')].map((a) => a.href),
+  sortie: [...document.querySelectorAll('[data-lbc-retirer-sortie]')].map((e) => e.getAttribute('data-lbc-retirer') + ':' + e.getAttribute('data-lbc-retirer-sortie')),
+  doute: [...document.querySelectorAll('[data-lbc-retirer-doute]')].map((e) => e.getAttribute('data-lbc-retirer-doute')),
+  douteTxt: (document.querySelector('[data-lbc-retirer-doute]') || {}).innerText || '',
   resultats: [...document.querySelectorAll('[data-lbc-pause-resultat]')].map((e) => ({ id: e.getAttribute('data-lbc-pause-resultat'), etape: e.getAttribute('data-etape'), t: e.innerText })),
   deborde: [...document.querySelectorAll('button,input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1; }).map((e) => e.textContent.trim().slice(0, 20) || e.tagName),
   sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -164,7 +176,8 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       dit(v.retirer.includes('3290000001'), 'la N°18 vendue sur Vinted, encore en ligne sur Leboncoin ⇒ « à retirer »', JSON.stringify(v.retirer));
       dit(v.boutons.join() === '3290000001', '« Mettre en pause sur Leboncoin » sur CETTE annonce, et elle seule', JSON.stringify(v.boutons));
       dit(v.liens.length >= 1, 'le lien « voir sur Leboncoin » reste à côté');
-      dit(!v.retirer.includes('14') && !v.retirer.some((x) => x === '3270000004'), 'la N°14 (annonce « plus vue » dans une liste complète) n’est plus « à retirer »', JSON.stringify(v.retirer));
+      dit(!v.retirer.includes('14') && !v.retirer.some((x) => x === '3270000004'), 'la N°14 (annonce « plus vue » dans une liste complète POSTÉRIEURE à la marque « publiée ») n’est plus « à retirer »', JSON.stringify(v.retirer));
+      dit(v.sortie.length === 0 && v.doute.length === 0, '… et aucun doute n’est dit quand la preuve est là', JSON.stringify({ sortie: v.sortie, doute: v.doute }));
       dit(v.plusVues === '1' && /Rien n'est effacé/.test(v.plusVuesTxt) && /je ne sais pas laquelle/.test(v.plusVuesTxt), 'la ligne « plus comptée en ligne » le dit, une fois, sans dire vendue ni supprimée', v.plusVuesTxt.slice(0, 160));
       dit(v.pasRevues === '1' && !v.relier.includes('3270000003'), 'l’annonce pas revue depuis 32 jours ne demande pas « quelle paire ? » — comptée dans « pas revues »', JSON.stringify({ pasRevues: v.pasRevues, relier: v.relier }));
       dit(v.relier.includes('3290000005'), '… et l’annonce fraîche non reliée, elle, le demande toujours (l’autre sens)', JSON.stringify(v.relier));
@@ -229,6 +242,28 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
       const m = /(\d+) à retirer de Leboncoin/.exec(txt);
       dit(m && m[1] === '1', 'Ma journée : 1 à retirer de Leboncoin (la N°18) — pas la N°14 dont l’annonce n’est plus vue', m ? m[0] : 'absent');
       await o4.ctx.close();
+
+      // (revue du 22 oct.) SANS PREUVE : la marque « publiée » est postérieure à la
+      // dernière liste complète (une republication peut ne pas avoir été vue).
+      console.log(`── ${vp.width} px · marque « publiée » après la liste complète (pas de preuve)`);
+      const posted = rows.find((x) => x.id === 'vinted_lbc_posted');
+      posted.data.updatedAt = auj.toISOString();
+      try {
+        const o5 = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' });
+        await o5.pg.waitForSelector('[data-lbc-retirer-doute]', { timeout: 10000 }).catch(() => {});
+        const v6 = await lire(o5.pg);
+        dit(v6.retirer.includes('14') && v6.sortie.join() === '14:plusvue', 'la N°14 RESTE « à retirer » (l’annonce reliée n’est plus vue, mais rien ne prouve qu’aucune autre ne l’est)', JSON.stringify({ retirer: v6.retirer, sortie: v6.sortie }));
+        dit(v6.doute.length === 1 && v6.doute[0] === '1' && /aucune autre/.test(v6.douteTxt) && /profil Leboncoin/.test(v6.douteTxt), 'le doute et le geste sont dits UNE fois', v6.douteTxt.slice(0, 160));
+        dit(v6.retirer.includes('3290000001') && v6.boutons.join() === '3290000001', 'la N°18 (revue active après sa marque) reste « à retirer », avec son bouton', JSON.stringify({ r: v6.retirer, b: v6.boutons }));
+        dit(o5.errs.length === 0 && v6.sw <= v6.cw + 1, 'aucune erreur, aucun débordement', o5.errs.join(' | ').slice(0, 120));
+        await o5.pg.evaluate(() => { try { localStorage.setItem('vinted_annonces_vendues', JSON.stringify(['5001', '5003'])); } catch (_) {} });
+        await o5.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await o5.pg.waitForFunction(() => /à retirer de Leboncoin/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+        const t6 = await o5.pg.evaluate(() => document.body.innerText);
+        const m6 = /(\d+) à retirer de Leboncoin/.exec(t6);
+        dit(m6 && m6[1] === '2', 'Ma journée : 2 à retirer de Leboncoin (la N°14 aussi, sans preuve) — la MÊME règle (§11)', m6 ? m6[0] : 'absent');
+        await o5.ctx.close();
+      } finally { posted.data.updatedAt = ilYa(3); }
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }
