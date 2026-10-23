@@ -356,3 +356,76 @@
 .vrm-analyse-mini small{display:block;margin-top:10px;}
 .vrm-day-performance .vrm-analyses-ventes{border-top:0;margin-top:0;padding-top:0;}
 .vrm-day-performance .vrm-performance-chiffres{border-top:1px solid var(--vrm-line);margin-top:14px;padding-bottom:0;}
+
+/* Présentations retenues : messages, statistiques, achats et retraits.
+   Aucun sélecteur de cette passe ne modifie les lignes Ventes ou Annonces. */
+.vrm-chat-panel{--gestion-line:var(--vrm-line);--gestion-surface:var(--vrm-surface);--gestion-soft:var(--vrm-card2);}
+.vrm-message-workspace{gap:0;border:1px solid var(--gestion-line);border-radius:10px;background:var(--gestion-surface);}
+.vrm-message-workspace .vrm-inbox-column{padding:12px 0 0;}
+.vrm-message-workspace .vrm-inbox-column>input{margin-inline:12px;max-width:calc(100% - 24px);box-sizing:border-box;}
+.vrm-message-workspace .vrm-inbox-filters{padding-inline:12px;gap:4px;}
+.vrm-message-workspace .vrm-inbox-row{padding:12px!important;border-color:var(--gestion-line)!important;}
+.vrm-message-workspace .vrm-inbox-row>img{width:38px!important;height:44px!important;border-radius:6px!important;}
+.vrm-message-workspace .vrm-chat-column{border-left:1px solid var(--gestion-line);}
+.vrm-message-workspace .vrm-chat-empty{border:0;border-radius:0;background:var(--gestion-soft);min-height:560px;font-size:13px;}
+.vrm-message-workspace .vrm-chat-inline .vrm-chat-panel{border:0;border-radius:0!important;}
+.vrm-chat-panel .vrm-chat-head{padding:12px 14px;min-height:64px;background:var(--gestion-surface);border-bottom:1px solid var(--gestion-line);}
+.vrm-chat-panel .vrm-chat-history{background:var(--gestion-soft);padding:16px;}
+.vrm-chat-panel .vrm-bulle{font-size:13px;line-height:1.6;padding:10px 13px;border-radius:10px 10px 10px 3px!important;}
+.vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{border-radius:10px 10px 3px 10px!important;}
+.vrm-chat-panel .vrm-chat-foot{padding:12px!important;}
+.vrm-chat-panel .vrm-chat-compose{border:1px solid var(--gestion-line);border-radius:8px;background:var(--gestion-surface);padding:5px;gap:8px;}
+.vrm-chat-panel .vrm-chat-compose textarea{border:0!important;background:transparent!important;resize:vertical;min-width:0;}
+.vrm-chat-panel .vrm-chat-send{border-radius:6px!important;min-height:44px;}
+.vrm-main .vrm-pickup-board .vrm-pickup-point{border-radius:8px!important;}
+.vrm-main .vrm-pickup-point>div:first-child{padding-block:10px!important;background:var(--gestion-soft)!important;font-size:12px!important;}
+.vrm-main .vrm-pickup-card{padding:10px 12px!important;gap:8px 12px!important;}
+.vrm-main .vrm-pickup-card .vrm-pickup-thumb{width:36px!important;height:46px!important;border-radius:5px!important;}
+.vrm-main .vrm-pickup-code{display:grid;grid-template-columns:auto auto;gap:2px 10px;min-height:48px;padding:6px 10px;border:1px solid var(--gestion-line);background:var(--gestion-soft);border-radius:6px!important;}
+.vrm-main .vrm-pickup-code>span{font-size:10px;grid-column:1;}
+.vrm-main .vrm-pickup-code>strong{grid-column:1;font-size:16px!important;line-height:1.4;white-space:nowrap;}
+.vrm-main .vrm-pickup-code>small{grid-column:2;grid-row:1 / span 2;display:flex;align-items:center;gap:5px;font-size:11px;}
+.vrm-main .vrm-pickup-code[data-code-long=true]>strong{font-size:13px!important;letter-spacing:0!important;}
+.vrm-main .vrm-pickup-collect{font-size:11px!important;border-radius:6px!important;min-height:44px!important;}
+.vrm-main .vrm-buy-list{background:var(--gestion-surface);}
+.vrm-main .vrm-buy-row{padding:10px 12px!important;min-height:64px;}
+.vrm-main .vrm-buy-row .vrm-buy-ph{width:36px;height:46px;}
+.vrm-main .vrm-buy-row .vrm-buy-title{font-size:13px!important;}
+.vrm-main .vrm-buy-row .vrm-buy-meta{font-size:11px;gap:6px;}
+.vrm-statistiques-premium .vrm-stats-analyses h3{font-size:15px;margin:0 0 8px;}
+.vrm-statistiques-premium .vrm-analyse-mini h4{font-size:13px;}
+.vrm-statistiques-premium .vrm-stats-analyses>details>summary{font-size:13px;min-height:44px;display:flex;align-items:center;cursor:pointer;margin-top:12px;border-top:1px solid var(--gestion-line);}
+.vrm-statistiques-premium .vrm-stats-analyses>details>div{border:0!important;padding:10px 0 0!important;box-shadow:none!important;}
+@media(min-width:1200px){
+ .vrm-statistiques-premium{display:grid!important;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px!important;align-items:start;}
+ .vrm-statistiques-premium>*{grid-column:1 / -1;min-width:0;}
+ .vrm-statistiques-premium>div:first-child{grid-row:1;}
+ .vrm-statistiques-premium>[data-stats-carte=hero]{grid-column:1 / 9;grid-row:2;}
+ .vrm-statistiques-premium>.vrm-finance-goal{grid-column:9 / -1;grid-row:2;}
+ .vrm-statistiques-premium>[data-stats-carte=courbe]{grid-column:1 / 9;grid-row:3;}
+ .vrm-statistiques-premium>.vrm-stats-comptes{grid-column:9 / -1;grid-row:3 / span 2;grid-template-columns:minmax(0,1fr)!important;align-self:stretch;}
+ .vrm-statistiques-premium>.vrm-stats-analyses{grid-column:1 / 9;grid-row:4;}
+ .vrm-statistiques-premium>[data-stats-carte=boost]{grid-column:1 / -1;}
+}
+@media(max-width:767px){
+ .vrm-message-workspace{border:0;background:transparent;overflow:visible;}
+ .vrm-message-workspace .vrm-inbox-column{padding:0;}
+ .vrm-message-workspace .vrm-inbox-filters{padding-inline:0;}
+ .vrm-message-workspace .vrm-chat-column{border:0;}
+ .vrm-chat-panel .vrm-chat-compose textarea{font-size:16px!important;}
+ .vrm-main .vrm-pickup-card{padding:8px 10px!important;gap:8px!important;}
+ .vrm-main .vrm-pickup-code{gap:2px 6px;padding:5px 8px;}
+ .vrm-main .vrm-pickup-code>strong{font-size:14px!important;}
+ .vrm-main .vrm-buy-row .vrm-buy-title{font-size:12px!important;}
+}
+
+/* Neutralise les anciennes zones nommées du code de retrait. */
+.vrm-main .vrm-achats .vrm-pickup-code{grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"label copy" "code copy"!important;gap:2px 8px!important;min-width:150px;}
+.vrm-main .vrm-achats .vrm-pickup-code>span{grid-area:label!important;}
+.vrm-main .vrm-achats .vrm-pickup-code>strong{grid-area:code!important;white-space:nowrap!important;overflow-wrap:normal;letter-spacing:.02em!important;}
+.vrm-main .vrm-achats .vrm-pickup-code>small{grid-area:copy!important;}
+@media(max-width:767px){
+ .vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-code,.vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code){flex:1 1 100%!important;width:100%;margin-left:0!important;}
+ .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code){flex-wrap:wrap;}
+ .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>.vrm-pickup-code{flex:1 1 150px!important;}
+}

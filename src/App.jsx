@@ -10311,6 +10311,7 @@ const ICON_PATHS = {
   tag:   <><path d="M3.5 11.2V4.5a1 1 0 0 1 1-1h6.7a1 1 0 0 1 .7.3l8.3 8.3a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L3.8 11.9a1 1 0 0 1-.3-.7Z"/><circle cx="8" cy="8" r="1.4"/></>,
   cash:  <><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/></>,
   bag:   <><path d="M4.6 8.4h14.8l-1.1 11.4a2 2 0 0 1-2 1.8H7.7a2 2 0 0 1-2-1.8L4.6 8.4Z"/><path d="M8.7 10V6.9a3.3 3.3 0 0 1 6.6 0V10"/></>,
+  copy:  <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></>,
   doc:   <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></>,
   chat:  <><path d="M20.5 11.6c0 4-3.8 7.2-8.5 7.2-1 0-2-.15-2.9-.42L4 20.5l1.3-3.5A6.8 6.8 0 0 1 3.5 11.6C3.5 7.6 7.3 4.4 12 4.4s8.5 3.2 8.5 7.2Z"/></>,
   home:  <><path d="M3.5 10.4 12 3.6l8.5 6.8"/><path d="M5.6 12v7.5a1 1 0 0 0 1 1h10.8a1 1 0 0 0 1-1V12"/></>,
@@ -14124,7 +14125,7 @@ function CodeRetraitCopiable({label,code}) {
     catch { setEtat('Copie indisponible'); }
   }}>
     <span>{label}</span><strong className="vrm-sensible" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
-    <small aria-live="polite">{etat || 'Copier'}</small>
+    <small aria-live="polite"><Icon name="copy" size={14}/><span>{etat || 'Copier'}</span></small>
   </button>;
 }
 
@@ -19952,7 +19953,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
 
   return (
-    <div className="vrm-finance-page" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+    <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <div>
         <h2 style={{margin:0,color:C.text,fontSize:28,fontWeight:600,letterSpacing:-0.5}}>Statistiques</h2>
         <div style={{fontSize:13,color:C.muted,marginTop:2}}>Tes ventes, ton évolution, tes résultats</div>
@@ -20157,7 +20158,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const totPlat = plateformes.reduce((s2,p)=>s2+(p.ca||0),0);
         const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
         return (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
+          <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>Finalisé par plateforme</div>
               {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
@@ -20379,7 +20380,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       })()}
 
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
-      <RepartitionsVentes panelOff={panelOff}/>
+      <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
       <BoostRentable panelOff={panelOff}/>
@@ -27264,6 +27265,13 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
   }
   return R;
 };
+function AnalysesStatistiques({panelOff}) {
+ const [detail,setDetail]=React.useState(false);
+ return <section className="vrm-stats-analyses" data-stats-carte="repartitions" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18}}>
+  <h3>Répartition des ventes</h3><RepartitionsVentes panelOff={panelOff} apercu/>
+  <details onToggle={e=>setDetail(e.currentTarget.open)}><summary>Tailles, modèles et délais de vente</summary>{detail&&<RepartitionsVentes panelOff={panelOff}/>}</details>
+ </section>;
+}
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
  return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
   <div className="vrm-day-head"><h3>Analyses des ventes</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
