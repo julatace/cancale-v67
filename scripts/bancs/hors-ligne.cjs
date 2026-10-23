@@ -22,6 +22,7 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 const http = require('http'), fs = require('fs'), path = require('path');
 const { servir } = require('./_minipgrest.cjs');
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : service worker, QR)
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
@@ -36,6 +37,10 @@ const JETON = (() => { const b = (o) => Buffer.from(JSON.stringify(o)).toString(
 const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: UID_A, email: 'vendeuse@exemple.fr' }, totp: [] };
 const COMPTE = { vinted_user_id: '900000001', login: 'compte-de-banc', owner: UID_A, access_token: 'x', refresh_token: 'x', csrf_token: 'x', updated_at: new Date().toISOString(), created_at: new Date().toISOString() };
 const QR_URL = 'https://qr.exemple.test/api/barcode/AztecCode?d=PICKUPPASS:BANC';
+// (22 oct., revue) Le QR Vinted Go tel qu'il est dans sa base : en http (15 sur
+// 15). Il n'entrait JAMAIS dans la réserve (rechaufferQr et le service worker ne
+// prennent que https://) et faisait signaler une violation à chaque affichage.
+const QR_VG = 'http://p.vintedgo.com/public/v1/qr_codes/BANC0000000000:C49341:BANC0000000000?v=1';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAAHUlEQVR4nGNgYGD4z8DAwMDAxMDAwMDAwMDAwMAAAxQAAXy7tqQAAAAASUVORK5CYII=', 'base64');
 
 const maintenant = new Date();
@@ -48,11 +53,14 @@ const VENTE = { transaction_id: 70001, title: 'Nike Air Max 1 banc', status: 'Le
   price: { amount: '60.0', currency_code: 'EUR' }, date: iso(Date.now() - 2 * 864e5) };
 const TRACK = { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '4321', lieu: 'Tabac du Port Cancale', carrier: 'mondial_relay',
   suivi: 'MR999000111', artTitle: '', qrUrl: QR_URL, receivedAt: iso(Date.now() - 3600e3), limite: jour(5) };
+const TRACK_VG = { status: 'available', statusLabel: 'Arrivé au point de retrait', code: 'C49341', lieu: 'Consigne Vinted Go Laverie du Port', carrier: 'vinted',
+  suivi: 'VGSBANC000001', artTitle: '', qrUrl: QR_VG, receivedAt: iso(Date.now() - 2 * 3600e3), limite: jour(4) };
 const ROWS = [
   ligne('main', {}),
   ligne(`harvest_${COMPTE.vinted_user_id}_orders_sold`, { capturedAt: iso(Date.now()), payload: { my_orders: [VENTE] } }),
   ligne(`harvest_${COMPTE.vinted_user_id}_orders_purchased`, { capturedAt: iso(Date.now()), payload: { my_orders: [] } }),
   ligne('email_track_mondial_relay_MR999000111', TRACK),
+  ligne('email_track_vinted_VGSBANC000001', TRACK_VG),
   ligne('panel_colis_relais', {}),
 ];
 
@@ -92,6 +100,7 @@ async function brancher(ctx, etat) {
   });
   await ctx.route(/\/api\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
   await ctx.route(/qr\.exemple\.test/, (route) => { etat.qrServis = (etat.qrServis || 0) + 1; return etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
+  await ctx.route(/^https?:\/\/p\.vintedgo\.com\//, (route) => { const k = route.request().url().startsWith('https:') ? 'vgHttps' : 'vgHttp'; etat[k] = (etat[k] || 0) + 1; return etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
   await ctx.route(/vinted\.net|fonts\.(googleapis|gstatic)\.com|jsdelivr|cdnjs/, (route) => route.abort());
 }
 
@@ -115,6 +124,7 @@ async function main() {
       console.log(`\n── ${T} · A. lecture complète → hors ligne → retour du réseau`);
       await essaie(`${T} A`, async () => {
         const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false };
         await brancher(ctx, etat);
         await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
@@ -124,10 +134,13 @@ async function main() {
         let photo = null;
         for (let i = 0; i < 40 && !(photo = await photoDe(pg, UID_A)); i++) await pg.waitForTimeout(500);
         dit(!!photo, 'en ligne, lecture complète : la photo de CE vendeur est écrite sur l\'appareil', photo ? `${photo.nEnvoyer} à envoyer · ${photo.nRetirer} à retirer` : 'aucune');
-        dit(!!photo && photo.uid === UID_A && photo.nEnvoyer === 1 && photo.nRetirer === 1 && photo.retirer[0].code === '4321', 'elle porte le colis à expédier et le colis à retirer avec son code', photo ? JSON.stringify({ e: photo.envoyer.map((x) => x.titre), r: photo.retirer.map((x) => x.code) }) : '');
-        let enReserve = 0;
-        for (let i = 0; i < 20 && !enReserve; i++) { enReserve = await pg.evaluate(async () => (await (await caches.open('vrm-hl-qr')).keys()).length).catch(() => 0); if (!enReserve) await pg.waitForTimeout(300); }
-        dit(enReserve > 0, 'le QR du colis est mis en réserve pour le service worker', enReserve + ' entrée(s)');
+        dit(!!photo && photo.uid === UID_A && photo.nEnvoyer === 1 && photo.nRetirer === 2 && ['4321', 'C49341'].every((c) => photo.retirer.some((x) => x.code === c)), 'elle porte le colis à expédier et les deux colis à retirer avec leur code', photo ? JSON.stringify({ e: photo.envoyer.map((x) => x.titre), r: photo.retirer.map((x) => x.code) }) : '');
+        dit(!!photo && photo.retirer.some((x) => /^https:\/\/p\.vintedgo\.com\//.test(x.qr || '')), 'le QR Vinted Go (http dans l\'email) est gardé en https dans la photo', photo ? JSON.stringify(photo.retirer.map((x) => String(x.qr || '').slice(0, 30))) : '');
+        let cles = [];
+        for (let i = 0; i < 30 && cles.length < 2; i++) { cles = await pg.evaluate(async () => (await (await caches.open('vrm-hl-qr')).keys()).map((r) => decodeURIComponent(r.url.replace(/^.*?u=/, '')))).catch(() => []); if (cles.length < 2) await pg.waitForTimeout(300); }
+        dit(cles.length > 0, 'le QR du colis est mis en réserve pour le service worker', cles.length + ' entrée(s)');
+        dit(cles.some((u) => /^https:\/\/p\.vintedgo\.com\//.test(u)), 'le QR Vinted Go est mis en réserve aussi (avant : jamais, il était en http)', JSON.stringify(cles.map((u) => u.slice(0, 30))));
+        dit(!etat.vgHttp && etat.vgHttps > 0, 'le QR Vinted Go n\'est demandé qu\'en https', `https ${etat.vgHttps || 0} · http ${etat.vgHttp || 0}`);
         // Hors ligne, jeton EXPIRÉ : la session ne doit pas partir.
         await pg.evaluate(() => { const s = JSON.parse(localStorage.getItem('vrm_session')); s.expires_at = Date.now() - 3600e3; localStorage.setItem('vrm_session', JSON.stringify(s)); });
         etat.hors = true; await ctx.setOffline(true);
@@ -136,13 +149,13 @@ async function main() {
         await pg.waitForTimeout(1200);
         const r = await pg.evaluate(() => {
           const v = document.querySelector('[data-hors-ligne]');
-          const qr = document.querySelector('[data-hl-qr]');
+          const qrs = [...document.querySelectorAll('[data-hl-qr]')];
           return {
             vue: v && v.getAttribute('data-hors-ligne'),
             lignes: [...document.querySelectorAll('[data-hors-ligne-ligne]')].map((x) => x.innerText),
             colis: [...document.querySelectorAll('[data-hl-colis]')].map((x) => x.innerText),
-            code: !!document.querySelector('[data-hl-code="4321"]'),
-            qr: qr ? { etat: qr.getAttribute('data-hl-qr'), w: qr.naturalWidth || 0 } : null,
+            code: !!document.querySelector('[data-hl-code="4321"]') && !!document.querySelector('[data-hl-code="C49341"]'),
+            qr: qrs.length ? qrs.map((q) => ({ etat: q.getAttribute('data-hl-qr'), w: q.naturalWidth || 0 })) : null,
             soir: document.querySelector('[data-hl-soir]') ? document.querySelector('[data-hl-soir]').getAttribute('data-hl-soir-n') : null,
             gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled).map((b) => b.innerText) : ['(pas de vue)'],
             gestes: v ? v.querySelectorAll('[data-hl-geste]').length : 0,
@@ -155,8 +168,8 @@ async function main() {
         dit(r.vue === 'photo', 'hors ligne : Ma journée s\'ouvre sur la photo', 'vue ' + r.vue);
         dit(r.lignes.length === 1 && /^Hors ligne — ce que tu vois date de .+ ; rien ne peut être envoyé\.?$/.test(r.lignes[0].trim()), 'UNE ligne en tête qui dit de quand ça date et que rien ne part', JSON.stringify(r.lignes));
         dit(r.colis.length === 1 && /Nike Air Max 1 banc/.test(r.colis[0]), 'le colis à expédier est là', JSON.stringify(r.colis));
-        dit(r.code, 'le code de retrait est là (4321)');
-        dit(!!r.qr && r.qr.etat === 'ok' && r.qr.w > 0, 'le QR s\'affiche SANS réseau (réserve du service worker)', JSON.stringify(r.qr));
+        dit(r.code, 'les codes de retrait sont là (4321, C49341)');
+        dit(!!r.qr && r.qr.length === 2 && r.qr.every((q) => q.etat === 'ok' && q.w > 0), 'les deux QR (Pickup et Vinted Go) s\'affichent SANS réseau (réserve du service worker)', JSON.stringify(r.qr));
         dit(r.soir === '1', 'la liste du soir dit le colis à poster demain', 'n=' + r.soir);
         dit(!/Tout est à jour/i.test(r.texte), 'jamais « Tout est à jour » hors ligne');
         dit(r.gestes >= 2 && r.gestesActifs.length === 0, 'aucun geste actif hors ligne (les boutons sont grisés)', `${r.gestes} geste(s) grisé(s) · actifs : ${JSON.stringify(r.gestesActifs)}`);
@@ -179,6 +192,7 @@ async function main() {
       console.log(`\n── ${T} · B. lecture partielle (emails de suivi en panne) → aucune photo`);
       await essaie(`${T} B`, async () => {
         const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false, suiviKO: true };
         await brancher(ctx, etat);
         await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
@@ -192,7 +206,7 @@ async function main() {
         await pg.waitForSelector('[data-hors-ligne]', { timeout: 15000 }).catch(() => {});
         const r = await pg.evaluate(() => ({ vue: (document.querySelector('[data-hors-ligne]') || { getAttribute: () => null }).getAttribute('data-hors-ligne'), t: document.body.innerText, lignes: document.querySelectorAll('[data-hors-ligne-ligne]').length }));
         dit(r.vue === 'sans-photo' && r.lignes === 1, 'hors ligne : « aucune copie gardée », dit une fois', `vue ${r.vue} · ${r.lignes} ligne(s)`);
-        dit(!/Nike Air Max 1 banc|4321/.test(r.t), 'aucune donnée partielle présentée comme ta journée');
+        dit(!/Nike Air Max 1 banc|4321|C49341/.test(r.t), 'aucune donnée partielle présentée comme ta journée');
         dit(!/Tout est à jour/i.test(r.t), 'jamais « Tout est à jour » hors ligne');
         await ctx.close();
       });
@@ -201,6 +215,7 @@ async function main() {
       console.log(`\n── ${T} · C. la photo d'un autre vendeur reste à lui`);
       await essaie(`${T} C`, async () => {
         const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
         const etat = { hors: false, baseKO: true };
         await brancher(ctx, etat);
         const photoB = { v: 1, uid: UID_B, at: Date.now() - 600e3, nEnvoyer: 1, nRetirer: 1, nePasPoster: 0,
@@ -225,6 +240,7 @@ async function main() {
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }
   finally { await nav.close(); srv.close(); }
+  ko += bilanCsp();
   console.log(ko ? `\n❌ hors-ligne : ${ko} rouge(s)` : '\n✅ hors-ligne : tout est vert');
   process.exit(ko ? 1 : 0);
 }

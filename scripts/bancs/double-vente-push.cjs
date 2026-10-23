@@ -149,6 +149,10 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
 (async () => {
   const inbound = await import('file://' + path.join(RACINE, 'api', 'email-inbound.js'));
   const libPush = await import('file://' + path.join(RACINE, 'api', '_lib', 'push.js'));
+  // Depuis le 22 octobre, une adresse déclarée n'est attribuée (base cloisonnée)
+  // que PROUVÉE. Ce banc juge les notifications, pas la preuve : B a prouvé la
+  // sienne (A est le propriétaire de l'installation — ses adresses restent).
+  let libPreuve = null; try { libPreuve = await import('file://' + path.join(RACINE, 'api', '_lib', 'preuve-adresse.js')); } catch (_) {}
   let libAcces = {}; try { libAcces = await import('file://' + path.join(RACINE, 'api', '_lib', 'abonnement.js')); } catch (_) {}
   const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-notifications'}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
   const reset = () => {
@@ -158,6 +162,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     if (typeof libAcces.oublierAcces === 'function') libAcces.oublierAcces();
     pose(A, 'vrm_email_owners', { adresses: { 'a@vrm.test': { owner: A } } });
     pose(B, 'vrm_email_owners', { adresses: { 'b@vrm.test': { owner: B } } });
+    if (libPreuve) pose(libPreuve.PROPRIETAIRE_NEUTRE, libPreuve.idPreuve(B, 'b@vrm.test'), { owner: B, adresse: 'b@vrm.test', etat: 'prouvee' });
     pose(A, 'push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/A-iphone' }] });
     pose(B, 'push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/B-iphone' }] });
     pose(A, 'main', { vinted_annonce_numeros: {} });

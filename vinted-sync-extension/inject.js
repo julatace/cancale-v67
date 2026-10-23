@@ -273,10 +273,11 @@
   // Vinted crée l'annonce par `POST /api/v2/item_upload/items` (vu dans ses
   // chemins captés). On lit l'IDENTIFIANT de l'annonce dans la réponse (2xx
   // seulement) — c'est lui qui relie le numéro affiché à côté du bouton à
-  // CETTE annonce (§5). Jamais le corps envoyé, jamais un titre. Forme
-  // inconnue ⇒ on dit seulement les NOMS de clés (rien de lié).
+  // CETTE annonce (§5). Jamais un titre. Forme inconnue ⇒ on dit seulement
+  // les NOMS de clés (rien de lié). (22 oct. : le corps envoyé part à part,
+  // en `fiche`, pour sa description — voir `noteModification` juste après.)
   const RE_PUBLIE = /^\/api\/v\d+\/item_upload\/items\/?$/;
-  const notePublication = (method, url, status, lireTexte) => {
+  const notePublication = (method, url, status, lireTexte, corps) => {
     try {
       if (String(method || '').toUpperCase() !== 'POST') return;
       const st = Number(status);
@@ -287,9 +288,38 @@
         let j = null; try { j = JSON.parse(t); } catch (_) {}
         const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
         const id = it && it.id != null ? String(it.id) : '';
-        if (/^\d{4,15}$/.test(id)) post({ kind: 'publication', itemId: id, status: st });
+        if (/^\d{4,15}$/.test(id)) {
+          post({ kind: 'publication', itemId: id, status: st });
+          const tc = (typeof corps === 'string' && corps.length <= 100000) ? corps : '';   // 22 oct. : sa fiche, sous l'identifiant que Vinted vient de donner
+          if (tc) post({ kind: 'fiche', itemId: id, status: st, via: 'publication', corps: tc });
+        }
         else post({ kind: 'publication', itemId: null, status: st, cles: j && typeof j === 'object' ? Object.keys(j).slice(0, 12) : [] });
       }).catch(() => {});
+    } catch (_) {}
+  };
+
+  // ── SA FICHE, TELLE QU'IL L'ENREGISTRE (22 octobre) ────────────────────────
+  // Quand il publie (`POST …/item_upload/items`) ou MODIFIE une annonce
+  // (`PUT …/item_upload/items/{id}`), la page envoie SA description et les codes
+  // de CETTE annonce (catégorie, marque, couleurs, taille, état). On ne la
+  // transmet qu'après un 2xx de Vinted, avec l'identifiant de l'ADRESSE (la
+  // modification) ou de la RÉPONSE (la publication) — jamais un titre (§5).
+  // Le fond n'en garde que la description et les codes (`noterFicheVinted`).
+  // C'est une LECTURE de ce que la page vient de faire sur SON clic : zéro
+  // requête de plus vers Vinted (§3).
+  const RE_MODIF = /^\/api\/v\d+\/item_upload\/items\/(\d{4,15})\/?$/;
+  const corpsTexte = (c) => (typeof c === 'string' && c.length <= 100000) ? c : '';
+  const noteModification = (method, url, status, corps) => {
+    try {
+      if (String(method || '').toUpperCase() !== 'PUT') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname)) return;
+      const m = RE_MODIF.exec(U.pathname);
+      const t = corpsTexte(corps);
+      if (!m || !t) return;
+      post({ kind: 'fiche', itemId: m[1], status: st, via: 'modif', corps: t });
     } catch (_) {}
   };
 
@@ -334,13 +364,15 @@
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
         const method = (init && init.method) || (input && input.method) || 'GET';
-        sendWriteReq(method, url, init && init.body);
+        const corpsEnvoye = init && init.body;
+        sendWriteReq(method, url, corpsEnvoye);
         const p = origFetch.apply(this, arguments);
         noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
           try {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
-            notePublication(method, url, res.status, () => res.clone().text());   // 5.201
+            notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
+            noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             if (/application\/pdf/i.test(ct)) {
@@ -382,7 +414,8 @@
         this.addEventListener('load', function () {
           try {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
-            notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''));   // 5.201
+            notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
+            noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
             // Bordereau PDF via XHR (si Vinted le charge en binaire).

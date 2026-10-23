@@ -1,8 +1,29 @@
 # VRM — dossier de passation
 
+> ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
+> Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
+> hors plafond de dépenses, **plus** chaque SMS facturé par Twilio/MessageBird. Julien : « si c'est
+> payant ne fais pas, essaie de trouver autre chose ». ⇒ La branche `codex/mfa-sms` **n'est PAS
+> fusionnée** et rien ne propose le SMS. **Le chantier devient « double vérification GRATUITE »** :
+> la vérification par app d'authentification (TOTP, Réglages → Mon compte → Double vérification,
+> déjà sur `main`, gratuite, marche avec l'app « Mots de passe » de l'iPhone) reste LA méthode ; ce
+> qui manque est un **chemin de secours gratuit** quand le téléphone est perdu : permettre
+> d'ajouter **un second appareil** (un second facteur TOTP — Supabase en accepte plusieurs ; c'est
+> la recommandation de sa doc faute de codes de secours), le nommer, le retirer, et le dire sur
+> l'écran du code. Les clés d'accès (WebAuthn/passkey) ne sont qu'**expérimentales** chez Supabase
+> au 22 octobre : ne pas les livrer. Jamais rien de payant, jamais une invitation forcée au
+> démarrage (retirée à sa demande).
+
+> ⚠️⚠️ **PASSATION DU 22-23 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-22-integration.md`** :
+> treize chantiers finis, relus et fusionnés (CSP, Ma journée en widgets, carte, offres + adresse
+> prouvée, double vérification gratuite, fiabilité, colis à l'heure, numéros et annonces masquées,
+> photos, Leboncoin « plus vue » et pause, URSSAF, petits correctifs, migration 016), l'extension
+> **5.213.0**, le piège de banc des worktrees, et les gestes de Julien.
+
 > ⚠️⚠️ **PASSATION DU 21 OCTOBRE — LIS D'ABORD `docs/passation/2026-10-21.md`** : ce qui est
 > en ligne, `claude/lot-21oct` (hors ligne, retours, 5.204, carte OpenFreeMap), les branches
-> non déployées (`csp-app`, `app-rapide`, et INACHEVÉES `carte-pro`, `journee-widgets`), les gestes de Julien.
+> non déployées (`csp-app`, `app-rapide`, et INACHEVÉE `carte-pro`), les gestes de Julien.
+> `journee-widgets` est FINIE le 22 octobre sur `v22-widgets` (non déployée) : § « Ma journée en widgets ».
 
 > ⚠️⚠️ **PASSATION DU 12 OCTOBRE — DEUX AGENTS — LIS D'ABORD `docs/passation/README.md`,
 > section « 🔴 LIRE D'ABORD » puis « RÉPARTITION ».** Agent 1 : mettre en ligne
@@ -204,6 +225,81 @@ qu'aucune règle n'en désigne une.
   20 oct. : N°51, 52, 59, 73 en double (une paire du 14 oct., une renumérotée le
   18) — la seconde de chaque paire reçoit un numéro neuf à la prochaine
   ouverture de VRM.
+  ⚠️⚠️ **22 OCTOBRE — CETTE PROMESSE N'ÉTAIT PAS TENUE : LES ANNONCES MASQUÉES
+  PAR VINTED N'ÉTAIENT PAS DES PAIRES PRÉSENTES.** Mesuré (lecture seule) :
+  seuls 58→91 et 70→92 avaient été réglés. Le dressing de julatace35260
+  (3156028798, lu le 17/10) porte 6 annonces **`is_hidden: true`**
+  (`is_closed: false`, `is_draft: false`, `item_closing_action` vide) ; sa
+  lecture publique du 22/10 est complète et vide. La règle « en ligne » les
+  range parmi les FERMÉES : ni « en ligne », ni « à confirmer » — donc absentes
+  de `porteursNum`. Les N°**51, 52, 59, 73** (masquées, numérotées le 14/10
+  15:47) restaient portés aussi par 4 paires en ligne numérotées le 18/10 08:26,
+  toutes automatiques. ⇒ `<masquees-regle>` (`masqueeSurVinted`,
+  `masqueesDuCompte` : prises dans les fermées rendues par `enLigneDuCompte` —
+  jamais le dressing brut, une démasquée depuis est déjà « en ligne » — ; une
+  suppression vue après la lecture la retire ; « pas su » n'écarte rien) et UNE
+  liste `annoncesPresentes` (en ligne + à confirmer + masquées, une fois chacune)
+  pour `porteursNum`, `numDoublons`, le règlement des doublons,
+  `vinted_nums_physiques`, `presentesAnnonceIds`, les cartons à vérifier et à
+  réécrire, et la recherche « Tout sur le N° » (état `masquee`). La règle du
+  20 octobre est INCHANGÉE : à la prochaine ouverture (ventes et annonces de tous
+  les comptes lues), les 4 paires en ligne du 18/10 reçoivent un numéro neuf,
+  dit dans « nouveaux numéros à écrire sur tes cartons » ; les masquées gardent
+  le leur. Une masquée n'est **pas** « en ligne » (totaux, grille, files
+  Leboncoin/eBay inchangés). L'écran la nomme « masquée par Vinted, toujours chez
+  toi ». Une entrée de cache d'annonces d'avant ce correctif est relue (elle ne
+  sait pas lesquelles sont masquées). Preuves : banc `numeros-doublons.cjs`
+  F/G/H (**6 rouges** sur `main` d198bca, vert après ; sous mutation —
+  suppression ignorée + masquées hors du règlement — **5 rouges**) ;
+  `audit-masquees-numeros.cjs` (13 contrôles, **3 rouges** sur `main`, 3
+  mutations sur 3 attrapées) ; `audit-identite.cjs` lisait 2 200 caractères fixes
+  de `porteursNum` et criait au loup : il lit le corps du `useMemo` (rouge si la
+  règle « annulée avant l'envoi » disparaît, prouvé). **Non mesuré** : le rendu
+  sur sa vraie base (aucune fixture ici) ; une masquée vendue hors Vinted fait
+  renuméroter l'autre pour rien (un carton à réécrire, jamais deux paires sous
+  un N°) — le geste « Elle n'est plus là » (ci-dessous) la règle. Les annonces
+  « disparues » d'une lecture publique (`_vrmAbsente` : supprimées, vendues OU
+  masquées après la lecture du dressing) ne sont PAS comptées : rien ne dit
+  qu'elles sont masquées.
+  ⚠️⚠️ **RELECTURE (22-23 octobre) — DEUX DÉFAUTS DE CE CORRECTIF, REPRODUITS,
+  CORRIGÉS.** (1) Une masquée DÉCLARÉE partie (« Retirer » des annonces
+  disparues, `vinted_pairs_lost`) redevenait « toujours chez toi » : `porteursNum`,
+  `annoncesPresentes`, « à vérifier » et `vinted_nums_physiques` ne lisaient pas
+  `pairsLost` — un numéro brûlé et un carton à réécrire pour rien (reproduit :
+  N°51 masquée déclarée partie ⇒ la paire en ligne passait N°53). (2) Le geste
+  « elle n'est plus là » que ce paragraphe nommait **n'existait pas** (0
+  occurrence dans le build) : une masquée sans doublon, ou d'un compte sans
+  annonce en ligne, n'avait aucun chemin. ⇒ Dans `<masquees-regle>` :
+  `annonceDeclareePartie` (IDENTITÉ d'abord : une entrée qui porte `id` ne vise
+  que cette annonce ; une entrée ANCIENNE, numéro seul, ne vaut que si AUCUNE
+  autre fiche ne porte ce N° — sinon gardée présente, le sens sûr),
+  `cleDeclarationPartie` (clé nue quand le N° est à elle seule, sinon `N°@id` :
+  les files Leboncoin/eBay et les retours lisent `vinted_pairs_lost` PAR NUMÉRO,
+  la clé nue en sortirait l'AUTRE paire, qui garde ce N°) et `masqueesPresentes`.
+  `masqueesSurEtagere` (un seul endroit, §11) alimente `annoncesPresentes`,
+  `porteursNum`, « à vérifier » et la recherche ; « Retirer » range désormais
+  l'identifiant ; les masquées sortent de « disparues sans vente » (deux voix
+  contraires sur la même paire). Le geste **« Elle n'est plus là »**, confirmé
+  (il dit que l'autre paire au même N° le garde), est sur la ligne « à vérifier »,
+  le bloc des doublons d'Annonces, le bloc rouge de Colis, « à écrire », et dans
+  un bloc **« N paires masquées par Vinted, comptées sur ton étagère »**
+  (Annonces → Stock et ajustements → Conseils & signalements ; sous « Aucune
+  annonce en ligne » quand tout est masqué), qui garde aussi les déclarées
+  parties avec **« Elle est encore là »** (compté parmi les signalements 7 jours
+  après la déclaration, pas au-delà). Mesuré (lecture seule) :
+  `vinted_pairs_lost` de Julien ne porte que des numéros B (B23…B540) — aucune
+  entrée ancienne ambiguë sur 15, 39, 51, 52, 59, 73. **Tranché** : le cas
+  « entrée ancienne sans identifiant + deux fiches au même N° » (le R3 du
+  relecteur) garde la masquée présente et renumérote l'autre — on ne devine pas
+  laquelle est partie. Preuves : `numeros-doublons.cjs` I/J/J2/K/K2/L (**20
+  rouges** sur fcc80cb, tout vert après ; règle débranchée, `masqueesSurEtagere`
+  = toutes les masquées ⇒ **11 rouges**) ; `audit-masquees-numeros.cjs` F/G
+  (23 contrôles, 2 rouges sur fcc80cb, 6 mutations sur 6 dont `sans_identite`,
+  `ancienne_sans_garde`, `cle_nue`) ; `audit-supprimees.cjs` servait une forme
+  que le code ne lit plus (§6.3 : `dressingEnLigne` appelle `masqueesDuCompte`,
+  absent du `vm` ⇒ l'écran rendait `[]`, 3 rouges depuis fcc80cb) — il charge le
+  bloc. **Non mesuré** : le rendu sur sa vraie base ; la mutation `filelbc`
+  d'`audit-supprimees` a une ancre périmée, déjà sur `main`.
 
 ### Les chiffres
 - **Le chiffre faux est la porte pour le corriger.** « Coût d'achat · 1/184
@@ -4449,7 +4545,9 @@ noire en ligne sur eBay sous VRM-82 ; eBay VRM-81 / VRM-48 sont aujourd'hui 80 /
 - **Mémoire de défilement (18 oct.)** : `MemoireDefilement` observait le premier enfant de la zone (un bandeau de 74 px) et s'arrêtait au premier succès — l'écran qui se raccourcit le temps d'un chargement ramenait la position à 0. Elle se tient 2,5 s, réessayée à chaque image, et cède dès que la personne fait défiler (molette, doigt, clavier, clic). Banc `revendeurs.cjs` (rouge sur l'avant : 250 → 0).
 - La ligne « Ventes Vinted à jour / capture ancienne » sort du résumé Vinted replié sur téléphone (une alerte cachée n'en est pas une).
 
-### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — PAS ENCORE APPLIQUÉE
+### La mémoire de l'agent eBay : migration 014 (chantier K3, 11 octobre) — ✅ APPLIQUÉE le 12 octobre (vérifié le 22)
+> ⚠️ Correction du 22 octobre : `list_migrations` porte `vrm_agent_memory_014` (12 oct., 20:35 UTC), les 16 tables
+> existent et les **28 corps de fonctions** sont identiques au fichier (md5). Ce qui suit « PAS appliquée » est périmé.
 Premier morceau de l'agent eBay « VRM fermé » (spécification `spec-finale.md`
 §5.1-5.2, K3). Julien ne voit rien. **Aucune horloge** (ni `pg_cron` ni `pg_net` :
 c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides et
@@ -4682,7 +4780,7 @@ c'est la 015, sur son oui), **aucun DROP**, rien qui tourne : des tables vides e
   de Postgres pourra exiger de recopier l'empreinte.
 - **Julien** : rien.
 
-### Le mode équipe : migration 016 (fonction n°37, 16-17 octobre) — PAS APPLIQUÉE ; écran livré le 17
+### Le mode équipe : migration 016 (fonction n°37, 16-17 octobre) — PAS APPLIQUÉE ; écran livré le 17 ; corrigée et essayée sur la vraie base le 22 (voir plus bas)
 Retenue le 11 octobre : le vendeur invite un aide qui voit les colis à expédier
 et à retirer, les codes de retrait, imprime les bordereaux — et RIEN d'autre.
 **Livré le 16 : la migration prouvée. Le 17 : la route, les écrans et leur banc**
@@ -4720,8 +4818,11 @@ de l'agent eBay).
   une requête qui porte l'en-tête (PostgREST l'expose dans `request.headers`,
   déjà lu en production par `noter_ecriture`) ET si l'appelant en est membre
   actif. Sans en-tête : rien ne change pour personne.
-- **Zéro écriture pour le membre.** « Coché posté » n'est pas indispensable :
-  Vinted sort le colis d'« à expédier » dès le scan au relais.
+- **Aucune écriture du membre PAR RLS.** « Coché posté » n'est pas indispensable :
+  Vinted sort le colis d'« à expédier » dès le scan au relais. ⚠️ Mais la 016 met
+  en service UNE écriture du membre, hors RLS : l'écran Organisation
+  (`/api/compte?mode=operations`) réécrit `vrm_operations_v1` du vendeur avec la
+  clé de service — voir « Revue du 22-23 octobre » plus bas.
 - **L'abonnement est celui du VENDEUR** : `vrm_equipe_actif` exige
   `vrm_acces_pour(vendeur)`. Seul objet existant modifié : la restrictive
   `abonnement_requis` d'`app_data` (`… or owner = (select
@@ -4830,7 +4931,63 @@ de l'agent eBay).
   aide, la prévenir ; elle crée son compte VRM avec cette adresse, la confirme, et
   arrive directement sur « Colis à préparer ».
 
-### La carte de la communauté : migration 018 (20 octobre) — PAS APPLIQUÉE ; écran livré
+#### 22 octobre : la 016 retouchée pour la 021, essai annulé sur la vraie base — sûre à appliquer
+**Mesuré (lecture seule, 22 oct.)** : `list_migrations` porte 005-008, **014** (12 oct.), 017, **018** (20 oct.,
+deux morceaux), 019, 020 ; la **013** est en place (27 corps de fonctions identiques au fichier, md5) ; la **021**
+aussi (ses politiques sont là, appliquée hors `list_migrations`) ; 014 (28 corps), 017, 018-020 (22 corps) : tous
+identiques au fichier. **Seule la 016 manque** (aucune table, aucune fonction `vrm_equipe_*` : d'où les 404 de
+`rpc/vrm_equipe_lister`). La passation du 21 (« 014, 016, 018 non appliquées ») était fausse pour 014 et 018.
+- ⚠️⚠️ **Le défaut, trouvé en relisant la 016 contre le schéma actuel** : la 021 a posé, AVANT la 016, la
+  restrictive `vrm_lecture_privee` (SELECT, `owner = auth.uid()`, sans la clause de l'équipe puisque ses
+  fonctions n'existaient pas). Une restrictive s'ajoute (ET) : la 016 d'avant, appliquée telle quelle, aurait
+  installé un mode équipe **mort** — l'aide lit 0 ligne (rejoué sur Postgres jetable dans l'ordre de la
+  production). Corrigé : §11 bis pose sur `vrm_lecture_privee` l'expression que la 021 prévoit elle-même (§11,
+  mot pour mot, `alter policy`, aucun DROP) ; §11 ter **refuse toute la migration** si une autre restrictive de
+  lecture ignore l'équipe (`vrm_equipe_lecture_bloquee`) ; `--verifier` exige la clause sur `vrm_lecture_privee`
+  quand elle existe (`regles`) et aucune restrictive bloquante (`restrictives_bloquantes`).
+- **Isolation** (relue) : `abonnement_requis` ne s'ouvre que pour `owner = vrm_equipe_vendeur()` (membre ACTIF
+  d'un vendeur dont l'accès est ouvert, DEMANDÉ par l'en-tête) ; aucune écriture du membre PAR RLS
+  (restrictives d'écriture de la 021, permissives `owner = auth.uid()`) — mais la 016 met en service le
+  parcours membre d'Organisation, hors RLS (puce suivante) ; `vinted_accounts` n'est pas
+  touchée ; la vérification de séparation de `api/compte.js?mode=confidentialite` n'envoie pas l'en-tête (rien ne
+  change pour elle).
+- ⚠️ **Revue du 22-23 octobre — ce que la 016 OUVRE en plus, hors RLS** (le premier jet disait « les écritures
+  restent fermées » et « la migration ne change rien pour operations.js » : faux). **Mesuré** (la vraie route
+  `api/_lib/operations.js`, fetch simulé, données inventées) : sans la 016, `rpc/vrm_equipe_lister` répond 404 et
+  un membre qui poste `mission.etat` chez le vendeur reçoit 403, 0 écriture ; avec la 016 (`membre_de`,
+  `acces === true`), la route **lit et réécrit la ligne `vrm_operations_v1` DU VENDEUR avec la clé de service**
+  (`PATCH …owner=eq.<vendeur>&id=eq.vrm_operations_v1`). ⇒ **Appliquer la 016 met en service le parcours membre
+  d'Organisation** (`/api/compte?mode=operations`). Bornes, tenues par `src/operations/metier.js` et vérifiées :
+  `mission.etat` et `mission.etape` seulement, sur SES missions (attribution = son invitation), jamais valider
+  (en_cours, terminee, bloquee) ; `mission.creer`, `reservation.creer`, la mission d'un autre aide, un vendeur à
+  l'accès fermé ou dont il n'est pas membre ⇒ refusés, 0 écriture ; il ne LIT que SES missions (ni réservations,
+  ni montants). **Décidé** : rien à changer dans le SQL ni dans la route (bornée, pas une fuite) ; l'en-tête de la
+  016 et ce dossier le disent (commentaires seuls : l'essai annulé et l'essai de production produisent le même
+  texte qu'avant, md5 `eeb6e4fe…` et `69f80fe9…` — l'essai déjà joué sur la vraie base vaut toujours ; `audit-equipe-sql`
+  144 verts). **Prouvé** : `scripts/audit-equipe-ecriture-membre.cjs` (16 contrôles, sans
+  Postgres) — rouge sur 15dbcb3 (l'en-tête et la section ne nommaient pas ce chemin) ; `--prouve` : 6/6 mutations
+  au rouge (en-tête d'avant, section sans le chemin, membre qui crée, qui touche la mission d'un autre, qui
+  valide, accès fermé ignoré). **Non mesuré** : la route contre la vraie base (aucune écriture en production).
+- **Essai annulé sur la vraie base** (`scripts/equipe-sql/essai-production.cjs`, UN appel `execute_sql`, BEGIN →
+  migration → contrôles par rôle joués comme PostgREST → ROLLBACK ; aide, vendeur et adresse non confirmée
+  INVENTÉS dans la transaction) : propriétaire 7 840/7 840 lignes avant et après (avec l'en-tête aussi) ; un autre
+  vendeur réel 21 siennes, **0** du propriétaire, même en le demandant ; l'aide **577** lignes = exactement la liste
+  blanche (même empreinte), 0 sans en-tête, 0 de `main`/ventes/transactions/porte-monnaie/eBay, 0 compte Vinted,
+  le PDF lisible, 0 modifiée/effacée, création refusée (42501) ; projection : 36 ventes, 50 achats, clés
+  `date, photo, status, title, transaction_id, transaction_user_status, uid`, **aucune clé d'argent** ; inventaire
+  des clés des 577 lignes : aucune clé d'argent (le seul « € » du texte est le pied légal d'un email Chronopost) ;
+  adresse non confirmée refusée ; révocation : 0 tout de suite ; plans d'index inchangés (+1 à 2 ms sur un
+  balayage de 7 840 lignes) ; `--verifier` ok, empreinte 948f… identique en 17.6. Verrou de table **660 ms**
+  (essai entier 1 s). Relu ensuite : ni table, ni fonction, ni règle, ni compte inventé.
+- Preuves : `audit-equipe-sql.cjs` **144 contrôles** (021 puis 016, 016 puis 021, restrictive inconnue, l'essai de
+  production rejoué et ne laissant rien) ; **6 rouges** sur la 016 d'origin/main (dont « l'aide lit [] ») ;
+  `--prouve` **19/19** mutations (dont `sans-lecture-021`, `sans-garde-restrictive`, `verifier-restrictives`).
+- **Appliquer** : le fichier tel quel (comme 019/020, par `apply_migration` ou l'éditeur SQL), VRM peu sollicité
+  (verrou exclusif bref sur `app_data`). Puis `node scripts/equipe-sql/essai-annule.cjs --verifier` ⇒ `ok: true`.
+- **Non mesuré** : l'en-tête `x-vrm-equipe` à travers la passerelle de Supabase depuis un navigateur (CORS) ; la
+  confirmation d'email obligatoire du projet (geste de Julien, voir plus haut).
+
+### La carte de la communauté : migration 018 (20 octobre) — ✅ APPLIQUÉE le 20 octobre (vérifié le 22)
 Julien : « un onglet avec une carte où les utilisateurs de VRM peuvent mettre
 leur emplacement quand on est connecté, pour s'écrire si on est dans la même
 ville ; un vrai jeu interactif ». Gestion → Autres outils → **Communauté**
@@ -5845,7 +6002,9 @@ en écriture.
   PROUVÉE (lien de confirmation envoyé à l'adresse déclarée, cliqué depuis la
   session du vendeur, preuve rangée côté serveur) — il faut un envoi d'email
   (SMTP), qui n'existe pas ici. Tant que ce n'est pas fait : **VRM ne s'ouvre
-  qu'à des gens de confiance**. (2) Un email « corps illisible » (`garderInconnu`, avant toute
+  qu'à des gens de confiance**. ✅ **Fait le 22 octobre** (« l'adresse de
+  réception PROUVÉE », fin du dossier) : base cloisonnée, une adresse non
+  prouvée ne donne plus rien. (2) Un email « corps illisible » (`garderInconnu`, avant toute
   attribution) part encore chez le propriétaire de l'installation. (3) Un email
   sans adresse lisible reste au neutre pour toujours : personne ne peut le
   réclamer (mieux vaut un blanc qu'un faux). (4) Le 404 « pas à toi » se
@@ -5994,11 +6153,10 @@ pouvait lire sa session. Mesuré au banc sur le code d'avant : **18 exécutions*
 - Le **reçu d'achat** (`openReceipt`) échappait déjà ses valeurs, et il garde
   ses boutons en ligne. Il n'est pas touché.
 - **Ajouté** : `X-Content-Type-Options: nosniff` (`vercel.json`).
-- ⚠️ **Pas fait, et pourquoi** : une vraie politique `script-src` sur toute
-  l'app. `index.html` a deux scripts en ligne, et la fenêtre du reçu hérite
-  de la politique de l'app (ses `onclick` casseraient). Surtout, les bancs
-  servent `dist/` **sans les en-têtes de Vercel** : rien ne verrait la casse.
-  Il faut d'abord un banc qui sert les vrais en-têtes.
+- ✅ **Fait le 21 octobre** : une politique sur toute l'app (section « La
+  politique de sécurité du contenu », avant le §6) — scripts en ligne sortis
+  d'`index.html`, boutons du reçu branchés depuis l'app, banc qui sert les
+  vrais en-têtes de `vercel.json`.
 
 ### ⚠️⚠️ « JE NE PEUX PAS APPUYER SUR LE BORDEREAU, ÇA MET QUE L'EXTENSION NE RÉPOND PAS » (5 octobre, 5.160)
 Une vente à expédier, l'extension allumée, et le bouton grisé. **Trois causes,
@@ -7825,6 +7983,16 @@ une vente Leboncoin ne disait rien de la paire, qui restait en vente sur Vinted.
   ⚠️ **L'audit a attrapé ma première règle de pointure** : elle prenait le
   premier nombre venu, donc « 90 » dans « Nike Air Max **90** … taille 44 », et
   proposait une paire en 42.
+  ⚠️⚠️ **23 octobre, capture de Julien** : une « Adidas Spezial marron taille
+  40,5 » vendue 45 € proposait « N°65 Nike LD waffle sacai » — même pointure
+  (+3) et prix proche (+2) suffisaient (seuil 4), **sans un seul mot en
+  commun**. Deux gardes : une **marque différente** écarte la paire
+  (`familleMarque`, sur `extractBrand` ; Jordan = famille Nike), et il faut au
+  moins un **mot du modèle** en commun (`motsModele` : ni la marque, ni une
+  couleur, ni un nombre, ni low/mid/high). Pointure et prix ne disent rien du
+  modèle. `audit-double-vente.cjs` sert ce cas exact (et une Samba à la même
+  pointure et au même prix, et l'autre sens : la vraie Spezial reste proposée) ;
+  les deux gardes retirées ⇒ 2 rouges.
 - ⚠️⚠️ **`account` NE PROUVE PAS QU'UNE ANNONCE EST À LUI.** Mesuré : 58
   annonces portent ce champ, sur **48 comptes** — la 5.88 étiquetait celles
   d'AUTRUI de leur propre propriétaire. J'ai failli l'ajouter à `aLui` (« 57
@@ -9966,6 +10134,109 @@ l'active pas.
 
 ---
 
+### ⛔ Double vérification GRATUITE : un second appareil de secours, pas de SMS (22 octobre)
+**Décision de Julien, 22 octobre : pas de SMS — c'est payant** (« Advanced MFA
+Phone » : 75 $/mois chez Supabase, hors plafond, plus chaque SMS ; §2.9). La
+double vérification reste l'app d'authentification (TOTP, gratuite), et le
+chemin de secours est un **second appareil**.
+- **La branche `codex/mfa-sms` (4870df1, 21 oct.) a été lue, fusionnée à l'essai
+  avec main (un conflit : l'invitation au démarrage qu'elle modifiait a été
+  retirée de main), puis NON gardée.** Au-delà du prix, elle était dangereuse :
+  1. `utilisateurDe` exigeait `aal2` dès qu'un facteur est vérifié, et sa
+     migration 022 posait une règle RLS restrictive `aal2` sur `app_data` et
+     `vinted_accounts`. Or la session de l'extension est **`aal1`** (lien
+     magique, § TOTP du 16 oct.) : activer la double vérification **coupait
+     toutes les captures** — la limite que ce dossier dit « à trancher plus
+     tard », tranchée dans le mauvais sens ;
+  2. le SMS était proposé à tous, sans savoir si un fournisseur existe (l'erreur
+     n'arrivait qu'au clic) ;
+  3. avec deux apps d'authentification, son écran du code listait « Application
+     d'authentification » deux fois et ne défiait que le premier facteur : le
+     code du second était refusé (mesuré, son build au banc ci-dessous : 13
+     rouges sur 19 à 390 px).
+  `audit-mfa-gratuite.cjs` refuse tout enrôlement `phone`, `channel:'sms'` et les
+  modules `mfaSms`/`VerificationSms` (rouge sur la branche : 6 lignes nommées).
+- **Mesuré (base, lecture seule, `auth.mfa_factors` en comptes)** : **1** facteur
+  TOTP **non vérifié** (21 oct. 16:38 — l'essai de l'invitation retirée), **0
+  vérifié, 0 téléphone** : personne n'a la double vérification active, personne
+  ne peut être enfermé aujourd'hui. `auth.mfa_recovery_code_sets` existe dans le
+  schéma (codes de secours de GoTrue), mais son API n'a pas pu être mesurée
+  (supabase.co bloqué par le proxy du conteneur) : **non livré**.
+- **Livré (app seule — aucune route, aucune migration, extension NON touchée)** :
+  - **L'écran du code accepte le code de N'IMPORTE LEQUEL des appareils**
+    (`mfaVerifierCodeParmi` : chaque facteur vérifié, jusqu'au premier qui
+    accepte). Trois états : un injoignable ⇒ « pas su », jamais « faux » ; un
+    429 ⇒ « trop d'essais » (il affichait « Too many requests », en anglais) et
+    on s'arrête ; tous disparus (appareil retiré ailleurs, il affichait « Factor
+    not found ») ⇒ la liste est relue et UN envoi du bon code suffit. Il nomme
+    les appareils, et « appareil perdu » dit d'entrer avec l'autre puis de
+    retirer le perdu.
+  - **Réglages → Mon compte → Double vérification** : chaque appareil a un
+    **nom** (choisi à l'enrôlement — GoTrue n'a pas de renommage ; un ancien nom
+    automatique « VRM 2026-… » s'affiche « Appareil ajouté le … »), la liste,
+    « Ajouter un appareil de secours » (nom, QR, « prends l'AUTRE appareil »,
+    ajouté seulement après SON premier code), « Retirer… » par appareil avec le
+    code de n'importe lequel (les AUTRES d'abord : le cas « perdu »), le dernier
+    retiré = désactiver. Un seul appareil : une phrase neutre propose un appareil
+    de secours — **jamais imposé, aucune invitation au démarrage**.
+  - Un nom déjà pris est refusé ici (sans casse) **sans rien créer** chez
+    GoTrue ; 422 `name_conflict`, 403 (aal) et 429 sont dits en français.
+  - La session porte `totpNoms` (affichage seul ; `totp` décide toujours, §11) ;
+    la ligne de Réglages dit « Activée · 2 appareils ».
+- **Récupération si l'UNIQUE appareil est perdu** — lui seul, il possède le
+  projet : Supabase → SQL Editor → `delete from auth.mfa_factors where user_id =
+  '<son identifiant>';` (les défis et jeux de codes partent en cascade — vérifié
+  dans le schéma). **Jamais exécuté ici.** Pour un autre vendeur : l'adresse de
+  contact (vide aujourd'hui, « à venir »).
+- **Preuves (§6)** :
+  | contrôle | code d'avant (origin/main d198bca, build copié) | après | mutations |
+  |---|---|---|---|
+  | banc `double-verification-appareils.cjs` (port 6251, faux GoTrue : un code par facteur, nom unique, aal2 pour enrôler et supprimer, 404, 429 ; 390 tactile + 1512) | **26 rouges sur 40** (la suite ne peut pas tourner : rien à cliquer) | **70/70** | `premier` (ne défier que le 1er) · `nompris` · `perime` (ne pas relire) · `trop` (429 non traité) · `ordre` (défier d'abord l'appareil retiré) : chacune rouge sur SON contrôle (1, à 1512 px) |
+  | même banc sur le build de `codex/mfa-sms` (390 px) | 13 rouges sur 19 | — | — |
+  | banc `double-verification.cjs` existant (PORT=6252, inchangé) | — | 62/62 | — |
+  | `audit-mfa-gratuite.cjs` (la vraie règle dans un `vm`) | rouge (règle absente) ; branche codex : 2/2 rouges | 8/8 | `premier` 4 · `trop` 1 · `passu` 1 rouges |
+  Et sur l'arbre final : `npm run build`, les **143 audits** `scripts/audit-*.cjs`
+  verts (lancés un par un), banc `session-reveil.cjs` vert. Captures regardées à
+  390 et 1512 px (écran du code à deux appareils, liste, QR de secours, retrait).
+- **Non mesuré** : le vrai GoTrue (formes tirées de sa doc et de son code : nom
+  unique, `aal2` pour enrôler un second facteur, sessions liées au facteur
+  supprimé rétrogradées en `aal1` — si Julien retire l'appareil dont il vient
+  de taper le code, VRM peut lui redemander un code au renouvellement suivant,
+  ≤ 1 h) ; « Mots de passe » de l'iPhone avec deux QR du même compte ; que TOTP
+  soit activé dans le projet (Authentication → MFA). La règle `aal2` côté base
+  reste **à trancher** — avec une session d'extension en `aal2`, jamais avant.
+- **Geste de Julien** : aucun obligatoire. S'il la veut : Réglages → Mon compte →
+  Double vérification → Activer (iPhone), puis « Ajouter un appareil de
+  secours » avec un AUTRE appareil (iPad, ancien téléphone).
+- **Revue du 22 octobre (soir) — deux défauts du retrait, reproduits puis
+  corrigés** (`DoubleVerification`, `retirer`) :
+  1. **Un appareil déjà retiré ailleurs** (le formulaire ouvert sur un autre
+     écran) : le `DELETE` répond **404** et le panneau disait « Le service de
+     connexion a refusé (erreur 404). « Téléphone » reste enregistré. » — faux,
+     GoTrue ne le connaît plus. ⇒ 404 = déjà retiré : même mise à jour de la
+     session qu'un succès, message « n'était déjà plus enregistré (retiré
+     entre-temps)… Je relis la liste » (ton gris, pas une erreur).
+  2. **Formulaire fantôme** : après ce 404, ou un retrait FAIT dont la réponse
+     s'est perdue (503), la liste relue n'a plus qu'un appareil et le formulaire
+     resté ouvert devenait « Pour désactiver la double vérification… Ton mot de
+     passe suffira ensuite » — faux (l'iPad reste actif), liste cachée. ⇒ un
+     effet sur la liste relue referme le formulaire « retirer » quand l'appareil
+     qu'il vise n'y est plus ; la liste et les gestes de l'appareil restant
+     reviennent (proposition de nom refaite, comme après un retrait réussi).
+  - Preuves : banc `double-verification-appareils.cjs` **section H** (faux
+    GoTrue : retiré ailleurs ⇒ 404 ; « réponse perdue » ⇒ retiré puis 503 ;
+    `SECTIONS=H` rejoue la section seule) — **16 rouges sur 34** sur le build
+    de 078823f (worktree), **8 sur 17** sur sa copie `git archive` à 1512 px
+    (§6.1) ; après, **104/104** aux deux tailles. Mutations : 404 non traité ⇒
+    4 rouges (le message), effet retiré ⇒ 6 rouges (le formulaire fantôme).
+    `double-verification.cjs` vert, 138 audits non SQL verts, build OK.
+  - Non mesuré : le statut que le vrai GoTrue rend sur un facteur inconnu au
+    `DELETE` (404 d'après son code, `mfa_factor_not_found`) ; dans le cas 503 la
+    session garde l'appareil disparu dans `totp` jusqu'à sa prochaine relecture
+    (sans effet : la porte relit les facteurs chez GoTrue).
+
+---
+
 ### Studio photo : cadre guide + détourage DANS le navigateur (fonction n°33, 17 octobre)
 Retenue le 11 octobre (« studio photo + détourage »), sous §2.9 : rien de payant
 sur la clé de Julien. Annonces → « ⋯ Outils » → **Studio photo**
@@ -10718,7 +10989,9 @@ Julien : « fait tout » — deux notifications.
   jour de Paris), préférence coupée, abonnement coupé. eBay illisible ⇒ « au
   moins N », eBay nommé. Le passage du soir n'envoie ni le rappel du matin, ni
   l'URSSAF, ni le bilan. « Avant midi » n'est pas dit : aucune heure limite n'est
-  captée (les dates limites sont des jours).
+  captée (les dates limites sont des jours). ⚠️ **FAUX, corrigé le 22 octobre** :
+  204 bordereaux sur 205 portent leur heure dans `dateLimite` — voir « Tes
+  colis à l'heure » plus bas.
 - Preuves : bancs `colis-relais-push.cjs` (vraie route des emails, 14 contrôles ;
   3 rouges sur le code d'avant ; mutation « clé commune » 3 rouges) et
   `rappel-soir.cjs` (vraie route, deux vendeurs, widget comparé, 17 contrôles ;
@@ -10936,7 +11209,8 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
 (`basemaps.cartocdn.com`) et les tuiles OSM directes sont retirés partout.
 - **Fond** : OpenFreeMap (instance publique : aucune inscription, aucune clé,
   aucun cookie, usage commercial permis), styles `liberty` (clair) et `dark`
-  (sombre — « pas encore complet » selon ses auteurs). Attribution affichée :
+  (sombre — « pas encore complet » selon ses auteurs) — ⚠️ remplacés le 22 oct.
+  par `positron`/`dark`, MapLibre seul (section suivante). Attribution affichée :
   OpenFreeMap · © OpenMapTiles · © OpenStreetMap. Conditions lues dans les dépôts
   `hyperknot/openfreemap(-styles)` (openfreemap.org bloqué d'ici).
 - **Moteur** : `maplibre-gl` 6.11.2 (BSD-3) + `@maplibre/maplibre-gl-leaflet`
@@ -10948,7 +11222,7 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
   la communauté en liste (jamais une carte grise). Mini-carte des points relais
   (`FondMiniCarte`) ⇒ fond uni, épingles gardées — ⚠️ elle est injoignable
   aujourd'hui (`openRelayPicker` n'a aucun appelant) : pas de banc.
-- **CSP** : `vercel.json` ne pose que `frame-ancestors` ⇒ rien à changer. Si une
+- **CSP** (✅ fait le 22 oct., « La CSP finie ») : `vercel.json` ne pose que `frame-ancestors` ⇒ rien à changer. Si une
   CSP complète est posée : `connect-src`/`img-src https://tiles.openfreemap.org`,
   `worker-src 'self' blob:`.
 - Preuves : banc `communaute.cjs` (OpenFreeMap servi par le banc, `liberty` puis
@@ -10957,6 +11231,1085 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
   6 contrôles, 3 rouges sur l'avant.
 - **Non mesuré** : la vraie instance OpenFreeMap depuis son téléphone ; WebGL sur
   un vrai iPhone ; le rendu du style `dark`.
+
+### La politique de sécurité du contenu (CSP) sur toute l'app (21 octobre)
+Suite de l'audit du 4-5 octobre (« Pas fait : une vraie politique `script-src` »).
+- **`vercel.json`, deux en-têtes** : EN VIGUEUR, les directives structurelles
+  (`frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`,
+  + `X-Frame-Options: DENY`) ; en **Report-Only**, la politique complète :
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://lgonxzrzjcqthjtbdpzo.supabase.co wss://lgonxzrzjcqthjtbdpzo.supabase.co https://cdn.jsdelivr.net https://*.vinted.net https://api-adresse.data.gouv.fr https://nominatim.openstreetmap.org data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com chrome-extension: moz-extension:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+  **Pourquoi Report-Only** : le vrai Turnstile, le vrai jsdelivr et Safari iOS ne
+  sont pas joignables d'ici ; une violation non vue en vigueur casserait un écran
+  sans rien dire. Les violations sont **notées** dans le journal des plantages
+  (`ecouterViolationsCsp`, `plantage_*` origine `csp`, sources d'extensions
+  écartées) : après quelques jours sans violation chez lui, **renommer l'en-tête
+  en `Content-Security-Policy`** — le banc en mode `BANC_CSP_EN_VIGUEUR=1` prouve
+  déjà que ça tient.
+- **Aucun `'unsafe-inline'` pour les scripts** : les deux scripts en ligne
+  d'`index.html` sont devenus `public/demarrage-theme.js` (dans `<head>`, avant
+  le premier rendu) et `public/demarrage-densite.js`. `style-src 'unsafe-inline'`
+  est accepté exprès (styles en ligne partout, React).
+- **Le reçu d'achat** (`openReceipt`, fenêtre `about:blank` qui HÉRITE de la
+  politique) n'a plus d'`onclick` : ses boutons portent un id et l'app y attache
+  les gestes après `document.close()`. La facture imprimable garde sa propre
+  `default-src 'none'`. pdf.js : `isEvalSupported: false` (sa sonde `eval`
+  était une violation). ORT (studio photo) : `'wasm-unsafe-eval'` + jsdelivr.
+  Le pont de l'extension ouvre `popup.html?mode=reparer` en iframe ⇒
+  `frame-src chrome-extension: moz-extension:`. Leaflet et les tuiles : `img-src https:`
+  (⚠️ 22 oct. : plus vrai pour le fond OpenFreeMap — MapLibre va chercher ses
+  tuiles par `fetch`, donc `connect-src` ; voir « La CSP finie » juste après).
+- ⚠️ **Toute nouvelle origine appelée par le navigateur** (un CDN, une API) doit
+  entrer dans `connect-src`/`script-src`, sinon elle sera refusée le jour du
+  basculement — `csp.cjs` et `audit-csp.cjs` le voient.
+- Preuves : `scripts/bancs/_vercel.cjs` (sert `dist/` avec les `headers` et
+  `rewrites` LUS dans `vercel.json`) ; banc `csp.cjs` (24 écrans × 390/1512, pages
+  publiques, reçu, facture, bordereau blob:, contrôle positif) : **0 violation**
+  dans les deux modes, **9 rouges sur le build d'avant** (b25ed61) ; mutations
+  `BANC_CSP_MUTATION=supabase` ⇒ 8 rouges, jsdelivr retiré ⇒ studio photo
+  12 violations. `audit-csp.cjs` (statique) : 19 rouges sur l'avant. Bilan CSP
+  branché dans `studio-photo`, `communaute`, `imprimante`, `captcha`.
+- **Non mesuré** : la vraie production (en-têtes réels après déploiement), Safari
+  iOS, le vrai Turnstile, Discord/Stripe (redirections pleine page, hors
+  `connect-src`). L'extension n'a pas été touchée.
+
+### La CSP finie (22 octobre) — la carte OpenFreeMap, le service worker, et des workers que le banc ne voyait pas
+Branche `claude/csp-app` reprise : **vrais merges** d'origin/main (3de5c8f — un
+seul conflit, ce fichier, les deux sections gardées — puis 911898e, sans conflit).
+- **Mesuré d'abord, sur l'arbre fusionné** : `communaute.cjs` → **38 violations**
+  `connect-src ← https://tiles.openfreemap.org/…` (style, sprite). La carte
+  OpenFreeMap arrivée sur main (21 oct.) n'était pas dans la politique : passée
+  en vigueur telle quelle, la carte de la Communauté serait tombée en liste chez
+  tout le monde, sans un mot.
+- ⚠️⚠️ **LE BANC NE VOYAIT PAS LES WORKERS.** Mesuré dans Chromium : une violation
+  DANS un worker (MapLibre charge ses tuiles depuis le sien) ou dans le service
+  worker n'arrive **ni** à l'évènement `securitypolicyviolation` de la page **ni**
+  à sa console. Seul `report-uri` la voit. `_vercel.cjs` pose donc
+  `report-uri /__vrm-csp-rapport` sur la CSP qu'il SERT (jamais dans vercel.json :
+  la production n'a pas de collecteur) et compte les rapports. Sur le code
+  d'avant, 4 tuiles refusées (`document /assets/maplibre-gl-worker-*.js`)
+  n'étaient visibles QUE par là. Contrôle positif : un worker qui contacte une
+  adresse interdite DOIT être signalé — `BANC_CSP_SANS_RAPPORTS=1` ⇒ rouge.
+  ⚠️ Conséquence en production : le journal des plantages (`origine: 'csp'`) voit
+  les violations de la PAGE et (depuis la revue du soir) des fenêtres que l'app
+  ouvre (reçu, facture). Celles du worker de la carte, du service worker et de
+  l'onglet du bordereau PDF ne remontent nulle part — elles ne sont tenues que
+  par ce banc et `audit-csp.cjs`.
+- ⚠️⚠️ **MA JOURNÉE HORS LIGNE : LA PAGE ALLAIT CHERCHER LES QR CHEZ LES
+  TRANSPORTEURS** (`rechaufferQr` → `fetch(u)`). Mesuré dans sa base (lecture
+  seule, hôtes seulement) : `qrUrl` sur **6 hôtes** — p.vintedgo.com ×15,
+  avn-webexternal.azureedge.net ×11, tracking.network1.pickup.fr ×9,
+  avisageng-colis-webexternal.pickup-services.com ×5,
+  pickup-services.email-messaging.com ×4, static.chronopost.fr ×1. Une liste
+  blanche en `connect-src` éteindrait la réserve au premier changement d'hôte.
+  ⚠️ (corrigé par la revue du soir) Ces six hôtes sont ceux des `qrUrl`, pas des
+  QR : `URL_PAS_UN_QR` écarte les mouchards et bannières, il reste **deux hôtes
+  de vrais QR** (p.vintedgo.com ×15, avisageng-…pickup-services.com ×5), et les
+  15 Vinted Go sont en **http** — ils n'entraient jamais dans la réserve (voir
+  la revue ci-dessous).
+  ⇒ La page demande `/hl-qr?u=…` (même origine), **seulement quand le service
+  worker la commande** ; c'est lui qui va chercher et qui **range** (`public/sw.js`).
+  ⇒ `/sw.js` n'est **plus sous la politique complète** :
+  `"source": "/((?!sw\\.js).*)"` (vérifié avec path-to-regexp 6.1.0, celle de
+  `@vercel/routing-utils` : `/`, `/index.html`, `/assets/…`, `/recuperation.html`
+  oui, `/sw.js` non). Il garde les directives structurelles. Sans service worker
+  aux commandes, rien n'est rangé (la réserve ne sert que par lui) : réessayé à
+  l'ouverture suivante.
+- **`vercel.json`** : `connect-src` et `img-src` + `https://tiles.openfreemap.org`
+  (style, TileJSON, tuiles vectorielles et raster, sprite, polices — un seul
+  domaine dans les vrais `liberty`/`dark`, relus dans hyperknot/openfreemap-styles) ;
+  `worker-src 'self' blob:` (déjà là : le worker de MapLibre est un fichier servi
+  par VRM, celui de pdf.js un blob). La politique complète vit dans SA règle ; la
+  bascule = renommer SA clé en `Content-Security-Policy`.
+- `_vercel.cjs` : un motif à parenthèses imbriquées était mal lu (coupé à la
+  première `)`) — les bancs auraient servi d'autres en-têtes que Vercel.
+- **Bancs** : `csp.cjs` passe par `_porte-banc` (l'« accès direct » est retiré),
+  rend la carte dans un contexte NEUF (les violations sont dédoublonnées par
+  contexte : la tournée des écrans rendait ce contrôle vert par accident sur le
+  code d'avant) et exige qu'elle ait DEMANDÉ style, TileJSON, tuiles, raster et
+  sprite ; `/recuperation.html` ; la réserve d'un QR par le service worker (le
+  VRAI `rechaufferQr`). `abonnement.cjs` (Stripe : clic « S'abonner » →
+  checkout.stripe.com) et `hors-ligne.cjs` observent maintenant la CSP.
+- **Preuves** — §6.1, arbre `git archive` de la fusion (7a7038f), banc copié dedans :
+  `csp.cjs` **7 rouges** avant (101 verts), **0** après (109) ; en vigueur
+  (`BANC_CSP_EN_VIGUEUR=1`) **0** (111 verts, carte dessinée, QR rangé) ;
+  mutations `openfreemap` 3 rouges · `swpolitique` 2 rouges (le rapport vient de
+  `/sw.js`) · `BANC_CSP_SANS_RAPPORTS=1` 2 rouges. `audit-csp.cjs` **5 rouges**
+  avant, 0 après. `hors-ligne.cjs` avant : **4 violations** (le QR demandé par la
+  page) ; après 0, la réserve se remplit et le QR s'affiche sans réseau.
+  `communaute` 144 + 0 violation (dont « Se connecter avec Discord »), `captcha`
+  (Turnstile) 62, `imprimante` 32, `studio-photo`, `abonnement` 83 + 0 violation,
+  `sw-cache` : verts. Et avec la politique complète servie **EN
+  VIGUEUR** (copie de vercel.json par `BANC_VERCEL_JSON`) : `communaute`,
+  `captcha`, `abonnement`, `hors-ligne`, `imprimante`, `studio-photo` — tous
+  verts, **0 violation**.
+- **Les 143 audits** (`scripts/audit-*.cjs`) : tous verts sur cette branche,
+  après chacun des deux merges — aucun rouge, donc rien à comparer avec main
+  (`audit-agent-sql` est tombé une fois sur « No space left on device » : le
+  disque de la machine partagée était plein à 98 % ; vert à la relance). Après
+  le second merge : build, `audit-csp` et `csp.cjs` (109 verts, 0 rouge) relancés ;
+  les autres bancs cités ici l'ont été sur le premier (main y a changé le
+  diagnostic Leboncoin et l'extension, rien de ce qu'ils rendent). `verif_visuel.cjs` (fixtures
+  réelles, hors dépôt) : 21 contrôles non conformes, **exactement la même liste
+  sur un arbre `git archive origin/main`** (CA par plateforme, vente Leboncoin
+  prouvée, résumé Vinted, carte héros) : rien ne vient de ce chantier.
+- **Passer en vigueur** : les directives structurelles le sont déjà
+  (`frame-ancestors 'none'` : aucun écran ne s'encadre lui-même, vérifié). ⚠️
+  Critère RÉÉCRIT par la revue du soir (voir ci-dessous) — l'ancien demandait
+  d'ouvrir des surfaces que le journal ne pouvait pas voir, et le faux positif
+  des QR Vinted Go le rendait inatteignable. Il y a deux moitiés :
+  1. **Ce que le journal voit** (la page, le reçu d'achat, une facture) : 7 jours
+     sans aucune ligne `plantage_*` d'origine `csp` depuis le déploiement de ce
+     correctif, à condition qu'il ait ouvert pendant ces 7 jours, sur son iPhone
+     ET sur l'ordinateur : Ma journée avec un colis à retirer, Achats, Mon
+     compte, un reçu d'achat, le studio photo. Vérification (lecture seule) :
+     `select data->>'message', data->>'ecran', data->>'navigateur', count(*), max(data->>'at') from app_data where id like 'plantage_%' and data->>'origine' = 'csp' group by 1, 2, 3;`
+     (`ecran` dit où : `cat_achats`, `journee`, `fenetre:recu`, `fenetre:facture`…).
+  2. **Ce que le journal ne voit PAS, et ne peut pas voir d'une page** : le
+     worker de la carte de la Communauté (MapLibre), le worker de pdf.js
+     (aperçus d'imprimante), le service worker, l'onglet du bordereau PDF. Ils
+     ne sont tenus QUE par le banc `csp.cjs` (dans Chromium, par `report-uri`) ;
+     sur Safari iOS ils ne sont pas mesurés. Le jour de la bascule, les regarder
+     À L'ŒIL sur l'iPhone ET l'ordinateur : la carte de la Communauté montre la
+     carte (pas la liste), un bordereau s'ouvre, Réglages → Imprimante → « Voir
+     les aperçus » dessine les aperçus. Sinon : remettre la clé
+     `Content-Security-Policy-Report-Only`.
+  Le geste : dans la règle `/((?!sw\\.js).*)` de vercel.json, renommer la clé
+  `Content-Security-Policy-Report-Only` en `Content-Security-Policy`.
+- **Non mesuré** : les en-têtes réels de Vercel avec cette règle (aucun
+  déploiement d'ici) ; Safari iOS ; le vrai Turnstile ; la vraie instance
+  OpenFreeMap (bloquée d'ici ; que sa TileJSON `/planet` désigne des tuiles sur
+  le MÊME domaine est DOCUMENTÉ — README d'hyperknot/openfreemap, « `/planet/latest/{z}/{x}/{y}.pbf` » —
+  pas mesuré : un autre hôte ferait passer la carte en liste une fois en vigueur,
+  et en Report-Only la violation viendrait du worker, que le journal ne voit pas) ; les
+  vraies redirections Stripe et Discord (navigations pleine page, hors CSP).
+  L'extension n'est pas touchée.
+### Ma journée en widgets, finie et vérifiée (22 octobre)
+Demande de Julien (21 oct.) : Ma journée « comme l'écran d'un iPhone, avec des
+widgets ». Reprise de `claude/journee-widgets` (f4cfaff, « EN COURS, non
+vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
+`v22-widgets` — **non déployée**.
+- **Ce que c'est** : la disposition SEULE (`src/journeeWidgets.js`) — quels blocs,
+  dans quel ordre, à quelle largeur — rangée dans `vrm_journee_widgets`
+  (synchronisé, `{v:1, w:[{id,t}]}`, rattrapé par `onCloudReady` seulement s'il
+  est resté vide). Chaque widget rend un bloc que Ma journée calculait déjà :
+  **aucun chiffre n'est recalculé** (§11), **aucune lecture de plus**.
+  « Modifier » (ordinateur : en haut de la grille ; téléphone : « Modifier
+  l'écran » en bas) ou appui long au doigt ⇒ les widgets tremblent (rien si
+  « réduire les animations »), on glisse, « − » retire, « + Ajouter » (feuille),
+  « OK ». Clavier : flèches, Suppr, Échap. Catalogue : les 7 blocs d'avant +
+  14 derniers jours, URSSAF, et 4 petites cases (à envoyer, à retirer,
+  messages, prix à baisser). PAS de widget « bénéfice » (revue ci-dessous).
+- **La mise en page par défaut est CELLE D'AVANT**, même ordre, même place :
+  barre, à faire, vendu | semaine | attente, puis photos 2/3 | stock 1/3 sur
+  ordinateur (grille de 6 colonnes) ; l'un sous l'autre sur téléphone.
+  ⚠️ **Une exception, assumée** : les alertes qui coûtent étaient les premières
+  lignes de « À faire », SOUS la barre ; elles sont maintenant au-dessus de la
+  grille, donc de la barre (revue ci-dessous). Le banc
+  `revendeurs` (vert sur origin/main) l'exige — « stock à droite des dernières
+  ventes », tout visible sans défiler — et il était ROUGE sur mon premier jet
+  (grille de 4 colonnes) : *une nouveauté ne doit pas changer ce qu'on voit tant
+  qu'on n'a rien touché.*
+- **Mesuré au rendu sur f4cfaff, corrigé** :
+  1. ⚠️⚠️ **à la souris, glisser un widget de côté CHANGEAIT D'ONGLET** : le
+     balayage horizontal de la coque prenait le geste ; on lâchait le widget sur
+     l'écran Vinted. La grille porte `data-noswipe` en mode « Modifier » ;
+  2. **sur téléphone, « Modifier » était INVISIBLE** : il vivait dans la tête de
+     l'écran, que `styles-mobile-studio` cache sous 768 px. Seul l'appui long
+     (que personne ne devine) y menait. Un seul des deux boutons se voit à une
+     largeur donnée ;
+  3. **« Grand » ne montrait rien de plus** : la même carte, deux rangées plus
+     haute et vide. Une taille est une **largeur** (ordinateur : 1/6, un tiers,
+     deux tiers, pleine largeur) ; sur téléphone (2 colonnes) tout ce qui n'est
+     pas petit fait toute la largeur : le bouton de taille n'y est pas proposé ;
+  4. **« 1 colis en retard » était dit deux fois** (une alerte de tête ajoutée +
+     la case de la barre) : il ne remonte en tête que si AUCUNE case ne le
+     montre (`caseVisible`). Même règle ajoutée pour le colis **hors délai à
+     retirer** (il repart chez l'expéditeur), que le premier jet oubliait :
+     retirer la barre l'aurait rendu muet ;
+     ⚠️ (23 oct., après la fusion avec « colis à l'heure ») la règle de date
+     limite dit déjà en tête tout colis Vinted dépassé (`colis-limite`) :
+     `colis-en-retard` ne garde que les colis **eBay** en retard, sinon un vrai
+     retard était dit deux fois (banc `journee-widgets` H, rouge avant) ;
+  5. **« À faire » était retirable** — et avec lui les emails mis de côté, les
+     colis cochés non partis, le litige, « Tout est OK » à confirmer… Il est
+     **fixe** (déplaçable, jamais retiré ; remis s'il manque d'une disposition
+     abîmée) ;
+  6. **le premier jour, la grille entière était cachée**, « À faire » compris :
+     la ligne « N emails mis de côté » disparaissait (banc `emails-mis-de-cote`,
+     2 ❌ sur un jet intermédiaire, vert sur origin/main). La grille est rendue,
+     ses widgets se taisent d'eux-mêmes, et « Modifier » n'y est pas ;
+  7. **base injoignable** : la carte « Lecture du stock indisponible » était une
+     troisième voix après le bloc de la coque et la ligne de panne (§7) — retirée,
+     et « Modifier » n'est pas proposé pendant la panne.
+- **Décidé (sans lui demander)** : les alertes qui coûtent (`urgent` : deux
+  paires sous un N°, double vente, ne pas poster eBay, coché non parti, « Tout
+  est OK » à moins de 24 h) restent HORS grille, en tête, jamais retirables.
+  Une disposition illisible ou abîmée retombe sur ce qui est lisible, jamais sur
+  un écran vide.
+- **Prouvé** : banc `journee-widgets.cjs` (données inventées, base cloisonnée
+  comme en production, 1512 et 390 px, clair ET sombre, souris et doigt)
+  **129 ✅ · 0 ❌** ; **50 ❌ sur origin/main** (3de5c8f), **34 ❌ sur
+  f4cfaff** ; il compare les chiffres, les actions (`data-job`) et les blocs
+  rendus au build de la base de fusion (mêmes valeurs). Mutations, chacune
+  ROUGE : grille sans `data-noswipe` (5 ❌), alerte de retard sans `caseVisible`
+  (2 ❌), sans le bouton du bas (9 ❌), « À faire » retirable (2 ❌), « Deux
+  tiers » remis en carte plus haute (3 ❌). Audits `tdz`, `boutons`, `icones`,
+  `variables`, `chiffres`, `coherence`, `identite`, `bancs`, `extension-zip`
+  verts.
+  - **Sur le build final** (fusionné avec d198bca) : `journee-widgets`,
+    `journee-premium`, `premierjour`, `vendu-recu`, `emails-mis-de-cote`,
+    `revendeurs`, `hors-ligne`, `demarrage`, `stock-journee` verts, et les bancs
+    Leboncoin arrivés avec main (`lbc-identite-privee`, `lbc-demarrage`,
+    `lbc-rappel-mise-a-jour` — ⚠️ ils cherchent `/usr/bin/chromium` :
+    `CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`).
+  - Sur un build intermédiaire de la branche : `cartes-vivantes`,
+    `chiffres-croises`, `glisser-onglet`, `compact`, `accueil`,
+    `double-verification`, `numeros-remise-a-zero`, `session-reveil`,
+    `photo-vente` verts.
+  - **`vitesse`** : aucune lecture de plus (64 à 390 px comme main, 60 contre 62
+    à 1512) ; rendus au démarrage indiscernables (médianes à 390 px, quatre
+    mesures alternées : main 14·16·17·16, ici 15·14·15·16) — ses deux rouges
+    (« ≤ 62 lectures », « ≤ 13 rendus ») le sont déjà sur main.
+  - Rouges À L'IDENTIQUE sur origin/main (même nombre, déjà rouges avant ce
+    chantier, à regarder à part) : `benefice-journee` 2, `ebay-messages-journee`
+    8, `a-confirmer` 6, `poste-sans-depart` 12, `double-vente` 30,
+    `rappel-urssaf` 6, `statuts-colis` 52, `seuils-vinted` 13,
+    `recherche-numero` 13, `tout-generer` 36, `ebay-colis` 8, `audit-reel-20oct`
+    24, `codes-hors-ligne` 6, `photos-vinted` 40. Pour `benefice-journee`
+    (« éteint ⇒ plus de carte ») la cause est dans le BANC : il sert la sonde de
+    schéma en 400 (base non cloisonnée), donc `cloudPush` ne part pas, et le
+    rechargement relit « allumé » dans le nuage (§6.3 — le même piège que mon
+    propre banc avant qu'il serve 200).
+- **Non mesuré** : le vrai iPhone (appui long, défilement pendant le glisser —
+  tout est au Chromium tactile du banc) ; le mode stream ne floute rien de
+  Ma journée (aucun `vrm-sensible` dans l'écran, sur main non plus : les comptes
+  nommés dans « À faire » restent lisibles — inchangé, à trancher à part).
+- **Revue adverse du 22 octobre (soir) — six défauts reproduits sur 43c8e48,
+  six corrigés** :
+  1. ⚠️ **En mode « Modifier », → déplaçait le widget ET menait à l'onglet
+     Vinted** (mode perdu) : la coque écoute ← → sur la fenêtre, et un widget
+     (`role="group"`) n'est pas un bouton pour elle. Les flèches d'un widget
+     sont prises (`preventDefault` + `stopPropagation`), même au bord (rien à
+     déplacer) ; et la coque ignore une flèche déjà prise ou partie d'une zone
+     `data-noswipe` (deux gardes indépendantes) ;
+  2. ⚠️ **Le premier jour, l'appui long ouvrait « Modifier »** (absent ce jour-là) :
+     six cases « Rien à montrer », et ce qu'on retirait partait au nuage. Même
+     trou pour un vendeur eBay/Leboncoin sans compte Vinted (premier jour
+     permanent). L'appui long lit `peutModifier`, et le mode se ferme tout seul
+     s'il ne l'est plus (panne pendant la modification) ;
+  3. **Deux propriétaires pour le bénéfice** : le widget « Ton bénéfice »
+     l'affichait pendant que Réglages disait « éteint », et l'interrupteur n'avait
+     plus d'effet (§11). Tranché : le widget est RETIRÉ du catalogue — le
+     réglage `vrm_journee_benefice` reste le seul propriétaire, et le bénéfice
+     reste DANS la carte « Vendu et reçu » (décision de Julien du 21 oct.,
+     c136941, « regrouper CA et bénéfice »). Carte « Vendu » retirée, réglage
+     allumé ⇒ il a sa propre carte sous la grille (jamais « allumé » et
+     invisible). Mesuré (lecture seule) : un vendeur a `vrm_journee_benefice`
+     à `true`, aucun n'a de disposition rangée ; un `benefice` resté dans une
+     disposition (builds intermédiaires) est ignoré ;
+  4. **« Même ordre qu'avant » était faux avec une alerte qui coûte** (au-dessus
+     de la barre au lieu de dessous). Tranché : ASSUMÉ — aucune disposition ne
+     doit pouvoir pousser « deux paires sous un N° » en bas de l'écran. Dit
+     ci-dessus et vérifié au banc (A2), plus « même ordre » sur ces données-là ;
+  5. **La feuille « Ajouter » proposait les petites cases à côté de la barre** :
+     « 2 À envoyer » écrit deux fois (§7 — et le banc l'exigeait). Une petite
+     case n'est plus proposée tant que la barre est là, ni la barre tant qu'une
+     petite case est là (`widgetsAjoutables`), et la feuille dit pourquoi en
+     une phrase ;
+  6. **En mode « Modifier » à 1512 px, le bouton de largeur recouvrait la carte**
+     (« Mes ventes › » réduit à « Me », la légende « Vendu », « tout voir › ») :
+     il est SOUS la carte.
+  - Prouvé : banc `journee-widgets.cjs` **163 ✅ · 0 ❌** (sections A2, B3, B4,
+    K, E réécrite, E2 étendue) ; le même banc lancé depuis une copie de 43c8e48
+    (`git archive`, §6.1) **15 ❌** (clavier 4, premier jour 2, bénéfice 4,
+    petites cases 2 + la suite de BF qui meurt faute du bouton « Fermer »
+    marqué) ; le recouvrement mesuré à part sur 43c8e48 : 6 boutons sur 6
+    recouvrent leur carte (`afaire:105x30`, `vendu:71x30`…), 0 après. Mutations
+    (`BANC_SECTIONS`), chacune ROUGE : flèches sans les deux gardes (B3, 4 ❌),
+    appui long sans `peutModifier` (B4, 2 ❌), bénéfice sans sa carte hors
+    « Vendu » (K, 2 ❌), feuille sans exclusion (E, 4 ❌), bouton de largeur
+    remis en absolu (E2, 1 ❌). ⚠️ Une seule des deux gardes du clavier (ou de
+    l'appui long) retirée reste VERTE : défense en profondeur, voulu.
+    137 audits verts (les 5 qui montent un Postgres jetable, sans lien avec ce
+    chantier, n'ont pas été lancés). Bancs voisins sur ce build, un par un :
+    `journee-premium` 17, `premierjour` 86, `vendu-recu` 57, `demarrage` 12,
+    `hors-ligne` 45, `glisser-onglet` 14, `revendeurs` 196, `stock-journee` 7,
+    `emails-mis-de-cote` 52 verts ; `benefice-journee` : ses 2 mêmes rouges que
+    sur main (« éteint ⇒ plus de carte », cause dans le banc), et « CA et
+    bénéfice partagent la même carte » vert.
+### La carte de la communauté « plus professionnelle » (22 octobre) — branche `v22-carte`
+Julien (21 oct.) : « une autre carte, beaucoup plus professionnelle, fiable et de
+qualité ». Une session l'avait commencée (`claude/carte-pro`, b3fe852, « EN COURS,
+non vérifié ») : Leaflet retiré (MapLibre seul), fond **VersaTiles** + secours
+OpenFreeMap. Finie ici, après un VRAI merge de main (avatars Discord de main portés
+sur les épingles MapLibre). Mesuré en production (lecture seule, 22 oct.) :
+**1 inscrit** sur la carte (1 ville, pseudo Discord renseigné).
+- **Tranché** : **OpenFreeMap seul**, VersaTiles retiré. Raisons : un seul domaine
+  (`tiles.openfreemap.org` : style, TileJSON, tuiles, polices, icônes) — celui que
+  la CSP de `claude/csp-app` prépare et que la politique de confidentialité nomme ;
+  un second fournisseur = un second tiers qui voit l'IP de chaque vendeur, jamais
+  mesuré depuis son téléphone. Le repli reste la LISTE (jamais une carte grise).
+- **Le rendu pro** : styles SOBRES d'OpenFreeMap — `positron` (clair, gris, sans
+  points d'intérêt) et `dark` (Dark Matter). `liberty` (couleurs OSM) est retiré :
+  sur un fond presque sans couleur, l'accent PLEIN reste à SON épingle (§7 ;
+  un liseré accent marque seulement « près de toi », et depuis la relecture les
+  initiales des autres sont en encre neutre). **Noms en français** : `enFrancais` enveloppe chaque étiquette de NOM par
+  `["coalesce", ["get","name:fr"], <expression d'origine>]` (« Allemagne », pas
+  « Germany ») ; sans `name:fr`, le nom d'origine ; les numéros de route intacts.
+  Ni rotation ni inclinaison, zoom 44 px, « Ma ville », attribution dépliée sur
+  ordinateur ; sous 640 px elle est VISIBLE à l'ouverture et se replie en « i »
+  au premier glisser (comportement de MapLibre, gardé — voir la relecture).
+- **Quatre défauts de l'état laissé, VUS AU RENDU** (banc, 390 et 1512) :
+  1. ⚠️ l'épingle ÉTAIT le marqueur MapLibre, qui se place par un `transform` en
+     ligne : la `transition: transform .15s` de `.vrm-cm-pin` la faisait TRAÎNER
+     derrière la carte (80 px au lieu de 120 sur un glisser), et à 390 px le
+     toucher manquait l'épingle (coucou, message, blocage : 4 rouges en cascade).
+     ⇒ un PORTEUR (`.vrm-cm-porteur`) est le marqueur, le bouton vit dedans ;
+  2. l'attribution était DOUBLÉE (la mention ajoutée + celle de la TileJSON) ⇒
+     `attributionManquante` n'ajoute que ce que les sources ne portent pas ;
+  3. deux « i » empilés à 390 px : la règle générale des boutons de `.vrm-main`
+     (`min-height: 44px !important`) étirait le `<summary>` de MapLibre et son
+     image se répétait ;
+  4. sa propre épingle n'était plus en accent : la règle `.profil` de main (avatars)
+     la repeignait en blanc (vrai aussi sur main).
+  Et le fond tombait en liste sur UNE tuile en erreur (500) : `poserFond` ne
+  déclare « dessiné » qu'après une tuile ARRIVÉE ; une tuile isolée en erreur ne
+  fait pas tomber la carte ; une source (TileJSON) injoignable si ; une police ou
+  une icône manquante non ; AUCUNE tuile arrivée ⇒ délai (12 s) ⇒ liste (une
+  tuile LENTE la faisait encore tomber : corrigé par la relecture, ci-dessous).
+- **Politique de confidentialité** : elle nommait encore **CARTO** (retiré le
+  21 oct.) — la ligne dit OpenFreeMap (IP + zone affichée, aucun compte, aucun
+  cookie, lieu « non précisé par le service ») et le géocodage de la communauté
+  (BAN, Photon, Nominatim, par le serveur ; BAN depuis le navigateur en repli).
+  Date au 22 oct. ⚠️ Ce remplacement avait retiré la déclaration du géocodage
+  de l'écran ACHATS (relecture, ci-dessous) : remise.
+- **Le banc sert la VRAIE forme** (§6.3) : les vrais styles `positron`/`dark`
+  (`hyperknot/openfreemap-styles` @ 6e53612), une TileJSON qui déclare toutes les
+  couches et porte l'attribution exacte du README, de vraies tuiles OpenMapTiles
+  (Natural Earth : eau, frontières, villes et pays avec `name:fr`), de vrais
+  glyphes Noto Sans (`protomaps/basemaps-assets` @ 028c18f, « Bold » servi par
+  « Medium »), une planche d'icônes valide mais vide. ⚠️ Avec une TileJSON qui ne
+  déclarait que 3 couches, MapLibre criait « Source layer … does not exist » —
+  une erreur que le vrai service ne produit pas : corrigé dans le banc.
+  Téléchargés une fois par `curl` dans `os.tmpdir()/vrm-carte-banc-v2`.
+- **Preuves** : `scripts/bancs/communaute.cjs` (port `BANC_PORT`) **168 verts** ;
+  **16 rouges** sur l'état laissé (b3fe852 + main, build de la copie) ; **15
+  rouges** sur origin/main 4afdcda ; 4 mutations de l'app posées ensemble
+  (bouton = marqueur, accent retiré, « i » sans correctif, une tuile qui tue) ⇒
+  **10 rouges**, chacune attrapée par SON contrôle. `scripts/audit-fond-carte.cjs`
+  (exécute `src/fondCarte.js` : vrais styles évalués par
+  `@maplibre/maplibre-gl-style-spec`, fausse carte aux évènements de MapLibre) :
+  **15 rouges** sur l'état laissé, **15** sur main, vert après, `--prouve` **7/7
+  mutations** attrapées. Les 4 combinaisons 1512/390 × clair/sombre regardées.
+- **CSP** (pour `claude/csp-app`) : la carte ne demande que
+  `https://tiles.openfreemap.org` (`connect-src` : style, TileJSON, tuiles, polices,
+  icônes) ; le worker MapLibre est servi par VRM. ⚠️ Les avatars de main viennent
+  de `https://cdn.discordapp.com` (`img-src`) — pas de ce chantier, à ne pas oublier.
+- **Non mesuré** : la vraie instance depuis son téléphone (bloquée d'ici) ; que les
+  tuiles réelles portent `name:fr` (absent ⇒ le nom d'origine, aucune régression) ;
+  le rendu de Dark Matter sur de vraies données ; WebGL sur un vrai iPhone ; la
+  mini-carte des points relais (injoignable, pas de banc ; `interactive: false` et
+  `compact: true` : son attribution reste dépliée, jamais repliée).
+
+#### Relecture adverse du 22 octobre (soir) — quatre défauts reproduits, corrigés
+Chacun REPRODUIT d'abord (copie `git archive` de 87df182 compilée, contrôles lancés
+depuis la copie, §6.1), corrigé, rouge sur 87df182, vert après, rouge sous mutation.
+- ⚠️ **Une tuile LENTE faisait tomber en liste une carte qui dessinait déjà.**
+  MapLibre (6.11.2) n'émet `idle` qu'une fois TOUTES les tuiles visibles chargées
+  ET la carte immobile ; le délai de 12 s de `poserFond` rejetait sans regarder si
+  des tuiles étaient arrivées. Reproduit au banc : une tuile tenue sans réponse,
+  3 servies ⇒ à ~11 s `data-cm-fond="charge"` et AUCUNE attribution, à 18 s la
+  liste (« La carte n'a pas pu se charger »). Même défaut sur main (déjà là
+  avant), mais l'en-tête de `fondCarte.js` et ce dossier affirmaient le contraire.
+  Même effet attendu sur un réseau lent ou si la personne glisse la carte pendant
+  le chargement (pas d'`idle` pendant un mouvement) — non mesuré.
+  ⇒ « dessiné » = une tuile ARRIVÉE puis la carte REPEINTE (`render`), sans
+  attendre `idle` ni les autres tuiles ; au délai, une tuile arrivée (onglet en
+  arrière-plan : pas de repeinte) ⇒ dessiné, aucune ⇒ liste ; une repeinte sans
+  aucune tuile ne compte pas. L'attribution est donc posée dès que la carte
+  dessine.
+- ⚠️ **La politique ne déclarait plus le géocodage de l'écran ACHATS.** À chaque
+  ouverture d'Achats, le NAVIGATEUR envoie l'adresse de chaque point relais à la
+  Base Adresse Nationale puis à Nominatim (`geocode`, `useEffect` sur `tracking`)
+  — reproduit : 8 requêtes pour 4 points (colis inventés). L'ancienne ligne
+  « Nominatim, CARTO … points relais » le couvrait ; la nouvelle ne parlait que de
+  la communauté, « envoyé par le serveur ». ⇒ une ligne « Base Adresse Nationale,
+  Nominatim — placer sur la carte les points relais (écran Achats) — adresse du
+  point relais, envoyée par ton navigateur ». Et, trouvés par le contrôle écrit
+  pour ça, deux autres envois du navigateur jamais déclarés : les **photos de
+  profil Discord** de la carte (`cdn.discordapp.com`, une ligne) et **jsDelivr**
+  (pdf.js des aperçus de bordereaux, onnxruntime du Studio photo — adresse IP
+  seulement, une ligne). ⇒ `scripts/audit-politique-hotes.cjs` : TOUTE adresse
+  `https://` du CODE de `src/` (commentaires retirés) est dans une liste FERMÉE
+  (« politique » · « lien » · « vrm » · « éteint ») ; un hôte contacté tout seul
+  par le navigateur exige une ligne qui nomme le service, dit À QUOI il sert ici
+  et QUI l'envoie (juger le seul nom serait vert sur le défaut : Nominatim restait
+  nommé) ; un couple (fichier, hôte) inconnu ⇒ rouge. **5 rouges sur 87df182**,
+  `--prouve` 5/5. ⚠️ Turnstile (`challenges.cloudflare.com`) reste « éteint » :
+  la politique devra citer Cloudflare le jour où la clé est posée.
+- **L'attribution à 390 px était annoncée « repliée en « i » » : FAUX** —
+  MapLibre ajoute `maplibregl-compact-show` sous 640 px et ne replie qu'au premier
+  glisser. Tranché : on GARDE ce comportement (une mention vue à l'ouverture est le
+  choix sûr pour la licence) ; ce qui l'annonçait est corrigé (en-tête du
+  composant, ce dossier). Le banc juge maintenant ce qui est vrai : texte visible à
+  l'ouverture, replié derrière le « i » après un glisser AU DOIGT (événements tactiles
+  CDP). Le comportement n'a pas changé (vert aussi sur 87df182 — c'est un défaut
+  d'annonce) ; rouge sous la mutation « repliée d'office » (`display:none
+  !important` sur le texte).
+- **Les initiales des AUTRES étaient en accent** (règle `.profil` de main) : avec
+  50 vendeurs l'accent n'aurait plus rien de rare (§7). ⇒ `.profil:not(.moi)` en
+  encre neutre ; l'accent plein reste à SA propre épingle.
+- **Banc** `scripts/bancs/communaute.cjs` : **175 verts** (scènes « tuile lente »,
+  « attribution 390 », couleur des épingles à 1512 sombre et 390 clair) ; **5
+  rouges sur 87df182** (2 couleurs, 3 tuile lente) ; 3 mutations de l'app posées
+  ensemble (délai qui rejette + repeinte ignorée · règle `:not(.moi)` retirée ·
+  attribution repliée d'office) ⇒ **6 rouges**, chacune par SON contrôle.
+  ⚠️ Un rouge intermittent sous charge (« un coucou : le message part » ×4 en
+  cascade) venait du BANC : il attendait « un toast » quelconque, et celui de
+  l'arrivée sur la carte (3,5 s) était encore là ⇒ il lisait la base avant
+  l'envoi. Il attend maintenant le toast du coucou. `audit-fond-carte.cjs`
+  `--prouve` **10/10** (3 mutations de plus : délai qui rejette malgré des tuiles,
+  repeinte ignorée, repeinte sans tuile = dessiné) ; **2 rouges sur 87df182**.
+  Les 138 audits non SQL : 0 rouge.
+- **Non mesuré** : un vrai réseau mobile lent ; la vraie instance OpenFreeMap.
+### Les photos de fond ne font plus freiner Vinted, et sa description enregistrée est gardée (22 octobre — propositions 3 et 13, extension non montée)
+**Mesuré (lecture seule, `panel_diag_capture` de Julien, extension 5.211)** :
+`vinted_frein_429` = 23 = `photos_page_refuse_429` = 23 — les 23 « trop de
+demandes » venaient TOUS d'une page d'annonce lue pour ses photos ; paliers de
+pause 1/2/3 : 24/2/1, soit **27 pauses = 23 (les 429, tous d'une page photo) + 4
+(des 403, `vinted_frein_403` = 4, sur d'AUTRES requêtes : aucun
+`photos_page_refuse_403`)** — rien n'est promis sur la disparition des pauses ;
+`visite_en_pause` = 119 visites sautées ; dernière pause le
+22 à 05:10 (`quoi: page`). Cause : `capterPhotosAnnonces` lisait jusqu'à 20 pages
+d'affilée, sans écart, à chaque minute (`tickPhotos`) ET à la fin de chaque visite.
+Et sur ses **49 annonces en ligne, 4** ont leur description dans
+`vinted_item_details`, **0** leur catégorie ou leurs couleurs
+(`fiche_codes_absents` = 804) — alors que ses modifications partent en
+`PUT /api/v2/item_upload/items/{id}` avec `{item:{id, description, catalog_id,
+brand_id, color_ids, item_attributes…}}` (6 modifications mesurées : l'`id` du
+corps est toujours celui de l'adresse). `vinted_item_details` est bien la ligne
+de la publication (`buildLbcData`, `buildEbayData`, l'app, le coffre) — pas le
+coffre seul.
+**Tranché (3)** : une page photo par tour d'alarme (`PHOTOS_PAR_TOUR` = 1), jamais
+deux à moins de 45 s (écart FIXE, §3), aucune pendant qu'il navigue sur Vinted
+(2 min de calme, vu par `chrome.tabs.onUpdated` et la visite, zéro requête), plus
+aucune dans la visite ; un 429/403 sur une page photo pose la pause habituelle
+(le reste de l'extension la suit) ET coupe les photos de fond 24 h
+(`vrmPhotosFrein`). Le budget horaire n'a pas bougé (`gardeLecture`). Le clic
+« Publier » (`completerPhotos`) ne subit ni l'écart, ni le calme, ni le frein
+photos. La liste à compléter est calculée une fois par 15 min (`vrmPhotosPlan`)
+et les fiches lues partent en UNE écriture pour 5 pages (`vrmFichesAttente`,
+§4.4) — sinon la ligne de 283 Ko redescendait pour chaque page.
+**Tranché (13)** : `inject.js` transmet la fiche après un 2xx de Vinted seulement,
+sous l'identifiant de l'ADRESSE (modification) ou de la RÉPONSE (publication) ;
+le fond n'en garde que la description et les codes (catégorie, marque, couleurs,
+taille, état, format), jamais les photos envoyées ni la session de dépôt ; une
+valeur vide ne remplace jamais une pleine ; un `id` de corps qui contredit
+l'adresse ne range RIEN. Même file que les pages (`noterFicheVinted` →
+`viderFiches`), rangée tout de suite ; base illisible ⇒ rien n'est écrit, la
+fiche attend (et le rangement automatique attend 10 min après un échec).
+La couleur AFFICHÉE (« Blanc ») n'est pas dans le corps : seuls ses codes sont
+rangés, rien n'est inventé.
+**Prouvé** : `audit-photos-etalees.cjs` (30 contrôles, horloge pilotée) — **17
+rouges** sur `origin/main` (20 pages à la minute 0, 17 pages dans la visite,
+19 pages pendant la « pause finie », versements affamés à 0) et 7 mutations qui
+rougissent ; `audit-fiche-modif.cjs` (22) — **12 rouges** sur `origin/main`
+(la file Leboncoin partait avec « Envoi rapide et soigné… ») et 4 mutations.
+Adaptés à « une page par tour » sans affaiblir la règle : `audit-photos-passif`,
+`audit-budget-lectures`, `audit-fiabilite-fond` (une relecture ratée ne fait
+plus relire Vinted : la fiche attend). `_fond-vm.cjs` rejoue `tabs.onUpdated`.
+**Non mesuré** : le rythme réel que tolère Vinted (aucun appel d'ici) ; la forme
+du `PUT` hors des 6 modifications vues ; que la page de dépôt envoie la
+publication en `fetch` ou XHR (les deux sont couverts). **Version et zip non
+montés** (à l'intégration) : `audit-extension-zip` et le contrôle de version
+d'`audit-preuve-vente` sont rouges tant que la 5.211 n'est pas montée et le zip
+régénéré ; les 65 autres audits qui exécutent l'extension sont verts. **Geste de Julien**, une fois l'extension installée : ouvrir
+« Modifier » puis « Enregistrer » sur ses annonces déjà en ligne.
+### Leboncoin : « plus vue sur Leboncoin » et « Mettre en pause » (22 octobre, propositions 14 et 6)
+**Mesuré (lecture seule, sa base, 22 oct.)** : 11 annonces à son compte
+`8442c3e8…` (Totomondu), toutes `status: 'active'` ; 4 vues le 22/10, 7 jamais
+revues depuis le 20/09 (3 vendues, 4 très probablement supprimées par lui le
+10/10 : `lbc_recon.envois` porte son `DELETE …/manual/delete/ads`). Sa page
+profil charge `POST adfinder/v2/owner_listing` (corps : `limit, offset, sort_by,
+sort_order, filters.owner.user_id, filters.enums.ad_type`, réponse `total,
+total_active, max_pages, referrer_id, ads[].list_id, ads[].owner.user_id`) ; la
+v1 (« autres annonces du vendeur ») exclut l'annonce affichée (`displayed_id`) ;
+`dashboard/v1/search` (sa page « Mes annonces ») dit `all_ads: 4, active_ads: 4`
+mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106) :
+`PUT api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads`, corps
+`{list_ids:[number]}` — ni sa réponse ni ses en-têtes n'ont jamais été vus.
+`lbc-account:<id>` (session privée) = l'`user_id` des annonces (mesuré).
+- **(14) « plus vue »** : `lbc-inject.js` n'envoie `lbcListeComplete` que pour une
+  liste PROUVÉE complète — `owner_listing` v2 filtré sur le SEUL vendeur (aucun
+  mot-clé ni catégorie, `ad_type` absent ou `['offer']`), `referrer_id` vide,
+  chaque annonce à ce vendeur, total atteint par les identifiants distincts de
+  toutes les pages lues dans le document (même total, < 3 min), total > 0. Le fond
+  (`noterListeLbcComplete`, chaîne `enChaineLbcListings` : trois écrivains de
+  `lbc_listings`, une file) n'agit que pour un de SES comptes (`comptesMiens`) :
+  ses annonces absentes reçoivent `plusVueAt` (un état — jamais « vendue », jamais
+  « supprimée », rien d'effacé), une liste complète qui la remontre l'efface ;
+  lecture ratée ⇒ rien n'est écrit ; `lectures[compte]` date la lecture.
+- **La règle partagée** `<lbc-en-vente-regle>` (app = extension = serveur, §11) :
+  plus « en vente » si `lbcSortieDe(ad)` (`plusVueAt` ou `pauseAt` EFFECTIFS, voir
+  la revue ci-dessous) ou un état `paus|inacti`. Elle sort donc l'annonce de « à
+  retirer », « à vérifier », « non reliée », du compteur, de la double vente
+  serveur. `numerosLbcSortis` (une règle, écran Leboncoin + Ma journée) : voir la
+  revue — la ligne venue de `vinted_lbc_posted` ne part que sur une PREUVE. Une annonce pas revue depuis plus de 7 jours ne demande plus « quelle
+  paire ? » ; une ligne dit le geste (sa page profil Leboncoin). Sans `seenAt` :
+  rien ne change (on ne sait pas qu'elle est vieille).
+- **(6) « Mettre en pause sur Leboncoin »** : sur la ligne « vendue sur Vinted — à
+  retirer », seulement si l'extension d'ici le sait (`lbcPause` dans son état,
+  capacité par présence ; en retard ⇒ « mets-la à jour » ; absente ⇒ le lien seul).
+  Confirmation qui nomme l'annonce (titre, N°, prix) et dit « pas une
+  suppression » ; l'app n'envoie que l'identifiant. Le fond (`pauseLbcDepuisApp`)
+  relit l'annonce EN BASE, exige que son compte soit celui de la session privée de
+  l'onglet (`vrmLbcTransport`), sinon refuse et nomme le compte ; sans onglet, en
+  ouvre un en arrière-plan, attend la session (20 s), le referme ; une à la fois,
+  10 par heure. L'ordre passe fond → `lbc-relay.js` (cadre principal, émetteur =
+  l'extension) → `lbc-inject.js` (monde MAIN) qui envoie UNE requête à l'adresse
+  écrite en dur, avec les en-têtes que le site met lui-même, et rend statut +
+  300 caractères + forme. 2xx ⇒ « fait » (`pauseAt` posé), sinon « pas fait » avec
+  la réponse, silence ⇒ « je ne sais pas ». La forme de la réponse est rangée
+  (`lbc_recon.envois`, clés et types seulement). Une pause encore listée moins
+  d'1 h après n'est pas levée (index de recherche, borne non mesurée).
+- **Fusion avec main (6056c7d, « sources privées »)** : main range désormais ses
+  annonces sous `account: 'lbc-account:{id}'` (0 aujourd'hui en base, les 10 de
+  Julien portent l'id nu). Les deux formes sont UNE identité (`idCompteLbc`) pour
+  « plus vue » et pour la pause — sinon ses annonces recapturées n'auraient plus
+  jamais été marquées, et la pause aurait répondu « autre compte » sur son propre
+  compte. Et `storeLbcListings` (main) réécrivait `{items, updatedAt, lastUrl}`
+  seul : il garde maintenant les autres clés (`lectures`).
+- **Preuves** : `audit-lbc-plus-vue-pause.cjs` (vrais `lbc-inject.js`, `lbc-relay.js`,
+  `background.js` en vm) **49 contrôles, 30 rouges sur origin/main (6056c7d)**, et
+  `--prouve` : 12 mutations (dont `prefixe`), chacune rouge. Banc `bancs/lbc-pause.cjs` (port 6331,
+  données inventées, 390 et 1512 px, 4 scénarios) **38 contrôles, 28 rouges sur le
+  build d'origin/main** (dont Ma journée « 2 à retirer » au lieu de 1) ; trois
+  builds réaffaiblis, chacun rouge : règle sans `plusVueAt`/`pauseAt` (8),
+  pause sans confirmation (4), « quelle paire ? » sur une annonce périmée (2).
+  `audit-double-vente` lit encore `let lbcRemoveCount=0;` (orthographe gardée).
+  ⚠️ Relancés le 23 oct. AVEC la porte des bancs (`NODE_OPTIONS="--require
+  /tmp/claude-0/redir-pw.cjs"`, sinon l'app reste sur la connexion) :
+  `lbc-relier.cjs` 18/18 vert ; `double-vente.cjs` 6 rouges À L'IDENTIQUE sur le
+  build de 0d68493 et après la revue (listes comparées ligne à ligne).
+- **Extension touchée** (`background.js`, `lbc-inject.js`, `lbc-relay.js`), **version
+  NON montée** (5.212.0 de main, `audit-extension-zip` rouge jusqu'à l'intégration) ; aucune
+  entrée d'`EXT_CAPACITES` (capacité par présence).
+- ⚠️ **Non mesuré** : la réponse de Leboncoin à la pause et ses en-têtes requis (le
+  premier clic EST la mesure) ; la valeur de `ad_type` et de `referrer_id` dans
+  SA requête v2 (si elles diffèrent, rien ne décide : sens sûr) ; quelle page
+  déclenche exactement la v2 (l'ordre des chemins désigne la page profil) ; le
+  retard de l'index après une pause ; un `account_id` différent de l'`user_id`
+  chez un autre vendeur (la pause serait refusée « autre compte » : sens sûr).
+  Limite connue : un script de la page leboncoin.fr peut poster l'ordre de pause
+  au capteur — il pourrait déjà envoyer cette requête lui-même (même session).
+  Non fait : la pastille « Aussi sur Leboncoin » (écran Annonces) suit
+  `vinted_lbc_posted`, pas les captures — la relier coûterait 235 Ko par
+  ouverture (§4.4).
+- **Revue du 22 octobre (relue le 23), deux défauts REPRODUITS par le relecteur,
+  corrigés** :
+  - ⚠️⚠️ **« Plus vue » et « mise en pause » restaient collées** (haute) : une
+    capture privée PLUS RÉCENTE (« Mes annonces », `myads`) qui remontrait
+    l'annonce ACTIVE ne les levait pas (`Object.assign(ancien, l)` les gardait, la
+    règle ne regardait pas `seenAt`) — reproduit : `en vente = false` après la
+    capture, `lireLbcAnnonces` ne la voyait plus ⇒ alerte « à retirer » tombée,
+    paire reproposée à la publication. **La donnée la plus récente gagne** :
+    `lbcSortieDe` (dans la règle partagée, texte identique ×3, avec
+    `LBC_PAUSE_INDEX_MS` = 1 h qui y vit désormais) — « plus vue » ne compte que si
+    aucune capture ne l'a revue APRÈS ; une pause, que si aucune ne l'a revue plus
+    d'une heure après. Douter ⇒ « en vente » (l'alerte reste, la paire n'est pas
+    reproposée : le sens sûr). En base aussi : `storeLbcListings` lève
+    `plusVueAt` (et `pauseAt` passé l'heure) sur une capture neuve. Et
+    `noterListeLbcComplete` ne marque plus une annonce VUE il y a moins d'une heure
+    (l'index public peut ne pas montrer une annonce publiée le matin — l'ordre
+    inverse du cas reproduit), et repose une marque levée si une liste complète ne
+    la montre toujours pas. Décision : toute capture compte (pas seulement la
+    liste privée) — une capture qui revoit une annonce à tort la remet « en
+    vente », le sens sûr.
+  - **`numerosLbcSortis` retirait l'alerte par ressemblance** (moyenne) : le
+    « nXXX » d'un TITRE d'annonce morte effaçait la N°18 « à retirer » (§5), et une
+    annonce reliée sortie suffisait alors que `vinted_lbc_posted` ne dit pas QUELLE
+    annonce porte la paire (second compte, republication pas encore vue). Les
+    annonces sorties désignent leur paire par IDENTITÉ seulement
+    (`numeroLbcIdentite` : lien posé à la main, référence VRM) ; les annonces EN
+    VENTE gardent toutes leurs clés, titre compris (une ressemblance GARDE
+    l'alerte). La ligne ne part (`prouves`) que si une liste COMPLÈTE de CHACUN de
+    ses comptes (session vue ou vente prouvée, plus le compte de l'annonce sortie ;
+    `lbc-account:{id}` = l'id nu) est POSTÉRIEURE à la marque « publiée »
+    (`vinted_lbc_posted.updatedAt`, la dernière écriture : un majorant de chaque
+    marque) ; comptes, ventes, annonces ou marque illisibles ⇒ pas de preuve.
+    Sinon elle reste, avec « l'annonce reliée n'est plus dans ta liste / est en
+    pause depuis VRM » sur la ligne et, UNE fois dans sa carte, le doute et le
+    geste (ouvrir sa page profil sur chacun de ses comptes). Même règle dans Ma
+    journée (`lbcListingsSession` garde `lectures` ; `lbc_accounts` n'y est lu que
+    s'il y a quelque chose à retirer).
+  - **Mesuré (lecture seule, 23 oct.)** : `vinted_lbc_posted.updatedAt` existe
+    (17/10, 3 paires) ; un seul compte à session vue (`8442c3e8…`, sous ses deux
+    écritures) — SHOPCANCALE (`faf3fbba…`) n'a pas de `sessionAt`, il n'est donc
+    pas exigé ; aucune `lectures` en base (la fonction n'est pas en production).
+  - **Preuves** : `audit-lbc-plus-vue-pause.cjs` **71 contrôles** (sections 2 bis
+    et 6, et 2 contrôles de plus par copie de la règle) — **17 rouges sur
+    0d68493** (audit copié dans `git archive 0d68493`, lancé depuis la copie ;
+    l'ancienne forme de `numerosLbcSortis`, un Set, est lue telle quelle) ;
+    `--prouve` **22/22** mutations rouges, dont 10 neuves (`regleRecente`,
+    `pauseCollee`, `plusVueCollee`, `pauseFenetre`, `vueRecente`, `remarque`,
+    `titreSortis`, `sansPreuve`, `unCompte`, `comptesSortis`), chacune sur SON
+    contrôle de comportement (pas seulement l'égalité de texte). Banc
+    `lbc-pause.cjs` **50 contrôles** (N°18 marquée « plus vue » puis revue active ;
+    scénario « marque publiée après la liste complète » aux deux tailles, Ma
+    journée « 2 ») — **32 rouges sur le build de 0d68493** ; builds réaffaiblis :
+    preuve ignorée ⇒ 6 rouges, marque collée ⇒ 30 rouges (mutations posées sur bbe1f17).
+  - ⚠️ **Non mesuré** : qu'une page publique de Leboncoin ne remontre jamais une
+    annonce supprimée (si oui, elle redevient « en vente » jusqu'à la liste
+    complète suivante : sens sûr) ; une republication FAITE À LA MAIN après la
+    dernière liste complète, hors VRM, ne se voit qu'à la capture suivante (aucune
+    marque « publiée » ne bouge).
+- **Geste de Julien** : installer l'extension de l'intégration, ouvrir sa page
+  profil Leboncoin (les 7 annonces fantômes sortent), puis « Mettre en pause » la
+  N°18 depuis VRM → Leboncoin → Annonces.
+### Petits correctifs du 22 octobre : code Chronopost, délai d'email, mentions avant paiement, première visite (7, 8, 15, 16)
+- **(7) Le code de retrait Chronopost « …suivant au commerçant : »** — mesuré
+  (lecture seule) : l'email « Votre colis VINTED est arrivé en relais Pickup »
+  écrit « communiquez le code de retrait suivant au commer&ccedil;ant : NNNNNN »
+  (entité HTML non décodée) ; 3 emails Chronopost « arrivé » sur 8 portaient
+  leur code. Une règle (`api/_lib/code-retrait-email.js`, `codeRetraitTournure`,
+  §11) : les 4-10 chiffres qui suivent la tournure SUR LA MÊME LIGNE, rien d'autre
+  (un nombre à la ligne suivante, un suivi de 14 chiffres, « suivant » seul ⇒
+  rien). Lue par la route à l'arrivée ET par l'app (`reclassifyTrack`) dans
+  l'`extraitCode` d'une ligne déjà rangée : **1 ligne en base** (lue en booléen,
+  aucun code publié) affiche son code sans réécriture. `audit-transporteurs.cjs`
+  (règle, vraie route, app dans un `vm`) : **10 rouges sur l'avant** ;
+  mutations `ligne-suivante`, `sans-regle`, `app-sans-relecture` rouges.
+- **(8) « réessaie dans N secondes »** — GoTrue répond 429
+  « For security purposes, you can only request this after N seconds. »
+  (inscription, mot de passe oublié, renvoi, lien, changement d'adresse).
+  `delaiDemandeEmail` le lit, la phrase le dit en français, et le bouton est
+  GRISÉ avec le décompte (« Réessaie dans N s », `data-auth-attente`) ; taper
+  une autre adresse le libère. Le Site URL et l'expéditeur restent des réglages
+  de Julien (non simulés). Banc `attente-email.cjs` (faux GoTrue, horloge
+  pilotée, 390 et 1512) : vert ; **24 rouges sur le build d'avant** ; mutation
+  « décompte toujours à 0 » ⇒ 16 rouges.
+- **(15) Pas de paiement sur des CGV vides** — mesuré : les 10 champs de
+  `public/legal/editeur.js` valent `null`, `src/contact.js` est vide, et l'art. 5
+  des CGV renvoie à une adresse qui n'existe pas. `api/_lib/mentions-legales.js`
+  lit CE fichier (le serveur l'importe ; il reste un simple script pour les
+  pages) ; `checkout` refuse tant qu'un champ de `VRM_EDITEUR_OBLIGATOIRES` est
+  vide ou que le fichier est illisible (« pas su » = fermé) : **503
+  `mentions-legales`, même forme que « prix ≠ CGV »** — phrase générique au
+  vendeur, détail dans les journaux et sur la carte du propriétaire
+  (`mentionsManquantes`, libellés, au propriétaire seul ; `mentionsCompletes`
+  null/true/false pour tous). L'app : la porte et la carte « Mon compte »
+  ferment le paiement (`data-raison="mentions"`), le propriétaire lit la liste
+  (`data-mentions-manquantes`).
+  **Tranché** : la seconde case est une **demande d'accès immédiat** (L221-25),
+  pas une renonciation au droit de rétractation (L221-28 1° exige un service
+  pleinement exécuté sous 14 jours ; l'art. 5 garde ce droit, au prorata).
+  Même composant que la case des CGV (`CaseCgv`, `cases={cgv, acces}`),
+  « S'abonner » exige les deux, envoyée (`accesImmediat: true`, exigée par le
+  serveur : 400 `acces-immediat`) et datée comme les CGV
+  (`acces_immediat_demande_le`). Formulaire type (annexe R221-1) :
+  `public/legal/retractation.html`, lié depuis l'art. 5 des CGV et la case ;
+  CGV mises à jour au 22 octobre (`CGV_VERSION = '2026-10-22'`). Aucune mention
+  inventée : « à compléter ». Preuves : `audit-mentions-paiement.cjs`
+  (16 contrôles, **14 rouges sur l'avant**, 6 mutations rouges : porte retirée,
+  détail au vendeur, pas su ouvert, case ignorée, liste à tous, métadonnée
+  absente) ; `audit-abonnement` et `audit-lancement` remplissent les mentions
+  (valeurs inventées) et envoient la case ; banc `abonnement.cjs` 100 verts
+  (deux cases, porte, mentions vides, propriétaire).
+- **(16) Le premier passage d'un nouvel inscrit n'a rien rangé — diagnostic**
+  (lecture seule, aucune donnée de ce vendeur dans le dépôt) : son onglet
+  Vinted était ouvert AVANT la liaison. La visite est sortie sur
+  `visite_sans_session` (sans garde, voulu), la capture passive du profil a été
+  refusée (`ecriture_ratee_harvest_profile_sans_session` ×2) et le dressing
+  passif ignoré (`ignore_dressing_profil_pas_lu` ×2). Achats et messages sont
+  arrivés 2 s après la liaison (capture passive) ; profil et annonces ont
+  attendu l'alarme des 20 minutes (`runActive`). 0 vente : pas de
+  `orders_sold`, normal. Aucun recul de base ni pause Vinted dans ses
+  compteurs ; l'« heure de vide » lue d'abord venait d'`updated_at` (§4.3).
+  **Corrigé (extension, version NON montée — à l'intégration)** :
+  `visiteApresSession` — une session NEUVE pour la capture (aucune, morte, autre
+  compte VRM ; liaison adressée ou mot de passe) relance `visiteVinted` sur
+  l'onglet Vinted déjà ouvert, avec TOUS ses garde-fous (compte ignoré, pause,
+  recul, garde des 5 min, file, budgets) ; la même session vivante renvoyée,
+  ou aucun onglet Vinted ⇒ rien. `audit-liaison-visite.cjs` (vrai
+  `background.js`) : 10 contrôles, **5 rouges sur l'avant** ; mutations
+  `sans-appel`, `toujours`, `sans-onglet`, `contourne-gardes` rouges.
+- **Revue du 23 octobre (nuit) — deux défauts reproduits, corrigés.**
+  1. ⚠️ **Mentions ILLISIBLES (« pas su ») : le serveur refusait le paiement (503),
+     la porte et la carte « Mon compte » proposaient quand même les deux cases et
+     « S'abonner »** (reproduit avec un `editeur.js` rempli à la main d'une
+     apostrophe dans une chaîne entre apostrophes : `nom: 'Julien d'Exemple'` ⇒
+     le fichier ne se charge plus, `mentionsCompletes: null`). C'est le défaut de
+     la revue du 11 octobre refait sur « pas su ». ⇒ L'app traite `null` (et
+     absent) comme le serveur : FERMÉ (`mentionsCompletes !== true`, porte et
+     carte, `data-raison="mentions"`). ≠ `prixConforme: null` (Stripe muet,
+     passager, le serveur relit au clic) : un fichier illisible le reste.
+     Le propriétaire lit l'erreur MESURÉE (`mentionsErreur`, à lui seul :
+     « Unexpected identifier 'Exemple' ») et la cause la plus courante
+     (l'apostrophe, avec le geste : des guillemets droits) ; `lireMentions` rend
+     `{erreur}` au lieu de `null` (`mentionsManquantes` rend toujours `null` ⇒
+     fermé). Banc `abonnement.cjs` (la forme du serveur : `mentionsCompletes`
+     toujours présent dans `base`) : **7 rouges sur le build de 39a9042**, 109
+     verts après ; mutation « `=== false` » ⇒ 6 rouges.
+     `audit-mentions-paiement.cjs` : + un `editeur.js` à apostrophe dans une
+     copie (fermé, vendeur sans l'erreur, propriétaire avec) — 1 rouge sur
+     39a9042 (l'erreur au propriétaire est neuve), mutations `erreur-a-tous`,
+     `sans-cause`, `passu-ouvert` rouges.
+  2. **§7 : le compte à rebours s'écrivait deux fois** (« … dans 57 secondes »
+     au-dessus de « Réessaie dans 57 s »). Là où un bouton grisé porte le
+     décompte (inscription, mot de passe oublié, « Renvoyer » d'un compte pas
+     confirmé, fenêtre « Changer mon email »), la phrase dit la cause SANS chiffre
+     (`TEXTE_DELAI_EMAIL_BOUTON`) ; ailleurs (aucun bouton ne le porte) elle
+     garde le nombre. Banc `attente-email.cjs` : contrôle qui COMPTE les nombres
+     de secondes à l'écran (1, jamais 2) + scénario D « Changer mon email »
+     (session de banc, `PUT /user` refusé) ; **12 rouges sur le build de
+     39a9042**, vert après ; mutation « phrase avec chiffre » ⇒ 8 rouges.
+     ⚠️ Son `pause(ms)` valait 0 ms (`pause(_pg, ms)` appelée à un argument) :
+     corrigé ; il charge maintenant `_porte-banc.cjs`.
+- **Non mesuré** : la vraie réponse de GoTrue au rendu (le texte vient de son
+  code) ; Stripe réel ; la page de rétractation relue par un juriste ; la
+  visite relancée dans un vrai Chrome ; que Vercel embarque bien
+  `public/legal/editeur.js` dans la fonction (import dynamique au chemin
+  littéral : sinon `mentionsErreur` le dira au propriétaire). `audit-extension-zip` est rouge tant que
+  la version n'est pas montée et le zip refait (à l'intégration).
+- **Gestes de Julien** : remplir `public/legal/editeur.js` (les 10 champs, dont
+  le médiateur) ET `src/contact.js` — tant qu'ils sont vides, personne ne peut
+  payer ; faire relire CGV et formulaire par un juriste ; régler le Site URL et
+  le SMTP dans Supabase (inchangé).
+
+#### Revue du chantier CSP (22 octobre, soir) — cinq défauts reproduits, cinq corrigés
+Chacun REPRODUIT d'abord sur cab152a (copie `git archive`, contrôles lancés
+depuis elle, §6.1), corrigé à la racine, rouge avant, vert après, rouge sous
+mutation. Extension non touchée.
+- ⚠️⚠️ **Reçu d'achat : « Imprimer » et « Fermer » ne faisaient plus rien dès que
+  l'onglet de VRM s'était rechargé** (régression du chantier : ses gestes étaient
+  branchés DEPUIS l'onglet de VRM, et un écouteur meurt avec l'onglet qui l'a
+  posé — or l'app se recharge toute seule : version vérifiée chaque minute,
+  nouveau service worker après chaque déploiement). ⇒ La fenêtre charge
+  `public/recu-boutons.js` (même origine, permis par `script-src 'self'`) qui
+  branche les deux gestes et pose `__vrmRecuBoutons` ; les écouteurs posés par
+  l'onglet de VRM ne restent qu'en SECOURS (si le fichier n'a pas pu se charger),
+  gardés par ce drapeau : jamais deux impressions.
+  ⚠️ **Piège de banc mesuré** : l'interception de Playwright (`ctx.route`) laisse
+  en suspens la requête d'un script chargé par une fenêtre `about:blank` —
+  jamais partie, alors qu'elle part sans interception. Le reçu se juge donc dans
+  un contexte SANS route (ouvreur : `/legal/cgv.html`, même politique).
+- **Les QR Vinted Go (http, 15 sur 15 dans sa base) faisaient signaler une
+  violation à chaque affichage d'Achats** (le critère des 7 jours était
+  inatteignable) **et n'entraient JAMAIS dans la réserve hors ligne**
+  (`rechaufferQr` et le service worker ne prennent que https — pré-existant,
+  déjà sur main). Mesuré (lecture seule) : `qrUrl` http = p.vintedgo.com ×15
+  seulement, tous les autres hôtes en https ; aucune adresse
+  `https://p.vintedgo.com` nulle part en base. ⇒ **Une règle dans `qrImage`**
+  (`qrEnHttps`, §11 : tous les lecteurs du QR passent par elle) : un QR hébergé
+  en `http://` est rendu en `https://` — ce que le navigateur fait déjà de
+  lui-même sur vrm.center (mesuré par la revue dans Chromium : la demande part
+  vers https). ⚠️ **Non mesuré** (aucun appel à Vinted d'ici) : que
+  p.vintedgo.com réponde en https — c'est l'adresse que Chrome lui demande déjà.
+- **Le journal des violations ne voyait ni le reçu ni la facture**, et ne disait
+  pas quel écran avait parlé (`ecran` vide : l'app retire `?tab=` de l'adresse).
+  ⇒ `ecouterViolationsCspDans(doc, …)` (src/plantages.js) écoute aussi le
+  document des fenêtres que l'app ouvre (`ecouterFenetreCsp`, après
+  `w.document.open()` — `open()` efface les écouteurs posés avant — et avant
+  d'écrire), `ecran` = `fenetre:recu` / `fenetre:facture` ; l'écran de la page
+  se lit dans `history.state.vrmTab` (main.jsx, `ecranCourant`). Les workers,
+  le service worker et l'onglet du bordereau PDF restent invisibles d'une page :
+  le critère de bascule est réécrit en deux moitiés (ci-dessus).
+- **Le service worker rangeait toute adresse ouverte par un lien vers
+  `/hl-qr?u=…`** (n'importe quel site, sans limite) dans le stockage de
+  vrm.center. ⇒ Une navigation vers `/hl-qr` répond 404 sans rien demander ni
+  ranger ; le service worker ne va chercher que pour une image ou pour
+  `rechaufferQr` (en-tête `x-vrm-hl-qr: 1`) ; la réserve garde au plus `QR_MAX`
+  (60) entrées, les plus anciennes partent d'abord.
+- **Preuves** (§6.1, arbre `git archive cab152a`, build refait là, scripts
+  copiés dedans) : `audit-csp.cjs` **10 rouges** sur l'avant (section « revue du
+  22 oct. »), 0 après ; `csp.cjs` **17 rouges** sur le build de cab152a (aux deux tailles : la violation `img-src ← http://p.vintedgo.com` sur Achats, le QR demandé en http, `ecran` vide, « Imprimer »/« Fermer » muets après rechargement, rien au journal pour le reçu ni la facture ; puis le QR Vinted Go hors de la réserve, 3 pages tierces rangées par 3 navigations, aucune borne), 0 après ; `hors-ligne.cjs` (un colis Vinted Go en http ajouté à ses données) **8 rouges** sur l'avant (le QR gardé vide dans la photo, jamais en réserve, absent hors ligne — aux deux tailles), 0 après.
+  Mutations (deux builds mutés, `ECRANS=cat_achats`), chacune rouge sur SON contrôle : script du reçu retiré ⇒ « Imprimer »/« Fermer » muets après rechargement (4) · journal non posé sur le reçu ⇒ rien au journal (2, la facture reste verte) · `qrEnHttps` neutralisé ⇒ violation + QR en http + hors réserve (5) · garde de navigation retirée ⇒ pages tierces rangées (1) · écran lu dans l'adresse ⇒ `ecran` vide (2) · secours non gardé ⇒ « print() appelé 2 fois » (2) · borne retirée ⇒ 67 entrées pour 60 (1).
+- Après : `csp.cjs` complet **128 verts, 0 rouge** ; en vigueur
+  (`BANC_CSP_EN_VIGUEUR=1`, `ECRANS=journee,cat_achats`) vert — le script du
+  reçu passe sous `script-src 'self'` ; `hors-ligne.cjs` vert ; `sw-cache.cjs`
+  vert ; les **143 audits** verts.
+- **Non mesuré** : un vrai Safari iOS (la fenêtre du reçu et son script, le
+  journal dans la fenêtre) ; que p.vintedgo.com réponde en https (voir plus
+  haut) ; la vraie production (aucun déploiement d'ici).
+
+**Revue du 23 octobre — quatre défauts reproduits sur 5f6943d, corrigés** (même branche, extension toujours non montée) :
+- ⚠️⚠️ **Un message « fiche » se FORGEAIT.** `content.js` relaie tout message
+  étiqueté de la page : n'importe quel script de vinted.fr postait `{kind:'fiche',
+  itemId: <n'importe laquelle de ses annonces>}` SANS aucune requête chez Vinted,
+  le texte remplaçait la description rangée et partait dans les files Leboncoin et
+  eBay, publié sous son nom (reproduit : « Paye-moi hors plateforme… » dans la file).
+  Le rapport du chantier disait « au pire une de ses annonces jusqu'à sa prochaine
+  modification » : c'était sous-estimé. ⇒ `ficheDeLaPage` juge l'ONGLET émetteur
+  (`sender`, posé par le navigateur) : une modification n'est rangée que de l'onglet
+  qui montre CETTE annonce (`/items/{id}/edit` ou `/items/{id}`) ou qui l'a ouverte
+  en édition il y a moins de 30 min (`vrmOngletsAnnonces`, noté par
+  `tabs.onUpdated` : la page peut changer d'adresse juste après l'enregistrement) ;
+  une publication, que de l'onglet dont la réservation de numéro vient d'être liée
+  à CETTE annonce (`vrmOngletsPublications`, posé par `noterPublication`) ; sans
+  provenance, rien. ⚠️ **Reste, dit tel quel** : un script de la page peut changer
+  l'adresse de SON onglet (`history.pushState`) vers `/items/{X}/edit` puis forger
+  la fiche de X — la falsification vaut pour l'annonce que montre l'onglet, plus
+  pour toutes ses annonces de n'importe quelle page ; et un tel script peut de toute
+  façon modifier l'annonce chez Vinted lui-même, avec sa session.
+- **La fiche ignorait « Non, ignorer ce compte »** et les comptes supprimés
+  définitivement : `noterFicheVinted` passe maintenant par `compteNonCapte` (la
+  porte des cinq autres captures, 5.191) ; cookie illisible ⇒ on capte, comme elles.
+- **Vinted lent ⇒ la même annonce partait plusieurs fois d'affilée** (4 tours
+  d'alarme pendant qu'une page tarde : `800@0s, 800@240s ×3`). `tickPhotos` est
+  SÉRIALISÉ (promesse en vol + verrou daté `vrmPhotosTour` de 3 min dans
+  `chrome.storage.local`, qui survit à un redémarrage du service worker) ; le mémo
+  de l'annonce est enregistré AVANT la requête (`majMemoPhotos`, clé par clé sur la
+  valeur relue) ; l'écart de 45 s se compte depuis la RÉPONSE ; et `vintedGetHtml`
+  est borné à 30 s (`AbortController`) — sans ça une page muette tenait la file
+  Vinted entière (bordereaux, réponses, ventes derrière elle).
+- **« Les photos étaient la SEULE cause des pauses » était faux** (commentaire et
+  ce dossier) : 23 des 27 (tous les 429) ; 4 sont des 403 ailleurs. Corrigé.
+- **Prouvé** : `audit-fiche-modif.cjs` 35 contrôles — **7 rouges sur 5f6943d**
+  (copie `git archive`, audit lancé depuis elle), 0 après, 3 mutations nouvelles
+  rouges (onglet ignoré, publication sans réservation, compte refusé ignoré) ;
+  `audit-photos-etalees.cjs` 43 contrôles — **7 rouges sur 5f6943d**, 0 après,
+  5 mutations nouvelles rouges (tours non sérialisés, verrou retiré, mémo après la
+  page, écart depuis le départ, page sans délai). `_fond-vm.cjs` passe le signal
+  d'interruption au faux Vinted (non énumérable). Les 70 audits qui exécutent
+  l'extension relancés un par un : verts sauf les 2 attendus tant que la version
+  n'est pas montée (`audit-extension-zip`, contrôle de version
+  d'`audit-preuve-vente`) ; bancs `badge`, `popup`, `session`, `numero-vinted`
+  verts. **Non mesuré** : l'adresse exacte de la page de modification de Vinted
+  (`/items/{id}/edit` supposée, `/items/edit/{id}` acceptée aussi — jamais vue
+  d'ici) et que `sender.tab.url` d'un vrai Chrome la porte au moment du relais
+  (une navigation APRÈS l'enregistrement est couverte par `vrmOngletsAnnonces`) :
+  une fiche refusée à tort se verra au compteur `fiche_onglet_refuse` de
+  `panel_diag_capture` ; la durée réelle d'une page photo chez lui.
+  N°18 depuis VRM → Leboncoin → Annonces. La ligne de la N°18 venue de sa marque
+  « publiée » part quand sa page profil a été relue APRÈS (sinon elle reste, avec
+  le doute dit une fois).
+
+### eBay → Annonces → « Inactives » : les annonces terminées sans vente (23 octobre)
+Julien : « est-ce que les onglets de l'app eBay sont dans VRM ? ». Il manquait les
+INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
+- **Décidé (ne pas rediscuter)** : LECTURE SEULE. VRM ne remet RIEN en vente
+  (`RelistFixedPriceItem` peut coûter des frais d'insertion, §2-§3) ; chaque ligne
+  mène à SA page eBay (`https://www.ebay.fr/itm/{ItemID}`, ItemID validé).
+- **Route, aucun appel de plus** : `<UnsoldList>` (Include, `DurationInDays` 60,
+  page 1 de 200) part dans le MÊME `GetMyeBaySelling` que la page 1 des annonces en
+  ligne, et seulement pour la synchro et la relecture sans geste
+  (`listeVendeur(token, {invendues:true})`) ; `dejaChezEbay`, les règles d'offre,
+  les programmées : inchangés — une inactive n'entre JAMAIS dans `actives`.
+  Rangée dans une ligne DÉDIÉE par compte, `ebay_inactives{_clé}` (⚠️ pas
+  `ebay_listings_*` : deux lecteurs balaient cette famille), chez le vendeur de la
+  session (`modifierDonnee` → `portee(owner)`, comparer-et-échanger), projetée (`resumeInactive` : ItemID, SKU
+  hors variantes, titre, prix + devise, fin, début, observateurs, photo
+  `i.ebayimg.com` seulement, `RelistedItemID`), `{items, complet, jours, capturedAt}`.
+  ⚠️ **À L'INVERSE des deux autres listes, un `UnsoldList` ABSENT vaut « pas lu »**
+  (`invendues: null`) : rien n'est écrit, la dernière capture reste ; une réponse
+  ratée aussi. `<UnsoldList/>` ou un conteneur à 0 entrée = « lue vide ».
+  `lu.inactives` dans la réponse (l'app n'en juge pas la synchro).
+- **Écran** : une section « Inactives sur eBay » SOUS les programmées
+  (`EbayInactives`, `outilsSuite` : visible même sans annonce en ligne), chargée
+  seule (`lireEbayParCompte`, `select` scalaires, `->>` en texte). États
+  `data-ebay-inactives` = `charge · jamais · vide · ancienne · lu · pas-su` ; « Inactives (N) »
+  (`data-ebay-inactives-n`) seulement si TOUS les comptes de la vue sont lus et la
+  liste entière, « au moins N » si eBay en a plus (`data-ebay-inactives-aumoins`),
+  un compte illisible nommé (`data-inactives-illisibles`) sans aucun nombre. Pas
+  d'eBay relié et rien de rangé ⇒ pas de section. La vue suit le compte choisi
+  (`vue`), le compte nommé sur la ligne seulement si la liste en mélange (§7).
+  Ligne : photo, N° SEULEMENT par le SKU (`numEbayLu` avec la date de PUBLICATION :
+  avant la remise à zéro ⇒ série B ; sinon « pas reliée », jamais par titre),
+  prix, « terminée le … » (`data-inactive-fin`, jour de Paris), observateurs.
+  ⚠️ « Retirer d'eBay » une paire vendue sur Vinted l'envoie DANS cette liste :
+  « Remettre en vente sur eBay ↗ » (`data-inactive-relancer`) n'est proposé ni pour
+  une paire vendue ailleurs (`numerosDejaVendus`, `data-inactive-vendue`), ni déjà
+  de retour sur eBay (`dejaSurEbay` ou `RelistedItemID`, `data-inactive-deja`), ni
+  tant que les ventes ne sont pas vérifiées (dit une fois, `data-inactives-verif`) —
+  le lien devient « Voir sur eBay » (`data-inactive-voir`). « encore en ligne sur
+  Vinted » par identité (`data-inactive-vinted`). Une inactive reliée fait lire la
+  preuve de vente (`aVerifier`). Aucune couleur rouge.
+- **Preuves** : `audit-ebay-route.cjs` section 14 « [INA] » (même appel, ligne
+  dédiée, vendeur et compte, « pas lu » n'écrase rien sous trois formes, page 2 non
+  demandée, une inactive ne bloque pas publier/programmer, ni `programmees` ni
+  `regleoffrelire` ne la demandent, aucun Relist/AddItem envoyé ni écrit dans
+  `api/`) : **14 rouges sur 789401d**, 10 mutations de la route toutes rouges
+  (absent = vide, appel séparé, ligne sans suffixe, fusion dans `actives`, tous les
+  appelants, photo non filtrée, owner de l'installation, remise en vente glissée,
+  détail brut, « pas lu » rangé vide). Banc `bancs/ebay-inactives.cjs` (port
+  `BANC_PORT`, 390 tactile + 1512, données inventées, 44 contrôles) : **43 rouges
+  sur le build de 789401d** (le 44ᵉ y lève), et 8 mutations de l'écran rouges.
+  ⚠️ §6.3 : `ebay-parcours.mjs` exécute `handleSync` dans un `vm` avec ses
+  dépendances injectées — il sert maintenant `rangerInactives` (sinon
+  `ReferenceError`, sur une route intacte).
+- ⚠️ **Non mesuré — rien n'a été envoyé à eBay** : la forme de `UnsoldList` vient
+  de la doc d'eBay (présence de `WatchCount`, `GalleryURL`, `EndTime`, `SKU`,
+  `RelistedItemID`, la limite réelle de `DurationInDays`) ; surtout, qu'eBay émette
+  `<UnsoldList>` quand il n'y a AUCUNE inactive — s'il l'omet, la section reste
+  « jamais lue » (« se lit à la prochaine relecture ») pour un vendeur sans
+  inactive. Le cron du matin ne relit pas les annonces : la liste se rafraîchit
+  avec la synchro et la relecture (≤ 10 min, app ouverte).
+- **Julien** : rien. La section se remplit à la prochaine relecture eBay.
+
+#### Revue du 23 octobre — treize constats, tous reproduits, corrigés
+Chaque constat REPRODUIT d'abord (la vraie route dans le harnais
+d'`audit-ebay-route`, l'écran rendu sur données inventées), puis corrigé ; rouge
+sur a9115c0 (copie `git archive`, contrôle lancé DEPUIS elle, §6.1), vert après,
+rouge sous mutation. Décision gardée : un `UnsoldList` absent vaut « pas lu »
+(on ne range jamais du vide) — c'est l'ÉCRAN qui dit l'âge de la capture.
+- ⚠️⚠️ **Une capture figée se présentait comme la liste du jour** (n° 1 et 3) :
+  95 jours, une annonce finie il y a 100 jours sous « ces 60 derniers jours »,
+  « Inactives (1) » et « Remettre en vente ». Route : `rangerInactives` ne range
+  que les fins dans les 60 jours (fin illisible gardée). Écran : une capture de
+  plus de 24 h (`INACTIVES_FRAICHE_MS`), ou plus vieille de 15 min
+  (`INACTIVES_ECART_MS`) que les annonces en ligne du même compte (la route les
+  range dans le MÊME appel : eBay ne l'a pas rendue), est `ancienne` :
+  « Lue le … — pas relue depuis » (`data-inactives-anciennes`,
+  `data-inactives-lue-le`, jour de Paris), aucun « (N) », « Voir sur eBay »
+  seulement, ni « ces 60 derniers jours » ; une ligne hors fenêtre n'est jamais
+  montrée (`dansFenetreInactives`). « Jamais lue » se dédouble
+  (`data-inactives-jamais` = `pas-relue` · `non-rendue`) : une relecture des
+  annonces DÉJÀ faite sans la liste ne promet plus « la prochaine relecture »
+  (eBay ne l'émet peut-être pas sans inactive — non mesuré).
+- **Course synchro / relecture** (n° 2) : la capture est datée au DÉPART de la
+  question (`tListe`, `t0`), écrite par `modifierDonnee` qui refuse de remplacer
+  une capture plus récente (la règle du `lueA` des règles d'offre).
+- **La même ItemID en ligne ET inactive** (n° 4) : sa ligne dit « état à relire
+  chez eBay » (`data-inactive-deja="a-relire"`), plus « déjà de nouveau en
+  vente » ; `deja` n'est retenu que pour une AUTRE ItemID ou un `via`. Route : la
+  relecture ne range les inactives que si `ebay_listings` a été rangée par le
+  même appel.
+- **« 95,00 € USD »** (n° 5) : `prixEbayTexte` (la règle de la carte des
+  annonces, §11) — « 95,00 USD », aucune devise ⇒ aucun symbole.
+- **§7** (n° 6) : une panne déjà dite par l'écran (ventes : `pasSu` de la ligne
+  du haut, `pasSuVentes` de `bloqueCommun` ; registre eBay illisible) n'est pas
+  redite — `dejaDit`, une pastille « pas lue », `data-inactives-dit="ecran"`.
+- **Un compte lu vide + un jamais lu** (n° 7) : `vide` (« aucune … sur X ») +
+  « pas encore lue pour Y » — plus « Pas encore lue » pour tout.
+- **Cinq trous de banc** (n° 8 à 12, le code était juste) : marqueur 013 (VRM-21
+  publiée avant la coupure ⇒ B21, jamais 21) et `numberedAt` après publication
+  (« pas reliée ») ; ventes EN COURS de lecture (requêtes retenues : aucun
+  « Remettre en vente ») ; un compte jamais lu ⇒ aucun « (N) » ; une paire à
+  l'annonce Vinted FERMÉE n'est pas « encore en ligne sur Vinted » ; une fin à
+  23 h 30 UTC = le lendemain à Paris. **n° 13** (audit) : photos
+  `i.ebayimg.com.evil.test`, `http://i.ebayimg.com/…`, `evil.test/?u=i.ebayimg.com`
+  doivent être vidées.
+- **Preuves** : `audit-ebay-route.cjs` **502 contrôles, 5 rouges sur a9115c0**
+  ([INA-fenetre], [INA-course], [INA-coherence], et l'écriture par
+  comparer-et-échanger, sync et relire) ; cinq mutations de la route, chacune
+  rouge : fenêtre retirée (1), garde « plus récente » retirée (1), date prise à
+  l'ÉCRITURE (1, [INA-course2] : la relecture partie avant une synchro, écrite
+  avant elle), couplage retiré (1), regex photo non ancrée (4) ; l'ANCIEN audit
+  sous la regex non ancrée : les mêmes rouges que sur la route juste (le trou
+  n° 13 reproduit). Banc `bancs/ebay-inactives.cjs` (`BANC_SEUL=A,H,…`)
+  **80 contrôles, 28 rouges sur le build de a9115c0** ; quatorze mutations de
+  l'écran, chacune rouge sur SON scénario (capture jamais ancienne 6 · écart de
+  15 min retiré 2 · fenêtre retirée 2 · même ItemID ignorée 2 · prix « € USD » 2 ·
+  §7 ventes 2 · §7 registre 2 · mixte rabattu sur « jamais » 2 · N° sans date 4 ·
+  ventes en cours ignorées 2 · « (N) » avec un compte jamais lu 2 · « sur
+  Vinted » sans identité 4 · jour UTC 2 · sous-état unique 2) ; l'ANCIEN banc
+  sous les mutations des trous n° 8 à 12 : exactement le même verdict que sur
+  l'écran juste (42 OK, 2 KO dus à un attribut déplacé) — le trou reproduit.
+- **Non mesuré** : qu'eBay émette `<UnsoldList>` vide (sinon « pas encore rendue
+  par eBay » reste pour un vendeur sans inactive) ; rien n'a été envoyé à eBay.
+
+### Le reçu d'achat : toutes les lignes, la somme vérifiée, au-dessus de la barre (23 octobre)
+Julien, capture iPhone (Vinted → Achats → ⋯ → « Reçu d'achat ») : « le reçu s'affiche
+mal » — la barre du bas passait par-dessus la feuille (« N° de transaction » coupé, la
+fin inatteignable), et 24,93 € payés pour 20,00 + 3,23 affichés.
+- **Mesuré (lecture seule, 117 lignes `email_achat_*`)** : 81 vrais reçus (« Ton reçu
+  pour la commande … »). Le bloc « Montant payé » → « Mode de paiement » porte Article,
+  Frais de port, puis « Frais Vinted » (55) OU « Frais de Protection acheteurs » (26),
+  et « Réduction -X,XX € » (8, négative) ; la somme vaut le Montant payé sur 81/81.
+  L'ancien parseur ne lisait que trois libellés : 55 reçus perdaient leurs frais, 8
+  leur réduction. 36 lignes ne sont PAS des reçus (« Commande mise à jour pour … » 18,
+  « … - Confirmation requise » 16, « Retourne ta commande … » 2 ; du 16 juillet au
+  3 août, aucune avec un Montant payé) : la vraie route `email-inbound` ne les crée
+  plus (prouvé). `transaction` est vide sur les 81 (l'astérisque de « *N° de
+  transaction* » casse le motif du serveur) alors que le texte porte le n° sur 81/81 :
+  61 se relient ainsi à un achat capté, 0 doublon. Toutes ont `pdfB64` vide.
+- **Une règle** `<recu-achat-regle>` (App.jsx) : `ventilationRecuAchat` (toutes les
+  lignes « Libellé ±X,XX € », libellé de Vinted, en centimes, aucune jetée — une ligne
+  illisible est GARDÉE ; `juste` · `ecart` · `passu`), `txRecuAchat` (le n° lu sur sa
+  ligne), `estRecuAchat` (⚠️ revue ci-dessous : tout email rangé comme achat SAUF les
+  trois sujets de statut mesurés, sans Montant payé ni PDF),
+  `recusAchatDe` (`undefined`/`null` passés tels quels). `champsRecuAchat` sert la
+  feuille ET la fenêtre PDF (§11) ; `phraseSommeRecu` dit l'écart ou le « pas su » en
+  une ligne neutre, jamais un total partiel présenté comme complet.
+- **Liste et menu** : « Reçus d'achat par email » ne liste que les vrais reçus et dit
+  combien d'autres emails n'en sont pas (`data-recus-autres`) ; le menu ⋯ d'un achat
+  (`receiptFor`) relie par n° de transaction, et le titre ne relie plus qu'un reçu SANS
+  n° (§5 : un reçu au même titre et à un autre n° est celui d'un autre achat).
+  `ordersFromEmailAchats` (mort depuis août, seconde règle « reçu ») est retiré.
+- **La feuille** (`FeuilleRecuAchat`) est portée sur `<body>` : sur iPhone, `<main>`
+  (qui défile) forme un contexte d'empilement et la barre du bas passait dessus. ‹ et
+  PDF à 44 px, zone de sécurité en bas, hauteur en `dvh` ; « Visa •••• 4242 » (sans
+  les étoiles de l'email, on lisait « Visa, 4242 ») ; montant payé à l'encre (§7),
+  bande à `COULEUR_PLATEFORME.vinted`. ⚠️ Le « zoom 0,8 » du téléphone (§7, 19 oct.)
+  est en réalité ANNULÉ par `styles-iphone.css` (`.vrm-app-shell .vrm-main{zoom:1}`).
+- **Preuves** : `audit-recu-achat.cjs` (la règle dans un vm + la vraie route
+  email-inbound) 43 contrôles, 18 rouges sur bf0a9c8 (la règle n'existait pas : pas
+  une preuve seule) et 7 mutations rouges (`connus` 10, `somme` 2, `signe` 6,
+  `nonrecu` 2, `jete` 2, `txtexte` 3, `mode` 1). Banc `recu-achat.cjs` (ports 9201 à
+  9210 ; 390 × 560 tactile clair, 390 × 700 sombre, 1512) 86 contrôles : **48 rouges
+  sur le build de bf0a9c8**, 0 après ; feuille rendue sans portail ⇒ 12 rouges,
+  libellés connus seulement ⇒ 21. ⚠️ Chromium ne fait pas de `<main>` un contexte
+  d'empilement : le banc l'impose sur téléphone (`.vrm-main{isolation:isolate}`) pour
+  rejouer l'iPhone — sans ça il était VERT sur le défaut.
+- **Non mesuré** : un vrai iPhone ; la propriété exacte qui fait de `<main>` un
+  contexte d'empilement dans WebKit ; un reçu à deux moyens de paiement (forme vue une
+  fois, montants gardés).
+- **Pas fait** : le serveur range toujours `transaction` vide — corriger son motif
+  changerait la CLÉ des nouveaux reçus (un email renvoyé ferait un doublon) ; l'app lit
+  le n° dans le texte.
+- **Revue du 23 octobre — défauts reproduits, corrigés** (chacun rouge avant le
+  correctif — sur 7ba9670 —, vert après, rouge sous mutation) :
+  - **Le banc `csp.cjs` ne jugeait plus la fenêtre du reçu** : il extrayait
+    `parseReceiptFields` (retiré), sortait « ❌ le code du reçu se retrouve dans
+    App.jsx » et SAUTAIT ses 18 contrôles (impression une fois, Fermer, aucune
+    violation, onglet rechargé, journal « fenetre:recu »). Il extrait ce que lit
+    `openReceipt` (`COULEUR_PLATEFORME`, `<recu-achat-regle>`, `modePaiementRecu`,
+    `phraseSommeRecu`, `champsRecuAchat`), son reçu a la forme mesurée, et un
+    contrôle de plus exige les vraies lignes dans la fenêtre (Frais Vinted, somme
+    juste, « Visa •••• 4242 ») : 2 rouges sur 7ba9670, vert après, 2 rouges quand la
+    fenêtre ne garde que les trois anciens libellés.
+  - **Un email que la ROUTE range comme achat disparaissait de la liste** :
+    `estRecuAchat` exigeait un Montant payé, un sujet « reçu pour la commande » ou un
+    PDF, alors que la route (branche 2b) range aussi « Merci pour ton achat », « Tu as
+    acheté », « Confirmation d'achat » (et notifie « justificatif archivé ») — ils
+    étaient comptés parmi « les mises à jour, confirmations, retours », et un reçu dont
+    Vinted changerait la tournure aurait suivi. « Pas un reçu » = les trois sujets de
+    statut MESURÉS (`SUJET_STATUT_ACHAT` : « Commande mise à jour pour » 18, « -
+    Confirmation requise » 16, « Retourne ta commande » 2 ; aucun avec un Montant payé
+    ni un PDF), rien d'autre. Sans bloc Montant payé, la feuille et la fenêtre
+    montrent le TEXTE de l'email (`hasStructured` = `v.trouve` : avant, un n° de
+    transaction suffisait à afficher un reçu vide). `audit-recu-achat.cjs` fait
+    passer ces emails par la vraie route puis par la vraie règle (§11) : 6 rouges sur
+    7ba9670 ; mutations `positif` 4, `nonrecu` 2, `texte` 1. Banc `recu-achat.cjs` :
+    « Merci pour ton achat » listé et lu en texte, 12 rouges sur le build de 7ba9670.
+  - **Une ligne de frais au libellé « Transaction … » ou « Vendeur … » finissait le
+    bloc** (« Transaction sécurisée 0,50 € » : elle ET « Frais Vinted » qui suivait
+    étaient jetées — la feuille disait l'écart, mais la promesse « aucune ligne jetée »
+    ne tenait pas). Ces deux mots ne sont une borne que sans montant en fin de ligne
+    (`FIN_SI_SANS_MONTANT_RECU`) ; « Mode de paiement », « Date du paiement », « N° de
+    transaction » restent des bornes quoi qu'il arrive (mesuré : aucune des 81 ne finit
+    par « € »). Audit : 2 rouges avant ; mutations `borne` 2, `bornetoutes` 1. Aucun
+    reçu réel n'avait ce libellé.
+  - **À 320 px, un montant ou la carte se coupaient** (« 11,20 » / « € » avec la
+    police du banc, « MasterCard •••• » / « 9999 » avec des métriques d'Arial, et
+    « 10 h » / « 47 ») : la valeur d'une ligne était en `overflowWrap:'anywhere'`,
+    qui casse même une espace insécable, et la fenêtre PDF, elle, posait `nowrap`.
+    Les montants de la feuille ne passent plus à la ligne (`Row montant`, comme la
+    fenêtre), et `•••• 9999` et `10 h 47` portent des espaces insécables
+    (`modePaiementRecu`, `champsRecuAchat` — la feuille ET la fenêtre). Banc
+    `recu-achat.cjs` : deux vues 320 × 568 (police du banc, métriques d'Arial) et un
+    reçu aux libellés les plus longs mesurés : 4 rouges sur le build de 7ba9670, 3
+    sous la mutation « nowrap et insécable retirés » ; audit, mutation `nbsp` 1.
+  - **Au clavier, la feuille laissait partir le focus** (au 3ᵉ Tab sur `<body>`,
+    derrière le voile — et Échap, écouté sur le seul dialogue, ne fermait plus rien),
+    ↓ et Page bas ne faisaient pas défiler le reçu (le focus était sur le dialogue, qui
+    ne défile pas), et à la fermeture le focus tombait sur `<body>`. Déjà vrai sur
+    bf0a9c8 (pas une régression). `FeuilleRecuAchat` : focus sur la zone qui défile
+    (`data-recu-defile`, `tabIndex 0`), Tab / Maj+Tab tournent dans la feuille, Échap
+    écouté sur le document, le focus rendu à « Voir › » (le motif de `MenuEcrans`).
+    Banc `recu-achat.cjs` K (ouverture au clavier, Page bas, Tab ×5 + Maj+Tab ×4,
+    Échap après cinq Tab, focus rendu) : 10 rouges sur le build de 7ba9670 ; 10 sous
+    « piège, écoute du document et retour retirés », 3 sous « retour du focus retiré ».
 
 ---
 
@@ -10972,8 +12325,8 @@ Avant de conclure « c'est vide » : vérifier le **nom** et la **forme** du cha
 | `npm run build` | compile — ne voit ni les variables absentes ni le rendu |
 | `node scripts/audit-*.cjs` | **84 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
 | `scripts/bancs/*.cjs` | les **76 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
-| `node scripts/audit-*.cjs` | **98 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
-| `scripts/bancs/*.cjs` | les **89 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
+| `node scripts/audit-*.cjs` | **156 audits** : identité, chiffres, cohérence app↔extension, QR, colis, push, URSSAF, relevé, variables non déclarées, secrets… |
+| `scripts/bancs/*.cjs` | les **201 bancs** — l'app **rendue sur les vraies données**, à 390 px et 1512 px — leur `README.md` dit comment les lancer. ⚠️ Leurs fixtures (`fx/`) ne montent **jamais** dans le dépôt : vraies ventes, vrais acheteurs, vraies adresses, dépôt **public**. `audit-bancs.cjs` le vérifie. |
 | banc `vm` + faux `chrome` | le VRAI code de l'extension exécuté hors de Chrome |
 
 **Trois règles de preuve :**
@@ -11188,6 +12541,99 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   ⚠️ Le drapeau `DEMANDE_SAISIE_PRIX` vit au niveau **module** : au moment du
   clic l'écran Annonces n'est pas monté, un `dispatchEvent` serait perdu.
 
+### Les feuilles sous la barre du bas, sur iPhone : la vraie cause (23 octobre)
+Julien, sur iPhone : la feuille « Reçu d'achat » passe SOUS la barre du bas, qui
+en cache la fin. Même plainte le 30 sept. (« Se déconnecter ») et le 2 oct.
+(« CSV / PDF introuvables »), traitée feuille par feuille par des portails.
+- **Mesuré** (code de WebKit, `StyleAdjuster.cpp`) : sur iPhone seulement
+  (`ENABLE_WEBKIT_OVERFLOW_SCROLLING_CSS_PROPERTY`), un élément qui défile et
+  porte `-webkit-overflow-scrolling: touch` reçoit un z-index 0 — un contexte
+  d'empilement. `<main className="vrm-main">` le portait depuis la coque
+  (28 sept.) : **toute** feuille rendue dans l'écran était peinte dans la couche
+  de `<main>`, sous la barre du bas (z-index 60) et l'en-tête, quel que soit son
+  z-index. Chromium ignore la propriété : aucun banc ne pouvait le voir.
+  Le zoom 0,8 n'y est pour rien (il est d'ailleurs ramené à 1 par
+  `styles-iphone.css`).
+- **Corrigé à la racine** : la propriété est retirée de `<main>` (depuis iOS 13
+  le défilement à inertie est natif, elle ne servait plus qu'à piéger). Les ~40
+  feuilles rendues dans l'écran sortent toutes d'un coup, le bloc du reçu n'est
+  pas touché. ⚠️ **Ne jamais remettre `-webkit-overflow-scrolling: touch` sur un
+  conteneur qui peut contenir une feuille** (les quelques autres qui la portent
+  — rangées défilantes, corps de feuilles — n'en contiennent aucune).
+- **Et un défaut de tous les navigateurs** : « 📦 Paires du lot » (z-index 80)
+  s'ouvrait depuis le tiroir d'une vente (`vrm-ledger-drawer-host`, z-index 150,
+  dans `document.body`)… dessous. Passée à 1300.
+- **Preuve** : banc `feuilles-coque.cjs` (ports 9211-9220, fixtures + reçus
+  inventés) — en 390 tactile il APPLIQUE la règle de WebKit (style en ligne posé
+  par React et règles de la feuille livrée), en 1512 rien. 15 feuilles ouvertes
+  comme Julien (reçu, note, outils d'Annonces, passeport, rapport comptable,
+  registre, paires du lot, « Tout imprimer », nouvelle facture, « Supprimer ce
+  compte »…) : rien par-dessus (coins et bas du panneau, haut du voile), bas du
+  contenu touchable, boutons à 44 px. **26 rouges sur le build de bf0a9c8**
+  (24 iPhone, 2 ordinateur — le lot), 0 après ; mutation « propriété remise sur
+  `<main>` » ⇒ 24 rouges, « lot à 80 » ⇒ 4.
+- **Non mesuré** : un vrai iPhone (pas de WebKit d'iOS ici : c'est sa règle,
+  lue dans son code, que le banc applique) ; les feuilles qu'aucune donnée de
+  banc n'ouvre (Stock, bordereau tamponné, fiche Leboncoin sans extension).
+- ⚠️ **`mobile.cjs` meurt parfois** (« reading 'querySelectorAll' » : l'en-tête
+  lu juste après `main`) : une course DU BANC, mesurée au même taux (environ une
+  page sur trois sous charge) sur bf0a9c8, sur ce correctif et sur ses deux
+  mutations. Le relancer seul ; ce n'est pas l'app.
+
+#### Revue du même jour — huit défauts reproduits au banc, corrigés
+Chacun ROUGE sur le build de 8a573a4 (le banc final copié dans l'arbre et lancé
+depuis lui, §6.1), vert après, rouge sous une mutation.
+- ⚠️ **L'ordre des couches est écrit une fois**, en tête de `SheetShell` : les
+  écrans et leurs feuilles (≤ 1300), le tiroir d'une vente (150), le lot
+  « Bordereaux à imprimer » (9000), « Mon compte » (10000), **une confirmation
+  `Z_CONFIRMATION` = 20000**, **les messages `Z_MESSAGES` = 30000**, le bloc
+  « Recharger » (100000). Une nouvelle couche se range dans cette liste.
+- **D1 + D8 — la confirmation s'ouvrait SOUS le lot** (« C'est la bonne paire,
+  imprimer », « Oui, c'est écrit » : `askConfirm` → `SheetShell` à 2000, le lot
+  à 9000) : on ne pouvait ni confirmer ni annuler. `ConfirmHost` (et la saisie)
+  passe par un portail dans `document.body`, à `Z_CONFIRMATION`.
+- **D7 — les messages passaient sous les feuilles** (« Échec de la suppression »
+  sous « Supprimer ce compte », « Ces bordereaux n'ont plus leur PDF » sous le
+  lot) : le `Toaster` monte à `Z_MESSAGES`, et sur téléphone il se pose **en
+  haut** quand une feuille est ouverte (le registre `_feuillesOuvertes` de
+  `FermeAuRetour` le prévient : `abonnerFeuilles`, `uneFeuilleOuverte`) — en bas
+  il cachait les boutons de la feuille. Sur ordinateur il reste en bas à droite.
+- **D2 — les feuilles de l'en-tête** (« Tous les écrans » en variante haute,
+  le panneau « État des actions ») vivaient dans l'en-tête sticky (z 50), donc
+  sous la barre du bas (z 60) en paysage et sur iPad : bas de la feuille caché,
+  barre du bas touchable derrière le voile. Portail dans `document.body` ; le
+  panneau est borné à l'écran (`100dvh` moins en-tête et zones sûres, défile).
+  ⚠️ Le panneau n'a été pris en défaut qu'en **568 × 320** (petit téléphone en
+  paysage) : en 844 × 390 il fait 212 à 224 px et tient au-dessus de la barre,
+  avec ou sans extension (mesuré, bf0a9c8 comme 8a573a4).
+- **D3 — le bas de 8 feuilles tombait dans la zone de la barre d'accueil**
+  (34 px sur iPhone en PWA) : reçu, Répartir un lot, Rapport comptable,
+  Registre, Audit, Passeport, « Supprimer ce compte », Paires du lot. Leur
+  panneau porte `env(safe-area-inset-bottom)` en bas, comme `SheetShell`.
+- **D4 — « Paires du lot » au-dessus du tiroir ne prenait pas le clavier** :
+  Échap fermait le tiroir CACHÉ, le lot restait. Le panneau est un `dialog`
+  (focus à l'ouverture), Échap le ferme sans aller plus loin, et le focus revient
+  à « Voir les paires du lot », retenu AU CLIC (Safari ne donne pas le focus à
+  un bouton cliqué). ⚠️ Ce bouton vit dans le repli « Modifier » de la vente :
+  replié, il n'est pas focalisable (le premier jet du banc le cliquait par
+  script, repli fermé, et concluait à tort que le focus ne revenait pas).
+- **D5 — les reçus du banc n'avaient pas la forme réelle** (`prix` « 40,00 € »
+  et aucun `texte` : l'écran affichait « 40,00 € € », jamais le détail).
+  Mesuré (formes seules, sans valeur) : `prix` sans « € », pas de `montant`,
+  un `texte` « *Vendeur* … · Article … · Frais de port … · Protection
+  acheteurs … · *Montant payé* … ». Le banc sert cette forme et l'exige au rendu.
+- **D6 — l'Inventaire physique et le Studio photo** n'avaient pas de
+  `FermeAuRetour` : « retour » quittait la section. Posé (la caméra du Studio se
+  coupe au démontage).
+- **Preuves** (`feuilles-coque.cjs`, 183 contrôles — parties `confirmation`,
+  `messages`, `entete` dont 568 × 320 et une extension simulée qui répond,
+  `clavier`, et la zone sûre de 34 px posée par CDP) : **32 rouges sur
+  8a573a4**, 54 sur bf0a9c8, 0 après. Mutations, chacune rouge sur SA partie :
+  confirmation remise à z 2000 ⇒ 4 · messages à 210 ⇒ 4 · feuilles de l'en-tête sans portail ⇒ 5 · reçu sans zone sûre ⇒ 1 · lot sans gestion du clavier ⇒ 3 · Inventaire sans `FermeAuRetour` ⇒ 4 · reçus du banc à l'ancienne forme ⇒ 2.
+- **Non mesuré** : un vrai iPhone (zone sûre posée par le banc, règle de WebKit
+  appliquée par lui) ; le toast en haut sous l'encoche d'un vrai téléphone ;
+  les feuilles qu'aucune donnée de banc n'ouvre.
+
 ---
 
 ### Le zip de l'extension — le défaut le plus coûteux du projet
@@ -11294,8 +12740,8 @@ vinted-sync-extension/          background.js · inject.js · vinted-panel.js ·
 api/                            email-inbound · push · widget · ship-reminders · ai
 scripts/audit-*.cjs             les 84 audits
 scripts/bancs/                  les 76 bancs (leur README dit comment les lancer)
-scripts/audit-*.cjs             les 98 audits
-scripts/bancs/                  les 89 bancs (leur README dit comment les lancer)
+scripts/audit-*.cjs             les 156 audits
+scripts/bancs/                  les 201 bancs (leur README dit comment les lancer)
 docs/journal-2026.md            l'historique complet (pourquoi chaque règle existe)
 SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 ```
@@ -11471,6 +12917,23 @@ Le rappel du 30 septembre partait le 1er de chaque mois, sans date ni montant, q
 
 - ⚠️ **Noté, pas corrigé (session eBay)** : le CA et le bénéfice eBay lisent `pricingSummary.total`, port compris — contraire à §2.8 et à la décision « l'argent que tu reçois » (dû au vendeur − frais). Non mesuré : 0 commande eBay en base, aucune facture manuelle, forme réelle de `cancelState` non vue.
 
+### URSSAF et compta : « C'est déclaré », la notification du 1er, le net avant dépenses, le relevé (22 octobre, propositions 5, 9, 10)
+**Mesuré (lecture seule, sa base, 22 oct.)** : `vrm_urssaf_declare` ABSENT de `main` (aucun mois jamais noté) ; `vinted_urssaf_freq` = mensuel ; la ligne publiée `vinted_urssaf_mois` dit septembre 89 ventes, **4 330,90 €** (⇒ 584,67 € à 13,5 %), et 2 ventes Leboncoin sans date (133 €) ; `vrm_compta` ABSENT (aucune dépense, aucun abonnement jamais noté) alors que `vrm_journee_benefice` = true ; 0 ligne `harvest_*_releve_*`, 0 compteur `releve_*`, extension 5.211, et les 4 lignes `_billing` de forme complète portent `history: []`.
+- **(5) « C'est déclaré »** sur la carte URSSAF de Comptabilité (« Prochaine déclaration », à côté du lien URSSAF) ET sur la ligne URSSAF de Ma journée. Il pose `DEMANDE_DECLARATION` (le mois, 30 s au plus) et va sur Ventes : le rapport comptable s'y ouvre sur CE mois et le formulaire « Qu'as-tu déclaré ? » se déplie seul — **le même formulaire, pas une copie (§11)** : le registre retient l'identité des ventes, seul le rapport les a. **Mêmes gardes** : lecture encore en cours ⇒ on attend ; lecture ratée (`lectureIncomplete.rates`) ⇒ rien ne s'ouvre, le bouton reste grisé avec sa raison ; registre pas su ⇒ on attend ; mois déjà noté ⇒ le rapport le montre. Période pas finie (trimestre en cours) ⇒ pas de bouton. Tout noté ⇒ « ✓ Notée « déclarée » le … » et l'échéance ne se colore plus (§7). Trimestriel : le bouton nomme le mois à noter (`aNoter`, rendu par `rappelUrssaf`). Ma journée : la ligne devient un groupe de deux boutons (un bouton ne se met pas dans un bouton), et se recalcule dès que le registre est enregistré (`vrm:save` → `colisTick`).
+- **La notification du 1er** (api/ship-reminders.js, partie URSSAF seule) passe par la RÈGLE DE L'APP : `rappelUrssaf` recopié dans `api/_lib/urssaf-regle.js` (miroir, **jamais modifié à la main** : `node scripts/audit-rappel-urssaf.cjs --recopie`), appelé par `api/_lib/rappel-urssaf.js` (`notificationUrssaf`, pure). Elle suit le rythme, se tait pour un mois noté, donne le montant de la ligne publiée — le texte est mot pour mot celui de Ma journée — et ouvre Ma journée. `main` illisible ⇒ le rappel d'avant, SANS montant. La réponse du cron ne porte aucun montant. Toujours le 1er seulement, une fois par mois (`urssaf_reminder_dedup`).
+- **Tranché** : le montant d'une période (`montantPeriodeUrssaf`, une règle pour le rappel, la notification ET la carte « Prochaine déclaration ») est un **minimum** (« au moins ») quand la ligne a été publiée AVANT la fin de la période — sinon la notification du 1er présentait comme complet un total calculé le 27 si Ventes n'a pas été rouvert. Date de publication illisible ⇒ « au moins ». ⚠️ La ligne ne se republie que si son contenu change : un mois sans aucun mouvement après la fin du mois garde son « au moins » (vrai, juste imprécis).
+- **(9) Les charges en trois états** (`depensesEtat`, la même pour Comptabilité et Ma journée via `beneficePeriode`) : `jamais` (rien noté, pas répondu) ⇒ « **Net avant tes dépenses** », la ligne « − charges » à « — », et le choix UNE fois (`ChoixDepenses`) : « Je n'ai pas de dépenses à noter » (range `vrm_compta.sansDepenses = {at}`, synchronisé ; la réponse compte comme une saisie dans `comptaVide`, le rattrapage du nuage ne l'écrase pas) ou « Ajouter une dépense » (le formulaire de Comptabilité, déplié par `DEMANDE_DEPENSE`) ; `aucune` ⇒ 0 € vrai ; `notees` ⇒ inchangé. Le choix n'apparaît qu'une fois le nuage arrivé (pas su ≠ jamais noté). Les `data-benef-*` gardent leurs valeurs (charges 0) : les bancs croisés restent juges.
+- **(10) Le relevé n'est plus promis** : « l'extension le récupère à ta prochaine visite » s'affichait dès l'extension à jour, et n'arrivait jamais. Une seule phrase, quelle que soit la version : « VRM n'a pas encore réussi à le lire pour ce mois. Le CA ci-dessus n'en dépend pas ». Aucune adresse Vinted devinée (§3). Lecture du relevé ratée ⇒ « la base n'a pas répondu » (elle valait « rien de capté »). `data-releve` = `encours` · `passu` · `pasencore` · `lu`. `EXT_CAPACITES.releve` reste dans la table (plus lue par l'écran).
+- **Preuves** : `audit-rappel-urssaf.cjs` (vraie règle dans un vm + miroir au jeton près + règle de la notification + le VRAI cron exécuté un 1er octobre, faux Web Push) — **24 rouges sur origin/main** (d198bca : aucun montant, `?tab=dashboard`, sonne pour un mois noté, sonne en trimestre en cours) ; mutations `rythme · declare · zero · fenetre · date · serveur-registre · serveur-montant · serveur-passu` ⇒ 3 · 3 · 3 · 5 · 3 · 2 · 6 · 2 rouges. `audit-benefice.cjs` + 6 contrôles (rouge sur main ; mutations `depenses` ⇒ 2, `reponse` ⇒ 1). Banc `scripts/bancs/declare-urssaf.cjs` (données inventées, `BANC_PORT`, 390 tactile et 1512, horloge au 27 octobre, base cloisonnée pour que la déclaration parte au nuage) : **61 contrôles** — Comptabilité et Ma journée ⇒ le formulaire sur septembre, 3 ventes notées par identité, écrites au nuage, le bouton/la ligne partent sans recharger ; versements illisibles ⇒ rien ne s'ouvre ni ne s'écrit ; net avant dépenses, réponse rangée et lue par Comptabilité, « Ajouter » ouvre le formulaire, une dépense notée ⇒ plus de question ; relevé identique extension absente / à jour, « pas su » sur un 522. **23 rouges sur le build d'origin/main** ; un build réaffaibli (garde retirée · ancienne promesse sur extension à jour · `depensesEtat` sans `jamais`) ⇒ **15 rouges**, chaque groupe sur SA mutation. Bancs voisins verts (`rappel-urssaf`, `rapport`, `vendu-recu`, `chiffres-croises`, `stats-compta`, `seuils-vinted`, `bilan-semaine`, `ship-multi`, `serveur`, `rappel-soir`, `widget-multi`) ; `benefice-journee` garde ses 2 rouges D (« éteint ⇒ plus de carte ») — **déjà rouges sur origin/main**, pas de ce lot.
+- ⚠️ **Les bancs de rendu qui n'appellent pas `_porte-banc.cjs`** (rappel-urssaf, rapport, vendu-recu, chiffres-croises, stats-compta, seuils-vinted, benefice-journee…) restent sur l'écran de connexion depuis le retrait de l'accès direct : lancés ici par une enveloppe qui pose la porte sur leur playwright absolu. Les y brancher reste à faire.
+- **Revue (nuit du 22 au 23 oct.) — trois défauts reproduits, corrigés** (chacun rouge sur 942ab62 — copie `git archive`, contrôle lancé depuis elle —, vert après, rouge sous mutation) :
+  1. **Ma journée à 390 px : le choix des dépenses était illisible** (1,3 à 1,7:1 en clair, 2,2-2,7:1 en sombre) : `ChoixDepenses` posait C.text / C.muted / C.accent en ligne, qui battaient les couleurs du bandeau sombre du bilan. En `compact`, plus aucune couleur imposée : le texte hérite de la note (`.vrm-day-note`, couleur posée par le bandeau), les deux gestes sont des `vrm-lien-action` (la couleur des liens de la carte). Mesuré après : phrase 5,5:1, gestes 6,3:1 (390 clair et sombre), 5,8 à 6,3:1 à 1512. Banc `declare-urssaf.cjs` : contraste RENDU calculé (WCAG, fonds remontés jusqu'au premier opaque, un dégradé jugé sur sa PIRE couleur) en E (390 et 1512, clair) et E2 (390 sombre) — **2 rouges sur le build de 942ab62**, et rouge sous la mutation « lien sans `vrm-lien-action` » (1,43:1).
+  2. **« à payer ≈ au moins 0,00 € »** dans la notification du 1er quand la ligne publiée date d'AVANT la période (Ventes pas rouvert depuis août) — un zéro qui veut dire « pas su » (§7). `montantPeriodeUrssaf` (une règle : rappel, notification, carte « Prochaine déclaration ») rend **aucun montant** (« Le montant se calcule dans Ventes ») si la ligne est publiée avant le DÉBUT de la période, ou si elle n'en porte AUCUN mois et que son total n'est qu'un minimum (publiée avant la fin, date illisible, ventes sans date de versement). **Tranché au-delà de la proposition du relecteur** : « au moins 0,00 € » ne se dit jamais, quelle qu'en soit la cause. L'autre sens tient : ligne publiée après la fin, lue, sans vente du mois ⇒ un vrai « 0,00 € ». Conséquence assumée : sur un trimestre EN COURS sans vente encore versée, la carte de Comptabilité dit « — » au lieu de « au moins 0,00 € ». La raison du cron dit « ligne publiée trop tôt » (sans montant).
+  3. **Le serveur (UTC) et l'app (Paris) ne jugeaient pas « au moins » à la même heure** : la fin de période était minuit LOCAL. Début et fin se calculent en **heure de Paris** (`minuitParisMs`, `Intl`, recopié dans le miroir) : une ligne publiée à 00:30 le 1er (Paris) n'est plus « au moins » côté serveur seulement.
+  - `audit-rappel-urssaf.cjs` : +6 contrôles (sonde du relecteur côté app ET serveur, l'autre sens) et une **section 4** qui exécute la règle dans DEUX processus, `TZ=Europe/Paris` (Ma journée) et `TZ=UTC` (la règle comme le serveur l'appelle, et la VRAIE notification du miroir), sur trois publications autour de minuit Paris (hiver, été, et 23:30 la veille ⇒ « au moins » des deux côtés) — **9 rouges sur 942ab62** ; mutations nouvelles `ancienne` ⇒ 4, `fuseau` ⇒ 3, `serveur-ancienne` (le miroir réaffaibli dans une copie) ⇒ 1 ; les huit d'avant restent rouges.
+- **Non mesuré** : la notification sur un vrai téléphone ; l'heure réelle du cron ; le rendu sur sa vraie base (données inventées) ; `urssaf.cjs` et `revue-19oct.cjs` (fixtures absentes ici, non lancés) ; le contraste sur un vrai iPhone (calculé dans Chromium).
+- **Geste de Julien** : noter septembre (« C'est déclaré » dans Comptabilité ou Ma journée), et août **s'il l'a déclaré à la date de vente** (Ventes → Outils → Rapport comptable → août) — sinon les 30 ventes d'août versées en septembre comptent deux fois. Puis, s'il n'a vraiment aucune dépense, répondre une fois « je n'ai pas de dépenses à noter ».
+
 ### Revue de tous les écrans après #596-#598 (20 octobre)
 Rendu de chaque écran et section (390 tactile clair, 1512 sombre, fixtures), captures regardées, 115 audits et tous les bancs relancés un par un ; chaque rouge comparé au build d'avant #596 (ed066d3). Banc `revue-20oct.cjs` (port 7795) : **20 rouges sur le build d'avant, 0 après**.
 - ⚠️ **La marge négative des liens-textes suivait encore l'ancien zoom** (-16 px pour 44 px de zone) : « Retirer mon argent » sortait de sa carte, « voir », « tout voir », « Compléter les prix d'achat » mordaient sur leurs voisins ⇒ -12 px (`styles-iphone.css`). « Retirer mon argent » n'est plus pris pour un lien-texte.
@@ -11566,7 +13029,7 @@ lignes `plantage_*`, `email_inconnu_*`, quarantaine, journal des emails.
   `EMAIL_INBOUND_SECRET` sur Vercel — absente aujourd'hui, la route des emails
   accepte donc encore un envoi sans clé (§ « la route des emails exige sa clé »).
 - Noté, normal : `rpc/vrm_equipe_lister` → 404 (~60/jour, une par ouverture) tant que
-  la 016 n'est pas appliquée (la route dit « pas encore activé ») ; quelques 401 au
+  la 016 n'est pas appliquée (corrigée et essayée le 22 octobre : voir la section de la 016) (la route dit « pas encore activé ») ; quelques 401 au
   réveil de l'iPhone (jeton expiré, le renouvellement et la reprise d'envoi existent).
 - Noté pour Julien : `STRIPE_SECRET_KEY` absente de Vercel (paiement non branché) ; le
   commentaire de `STRIPE_PRICE_LOOKUP` dit encore « 9,99 € ».
@@ -11613,3 +13076,336 @@ Julien : « qu'elle marche sur Orion sur l'iPhone, pareil que sur Chrome », pui
 - **Au doigt** : le bandeau de dépôt Leboncoin tient à 390 px et ses boutons font 44 px (`pointer: coarse` + `hover: none` seulement — rien ne change à la souris). Banc `leboncoin.cjs` (`BANC_PORT`).
 - Preuves : `audit-extension-navigateurs.cjs` sections G-I (profils `chromium`, `firefox-android`, `safari-ios`, `orion-ios`, `orion-ios-pire` dans `_fond-vm.cjs` — option `retirer`, `storage.onChanged` à état) : **30 rouges sur origin/main** (§6.1) ; `--mutation cookies|alarms|main` ⇒ 1 · 4 · 2 rouges ; parité : sans `scripting` ni `tabs.sendMessage`, exactement les mêmes requêtes Vinted que Chrome.
 - ⚠️ **Non mesuré** : aucun vrai Orion, iPhone, Safari ni Firefox Android ; la liste officielle d'API d'Orion (feuille Google, bloquée) ; si les cookies de session de Vinted sont HttpOnly (déterminant sans API `cookies`) ; WebKit absent du conteneur. **Gestes de Julien** : publier `VRM-firefox.zip` sur AMO (kit prêt, section 3), puis essayer Orion sur l'iPhone (section 2) ; Safari : Mac + Xcode + compte Apple 99 $/an (section 4).
+
+### Offres reçues par email rebranchées, et l'adresse de réception PROUVÉE (22 octobre)
+Deux chantiers restés ouverts, repris le 22 octobre (branche `v22-adresse`).
+
+**A. Les offres reçues par email.** **Mesuré** (lecture seule, sa base) :
+**248 offres `email_offer_*` en 14 jours** (17 le dernier jour, 5 comptes) ; dans
+les conversations captées, **3 offres en attente en tout**, la plus récente du
+15 septembre, **0 en 14 jours**. Or la règle `offresAtraiter` n'était plus
+**rendue nulle part** depuis le 13 octobre (bloc de Messages retiré, cloche
+retirée le 17) : ses offres ne s'affichaient plus du tout.
+- **Décidé** : rebrancher, pas retirer. UN bloc « N offres à trancher » en tête
+  de Messages (`data-offres-messages`), sur `offresAtraiter` (compte,
+  chronologie, titre non ambigu) ; lecture des 14 derniers jours en scalaires
+  `meta->>` (`lireTout(…, {strict:true})` : une page ratée vaut « pas su ») ;
+  « c'est fait » → `vinted_offers_done` (synchronisé, rattrapé par
+  `onCloudReady`), clé = l'identifiant de la ligne ; ⚠️ les 88 clés d'avant
+  (`receivedAt|article`) restent reconnues.
+- **Une offre vue par email ET dans sa conversation n'est écrite qu'une fois**
+  (`memeOffre` / `offresEmailHorsConversations`) : même compte, même acheteur
+  (login, sans la casse), même montant au centime, dans la tolérance de
+  classement ; le titre (celui de la TRANSACTION, `OFFRES_CONV_SELECT`) n'est
+  qu'une contrainte EN PLUS. ⚠️ **Mesuré : `qui` est vide sur 248/248 offres** —
+  la règle ne fusionne donc rien aujourd'hui, et c'est voulu : sans acheteur,
+  rien ne prouve que c'est la même (§5, mieux vaut une ligne de trop qu'une
+  offre cachée). Conversations illisibles ⇒ rien n'est retiré.
+- **Prouvé** : `audit-offres-email.cjs` (22 contrôles) **9 rouges sur
+  d198bca** ; mutations `sansqui` 4 et `titreseul` 11 rouges. Bancs
+  `messagerie.cjs` (**6 rouges** sur le build de d198bca) et `filtre-compte.cjs`
+  (**1 rouge**) — tous verts après.
+
+**B. L'adresse de réception PROUVÉE** (le ⛔ « bloquant avant d'ouvrir VRM à des
+inconnus » du 6 octobre). **Mesuré** : `vrm_email_owners` = **une seule ligne,
+celle de Julien, 16 adresses** (11 icloud.com, 3 gmail.com, **2 relais Apple**
+`privaterelay.appleid.com`), aucun autre vendeur ; 0 email en quarantaine
+vivante ; aucun passage du collecteur partagé enregistré.
+- **Décidé — la preuve** (`api/_lib/preuve-adresse.js`, une règle §11) : un lien
+  part **à l'adresse déclarée**, par la boîte Gmail de VRM (le script
+  `gmail-forwarder.gs`, même canal que les factures Pro — aucun SMTP ici) ; le
+  clic, **depuis la session du vendeur qui l'a demandé**, range la preuve **côté
+  serveur**, sous le propriétaire NEUTRE (aucune session ne peut l'écrire ni la
+  lire). Le lien est un HMAC (clé dérivée de la clé de service) sur la ligne et
+  un aléa : lire la base ne suffit pas à le fabriquer ; un autre compte qui
+  l'ouvre ne trouve rien (404, sans dire qu'une demande existe) ; 72 h ; un
+  renvoi toutes les 10 min, 5 par adresse et 10 adresses par vendeur et par
+  jour ; confirmation par écriture CONDITIONNELLE (même aléa, encore en
+  attente). Seconde preuve, sans email : l'adresse est l'adresse de connexion
+  VRM du vendeur, confirmée **par un lien** par Supabase. Un relais Apple ne
+  reçoit que les emails de Vinted : « impossible », dit tel quel.
+- **Décidé — l'attribution** : base cloisonnée, `fusionnerRegistres` ne retient
+  une adresse déclarée que si elle est **prouvée pour CE vendeur** ; sinon
+  l'email part en quarantaine (jamais donné), et `peutReclamer` le rend dès la
+  preuve. Base non cloisonnée : inchangé. Preuves illisibles ⇒ 503 (« renvoie-le »).
+- ⚠️ **Décidé — la transition, et pourquoi sans date** : le **propriétaire de
+  l'installation** garde ses adresses déclarées, prouvées ou non (« à
+  confirmer »). Ses 16 adresses restent reçues, ses 2 relais Apple ne pourraient
+  jamais être prouvés, et l'exiger de lui ne protège personne (il a la clé de
+  service). Une date de fin aurait été un piège à retardement. Une adresse qu'il
+  partage avec un vendeur qui l'a PROUVÉE ne désigne personne (conflit →
+  quarantaine, la règle existante).
+- Routes : `email-rattacher` (`GET preuves`, `POST preuve-demander`,
+  `POST preuve-confirmer`, session exigée) ; `email-inbound` (modes script
+  `preuves-a-envoyer` / `preuve-envoyee`, derrière la clé ; un lien de
+  confirmation transféré dans un email entrant est retiré avant d'être rangé).
+  **Toujours 12 fonctions.** Le script n'aspire plus ses propres envois
+  (`-in:sent`).
+- App : Réglages → Mes adresses de réception dit l'état de chaque adresse
+  (prouvée · à confirmer · lien envoyé · lien périmé · impossible), « Renvoyer »
+  / « Confirmer » (adresse de connexion), l'explication UNE fois au-dessus
+  (§7) ; une adresse ajoutée demande son lien d'elle-même ; au retour du lien
+  (`?confirmer-adresse=`), un bandeau dit le résultat et mène au panneau.
+- **Prouvé** : `audit-preuve-adresse.cjs` exécute les vraies routes contre une
+  base à état — **40 contrôles, 22 rouges sur 28 sur d198bca** ; mutations
+  `sansgarde` 6, `autrecompte` 3, `jetonignore` 2, `pasSu` 3 rouges. Banc
+  `adresses-preuve.cjs` (port `BANC_PORT`, données inventées, 390 et 1512 px) :
+  **45 contrôles, 31 rouges** sur le build de d198bca. Les bancs et tests
+  existants (`audit-proprietaire-email` 61, `audit-email-rattacher` 48,
+  `capacite-securite`, `emails-mis-de-cote` 52, `double-vente-push` 28) servent
+  désormais un monde PROUVÉ — sans quoi le second vendeur de leurs scénarios
+  part, à raison, en quarantaine (deux contrôles ajoutés, aucun retiré).
+- ⚠️ **Non mesuré** : aucun email n'est réellement parti (Apps Script non
+  exécuté d'ici ; quota d'envoi Gmail non mesuré) ; le refus réel d'un relais
+  Apple ; les filtres `data->>etat=eq.attente&data->>nonce=eq.…` sur la vraie
+  base (forme PostgREST seulement). **Vu au passage, laissé tel quel** :
+  `sendQueuedInvoices` du script teste la constante `SECRET` au lieu de
+  `secretVRM()` ; `reglages-premium.cjs` rouge sur `main` (champ photo de
+  profil 230×18 à 390 px), sans lien avec ce chantier.
+- **Geste de Julien** : recoller `scripts/gmail-forwarder.gs` dans la boîte qui
+  fait tourner le script (clé `EMAIL_INBOUND_SECRET` dans ses propriétés) — sans
+  ça aucun lien ne part, et seule l'adresse de connexion d'un vendeur peut être
+  prouvée. Pour lui, rien d'autre : ses adresses restent reçues ; « Confirmer »
+  est facultatif.
+#### Revue du 22 octobre (soir) — six défauts reproduits, six corrigés
+Chacun REPRODUIT d'abord (vraies routes `email-rattacher` + `email-inbound` dans
+une base à état ; rendu du build), rouge sur 9845685 (copie `git archive`,
+contrôle lancé depuis elle, §6.1), vert après, rouge sous mutation.
+- ⚠️⚠️ **Le frein « 10 adresses par jour » cédait à des demandes simultanées**
+  (30 en parallèle : 30 rangées, 30 emails pour UN compte) et rien ne plafonnait
+  la boîte VRM (10 × 5 renvois = 50 liens/jour par compte gratuit, sur le quota
+  Gmail des factures Pro). ⇒ Les freins du vendeur se RÉSERVENT avant d'écrire la
+  demande, par comparer-et-échanger sur sa ligne compteur neutre
+  (`vrm_email_preuve_compteur_<empreinte>`, `data->>rev`, `api/_lib/neutre-cas.js`,
+  même motif que `modifierDonnee`) : 10 adresses ET **15 demandes** (renvois
+  compris) par 24 h glissantes (`reserverDemande`). **Plafond de toute
+  l'installation : 40 liens par jour** (`vrm_liens_adresse_jour`, réservé dans
+  `preuves-a-envoyer` avant de rendre les liens ; illisible ⇒ 503, rien ne part ;
+  au-delà, `plafond: true`). Le script envoie **les factures AVANT les liens**.
+- **Des demandes périmées bloquaient la file** (`limit=20` avant le filtre
+  d'expiration). ⇒ La base filtre : `expire` > maintenant (un ISO se compare
+  comme un texte), pas abandonnée, plus ancienne demande d'abord
+  (`order=data->>demandeLe.asc`). Une adresse que GmailApp refuse : le script
+  appelle `preuve-echec` et s'arrête (souvent le quota) ; au 3ᵉ échec la demande
+  sort de la file (`abandonLe`), l'écran dit « la boîte VRM n'a pas pu envoyer le
+  lien » (état `echec`) avec « Renvoyer » (une demande neuve).
+- **« Fermer mon compte » laissait ses preuves d'adresse** (son identifiant +
+  l'adresse, sous le neutre). ⇒ Effacées AVANT ses données
+  (`id=like.vrm_email_preuve_*&data->>owner=eq.<lui>` : prouvées, en attente,
+  compteur) ; illisible ⇒ 503, rien d'autre n'est effacé, compte gardé, dit.
+- **Le propriétaire voyait « reçue — à confirmer » + « Confirmer » pour
+  toujours** (la route rendait « transition » avant l'état de sa demande). ⇒ Une
+  demande en cours prime (« lien en préparation », « lien envoyé », « lien
+  expiré »), et ce qui est RETENU est une autre question (`adresseRetenue` :
+  prouvée, ou propriétaire de l'installation) ; la route rend `retenue` par
+  adresse, et une ligne retenue n'est jamais en couleur d'alerte.
+- **L'explication promettait « proposés dès que tu l'ajoutes »** à un vendeur
+  (faux depuis la preuve) — en tête du panneau et dans « ajouter ces
+  adresses ». ⇒ Elle suit l'état lu (`data-adresses-promesse` : `confirmation`
+  pour un vendeur · `directe` pour le propriétaire ou une seule boutique ·
+  `passu` : « rien n'est perdu », aucune promesse).
+- **« Répondre sur Vinted » (offre par email) faisait 26 px au doigt** : 44 px
+  (`styles-iphone.css`, la règle des liens à 44 px depuis le zoom 1).
+- **Prouvé** : `audit-preuve-adresse.cjs` **56 contrôles**, **11 rouges sur
+  9845685** (parallèle 30 rangées, série 20 acceptées, 60 envois, file bloquée,
+  pas d'échec, propriétaire « transition », factures après les liens…) ; les 30
+  lectures du compteur sont TENUES ensemble par le banc (une requête tenue, jamais
+  un délai : sans elle l'ordonnancement les rendait séquentielles et la mutation
+  « sans condition » restait verte) ; mutations `sanscas`, `sansplafond`,
+  `perimees`, `abandon`, `installation` (et les 4 d'avant) : toutes rouges.
+  `audit-fermer-compte.cjs` **35** (la fausse base honore enfin `id=in.`,
+  `id=like.`, `data->>x=eq.` sur un DELETE) : **3 rouges** sur 9845685, 2 sous la
+  mutation « sans filtre de vendeur ». Banc `adresses-preuve.cjs` **54** :
+  **6 rouges** sur le build de 9845685, 2 sous la mutation « promesse figée » ;
+  `messagerie.cjs` : **1 rouge** (26 px) sur le build de 9845685, rouge sans la
+  règle CSS. ⚠️ Lancés depuis un worktree dont `node_modules` est un LIEN vers
+  un autre, les bancs qui visent `/home/user/cancale-v67/node_modules/playwright`
+  ne reçoivent pas le crochet `_porte-banc.cjs` (il patche le playwright de SON
+  dossier) : `messagerie.cjs` restait sur l'écran de connexion. Le crochet a été
+  posé à la main sur ce chemin (`node -r`), l'app n'y est pour rien. Après :
+  les 143 audits verts (`audit-renum-b` sauté), `capacite-securite` 8/8, bancs
+  `emails-mis-de-cote` 52 et `double-vente-push` 28 verts. ⚠️ Les scripts de
+  reproduction du relecteur ne savent plus juger ce code : leur fausse base
+  upserte toute insertion (pas de 409), ignore `gt.` (400) et compte la ligne
+  compteur (même préfixe) comme une demande — §6.3 ; `audit-preuve-adresse`
+  rejoue leurs trois scénarios sur la forme réelle.
+- ⚠️ **Non mesuré** : le comparer-et-échanger sur la vraie PostgREST (`data->>rev=eq.N`,
+  409 sur une insertion en double — formes de `modifierDonnee`, jamais envoyées
+  d'ici) ; `order=data->>demandeLe.asc` et `data->>expire=gt.` sur sa base ; le
+  quota réel de la boîte (40 liens/jour est une borne prudente, pas une mesure).
+  ⚠️ Le relecteur avait lu « aucune ligne `vrm_email_collecteur_*` » : la boîte
+  qui envoie n'a jamais tourné — **recoller le script reste LE geste**.
+### Tes colis à l'heure : le rappel du matin, le widget et l'heure limite (22 octobre, propositions 1 et 4)
+- **Mesuré (lecture seule)** : le matin du 22, `ship_reminder_dedup` = {total 0} alors que le soir du 21 en comptait 3. Deux règles à lui : il sautait un
+  bordereau **imprimé** (`vinted_bords_printed`) comme un colis parti — l'app a décidé l'inverse — et ne partait que des bordereaux reçus par **email** (30 jours :
+  angeled92 0/18, tomj606 0/8, arthuror2 1/10). Le widget faisait les deux mêmes erreurs pour son urgence. Et **204 `email_bord_*` sur 205 portent l'heure**
+  (« JJ/MM/AAAA HH h MM », 90 à 10 h 00) : `api/email-inbound.js` la gardait déjà dans `dateLimite`, ce sont TOUS les lecteurs qui la jetaient (`frToIso`,
+  `joursAvantLimiteFr` à 23:59:59, `bordDeadline` « Date SEULE »). Vente → limite (202 ventes reliées, jour de Paris) : **jamais avant** vente + 7 j —
+  140 le jour même, **62 de 1 à 3 jours PLUS TARD** (+1 : 28, +2 : 30, +3 : 4 ; remesuré le 23 oct.). vente + 7 j est un PLANCHER, pas la limite. Les bordereaux captés par l'extension (`harvest_{uid}_label_{tx}`) ne portent **aucune** date limite (clés : url, uid, tx, item, capturedAt).
+- **Une règle** : `api/_lib/limite-envoi.js` (pur, importé par l'app comme `colisEbay`) — `lireDateLimite` (heure de **Paris**, Intl ; « 10 h 00 », « 10h00 »,
+  « 10:00 » ; heure illisible ou inexistante ⇒ **jour seul**, fin de journée, comme avant), `limiteExpedition(o, b)` (email du bordereau, sinon vente + 7 j
+  **estimée**, jour seul ; une limite dépassée vaut ≤ −1 jour **même le jour même**), `texteLimiteEnvoi` (« à poster avant demain 10 h », « en retard —
+  c'était avant 7 h aujourd'hui »), `bordsParTransaction` (la table de Colis : PDF présent, le plus récent d'abord, masqué écarté), `compterEcheances`.
+- **Le matin** lit la liste du soir (`txsAExpedier`, via `lireDonneesColis` partagé avec le soir) et la limite de l'app ; « imprimé » n'est plus « parti ».
+  Texte : « 1 colis à envoyer (1 demain avant 10 h) », « Date estimée pour N » quand une limite est estimée. **Se tait** (pas su) : ventes, comptes, réglages
+  ou **bordereaux** illisibles (une date estimée ne remplace pas une heure non lue), aucune vente Vinted captée — l'eBay part quand même. **Le soir** et **le
+  widget** comptent avec la même fonction ; le soir écrit « 1 avec la date limite demain à 10 h ». Le widget rend `heureAujourdhui`, `heureDemain`,
+  `sansLimite`, `datesPasSu` ; pour une vente sans email il ne lit QUE la ligne de ventes du compte concerné (`id=in.`, 13 à 50 Ko mesurés), jamais tout.
+- **L'app** : la carte de Colis dit l'heure (`data-limite`, `data-limite-heure`, `data-jours`) ; Ma journée a une ligne `colis-limite` (le plus pressé, son
+  heure, estimée dite) ; la notice des Ventes et Ma journée hors ligne disent la même phrase. `bordDeadline` et `joursAvantLimiteFr` sont retirés.
+  La phrase des comptes muets disait « pas de rappel du matin pour leurs colis » : devenue FAUSSE, elle dit « leur date limite est estimée ».
+- **Le cron du matin passe à 05:00 UTC** (vercel.json, pas de cron de plus) : 7 h–8 h à Paris jusqu'au 25 octobre, 6 h–7 h l'hiver (plan Hobby : ± 1 h). Le
+  rappel URSSAF du 1er et le bilan du lundi arrivent donc plus tôt aussi.
+- **Tranché** : le seuil « 0 5 » plutôt que « 0 6 » (la proposition acceptée disait 7 h l'été, 6 h l'hiver) ; `panel_bords_done` n'entre plus dans le matin
+  (1 clé, figée depuis le 31 août, plus rien ne l'écrit) ; un bordereau email SANS PDF ne donne pas sa date (la règle de l'app, inchangée).
+- **Preuves** : rejeu des VRAIES routes sur la projection de sa base (scratchpad, jamais commitée) — avant : matin **0**, widget 0/0/0 ; après : matin
+  « **1 colis à envoyer (1 demain avant 10 h)** » (tomj683, 23236225358), widget tomorrow 1 · 10:00. `audit-colis-heure.cjs` (routes exécutées, 23
+  contrôles) : **14 rouges sur origin/main** (copie `git archive`, lancé depuis la copie), vert après ; mutations « imprimé resauté » 3 rouges, « jour
+  seul » 6+, « widget email seul » 2, « limite estimée retirée » 5. Banc `colis-heure.cjs` (port 6301, rendu, 390 + 1512 px, horloge fixée au 22 à
+  8 h 10 Paris) : vert après, **12 rouges sur le build d'origin/main**, mutation « heure ignorée » dans l'app 6 rouges ; `comptes-sans-email` 4 rouges sur
+  ce build. Bancs mis à la forme réelle (§6.3, `filename` porté par 204/204 bordereaux) : `rappel-soir`, `ship-multi`, `widget-colis` ;
+  `comptes-sans-email` juge la nouvelle phrase ; `audit-statuts` suit la règle dans le module.
+- ⚠️ **Non mesuré** : ce que fait Vinted après l'heure limite (rien n'est promis) ; l'heure réelle du cron chez Vercel ; la limite eBay garde ses jours
+  calendaires (`colisEbay`, domaine eBay — une limite eBay d'aujourd'hui passée n'est pas encore « en retard ») ; le script iOS du widget (il peut lire
+  `heureDemain`, rien ne l'y oblige).
+### Fiabilité laissée ouverte le 22 octobre : Ma journée relit moins, la barre des Ventes tient sur téléphone, les photos d'une extension muette (22 octobre)
+Les trois points « reste ouvert » de `docs/passation/2026-10-22.md`.
+- **Mesuré (bissection de `main`, une construction par fusion, banc `vitesse.cjs`)** :
+  Ma journée à 390 px est passée de 54 à 64 lectures et de ~13 à 15-16 rendus
+  entre le 21 et le 22 octobre. Cinq causes, toutes retirées (aucun plafond
+  touché, 62 et 13) :
+  1. #634 lisait les n° de suivi de **tous** les achats (560, six requêtes) pour
+     n'en utiliser que ceux au point relais ⇒ sur Ma journée, seulement
+     `vintedToPickup` (`demandesSuivis`, une clé stable) ;
+  2. #635 lisait `vrm_blocked_accounts` à **deux** adresses (filtrée sur le
+     vendeur et non) : le partage des lectures ne les réunit pas ⇒
+     `purgerComptesSupprimes` lit à la même adresse que `fetchVintedAccounts` ;
+  3. les brouillons eBay étaient lus pour « numéros à vérifier », qui ne vit que
+     sur Annonces ⇒ lus sur Annonces seulement ;
+  4. un signal `vrm:colis` re-rendait toute la coque (`colisTick`) puis la cloche
+     reposait une liste identique ⇒ le signal relance la passe directement, et
+     une liste, un index ou des réserves IDENTIQUES ne sont pas reposés ;
+  5. `lireReceptionLeboncoin` passait `signal` et `cache:'no-store'` : la lecture
+     sortait du partage (`lbc_ventes` lue trois fois) ⇒ attente bornée par une
+     course, plus de signal.
+  Mesuré après : **55 à 57 lectures (64 à 390 px et 63 à 1512 avant)** ;
+  rendus médiane 13, de 12 à 14 (19/16/15 avant) ; texte de Ma journée
+  **identique caractère pour caractère** à celui de `main` aux deux tailles
+  (`VITESSE_REFERENCE`). ⚠️ Les deux textes se produisent à la MÊME heure : le
+  bonjour suit l'heure (« Bon après-midi » contre « Bonsoir » a fait un faux
+  écart au premier essai).
+- ⚠️⚠️ **LE PLAFOND GLOBAL NE VOIT PAS LAQUELLE REVIENT** : les causes 1 à 4
+  remises ensemble donnent **exactement 62 lectures et une médiane de 13
+  rendus** — le banc était VERT sur la régression. D'où quatre contrôles, un par
+  cause (n° de suivi ⊆ achats au relais, une seule adresse pour la liste noire,
+  aucun brouillon eBay, 0 rendu sur le second signal) : **12 rouges** sur `main`
+  (d198bca), 8 rouges sous les quatre mutations. La cinquième est prouvée par
+  `scripts/tests/rafraichissement-leboncoin.test.mjs` (2 lectures pour 2
+  demandes sur l'ancien code, 1 après).
+- **Barre d'outils des Ventes, décidé** : sous 768 px, « Bordereaux auto » et
+  « Mes vues » passent dans « ⋯ Outils » ; sur ordinateur rien ne bouge. Mesuré
+  à 390 px : **273 → 113 px** de barre avant la première vente. Seuil du banc
+  `revendeurs.cjs` revenu à 150.
+  ⚠️ **Trouvé en le faisant, et c'était déjà cassé sur `main`** : sous 1024 px le
+  menu « ⋯ Outils » s'ouvrait DANS la rangée qui défile (`.vrm-rangee`,
+  `overflow-x:auto`) — coupé, Rapport comptable et Registre annuel
+  intouchables au doigt. Il s'ouvre sous la barre ; le bouton reste collé à
+  droite de la rangée. `revendeurs.cjs` : **8 rouges sur `main`**, 210 verts
+  après ; menu remis dans la rangée ⇒ rouge, outils remis dans la barre ⇒ rouge.
+- **`photos-vinted.cjs` : 40 rouges qui ne mesuraient aucune photo** — l'écran
+  de connexion. La porte de banc (`_porte-banc.cjs`, chargée par `_meta.cjs`) se
+  posait sur `require('playwright')` ; or le banc lance
+  `/home/user/cancale-v67/node_modules/playwright`, et dans un **worktree dont
+  `node_modules` est un lien vers un autre arbre** ce sont DEUX modules : la
+  porte sur l'un, le navigateur de l'autre. Même cause pour `rapport.cjs` (7
+  rouges) et `seuils-vinted.cjs` (13) — verts une fois la porte posée aussi sur
+  le chemin absolu (dans la porte elle-même, pas banc par banc). ⚠️ Les
+  workflows lancent leurs agents dans des worktrees : *un banc rouge en masse
+  dans un worktree, regarder d'abord l'écran capturé*. Porte posée, 6 rouges :
+  - ⚠️ **U, un vrai défaut d'app** (depuis e4a755f, 13 oct.) : avec une session,
+    le secours des photos vaut « oui » en permanence (la route serveur). Serveur
+    qui échoue + extension MUETTE ⇒ chaque photo partait en « délai », jamais
+    comptée perdue : des pictogrammes **sans aucune phrase**. Une extension
+    muette n'est plus interrogée (refus, jamais définitif), et son retour
+    redemande les photos refusées même quand le secours ne change pas
+    (`secoursChange`, contrôle ajouté à `audit-photos-vinted.cjs`, rouge sur
+    l'ancien code et sous la mutation `ext-revenue`). U : 3 rouges sur `main`
+    et sous mutation, verts après.
+  - **O et N, le banc en retard** : hors ligne, la coque remplace TOUS les écrans
+    par la copie de Ma journée (5588c02, 21 oct.) — plus de liste de photos ni de
+    navigation de sections pendant la coupure. Les deux scénarios jugent
+    maintenant ce qui existe : la coque dit « hors ligne », aucune phrase de
+    photos fausse, et au retour du réseau tout s'affiche sans phrase.
+- **« À envoyer 0 » avant la liste des comptes** (trouvé en relançant
+  `statuts-colis.cjs`, rouge sur `main`) : la tuile de Ma journée n'était « pas
+  su » que si les QUATRE lectures manquaient ET que des comptes étaient connus —
+  avant le retour de la liste des comptes, elle disait « 0 », puis « 2 » une
+  seconde plus tard. Un zéro inventé (§5) : « — » tant que les comptes, les
+  ventes (ou, pour « À retirer », les achats) ne sont pas lus. Rouge sur `main`
+  à 390 px (deux passages sur deux), et sur la mutation aux deux tailles ; vert
+  deux fois après. `ebay-colis`, `ebay-messages-journee`, `journee-premium`
+  (qui lisent la même tuile) restent verts.
+- ⚠️ **Disque plein pendant la passe** (`/` à 20 Mo libres) : Chromium mourait
+  (« No space left on device » dans ses journaux) et le banc disait seulement
+  « Target page, context or browser has been closed ». Un banc qui meurt ainsi,
+  c'est la machine : regarder `df -h /` avant d'accuser l'app.
+- **Non mesuré** : les rendus varient de 12 à 14 sous la charge de la machine
+  partagée (4 cœurs) — la médiane tient le plafond, un tirage isolé peut le
+  dépasser ; la route serveur des photos en production (le défaut U ne se voit
+  que si elle échoue) ; rien n'a été vu sur un vrai téléphone.
+- **Revue du soir (22 octobre) — trois défauts de cette passe, reproduits, corrigés.**
+  Chacun : rouge sur 204618c (copie `git archive`, contrôle lancé depuis elle),
+  vert après, rouge sous mutation.
+  1. ⚠️ **Une lecture PENDUE captait toutes les suivantes** (régression de la
+     cause 5) : sans `signal`, `lbc_ventes` entre dans le partage, qui gardait
+     une lecture EN COURS sans limite. Une requête perdue (réseau qui change,
+     iPhone qui se réveille) : « ↻ Actualiser » de l'écran Leboncoin ne
+     relançait plus rien, l'écran restait « — » jusqu'à une écriture. Une
+     lecture en cours ne se partage plus que `VOL_MAX_MS` = **8 s** (plus court
+     que les 12 s de `lireReceptionLeboncoin`) ; deux lectures simultanées
+     restent UN appel. `audit-lectures-partagees.cjs` §10 (mutation
+     `vol-sans-fin` rouge) ; `rafraichissement-leboncoin.test.mjs` 6/6 (« une
+     lecture pendue ne capte pas Actualiser », rouge sur 204618c).
+  2. **« 0 À retirer » sur un échec des achats** : la correction « — tant que
+     les achats ne sont pas lus » ne couvrait que l'attente (`items:null`) ; un
+     ÉCHEC rend `items:[]` + `error` + `failedUids`, et Achats disait
+     « Impossible de charger » au même moment (§5, §11). La tuile vaut « pas
+     su » si les achats sont en échec (`buys.error`, ou un compte non exclu
+     dans `failedUids`), comme « À envoyer » pour les ventes.
+     `statuts-colis.cjs` §3c (lecture groupée des commandes et relais en 503,
+     ventes lues) : **2 rouges sur 204618c** (« lu 0 »), 2 sous la mutation
+     « échec ignoré », vert après ; l'autre sens (achats lus ⇒ « 1 ») ajouté.
+  3. **Extension qui alterne muette/présente** : son retour rouvrait toutes les
+     photos refusées SANS le recul — chaque lien mort redemandé à chaque retour
+     (16 demandes par lien en 10 min contre 3 sur `main`, la borne « quinze
+     retours, quinze demandes » du 11 octobre contournée). `rouvrirTout(true)` :
+     une photo jamais rouverte l'est tout de suite (U reste vert), un lien mort
+     attend son recul ⇒ **4** demandes par lien. `audit-photos-vinted.cjs` :
+     contrôle « extension qui alterne », rouge sur 204618c ([16,…]) et sous
+     `ext-revenue-sans-recul` et `retour-sans-borne`.
+  Bancs relancés un par un (ports 6431-6434) : statuts-colis, photos-vinted U,
+  journee-premium (17 ✅), ebay-colis, ebay-messages-journee, vitesse (lectures
+  inchangées, 57/55). ⚠️ vitesse a donné une fois une médiane de 14 rendus sur
+  Ma journée 390 px (12/14/15) pendant le passage complet ; relancé seul deux
+  fois : 13/14/12 et 13/13/14, contre 13/14/13 et 13/13/13 sur 204618c — le
+  bruit de la machine partagée déjà noté, la tuile ne crée aucun état.
+  **Non mesuré** : la durée réelle d'une lecture lente sur un vrai téléphone
+  (une lecture de plus de 8 s n'est plus partagée : au pire une requête de
+  plus, jamais une réponse fausse).
+- **Revue du 22-23 octobre — deux défauts reproduits, corrigés** :
+  1. ⚠️ **Une date ESTIMÉE (vente + 7 j, sans email) dépassée était « en retard »** : titre « ⏰ … du retard ! » du matin, « dont déjà en retard » du soir,
+     `overdue` du widget, « 1 j de retard » sur la carte de Colis — alors que la vraie limite tombe jusqu'à 3 jours plus tard (62/202). Nouveau dans les
+     notifications et le widget (ils ne lisaient que les emails), ancien dans l'app. ⇒ Le module : `retard` = dépassée **et lue dans l'email** ; une estimée
+     dépassée a sa classe (`estimeeDepassee`), sa phrase (`TEXTE_ESTIMEE_DEPASSEE`, « date estimée dépassée — vérifie la vraie limite sur Vinted »), reste
+     dans les totaux et se dit à part : matin « N à vérifier sur Vinted — date estimée dépassée » (`aVerifier`, jamais le titre ⏰), soir « N à vérifier sur
+     Vinted (date estimée passée) » (les estimées d'aujourd'hui comprises), widget `estimeeDepassee` (hors `overdue`). L'app suit la même règle (§11) :
+     tuile et notice de Ma journée, publication `vrm_colis_aposter.enRetard`, bandeau d'urgence de Colis, liste du soir hors ligne (`aVerifier`, la photo porte
+     `estimee`). Un retard LU passe devant une estimée dépassée sur la ligne `colis-limite`.
+  2. **La ligne `colis-limite` de Ma journée était ROUGE** (icône, sous-titre, « Voir › ») sur un retard — §7 : ambre, comme `data-colis-urgence`.
+  - Preuves : `audit-colis-heure.cjs` section 8 (32 contrôles) — **9 rouges sur 8d164f1** (+ « l'autre sens », vacant avant : le champ `retard` n'existait
+    pas) ; mutations « estimée = retard » (module) 7 rouges, « soir sans les estimées d'aujourd'hui » 2, « widget overdue + estimées » 1. Banc
+    `colis-heure.cjs` (+ la vente 9205, estimée dépassée ; + la teinte de la ligne) — **6 rouges sur le build de 8d164f1** (« 1 j de retard », rgb(192,57,43)),
+    vert après ; mutations « ligne rouge » 2, « estimée = retard » 4. Verts : tous les audits hors SQL, `rappel-soir`, `widget-colis`, `ship-multi`,
+    `widget-multi`, `bilan-semaine`, `serveur`, `ebay-relecture-cron`, `hors-ligne`, `poste-sans-depart`, `ebay-colis`, `comptes-sans-email`,
+    `tout-generer`. ⚠️ `statuts-colis` sort rouge (tuile « À envoyer » lue 0) — **déjà rouge sur le build d'origin/main et de 8d164f1**, pas ce lot.
+  - ⚠️ Non mesuré : le texte réel sur l'iPhone (le script du widget lit-il `estimeeDepassee` ? rien ne l'y oblige).

@@ -164,10 +164,30 @@ async function brancher(p){
       const fin=await lignes.last().boundingBox();
       const analyse=await p.locator('.vrm-sales-analysis').boundingBox();
       // (22 oct.) Deux réglages ont rejoint la barre le 21 oct. (« Bordereaux auto », « Mes vues ») :
-      //   sur téléphone elle fait ~275 px (mesuré), 140 px sur ordinateur. Le seuil téléphone suit cet
-      //   ajout voulu ; l'ordinateur garde le sien. Les mettre sur une seule ligne reste à décider (passation).
-      check(outil.y+outil.height<=liste.y && outil.height<(width<600?300:150), 'outils regroupés et compacts avant les ventes '+width);
+      //   sur téléphone elle faisait ~275 px (le seuil avait été porté à 300). Tranché : sur téléphone
+      //   ils passent dans « ⋯ Outils » ; le seuil revient à sa valeur d'avant, 150 px, à toutes les tailles.
+      check(outil.y+outil.height<=liste.y && outil.height<150, 'outils regroupés et compacts avant les ventes '+width);
       check(analyse.y>=fin.y+fin.height, 'analyse placée après la liste '+width);
+      // …et ils restent JOIGNABLES : le menu s'ouvrait DANS la rangée des filtres, qui défile au doigt
+      // sous 1 024 px et le coupait (invisible, intouchable — mesuré sur le code d'avant). On juge ce
+      // qu'un doigt atteint (`elementFromPoint`), pas la présence dans le DOM.
+      const barreV=p.locator('.vrm-sales-workbar');
+      const dansBarre=await barreV.evaluate(b=>({ba:!!b.querySelector(':scope > div > button[role=switch]'),vues:!!b.querySelector(':scope > .vrm-vues')}));
+      if(width<768) check(!dansBarre.ba && !dansBarre.vues,'téléphone : « Bordereaux auto » et « Mes vues » sortis de la barre '+width);
+      else check(dansBarre.ba && dansBarre.vues,'ordinateur : « Bordereaux auto » et « Mes vues » restent dans la barre '+width);
+      const bOutils=barreV.getByRole('button',{name:/Outils/});
+      await bOutils.scrollIntoViewIfNeeded();
+      const outilsVisible=await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return !!x&&e.contains(x);});
+      check(outilsVisible,'« ⋯ Outils » touchable '+width);
+      await bOutils.click({timeout:5000}).catch(()=>{});await p.waitForTimeout(250);
+      // Le menu se reconnaît à son CONTENU (« Rapport comptable »), pas à un attribut posé par le correctif.
+      const atteint=await p.evaluate(()=>{const t=e=>{if(!e)return false;const b=e.getBoundingClientRect();if(!b.width||!b.height)return false;const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return !!x&&e.contains(x);};const r=[...document.querySelectorAll('.vrm-main button')].find(b=>/Rapport comptable/.test(b.innerText));if(!r)return null;const m=r.parentElement;return {rapport:t(r),ba:t(m.querySelector('button[role=switch]')),vues:t(m.querySelector('.vrm-vues summary'))};}).catch(()=>null);
+      check(!!atteint && atteint.rapport,'le menu « ⋯ Outils » s’ouvre et se touche '+width+' '+JSON.stringify(atteint));
+      if(width<768) check(!!atteint && atteint.ba && atteint.vues,'téléphone : « Bordereaux auto » et « Mes vues » touchables dans « ⋯ Outils » '+width);
+      // Refermer comme un doigt : ce qui est sous le bouton (le voile du menu) reçoit le clic. Sur le
+      // code d'avant le voile restait ouvert sur un menu invisible et bloquait tout l'écran.
+      await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(x&&!e.contains(x))x.click();}).catch(()=>{});await p.waitForTimeout(200);
+      check(await p.locator('.vrm-main button',{hasText:'Rapport comptable'}).count()===0 && await bOutils.getAttribute('aria-expanded')==='false','le menu « ⋯ Outils » se referme '+width);
     }
    }
    if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-desktop.png')});await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-390.png')});}

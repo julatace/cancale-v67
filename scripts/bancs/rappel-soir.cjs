@@ -52,10 +52,13 @@ const vendeurs = () => ({
       { transaction_id: 106, status: 'Le paiement a été validé', date: iso(SOIR - J), price: { amount: '30' }, transaction_user_status: 'needs_action' },
       { transaction_id: 107, status: 'Le paiement a été validé', date: iso(SOIR - 4 * J), price: { amount: '45' }, transaction_user_status: 'needs_action' },
     ] } },
+    // §6.3 (22 oct.) : la forme RÉELLE d'un bordereau email — `filename` et
+    // `receivedAt` sont sur 204 lignes sur 204 ; la table « un bordereau par
+    // vente » de l'app (et désormais des rappels) ne lit que celles-là.
     bords: [
-      { id: 'email_bord_106', data: { transaction: '106', dateLimite: '22/10/2026 23:59', numero: '12' } },
-      { id: 'email_bord_107', data: { transaction: '107', dateLimite: '21/10/2026 23:59', numero: '14' } },     // limite ce soir : demain, c'est en retard
-      { id: 'email_bord_102', data: { transaction: '102', dateLimite: '20/10/2026 23:59', numero: '9' } },   // coché « posté » : jamais compté
+      { id: 'email_bord_106', data: { transaction: '106', dateLimite: '22/10/2026 23:59', numero: '12', filename: 'Bordereau-Vinted-106.pdf', receivedAt: iso(SOIR - J) } },
+      { id: 'email_bord_107', data: { transaction: '107', dateLimite: '21/10/2026 23:59', numero: '14', filename: 'Bordereau-Vinted-107.pdf', receivedAt: iso(SOIR - 4 * J) } },     // limite ce soir : demain, c'est en retard
+      { id: 'email_bord_102', data: { transaction: '102', dateLimite: '20/10/2026 23:59', numero: '9', filename: 'Bordereau-Vinted-102.pdf', receivedAt: iso(SOIR - J) } },   // coché « posté » : jamais compté
     ],
     ebay: [ebayCmd('E1', '2026-10-25T21:00:00Z')],
   },

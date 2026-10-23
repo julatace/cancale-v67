@@ -28,6 +28,7 @@
 //  dans le dossier temporaire), à partir des sources de l'arbre où il est.
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (21 oct.)
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 
@@ -138,9 +139,10 @@ async function brancher(ctx, st) {
   await ctx.route('**://*.vinted.net/**', (r) => r.abort());
 }
 
-const ctxDe = async (nav, taille) => nav.newContext(taille === 390
+const ctxDe = async (nav, taille) => { const ctx = await nav.newContext(taille === 390
   ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }
   : { viewport: { width: 1512, height: 950 } });
+  await cspBanc(ctx, `http://localhost:${PORT}`, 'captcha ' + taille); return ctx; };
 const attendre = (pg, sel, ms = 10000) => pg.waitForSelector(sel, { timeout: ms }).then(() => true).catch(() => false);
 const statut = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-captcha]'); return e ? e.getAttribute('data-captcha') : null; });
 const bouton = (pg) => pg.evaluate(() => { const b = document.querySelector('form button[type=submit]'); return b ? { off: b.disabled, txt: b.innerText.trim() } : null; });
@@ -294,5 +296,6 @@ async function scenarios(nav, taille) {
     try { fs.rmSync(DIST_CAPTCHA, { recursive: true, force: true }); } catch (_) {}
   }
   console.log(`\n${ko ? '❌ ' + ko + ' contrôle(s) en échec' : '✅ tout est vert'}`);
+  ko += bilanCsp();
   process.exit(ko ? 1 : 0);
 })();

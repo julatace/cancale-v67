@@ -35,12 +35,34 @@
 .vrm-cm-chiffres b { display: block; font-size: 22px; color: var(--cm-encre); font-variant-numeric: tabular-nums; }
 .vrm-cm-vide { border-style: dashed; }
 .vrm-cm-carte { position: relative; height: min(56vh, 520px); min-height: 320px; border-radius: 12px; overflow: hidden; border: 1px solid var(--cm-bord); margin: 0 0 12px; background: var(--cm-carte); box-shadow: var(--cm-ombre); }
-.vrm-cm-carte-fond { position: absolute; inset: 0; }
+.vrm-cm-carte .vrm-cm-carte-fond { position: absolute; inset: 0; } /* plus fort que .maplibregl-map { position: relative } */
 .vrm-cm-carte-attente { position: absolute; inset: 0; display: grid; place-items: center; color: var(--cm-doux); margin: 0; }
-.vrm-communaute[data-dark="true"] .leaflet-container { background: #0B0E13; }
-.vrm-communaute[data-dark="true"] .leaflet-control-attribution { background: rgba(16,20,27,.8); color: #98A2B3; }
-.vrm-communaute[data-dark="true"] .leaflet-control-attribution a { color: #C7CEDA; }
-.vrm-communaute[data-dark="true"] .leaflet-bar a { background: #10141B; color: #E8ECF2; border-color: #1F2530; }
+/* La carte MapLibre : contrôles de VRM (une seule forme de bouton, aucune
+   couleur d'accent sur les contrôles — elle est réservée à SA épingle). */
+.vrm-cm-carte .maplibregl-map { font: inherit; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-canvas-container { background: #10141B; }
+.vrm-cm-carte .maplibregl-ctrl-attrib { font-size: 11px; background: rgba(255,255,255,.82); color: #5B6472; }
+.vrm-cm-carte .maplibregl-ctrl-attrib a { color: #10151B; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib { background: rgba(16,20,27,.82); color: #98A2B3; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib a { color: #C7CEDA; }
+.vrm-communaute[data-dark="true"] .vrm-cm-carte .maplibregl-ctrl-attrib-button { filter: invert(1); }
+/* Le « i » de l'attribution repliée (écran étroit) : UN seul pictogramme, à sa
+   taille. Une règle générale de l'app lui donnait 44 px de haut, et l'image de
+   fond se RÉPÉTAIT : deux « i » empilés (vu au rendu, 390 px). */
+/* (« :root body … » : la règle générale des boutons de .vrm-main est très forte.) */
+:root body .vrm-cm-carte .maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button { width: 24px; height: 24px; min-height: 24px !important; padding: 0 !important; background-repeat: no-repeat; background-position: center; }
+.vrm-cm-ctrl { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; border: 1px solid var(--cm-bord); background: var(--cm-carte); box-shadow: var(--cm-ombre); }
+.vrm-communaute .vrm-cm-ctrl button { width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 22px; font-weight: 500; line-height: 1; display: grid; place-items: center; }
+.vrm-communaute .vrm-cm-ctrl button + button { border-top: 1px solid var(--cm-bord); }
+.vrm-communaute .vrm-cm-ctrl button:hover, .vrm-communaute .vrm-cm-recentrer:hover { background: var(--cm-fond); }
+.vrm-communaute .vrm-cm-recentrer { position: absolute; left: 12px; top: 12px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; box-shadow: var(--cm-ombre); font-size: 13px; }
+.vrm-communaute .vrm-cm-ctrl button:focus-visible, .vrm-communaute .vrm-cm-recentrer:focus-visible, .vrm-communaute .vrm-cm-pin:focus-visible { outline: 2px solid var(--cm-accent); outline-offset: 2px; }
+.vrm-cm-carte .maplibregl-marker { cursor: pointer; }
+/* Le PORTEUR est le marqueur de MapLibre (position par un transform en ligne) :
+   aucune transition ni position ici, sinon les épingles traînent ou se décalent
+   quand on déplace la carte. Le bouton, dedans, porte la forme et le survol. */
+.vrm-cm-carte .vrm-cm-porteur { width: 44px; height: 44px; }
+.vrm-cm-carte .vrm-cm-porteur:has(.moi) { z-index: 1; }
 .vrm-communaute .vrm-cm-pin {
   width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%;
   background: var(--cm-carte); color: var(--cm-encre); border: 2px solid var(--cm-encre);
@@ -121,9 +143,8 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-groupe-actif b { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 
 /* Téléphone : la coque n'est plus zoomée (styles-iphone.css, .vrm-main { zoom:1 }).
-   L'ancienne compensation (zoom: 1.25 sur la carte) grossissait la carte de 25 %
-   et posait un zoom CSS sur le conteneur de Leaflet lui-même — ce que Leaflet ne
-   sait pas compter, surtout sous Safari (iPhone) : tuiles et épingles à côté. */
+   Aucun zoom CSS sur le conteneur de la carte : MapLibre ne le compte pas
+   (épingles et gestes à côté, Safari surtout). */
 @media (max-width: 767px) {
   .vrm-main .vrm-cm-carte { height: min(50vh, 420px); min-height: 280px; }
 }
@@ -138,3 +159,11 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-rang-moi{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-radius:12px;background:var(--cm-accent-fond);color:var(--cm-accent);font-size:12px;margin:0 0 16px}.vrm-cm-rang-moi>span:first-child>b{display:block;font-size:22px;font-weight:600;margin-top:3px}.vrm-cm-rang-moi small{font-size:12px;font-weight:400;opacity:.7}.vrm-cm-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:22px}.vrm-cm-laureat{min-width:0;display:flex;flex-direction:column;align-items:center;position:relative;padding:19px 9px 15px;border:1px solid var(--cm-bord);border-radius:14px;background:linear-gradient(160deg,var(--cm-fond),var(--cm-carte))}.vrm-cm-laureat.place-1{border-color:var(--cm-accent);background:linear-gradient(145deg,var(--cm-accent-fond),var(--cm-carte))}.vrm-cm-place{font-size:10px;color:var(--cm-doux);margin-bottom:9px;font-weight:600}.vrm-cm-laureat>b{font-size:12px;margin-top:9px;max-width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.vrm-cm-laureat>small{font-size:10px;color:var(--cm-doux);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px}.vrm-cm-score{font-size:23px;letter-spacing:-.7px;font-weight:600;margin-top:12px;font-variant-numeric:tabular-nums}.vrm-cm-score small{font-size:10px;font-weight:400;letter-spacing:0;color:var(--cm-doux)}.vrm-cm-entete-liste{display:flex;justify-content:space-between;padding:0 10px 9px;font-size:10px;color:var(--cm-doux)}
 .vrm-cm-classement li{grid-template-columns:36px minmax(0,1fr) auto;min-height:58px;padding:9px 10px;gap:12px}.vrm-cm-classement .vrm-cm-qui{display:flex;align-items:center;gap:10px;min-width:0}.vrm-cm-qui>span{min-width:0}.vrm-cm-qui b{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.vrm-cm-ventes{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.vrm-cm-ventes>b{font-size:16px;font-weight:600}.vrm-cm-ventes>small{display:block;font-size:10px;color:var(--cm-doux)}
 @media(max-width:520px){.vrm-cm-palmares-tete h2{font-size:19px}.vrm-cm-palmares-metrique{display:none}.vrm-cm-podium{gap:6px;margin-bottom:16px}.vrm-cm-laureat{border-radius:11px;padding:12px 5px}.vrm-cm-laureat .vrm-cm-avatar{width:36px;height:36px}.vrm-cm-score{font-size:20px;margin-top:8px}.vrm-cm-laureat>b{font-size:11px}.vrm-cm-laureat>small{font-size:9px}.vrm-cm-classement li{gap:8px;padding:8px 6px;grid-template-columns:29px minmax(0,1fr) auto;min-height:54px}.vrm-cm-classement .vrm-cm-qui{gap:8px}.vrm-cm-classement .vrm-cm-avatar{width:29px;height:29px}.vrm-cm-identite-discord{padding:12px;gap:10px}.vrm-cm-identite-discord .vrm-cm-ligne-boutons{gap:6px}}
+/* Sa propre épingle reste EN ACCENT même quand elle porte ses initiales (une
+   seule personne) : la règle « profil » ci-dessus la repeignait en blanc. */
+.vrm-communaute .vrm-cm-pin.profil.moi { background: var(--cm-accent); border-color: var(--cm-accent); color: #fff; }
+/* Les initiales des AUTRES en encre neutre (relecture du 22 oct.) : la règle
+   « profil » de main les peignait en accent ; avec 50 personnes à l'écran
+   l'accent n'aurait plus rien de rare (§7). L'accent PLEIN reste à SA propre
+   épingle ; un liseré accent signale seulement « près de toi » (`.pres`). */
+.vrm-communaute .vrm-cm-pin.profil:not(.moi) { color: var(--cm-encre); }

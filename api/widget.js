@@ -4,6 +4,9 @@ import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
+// La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
+// du matin et du rappel du soir (§11, 22 octobre).
+import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -27,7 +30,6 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KE
 const HEADERS = { ...sbCle(SUPABASE_KEY) };
 
 const parisDate = (off = 0) => new Date(Date.now() + off * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
-const frToIso = (s) => { const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 
 // ⚠️ §4.5 — SUPABASE PLAFONNE UNE RÉPONSE À 1000 LIGNES SANS LE DIRE. À
 // 1000 utilisateurs, un balayage `email_bord_*` / `harvest_%25_*` dépasse le
@@ -135,7 +137,10 @@ async function rows(like) {
 // le quota de bande passante Supabase (la même leçon qu'en §23 côté app, jamais
 // reportée ici). On ne projette que les 4 champs scalaires réellement lus plus
 // bas (date limite + clés d'identification) → l'appel passe de ~6 Mo à ~1 Ko.
-const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero';
+// (22 oct.) + `receivedAt` et `filename` : la table « un bordereau par vente »
+// est celle de l'écran Colis (`bordsParTransaction`, le PDF présent, le plus
+// récent d'abord) — deux scalaires de plus, toujours aucun PDF.
+const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
 // Une ligne projetée (§4.4) : objet · null (absente) · undefined (pas su).
 async function ligneProjetee(id, cles) {
   try {
@@ -197,16 +202,20 @@ async function comptesAExpedierOuRetirer(kind, vivants) {
     const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
     if (!rows) return null;
     const vus = new Set(); let resumeTrouve = false;
+    const ligneDe = {};
     for (const row of rows) {
       if (ligneDunCompteRetire(vivants, row.id)) continue;
       if (!Array.isArray(row.txns)) continue;
       resumeTrouve = true;
-      for (const t of row.txns) vus.add(String(t));
+      for (const t of row.txns) { vus.add(String(t)); if (!ligneDe[String(t)]) ligneDe[String(t)] = row.id; }
     }
     // Aucune ligne n'a encore de résumé (extension pas rechargée) → on le dit à
     // l'appelant, qui retombera sur la lecture complète. Une seule fois : dès la
     // première capture avec la nouvelle extension, on ne lit plus que ~1 Ko.
-    return resumeTrouve ? [...vus] : null;
+    // `ligneDe` : la ligne (le compte) de chaque transaction — pour aller
+    // chercher la DATE d'une vente sans bordereau email, et seulement elle.
+    if (!resumeTrouve) return null;
+    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); return out;
   } catch (_) { return null; }
 }
 async function harvestOrders(kind, vivants) {
@@ -274,7 +283,10 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // ⚠️ (17 oct.) `vinted_urssaf_mois` : la ligne que l'écran Ventes PUBLIE (son
 // propriétaire, §11) — le widget y lit l'argent REÇU du mois (`recu`, calculé
 // par `recuDuMois`, la règle même de « Reçu en {mois} » sur Ma journée).
-const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_printed', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois'];
+// ⚠️ (22 oct.) `vinted_bords_printed` n'est plus lu : un bordereau IMPRIMÉ
+// n'est pas un colis parti (la règle de l'app). `vinted_bords_hidden` l'est : un
+// bordereau qu'il a masqué ne donne pas la date limite (table de l'écran Colis).
+const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_sales_hidden', 'vinted_urssaf_mois'];
 async function main() {
   try {
     const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
@@ -407,7 +419,7 @@ export default async function handler(req, res) {
         && given.split('').reduce((acc, ch, i) => acc | (ch.charCodeAt(0) ^ expected.charCodeAt(i)), 0) === 0;
       if (!ok) { res.status(401).json({ error: 'cle invalide' }); return; }
     }
-    const today = parisDate(0), tomorrow = parisDate(1), ym = today.slice(0, 7);
+    const today = parisDate(0), ym = today.slice(0, 7);
 
     // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
     // emails imprécis : Vinted sait quand c'est expédié / récupéré.
@@ -421,16 +433,38 @@ export default async function handler(req, res) {
     const pickup = txBuy
       ? txBuy.filter(t => !pickupDone[String(t)]).length
       : purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)]).length;
-    // Urgence d'expédition : on croise avec les bordereaux (date limite) pour les
-    // ventes réellement en attente d'envoi.
-    const printed = m.vinted_bords_printed || {};
+    // ── URGENCE D'EXPÉDITION : LA RÈGLE DE L'APP ET DES RAPPELS (22 octobre) ──
+    // ⚠️ Elle sautait un bordereau IMPRIMÉ (« imprimer ne suffit pas », a
+    //    décidé l'app) et ne connaissait que les ventes dont le bordereau est
+    //    arrivé par EMAIL : une vente sans email n'était jamais « en retard ».
+    // ⇒ Pour CHAQUE vente à expédier (`shipTxns`, la liste du soir), la date
+    //    limite de l'app (`limiteExpedition` : l'email du bordereau AVEC son
+    //    heure, sinon vente + 7 jours, estimée).
     const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
-    let shipOverdue = 0, shipToday = 0, shipTomorrow = 0;
-    for (const b of bords) {
-      if (printed[bKey(b)] || bordsShipped[bKey(b)] || (b.transaction && !shipTxns.has(String(b.transaction)))) continue;
-      const iso = frToIso(b.dateLimite); if (!iso) continue;
-      if (iso < today) shipOverdue += 1; else if (iso === today) shipToday += 1; else if (iso === tomorrow) shipTomorrow += 1;
+    const cachees = (m.vinted_bords_hidden && typeof m.vinted_bords_hidden === 'object') ? m.vinted_bords_hidden : {};
+    const bordsTx = bordsParTransaction(bords, (b) => !!cachees[bKey(b)]);
+    // La DATE des ventes sans date limite lue dans un email (la limite estimée
+    // en part). Avec la liste complète (pas de résumé) on l'a déjà ; sinon on
+    // ne lit QUE les comptes concernés (§4.4 — la ligne d'un compte pèse 13 à
+    // 50 Ko, mesuré). Lecture ratée ⇒ ces ventes ne sont classées nulle part
+    // (`sansLimite`), jamais avec une date inventée.
+    const ventesTx = {};
+    for (const o of sold) if (o && o.transaction_id != null) ventesTx[String(o.transaction_id)] = o;
+    let datesPasSu = false;
+    if (txSold) {
+      const manque = [...shipTxns].filter((t) => !(bordsTx[t] && lireDateLimite(bordsTx[t].dateLimite)));
+      const ids = [...new Set(manque.map((t) => txSold.ligneDe && txSold.ligneDe[t]).filter(Boolean))];
+      if (ids.length) {
+        const j = await fetchPaginated(scoped(`app_data?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,my_orders:data->payload->my_orders`));
+        if (!j) datesPasSu = true;
+        else for (const row of j) for (const o of (Array.isArray(row.my_orders) ? row.my_orders : [])) if (o && o.transaction_id != null && shipTxns.has(String(o.transaction_id))) ventesTx[String(o.transaction_id)] = o;
+      }
     }
+    const ech = compterEcheances({ txs: [...shipTxns], ventes: ventesTx, bords: bordsTx, maintenant: Date.now() });
+    // ⚠️ (revue du 22 oct.) `overdue` ne compte qu'une limite LUE et dépassée ;
+    // une date ESTIMÉE dépassée (vente + 7 j, pas d'email) va dans
+    // `estimeeDepassee` — la vraie limite tombe jusqu'à 3 jours plus tard.
+    const shipOverdue = ech.retard, shipToday = ech.aujourdhui, shipTomorrow = ech.demain;
 
     // ── CA + VENTES DU MOIS : LA MÊME SOURCE QUE L'APP ────────────────────────
     // ⚠️ Ce bloc lisait les emails de vente, alors que l'app calcule désormais
@@ -469,6 +503,15 @@ export default async function handler(req, res) {
         total: shipTotal + (eb ? eb.total : 0), overdue: shipOverdue + (eb ? eb.overdue : 0),
         today: shipToday + (eb ? eb.today : 0), tomorrow: shipTomorrow + (eb ? eb.tomorrow : 0),
         vinted: shipTotal, ebay: eb, auMoins: !eb, manque: eb ? [] : ['eBay'],
+        // (22 oct.) L'heure limite la plus proche, par jour (« avant 10 h »), et
+        // les ventes Vinted dont la limite n'a pas pu être connue (ni email, ni
+        // date de vente lue) — elles comptent dans `total`, dans aucun jour.
+        heureAujourdhui: ech.premier.aujourdhui ? ech.premier.aujourdhui.heure : null,
+        heureDemain: ech.premier.demain ? ech.premier.demain.heure : null,
+        sansLimite: ech.sansLimite, datesPasSu,
+        // Les ventes Vinted dont seule une date ESTIMÉE (vente + 7 j) est
+        // dépassée : à vérifier sur Vinted, jamais comptées dans `overdue`.
+        estimeeDepassee: ech.estimeeDepassee,
       },
       pickup,
       moneyMonth: Math.round(moneyMonth),

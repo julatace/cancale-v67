@@ -22,11 +22,12 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
 const PASSE = '01/01/2020', LOIN = '31/12/2099';
+// §6.3 (22 oct.) : forme RÉELLE — un bordereau email porte `filename` (204/204).
 const BORDS = [
-  { transaction: 'T1', dateLimite: LOIN },   // à poster, pas pressé
-  { transaction: 'T2', dateLimite: PASSE },  // coché « posté » dans l'app
-  { transaction: 'T3', dateLimite: PASSE },  // bordereau marqué expédié
-  { transaction: 'T9', dateLimite: PASSE },  // compte retiré de VRM
+  { transaction: 'T1', dateLimite: LOIN, filename: 'Bordereau-Vinted-T1.pdf' },   // à poster, pas pressé
+  { transaction: 'T2', dateLimite: PASSE, filename: 'Bordereau-Vinted-T2.pdf' },  // coché « posté » dans l'app
+  { transaction: 'T3', dateLimite: PASSE, filename: 'Bordereau-Vinted-T3.pdf' },  // bordereau marqué expédié
+  { transaction: 'T9', dateLimite: PASSE, filename: 'Bordereau-Vinted-T9.pdf' },  // compte retiré de VRM
 ];
 
 function poserFetch({ comptes, resume = true }) {

@@ -24,6 +24,7 @@
 // locale à la place de cdn.jsdelivr.net (déterminisme) : BANC_PDFJS_DIR, sinon
 // téléchargé une fois depuis le registre npm.
 const path = require('path');
+const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (21 oct.)
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const PL = require(path.join(__dirname, '..', '..', 'node_modules', 'pdf-lib', 'cjs', 'index.js'));
 const { metaVersData } = require('./_meta.cjs');
@@ -101,6 +102,7 @@ const ecouter = () => new Promise((res, rej) => {
 async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, sansLecteur = false, nom }) {
   const doigt = largeur < 600;
   const ctx = await nav.newContext({ viewport: { width: largeur, height: doigt ? 844 : 1100 }, isMobile: doigt, hasTouch: doigt, deviceScaleFactor: 1 });
+  await cspBanc(ctx, `http://localhost:${PORT}`, 'imprimante ' + nom);
   const pg = await ctx.newPage();
   await pg.addInitScript((s) => {
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
@@ -225,5 +227,6 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
     dit(s.etat === 'lu' && tous.length > 0 && tous.every((a) => a.etat === 'ko') && /Ouvrir le PDF/.test(s.texte), 'lecteur PDF injoignable ⇒ « Ouvrir le PDF », pas un cadre vide', `${tous.filter((a) => a.etat === 'ko').length}/${tous.length}`);
   } finally { await nav.close(); srv.close(); }
   console.log(`\n${ko ? `${ko} contrôle(s) au rouge.` : 'Le réglage d’imprimante dit et montre ce qui sortira.'}`);
+  ko += bilanCsp();
   process.exit(ko ? 1 : 0);
 })();

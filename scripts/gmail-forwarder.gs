@@ -113,7 +113,10 @@ function forwardVintedEmails() {
   compteVerifie=true;signalerPassageVRM('debut');
   const traite=labelVRM(LABEL),preuve=labelVRM(LABEL_PREUVE),erreur=labelVRM('vrm-a-reessayer');
   confirmationTransfertVRM();
-  const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -in:spam -in:trash after:'+getStartDate();
+  const query='{from:(vinted OR mondialrelay OR chronopost OR privaterelay OR icloudmail OR leboncoin OR ebay OR colissimo OR laposte OR dpd OR gls OR ups OR relaiscolis) subject:(vinted OR vendu OR bordereau OR colis OR offre OR message OR achat OR commande OR facture)} -label:'+LABEL+' -label:vrm-configuration -in:spam -in:trash -in:sent after:'+getStartDate();
+  // (22 oct.) `-in:sent` : ce que CETTE boîte envoie (factures, liens de
+  // confirmation d'adresse — l'expéditeur contient « vinted ») n'est pas un
+  // email reçu, il ne repart pas vers VRM.
   const vus={};let n=0,phase='nouveaux';const proprietes=PropertiesService.getScriptProperties();
   while(n<MAX_PAR_PASSAGE&&Date.now()-debut<BUDGET_TRANSFERT_MS){
    if(phase==='nouveaux'&&n>=80)phase='reprises';
@@ -152,7 +155,11 @@ function forwardVintedEmails() {
   }
   // Conserve le flux Pro existant, limité au propriétaire de l'installation
   // par modeScript. Aucune facture des autres utilisateurs n'est ajoutée ici.
+  // (22 oct., revue) Les factures PASSENT AVANT les liens : elles partagent le
+  // quota d'envoi de cette boîte, et une facture compte plus qu'un lien.
   sendQueuedInvoices();
+  // Les liens de confirmation d'adresse demandés par les vendeurs (22 oct.).
+  envoyerPreuvesAdresse();
   if(Date.now()-debut<230000)nettoyerTraites();
  }catch(e){bilan.erreur=String(e.message||e);Logger.log('VRM : '+bilan.erreur);}
  finally{if(compteVerifie)signalerPassageVRM(bilan.erreur||bilan.aReessayer||bilan.classementEchoue?'erreur':'succes');bilan.fin=new Date().toISOString();try{PropertiesService.getScriptProperties().setProperty('VRM_DERNIER_PASSAGE',JSON.stringify(bilan));}finally{verrou.releaseLock();}}
@@ -213,6 +220,37 @@ function sendQueuedInvoices() {
       Logger.log('Erreur envoi facture : ' + e);
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// LIENS DE CONFIRMATION D'ADRESSE (22 octobre)
+// Un vendeur déclare dans VRM l'adresse où Vinted lui écrit ; VRM lui envoie
+// un lien À CETTE ADRESSE, et ce n'est qu'après son clic que ses emails lui
+// sont attribués. VRM écrit le message (le lien est fabriqué par le serveur,
+// sa clé ne quitte jamais Vercel) ; cette boîte l'envoie tel quel, puis le
+// dit à VRM. Un envoi raté est signalé à VRM (au 3ᵉ, la demande sort de la
+// file) et ARRÊTE le passage : c'est souvent le quota du jour, inutile de
+// brûler les suivantes. VRM plafonne lui-même le nombre de liens par jour.
+// ════════════════════════════════════════════════════════════════════
+function envoyerPreuvesAdresse() {
+  if (!secretVRM()) return;
+  let r;
+  try { r = appVRM('preuves-a-envoyer'); } catch (e) { Logger.log('Confirmations : VRM injoignable — ' + e); return; }
+  if (!r.ok) { Logger.log('Confirmations : VRM a répondu ' + r.code + ' — rien envoyé.'); return; }
+  const envois = (r.data.envois || []).slice(0, 20);
+  for (let i = 0; i < envois.length; i++) {
+    const e = envois[i];
+    try {
+      GmailApp.sendEmail(e.adresse, e.sujet, e.texte, { htmlBody: e.html, name: 'VRM' });
+    } catch (err) {
+      Logger.log('Confirmation non envoyée : ' + err);
+      try { appVRM('preuve-echec', 'post', { id: e.id }); } catch (_) {}
+      return;
+    }
+    let m = null;
+    try { m = appVRM('preuve-envoyee', 'post', { id: e.id }); } catch (_) { m = null; }
+    Logger.log('Confirmation envoyée' + (m && m.ok ? '' : ' — ⚠️ VRM ne l\'a pas notée (' + (m ? m.code : 'injoignable') + '), elle repartira'));
+  }
 }
 
 // Outil : retire l'étiquette pour re-traiter les anciens emails (à la main)

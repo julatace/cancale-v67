@@ -2,10 +2,22 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
-import { ecouterPlantages, noterPlantage } from './plantages.js';
+import { ecouterPlantages, ecouterViolationsCsp, noterPlantage } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
-ecouterPlantages(() => ({ ecran: (() => { try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; } })(),
+// ⚠️ (22 oct., revue) L'ÉCRAN SE LIT DANS L'HISTORIQUE : l'app retire `?tab=` de
+// l'adresse dès qu'elle l'a lu, et chaque écran pose `vrmTab` dans
+// `history.state` (le bouton « retour », 18 oct.). Lu dans l'adresse, le champ
+// `ecran` du journal restait vide — on ne savait pas quel écran avait parlé.
+const ecranCourant = () => {
+  try { const st = window.history.state; if (st && st.vrmTab) return String(st.vrmTab) + (st.vrmSub ? ':' + st.vrmSub : ''); } catch (_) {}
+  try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; }
+};
+ecouterPlantages(() => ({ ecran: ecranCourant(),
+  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
+// Et les violations de la politique de sécurité du contenu (Report-Only) : le
+// même journal, pour savoir sur SES appareils si elle peut passer en vigueur.
+ecouterViolationsCsp(() => ({ ecran: ecranCourant(),
   version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
 // ⚠️ APRÈS UN DÉPLOIEMENT, UN ONGLET RESTÉ OUVERT DEMANDE DES MORCEAUX QUI
 // N'EXISTENT PLUS (mesuré le 15 octobre dans le journal des plantages : « Unable
@@ -60,6 +72,7 @@ import './styles-plateformes.css';
 import './styles-iphone.css';
 import './styles-mobile-studio.css';
 import './styles-gestion.css';
+import './styles-widgets.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
@@ -115,7 +128,9 @@ const veutLApp = () => {
   // `?lier-extension=` : « Se connecter avec VRM » cliqué dans l'extension
   // (11 octobre) — droit dans l'app, qui connecte l'extension (ou demande
   // d'abord la connexion), jamais la page d'accueil.
-  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
+  // `?confirmer-adresse=` (22 oct.) : le lien de confirmation d'une adresse de
+  // réception — droit dans l'app (connexion d'abord s'il le faut), jamais l'accueil.
+  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');

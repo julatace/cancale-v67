@@ -226,9 +226,14 @@
 .vrm-day-benef-inline .vrm-display{font-size:20px!important;}
 .vrm-day-benef-inline .vrm-day-note{overflow-wrap:anywhere;}
 @media(max-width:767px){
- .vrm-day-money>.vrm-day-benef-inline{border-top-color:#ffffff30!important;padding-top:10px;margin-top:7px;}
- .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:#f1f7ef!important;}
- .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:#d4e6c8!important;}
+ /* 23 oct. : le bandeau « argent » de Ma journée est passé en fond CLAIR sur
+    téléphone (styles-mobile-studio.css, var(--vrm-surface)) ; ces textes étaient
+    encore forcés en blanc cassé et vert pâle, faits pour l'ancien bandeau sombre
+    — bénéfice et « Je n'ai pas de dépenses à noter » à 1,1:1 en clair. Ils suivent
+    maintenant les couleurs du thème, clair comme sombre. */
+ .vrm-day-money>.vrm-day-benef-inline{border-top-color:var(--vrm-line,#dce4df)!important;padding-top:10px;margin-top:7px;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:var(--vrm-ink,#213b41)!important;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:var(--vrm-accent,#244e54)!important;}
  .vrm-day-benef-inline .vrm-day-k{font-size:10px;letter-spacing:.04em;}
 }
 
@@ -293,7 +298,8 @@
 .vrm-toast>span:last-child{color:var(--message-ink)!important;min-width:0;overflow-wrap:anywhere;}
 .vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
 .vrm-toast:focus-visible{outline:2px solid var(--message-ink);outline-offset:3px;}
-@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;padding:0!important;}}
+/* Ordinateur : en bas à droite, même feuille ouverte (elle est centrée et ne va pas jusque-là). */
+@media(min-width:1024px){.vrm-toasts{left:auto!important;width:380px;right:24px!important;bottom:24px!important;top:auto!important;padding:0!important;}}
 @media(prefers-reduced-motion:reduce){.vrm-toast{animation:none!important;}}
 .vrm-main .vrm-set-panneau :is(p,small){line-height:1.6;}
 .vrm-main :is(.vrm-reception,.vrm-recus-email){
@@ -306,6 +312,17 @@
 .vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:10px!important;box-shadow:0 8px 28px #14282e20!important;}
 .vrm-main .vrm-ann-tools-pop button{border-radius:6px;}
 .vrm-main .vrm-ann-tools-pop button:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
+/* (22 oct.) « ⋯ Outils » des Ventes : sous 1 024 px la rangée des filtres défile
+   au doigt — le bouton reste collé à son bord droit (il était hors de l'écran,
+   au bout de la rangée) ; son menu s'ouvre sous la barre (App.jsx). */
+@media(max-width:1023px){
+ .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes{position:sticky;right:0;z-index:1;padding-left:8px;background:var(--vrm-surface);box-shadow:-10px 0 10px -6px var(--vrm-surface);}
+ .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes>button{min-height:36px;}
+}
+@media(max-width:767px){
+ .vrm-sales-workbar>.vrm-rangee>.vrm-outils-ventes{background:var(--vrm-mobile-paper,var(--vrm-bg));box-shadow:-10px 0 10px -6px var(--vrm-mobile-paper,var(--vrm-bg));}
+ [data-outils-ventes] .vrm-outils-reglages .vrm-vues{margin:8px 0 0;}
+}
 
 /* Perle : fondus limités aux surfaces, jamais aux informations. */
 .vrm-app-shell .vrm-atelier-rail{background-image:var(--vrm-nav-gradient)!important;}

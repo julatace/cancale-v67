@@ -36,6 +36,9 @@ const MIN = path.join(__dirname, 'agent-sql/supabase-min.sql');
 const OUTIL_SRC = path.join(__dirname, 'equipe-sql/essai-annule.cjs');
 const SOCLE = ['005-abonnements.sql', '006-acces-abonnement.sql', '007-droits-minimaux.sql', '013-anciens-numeros-en-b.sql']
   .map((f) => path.join(RACINE, 'supabase/migrations', f));
+// La 021 (confidentialité) : appliquée en production le 21 octobre, AVANT la
+// 016. Sa restrictive de lecture fermait la lecture du membre (22 octobre).
+const M021 = path.join(RACINE, 'supabase/migrations/021-confidentialite-boutiques.sql');
 // Des identités INVENTÉES.
 const J = '11111111-1111-1111-1111-111111111111';   // le vendeur
 const V = '22222222-2222-2222-2222-222222222222';   // un autre vendeur
@@ -78,7 +81,11 @@ const MUTATIONS = {
   'ecriture-membre': { apres: `create policy equipe_ecrit on public.app_data for update to authenticated
   using (owner = (select public.vrm_equipe_vendeur())) with check (true);` },
   'verifier-droits': { outil: (s) => remplace(s, "    droits: `json_array_length(e.j -> 'droits') = 0`,\n", '', 'verifier-droits') },
-  'verifier-regles': { outil: (s) => remplace(s, "    regles: `(e.j -> 'regles')::jsonb = ${lit(JSON.stringify(REGLES))}::jsonb`,\n", '', 'verifier-regles') },
+  'verifier-regles': { outil: (s) => remplace(s, "    regles: `(e.j -> 'regles')::jsonb = case when ${AVEC_021} then ${lit(JSON.stringify(REGLES_021))}::jsonb else ${lit(JSON.stringify(REGLES))}::jsonb end`,\n", '', 'verifier-regles') },
+  // 22 octobre : la 016 telle qu'elle était (sans retoucher la restrictive de la 021).
+  'sans-lecture-021': { sql: (s) => remplace(s, "  if exists (select 1 from pg_catalog.pg_policies where schemaname = 'public' and tablename = 'app_data' and policyname = 'vrm_lecture_privee') then\n", "  if false then\n", 'sans-lecture-021') },
+  'sans-garde-restrictive': { sql: (s) => remplace(s, "  if b is not null then\n    raise exception 'vrm_equipe_lecture_bloquee", "  if false then\n    raise exception 'vrm_equipe_lecture_bloquee", 'sans-garde-restrictive') },
+  'verifier-restrictives': { outil: (s) => remplace(s, "    restrictives_bloquantes: `(e.j ->> 'restrictives_bloquantes') is null`,\n", '', 'verifier-restrictives') },
 };
 
 if (PROUVE) {
@@ -225,7 +232,7 @@ const verifier = (db) => {
   });
 
   // ── LES DONNÉES (inventées) ─────────────────────────────────────────────
-  await essaie('données', () => {
+  const poserDonnees = () => {
     A(`insert into auth.users (id, email, email_confirmed_at) values
         ('${J}', 'j@exemple.fr', now()), ('${V}', 'v@exemple.fr', now()), ('${M}', 'm@exemple.fr', now()),
         ('${M2}', 'm2@exemple.fr', now()), ('${X}', 'x@exemple.fr', now()), ('${U}', 'u@exemple.fr', null);`);
@@ -257,7 +264,8 @@ const verifier = (db) => {
       ${row(M, 'main', { vrm_prenom: 'Membre' })};
       insert into public.vinted_accounts (vinted_user_id, login, owner, access_token, refresh_token) values
         ('9', 'jlogin', '${J}', 'tokJ', 'refJ'), ('8', 'vlogin', '${V}', 'tokV', 'refV');`);
-  });
+  };
+  await essaie('données', poserDonnees);
   const nbJ = Number(A(`select count(*) from public.app_data where owner = '${J}'`));
   // La requête DEMANDE le vendeur lu (en-tête `x-vrm-equipe`), comme le fera l'écran de l'équipe.
 const lusDe = (u, owner, entete = owner) => lignes(en(u, `select id from public.app_data where owner = '${owner}' order by id;`, entete));
@@ -416,6 +424,105 @@ const lusDe = (u, owner, entete = owner) => lignes(en(u, `select id from public.
     touche('restrictive-revenue', 'alter policy abonnement_requis on public.app_data using ((select public.vrm_acces_ok()));', 'regles');
     touche('ecriture-ajoutee', 'create policy equipe_ecrit on public.app_data for update to authenticated using (owner = (select public.vrm_equipe_vendeur()));', 'regles');
     touche('forme', 'alter table public.vrm_equipe add column note text;', 'forme');
+    DB = 'base';
+  });
+
+  // ── L'ORDRE DE LA PRODUCTION : la 021 AVANT la 016 (22 octobre) ────────
+  // En production, la 021 a posé `vrm_lecture_privee` (RESTRICTIVE, SELECT,
+  // `owner = auth.uid()`) le 21 octobre, avant la 016. La 016 d'avant ne la
+  // retouchait pas : le membre ne lisait RIEN (0 ligne au lieu des colis).
+  const parcoursMembre = (nom) => {
+    const a = JSON.parse(en(J, "select public.vrm_equipe_inviter('m@exemple.fr');"));
+    dit(a.ok === true, nom + ' : le vendeur invite', JSON.stringify(a));
+    dit(en(M, `select public.vrm_equipe_accepter('${a.id}');`) === 't', nom + ' : le membre accepte');
+    const lus = lusDe(M, J);
+    dit(JSON.stringify(lus) === JSON.stringify(PERMIS_J), nom + ' : le membre lit EXACTEMENT les colis du vendeur', JSON.stringify(lus));
+    dit(lignes(en(M, "select id from public.app_data where id like 'email_bord_%' or id like 'panel_%' or id like 'harvest_%' order by id;")).length === 0, nom + ' : sans en-tête, rien du vendeur');
+    dit(en(M, `select count(*) from public.vinted_accounts where owner = '${J}';`, J) === '0', nom + ' : ni ses comptes Vinted');
+    dit(lusDe(M, V).length === 0 && lusDe(M2, J).length === 0, nom + ' : rien entre vendeurs (ni de l\'autre vendeur, ni pour un étranger)');
+    const nb = Number(A(`select count(*) from public.app_data where owner = '${J}'`));
+    dit(lignes(en(J, `select id from public.app_data where owner = '${J}';`)).length === nb && nb > 0, nom + ' : le vendeur lit toujours TOUTES ses lignes');
+    dit(lignes(en(J, `select id from public.app_data where owner = '${J}';`, J)).length === nb, nom + ' : même avec l\'en-tête');
+    dit(lignes(en(V, `select id from public.app_data where owner = '${J}';`, J)).length === 0, nom + ' : un autre vendeur qui DEMANDE J ne lit rien');
+    const u = enRun(M, `with x as (update public.app_data set data = '{"vide":1}' where owner = '${J}' returning 1) select count(*) from x;`, J);
+    dit(u.ok ? u.out === '0' : true, nom + ' : le membre n\'écrit rien', u.out);
+    const v = verifier(DB);
+    dit(v.ok === true, nom + ' : `--verifier` rend ok', JSON.stringify(v.ecarts) + (v.ok ? '' : ' regles=' + JSON.stringify(v.etat.regles) + ' bloquantes=' + JSON.stringify(v.etat.restrictives_bloquantes)));
+  };
+  await essaie('021 puis 016 (l\'ordre de la production)', () => {
+    fraiche('prod021', 'socle');
+    Q(fs.readFileSync(M021, 'utf8'));
+    dit(Q("select qual from pg_policies where tablename = 'app_data' and policyname = 'vrm_lecture_privee'") === '(owner = ( SELECT auth.uid() AS uid))', 'la 021 posée seule : sa restrictive de lecture ne connaît pas l\'équipe (comme en production le 22 octobre)');
+    const r = run(SQL);
+    if (!r.ok) throw new Error(r.err);
+    if (mut && mut.apres) A(mut.apres);
+    poserDonnees();
+    parcoursMembre('021 puis 016');
+  });
+  await essaie('016 puis 021', () => {
+    fraiche('inverse', 'socle');
+    const r = run(SQL);
+    if (!r.ok) throw new Error(r.err);
+    Q(fs.readFileSync(M021, 'utf8'));
+    poserDonnees();
+    parcoursMembre('016 puis 021');
+    const t = run(SQL);
+    dit(t.ok, '016 puis 021 : la 016 se rejoue encore', t.err);
+  });
+  await essaie('une autre restrictive inconnue', () => {
+    fraiche('bloquee', 'socle');
+    Q('create policy autre_verrou on public.app_data as restrictive for select to authenticated using (owner = (select auth.uid()));');
+    const r = run(SQL);
+    dit(!r.ok && /vrm_equipe_lecture_bloquee/.test(r.err), 'une restrictive de lecture qui ignore l\'équipe fait REFUSER la migration (pas de fonction morte)', r.ok ? 'installée quand même' : r.err.slice(0, 120));
+    dit(Q("select count(*) from pg_proc where proname like 'vrm\\_equipe\\_%'") === '0', 'et rien n\'est installé');
+  });
+  // ── L'ESSAI DE PRODUCTION (scripts/equipe-sql/essai-production.cjs) ────
+  // Le bloc qui a été joué le 22 octobre sur la vraie base : il doit tourner
+  // d'un bloc sur une base à la forme de la production (021 posée), dire ce
+  // qu'il faut, et ne RIEN laisser.
+  await essaie('l\'essai de production', () => {
+    fraiche('essai_prod', 'socle');
+    A(`alter table auth.users add column if not exists aud text, add column if not exists role text,
+         add column if not exists created_at timestamptz, add column if not exists updated_at timestamptz;
+       grant insert on auth.users to postgres;`);
+    Q(fs.readFileSync(M021, 'utf8'));
+    poserDonnees();
+    A(`update public.vrm_reglages set valeur = '${J}' where cle = 'proprietaire';`);
+    const avant = A(`select md5(string_agg(owner::text || id || data::text, ',' order by owner, id)) from public.app_data`);
+    const g = spawnSync(process.execPath, [path.join(__dirname, 'equipe-sql/essai-production.cjs'), '--migration=' + FMIG], { encoding: 'utf8' });
+    if (g.status !== 0) throw new Error('générateur : ' + g.stderr.slice(0, 200));
+    const r = run(g.stdout);
+    dit(r.ok, 'l\'essai de production passe d\'un bloc', r.err);
+    if (r.ok) {
+      const t = JSON.parse(lignes(r.out).pop()), e = t.essai || {};
+      dit(e.autre_vendeur_trouve === true && e.avant_r_lit_j === 0 && e.apres_r_lit_j === 0 && e.apres_r_demande_j === 0 && e.apres_b_demande_j === 0,
+        'essai : un autre vendeur ne lit rien du propriétaire (même en le DEMANDANT)', JSON.stringify([e.avant_r_lit_j, e.apres_r_lit_j, e.apres_r_demande_j, e.apres_b_demande_j]));
+      dit(e.avant_j_lit_tout === e.avant_j_postgres && e.apres_j_lit_tout === e.avant_j_postgres && e.apres_j_lit_siennes_entete === e.avant_j_postgres,
+        'essai : le propriétaire lit toutes ses lignes, avant comme après', JSON.stringify([e.avant_j_postgres, e.avant_j_lit_tout, e.apres_j_lit_tout]));
+      dit(e.permis_j && e.permis_j.n === PERMIS_J.length && e.m_demande_j && e.m_demande_j.n === e.permis_j.n && e.m_demande_j.md5 === e.permis_j.md5 && e.m_demande_j.hors_liste === 0,
+        'essai : l\'aide lit EXACTEMENT la liste blanche', JSON.stringify([e.permis_j, e.m_demande_j]));
+      dit(e.m_sans_entete_j === 0 && e.m_demande_j_main === 0 && e.m_demande_j_ventes === 0 && e.m_demande_j_comptes_vinted === 0 && e.m_demande_r === 0,
+        'essai : et rien d\'autre (ni sans en-tête, ni main, ni ventes, ni comptes Vinted, ni l\'autre vendeur)');
+      dit(e.m_colis && e.m_colis.ventes === 1 && e.m_colis.achats === 1 && Array.isArray(e.m_colis.cles_argent) && e.m_colis.cles_argent.length === 0 && e.m_colis.mot_argent === false
+        && Array.isArray(e.permis_j_cles_argent) && e.permis_j_cles_argent.length === 0, 'essai : la projection et les colis ne portent aucune clé d\'argent', JSON.stringify(e.m_colis));
+      dit(e.m_modifie_j === 0 && e.m_efface_j === 0 && e.m_cree_chez_j && e.m_cree_chez_j.erreur === '42501', 'essai : l\'aide n\'écrit rien');
+      dit(e.m_accepte === true && e.n_accepte === false && e.r_prend_invitation_m === false && e.j_revoque_m === true && e.m_revoque_demande_j === 0 && e.m_revoque_colis === null,
+        'essai : accepter (adresse confirmée seulement), révoquer (plus rien, tout de suite)');
+      dit(t.verification && t.verification.ok === true, 'essai : la vérification rend ok dans la transaction', JSON.stringify(t.verification && t.verification.ecarts));
+    }
+    dit(Q("select to_regclass('public.vrm_equipe') is null") === 't' && Q("select count(*) from pg_proc where proname like 'vrm\\_equipe\\_%'") === '0'
+      && Q("select count(*) from pg_policies where policyname = 'equipe_lit'") === '0'
+      && Q("select qual from pg_policies where tablename = 'app_data' and policyname = 'vrm_lecture_privee'") === '(owner = ( SELECT auth.uid() AS uid))',
+      'après l\'essai de production : ni table, ni fonction, ni règle — tout est comme avant');
+    dit(A("select count(*) from auth.users where email like 'essai-016-%'") === '0' && A(`select md5(string_agg(owner::text || id || data::text, ',' order by owner, id)) from public.app_data`) === avant,
+      'après l\'essai de production : aucun compte inventé, aucune ligne touchée');
+  });
+
+  await essaie('la vérification voit la restrictive de la 021 retouchée', () => {
+    fraiche('t_lecture_021', 'prod021');
+    A('alter policy vrm_lecture_privee on public.app_data using (owner = (select auth.uid()));');
+    const v = verifier('t_lecture_021');
+    dit(v.ok === false && v.ecarts.includes('regles') && v.ecarts.includes('restrictives_bloquantes'), '--verifier voit « la restrictive de la 021 sans l\'équipe » (regles, restrictives_bloquantes)', JSON.stringify(v.ecarts));
     DB = 'base';
   });
 

@@ -22,10 +22,18 @@ const PORT = Number(process.env.BANC_PORT) || 4371;
 
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: '2026-10-27T08:00:00Z' }];
 const LIGNE = { at: '2026-10-27T07:00:00Z', mois: [{ ym: '2026-07', ca: 100, n: 1 }, { ym: '2026-08', ca: 200, n: 2 }, { ym: '2026-09', ca: 300, n: 3 }, { ym: '2026-10', ca: 999, n: 9 }] };
-const DECLARE = { '2026-07': { ids: ['v:1'], n: 1, ca: 100 }, '2026-08': { ids: ['v:2'], n: 2, ca: 200 }, '2026-09': { ids: ['v:3'], n: 3, ca: 300 } };
+// (23 oct., intégration) Les VENTES qui donnent cette ligne. Depuis la revue
+// URSSAF du 22 octobre, le rappel suit la DERNIÈRE ligne publiée : l'écran
+// Ventes la republie à partir des ventes lues — un banc qui servait la ligne
+// (600 € au T3) SANS aucune vente obtenait une republication à 0 €, juste, et
+// mesurait son incohérence. Versées en juillet, août, septembre (T3) et
+// octobre (hors T3, il ne doit pas compter).
+const VENTES_T = [[9101, 100, '2026-06-20T10:00:00Z', '2026-07-15T10:00:00Z'], [9102, 200, '2026-07-25T10:00:00Z', '2026-08-14T10:00:00Z'], [9103, 300, '2026-08-25T10:00:00Z', '2026-09-15T10:00:00Z'], [9104, 999, '2026-10-01T10:00:00Z', '2026-10-15T10:00:00Z']];
+const DECLARE = { '2026-07': { ids: ['vinted:9101'], n: 1, ca: 100 }, '2026-08': { ids: ['vinted:9102'], n: 1, ca: 200 }, '2026-09': { ids: ['vinted:9103'], n: 1, ca: 300 } };
 const rowsDe = (declare) => [
   { id: 'main', data: { vinted_urssaf_freq: 'trimestriel', vinted_urssaf_mois: LIGNE, ...(declare ? { vrm_urssaf_declare: declare } : {}) } },
-  { id: 'harvest_111_orders_sold', data: { capturedAt: '2026-10-27T07:30:00Z', payload: { my_orders: [] } } },
+  { id: 'harvest_111_orders_sold', data: { capturedAt: '2026-10-27T07:30:00Z', payload: { my_orders: VENTES_T.map(([tx, eur, vendu]) => ({ transaction_id: tx, id: tx, title: 'Baskets inventées ' + tx, price: { amount: String(eur), currency_code: 'EUR' }, status: 'Commande finalisée', date: vendu })) } } },
+  ...VENTES_T.map(([tx, , , verse]) => ({ id: 'harvest_111_txn_' + tx, data: { capturedAt: '2026-10-27T07:30:00Z', payload: { transaction: { id: tx, status: 450, status_title: 'Commande finalisée', status_updated_at: verse } } } })),
 ];
 
 let ko = 0;
