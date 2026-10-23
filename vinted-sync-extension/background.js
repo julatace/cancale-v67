@@ -2342,7 +2342,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'fiche') {
     // 22 oct. : la description et les codes qu'il vient d'ENREGISTRER sur Vinted
     // (2xx, identifiant de l'adresse ou de la réponse) — voir `noterFicheVinted`.
-    noterFicheVinted(msg.itemId, msg.status, msg.corps);
+    // 23 oct. : jugée sur l'ONGLET qui l'envoie, jamais sur ce que dit le message
+    // (`ficheDeLaPage`).
+    ficheDeLaPage(msg, sender, domain);
   } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
     // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
     // SA propre requête. Même pause que pour les requêtes du fond. (Un message
@@ -2668,6 +2670,9 @@ async function noterPublication(tabId, itemId, status) {
     if (!r || r.item) { noterDiag('publication_sans_resa'); return; }
     loc[tabId] = { ...r, item: id };
     try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
+    // 23 oct. : la fiche de CETTE publication n'est acceptée que de CET onglet
+    // (`ficheDeLaPage`) — la réservation, elle, est effacée dès qu'elle est rangée.
+    await noterOngletFiche(PUBLIS_ONGLETS, tabId, id);
     noterDiag('publication_vue');
     await lierPublicationsEnAttente();
   });
@@ -3504,12 +3509,15 @@ const estPorteMonnaie = (p) => !!(p && typeof p === 'object' && MONTANTS_PM.some
 // fait à chaque visite. Le relevé a donc sa PROPRE ligne, une par mois.
 const RELEVE_MAX_PAR_VISITE = 2;
 const RELEVE_RETRY_MS = 24 * 60 * 60 * 1000;
-// ⚠️⚠️ 22 octobre — LES PHOTOS DE FOND ÉTAIENT LA SEULE CAUSE DES PAUSES DE VINTED.
-//    Mesuré chez Julien (`panel_diag_capture`, extension 5.211) :
+// ⚠️⚠️ 22 octobre — 23 DES 27 PAUSES DE VINTED (TOUS LES 429) VENAIENT D'UNE PAGE PHOTO.
+//    Mesuré chez Julien (`panel_diag_capture`, extension 5.211, relu le 23 oct.) :
 //    `vinted_frein_429` = 23 = `photos_page_refuse_429` = 23 — les 23 « trop de
 //    demandes » de Vinted venaient TOUS d'une lecture de page d'annonce pour les
-//    photos ; paliers de pause 1/2/3 atteints 24/2/1 fois ; `visite_en_pause` =
-//    119 visites sautées (ventes et colis arrivés en retard dans VRM). Cause :
+//    photos ; les 4 autres pauses sont des 403 (`vinted_frein_403` = 4) sur
+//    d'AUTRES requêtes (aucun `photos_page_refuse_403`) ; paliers de pause 1/2/3
+//    atteints 24/2/1 fois (27 = 23 + 4) ; `visite_en_pause` = 119 visites sautées
+//    (ventes et colis arrivés en retard dans VRM). Rien n'est promis sur la
+//    disparition des pauses : ce correctif ne touche que les pages photo. Cause :
 //    jusqu'à 20 pages lues d'affilée, sans aucun écart, à chaque minute
 //    (`tickPhotos`) ET à la fin de chaque visite. (Avant : « monté 3 → 8 → 20
 //    pour remplir le catalogue plus vite » — c'est ce front-chargement que Vinted
@@ -3755,17 +3763,26 @@ function urlsPhotosDeItem(json) {
 // On récupère donc la PAGE publique de l'annonce (elle montre TOUTES les photos,
 // même déconnecté) et on l'analyse. `credentials:'omit'` : on ne touche pas à la
 // session, c'est une page publique.
+// ⚠️ 23 oct. : BORNÉE à `PAGE_DELAI_MS`. Sans délai, une page que Vinted ne rend
+//    jamais tenait la file Vinted ENTIÈRE (une requête à la fois) : bordereaux,
+//    réponses et ventes attendaient derrière elle. Interrompue ⇒ statut 0
+//    (« pas su » : le mémo de l'annonce est rendu, `memoApresEchec`).
+const PAGE_DELAI_MS = 30 * 1000;
 async function vintedGetHtml(acc, endpoint) {
   return requeteVinted('page', async () => {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const minuterie = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, PAGE_DELAI_MS) : null;
     try {
       const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
         method: 'GET',
         credentials: 'omit',
         headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' },
+        signal: ctl ? ctl.signal : undefined,
       });
       const text = await res.text();
       return { status: res.status, ok: res.ok, text };
     } catch (_) { return { status: 0, ok: false, text: '' }; }
+    finally { if (minuterie) clearTimeout(minuterie); }
   });
 }
 // Extrait { photos, description } de la PAGE d'une annonce. Priorité au bloc
@@ -4034,6 +4051,21 @@ async function planPhotos(uid) {
   return plan;
 }
 
+// Le mémo « annonce lue » (`vrmPhotosFaites`), modifié clé par clé sur la valeur
+// RELUE : `null` retire la clé. Un tour et un clic « Publier » qui écrivent en
+// même temps ne s'effacent plus l'un l'autre.
+let _chaineMemoPhotos = Promise.resolve();
+function majMemoPhotos(changes) {
+  const p = _chaineMemoPhotos.then(async () => {
+    const ks = Object.keys(changes || {});
+    if (!ks.length) return;
+    const m = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
+    for (const k of ks) { if (changes[k] == null) delete m[k]; else m[k] = changes[k]; }
+    await chrome.storage.local.set({ vrmPhotosFaites: m });
+  });
+  _chaineMemoPhotos = p.then(() => {}, () => {});
+  return p;
+}
 // ⚠️ SEUL `tickPhotos` APPELLE CETTE FONCTION (22 octobre) : c'est lui qui tient
 //    l'écart fixe, le calme et le frein. `max` vaut une page par tour.
 async function capterPhotosAnnonces(uid, max = PHOTOS_PAR_TOUR) {
@@ -4046,7 +4078,7 @@ async function capterPhotosAnnonces(uid, max = PHOTOS_PAR_TOUR) {
     const plan = await planPhotos(uid);
     if (!plan || !plan.ids.length) return 0;
     const memo = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {};
-    let n = 0; const lues = [];
+    let n = 0; const lues = [], touchees = [];
     for (const id of plan.ids) {
       if (n >= Math.max(1, Number(max) || PHOTOS_PAR_TOUR)) break;
       const k = `${uid}_${id}`;
@@ -4054,9 +4086,14 @@ async function capterPhotosAnnonces(uid, max = PHOTOS_PAR_TOUR) {
       const refus = await gardeLecture(uid, acc, 'photos');   // s'arrête avant la réserve argent/colis
       if (refus) { if (refus.code !== 'lectures-reservees' && refus.code !== 'vinted-pause') logActivity(`⚠️ Photos non captées : ${refus.error}`); break; }
       memo[k] = Date.now();
-      n++;
-      try { await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}
+      n++; touchees.push(k);
+      // 23 oct. : le mémo de CETTE annonce est enregistré AVANT la requête — un
+      // tour qui partirait pendant qu'elle tarde ne la remet pas en file.
+      try { await majMemoPhotos({ [k]: memo[k] }); await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}
       const rep = await vintedGetHtml(acc, `/items/${encodeURIComponent(id)}`);
+      // L'écart se compte depuis la RÉPONSE (une page qui a mis 40 s ne doit pas
+      // laisser partir la suivante 5 s après).
+      try { await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}
       // 5.193 : un frein de Vinted (429/403), une pause, un 401 ou une coupure ne
       // disent rien de l'annonce — le mémo de 6 h était posé quand même (mesuré :
       // `photos_page_refuse_429` ×15). Même règle que les codes de retrait et les
@@ -4099,7 +4136,10 @@ async function capterPhotosAnnonces(uid, max = PHOTOS_PAR_TOUR) {
       noterDiag('fiche_format_' + (det.format || 'aucun'));
     }
     if (lues.length) await enfilerFiches(lues);
-    await chrome.storage.local.set({ vrmPhotosFaites: memo });
+    // Les seules annonces de CE tour (posées, ou rendues par `memoApresEchec`),
+    // fusionnées dans le mémo RELU — jamais une copie du début de tour par-dessus
+    // ce qu'un clic « Publier » a noté entre-temps.
+    await majMemoPhotos(Object.fromEntries(touchees.map((k) => [k, memo[k] === undefined ? null : memo[k]])));
     // Plus rien à lire dans la liste : on range tout de suite (sinon au lot).
     const reste = plan.ids.some((id) => { const m = memo[`${uid}_${id}`]; return !(m && Date.now() - Number(m) < PHOTOS_RETRY_MS); });
     await viderFiches({ force: !reste });
@@ -4134,7 +4174,7 @@ async function completerPhotos(uid, id) {
     await saveItemDetail(id, { description: det.description || '', photos: det.photos, couleur: det.couleur || '' });
     noterDiag('photos_page_ecrit');
     // Lue sur son clic : le fond ne la relit pas dans la foulée (une page Vinted de moins).
-    try { const m = (await chrome.storage.local.get('vrmPhotosFaites')).vrmPhotosFaites || {}; m[`${uid}_${id}`] = Date.now(); await chrome.storage.local.set({ vrmPhotosFaites: m }); } catch (_) {}
+    try { await majMemoPhotos({ [`${uid}_${id}`]: Date.now() }); } catch (_) {}
     return true;
   } catch (_) { return false; }
 }
@@ -4160,7 +4200,33 @@ async function completerPhotosSiManque(uid, id) {
 // (`PHOTOS_CALME_MS`), rien pendant 24 h après un refus de Vinted sur une page
 // photo. Dès qu'il ne manque plus rien, une pause (`PHOTOS_TICK_COOLDOWN_MS`)
 // pour ne pas relire la base en boucle (§4.4). Aucun délai aléatoire (§3).
-async function tickPhotos() {
+// ⚠️⚠️ REVUE DU 23 OCTOBRE — UN TOUR À LA FOIS. L'alarme n'attend pas la fin du
+//    tour précédent : quand une page tardait (Vinted qui ralentit, justement
+//    quand il freine), les tours suivants repassaient l'écart (compté depuis le
+//    DÉPART de la page), relisaient le mémo AVANT que le tour bloqué ne l'ait
+//    écrit, et remettaient la MÊME annonce en file — trois pages de la même
+//    annonce à 0 s d'écart quand Vinted répondait (reproduit sur 5f6943d). Un
+//    tour qui en trouve un autre en cours SORT : la promesse en vol (ce service
+//    worker) et un verrou daté dans `chrome.storage.local` (§4.9 : il survit au
+//    redémarrage du service worker, `PHOTOS_TOUR_MS` au plus).
+const PHOTOS_TOUR = 'vrmPhotosTour';
+const PHOTOS_TOUR_MS = 3 * 60 * 1000;
+let _tourPhotos = null;
+function tickPhotos() {
+  if (_tourPhotos) { noterDiag('photos_tour_en_cours'); return Promise.resolve(); }
+  _tourPhotos = (async () => {
+    try {
+      const v = (await chrome.storage.local.get(PHOTOS_TOUR))[PHOTOS_TOUR];
+      const age = Date.now() - Number(v && v.at || 0);
+      if (v && age >= 0 && age < PHOTOS_TOUR_MS) { noterDiag('photos_tour_en_cours'); return; }
+      await chrome.storage.local.set({ [PHOTOS_TOUR]: { at: Date.now() } });
+    } catch (_) { return; }                            // stockage illisible : on ne lit aucune page
+    try { await tickPhotosUn(); }
+    finally { try { await chrome.storage.local.remove(PHOTOS_TOUR); } catch (_) {} }
+  })().finally(() => { _tourPhotos = null; });
+  return _tourPhotos;
+}
+async function tickPhotosUn() {
   try {
     await viderFiches();                               // une fiche en attente depuis 10 min part (rien sinon)
     const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
@@ -6000,6 +6066,10 @@ try {
     // 22 oct. : il navigue sur Vinted (une page charge, ou l'adresse change) —
     // aucune page photo de fond tant qu'il est là (`PHOTOS_CALME_MS`).
     if (info && (info.url || info.status === 'loading' || info.status === 'complete')) noterActiviteVinted();
+    // 23 oct. : l'annonce qu'il ouvre EN ÉDITION dans cet onglet — seule celle-là
+    // peut recevoir une fiche « modification » de cet onglet (`ficheDeLaPage`).
+    const ed = annonceDeAdresse(u);
+    if (ed && ed.edit && tabId != null) noterOngletFiche(ANNONCES_ONGLETS, tabId, ed.id);
     if (!info || info.status !== 'complete') return;
     // Petit délai : on laisse la page finir de se charger, la capture passive
     // en profite aussi (elle observe ce que la page demande d'elle-même).
@@ -6263,10 +6333,94 @@ function ficheDeCorpsVinted(corps, id) {
   if (Object.keys(c).length) out.codes = c;
   return out;
 }
-async function noterFicheVinted(itemId, status, corps) {
+// ⚠️⚠️ REVUE DU 23 OCTOBRE — LE MESSAGE « fiche » SE FORGE. `content.js` relaie
+//    tout message de la page qui porte l'étiquette ; n'importe quel script de
+//    vinted.fr (pub, mesure d'audience, faille) pouvait poster
+//    `{kind:'fiche', itemId: <n'importe laquelle de ses annonces>, corps}` SANS
+//    aucune requête chez Vinted : le texte remplaçait la description rangée, et
+//    partait tel quel dans les files Leboncoin et eBay — publié sous son nom
+//    (reproduit sur 5f6943d : « Paye-moi hors plateforme… » dans la file).
+// ⇒ On juge l'ONGLET ÉMETTEUR (`sender`, posé par le navigateur, jamais par la page) :
+//   · une MODIFICATION n'est acceptée que de l'onglet qui montre CETTE annonce
+//     (`/items/{id}/edit` ou `/items/{id}`), ou qui l'a ouverte en édition il y a
+//     moins de 30 min (`ANNONCES_ONGLETS`, noté par `chrome.tabs.onUpdated` — la
+//     page peut changer d'adresse juste après l'enregistrement) ;
+//   · une PUBLICATION, que de l'onglet dont la réservation de numéro vient d'être
+//     liée à CETTE annonce (`noterPublication`, 2xx de Vinted) ;
+//   · un compte refusé (« Non, ignorer ce compte ») ou supprimé définitivement :
+//     rien (`compteNonCapte`, la porte des cinq autres captures, 5.191).
+// ⚠️ CE QUI RESTE, dit tel quel : un script de la page peut encore changer
+//    l'adresse de SON onglet (`history.pushState`) vers `/items/{X}/edit` puis
+//    poster une fiche pour X. La falsification ne vaut donc plus « pour toutes
+//    ses annonces, de n'importe quelle page », mais pour l'annonce dont l'onglet
+//    affiche l'adresse ; et un tel script peut de toute façon modifier l'annonce
+//    chez Vinted lui-même, avec sa session.
+const FICHE_ONGLET_MS = 30 * 60 * 1000;
+const ANNONCES_ONGLETS = 'vrmOngletsAnnonces';   // { [tabId]: { id, at } } — l'annonce ouverte EN ÉDITION dans cet onglet
+const PUBLIS_ONGLETS = 'vrmOngletsPublications'; // { [tabId]: { id, at } } — l'annonce que cet onglet vient de publier (2xx)
+// L'annonce que montre une adresse Vinted : `/items/{id}` (avec ou sans le
+// libellé `-nike-air-max`), `/items/{id}/edit` (ou `/items/edit/{id}` : la forme
+// exacte de la page de modification n'a pas été vue d'ici). Autre chose ⇒ `null`.
+function annonceDeAdresse(u) {
+  let U = null; try { U = new URL(String(u || '')); } catch (_) { return null; }
+  if (U.protocol !== 'https:' || !/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname)) return null;
+  const m = /^(?:\/[a-z]{2}(?:-[a-z]{2})?)?\/items\/(edit\/)?(\d{4,15})(?:-[^/]*)?(\/edit)?\/?$/i.exec(U.pathname);
+  return m ? { id: m[2], edit: !!(m[1] || m[3]) } : null;
+}
+let _chaineOngletsFiche = Promise.resolve();
+function noterOngletFiche(cle, tabId, id) {
+  const p = _chaineOngletsFiche.then(async () => {
+    try {
+      const m = (await chrome.storage.local.get(cle))[cle] || {};
+      const t = Date.now(), v = m[String(tabId)];
+      if (v && v.id === String(id) && t - Number(v.at || 0) < 60 * 1000) return;   // rien de neuf : pas d'écriture
+      m[String(tabId)] = { id: String(id), at: t };
+      const garde = Object.entries(m).filter(([, x]) => x && t - Number(x.at || 0) < FICHE_ONGLET_MS)
+        .sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, 20);
+      await chrome.storage.local.set({ [cle]: Object.fromEntries(garde) });
+    } catch (_) {}
+  });
+  _chaineOngletsFiche = p.then(() => {}, () => {});
+  return p;
+}
+async function ongletFicheVu(cle, tabId, id) {
+  if (tabId == null) return false;
+  try {
+    const v = ((await chrome.storage.local.get(cle))[cle] || {})[String(tabId)];
+    const age = Date.now() - Number(v && v.at || 0);
+    return !!(v && v.id === String(id) && age >= 0 && age < FICHE_ONGLET_MS);
+  } catch (_) { return false; }
+}
+function ficheDeLaPage(msg, sender, domain) {
+  const id = String((msg && msg.itemId) || '');
+  const tabId = sender && sender.tab && sender.tab.id != null ? sender.tab.id : null;
+  if (msg && msg.via === 'publication') {
+    // Dans la file des réservations : la publication de CET onglet (message
+    // précédent de la page) est notée avant qu'on ne la cherche ici.
+    return unResaALaFois(async () => {
+      if (!(await ongletFicheVu(PUBLIS_ONGLETS, tabId, id))) { noterDiag('fiche_onglet_refuse'); return false; }
+      return noterFicheVinted(id, msg.status, msg.corps, domain);
+    });
+  }
+  if (msg && msg.via === 'modif') {
+    return (async () => {
+      const adr = annonceDeAdresse((sender && sender.tab && sender.tab.url) || (sender && sender.url) || '');
+      if (!((adr && adr.id === id) || (await ongletFicheVu(ANNONCES_ONGLETS, tabId, id)))) { noterDiag('fiche_onglet_refuse'); return false; }
+      return noterFicheVinted(id, msg.status, msg.corps, domain);
+    })();
+  }
+  noterDiag('fiche_onglet_refuse');
+  return Promise.resolve(false);
+}
+async function noterFicheVinted(itemId, status, corps, domain) {
   const id = String(itemId || '');
   const st = Number(status);
   if (!/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('fiche_modif_forme'); return false; }
+  // 23 oct. : la porte de TOUTE capture (5.191) — un compte qu'il a refusé dans ce
+  // Chrome, ou supprimé définitivement, ne range rien. Compte du cookie illisible
+  // ⇒ comme les autres portes : « pas répondu », on capte.
+  let uid = null; try { uid = await activeUidForDomain(domain || 'www.vinted.fr'); } catch (_) { uid = null; }
+  if (uid && await compteNonCapte(uid)) { noterDiag('fiche_compte_non_capte'); return false; }
   const f = ficheDeCorpsVinted(corps, id);
   if (!f) { noterDiag('fiche_modif_illisible'); return false; }
   if (f.contredit) { noterDiag('fiche_modif_id_contredit'); return false; }

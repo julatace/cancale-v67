@@ -4,7 +4,7 @@
 //  MESURÉ chez Julien (`panel_diag_capture`, extension 5.211, lecture seule) :
 //  `vinted_frein_429` = 23 = `photos_page_refuse_429` = 23 — tous les « trop de
 //  demandes » venaient d'une page d'annonce lue pour ses photos ; paliers de
-//  pause 1/2/3 : 24/2/1 ; `visite_en_pause` = 119 visites sautées. Cause : jusqu'à
+//  pause 1/2/3 : 24/2/1 (27 pauses = ces 23 + 4 « 403 » sur d'AUTRES requêtes) ; `visite_en_pause` = 119 visites sautées. Cause : jusqu'à
 //  20 pages d'affilée, sans écart, chaque minute ET à la fin de chaque visite.
 //
 //  On EXÉCUTE le vrai `background.js` (`_fond-vm.cjs`, horloge PILOTÉE) et on
@@ -75,6 +75,13 @@ function muter(motif, rempl) {
   fs.writeFileSync(p, TEXTE.split(motif).join(rempl));
   COPIES.push(p);
   return p;
+}
+
+function muterPlusieurs(paires) {
+  let t = TEXTE;
+  for (const [a, b] of paires) { if (!t.includes(a)) return null; t = t.split(a).join(b); }
+  const p = path.join(os.tmpdir(), `bg-photos-mut-${process.pid}-${COPIES.length}.js`);
+  fs.writeFileSync(p, t); COPIES.push(p); return p;
 }
 
 // ── Les scénarios rendent ce qu'ils mesurent ; les contrôles jugent. ────────
@@ -153,6 +160,76 @@ async function scenarioLot(src, { lectureKO = false } = {}) {
   return res;
 }
 
+// ── 23 oct. (revue) : Vinted LENT sur une page. L'alarme n'attend pas la fin du tour
+//    précédent : quatre tours à une minute d'écart pendant que la 1re page tarde, puis
+//    Vinted répond. On note l'heure (pilotée) où chaque page PART chez Vinted.
+async function scenarioPageLente(src) {
+  let lacher = null; const bloque = new Promise((r) => { lacher = r; });
+  let premiere = true; const envois = [];
+  const f = monter(src, { lignesInit: lignes(10), vinted: async (r) => {
+    const m = /^\/items\/(\d+)$/.exec(r.chemin);
+    if (m) { envois.push({ id: m[1], t: f.h.t }); if (premiere) { premiere = false; await bloque; } return { status: 200, body: html(m[1]) }; }
+    return vintedOk(r);
+  } });
+  const T0 = f.h.t, tours = [];
+  for (let m = 0; m < 4; m++) { f.h.t = T0 + m * MIN; tours.push(f.ctx.tickPhotos()); await new Promise((r) => setTimeout(r, 30)); }
+  const pendant = envois.length;
+  f.h.t = T0 + 4 * MIN; lacher();
+  await Promise.all(tours); await new Promise((r) => setTimeout(r, 30));
+  const ecarts = envois.slice(1).map((e, i) => e.t - envois[i].t);
+  return { pendant, total: envois.length, doublons: envois.length - new Set(envois.map((e) => e.id)).size,
+    ecartMin: ecarts.length ? Math.min(...ecarts) : null, pages: envois.map((e) => e.id + '@' + Math.round((e.t - T0) / 1000) + 's') };
+}
+// Le service worker meurt PENDANT une page (Chrome le tue ; la promesse en vol disparaît
+// avec lui). Un nouveau service worker, sur le même stockage : rien pendant le verrou,
+// puis une AUTRE annonce — jamais celle dont la requête est peut-être déjà partie.
+async function scenarioRedemarrage(src) {
+  const store = {}, l = lignes(10);
+  const h = { t: Date.now() };
+  const vinted1 = (r) => (/^\/items\/\d+$/.test(r.chemin) ? new Promise(() => {}) : vintedOk(r));   // ne répond jamais
+  const f1 = monter(src, { lignesInit: l, vinted: vinted1, store, t0: h.t });
+  f1.h = h; f1.ctx.__horloge = h;
+  f1.ctx.tickPhotos();
+  await new Promise((r) => setTimeout(r, 60));
+  const premiere = (f1.j.vinted.find((x) => /^\/items\/\d+$/.test(x.chemin)) || {}).chemin || '';
+  const f2 = faireFond({ src, lignes: l, vinted: vintedOk, store, connecte: UID });   // nouveau service worker, même stockage
+  f2.ctx.__horloge = h; vm.runInContext('Date.now = function () { return globalThis.__horloge.t; };', f2.ctx);
+  h.t += MIN; await f2.ctx.tickPhotos();
+  const pendantVerrou = pages(f2.j);
+  h.t += 3 * MIN; await f2.ctx.tickPhotos();
+  const apres = f2.j.vinted.filter((x) => /^\/items\/\d+$/.test(x.chemin)).map((x) => x.chemin);
+  return { premiere, pendantVerrou, apres };
+}
+// Une page qui met 40 s à revenir : l'écart de 45 s se compte depuis sa RÉPONSE.
+async function scenarioEcartArrivee(src) {
+  const f = monter(src, { lignesInit: lignes(10), vinted: async (r) => {
+    if (/^\/items\/\d+$/.test(r.chemin)) { f.h.t += 40e3; return vintedOk(r); }
+    return vintedOk(r);
+  } });
+  const T0 = f.h.t;
+  await f.ctx.tickPhotos();                               // part à T0, revient à T0+40 s
+  const lus = [];
+  for (const s of [60, 95]) { f.h.t = T0 + s * 1000; const av = pages(f.j); await f.ctx.tickPhotos(); lus.push(pages(f.j) - av); }
+  return { lus };
+}
+// Une page que Vinted ne rend jamais : la requête est INTERROMPUE (sinon elle tient la
+// file Vinted entière). Dans le banc, la minuterie du fond est ramenée à 2 ms.
+async function scenarioPageMuette(src) {
+  const f = monter(src, { lignesInit: lignes(10), vinted: (r) => {
+    if (/^\/items\/\d+$/.test(r.chemin)) return new Promise((res, rej) => {
+      const s = r.signal;
+      if (!s) return;                                     // sans signal : rien ne l'interrompra jamais
+      if (s.aborted) { rej(new Error('AbortError')); return; }
+      s.addEventListener('abort', () => rej(new Error('AbortError')));
+    });
+    return vintedOk(r);
+  } });
+  const fini = await Promise.race([f.ctx.tickPhotos().then(() => true), new Promise((r) => setTimeout(() => r(false), 1500))]);
+  const avant = f.j.vinted.length;
+  const suite = await Promise.race([f.ctx.capterDatesVersement(UID).then(() => true), new Promise((r) => setTimeout(() => r(false), 1500))]);
+  return { fini, suite, diags: f.j.diags.filter((d) => /photos_page_refuse/.test(d)), apres: f.j.vinted.length - avant };
+}
+
 (async () => {
   console.log('── 1. une page par minute, jamais deux à moins de 45 s, le total horaire ne monte pas');
   await essaie('étalement', async () => {
@@ -203,6 +280,28 @@ async function scenarioLot(src, { lectureKO = false } = {}) {
     dit(k.rangeesApresRetour === 5 && k.enAttenteApresRetour === 0, 'la base revenue : les cinq sont rangées, sans relire Vinted', JSON.stringify(k));
   });
 
+  console.log('── 6 bis. Vinted lent : un tour à la fois, une page par annonce, l’écart depuis la réponse (revue du 23 oct.)');
+  await essaie('page lente', async () => {
+    const r = await scenarioPageLente(SRC);
+    dit(r.pendant === 1, 'la 1re page tarde : les tours suivants de l’alarme ne lancent AUCUNE page de plus', `${r.pendant} page(s) pendant l’attente · ${JSON.stringify(r.pages)}`);
+    dit(r.doublons === 0 && (r.ecartMin == null || r.ecartMin >= 45e3), 'Vinted répond : jamais la même annonce relue, jamais deux pages à moins de 45 s', JSON.stringify(r));
+  });
+  await essaie('redémarrage', async () => {
+    const r = await scenarioRedemarrage(SRC);
+    dit(r.pendantVerrou === 0, 'le service worker redémarre pendant une page : le tour suivant ne lit rien tant que le verrou (3 min) tient', `${r.pendantVerrou} page(s)`);
+    dit(r.apres.length === 1 && r.premiere && r.apres[0] !== r.premiere, 'verrou passé : une page, et une AUTRE annonce que celle déjà demandée', JSON.stringify(r));
+  });
+  await essaie('écart depuis la réponse', async () => {
+    const r = await scenarioEcartArrivee(SRC);
+    dit(r.lus[0] === 0, 'une page revenue au bout de 40 s : la suivante n’attend pas 45 s depuis son DÉPART mais depuis sa RÉPONSE (rien à +60 s)', r.lus.join(','));
+    dit(r.lus[1] === 1, 'l’autre sens : 55 s après la réponse, la page suivante part', r.lus.join(','));
+  });
+  await essaie('page muette', async () => {
+    const r = await scenarioPageMuette(SRC);
+    dit(r.fini === true && r.diags.includes('photos_page_refuse_0'), 'une page que Vinted ne rend jamais est interrompue (« pas su », statut 0) : le tour se termine', JSON.stringify(r));
+    dit(r.suite === true && r.apres > 0, 'et la file Vinted est libérée : les versements repartent', JSON.stringify(r));
+  });
+
   console.log('── 7. §6.1 — chaque règle, réaffaiblie, fait rougir son contrôle');
   const MUT = [
     { nom: 'sans écart fixe (deux pages dans la même minute)', motif: 'if (depuisPage >= 0 && depuisPage < PHOTOS_ECART_MS) return;', rempl: '',
@@ -217,12 +316,22 @@ async function scenarioLot(src, { lectureKO = false } = {}) {
       mord: async (s) => { const r = await scenarioVisite(s); return r.pages > 0; } },
     { nom: 'le frein appliqué au clic', motif: "const refus = await gardeLecture(uid, acc, 'clic');", rempl: "if (await freinPhotos()) return false; const refus = await gardeLecture(uid, acc, 'clic');",
       mord: async (s) => { const r = await scenarioFrein(s, 429); return !(r.clic === true && r.clicPages === 1); } },
+    { nom: 'tours non sérialisés (promesse et verrou retirés)', motifs: [["if (_tourPhotos) { noterDiag('photos_tour_en_cours'); return Promise.resolve(); }", ''], ["if (v && age >= 0 && age < PHOTOS_TOUR_MS) { noterDiag('photos_tour_en_cours'); return; }", '']],
+      mord: async (s) => { const r = await scenarioPageLente(s); return r.pendant > 1 || r.doublons > 0 || (r.ecartMin != null && r.ecartMin < 45e3); } },
+    { nom: 'le verrou du stockage retiré (redémarrage)', motif: "if (v && age >= 0 && age < PHOTOS_TOUR_MS) { noterDiag('photos_tour_en_cours'); return; }", rempl: '',
+      mord: async (s) => { const r = await scenarioRedemarrage(s); return r.pendantVerrou > 0; } },
+    { nom: 'le mémo enregistré après la page (l’ancien ordre)', motif: 'try { await majMemoPhotos({ [k]: memo[k] }); await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}', rempl: 'try { await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}',
+      mord: async (s) => { const r = await scenarioRedemarrage(s); return !(r.apres.length === 1 && r.apres[0] !== r.premiere); } },
+    { nom: 'l’écart compté depuis le départ', motif: "      // L'écart se compte depuis la RÉPONSE (une page qui a mis 40 s ne doit pas\n      // laisser partir la suivante 5 s après).\n      try { await chrome.storage.local.set({ [PHOTOS_DERNIERE]: Date.now() }); } catch (_) {}\n", rempl: '',
+      mord: async (s) => { const r = await scenarioEcartArrivee(s); return r.lus[0] > 0; } },
+    { nom: 'la page sans délai (signal retiré)', motif: 'signal: ctl ? ctl.signal : undefined,', rempl: '',
+      mord: async (s) => { const r = await scenarioPageMuette(s); return !(r.fini === true && r.suite === true); } },
     { nom: 'une écriture par page (le lot retiré)', motif: 'file.length >= FICHES_LOT ||', rempl: 'file.length >= 1 ||',
       mord: async (s) => { const r = await scenarioLot(s); return r.ecrituresApres5 !== 1; } },
   ];
   for (const m of MUT) {
     await essaie(`mutation ${m.nom}`, async () => {
-      const p = muter(m.motif, m.rempl);
+      const p = m.motifs ? muterPlusieurs(m.motifs) : muter(m.motif, m.rempl);
       if (!p) { dit(false, `mutation « ${m.nom} » : motif introuvable — l’audit ne prouve plus rien`); return; }
       dit(await m.mord(p), `réaffaibli (${m.nom}) : le contrôle rougit`);
     });

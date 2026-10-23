@@ -94,8 +94,9 @@ async function pageFetch(url, methode, body, statut = 200, src) {
 }
 
 // ── 2. le fond ───────────────────────────────────────────────────────────────
-function fond(src = SRC, { details = {}, lectureKO = () => false } = {}) {
-  return faireFond({ src, connecte: '111', lectureKO, lignes: {
+function fond(src = SRC, { details = {}, lectureKO = () => false, store = {}, connecte = '111' } = {}) {
+  return faireFond({ src, connecte, lectureKO, store, lignes: {
+    panel_num_reserves: { attente: { 19: { at: new Date().toISOString(), uid: '111' } }, items: {} },
     vinted_item_details: details,
     main: { vinted_annonce_numeros: { [ID]: { numero: '18', mp: { lbc: true } } }, vinted_accounts_hidden: [], vinted_accounts: [{ vinted_user_id: '111' }] },
     vrm_blocked_accounts: { uids: [] },
@@ -153,6 +154,30 @@ async function scenarioBaseKO(src) {
   return { ecritAvant, attente, desc: d.description, attenteApres: (f.store.vrmFichesAttente || []).length };
 }
 
+// ── 23 oct. (revue) : le message « fiche » se FORGE (n'importe quel script de la page
+//    peut le poster, sans aucune requête chez Vinted). Le fond juge l'ONGLET qui l'envoie.
+const FORGE = 'Paye-moi hors plateforme : virement au 06 00 00 00 00, -20 %';
+async function scenarioForge(src, { sender, via = 'modif', store = {}, connecte = '111', avant = null } = {}) {
+  const f = fond(src, { details: { [ID]: { description: TEXTE_A_LUI, photos: PHOTOS, codes: { catalog_id: 1242 }, pageAt: new Date().toISOString() } }, store, connecte });
+  if (avant) await avant(f);
+  await f.envoyer({ from: 'cancale-content', kind: 'fiche', itemId: ID, status: 200, via, corps: JSON.stringify({ item: { description: FORGE } }), domain: 'www.vinted.fr' }, sender);
+  await attendre(60);
+  const d = (f.lignes.vinted_item_details || {})[ID] || {};
+  let lbc = null; try { lbc = await f.ctx.buildLbcData(); } catch (_) {}
+  const ad = lbc && (lbc.queue || []).find((a) => String(a.id) === ID);
+  return { desc: d.description, file: ad ? ad.description : null, diags: f.j.diags.filter((x) => /fiche|compte/.test(x)) };
+}
+// Une vraie publication : la page a d'abord vu le 2xx de Vinted (`publication`), dans
+// l'onglet qui portait la réservation de numéro, puis la fiche de CETTE annonce.
+async function scenarioPublication(src, { reservation = true, ongletFiche = 7 } = {}) {
+  const store = reservation ? { vrmNumResaOnglets: { 7: { numero: '19', at: Date.now(), uid: '111' } } } : {};
+  const f = fond(src, { store });
+  await f.envoyer({ from: 'cancale-content', kind: 'publication', itemId: NOUVEAU, status: 200, domain: 'www.vinted.fr' }, { url: 'https://www.vinted.fr/items/new', tab: { id: 7, url: 'https://www.vinted.fr/items/new' } });
+  await f.envoyer({ from: 'cancale-content', kind: 'fiche', itemId: NOUVEAU, status: 200, via: 'publication', corps: corps(null), domain: 'www.vinted.fr' }, { url: 'https://www.vinted.fr/items/new', tab: { id: ongletFiche, url: 'https://www.vinted.fr/items/new' } });
+  await attendre(80);
+  return { d: (f.lignes.vinted_item_details || {})[NOUVEAU] || null, diags: f.j.diags.filter((x) => /fiche|publication/.test(x)) };
+}
+
 (async () => {
   console.log('── 1. la page transmet SA fiche, après un 2xx de Vinted, sous l’identifiant de l’adresse');
   await essaie('page', async () => {
@@ -193,6 +218,36 @@ async function scenarioBaseKO(src) {
     dit(r.pagesRelues === 0, 'et son annonce (photos complètes, fiche enregistrée) n’est plus relue par la page pour ses codes : une requête Vinted de moins', `${r.pagesRelues} page(s)`);
   });
 
+  console.log('── 3 bis. un message forgé par la page ne range rien (revue du 23 oct.)');
+  await essaie('forgé', async () => {
+    const r = await scenarioForge(SRC, { sender: { url: 'https://www.vinted.fr/catalog', tab: { id: 9, url: 'https://www.vinted.fr/catalog' } } });
+    dit(r.desc === TEXTE_A_LUI && r.file && !r.file.includes('hors plateforme') && r.diags.includes('fiche_onglet_refuse'), 'message forgé depuis /catalog (aucune requête chez Vinted) : sa description reste, la file Leboncoin ne le porte pas, c’est noté', JSON.stringify({ desc: r.desc, diags: r.diags }));
+    const a = await scenarioForge(SRC, { sender: { url: 'https://www.vinted.fr/items/10900000555/edit', tab: { id: 9, url: 'https://www.vinted.fr/items/10900000555/edit' } } });
+    dit(a.desc === TEXTE_A_LUI, 'depuis la page d’édition d’une AUTRE annonce : rien', JSON.stringify(a));
+    const p = await scenarioForge(SRC, { via: 'publication', sender: { url: 'https://www.vinted.fr/items/new', tab: { id: 9, url: 'https://www.vinted.fr/items/new' } } });
+    dit(p.desc === TEXTE_A_LUI, 'se disant « publication », sans publication vue dans cet onglet : rien', JSON.stringify(p));
+    const sansVia = await scenarioForge(SRC, { via: null, sender: { url: 'https://www.vinted.fr/items/' + ID + '/edit', tab: { id: 7 } } });
+    dit(sansVia.desc === TEXTE_A_LUI, 'sans provenance (ni modification, ni publication) : rien', JSON.stringify(sansVia));
+    const nav = await scenarioForge(SRC, { sender: { url: 'https://www.vinted.fr/member/123', tab: { id: 7, url: 'https://www.vinted.fr/member/123' } },
+      avant: async (f) => { f.ongletMaj(7, { url: 'https://www.vinted.fr/items/' + ID + '/edit' }, { id: 7, url: 'https://www.vinted.fr/items/' + ID + '/edit' }); await attendre(20); } });
+    dit(nav.desc === FORGE, 'l’autre sens : il a ouvert CETTE annonce en édition dans l’onglet, puis la page a changé d’adresse — sa fiche est rangée', JSON.stringify(nav.desc));
+    const pub = await scenarioPublication(SRC);
+    dit(pub.d && pub.d.description === TEXTE_A_LUI, 'l’autre sens : la fiche d’une vraie publication (réservation de cet onglet liée à cette annonce) est rangée', JSON.stringify(pub));
+    const pubAutre = await scenarioPublication(SRC, { ongletFiche: 8 });
+    dit(!pubAutre.d, 'la fiche de cette publication venue d’un AUTRE onglet : rien', JSON.stringify(pubAutre));
+  });
+
+  console.log('── 3 ter. un compte qu’il a refusé (« Non, ignorer ce compte ») ne range rien');
+  await essaie('compte refusé', async () => {
+    const bon = { url: 'https://www.vinted.fr/items/' + ID + '/edit', tab: { id: 7, url: 'https://www.vinted.fr/items/' + ID + '/edit' } };
+    const r = await scenarioForge(SRC, { sender: bon, store: { vrmChoixComptes: { 111: { choix: 'non', login: 'x', at: Date.now() } } } });
+    dit(r.desc === TEXTE_A_LUI && r.diags.includes('fiche_compte_non_capte'), 'compte du cookie refusé dans ce Chrome : la fiche n’est pas rangée, et c’est noté', JSON.stringify(r));
+    const s = await scenarioForge(SRC, { sender: bon, avant: async (f) => { f.lignes.vrm_blocked_accounts = { uids: ['111'] }; } });
+    dit(s.desc === TEXTE_A_LUI, 'compte supprimé définitivement : rien non plus', JSON.stringify(s.desc));
+    const pasSu = await scenarioForge(SRC, { sender: bon, connecte: null });
+    dit(pasSu.desc === FORGE, 'l’autre sens : compte du cookie illisible — comme les autres portes, on capte (« pas répondu »)', JSON.stringify(pasSu.desc));
+  });
+
   console.log('── 4. base illisible : rien n’est écrit, rien n’est perdu');
   await essaie('base KO', async () => {
     const r = await scenarioBaseKO(SRC);
@@ -211,6 +266,14 @@ async function scenarioBaseKO(src) {
     { nom: 'écriture malgré une lecture ratée', texte: TEXTE, motif: "if (rr === null) return rate('fiches_lecture_ratee');", rempl: "if (rr === null) rr = [];", fichier: 'bg',
       mord: async (s) => { const r = await scenarioBaseKO(s); return r.ecritAvant > 0; } },
   ];
+  MUT.push(
+    { nom: 'l’onglet émetteur ignoré', texte: TEXTE, motif: '    ficheDeLaPage(msg, sender, domain);', rempl: '    noterFicheVinted(msg.itemId, msg.status, msg.corps, domain);', fichier: 'bg',
+      mord: async (s) => { const r = await scenarioForge(s, { sender: { url: 'https://www.vinted.fr/catalog', tab: { id: 9, url: 'https://www.vinted.fr/catalog' } } }); return r.desc !== TEXTE_A_LUI; } },
+    { nom: 'la publication acceptée sans réservation liée', texte: TEXTE, motif: "      if (!(await ongletFicheVu(PUBLIS_ONGLETS, tabId, id))) { noterDiag('fiche_onglet_refuse'); return false; }", rempl: '', fichier: 'bg',
+      mord: async (s) => { const r = await scenarioForge(s, { via: 'publication', sender: { url: 'https://www.vinted.fr/items/new', tab: { id: 9, url: 'https://www.vinted.fr/items/new' } } }); return r.desc !== TEXTE_A_LUI; } },
+    { nom: 'le compte refusé ignoré', texte: TEXTE, motif: "  if (uid && await compteNonCapte(uid)) { noterDiag('fiche_compte_non_capte'); return false; }", rempl: '', fichier: 'bg',
+      mord: async (s) => { const r = await scenarioForge(s, { sender: { url: 'https://www.vinted.fr/items/' + ID + '/edit', tab: { id: 7 } }, store: { vrmChoixComptes: { 111: { choix: 'non', login: 'x', at: Date.now() } } } }); return r.desc !== TEXTE_A_LUI; } },
+  );
   for (const m of MUT) {
     await essaie(`mutation ${m.nom}`, async () => {
       let t = m.texte;

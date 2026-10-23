@@ -85,6 +85,8 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     const u = String(url);
     const chemin = u.replace(/^https:\/\/[^/]+/, '');
     const entree = { methode: String((opts && opts.method) || 'GET').toUpperCase(), chemin, origine, at: Date.now() };
+    // 23 oct. : le signal d'interruption de la requête (non énumérable : rien ne change pour les audits qui comparent `j.vinted`).
+    Object.defineProperty(entree, 'signal', { value: opts && opts.signal, enumerable: false });
     j.vinted.push(entree);
     j.enVol++; j.maxEnVol = Math.max(j.maxEnVol, j.enVol);
     await new Promise((r) => setTimeout(r, 3));
