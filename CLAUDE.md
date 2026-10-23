@@ -11426,6 +11426,10 @@ vérifié »), vrai merge d'origin/main (3de5c8f, puis d198bca), finie sur
      montre (`caseVisible`). Même règle ajoutée pour le colis **hors délai à
      retirer** (il repart chez l'expéditeur), que le premier jet oubliait :
      retirer la barre l'aurait rendu muet ;
+     ⚠️ (23 oct., après la fusion avec « colis à l'heure ») la règle de date
+     limite dit déjà en tête tout colis Vinted dépassé (`colis-limite`) :
+     `colis-en-retard` ne garde que les colis **eBay** en retard, sinon un vrai
+     retard était dit deux fois (banc `journee-widgets` H, rouge avant) ;
   5. **« À faire » était retirable** — et avec lui les emails mis de côté, les
      colis cochés non partis, le litige, « Tout est OK » à confirmer… Il est
      **fixe** (déplaçable, jamais retiré ; remis s'il manque d'une disposition

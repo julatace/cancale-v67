@@ -181,8 +181,9 @@ async function page(b, T, port, opts = {}) {
     const eq = /[?&]id=eq\.([^&]*)/.exec(u);
     if (eq && eq[1] === 'main') return j([projette({ id: 'main', data: etat.main || {} }, S)]);
     if (opts.premierJour) return j([]);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, S)));
-    const lk = /[?&]id=like\.([^&]*)/.exec(u); if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map((r) => projette(r, S))); }
+    const R = opts.lignes ? rows.concat(opts.lignes) : rows;
+    if (eq) return j(R.filter((r) => r.id === eq[1]).map((r) => projette(r, S)));
+    const lk = /[?&]id=like\.([^&]*)/.exec(u); if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(R.filter((r) => re.test(r.id)).map((r) => projette(r, S))); }
     return j([]);
   });
   await pg.route('**/api/**', (r2) => r2.request().url().includes('mode=confidentialite')
@@ -552,7 +553,11 @@ if (require.main === module) (async () => {
         // Barre, « À envoyer » et « À retirer » absents : les deux remontent.
         let s = await page(b, T, PORT, { etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'afaire', t: 'grand' }, { id: 'vendu', t: 'moyen' }] } } } });
         let l = await lire(s.pg);
-        dit(/colis-en-retard/.test(l.alertesJobs) && /retrait-hors-delai/.test(l.alertesJobs) && l.alertesHorsGrille, 'sans aucune case : colis en retard ET hors délai dits en tête, hors grille', l.alertesJobs || '(aucune)');
+        // (23 oct., intégration) La date limite d'un colis passe par UNE règle
+        // (`api/_lib/limite-envoi.js`) et c'est « colis-limite » qui dit en tête
+        // un colis dépassé — ici sans bordereau reçu par email : date ESTIMÉE
+        // dépassée, « vérifie sur Vinted », jamais « en retard ».
+        dit(/colis-(en-retard|limite)/.test(l.alertesJobs) && /retrait-hors-delai/.test(l.alertesJobs) && l.alertesHorsGrille, 'sans aucune case : colis dépassé ET hors délai dits en tête, hors grille', l.alertesJobs || '(aucune)');
         dit(l.retirerSurAlertes === 0, 'ces alertes n’ont pas de « − »');
         if (SHOTS) await s.pg.screenshot({ path: path.join(SHOTS, `widgets-${tag}-sans-cases.png`) });
         await s.ctx.close();
@@ -560,6 +565,14 @@ if (require.main === module) (async () => {
         s = await page(b, T, PORT, { etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'afaire', t: 'grand' }, { id: 'envoyer', t: 'petit' }] } } } });
         l = await lire(s.pg);
         dit(!/colis-en-retard/.test(l.jobs) && /retrait-hors-delai/.test(l.alertesJobs), 'case « À envoyer » présente : le retard n’est pas dit deux fois ; le hors délai, lui, remonte', `${l.alertesJobs} | ${l.jobs}`);
+        await s.ctx.close();
+        // Un VRAI retard (date limite LUE dans l'email du bordereau, avant-hier
+        // 10 h), aucune case : il est dit UNE fois en tête — « colis-limite »
+        // le dit déjà, « colis-en-retard » ne le redit pas (§7).
+        const [aa, mm, jj] = jourLocal(-2).split('-');
+        s = await page(b, T, PORT, { lignes: [{ id: 'email_bord_banc_93004', data: { transaction: '93004', filename: 'Bordereau-Vinted-93004.pdf', modele: 'Baskets inventées 93004', article: 'Baskets inventées 93004', receivedAt: iso(ilYaJ(5)), dateLimite: `${jj}/${mm}/${aa} 10:00` } }], etat: { main: { vrm_journee_widgets: { v: 1, w: [{ id: 'afaire', t: 'grand' }, { id: 'vendu', t: 'moyen' }] } } } });
+        l = await lire(s.pg);
+        dit(/colis-limite/.test(l.alertesJobs) && !/colis-en-retard/.test(l.jobs), 'un vrai retard, aucune case : dit une fois en tête (« colis-limite »), pas redit', `${l.alertesJobs} | ${l.jobs}`);
         await s.ctx.close();
       });
 

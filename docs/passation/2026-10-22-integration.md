@@ -67,6 +67,24 @@ prouve rien. Dans le dépôt principal (`/home/user/cancale-v67`), rien à faire
 - `vitesse` : sous la charge de la machine partagée (load > 10), Ma journée à 390 px mesure
   14 rendus (plafond 13) et Ventes 9 lectures identiques (plafond 8) — bruit déjà noté par le
   chantier fiabilité ; à remesurer seul, machine calme.
+- Rouges À L'IDENTIQUE sur main 6798b0a (relancés seuls, mêmes titres) : `achats-hors-plateforme`
+  (12), `capacites` (28 — la grille d'Annonces ne se rend pas : le banc sert une base non
+  cloisonnée), `carte` (4), `comptes` (5), `conflit` (2), `formes-communes` (1), `ia` (2),
+  `lbc-preuve` (2), `lbc-relier` (2). Bancs en retard sur la forme actuelle, pas l'app.
+- `ebay-regle-offre` : meurt sur `Unexpected token 'export'` sur main AUSSI (il charge un module
+  ES dans un `vm` depuis la palette « Perle ») — banc à remettre à la forme, pas l'app.
+- `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-revue-complete`,
+  `diagnostic-leboncoin`, `extension-leboncoin-installee` : ils lancent `/usr/bin/chromium`
+  (absent ici). Avec `CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, les
+  quatre premiers sont VERTS ; `diagnostic-leboncoin` exige aussi un serveur Vite sur
+  127.0.0.1:4187 (son écran n'a pas changé depuis main).
+- `compact`, `mobile`, `lbc-publier-app` : rouges sous charge seulement, verts lancés seuls.
+- Corrigé le 23 oct. : Ma journée sur téléphone (le bénéfice forcé en blanc sur le bandeau
+  devenu clair, contraste 1,1:1 — `declare-urssaf`) ; et un colis VRAIMENT en retard dit DEUX
+  fois en tête quand la case « À envoyer » est retirée (la règle de date limite le dit déjà par
+  `colis-limite` ; `colis-en-retard` ne garde que l'eBay — `journee-widgets` section H, rouge
+  avant, vert après). La suggestion « quelle paire ? » de Leboncoin ne propose plus une autre
+  marque ni un autre modèle (`audit-double-vente`).
 
 ## 4. La migration 016 (mode équipe)
 

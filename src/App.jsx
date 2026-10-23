@@ -36791,12 +36791,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // remontent ici, en alerte de tête (hors grille, non retirable) — jamais
         // en double tant qu'une case les montre (§7). Mêmes listes que les cases
         // (`toShip`, `colisEb`, `pickupUnion`, §11) : aucun recalcul.
+        // ⚠️ (23 oct., intégration) Un colis Vinted EN RETARD est déjà dit en
+        // tête par « colis-limite » (la règle de date limite, plus haut : elle
+        // prend tous les colis dépassés, le retard d'abord) — le redire ici le
+        // disait DEUX fois, case « À envoyer » retirée (§7). Ne reste à dire que
+        // ce que « colis-limite » ne voit pas : les colis eBay en retard.
         if (!caseVisible(dispoJournee, 'envoyer')) {
           const lateE = colisEb && colisEb.aPoster ? colisEb.aPoster.filter(x => x.jours != null && x.jours < 0).length : 0;
-          const nl = late + lateE;
+          const lateV = jobs.some(j => j.id === 'colis-limite') ? 0 : late;
+          const nl = lateV + lateE;
           if (nl > 0) jobs.push({ id:'colis-en-retard', n:nl, icon:'truck', color:C.warn, urgent:true,
-            title:`${nl} colis en retard`,
-            sub:`La date limite d'envoi est passée${lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
+            title: lateV ? `${nl} colis en retard` : `${nl} colis eBay en retard`,
+            sub:`La date limite d'envoi est passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
             tab:'cat_bord', prio:0.15 });
         }
         if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.horsDelai.length) {
