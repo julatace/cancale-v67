@@ -4906,6 +4906,23 @@ const moisPeriodeUrssaf = (due) => {
   }
   return yms;
 };
+// (22 oct., revue) Minuit HEURE DE PARIS du jour civil (a, m0 de 0 à 11, j —
+// normalisé comme `Date`). Le début et la fin d'une période URSSAF sont des
+// INSTANTS comparés à l'heure de publication de la ligne : jugés dans le fuseau
+// de l'appareil (l'app, à Paris) et du serveur (Vercel, en UTC), la notification
+// du 1er disait « au moins » quand Ma journée ne le disait pas, pour une ligne
+// publiée entre minuit et 1 h (2 h l'été) à Paris. Minuit à Paris n'est jamais
+// sauté ni doublé (le changement d'heure se fait à 2-3 h).
+const minuitParisMs = (a, m0, j) => {
+  const base = Date.UTC(a, m0, j);
+  const f = minuitParisMs._f || (minuitParisMs._f = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }));
+  const decalage = (ms) => {
+    const o = {};
+    for (const p of f.formatToParts(new Date(ms))) o[p.type] = p.value;
+    return Date.UTC(Number(o.year), Number(o.month) - 1, Number(o.day), Number(o.hour) % 24, Number(o.minute)) - ms;
+  };
+  return base - decalage(base - decalage(base));
+};
 // Le montant d'une période d'échéance, lu dans la ligne PUBLIÉE par l'écran
 // Ventes (`vinted_urssaf_mois`) — une règle pour le rappel (Ma journée, la
 // notification du 1er) et la carte « Prochaine déclaration » de Comptabilité.
@@ -4920,8 +4937,16 @@ const montantPeriodeUrssaf = (due, ligne, taux) => {
   const yms = moisPeriodeUrssaf(due);
   const ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
   const atPub = typeof ligne.at === 'number' ? ligne.at : Date.parse(ligne.at || '');
-  const finPeriode = new Date(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1).getTime();
+  const debutPeriode = minuitParisMs(due.periodStart.getFullYear(), due.periodStart.getMonth(), due.periodStart.getDate());
+  const finPeriode = minuitParisMs(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1);
   const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !(atPub >= finPeriode);
+  // (22 oct., revue) Une ligne publiée AVANT le début de la période ne dit rien
+  // d'elle ; une ligne qui n'en porte AUCUN mois et dont le total n'est qu'un
+  // minimum (publiée avant la fin, date illisible, ventes sans date de
+  // versement) non plus : « au moins 0,00 € » est un zéro qui veut dire « pas
+  // su » (§7) ⇒ aucun montant (« se calcule dans Ventes »).
+  const porte = ligne.mois.some((m) => m && yms.includes(m.ym));
+  if (atPub < debutPeriode || (!porte && partiel)) return { ca: null, apayer: null, partiel: false };
   return { ca, apayer: aPayerUrssaf(ca, taux), partiel };
 };
 const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, taux = tauxUrssaf() } = {}) => {
@@ -28019,13 +28044,20 @@ function useBeneficeCalcul(compta, periode) {
 // noter » (le 0 € devient vrai) ou « ajouter une dépense » (le formulaire de
 // Comptabilité, le sien). Rendu par Comptabilité ET Ma journée (§11 : une règle,
 // `depensesEtat`) ; pas avant l'arrivée du nuage (pas su ≠ jamais noté).
+// (22 oct., revue) En `compact` (Ma journée), AUCUNE couleur imposée : sur
+// téléphone le bilan est un bandeau SOMBRE (styles-mobile-studio.css) dont les
+// notes et les liens portent leur propre couleur (`.vrm-day-note`,
+// `.vrm-lien-action`, avec !important). Des couleurs en ligne (C.text, C.muted,
+// C.accent) les battaient : 1,7:1 de contraste à 390 px en clair, illisible.
+// Le texte hérite donc de la note qui l'enveloppe, et les deux gestes sont des
+// `vrm-lien-action` comme les autres liens de la carte.
 function ChoixDepenses({ onAucune, onAjouter, compact = false }) {
   const lien = { background: 'none', border: 0, padding: 0, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit', minHeight: 0 };
   return (
-    <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 12.5 : 13, color: C.muted, lineHeight: 1.45 }}>
-      <span style={{ flex: '1 1 100%' }}>Aucune dépense notée (cartons, scotch, essence pour le relais…) : ce net est <b style={{ color: C.text, fontWeight: 600 }}>avant tes dépenses</b>.</span>
-      <button type="button" data-depenses-aucune="" onClick={onAucune} style={{ ...lien, color: C.text }}>Je n'ai pas de dépenses à noter</button>
-      <button type="button" data-depenses-ajouter="" onClick={onAjouter} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
+    <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 12.5 : 13, color: compact ? 'inherit' : C.muted, lineHeight: 1.45 }}>
+      <span style={{ flex: '1 1 100%' }}>Aucune dépense notée (cartons, scotch, essence pour le relais…) : ce net est <b style={{ color: compact ? 'inherit' : C.text, fontWeight: 600 }}>avant tes dépenses</b>.</span>
+      <button type="button" data-depenses-aucune="" onClick={onAucune} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: compact ? 'inherit' : C.text }}>Je n'ai pas de dépenses à noter</button>
+      <button type="button" data-depenses-ajouter="" onClick={onAjouter} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
     </div>
   );
 }
@@ -28196,7 +28228,7 @@ function BeneficeJournee({ onNav, place }) {
           {chiffre(B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Net ce mois', B.netFinal, raisonNet, 'net')}
         </div>
         {depenses === 'jamais' && (
-          <div className="vrm-day-note" style={{ marginTop: 8 }}>
+          <div className="vrm-day-note" style={{ marginTop: 8, color: C.muted }}>
             <ChoixDepenses compact onAucune={sansDepenses} onAjouter={ajouterDepense} />
           </div>
         )}

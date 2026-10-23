@@ -19,8 +19,14 @@
 //      ce qui part sur le téléphone, et rien quand le mois est noté.
 // `--mutation=…` réaffaiblit une règle : chaque mutation doit faire passer au
 // moins un contrôle au rouge. Aucune donnée réelle : tout est inventé ici.
-//   rythme · declare · zero · fenetre · date   (la règle de l'app)
-//   serveur-registre · serveur-montant · serveur-passu   (la notification)
+//   rythme · declare · zero · fenetre · date · ancienne · fuseau   (la règle de l'app)
+//   serveur-registre · serveur-montant · serveur-passu · serveur-ancienne   (la notification)
+// (22 oct., revue) Deux défauts reproduits par le relecteur : une ligne publiée
+// AVANT la période faisait dire « à payer ≈ au moins 0,00 € » (un zéro qui veut
+// dire « pas su ») ; et la fin de la période se jugeait en heure LOCALE — UTC
+// sur le serveur, Paris dans l'app : la notification disait « au moins » quand
+// Ma journée ne le disait pas. La section 4 exécute la règle sous TZ=UTC et
+// TZ=Europe/Paris, dans deux processus.
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const R = path.join(__dirname, '..');
 let parser;
@@ -34,6 +40,8 @@ else if (MUT === 'declare') muter('yms.every((ym) => moisDeclare(declare, ym))) 
 else if (MUT === 'zero') muter('return { ca: null, apayer: null, partiel: false };', 'return { ca: 0, apayer: 0, partiel: false };');
 else if (MUT === 'fenetre') muter('const proche = due.daysLeft <= 7;', 'const proche = false;');
 else if (MUT === 'date') muter('|| !(atPub >= finPeriode);', ';');
+else if (MUT === 'ancienne') muter('if (atPub < debutPeriode || (!porte && partiel)) return { ca: null, apayer: null, partiel: false };', '');
+else if (MUT === 'fuseau') muter('const finPeriode = minuitParisMs(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1);', 'const finPeriode = new Date(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1).getTime();');
 else if (MUT && !MUT.startsWith('serveur-')) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 let ko = 0;
@@ -62,7 +70,7 @@ function declarations(code, plugins) {
 }
 const decl = declarations(src, ['jsx']);
 // Ce que le miroir porte (et que le vm de l'app exécute) — l'ordre est celui du fichier.
-const NOMS = ['TAUX_URSSAF_DEFAUT', 'tauxDe', 'aPayerUrssaf', '_startOfDay', 'nextUrssafDeadline', 'moisPeriodeUrssaf', 'montantPeriodeUrssaf', 'moisDeclare', 'rappelUrssaf'];
+const NOMS = ['TAUX_URSSAF_DEFAUT', 'tauxDe', 'aPayerUrssaf', '_startOfDay', 'nextUrssafDeadline', 'moisPeriodeUrssaf', 'minuitParisMs', 'montantPeriodeUrssaf', 'moisDeclare', 'rappelUrssaf'];
 const MIROIR = path.join(R, 'api', '_lib', 'urssaf-regle.js');
 
 // ── --recopie : refabrique le miroir (le SEUL moyen de le modifier) ─────────
@@ -136,6 +144,20 @@ if (process.argv.includes('--recopie')) {
     const apres = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...LIGNE, at: new Date(2026, 9, 1, 2).getTime() } });
     dit(!!(apres && !apres.partiel && !/au moins/i.test(apres.sub)), 'publiée après la fin du mois : le total se dit tel quel', apres && apres.sub);
   });
+  // (22 oct., revue) Un « au moins 0,00 € » est un zéro qui veut dire « pas su » (§7).
+  const SANS_SEPT = { mois: [{ ym: '2026-07', ca: 900 }, { ym: '2026-08', ca: 500 }] };
+  await essaie('ligne publiée avant le début de la période', () => {
+    const x = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...SANS_SEPT, at: Date.parse('2026-08-20T10:00:00Z') } });
+    dit(!!(x && x.apayer == null && x.ca == null && !/0,00/.test(x.sub) && /se calcule dans Ventes/.test(x.sub)), 'publiée le 20 août, septembre à déclarer : aucun montant (« se calcule dans Ventes »), jamais « au moins 0,00 € »', x && x.sub);
+  });
+  await essaie('ligne sans aucun mois de la période, publiée avant sa fin', () => {
+    const x = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...SANS_SEPT, at: Date.parse('2026-09-05T10:00:00Z') } });
+    dit(!!(x && x.apayer == null && !/0,00/.test(x.sub)), 'publiée le 5 septembre sans aucune vente de septembre : aucun montant', x && x.sub);
+    const y = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...SANS_SEPT, aDater: { n: 3 }, at: Date.parse('2026-10-01T06:00:00Z') } });
+    dit(!!(y && y.apayer == null && !/0,00/.test(y.sub)), 'publiée après la fin, aucun mois de septembre mais des ventes sans date : aucun montant (« au moins 0 » ne dit rien)', y && y.sub);
+    const z = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 10), ligne: { ...SANS_SEPT, at: Date.parse('2026-10-01T06:00:00Z') } });
+    dit(!!(z && z.ca === 0 && z.apayer === 0 && !z.partiel && /0,00 € reçus/.test(z.sub) && !/au moins/i.test(z.sub)), 'l\'autre sens : publiée APRÈS la fin, lue et sans vente de septembre : un vrai 0,00 €, dit tel quel', z && z.sub);
+  });
   const code = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
   dit(!/Nouveau mois : pense à ta déclaration URSSAF/.test(code), 'l\'ancien rappel fixe du 1er du mois a disparu');
   dit(/rappelUrssaf\(\{\s*freq:/.test(code), 'le centre de notifications appelle `rappelUrssaf`');
@@ -165,6 +187,13 @@ if (process.argv.includes('--recopie')) {
     if (MUT === 'serveur-registre') m('const declare = objet(mm.vrm_urssaf_declare);', 'const declare = {};');
     else if (MUT === 'serveur-montant') m('const ligne = mm.vinted_urssaf_mois && Array.isArray(mm.vinted_urssaf_mois.mois) ? mm.vinted_urssaf_mois : null;', 'const ligne = null;');
     else if (MUT === 'serveur-passu') m("if (main === undefined) return { envoyer: true,", "if (main === undefined) return { envoyer: false, raison: 'pas su' }; if (false) return { envoyer: true,");
+    else if (MUT === 'serveur-ancienne') {
+      const f2 = path.join(API, '_lib', 'urssaf-regle.js');
+      const motif = 'if (atPub < debutPeriode || (!porte && partiel)) return { ca: null, apayer: null, partiel: false };';
+      const g2 = fs.readFileSync(f2, 'utf8');
+      if (!g2.includes(motif)) { console.log('❌ mutation impossible : motif absent'); process.exit(2); }
+      fs.writeFileSync(f2, g2.replace(motif, ''));
+    }
     else { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
     fs.writeFileSync(f, g);
   }
@@ -201,6 +230,12 @@ if (process.argv.includes('--recopie')) {
     dit(!!(p && p.envoyer && /au moins 4330,90 €/i.test(p.corps)), 'ligne publiée le 27 septembre : « au moins » (les ventes versées depuis n\'y sont pas)', p && p.corps);
     const app = r({ freq: 'mensuel', now: new Date(2026, 9, 1, 12), ligne: PUB });
     dit(!!(n && app && n.corps === `${app.text}. ${app.sub}`), 'mot pour mot la phrase de Ma journée (même règle, §11)', n && n.corps);
+  });
+  await essaie('notification : ligne publiée avant la période', () => {
+    // La sonde du relecteur : Ventes pas rouvert depuis le 20 août.
+    const ancienne = { at: Date.parse('2026-08-20T10:00:00Z'), mois: [{ ym: '2026-08', ca: 500, n: 5 }, { ym: '2026-07', ca: 900, n: 9 }], aDater: { n: 0 } };
+    const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: ancienne, vrm_urssaf_declare: {} });
+    dit(!!(n && n.envoyer && n.montant == null && !/0,00/.test(n.corps) && /se calcule dans Ventes/.test(n.corps)), 'ligne du 20 août, le 1er octobre : le rappel part SANS montant, jamais « à payer ≈ au moins 0,00 € »', n && n.corps);
   });
   await essaie('notification : mois noté', () => {
     const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB, vrm_urssaf_declare: { '2026-09': { ids: ['vinted:1'], n: 1, ca: 4330.9, at: 1 } } });
@@ -308,6 +343,56 @@ if (process.argv.includes('--recopie')) {
       dit(urssafDe().length === 0, 'le 2 du mois : la notification ne repart pas (c\'est la notification du 1er)', `${urssafDe().length} envoi(s)`);
     });
   }
+  // ── 4. Le même texte, que la règle tourne à Paris (l'app) ou en UTC (Vercel) ──
+  console.log('\n── 4. Fuseau : la règle sous TZ=Europe/Paris (l\'app) et TZ=UTC (le serveur), deux processus');
+  await essaie('fuseau', async () => {
+    const { execFileSync } = require('child_process');
+    const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-urssaf-tz-'));
+    // La règle de l'app (éventuellement mutée) telle que le vm l'exécute.
+    fs.writeFileSync(path.join(dossier, 'regle.js'), NOMS.filter((k) => decl.has(k)).map((k) => decl.get(k).texte).join('\n') + '\nthis.rappelUrssaf = rappelUrssaf;');
+    // Trois publications, chacune à 00:30 OU 23:30 heure de Paris autour de la fin du mois :
+    //   · 1er novembre 00:30 Paris (= 31 oct. 23:30 UTC, hiver) — après la fin d'octobre ;
+    //   · 1er octobre 00:30 Paris (= 30 sept. 22:30 UTC, été) — après la fin de septembre ;
+    //   · 31 octobre 23:30 Paris (= 22:30 UTC) — AVANT la fin : « au moins » des deux côtés.
+    const CAS = [
+      { nom: '1er nov. 00:30 Paris', at: '2026-10-31T23:30:00Z', ym: '2026-10', today: '2026-11-01', appNow: '2026-11-01T10:00:00+01:00', auMoins: false },
+      { nom: '1er oct. 00:30 Paris', at: '2026-09-30T22:30:00Z', ym: '2026-09', today: '2026-10-01', appNow: '2026-10-01T10:00:00+02:00', auMoins: false },
+      { nom: '31 oct. 23:30 Paris', at: '2026-10-31T22:30:00Z', ym: '2026-10', today: '2026-11-01', appNow: '2026-11-01T10:00:00+01:00', auMoins: true },
+    ];
+    fs.writeFileSync(path.join(dossier, 'cas.json'), JSON.stringify(CAS));
+    // Enfant : `regle` exécute la règle de l'app dans un vm (comme Ma journée, ou
+    // comme le serveur la construit : midi LOCAL du jour donné) ; `miroir` appelle
+    // la VRAIE notification du serveur (api/_lib/rappel-urssaf.js).
+    fs.writeFileSync(path.join(dossier, 'enfant.mjs'), `
+      import fs from 'fs'; import vm from 'vm';
+      const [mode, dossier, api] = process.argv.slice(2);
+      const cas = JSON.parse(fs.readFileSync(dossier + '/cas.json', 'utf8'));
+      const out = [];
+      let glue = null;
+      if (mode === 'miroir') glue = await import('file://' + api + '/_lib/rappel-urssaf.js');
+      const ctx = { tauxUrssaf: () => 13.5, Date, Math, Number, String, Array, isFinite };
+      vm.createContext(ctx); vm.runInContext(fs.readFileSync(dossier + '/regle.js', 'utf8'), ctx);
+      for (const c of cas) {
+        const ligne = { at: Date.parse(c.at), mois: [{ ym: c.ym, ca: 1000, n: 10 }], aDater: { n: 0 } };
+        if (mode === 'miroir') { out.push(glue.notificationUrssaf({ today: c.today, main: { vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: ligne, vrm_urssaf_declare: {} } }).corps); continue; }
+        const [y, m, d] = c.today.split('-').map(Number);
+        const now = mode === 'app' ? new Date(c.appNow) : new Date(y, m - 1, d, 12);
+        const x = ctx.rappelUrssaf({ freq: 'mensuel', now, declare: {}, ligne, taux: 13.5 });
+        out.push(x ? x.text + '. ' + x.sub : null);
+      }
+      console.log(JSON.stringify(out));
+    `);
+    const lance = (mode, tz) => JSON.parse(execFileSync(process.execPath, [path.join(dossier, 'enfant.mjs'), mode, dossier, API], { env: { ...process.env, TZ: tz }, encoding: 'utf8' }).trim().split('\n').pop());
+    const appParis = lance('app', 'Europe/Paris');
+    const regleUtc = lance('serveur', 'UTC');
+    const miroirUtc = lance('miroir', 'UTC');
+    CAS.forEach((c, i) => {
+      dit(appParis[i] != null && appParis[i] === regleUtc[i], `${c.nom} : la règle rend le même texte sous TZ=UTC (serveur) et TZ=Europe/Paris (Ma journée)`, appParis[i] === regleUtc[i] ? '' : `Paris « ${appParis[i]} » · UTC « ${regleUtc[i]} »`);
+      dit(appParis[i] != null && appParis[i] === miroirUtc[i], `${c.nom} : la VRAIE notification (miroir, TZ=UTC) dit mot pour mot ce que dit Ma journée à Paris`, appParis[i] === miroirUtc[i] ? '' : `Ma journée « ${appParis[i]} » · notification « ${miroirUtc[i]} »`);
+      dit(!!appParis[i] && /au moins/i.test(appParis[i]) === c.auMoins, `${c.nom} : ${c.auMoins ? '« au moins » (publiée avant la fin du mois, heure de Paris)' : 'pas de « au moins » (publiée après la fin du mois, heure de Paris)'}`, appParis[i]);
+    });
+  });
+
   console.log(ko ? `\n❌ audit-rappel-urssaf : ${ko} rouge(s)` : '\n✅ audit-rappel-urssaf : tout vert');
   process.exit(ko ? 1 : 0);
 })();

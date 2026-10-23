@@ -67,13 +67,32 @@ export const moisPeriodeUrssaf = (due) => {
   return yms;
 };
 
+export const minuitParisMs = (a, m0, j) => {
+  const base = Date.UTC(a, m0, j);
+  const f = minuitParisMs._f || (minuitParisMs._f = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }));
+  const decalage = (ms) => {
+    const o = {};
+    for (const p of f.formatToParts(new Date(ms))) o[p.type] = p.value;
+    return Date.UTC(Number(o.year), Number(o.month) - 1, Number(o.day), Number(o.hour) % 24, Number(o.minute)) - ms;
+  };
+  return base - decalage(base - decalage(base));
+};
+
 export const montantPeriodeUrssaf = (due, ligne, taux) => {
   if (!due || !ligne || !Array.isArray(ligne.mois)) return { ca: null, apayer: null, partiel: false };
   const yms = moisPeriodeUrssaf(due);
   const ca = Math.round(ligne.mois.reduce((s, m) => (m && yms.includes(m.ym)) ? s + (Number(m.ca) || 0) : s, 0) * 100) / 100;
   const atPub = typeof ligne.at === 'number' ? ligne.at : Date.parse(ligne.at || '');
-  const finPeriode = new Date(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1).getTime();
+  const debutPeriode = minuitParisMs(due.periodStart.getFullYear(), due.periodStart.getMonth(), due.periodStart.getDate());
+  const finPeriode = minuitParisMs(due.periodEnd.getFullYear(), due.periodEnd.getMonth(), due.periodEnd.getDate() + 1);
   const partiel = !!(ligne.aDater && Number(ligne.aDater.n) > 0) || !(atPub >= finPeriode);
+  // (22 oct., revue) Une ligne publiée AVANT le début de la période ne dit rien
+  // d'elle ; une ligne qui n'en porte AUCUN mois et dont le total n'est qu'un
+  // minimum (publiée avant la fin, date illisible, ventes sans date de
+  // versement) non plus : « au moins 0,00 € » est un zéro qui veut dire « pas
+  // su » (§7) ⇒ aucun montant (« se calcule dans Ventes »).
+  const porte = ligne.mois.some((m) => m && yms.includes(m.ym));
+  if (atPub < debutPeriode || (!porte && partiel)) return { ca: null, apayer: null, partiel: false };
   return { ca, apayer: aPayerUrssaf(ca, taux), partiel };
 };
 
