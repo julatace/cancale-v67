@@ -18,3 +18,12 @@ export function ListeReappro({consommables}) {
  {lignes.length ? <><ul className="ops-reappro">{lignes.map(x=><li key={x.id}><span>{x.titre}<small>{x.stock} en stock · seuil {x.seuil}</small></span><strong>+{x.minimum} {{piece:'pièce',rouleau:'rouleau',metre:'mètre'}[x.unite]||x.unite}{x.minimum>1?'s':''}</strong></li>)}</ul><button type="button" onClick={exporter}>Exporter la liste CSV</button></> : <p className="ops-note">Aucun stock renseigné au seuil ou en dessous.</p>}
  </details>;
 }
+
+export function ApercuConsommables({consommables,onOuvrir}) {
+ const {lignes,inconnus}=reapprovisionnement(consommables);
+ return <aside className="ops-materiel" aria-label="Aperçu des consommables"><h3>Stock & matériel</h3>
+  <p>{lignes.length} à réapprovisionner{inconnus.length?` · ${inconnus.length} à compter`:''}</p>
+  {!consommables.length?<p>Aucun consommable renseigné.</p>:<ul>{consommables.slice(0,4).map(x=><li key={x.id}><span>{x.titre}</span><strong>{Number.isSafeInteger(x.stock)&&x.stock>=0?`${x.stock} ${x.unite||''}`:'À compter'}</strong>{Number.isSafeInteger(x.stock)&&x.stock>=0&&Number.isSafeInteger(x.seuil)&&x.seuil>=0&&x.stock<=x.seuil&&<small>Seuil atteint</small>}</li>)}</ul>}
+  <button type="button" onClick={onOuvrir}>Gérer les consommables</button>
+ </aside>;
+}
