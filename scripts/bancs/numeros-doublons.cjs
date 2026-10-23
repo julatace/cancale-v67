@@ -348,6 +348,24 @@ const SERVIS = ['1', '2', '3', '51', '52'];
       await ctx.close();
     }
     {
+      console.log('\n── K2. Le même geste dans le bloc rouge de Colis');
+      const etat = { main: { vinted_annonce_numeros: {
+          '4411': { numero: '52', auto: true, numberedAt: '2026-10-14T15:47:09.775Z', title: 'Masquée colis de banc' },
+          '4412': { numero: '52', auto: true, numberedAt: '2026-10-18T08:26:45.251Z', title: 'En ligne colis de banc' },
+        }, vinted_used_numeros: [1, 2, 3, 52], vinted_accounts_hidden: [] },
+        listings: LISTINGS([{ id: 4411, t: 'Masquée colis de banc', masquee: true }, { id: 4412, t: 'En ligne colis de banc' }]), ventes: null, ecrits: [], ebay: null, panneEcriture: false, garder: true };
+      const { ctx, pg } = await ouvrir(nav, etat, 1512, 'cat_bord');
+      await pg.waitForSelector('[data-conflit-num="52"]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(1000);
+      const b = pg.locator('[data-conflit-num="52"] [data-masquee-partie="4411"]');
+      dit(await b.count() === 1, 'le bloc rouge porte « La masquée n\'est plus là »', String(await b.count()));
+      await b.first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
+      await pg.locator('button:not([data-masquee-partie])', { hasText: 'Elle n\'est plus là' }).last().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(1500);
+      const reste = await pg.locator('[data-conflit-num="52"]').count();
+      const perdus = await perdusLocaux(pg) || {};
+      dit(reste === 0 && perdus['52@4411'] && String(perdus['52@4411'].id) === '4411', 'confirmé : plus de doublon, déclaration rangée sous `52@4411`', JSON.stringify({ reste, perdus }));
+      await ctx.close();
+    }
+    {
       console.log('\n── L. Compte sans annonce en ligne : la masquée a son geste');
       const etat = { main: { vinted_annonce_numeros: {
           '4901': { numero: '39', auto: true, numberedAt: '2026-10-01T10:00:00.000Z', title: 'Masquée seule de banc' },

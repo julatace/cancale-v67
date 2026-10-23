@@ -270,7 +270,7 @@ qu'aucune règle n'en désigne une.
   entrée ancienne ambiguë sur 15, 39, 51, 52, 59, 73. **Tranché** : le cas
   « entrée ancienne sans identifiant + deux fiches au même N° » (le R3 du
   relecteur) garde la masquée présente et renumérote l'autre — on ne devine pas
-  laquelle est partie. Preuves : `numeros-doublons.cjs` I/J/J2/K/L (**18
+  laquelle est partie. Preuves : `numeros-doublons.cjs` I/J/J2/K/K2/L (**20
   rouges** sur fcc80cb, tout vert après ; règle débranchée, `masqueesSurEtagere`
   = toutes les masquées ⇒ **11 rouges**) ; `audit-masquees-numeros.cjs` F/G
   (23 contrôles, 2 rouges sur fcc80cb, 6 mutations sur 6 dont `sans_identite`,
