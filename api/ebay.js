@@ -1185,14 +1185,44 @@ const resumeInactive = (x) => ({
   relanceeEn: ID_EBAY.test(String(x.relanceeEn || '')) ? String(x.relanceeEn) : '',
 });
 // Rangée dans `ebay_inactives{_clé}` — UNE ligne dédiée par compte eBay, chez
-// CE vendeur (`storeData` passe par `portee(owner)`) — et SEULEMENT si eBay a
-// rendu le conteneur : « pas lu » (réponse ratée, conteneur absent) n'écrit
+// CE vendeur (`modifierDonnee` passe par `portee(owner)`) — et SEULEMENT si eBay
+// a rendu le conteneur : « pas lu » (réponse ratée, conteneur absent) n'écrit
 // RIEN, la capture d'avant reste. ⚠️ Pas `ebay_listings_*` : deux lecteurs
 // balaient cette famille (« sur eBay », double vente) — une inactive n'y est pas.
-async function rangerInactives(ctx, liste) {
+// (23 octobre, revue) TROIS GARDES DE PLUS :
+//  · `quand` = l'heure où la question PART chez eBay (`tListe` de la synchro,
+//    `t0` de la relecture), jamais l'heure de l'écriture : la synchro (lente,
+//    20 GetItem) écrivait une liste lue AVANT la relecture par-dessus celle de
+//    la relecture, avec une date plus récente — une annonce remise en vente
+//    entre-temps retrouvait « Remettre en vente ». Comparer-et-échanger
+//    (`modifierDonnee`) : une capture partie PLUS TARD n'est jamais remplacée
+//    (la règle du `lueA` des règles d'offre) ; une lecture ratée n'écrit rien.
+//  · Seulement les annonces terminées dans la fenêtre (`fin` dans les
+//    JOURS_INACTIVES derniers jours de `quand`). Une fin illisible est GARDÉE :
+//    eBay l'a mise dans sa liste des 60 jours, la jeter rangerait peut-être une
+//    liste « vide » qui ne l'est pas (mieux vaut un blanc qu'un faux).
+//  · L'appelant ne range les inactives QUE si `ebay_listings` a été rangée par
+//    le même appel : sinon une annonce terminée restait « en ligne » dans
+//    l'ancienne liste ET « inactive » dans la nouvelle (la relecture qui ne
+//    réécrit pas les annonces quand leur ancienne ligne est illisible).
+//    L'écran compare d'ailleurs les deux dates (`ebay_listings.capturedAt` plus
+//    récente ⇒ eBay n'a pas rendu les inactives à cette relecture).
+async function rangerInactives(ctx, liste, quand) {
   if (!liste || liste.ok !== true || !Array.isArray(liste.invendues)) return false;
-  const items = liste.invendues.map(resumeInactive).filter((x) => ID_EBAY.test(x.itemId)).slice(0, 200);
-  try { return await storeData(ligneDe('ebay_inactives', ctx), { items, complet: liste.invenduesComplet === true, jours: JOURS_INACTIVES, capturedAt: Date.now() }, ctx.owner) === true; } catch (_) { return false; }
+  const t = Number.isFinite(quand) ? quand : Date.now();
+  const limite = t - JOURS_INACTIVES * 86400000;
+  const items = liste.invendues.map(resumeInactive).filter((x) => ID_EBAY.test(x.itemId))
+    .filter((x) => { const f = Date.parse(x.fin || ''); return !Number.isFinite(f) || f >= limite; })
+    .slice(0, 200);
+  const nouveau = { items, complet: liste.invenduesComplet === true, jours: JOURS_INACTIVES, capturedAt: t };
+  let plusRecente = false;
+  try {
+    const r = await modifierDonnee(ligneDe('ebay_inactives', ctx), ctx.owner, (d) => {
+      if (d && Number(d.capturedAt) > t) { plusRecente = true; return undefined; }
+      return nouveau;
+    });
+    return r === true && !plusRecente;
+  } catch (_) { return false; }
 }
 async function handleProgrammees(ctx) {
   const at = await jetonDe(ctx);
@@ -1631,8 +1661,10 @@ async function handleSync(ctx) {
     const garder = liste.complet ? { ids: new Set([...lst, ...liste.programmees].map((x) => String(x.itemId))), a: tListe } : null;
     rangeRegles = (Object.keys(lecturesRegle).length || garder) ? await rangerReglesOffre(ctx, lecturesRegle, garder) : true;
   }
-  // (23 octobre) Les inactives : rangées seulement si eBay a rendu leur liste.
-  const inactivesRange = await rangerInactives(ctx, liste);
+  // (23 octobre) Les inactives : rangées seulement si eBay a rendu leur liste,
+  // et que les annonces en ligne de CE même appel ont été rangées ; datées de
+  // l'heure où la question est partie (`tListe`, revue du 23 octobre).
+  const inactivesRange = annoncesRange ? await rangerInactives(ctx, liste, tListe) : false;
   const lectureCommandesId=crypto.randomUUID();
   const captureCommandes=orders.ok?fusionCommandesEbay(null,orders.data,at2,lectureCommandesId):null;
   if(captureCommandes)commandesRange=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,d=>({...fusionCommandesEbay(d,orders.data,at2,lectureCommandesId),status:orders.status}))===true;
@@ -1686,6 +1718,10 @@ async function handleRelire(ctx) {
   // (21 octobre) + la page 1 des messages : la relecture tourne déjà au plus
   // toutes les ~10 min par compte (`relireEbaySiVieux`) — c'est CE rythme qui
   // borne la lecture des messages, aucun appel de plus à l'ouverture.
+  // (23 octobre, revue) L'heure où la question PART chez eBay : c'est elle qui
+  // date la capture des inactives (une synchro plus lente, partie AVANT, ne
+  // l'écrase plus).
+  const t0 = Date.now();
   const [cmd, liste, msgs] = await Promise.all([
     relireCommandesCompte({ owner: ctx.owner, compte: ctx.compte, token }),
     // (23 octobre) + les INACTIVES, dans le MÊME GetMyeBaySelling.
@@ -1693,9 +1729,6 @@ async function handleRelire(ctx) {
     gestionEbay.messages({ page: 1 }, ctx).catch(() => null),
   ]);
   const messagesRange = await rangerResumeMessages(ctx, msgs);
-  // Rangées HORS de la garde de `ebay_listings` (qui protège le détail des
-  // annonces en ligne) : la liste d'eBay fait foi, rien n'est à fusionner.
-  const inactivesRange = await rangerInactives(ctx, liste);
   let annoncesRange = false, programmeesRange = false;
   if (liste.ok) {
     const avant = await lireDonnee(ligneDe('ebay_listings', ctx), ctx.owner);
@@ -1713,6 +1746,11 @@ async function handleRelire(ctx) {
       programmeesRange = await storeData(ligneDe('ebay_programmees', ctx), { items: liste.programmees.map(resumeProgrammee), enLigne: items.map((x) => ({ itemId: x.itemId, sku: x.sku })), complet: liste.complet, capturedAt: at2 }, ctx.owner) === true;
     }
   }
+  // (23 octobre, revue) Les inactives : seulement si les annonces en ligne de
+  // CE même appel ont été rangées — sinon une annonce terminée restait « en
+  // ligne » dans l'ancienne liste ET « inactive » dans la nouvelle. Hors de la
+  // garde de détail de `ebay_listings` : la liste d'eBay fait foi.
+  const inactivesRange = annoncesRange ? await rangerInactives(ctx, liste, t0) : false;
   const ok = cmd.ok === true;
   return { status: ok ? 200 : (cmd.status || 502), body: {
     ok, reason: ok ? undefined : cmd.reason,

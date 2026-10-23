@@ -12097,7 +12097,7 @@ INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
   les programmées : inchangés — une inactive n'entre JAMAIS dans `actives`.
   Rangée dans une ligne DÉDIÉE par compte, `ebay_inactives{_clé}` (⚠️ pas
   `ebay_listings_*` : deux lecteurs balaient cette famille), chez le vendeur de la
-  session (`storeData` → `portee(owner)`), projetée (`resumeInactive` : ItemID, SKU
+  session (`modifierDonnee` → `portee(owner)`, comparer-et-échanger), projetée (`resumeInactive` : ItemID, SKU
   hors variantes, titre, prix + devise, fin, début, observateurs, photo
   `i.ebayimg.com` seulement, `RelistedItemID`), `{items, complet, jours, capturedAt}`.
   ⚠️ **À L'INVERSE des deux autres listes, un `UnsoldList` ABSENT vaut « pas lu »**
@@ -12107,7 +12107,7 @@ INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
 - **Écran** : une section « Inactives sur eBay » SOUS les programmées
   (`EbayInactives`, `outilsSuite` : visible même sans annonce en ligne), chargée
   seule (`lireEbayParCompte`, `select` scalaires, `->>` en texte). États
-  `data-ebay-inactives` = `charge · jamais · vide · lu · pas-su` ; « Inactives (N) »
+  `data-ebay-inactives` = `charge · jamais · vide · ancienne · lu · pas-su` ; « Inactives (N) »
   (`data-ebay-inactives-n`) seulement si TOUS les comptes de la vue sont lus et la
   liste entière, « au moins N » si eBay en a plus (`data-ebay-inactives-aumoins`),
   un compte illisible nommé (`data-inactives-illisibles`) sans aucun nombre. Pas
@@ -12145,6 +12145,68 @@ INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
   inactive. Le cron du matin ne relit pas les annonces : la liste se rafraîchit
   avec la synchro et la relecture (≤ 10 min, app ouverte).
 - **Julien** : rien. La section se remplit à la prochaine relecture eBay.
+
+#### Revue du 23 octobre — treize constats, tous reproduits, corrigés
+Chaque constat REPRODUIT d'abord (la vraie route dans le harnais
+d'`audit-ebay-route`, l'écran rendu sur données inventées), puis corrigé ; rouge
+sur a9115c0 (copie `git archive`, contrôle lancé DEPUIS elle, §6.1), vert après,
+rouge sous mutation. Décision gardée : un `UnsoldList` absent vaut « pas lu »
+(on ne range jamais du vide) — c'est l'ÉCRAN qui dit l'âge de la capture.
+- ⚠️⚠️ **Une capture figée se présentait comme la liste du jour** (n° 1 et 3) :
+  95 jours, une annonce finie il y a 100 jours sous « ces 60 derniers jours »,
+  « Inactives (1) » et « Remettre en vente ». Route : `rangerInactives` ne range
+  que les fins dans les 60 jours (fin illisible gardée). Écran : une capture de
+  plus de 24 h (`INACTIVES_FRAICHE_MS`), ou plus vieille de 15 min
+  (`INACTIVES_ECART_MS`) que les annonces en ligne du même compte (la route les
+  range dans le MÊME appel : eBay ne l'a pas rendue), est `ancienne` :
+  « Lue le … — pas relue depuis » (`data-inactives-anciennes`,
+  `data-inactives-lue-le`, jour de Paris), aucun « (N) », « Voir sur eBay »
+  seulement, ni « ces 60 derniers jours » ; une ligne hors fenêtre n'est jamais
+  montrée (`dansFenetreInactives`). « Jamais lue » se dédouble
+  (`data-inactives-jamais` = `pas-relue` · `non-rendue`) : une relecture des
+  annonces DÉJÀ faite sans la liste ne promet plus « la prochaine relecture »
+  (eBay ne l'émet peut-être pas sans inactive — non mesuré).
+- **Course synchro / relecture** (n° 2) : la capture est datée au DÉPART de la
+  question (`tListe`, `t0`), écrite par `modifierDonnee` qui refuse de remplacer
+  une capture plus récente (la règle du `lueA` des règles d'offre).
+- **La même ItemID en ligne ET inactive** (n° 4) : sa ligne dit « état à relire
+  chez eBay » (`data-inactive-deja="a-relire"`), plus « déjà de nouveau en
+  vente » ; `deja` n'est retenu que pour une AUTRE ItemID ou un `via`. Route : la
+  relecture ne range les inactives que si `ebay_listings` a été rangée par le
+  même appel.
+- **« 95,00 € USD »** (n° 5) : `prixEbayTexte` (la règle de la carte des
+  annonces, §11) — « 95,00 USD », aucune devise ⇒ aucun symbole.
+- **§7** (n° 6) : une panne déjà dite par l'écran (ventes : `pasSu` de la ligne
+  du haut, `pasSuVentes` de `bloqueCommun` ; registre eBay illisible) n'est pas
+  redite — `dejaDit`, une pastille « pas lue », `data-inactives-dit="ecran"`.
+- **Un compte lu vide + un jamais lu** (n° 7) : `vide` (« aucune … sur X ») +
+  « pas encore lue pour Y » — plus « Pas encore lue » pour tout.
+- **Cinq trous de banc** (n° 8 à 12, le code était juste) : marqueur 013 (VRM-21
+  publiée avant la coupure ⇒ B21, jamais 21) et `numberedAt` après publication
+  (« pas reliée ») ; ventes EN COURS de lecture (requêtes retenues : aucun
+  « Remettre en vente ») ; un compte jamais lu ⇒ aucun « (N) » ; une paire à
+  l'annonce Vinted FERMÉE n'est pas « encore en ligne sur Vinted » ; une fin à
+  23 h 30 UTC = le lendemain à Paris. **n° 13** (audit) : photos
+  `i.ebayimg.com.evil.test`, `http://i.ebayimg.com/…`, `evil.test/?u=i.ebayimg.com`
+  doivent être vidées.
+- **Preuves** : `audit-ebay-route.cjs` **502 contrôles, 5 rouges sur a9115c0**
+  ([INA-fenetre], [INA-course], [INA-coherence], et l'écriture par
+  comparer-et-échanger, sync et relire) ; cinq mutations de la route, chacune
+  rouge : fenêtre retirée (1), garde « plus récente » retirée (1), date prise à
+  l'ÉCRITURE (1, [INA-course2] : la relecture partie avant une synchro, écrite
+  avant elle), couplage retiré (1), regex photo non ancrée (4) ; l'ANCIEN audit
+  sous la regex non ancrée : les mêmes rouges que sur la route juste (le trou
+  n° 13 reproduit). Banc `bancs/ebay-inactives.cjs` (`BANC_SEUL=A,H,…`)
+  **80 contrôles, 28 rouges sur le build de a9115c0** ; quatorze mutations de
+  l'écran, chacune rouge sur SON scénario (capture jamais ancienne 6 · écart de
+  15 min retiré 2 · fenêtre retirée 2 · même ItemID ignorée 2 · prix « € USD » 2 ·
+  §7 ventes 2 · §7 registre 2 · mixte rabattu sur « jamais » 2 · N° sans date 4 ·
+  ventes en cours ignorées 2 · « (N) » avec un compte jamais lu 2 · « sur
+  Vinted » sans identité 4 · jour UTC 2 · sous-état unique 2) ; l'ANCIEN banc
+  sous les mutations des trous n° 8 à 12 : exactement le même verdict que sur
+  l'écran juste (42 OK, 2 KO dus à un attribut déplacé) — le trou reproduit.
+- **Non mesuré** : qu'eBay émette `<UnsoldList>` vide (sinon « pas encore rendue
+  par eBay » reste pour un vendeur sans inactive) ; rien n'a été envoyé à eBay.
 
 ---
 

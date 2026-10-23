@@ -2425,14 +2425,23 @@ const RA = {};
   //    de la session ; un conteneur absent ou une réponse ratée n'écrit RIEN ;
   //    aucune remise en vente (Relist*, AddItem) n'est jamais envoyée ; une
   //    inactive ne bloque jamais une publication (elle n'est pas en vente).
-  const INACTIVE_A = () => ({ ...annonce('110000000930', 'Asics Gel 1130 argent T39', 'VRM-30', '75.0', '2026-09-01T10:00:00.000Z', { watch: 2, fin: '2026-10-01T10:00:00.000Z', photo: 'https://i.ebayimg.com/images/g/aaa/s-l225.jpg' }) });
-  const INACTIVE_B = () => ({ ...annonce('110000000931', 'Puma Suede rouge T42', '', '60.0', '2026-09-02T10:00:00.000Z', { fin: '2026-10-02T10:00:00.000Z', photo: 'https://evil.test/traceur.gif', relist: '110000000999', variantes: '<Variations><Variation><SKU>VAR-1</SKU></Variation></Variations>' }) });
+  // (revue du 23 octobre) Les photos de ces fixtures RESSEMBLENT à eBay sans
+  // l'être : une adresse sur un autre hôte (`evil.test`) ne départageait pas une
+  // règle ancrée d'une règle qui ne l'est pas (`/i\.ebayimg\.com/` passait vert).
+  // ⚠️ Les fins sont RELATIVES : la route ne range que les annonces terminées
+  // dans les 60 derniers jours.
+  const ilYa = (j) => new Date(Date.now() - j * 86400000).toISOString();
+  const FINS = { a: ilYa(22), b: ilYa(21), c: ilYa(20), d: ilYa(19) };
+  const INACTIVE_A = () => ({ ...annonce('110000000930', 'Asics Gel 1130 argent T39', 'VRM-30', '75.0', '2026-09-01T10:00:00.000Z', { watch: 2, fin: FINS.a, photo: 'https://i.ebayimg.com/images/g/aaa/s-l225.jpg' }) });
+  const INACTIVE_B = () => ({ ...annonce('110000000931', 'Puma Suede rouge T42', '', '60.0', '2026-09-02T10:00:00.000Z', { fin: FINS.b, photo: 'https://i.ebayimg.com.evil.test/traceur.gif', relist: '110000000999', variantes: '<Variations><Variation><SKU>VAR-1</SKU></Variation></Variations>' }) });
+  const INACTIVE_C = () => ({ ...annonce('110000000932', 'Vans Old Skool noir T40', '', '40.0', '2026-09-03T10:00:00.000Z', { fin: FINS.c, photo: 'http://i.ebayimg.com/images/g/ccc/s-l225.jpg' }) });
+  const INACTIVE_D = () => ({ ...annonce('110000000933', 'Nike Air Max 90 blanc T42', '', '70.0', '2026-09-04T10:00:00.000Z', { fin: FINS.d, photo: 'https://evil.test/?u=i.ebayimg.com/x.gif' }) });
   const CLES_INACTIVE = ['itemId', 'sku', 'title', 'price', 'currency', 'fin', 'depuis', 'observateurs', 'photo', 'relanceeEn'];
   const listesDe = (j) => auCompte(j).filter((x) => x.appel === 'GetMyeBaySelling');
   await essaie('[INA] la synchro demande les inactives dans le MÊME appel', async () => {
     for (const action of ['sync', 'relire']) {
       remettre(); remettreBase();
-      ebay['at-J'].invendues = [INACTIVE_A(), INACTIVE_B()];
+      ebay['at-J'].invendues = [INACTIVE_A(), INACTIVE_B(), INACTIVE_C(), INACTIVE_D()];
       const o = await app(JWT_J, { action });
       const ls = listesDe(o.journal);
       const corps = ls[0] ? ls[0].corps : '';
@@ -2441,13 +2450,20 @@ const RA = {};
         `[INA] « ${action} » : UN SEUL GetMyeBaySelling, qui demande en ligne + programmées + INACTIVES (UnsoldList, DurationInDays ≤ 60) — aucun appel eBay de plus`, `${ls.length} appel(s) · jours=${jours}`);
       const w = ecrit(o.journal, 'ebay_inactives');
       const wb = o.journal.filter((x) => x.ou === 'base' && x.corps.includes('"id":"ebay_inactives"'));
-      dit(o.code === 200 && !!w && w.owner === J && wb.length === 1 && /on_conflict=owner,id/.test(wb[0].u) && Array.isArray(w.data.items) && w.data.items.length === 2 && w.data.complet === true && w.data.jours === 60 && Number(w.data.capturedAt) > 0,
-        `[INA] « ${action} » : les 2 inactives sont rangées dans la ligne DÉDIÉE ebay_inactives, chez le vendeur de la session (owner, on_conflict=owner,id), avec complet/jours/capturedAt`, w ? `owner=${w.owner} · ${w.data.items && w.data.items.length} · ${wb[0] && wb[0].u}` : `rien rangé · HTTP ${o.code}`);
+      // (revue du 23 octobre) L'écriture est un COMPARER-ET-ÉCHANGER
+      // (`modifierDonnee`) : une insertion sans `on_conflict` (409 si la ligne
+      // existe), ou un PATCH filtré sur sa version — jamais un upsert aveugle.
+      const casOk = wb.length === 1 && ((wb[0].m === 'POST' && !/on_conflict=/.test(wb[0].u)) || (wb[0].m === 'PATCH' && /data->>rev=/.test(wb[0].u) && /owner=eq\./.test(wb[0].u)));
+      dit(o.code === 200 && !!w && w.owner === J && casOk && Array.isArray(w.data.items) && w.data.items.length === 4 && w.data.complet === true && w.data.jours === 60 && Number(w.data.capturedAt) > 0,
+        `[INA] « ${action} » : les 4 inactives sont rangées dans la ligne DÉDIÉE ebay_inactives, chez le vendeur de la session (owner), par comparer-et-échanger, avec complet/jours/capturedAt`, w ? `owner=${w.owner} · ${w.data.items && w.data.items.length} · ${wb[0] && wb[0].m} ${wb[0] && wb[0].u}` : `rien rangé · HTTP ${o.code}`);
       const a = w && w.data.items.find((x) => x.itemId === '110000000930'), b = w && w.data.items.find((x) => x.itemId === '110000000931');
+      const c = w && w.data.items.find((x) => x.itemId === '110000000932'), d = w && w.data.items.find((x) => x.itemId === '110000000933');
       const clesOk = !!w && w.data.items.every((x) => Object.keys(x).every((k) => CLES_INACTIVE.includes(k)));
-      dit(clesOk && a && a.sku === 'VRM-30' && a.price === '75.0' && a.currency === 'EUR' && a.fin === '2026-10-01T10:00:00.000Z' && a.observateurs === 2 && a.photo === 'https://i.ebayimg.com/images/g/aaa/s-l225.jpg'
+      dit(clesOk && a && a.sku === 'VRM-30' && a.price === '75.0' && a.currency === 'EUR' && a.fin === FINS.a && a.observateurs === 2 && a.photo === 'https://i.ebayimg.com/images/g/aaa/s-l225.jpg'
         && b && b.sku === '' && b.photo === '' && b.relanceeEn === '110000000999' && b.observateurs === null,
-        `[INA] « ${action} » : seuls les scalaires utiles sont rangés (§4.4 — ni détail, ni « vues » brut), la photo hors i.ebayimg.com est VIDÉE, le SKU d'une variante n'est pas celui de l'annonce, la remise en vente déjà faite (RelistedItemID) est gardée`, w ? JSON.stringify(w.data.items) : '∅');
+        `[INA] « ${action} » : seuls les scalaires utiles sont rangés (§4.4 — ni détail, ni « vues » brut), le SKU d'une variante n'est pas celui de l'annonce, la remise en vente déjà faite (RelistedItemID) est gardée`, w ? JSON.stringify(w.data.items) : '∅');
+      dit(!!w && b && c && d && b.photo === '' && c.photo === '' && d.photo === '' && a && a.photo !== '',
+        `[INA] « ${action} » : une photo qui RESSEMBLE à eBay sans l'être est VIDÉE (i.ebayimg.com.evil.test, http://, i.ebayimg.com cité dans une autre adresse) — seule https://i.ebayimg.com/… reste`, w ? JSON.stringify([a && a.photo, b && b.photo, c && c.photo, d && d.photo]) : '∅');
       dit(o.corps && o.corps.lu && o.corps.lu.inactives === true, `[INA] « ${action} » : la réponse dit les inactives LUES (lu.inactives)`, JSON.stringify(o.corps && o.corps.lu));
       const L = ecrit(o.journal, 'ebay_listings');
       dit(!L || !L.data.items.some((x) => /^11000000093[01]$/.test(String(x.itemId))), `[INA] « ${action} » : aucune inactive dans ebay_listings (elles ne sont pas en vente)`, L ? L.data.items.map((x) => x.itemId).join(',') : 'ebay_listings non réécrite');
@@ -2546,6 +2562,99 @@ const RA = {};
     const fichiers = [path.join(RACINE, 'api', 'ebay.js'), ...fs.readdirSync(path.join(RACINE, 'api', '_lib')).filter((f) => /\.js$/.test(f)).map((f) => path.join(RACINE, 'api', '_lib', f))];
     const fautifs = fichiers.filter((f) => /['"`](?:Relist\w*|AddItem)['"`]/.test(sansCommentaires(fs.readFileSync(f, 'utf8'))));
     dit(fautifs.length === 0, '[INA] aucun appel Relist*/AddItem dans api/ (lu sans les commentaires)', fautifs.map((f) => path.basename(f)).join(','));
+  });
+
+  // ── 14 bis. (revue du 23 octobre) LA FENÊTRE, LA COURSE, LA COHÉRENCE ──────
+  await essaie('[INA-fenetre] seulement les 60 derniers jours', async () => {
+    remettre(); remettreBase();
+    // eBay rend (au-delà de ce qui est demandé) une annonce terminée il y a
+    // 70 jours, une il y a 10 jours, et une SANS date de fin.
+    const vieille = { ...INACTIVE_A(), itemId: '110000000941', sku: '', fin: ilYa(70) };
+    const recente = { ...INACTIVE_A(), itemId: '110000000942', sku: '', fin: ilYa(10) };
+    const sansFin = { ...INACTIVE_A(), itemId: '110000000943', sku: '' }; delete sansFin.fin;
+    ebay['at-J'].invendues = [vieille, recente, sansFin];
+    const o = await app(JWT_J, { action: 'sync' });
+    const w = ecrit(o.journal, 'ebay_inactives');
+    const ids = w ? w.data.items.map((x) => x.itemId).sort().join(',') : '';
+    dit(ids === '110000000942,110000000943',
+      '[INA-fenetre] une annonce terminée il y a 70 jours (hors de la fenêtre de 60 jours) n\'est PAS rangée ; celle d\'il y a 10 jours l\'est ; une fin illisible est gardée (mieux vaut un blanc qu\'un faux)', ids || 'rien rangé');
+  });
+  await essaie('[INA-course] synchro lente / relecture', async () => {
+    remettre(); remettreBase();
+    const fin5 = ilYa(5);
+    ebay['at-J'].invendues = [{ ...INACTIVE_A(), itemId: '110000000950', sku: '', fin: fin5 }];
+    const vraiFetch = global.fetch;
+    let lacher; const porte = new Promise((ok) => { lacher = ok; });
+    let tenus = 0;
+    global.fetch = async (url, opts = {}) => {
+      const h = (opts && opts.headers) || {};
+      if (String(url).includes('/ws/api.dll') && h['X-EBAY-API-CALL-NAME'] === 'GetItem') { tenus++; await porte; }
+      return vraiFetch(url, opts);
+    };
+    let apresRelire = null, fin = null;
+    try {
+      const pSync = app(JWT_J, { action: 'sync' });
+      // La synchro a lu sa liste ; elle attend ses GetItem. Pendant ce temps,
+      // l'annonce est REMISE EN VENTE sur eBay et la relecture passe.
+      for (let i = 0; i < 100 && !tenus; i++) await new Promise((ok) => setTimeout(ok, 5));
+      ebay['at-J'].invendues = [{ ...INACTIVE_A(), itemId: '110000000950', sku: '', fin: fin5, relist: '110000000951' }];
+      await new Promise((ok) => setTimeout(ok, 3));
+      await app(JWT_J, { action: 'relire' });
+      apresRelire = JSON.parse(JSON.stringify(lignes.find((x) => x.owner === J && x.id === 'ebay_inactives') || null));
+      lacher();
+      await pSync;
+      fin = lignes.find((x) => x.owner === J && x.id === 'ebay_inactives') || null;
+    } finally { lacher(); global.fetch = vraiFetch; }
+    const it0 = (l) => (l && l.data && Array.isArray(l.data.items) ? l.data.items[0] || {} : {});
+    dit(tenus > 0 && apresRelire && it0(apresRelire).relanceeEn === '110000000951' && fin && it0(fin).relanceeEn === '110000000951' && Number(fin.data.capturedAt) === Number(apresRelire.data.capturedAt),
+      '[INA-course] une synchro lente (liste lue AVANT la relecture) ne remplace pas la capture plus récente de la relecture — ni ses données, ni sa date', `GetItem tenus=${tenus} · après relire relanceeEn=${it0(apresRelire).relanceeEn} · à la fin relanceeEn="${it0(fin).relanceeEn}" · capturedAt ${apresRelire && apresRelire.data.capturedAt} → ${fin && fin.data.capturedAt}`);
+  });
+  // L'autre ordre : la relecture part la PREMIÈRE et écrit avant une synchro
+  // partie APRÈS elle (donc plus fraîche). Daté à l'écriture, le rangement de la
+  // relecture porterait une date plus récente que le départ de la synchro, qui
+  // serait refusée : la donnée la plus ANCIENNE gagnerait.
+  await essaie('[INA-course2] relecture partie avant, écrite avant', async () => {
+    remettre(); remettreBase();
+    const fin6 = ilYa(6);
+    ebay['at-J'].invendues = [{ ...INACTIVE_A(), itemId: '110000000960', sku: '', fin: fin6 }];
+    const vraiFetch = global.fetch;
+    let lacherM, lacherG; const porteM = new Promise((ok) => { lacherM = ok; }), porteG = new Promise((ok) => { lacherG = ok; });
+    let listes = 0, messages = 0, getitems = 0;
+    global.fetch = async (url, opts = {}) => {
+      const h = (opts && opts.headers) || {};
+      const appel = String(url).includes('/ws/api.dll') ? h['X-EBAY-API-CALL-NAME'] : '';
+      if (appel === 'GetMyeBaySelling') listes++;
+      if (appel === 'GetMemberMessages') { messages++; await porteM; }
+      if (appel === 'GetItem') { getitems++; await porteG; }
+      return vraiFetch(url, opts);
+    };
+    let fin = null;
+    try {
+      const pR = app(JWT_J, { action: 'relire' });
+      for (let i = 0; i < 200 && !(listes >= 1 && messages >= 1); i++) await new Promise((ok) => setTimeout(ok, 5));
+      // La relecture a lu sa liste. L'annonce est remise en vente PUIS la
+      // synchro part (plus tard) et lit la liste à jour.
+      ebay['at-J'].invendues = [{ ...INACTIVE_A(), itemId: '110000000960', sku: '', fin: fin6, relist: '110000000961' }];
+      await new Promise((ok) => setTimeout(ok, 3));
+      const pS = app(JWT_J, { action: 'sync' });
+      for (let i = 0; i < 200 && !getitems; i++) await new Promise((ok) => setTimeout(ok, 5));
+      await new Promise((ok) => setTimeout(ok, 3));
+      lacherM(); await pR;           // la relecture (partie avant) écrit d'abord
+      lacherG(); await pS;           // puis la synchro (partie après)
+      fin = lignes.find((x) => x.owner === J && x.id === 'ebay_inactives') || null;
+    } finally { lacherM(); lacherG(); global.fetch = vraiFetch; }
+    const it0 = (l) => (l && l.data && Array.isArray(l.data.items) ? l.data.items[0] || {} : {});
+    dit(listes >= 2 && messages >= 1 && getitems > 0 && fin && it0(fin).relanceeEn === '110000000961',
+      '[INA-course2] relecture partie AVANT une synchro mais écrite avant elle ⇒ la synchro (plus fraîche) la remplace : la capture est datée de son DÉPART, jamais de son écriture', `listes=${listes} messages=${messages} getitems=${getitems} · à la fin relanceeEn="${it0(fin).relanceeEn}"`);
+  });
+  await essaie('[INA-coherence] pas d\'inactives sans les annonces en ligne du même appel', async () => {
+    remettre(); remettreBase();
+    lignes.push({ owner: J, id: 'ebay_listings', data: { items: [{ itemId: '110000000930', title: 'Asics', sku: 'VRM-30' }], capturedAt: 1 } });
+    ebay['at-J'].invendues = [INACTIVE_A()];   // l'annonce 930 est terminée chez eBay
+    mode.listingsKo = true;                    // la relecture ne peut pas relire l'ANCIENNE ligne des annonces : elle ne la réécrit pas
+    const o = await app(JWT_J, { action: 'relire' });
+    dit(ecrit(o.journal, 'ebay_listings') === null && ecrit(o.journal, 'ebay_inactives') === null && !(o.corps && o.corps.lu && o.corps.lu.inactives),
+      '[INA-coherence] la relecture n\'a pas pu réécrire les annonces en ligne ⇒ elle ne range pas non plus les inactives (sinon la MÊME annonce serait « en ligne » dans l\'ancienne liste ET « inactive » dans la nouvelle)', JSON.stringify(o.corps && o.corps.lu));
   });
 
   // ── 11. BASE PAS ENCORE CLOISONNÉE : rejouée dans un processus neuf ─────────
