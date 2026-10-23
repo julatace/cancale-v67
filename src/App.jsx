@@ -3835,72 +3835,152 @@ const ordersFromEmailSales = (mails, accounts) => {
     };
   }).filter(Boolean);
 };
-// Même filet pour les ACHATS : les reçus d'achat `email_achat_*` (46 en base)
-// portent article, prix, transaction et date. Ils prennent le relais quand la
-// moisson des achats est vide, sans aller déranger Vinted.
-const ordersFromEmailAchats = (mails, accounts) => {
-  const parCle = new Map();
-  (accounts || []).forEach(a => {
-    parCle.set(String(a.vinted_user_id), a);
-    if (a.login) parCle.set(String(a.login).toLowerCase(), a);
-  });
-  // ⚠️ VÉRIFIÉ SUR LES VRAIES DONNÉES (47 lignes email_achat en base) : seules
-  // 11 sont de VRAIS achats (« Ton reçu pour la commande … »). Les 36 autres
-  // sont des emails de STATUT mal classés par l'ancien tri, et qui polluaient
-  // les Achats :
-  //   • « … - Confirmation requise » (Vinted demande de confirmer la conformité —
-  //     c'est un email lié à une VENTE, pas un achat) ;
-  //   • « Commande mise à jour pour … » (simple changement de statut) ;
-  //   • « Retourne ta commande d'ici … » (retour).
-  // On ne garde donc QUE les lignes dont le sujet est un vrai reçu d'achat. Le
-  // tri à la source (email-inbound) ne les crée plus, mais les anciennes lignes
-  // restent en base : ce filtre les écarte à l'affichage.
-  const estVraiAchat = (m) => {
-    const s = String(m.subject || '').toLowerCase();
-    if (/confirmation requise|mise à jour|mis à jour|retourne ta commande|à expédier|pr[ée]pare ta commande|vendu/i.test(s)) return false;
-    return /re[çc]u pour (?:la |ta |votre )?commande|tu as achet|as achet[ée]|merci pour (?:ton|votre) achat|confirmation d['']achat/i.test(s);
-  };
-  return (mails || []).filter(estVraiAchat).map(m => {
-    const titre = String(m.article || '').trim();
-    if (!titre) return null;
-    const montant = parseFloat(String(m.prix || '').replace(',', '.'));
-    const acc = parCle.get(String(m.uid || '')) || parCle.get(String(m.account || '').toLowerCase())
-      || { vinted_user_id: m.uid || '', login: m.account || '' };
-    return {
-      transaction_id: m.transaction || ('mail:' + (m.uid || '') + ':' + (m.receivedAt || '')),
-      title: titre,
-      price: { amount: isNaN(montant) ? null : montant, currency_code: 'EUR' },
-      date: m.receivedAt || null,
-      status: 'Achat confirmé',
-      _fromEmail: true,
-      _acc: acc,
-    };
-  }).filter(Boolean);
-};
+// (23 oct.) `ordersFromEmailAchats` est RETIRÉ : plus aucun appelant depuis
+// août (la moisson de l'extension est la seule source des achats, voir
+// `loadOrders`), et il portait une SECONDE règle de « ce qui est un reçu »
+// (`estVraiAchat`, par le sujet). Une seule règle vit maintenant :
+// `estRecuAchat`, ci-dessous (§11). Ne pas le rebrancher.
 
-// Extrait les champs propres d'un reçu d'achat depuis l'email Vinted (montant,
-// détail, vendeur, date, transaction). Sert à la fois à la modale in-app et à
-// l'impression PDF. On retire les astérisques de mise en forme de Vinted.
-const parseReceiptFields = (a) => {
-  const txt = String(a.texte || '').replace(/\*/g, ' ');
-  const grab = (re) => { const m = txt.match(re); return m ? m[1].trim().replace(/\s{2,}/g, ' ') : ''; };
-  const eur = (re) => { const m = txt.match(re); return m ? m[1].replace('.', ',') + ' €' : ''; };
-  const article = a.article || grab(/commande\s*[«"“]\s*([^»"”\n]+)/i) || 'Article';
-  const vendeur = grab(/vendeur\s*:?\s*([^\n]+)/i);
-  const paid = a.prix ? (String(a.prix).replace('.', ',') + ' €') : eur(/montant\s*pay[ée]s?\s*:?\s*([\d.,]+)\s*€/i);
-  const artPrice = eur(/(?:^|\n)\s*article\s+([\d.,]+)\s*€/i);
-  const port = eur(/frais\s+de\s+port\s+([\d.,]+)\s*€/i);
-  const protection = eur(/protection\s+acheteurs?\s+([\d.,]+)\s*€/i);
-  const mode = grab(/mode\s+de\s+paiement\s*:?\s*([^\n]+)/i);
-  const datePaie = grab(/date\s+du\s+paiement\s*:?\s*([^\n]+)/i) || (a.receivedAt ? new Date(a.receivedAt).toLocaleString('fr-FR') : '');
-  const trans = a.transaction || grab(/transaction\s*:?\s*(\d+)/i);
-  const compte = a.account || '';
-  const cleaned = txt
+// ── LE REÇU D'ACHAT VINTED (23 octobre) ─────────────────────────────────────
+// Julien, capture iPhone : « le reçu s'affiche mal » — Montant payé 24,93 €,
+// Article 20,00 €, Frais de port 3,23 €, et rien d'autre : il manquait 1,70 €.
+// MESURÉ (lecture seule, 117 lignes `email_achat_*`) : 81 vrais reçus. Le bloc
+// « Montant payé » → « Mode de paiement » porte, une par ligne, « Article »,
+// « Frais de port », puis SOIT « Frais Vinted » (55 reçus, la forme récente)
+// SOIT « Frais de Protection acheteurs » (26, l'ancienne), et parfois
+// « Réduction -3,79 € » (8, NÉGATIVE). Avec toutes ses lignes, la somme vaut le
+// Montant payé sur les 81. L'ancien parseur ne connaissait que « protection
+// acheteurs » : 55 reçus perdaient leurs frais, 8 leur réduction.
+// ⇒ UNE règle (§11) pour la feuille de l'app ET la fenêtre imprimable : toutes
+//   les lignes « Libellé ±X,XX € » du bloc, libellé tel que Vinted l'écrit,
+//   aucune jetée, même inconnue ; la somme se vérifie EN CENTIMES contre le
+//   Montant payé : `juste` · `ecart` · `passu` — et la feuille le DIT (§5 : un
+//   total partiel ne se présente pas comme complet).
+// ⇒ Les 36 autres lignes (« Commande mise à jour pour … », « … - Confirmation
+//   requise », « Retourne ta commande … », juillet-août) n'ont NI Montant payé
+//   NI lignes : ce ne sont PAS des reçus (`estRecuAchat`). Rien n'est supprimé
+//   en base (« on ne jette aucun email ») ; l'app ne les présente plus comme
+//   « Reçu d'achat ».
+// ⇒ Le n° de transaction est écrit dans CHAQUE reçu (« N° de transaction … »,
+//   81 sur 81), mais le serveur ne le rangeait pas (l'astérisque entre le
+//   libellé et le nombre cassait son motif) : `transaction` est vide sur les 81.
+//   `txRecuAchat` le lit dans le texte — c'est une IDENTITÉ (§5) : 61 reçus se
+//   relient ainsi à leur achat capté, 0 doublon.
+// <recu-achat-regle>
+const centimesRecu = (s) => {
+  const t = String(s == null ? '' : s).replace(/[\s  ]/g, '').replace(/[−–]/g, '-');
+  const m = t.match(/^([+-])?(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,](\d{1,2}))?$/);
+  if (!m) return null;
+  const v = parseInt(m[2].replace(/[.,]/g, ''), 10) * 100 + (m[3] ? (m[3].length === 1 ? Number(m[3]) * 10 : Number(m[3])) : 0);
+  if (!Number.isSafeInteger(v)) return null;
+  return m[1] === '-' ? -v : v;
+};
+const texteCentimesRecu = (c) => {
+  if (!Number.isSafeInteger(c)) return '';
+  const n = Math.abs(c);
+  const e = String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (c < 0 ? '−' : '') + e + ',' + String(n % 100).padStart(2, '0') + ' €';
+};
+const lignesRecu = (texte) => String(texte == null ? '' : texte).replace(/\r/g, '').split('\n')
+  .map((l) => l.replace(/\*+/g, ' ').replace(/[\t  ]/g, ' ').replace(/ {2,}/g, ' ').trim());
+const MONTANT_RECU = '([+\\-−–]?\\s?(?:\\d{1,3}(?:[ .]\\d{3})+|\\d+)(?:[.,]\\d{1,2})?)\\s*(?:€|eur(?:os?)?)';
+const RE_MONTANT_SEUL_RECU = new RegExp('^' + MONTANT_RECU + '$', 'i');
+const RE_LIGNE_RECU = new RegExp('^(.*?\\S)\\s*:?\\s+' + MONTANT_RECU + '$', 'i');
+const RE_MONTANT_PAYE_RECU = /^montant\s+pay[ée]e?s?(?![\p{L}\d])\s*:?\s*/iu;
+const FIN_VENTILATION_RECU = /^(?:mode\s+de\s+paiement|date\s+du\s+paiement|n[°º]?\s*de\s+transaction|transaction|vendeur)\b/i;
+const ventilationRecuAchat = (texte) => {
+  const L = lignesRecu(texte);
+  const i = L.findIndex((l) => RE_MONTANT_PAYE_RECU.test(l));
+  if (i < 0) return { trouve: false, paye: null, lignes: [], somme: 'passu', total: null, ecart: null, raison: 'sans-montant' };
+  let reste = L[i].replace(RE_MONTANT_PAYE_RECU, '');
+  let j = i + 1;
+  if (!reste) { while (j < L.length && !L[j]) j++; if (j < L.length && RE_MONTANT_SEUL_RECU.test(L[j])) reste = L[j++]; }
+  const ms = reste.match(RE_MONTANT_SEUL_RECU);
+  const paye = ms ? centimesRecu(ms[1]) : null;
+  const lignes = [];
+  let fin = false;
+  for (; j < L.length && lignes.length <= 20; j++) {
+    const l = L[j];
+    if (!l) continue;
+    if (FIN_VENTILATION_RECU.test(l)) { fin = true; break; }
+    const m = l.match(RE_LIGNE_RECU);
+    const c = m ? centimesRecu(m[2]) : null;
+    if (m && c != null && /\p{L}/u.test(m[1])) lignes.push({ libelle: m[1].replace(/\s*:$/, ''), centimes: c });
+    else if (l.length > 60) break;                       // de la prose : le bloc est fini, sans sa borne
+    else lignes.push({ libelle: l, centimes: null });   // une ligne du bloc qu'on ne sait pas lire : gardée, jamais jetée
+  }
+  const lisibles = lignes.length > 0 && lignes.every((x) => x.centimes != null);
+  const total = lisibles ? lignes.reduce((s, x) => s + x.centimes, 0) : null;
+  let somme = 'passu', ecart = null, raison = null;
+  if (paye == null) raison = 'montant-illisible';
+  else if (!lignes.length) raison = 'sans-detail';
+  else if (!lisibles) raison = 'ligne-illisible';
+  else if (total === paye) somme = 'juste';
+  else if (!fin) raison = 'fin-introuvable';
+  else { somme = 'ecart'; ecart = paye - total; }
+  return { trouve: true, paye, lignes, somme, total, ecart, raison };
+};
+const txRecuAchat = (a) => {
+  const t = String((a && a.transaction) || '').trim();
+  if (/^\d{6,}$/.test(t)) return t;
+  for (const l of lignesRecu(a && a.texte)) {
+    const m = l.match(/^(?:n[°º]?\s*de\s+)?transaction\s*:?\s*#?\s*(\d{6,})$/i);
+    if (m) return m[1];
+  }
+  return '';
+};
+// Un « reçu » est un email qui porte un Montant payé (ou dont le sujet est un
+// reçu, ou qui a un PDF joint). Les emails de statut rangés là par l'ancien tri
+// du serveur n'en ont aucun.
+const estRecuAchat = (a) => !!a && (ventilationRecuAchat(a.texte).trouve
+  || /re[çc]u\s+pour\s+(?:la\s+|ta\s+|votre\s+)?commande/i.test(String(a.subject || ''))
+  || !!a.pdfB64);
+// undefined = lecture en cours, null = pas su : passés tels quels.
+const recusAchatDe = (rows) => (Array.isArray(rows)
+  ? rows.filter(estRecuAchat).map((r) => ({ ...r, transaction: txRecuAchat(r) }))
+  : rows);
+// </recu-achat-regle>
+// Le mode de paiement tel qu'on le lit : « Visa •••• 4242 » (l'email écrit
+// « Visa, **********4242 (24,93 €) » ; sans les étoiles il devenait « Visa,
+// 4242 », un nombre qui n'en est pas un). Le montant entre parenthèses n'est
+// gardé que s'il en dit plus que le Montant payé (deux moyens de paiement).
+const modePaiementRecu = (texte, paye) => {
+  const brut = String(texte == null ? '' : texte).replace(/\r/g, '').split('\n').find((l) => /^[\s*]*mode\s+de\s+paiement\b/i.test(l));
+  if (!brut) return '';
+  let m = brut.replace(/\*{3,}\s*(\d{2,4})\b/g, '•••• $1').replace(/\*+/g, ' ').replace(/[\t  ]/g, ' ').replace(/ {2,}/g, ' ').trim()
+    .replace(/^mode\s+de\s+paiement\s*:?\s*/i, '').replace(/,\s*(?=••••)/g, ' ');
+  const montants = [...m.matchAll(/\(\s*([^()]*?)\s*(?:€|eur)\s*\)/gi)];
+  if (montants.length === 1 && paye != null && centimesRecu(montants[0][1]) === paye) m = m.replace(montants[0][0], '').trim();
+  else m = m.replace(/\)\s+(?=\S)/g, ') · ');
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : '';
+};
+// La phrase qui accompagne le détail — venue de la même source que les lignes.
+const phraseSommeRecu = (v) => {
+  if (!v || v.somme === 'juste') return '';
+  if (v.somme === 'ecart') return `Ces lignes font ${texteCentimesRecu(v.total)}, pas le montant payé (${texteCentimesRecu(v.paye)}) — regarde l'email de Vinted.`;
+  if (v.raison === 'sans-detail') return 'Le détail (article, port, frais) n\'est pas dans cet email — regarde l\'email de Vinted.';
+  if (v.raison === 'montant-illisible') return 'Le montant payé n\'a pas pu être lu — regarde l\'email de Vinted.';
+  return 'Le détail n\'a pas pu être lu en entier : ces lignes ne sont peut-être pas toutes là — regarde l\'email de Vinted.';
+};
+// Les champs d'un reçu pour la feuille de l'app ET la fenêtre imprimable.
+const champsRecuAchat = (a) => {
+  const L = lignesRecu(a && a.texte);
+  const val = (re) => { for (const l of L) { const m = l.match(re); if (m && m[1].trim()) return m[1].trim(); } return ''; };
+  const v = ventilationRecuAchat(a && a.texte);
+  const article = String((a && a.article) || '').trim() || (String((a && a.subject) || '').match(/commande\s*[«"“]\s*([^»"”]+?)\s*[»"”]/i) || [])[1] || 'Article';
+  const vendeur = val(/^vendeur\s*:?\s*(.+)$/i);
+  const mode = modePaiementRecu(a && a.texte, v.paye);
+  const recuLe = a && a.receivedAt && Number.isFinite(Date.parse(a.receivedAt)) ? new Date(a.receivedAt).toLocaleString('fr-FR') : '';
+  const datePaie = val(/^date\s+du\s+paiement\s*:?\s*(.+)$/i) || recuLe;
+  const trans = txRecuAchat(a);
+  const compte = String((a && a.account) || '');
+  const cleaned = String((a && a.texte) || '').replace(/\*/g, ' ')
     .replace(/<https?:\/\/[^>]+>/g, '').replace(/https?:\/\/links\.vinted\.com\/\S+/gi, '')
     .split('\n').map(l => l.trim())
     .filter(l => l && !/nous sommes tenus|d[ée]sabonner|politique de confidentialit|termes et conditions|pour conna[îi]tre vos droits|l['’]équipe vinted/i.test(l))
     .join('\n');
-  return { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured: !!(paid || artPrice || port || protection || vendeur || mode || trans) };
+  return { article, vendeur, ...v, phrase: phraseSommeRecu(v), mode, datePaie, trans, compte, cleaned,
+    hasStructured: v.trouve || !!(vendeur || mode || trans) };
 };
 // ⚠️ (22 oct., revue) LE JOURNAL DES VIOLATIONS ÉCOUTE AUSSI LES FENÊTRES QUE
 // L'APP OUVRE (le reçu, une facture imprimable) : elles héritent de la politique
@@ -3921,10 +4001,13 @@ const openReceipt = (a) => {
   const w = window.open('', '_blank'); if (!w) return;
   try { w.document.open(); } catch (_) {}
   try { ecouterFenetreCsp(w, 'recu'); } catch (_) {}
-  const esc = (s) => String(s || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-  const { article, vendeur, paid, artPrice, port, protection, mode, datePaie, trans, compte, cleaned, hasStructured } = parseReceiptFields(a);
+  const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  // (23 oct.) Les MÊMES lignes que la feuille de l'app : `champsRecuAchat` (§11).
+  const r = champsRecuAchat(a);
+  const { article, vendeur, mode, datePaie, trans, compte, cleaned, hasStructured } = r;
+  const paid = texteCentimesRecu(r.paye);
   const line = (label, val, strong) => val ? `<tr><td style="padding:9px 0;color:#667;font-size:14px">${esc(label)}</td><td style="padding:9px 0;text-align:right;font-size:14px;${strong ? 'font-weight:800;color:#111' : 'color:#111'}">${esc(val)}</td></tr>` : '';
-  const breakdown = [line('Article', artPrice), line('Frais de port', port), line('Protection acheteurs', protection)].join('');
+  const breakdown = r.lignes.map((l) => `<tr data-recu-ligne="${esc(l.libelle)}" data-recu-centimes="${l.centimes == null ? '' : l.centimes}"><td style="padding:9px 0;color:#667;font-size:14px">${esc(l.libelle)}</td><td style="padding:9px 0;text-align:right;font-size:14px;color:#111;white-space:nowrap">${l.centimes == null ? '—' : esc(texteCentimesRecu(l.centimes))}</td></tr>`).join('');
   const meta = [line('Vendeur', vendeur), line('Mode de paiement', mode), line('Date du paiement', datePaie), line('N° de transaction', trans), line('Compte', compte)].join('');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reçu — ${esc(article)}</title></head>
   <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;margin:0;background:#f4f6f5;color:#111;-webkit-print-color-adjust:exact">
@@ -3934,16 +4017,17 @@ const openReceipt = (a) => {
     </div>
     <div style="max-width:520px;margin:0 auto;padding:4px 16px 40px">
       <div style="background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.07)">
-        <div style="background:#007782;color:#fff;padding:18px 20px">
+        <div style="background:${COULEUR_PLATEFORME.vinted};color:#fff;padding:18px 20px">
           <div style="font-size:12px;opacity:.85;font-weight:700;letter-spacing:.4px;text-transform:uppercase">Reçu d'achat Vinted</div>
           <div style="font-size:19px;font-weight:800;margin-top:3px">${esc(article)}</div>
         </div>
         ${hasStructured ? `
         <div style="padding:18px 20px">
-          ${paid ? `<div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #eef1f0;margin-bottom:6px">
+          ${paid ? `<div data-recu-total="${r.paye}" style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #eef1f0;margin-bottom:6px">
             <span style="font-size:14px;color:#667;font-weight:700">Montant payé</span>
-            <span style="font-size:26px;font-weight:900;color:#007782">${esc(paid)}</span></div>` : ''}
-          ${breakdown ? `<table style="width:100%;border-collapse:collapse">${breakdown}</table>` : ''}
+            <span style="font-size:26px;font-weight:900;color:#111">${esc(paid)}</span></div>` : ''}
+          ${breakdown ? `<table data-recu-lignes="" style="width:100%;border-collapse:collapse">${breakdown}</table>` : ''}
+          <div data-recu-somme="${r.somme}"${r.phrase ? ' style="font-size:13px;color:#556;line-height:1.5;padding:8px 0 2px"' : ' hidden'}>${esc(r.phrase)}</div>
           ${meta ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;border-top:1px solid #eef1f0">${meta}</table>` : ''}
         </div>` : `
         <div style="padding:18px 20px;white-space:pre-wrap;line-height:1.6;font-size:14px;color:#333">${esc(cleaned)}</div>`}
@@ -3975,6 +4059,68 @@ const openReceipt = (a) => {
     if (imprimer) imprimer.addEventListener('click', () => { if (w.__vrmRecuBoutons) return; try { w.focus(); w.print(); } catch (_) {} });
   } catch (_) {}
 };
+// ── LA FEUILLE « REÇU D'ACHAT » (23 octobre) ───────────────────────────────
+// Capture iPhone de Julien : la barre du bas passait PAR-DESSUS la feuille —
+// « N° de transaction » coupé, et la fin du reçu inatteignable. Rendue dans
+// <main>, la feuille restait dans son contexte d'empilement (le z-index n'y
+// change rien : sur iPhone, `<main>` qui défile forme un contexte d'empilement).
+// Elle est PORTÉE sur <body>, comme l'aperçu des widgets ou le récap de
+// l'année. Hors de <main> elle ne profite plus des règles de taille de
+// `.vrm-main` : ses cibles sont donc posées à 44 px ICI, et le bas du
+// défilement garde la zone de sécurité de l'iPhone (recus-email.css). Les
+// lignes, le total et la phrase viennent de `champsRecuAchat` — la même règle
+// que la fenêtre PDF.
+function FeuilleRecuAchat({ recu, fermer }) {
+  const r = champsRecuAchat(recu);
+  const boite = useRef(null);
+  useEffect(() => { try { boite.current && boite.current.focus({ preventScroll: true }); } catch (_) {} }, []);
+  const Row = ({ label, val, attrs }) => val ? (
+    <div {...(attrs || {})} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,padding:'10px 0',borderBottom:`1px solid ${C.border}`}}>
+      <span style={{fontSize:14,color:C.muted,fontWeight:500,minWidth:0}}>{label}</span>
+      <span style={{fontSize:14,color:C.text,fontWeight:500,textAlign:'right',overflowWrap:'anywhere'}}>{val}</span>
+    </div>) : null;
+  const cible = { minWidth:44, minHeight:44, boxSizing:'border-box', display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:10, border:`1px solid ${C.border}`, background:C.card, color:C.text, cursor:'pointer', fontFamily:'inherit', flexShrink:0 };
+  return createPortal(
+    <div data-noswipe="1" data-recu-voile="" onClick={fermer} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      <FermeAuRetour fermer={fermer}/>
+      <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();fermer();}}} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+          <button type="button" data-recu-retour="" onClick={fermer} aria-label="Retour" style={{...cible,width:44,height:44,padding:0,fontSize:22,fontWeight:600,lineHeight:1}}>‹</button>
+          <div style={{flex:1,minWidth:0,fontSize:16,fontWeight:700,color:C.text}}>Reçu d'achat</div>
+          <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title="Imprimer / PDF" style={{...cible,gap:6,padding:'0 14px',fontSize:14,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
+        </div>
+        <div className="vrm-recu-defile" data-recu-defile="" style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
+          <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
+            <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
+              <div style={{fontSize:11,opacity:0.9,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
+              <div style={{fontSize:19,fontWeight:600,marginTop:3,lineHeight:1.3,overflowWrap:'anywhere'}}>{r.article}</div>
+            </div>
+            {r.hasStructured ? (
+              <div style={{padding:'14px 18px 16px'}}>
+                {r.paye != null && (
+                  <div data-recu-total={r.paye} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
+                    <span style={{fontSize:14,color:C.muted,fontWeight:500}}>Montant payé</span>
+                    <span style={{fontSize:26,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{texteCentimesRecu(r.paye)}</span>
+                  </div>
+                )}
+                {r.lignes.map((l, i) => <Row key={i} label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
+                <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.phrase}</div>
+                <div style={{height:10}}/>
+                <Row label="Vendeur" val={r.vendeur}/>
+                <Row label="Mode de paiement" val={r.mode}/>
+                <Row label="Date du paiement" val={r.datePaie}/>
+                <Row label="N° de transaction" val={r.trans} attrs={{ 'data-recu-transaction': r.trans }}/>
+                <Row label="Compte" val={r.compte}/>
+              </div>
+            ) : (
+              <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:14,color:C.text}}>{r.cleaned}</div>
+            )}
+          </div>
+          <div data-recu-fin="" style={{textAlign:'center',color:C.muted,fontSize:12,marginTop:12,lineHeight:1.5}}>Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
+        </div>
+      </div>
+    </div>, document.body);
+}
 // ⚠️ Le générateur de QR (qrcode-generator) a été RETIRÉ à dessein.
 // Vérifié sur 61 colis : le QR n'existe que chez Chronopost (image hébergée).
 // Mondial Relay — 39 colis, zéro QR — fonctionne au CODE DE RETRAIT. Fabriquer
@@ -29809,6 +29955,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
   const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
+  // (23 oct.) Seuls les VRAIS reçus (un Montant payé) — les emails de statut
+  // rangés là par l'ancien tri ne s'appellent plus « Reçu d'achat » — et leur n°
+  // de transaction lu dans le texte (une identité). Rien n'est retiré en base.
+  const recusAchat = useMemo(() => recusAchatDe(achEmails), [achEmails]);
+  const nonRecusAchat = Array.isArray(achEmails) && Array.isArray(recusAchat) ? achEmails.length - recusAchat.length : 0;
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
@@ -29892,8 +30043,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (« est conforme à sa », 16 fois). La voie certaine ne fonctionne donc jamais
   // aujourd'hui, et le titre ne vaut rien — d'où la sévérité assumée : on rend
   // `null` plutôt que le reçu d'un autre achat.
+  // (23 oct.) La voie certaine MARCHE enfin : le n° de transaction est lu dans
+  // le texte du reçu (`txRecuAchat`) — mesuré, 61 reçus sur 81 se relient ainsi
+  // à leur achat capté, 0 doublon. Et seuls les VRAIS reçus sont candidats
+  // (`recusAchat`) : un email « Commande mise à jour pour … » au titre de
+  // l'achat ne s'appelle plus « Reçu d'achat ».
   const receiptFor = (o) => {
-    const list = achEmails || [];
+    const list = Array.isArray(recusAchat) ? recusAchat : [];
     if (!list.length) return null;
     // 1) n° de transaction = identité certaine.
     const tx = String(o.transaction_id || '');
@@ -29903,11 +30059,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (n === 1) return seul;
       if (n > 1) return null;   // deux reçus pour une transaction : on ne tranche pas
     }
-    // 2) titre STRICTEMENT égal, et un seul candidat DES DEUX CÔTÉS.
+    // 2) titre STRICTEMENT égal, et un seul candidat DES DEUX CÔTÉS — parmi les
+    // reçus SANS n° de transaction seulement : un reçu qui porte un AUTRE n°
+    // est celui d'un autre achat, même au titre identique (§5).
     const ot = normTitle(o.title);
     if (!ot) return null;
     let seul = null, n = 0;
-    for (const a of list) if (a.article && normTitle(a.article) === ot) { n++; seul = a; }
+    for (const a of list) if (!a.transaction && a.article && normTitle(a.article) === ot) { n++; seul = a; }
     return n === 1 ? seul : null;
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
@@ -38042,7 +38200,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='achats' && (<div className="vrm-achats">
         <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
-        <RecusEmail recus={achEmails} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
+        <RecusEmail recus={recusAchat} autres={nonRecusAchat} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -41357,52 +41515,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         </div>
       )}
-      {receiptView && (()=>{ const r=parseReceiptFields(receiptView); const Row=({label,val,strong})=> val ? (
-          <div style={{display:'flex',justifyContent:'space-between',gap:12,padding:'9px 0',borderBottom:`1px solid ${C.border}`}}>
-            <span style={{fontSize:13,color:C.muted,fontWeight:600}}>{label}</span>
-            <span style={{fontSize:13,color:C.text,fontWeight:strong?600:500,textAlign:'right'}}>{val}</span>
-          </div>) : null;
-        return (
-        <div onClick={()=>setReceiptView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <FermeAuRetour fermer={()=>setReceiptView(null)}/>
-          <div role="dialog" aria-modal="true" aria-label="Reçu d'achat" tabIndex={-1} ref={el=>el?.focus()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setReceiptView(null);}}} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <button className="vrm-icon-control" type="button" onClick={()=>setReceiptView(null)} aria-label="Retour" style={{display:'flex',alignItems:'center',justifyContent:'center',width:36,height:36,borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:'pointer',fontSize:20,fontWeight:600,fontFamily:'inherit',lineHeight:1,flexShrink:0}}>‹</button>
-              <div style={{flex:1,fontSize:15,fontWeight:700,color:C.text}}>Reçu d'achat</div>
-              <button type="button" onClick={()=>openReceipt(receiptView)} title="Imprimer / PDF" style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'7px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>PDF</button>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:16}}>
-              <div style={{background:C.card,borderRadius:10,overflow:'hidden',border:`1px solid ${C.border}`}}>
-                <div style={{background:'#007782',color:'#fff',padding:'16px 18px'}}>
-                  <div style={{fontSize:11,opacity:0.85,fontWeight:500,letterSpacing:0.4,textTransform:'uppercase'}}>Reçu d'achat Vinted</div>
-                  <div style={{fontSize:20,fontWeight:600,marginTop:3}}>{r.article}</div>
-                </div>
-                {r.hasStructured ? (
-                  <div style={{padding:'16px 18px'}}>
-                    {r.paid && (
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:4}}>
-                        <span style={{fontSize:13,color:C.muted,fontWeight:500}}>Montant payé</span>
-                        <span style={{fontSize:26,fontWeight:700,color:'#007782'}}>{r.paid}</span>
-                      </div>
-                    )}
-                    <Row label="Article" val={r.artPrice}/>
-                    <Row label="Frais de port" val={r.port}/>
-                    <Row label="Protection acheteurs" val={r.protection}/>
-                    <div style={{height:8}}/>
-                    <Row label="Vendeur" val={r.vendeur}/>
-                    <Row label="Mode de paiement" val={r.mode}/>
-                    <Row label="Date du paiement" val={r.datePaie}/>
-                    <Row label="N° de transaction" val={r.trans}/>
-                    <Row label="Compte" val={r.compte}/>
-                  </div>
-                ) : (
-                  <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:13,color:C.text}}>{r.cleaned}</div>
-                )}
-              </div>
-              <div style={{textAlign:'center',color:C.muted,fontSize:11,marginTop:12,lineHeight:1.5}}>Reçu reconstruit depuis l'e-mail Vinted — à conserver pour ta comptabilité.</div>
-            </div>
-          </div>
-        </div>); })()}
+      {receiptView && <FeuilleRecuAchat recu={receiptView} fermer={()=>setReceiptView(null)}/>}
       {showSourcing && (
         <div onClick={()=>setShowSourcing(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setShowSourcing(false)}/>

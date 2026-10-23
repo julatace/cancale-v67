@@ -15,3 +15,10 @@
 .vrm-recus-email [role=status]>button{margin-left:8px;}
 @media(max-width:767px){.vrm-recus-email input{font-size:16px;}}
 .vrm-recus-email input{margin-top:10px;}
+/* (23 oct.) La feuille « Reçu d'achat » est portée sur <body> : la barre du bas
+   ne passe plus par-dessus. Hauteur bornée à l'écran VISIBLE (dvh, repli vh),
+   et le bas du défilement garde la zone de sécurité de l'iPhone : la dernière
+   ligne du reçu se lit jusqu'au bout. */
+.vrm-recu-feuille{max-height:92vh;max-height:calc(100dvh - 16px - env(safe-area-inset-top,0px));}
+.vrm-recu-defile{padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px));}
+@media(min-width:768px){.vrm-recu-defile{padding:16px 16px 20px;}}
