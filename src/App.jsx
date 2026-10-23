@@ -42739,13 +42739,32 @@ const pointureDe = (s) => {
   const tous = [...t.matchAll(/(?:^|[^\d])(\d{2}(?:[.,]5)?)(?=[^\d]|$)/g)].map((x) => x[1].replace(',', '.')).filter((x) => { const n = parseFloat(x); return n >= 16 && n <= 50; });
   return tous.length ? tous[tous.length - 1] : null;
 };
+// 23 oct. (capture de Julien) : une Adidas Spezial marron 40,5 vendue 45 € sur
+// Leboncoin proposait « N°65 Nike LD waffle sacai » — même pointure (+3), prix
+// proche (+2), donc 5, sans UN SEUL mot en commun. Une suggestion qui désigne
+// une autre marque fait douter de toutes les autres. Deux règles de plus :
+// une MARQUE différente écarte la paire (Jordan est de la famille Nike), et il
+// faut au moins un mot du MODÈLE en commun (ni la marque, ni une couleur, ni
+// un nombre) — même pointure et même prix ne disent rien du modèle.
+const familleMarque = (t) => { const b = extractBrand(String(t || '')); return b ? (/jordan/i.test(b) ? 'nike' : b.toLowerCase()) : null; };
+const MOTS_HORS_MODELE = new Set(['nike', 'adidas', 'air', 'new', 'balance', 'asics', 'puma', 'reebok', 'vans', 'converse', 'salomon', 'hoka', 'lacoste', 'fila', 'saucony', 'mizuno', 'brooks',
+  'noir', 'noire', 'noires', 'blanc', 'blanche', 'blanches', 'gris', 'grise', 'bleu', 'bleue', 'rouge', 'vert', 'verte', 'marron', 'beige', 'rose', 'jaune', 'orange', 'violet', 'kaki', 'creme', 'black', 'white', 'grey', 'gray', 'blue', 'red', 'green', 'brown',
+  'chaussures', 'chaussure', 'baskets', 'basket', 'sneakers', 'sneaker', 'low', 'high', 'mid']);
+const motsModele = (s) => motsDeTitre(s).filter((w) => !/^\d/.test(w) && !MOTS_HORS_MODELE.has(w));
 function suggestionsPaires(cible, candidats, max = 3) {
   const mc = new Set(motsDeTitre(cible && cible.titre));
+  const mm = new Set(motsModele(cible && cible.titre));
+  const fc = familleMarque(cible && cible.titre);
   const tc = pointureDe(cible && cible.titre);
   const pc = Number(cible && cible.prix);
   return (candidats || []).map((c) => {
     let note = 0;
-    for (const w of new Set(motsDeTitre(`${c.titre || ''} ${c.marque || ''}`))) if (mc.has(w)) note += /^\d/.test(w) ? 1 : 2;
+    const texte = `${c.titre || ''} ${c.marque || ''}`;
+    for (const w of new Set(motsDeTitre(texte))) if (mc.has(w)) note += /^\d/.test(w) ? 1 : 2;
+    // Une autre marque, ou aucun mot du modèle en commun : ce n'est pas la même paire.
+    const f = familleMarque(texte);
+    if (fc && f && fc !== f) return { ...c, note: -1 };
+    if (!motsModele(texte).some((w) => mm.has(w))) return { ...c, note: -1 };
     const t = pointureDe(c.taille) || pointureDe(c.titre);
     // Une pointure DIFFÉRENTE écarte la paire, quoi que disent les mots : c'est
     // le cas des « 50 paires identiques » (§2.4) — même modèle, autre paire.

@@ -7983,6 +7983,16 @@ une vente Leboncoin ne disait rien de la paire, qui restait en vente sur Vinted.
   ⚠️ **L'audit a attrapé ma première règle de pointure** : elle prenait le
   premier nombre venu, donc « 90 » dans « Nike Air Max **90** … taille 44 », et
   proposait une paire en 42.
+  ⚠️⚠️ **23 octobre, capture de Julien** : une « Adidas Spezial marron taille
+  40,5 » vendue 45 € proposait « N°65 Nike LD waffle sacai » — même pointure
+  (+3) et prix proche (+2) suffisaient (seuil 4), **sans un seul mot en
+  commun**. Deux gardes : une **marque différente** écarte la paire
+  (`familleMarque`, sur `extractBrand` ; Jordan = famille Nike), et il faut au
+  moins un **mot du modèle** en commun (`motsModele` : ni la marque, ni une
+  couleur, ni un nombre, ni low/mid/high). Pointure et prix ne disent rien du
+  modèle. `audit-double-vente.cjs` sert ce cas exact (et une Samba à la même
+  pointure et au même prix, et l'autre sens : la vraie Spezial reste proposée) ;
+  les deux gardes retirées ⇒ 2 rouges.
 - ⚠️⚠️ **`account` NE PROUVE PAS QU'UNE ANNONCE EST À LUI.** Mesuré : 58
   annonces portent ce champ, sur **48 comptes** — la 5.88 étiquetait celles
   d'AUTRUI de leur propre propriétaire. J'ai failli l'ajouter à `aLui` (« 57
