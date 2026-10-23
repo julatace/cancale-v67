@@ -70,10 +70,14 @@ const accounts = FX('accounts').map(a => { const { owner, ...r } = a; return r; 
 // 2,88 € », « *Montant payé* 42,70 € », « *Date du paiement* 13/10/2026 10 h
 // 00 »…). Sans texte, le reçu mesuré faisait 414 px au lieu de 589 : le bas
 // du contenu était jugé sur une feuille 30 % plus courte que la vraie (§6.3).
+// ⚠️ (fusion du 23 oct.) Et dans L'ORDRE mesuré : le détail vient APRÈS
+// « Montant payé », avant « Mode de paiement » (81 reçus sur 81), avec « Frais
+// Vinted » (la forme récente) — la règle du reçu lit ce bloc-là.
 const texteRecu = (i) => [
   'Bonjour,', `Merci pour ta commande « Paire inventée ${i} ».`,
-  `*Vendeur* vendeur_invente_${i}  `, 'Article 37,00 € ', 'Frais de port 2,88 € ', 'Protection acheteurs 2,82 € ',
-  '*Montant payé* 42,70 € ', '*Mode de paiement* Carte bancaire, **********', `*Date du paiement* 1${i}/10/2026 10 h 00 `,
+  `*Vendeur* vendeur_invente_${i}  `,
+  '*Montant payé* 42,70 € ', 'Article 37,00 € ', 'Frais de port 2,88 € ', 'Frais Vinted 2,82 € ',
+  '*Mode de paiement* Carte bancaire, **********', `*Date du paiement* 1${i}/10/2026 10 h 00 `,
   "L'équipe Vinted",
 ].join('\n');
 const recus = [1, 2, 3].map(i => ({ id: 'email_achat_banc' + i, data: { type: 'achat', article: 'Paire inventée ' + i, account: 'compte_banc', uid: '', receivedAt: `2026-10-1${i}T10:00:00Z`, transaction: '99900000' + i, prix: '42,70', subject: 'Ton reçu pour ta commande', filename: '', texte: texteRecu(i) } }));
