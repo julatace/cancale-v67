@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {structureNotifications,lireDiagnosticFavoris} from '../../src/diagnosticFavoris.js';
+import {structureNotifications,lireDiagnosticFavoris,tracesNotifications} from '../../src/diagnosticFavoris.js';
 
 const owner='11111111-1111-4111-8111-111111111111';
 const autre='22222222-2222-4222-8222-222222222222';
@@ -50,4 +50,29 @@ test('une capture absente est distincte d’une lecture en erreur ou ambiguë',a
  const r=await lireDiagnosticFavoris({...options(),fetcher:async()=>response([])});
  assert.equal(r.reception,'aucune_capture');assert.equal(r.champs,undefined);
  for(const fetcher of [async()=>({ok:false}),async()=>response(null),async()=>response([{owner,data:donnees},{owner,data:donnees}])]) await assert.rejects(lireDiagnosticFavoris({...options(),fetcher}));
+});
+test('les traces distinguent liste, compteur et refus sans exporter les chemins ou paramètres',()=>{
+ const r=tracesNotifications({ver:'5.214.0',paths:['/inbox-notifications/v1/notifications/unread_count?token=secret','/users/123456'],reponses:{'GET /inbox-notifications/v1/notifications?token=secret':{st:403},'POST /api/v2/notifications':{st:200},'GET /api/v2/notifications':{st:200},'GET https://autre.invalid/api/v2/notifications':{st:200}}});
+ assert.equal(r.versionExtension,'5.214.0');
+ assert.ok(r.observations.some(x=>x.flux==='compteur_seulement'));
+ assert.ok(r.observations.some(x=>x.flux==='liste_inbox'&&x.statut===403));
+ assert.ok(r.observations.some(x=>x.flux==='liste_api'&&x.statut===200));
+ assert.equal(JSON.stringify(r).includes('secret'),false);assert.equal(JSON.stringify(r).includes('123456'),false);
+ assert.equal(JSON.stringify(r).includes('https://'),false);
+});
+test('après absence de capture, seules les traces du même compte et propriétaire sont lues',async()=>{
+ const appels=[];
+ const r=await lireDiagnosticFavoris({...options(),fetcher:async(url,opts)=>{appels.push({url,opts});return response(appels.length===1?[]:[{owner,data:{uid:'123',ver:'5.214.0',paths:[]}}]);}});
+ assert.equal(appels.length,2);assert.equal(r.traces.versionExtension,'5.214.0');
+ const u=new URL(appels[1].url);assert.equal(u.searchParams.get('id'),'eq.harvest_123_seen_urls');assert.equal(u.searchParams.get('owner'),'eq.'+owner);
+ for(const row of [{owner:autre,data:{uid:'123'}},{owner,data:{uid:'456'}}]){
+  let n=0;await assert.rejects(lireDiagnosticFavoris({...options(),fetcher:async()=>response(++n===1?[]:[row])}));
+ }
+});
+test('une panne de lecture des traces reste une panne, pas une absence de requêtes',async()=>{
+ let n=0;
+ const r=await lireDiagnosticFavoris({...options(),fetcher:async()=>++n===1?response([]):{ok:false}});
+ assert.equal(r.traces.etat,'lecture_indisponible');
+ let acteur=owner,appels=0;
+ await assert.rejects(lireDiagnosticFavoris({...options(),ownerActuel:()=>acteur,fetcher:async()=>{if(++appels===1)return response([]);acteur=autre;return response([]);}}));
 });
