@@ -70,7 +70,9 @@ prouve rien. Dans le dépôt principal (`/home/user/cancale-v67`), rien à faire
 - Rouges À L'IDENTIQUE sur main 6798b0a (relancés seuls, mêmes titres) : `achats-hors-plateforme`
   (12), `capacites` (28 — la grille d'Annonces ne se rend pas : le banc sert une base non
   cloisonnée), `carte` (4), `comptes` (5), `conflit` (2), `formes-communes` (1), `ia` (2),
-  `lbc-preuve` (2), `lbc-relier` (2). Bancs en retard sur la forme actuelle, pas l'app.
+  `lbc-preuve` (2), `lbc-relier` (2), `revue-19oct` (5), `revue-20oct` (6), `revue-21oct` (6),
+  `serie` (1), `retrait` (12), `panne` (23), `perfv` (8), `postes` (6), `prixachat` (4),
+  `retours-stock` (2). Bancs en retard sur la forme actuelle, pas l'app.
 - `ebay-regle-offre` : mourait sur `Unexpected token 'export'` sur main AUSSI (il lisait la palette
   « Perle » en ne retirant qu'un `export`) — banc réparé le 23 oct. : **342 contrôles, 0 rouge**.
 - `rappel-urssaf` : le banc servait une ligne URSSAF à 600 € SANS aucune vente ; depuis la revue
