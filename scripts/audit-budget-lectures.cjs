@@ -14,7 +14,8 @@
 //   1. budget d'ACTIONS plein ⇒ codes, versements et relevés se lisent quand
 //      même, et le budget d'actions ne bouge pas ;
 //   2. les photos s'arrêtent avant la RÉSERVE de l'argent et des colis (13 depuis
-//      la 5.167 : les 3 preuves de vente des ventes en cours y entrent) —
+//      la 5.167 : les 3 preuves de vente des ventes en cours y entrent ; 16 depuis
+//      la 5.214 : les 3 suivis Vinted des achats en cours aussi) —
 //      même en tournant tout l'heure — et les lectures prioritaires y tiennent ;
 //   3. la réserve se LIBÈRE quand les lecteurs prioritaires n'ont plus rien à
 //      lire (l'autre sens : sinon les photos seraient bridées pour toujours) ;
@@ -65,6 +66,7 @@ function lignes({ ventes = 6, relais = 3, mois = 3, annonces = 30, datees = fals
 function vinted(r) {
   const c = r.chemin;
   let m;
+  if (/\/api\/v2\/transactions\/\d+\/shipment\/journey_summary$/.test(c)) return { status: 200, body: { journey_summary: { steps: [{ title: 'Colis en transit', date: new Date(Date.now() - 3600000).toISOString(), status: 'in_transit' }] } } };
   if ((m = /\/api\/v2\/transactions\/(\d+)$/.exec(c))) return { status: 200, body: { transaction: { id: Number(m[1]), status: 450, status_updated_at: '2026-10-01T10:00:00Z' } } };
   if (/\/api\/v2\/conversations\/\d+$/.test(c)) return { status: 200, body: { conversation: { id: 1, messages: [] } } };
   if ((m = /\/payouts\?year=(\d+)&month=(\d+)/.exec(c))) { const mm = String(m[2]).padStart(2, '0'); return { status: 200, body: { starting_date: `${m[1]}-${mm}-01`, invoice_lines_has_more: false, invoice_lines: [{ id: 1, amount: { amount: '10.0' }, date: `${m[1]}-${mm}-05`, entity_type: 'payout' }] } }; }
@@ -76,7 +78,7 @@ const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
 const actions = (store) => ((store.vrmActions || {})[UID] || []).length;
 const maintenant = () => Date.now();
 const tours = async (ctx, n) => { for (let i = 0; i < n; i++) await ctx.capterPhotosAnnonces(UID); };
-const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await ctx.capterRetraits(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
+const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await ctx.capterRetraits(UID); await ctx.capterSuivisAchats(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
 
 (async () => {
   console.log('── 1. budget d’ACTIONS plein (20 bordereaux/réponses dans l’heure)');
@@ -88,6 +90,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     dit(compte(f.j, /\/transactions\/\d+$/) > 0, 'les dates de versement se lisent quand même', `${compte(f.j, /\/transactions\/\d+$/)} transaction(s) lue(s)`);
     dit(compte(f.j, /\/payouts\?year=/) > 0, 'les relevés se lisent quand même', `${compte(f.j, /\/payouts\?year=/)} relevé(s) lu(s)`);
     dit(compte(f.j, /\/transactions\/51\d\d$/) === 3, 'et les preuves de vente aussi (5.167 : 3 ventes en cours sans preuve)', `${compte(f.j, /\/transactions\/51\d\d$/)} preuve(s) lue(s)`);
+    dit(compte(f.j, /\/shipment\/journey_summary$/) === 3, 'et le suivi Vinted des achats en cours aussi (5.214 : 3 achats au point relais)', `${compte(f.j, /\/shipment\/journey_summary$/)} suivi(s) lu(s)`);
   });
   await essaie('budget actions intact', async () => {
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
@@ -103,11 +106,11 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     await f.ctx.relireAnnoncesAutresComptes(UID);      // un seul compte : rien à relire (noté)
     await tours(f.ctx, 30);                          // le fond qui tourne chaque minute, une demi-heure
     const ph = compte(f.j, /^\/items\/\d+$/);
-    dit(ph === 7, 'trente annonces à compléter, tout l’heure : 7 pages lues, pas 20 (la réserve de 13 tient : 5 versements, 3 codes, 2 relevés, 3 preuves de vente)', `${ph} page(s) lue(s)`);
+    dit(ph === 4, 'trente annonces à compléter, tout l’heure : 4 pages lues, pas 20 (la réserve de 16 tient : 5 versements, 3 codes, 2 relevés, 3 preuves de vente, 3 suivis d’achats)', `${ph} page(s) lue(s)`);
     const avant = f.j.vinted.length;
     await prioritaires(f.ctx);
     const pr = f.j.vinted.length - avant;
-    dit(pr === 13, 'et l’argent + les colis y tiennent : 5 versements, 3 codes, 2 relevés, 3 preuves de vente', `${pr} lecture(s) prioritaire(s)`);
+    dit(pr === 16, 'et l’argent + les colis y tiennent : 5 versements, 3 codes, 2 relevés, 3 preuves de vente, 3 suivis d’achats', `${pr} lecture(s) prioritaire(s)`);
     dit(lect(f.store) <= 20, 'le plafond total de 20 lectures/heure n’est jamais dépassé', `lectures=${lect(f.store)}`);
   });
 
@@ -148,16 +151,16 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
   await essaie('relecture', async () => {
     // Plusieurs comptes liés, relecture jamais notée (« pas su ») : sa réserve (3) s'ajoute à celle de
     // l'argent et des colis — 13 depuis la fusion avec la preuve de vente (5 versements + 2 relevés
-    // + 3 codes + 3 preuves).
+    // + 3 codes + 3 preuves), 16 depuis la 5.214 (+ 3 suivis d'achats).
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
     await tours(f.ctx, 10);
     const ph = compte(f.j, /^\/items\/\d+$/);
-    dit(ph === 4, 'les photos s’arrêtent avant la réserve de l’argent ET celle de la relecture : 4 pages (20 − 13 − 3)', `${ph} page(s) lue(s)`);
+    dit(ph === 1, 'les photos s’arrêtent avant la réserve de l’argent ET celle de la relecture : 1 page (20 − 16 − 3)', `${ph} page(s) lue(s)`);
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };
     const g = []; for (let i = 0; i < 4; i++) g.push(await f.ctx.gardeLecture(UID, acc, 'enligne'));
     dit(g.slice(0, 3).every((x) => x === null) && g[3] && g[3].code === 'lectures-reservees', 'la relecture lit ses 3 places, pas une de plus (la réserve de l’argent tient)', JSON.stringify(g.map((x) => x && x.code)));
-    const a = []; for (let i = 0; i < 13; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
-    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis et les preuves ont toujours leurs 13 places — et le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
+    const a = []; for (let i = 0; i < 16; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
+    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis, les preuves et les suivis ont toujours leurs 16 places — et le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} budget des lectures : ${ok} vert(s), ${ko} rouge(s)`);

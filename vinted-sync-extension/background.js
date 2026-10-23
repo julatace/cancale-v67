@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.213.0';
+const CODE_VERSION = '5.214.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2345,6 +2345,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 23 oct. : jugée sur l'ONGLET qui l'envoie, jamais sur ce que dit le message
     // (`ficheDeLaPage`).
     ficheDeLaPage(msg, sender, domain);
+  } else if (msg.kind === 'suivi') {
+    // 5.214 : le suivi / l'expédition / le code de retrait qu'une page Vinted
+    // vient de recevoir — sa FORME, et pour le suivi le contenu allégé (voir
+    // `noterSuiviPage`). Le compte est celui du cookie, jamais celui du message.
+    noterSuiviPage(domain, msg);
   } else if (msg.kind === 'vintedFrein' && freinVinted(Number(msg.statut))) {
     // 5.162 : la moisson faite DANS la page (`inject.js`) a reçu un 429/403 sur
     // SA propre requête. Même pause que pour les requêtes du fond. (Un message
@@ -4910,6 +4915,452 @@ async function envoyerNotifsRetrait() {
   } catch (_) { return 0; }
 }
 
+// ══ LE SUIVI QUE VINTED MONTRE DE SES ACHATS (23 octobre, 5.214) ════════════
+// Julien : « enregistrer le numéro de suivi et tracer le colis » ; « que ça me
+// prévienne dès qu'il y a une mise à jour d'un colis ». MESURÉ avant de coder :
+// les transporteurs n'ouvrent rien de gratuit à un destinataire, et Vinted
+// n'expose AUCUN n° de suivi dans ses transactions (0 sur 1 290), ses
+// conversations (0 sur 1 400) ni ses commandes. Ce que Vinted MONTRE de ses
+// achats, c'est le bouton « Suivre le colis » : `GET /api/v2/transactions/{tx}/
+// shipment/journey_summary` (vu 200 dans son navigateur, forme jamais vue).
+// Trois voies, une règle (bloc <suivi-regle>, le MÊME texte qu'inject.js) :
+//   · passive : la page reçoit le suivi (`journey_summary`), l'expédition d'une
+//     commande (`escrow_orders/{id}/shipment`) ou le code de retrait
+//     (`parcel_collection_code`, sa FORME seulement) — `inject.js` n'envoie que
+//     la forme et le contenu allégé (`noterSuiviPage`) ;
+//   · active : `capterSuivisAchats` lit le suivi des achats en cours de CE
+//     compte, sur le modèle exact de `capterRetraits` (3 par visite, file
+//     Vinted, budget de lecture « colis », 3 h, pause et frein) ;
+//   · ce qui se RANGE : la forme dans `panel_formes_suivi` (lire-fusionner-
+//     réécrire gardé), le contenu dans `harvest_{uid}_suivi_{tx}` — le CONTRAT
+//     avec l'app — seulement pour un ACHAT de CE compte (sa commande dans
+//     `harvest_{uid}_orders_purchased` : une identité, jamais un titre), et
+//     seulement si la dernière étape CHANGE ; une capture plus pauvre ou plus
+//     ancienne ne remplace jamais une plus riche (§4.2).
+// Une NOUVELLE étape (datée, de moins de 72 h) part au serveur
+// (`/api/push { action: 'suivi', tx, uid }`) qui relit la ligne au nom du
+// vendeur et décide (catégorie « suivi », une fois par étape). La première
+// lecture d'un colis est la LIGNE DE BASE : elle ne sonne jamais (sinon
+// installer la 5.214 ferait sonner d'un coup tous les colis en route).
+// <suivi-regle> — LA MÊME RÈGLE DANS inject.js ET background.js (§11), texte pour
+// texte ; comparées par scripts/audit-suivi-vinted.cjs (23 octobre, 5.214).
+// Le suivi que VINTED montre de SES commandes d'achat (le bouton « Suivre le
+// colis » : `/transactions/{id}/shipment/journey_summary`, et la page d'une
+// commande : `/escrow_orders/{id}/shipment`). Leur FORME n'a jamais été vue :
+//  · `formeSuivi` — les NOMS de clés et les TYPES, jamais une valeur (une clé qui
+//    ressemble à une donnée — e-mail, nombre de 3 chiffres ou plus, longue suite
+//    hexadécimale, espace — devient `{k}`) ;
+//  · `allegerSuivi` — une LISTE BLANCHE de noms de clés : statut, titre /
+//    libellé / message, dates, transporteur, n° de suivi, nom du point relais.
+//    Tout le reste (noms, adresses, e-mails, téléphones, codes de retrait, QR)
+//    est RETIRÉ ; et un texte gardé qui CITE une valeur retirée (le nom du
+//    destinataire, sa rue, le code) la perd aussi (`…`), comme une adresse
+//    e-mail, un téléphone, « code 482913 », « 12 rue … », « 35000 Rennes » ;
+//  · `contratSuivi` — ce qu'on en range (le CONTRAT de `harvest_{uid}_suivi_{tx}`) :
+//    les étapes (30 au plus, la plus RÉCENTE en premier), la dernière DATÉE,
+//    le transporteur et le n° de suivi s'ils y sont. Aucune étape reconnue ⇒
+//    `null` : la forme est gardée, le contenu ne l'est pas (« pas su »). Une
+//    étape sans date lisible n'est jamais « la dernière » (mieux vaut un blanc
+//    qu'un faux) : sans date, rien ne sonne.
+const SUIVI_TEXTES = ['title', 'status_title', 'state_title', 'event_title', 'label', 'libelle', 'status_label', 'state_label', 'event_label', 'headline', 'message', 'status_message', 'description', 'event_description', 'status_text', 'text', 'summary', 'subtitle'];
+const SUIVI_CODES = ['status_code', 'event_code', 'state_code', 'event_type', 'status', 'state', 'statut', 'etat', 'step', 'step_type', 'event_status', 'current_status', 'shipment_status', 'tracking_status'];
+const SUIVI_DATE = /(?:^|_)(?:date|time|datetime|timestamp|at|ts|heure|happened|occurred)(?:_|$)/i;
+const SUIVI_LIMITE = /(?:^|_)(?:deadline|until|expires?|expiry|limit|limite)(?:_|$)/i;
+const SUIVI_NUMERO = /^(?:tracking_code|tracking_number|tracking_no|tracking_id|parcel_number|parcel_tracking_number|shipment_tracking_code|numero_suivi|numero_de_suivi)$/i;
+const SUIVI_TRANSP = /^(?:carrier|carrier_name|carrier_title|carrier_code|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/i;
+const SUIVI_PARENT_TRANSP = /(?:carrier|courier|transporteur|shipping_provider|provider)/i;
+const SUIVI_PARENT_RELAIS = /(?:pickup|relay|relais|drop_?off|pudo|locker|parcel_?shop|service_?point)/i;
+const SUIVI_PARENT_NUMERO = /^(?:tracking|suivi|parcel_tracking)$/i;
+const SUIVI_PERSO = /(?:^|_)(?:name|first_?name|last_?name|full_?name|surname|username|login|nickname|email|e_?mail|phone|phone_?number|telephone|tel|mobile|address|adresse|street|street_?name|line\d?|address_?line\d?|house_?number|city|ville|town|postal_?code|post_?code|zip|zip_?code|code|pickup_?code|collection_?code|pin|qr|qr_?code|barcode|password|token|iban)(?:_|$)/i;
+const SUIVI_PAS_PERSO = /(?:country|currency|locale|language|lang|type|status|state)/i;
+const SUIVI_TYPES = ['string', 'number', 'boolean', 'null', 'object', 'array'];
+function suiviCleSure(k) {
+  const s = String(k == null ? '' : k);
+  return !!s && s.length <= 40 && !/@|\d{3,}|[0-9a-f]{16,}|\s/i.test(s);
+}
+function suiviDateIso(v, futurMs) {
+  if (v == null || v === '' || typeof v === 'boolean') return null;
+  let ms = NaN;
+  if (typeof v === 'number') ms = v < 1e12 ? v * 1000 : v;
+  else {
+    const s = String(v).trim();
+    if (/^\d{9,13}$/.test(s)) { const n = Number(s); ms = n < 1e12 ? n * 1000 : n; }
+    else if (/^\d{4}-\d{2}-\d{2}/.test(s)) ms = Date.parse(s);
+  }
+  if (!Number.isFinite(ms) || ms < Date.UTC(2020, 0, 1) || ms > Date.now() + (futurMs == null ? 60 * 86400000 : futurMs)) return null;
+  return new Date(ms).toISOString();
+}
+function suiviNumero(v) {
+  const s = String(v == null ? '' : v).replace(/[\s-]/g, '').toUpperCase();
+  return /^[A-Z0-9]{6,40}$/.test(s) && /\d/.test(s) ? s : null;
+}
+function nettoyerTexteSuivi(s, interdits) {
+  let t = String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ');
+  for (const x of interdits || []) {
+    const e = String(x).trim();
+    if (e.length < 3) continue;
+    t = t.replace(new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '…');
+  }
+  t = t.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '…')
+    .replace(/(?:\+\d{2}\s?|\b0)[1-9](?:[\s.-]?\d{2}){4}\b/g, '…')
+    .replace(/\b\d{1,4}\s*(?:bis|ter)?\s*,?\s*(?:rue|avenue|av\.?|bd|boulevard|chemin|place|all[ée]e|impasse|route|quai|cours|square|r[ée]sidence|lotissement|lieu[- ]dit)\b[^,.;\n]*/gi, '…')
+    .replace(/\b\d{5}\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:[ -][A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’-]+)*/g, '…')
+    .replace(/((?:\b[Cc]ode|\bCODE|\bPIN|\b[Pp]in)(?:\s+(?:de\s+retrait|retrait|PIN|d['’]acc[èe]s))?\s*(?:[:：=]|est|is)?\s*)([A-Za-z0-9-]{4,})/g, (m, a, b) => (/\d/.test(b) ? a + '…' : m));
+  t = t.replace(/\s*(?:…\s*)+/g, ' … ').replace(/\s+/g, ' ').trim();
+  return /^[…\s.,;:!?-]*$/.test(t) ? '' : t.slice(0, 200);
+}
+// Une feuille gardée : `{ sorte, v }`, ou `null` (retirée).
+function suiviFeuille(cle, parent, v) {
+  const k = String(cle).toLowerCase(), p = String(parent || '');
+  if (!(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) return null;
+  if (SUIVI_PARENT_TRANSP.test(p) && /^(?:name|title|label|code)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
+  if (SUIVI_PARENT_RELAIS.test(p) && /^(?:name|title|label)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
+  if (SUIVI_PARENT_NUMERO.test(p) && /^(?:code|number|numero|id)$/.test(k)) { const n = suiviNumero(v); return n ? { sorte: 'numero', v: n } : null; }
+  if (SUIVI_NUMERO.test(k)) { const n = suiviNumero(v); return n ? { sorte: 'numero', v: n } : null; }
+  if (SUIVI_TRANSP.test(k)) return typeof v === 'string' ? { sorte: 'texte', v } : null;
+  if (SUIVI_TEXTES.includes(k)) return typeof v === 'string' ? { sorte: 'texte', v } : null;
+  if (SUIVI_CODES.includes(k)) {
+    if (typeof v === 'string' && v.length > 40) return { sorte: 'texte', v };
+    return { sorte: 'code', v };
+  }
+  if (SUIVI_DATE.test(k) || SUIVI_LIMITE.test(k)) { const d = suiviDateIso(v); return d ? { sorte: 'date', v: d } : null; }
+  return null;
+}
+function allegerSuivi(racine) {
+  const interdits = new Set(), aLaver = [];
+  const marche = (v, parent, prof) => {
+    if (prof > 8 || v == null) return undefined;
+    if (Array.isArray(v)) {
+      const out = [];
+      for (const x of v.slice(0, 40)) { const r = marche(x, parent, prof + 1); if (r !== undefined) out.push(r); }
+      return out.length ? out : undefined;
+    }
+    if (typeof v !== 'object') return undefined;
+    const out = {};
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (x && typeof x === 'object') {
+        if (!suiviCleSure(k)) continue;
+        const r = marche(x, k, prof + 1);
+        if (r !== undefined) out[k] = r;
+        continue;
+      }
+      const g = suiviCleSure(k) ? suiviFeuille(k, parent, x) : null;
+      if (g) { out[k] = g.v; if (g.sorte === 'texte') aLaver.push([out, k]); continue; }
+      if (typeof x === 'string' || typeof x === 'number') {
+        const s = String(x).trim();
+        if (s.length >= 3 && ((SUIVI_PERSO.test(k) && !SUIVI_PAS_PERSO.test(k)) || /[\w.+-]+@[\w-]+\.[\w-]+/.test(s))) interdits.add(s.slice(0, 200));
+      }
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
+  const garde = marche(racine, '', 0) || {};
+  const liste = [...interdits].sort((a, b) => b.length - a.length);
+  for (const [o, k] of aLaver) {
+    const t = nettoyerTexteSuivi(o[k], liste);
+    if (t) o[k] = t; else delete o[k];
+  }
+  return garde;
+}
+function formeSuivi(racine) {
+  const out = {};
+  let n = 0;
+  const poser = (c, t) => {
+    if (out[c] === undefined) { if (n < 200) { out[c] = t; n++; } return; }
+    if (!out[c].split('|').includes(t)) out[c] = (out[c] + '|' + t).slice(0, 60);
+  };
+  const marche = (v, chemin, prof) => {
+    if (prof > 8) return;
+    if (Array.isArray(v)) {
+      if (!v.length) { poser(chemin || '(racine)', 'array'); return; }
+      for (const x of v.slice(0, 5)) marche(x, chemin + '[]', prof + 1);
+      return;
+    }
+    if (v && typeof v === 'object') {
+      const cles = Object.keys(v);
+      if (!cles.length) { poser(chemin || '(racine)', 'object'); return; }
+      for (const k of cles.slice(0, 80)) marche(v[k], (chemin ? chemin + '.' : '') + (suiviCleSure(k) ? k : '{k}'), prof + 1);
+      return;
+    }
+    poser(chemin || '(racine)', v === null ? 'null' : typeof v);
+  };
+  marche(racine, '', 0);
+  return out;
+}
+// La forme reçue d'une page (ou d'un message forgé) : seulement des chemins de
+// noms de clés sûrs et des types connus — jamais une valeur.
+function nettoyerFormeSuivi(f) {
+  const out = {};
+  if (!f || typeof f !== 'object' || Array.isArray(f)) return out;
+  let n = 0;
+  for (const c of Object.keys(f)) {
+    if (n >= 200) break;
+    const t = String(f[c] == null ? '' : f[c]);
+    if (!/^[A-Za-z0-9_.[\]{}()-]{1,160}$/.test(c) || /\d{3,}|@/.test(c)) continue;
+    if (!t || !t.split('|').every((x) => SUIVI_TYPES.includes(x))) continue;
+    out[c] = t.slice(0, 60); n++;
+  }
+  return out;
+}
+function suiviVal(o, cle) {
+  for (const k of Object.keys(o)) if (k.toLowerCase() === cle) return o[k];
+  return undefined;
+}
+function suiviEtape(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  let t = '';
+  for (const k of SUIVI_TEXTES) { const x = suiviVal(o, k); if (typeof x === 'string' && x.trim()) { t = x.trim(); break; } }
+  if (!t) return null;
+  let at = null;
+  for (const k of Object.keys(o)) {
+    if (!SUIVI_DATE.test(k) || SUIVI_LIMITE.test(k)) continue;
+    const d = suiviDateIso(o[k], 86400000);
+    if (d) { at = d; break; }
+  }
+  let code = null;
+  for (const k of SUIVI_CODES) {
+    const x = suiviVal(o, k);
+    if ((typeof x === 'string' && x.trim() && x.length <= 40 && x !== t) || typeof x === 'number') { code = String(x).trim(); break; }
+  }
+  return { t: t.slice(0, 200), at, code };
+}
+function contratSuivi(a) {
+  if (!a || typeof a !== 'object') return null;
+  const groupes = [], seuls = [];
+  const dansGroupe = new Set();
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) {
+      const g = [];
+      for (const x of v) { const e = suiviEtape(x); if (e) { g.push(e); dansGroupe.add(x); } }
+      if (g.length) groupes.push(g);
+      for (const x of v) marche(x, prof + 1);
+      return;
+    }
+    for (const k of Object.keys(v)) marche(v[k], prof + 1);
+  };
+  marche(a, 0);
+  const objets = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v) objets(x, prof + 1); return; }
+    if (!dansGroupe.has(v)) { const e = suiviEtape(v); if (e && e.at) seuls.push(e); }
+    for (const k of Object.keys(v)) objets(v[k], prof + 1);
+  };
+  objets(a, 0);
+  if (seuls.length) groupes.push(seuls);
+  const score = (g) => g.filter((e) => e.at).length * 100 + g.length;
+  let meilleur = null;
+  for (const g of groupes) if (!meilleur || score(g) > score(meilleur)) meilleur = g;
+  if (!meilleur || !meilleur.length) return null;
+  const vues = new Set(), etapes = [];
+  for (const e of meilleur) { const c = `${e.at || ''}|${e.t}|${e.code || ''}`; if (!vues.has(c)) { vues.add(c); etapes.push(e); } }
+  const datees = etapes.filter((e) => e.at).sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
+  const sansDate = etapes.filter((e) => !e.at);
+  const toutes = datees.concat(sansDate).slice(0, 30);
+  let transporteur = null, suivi = null;
+  const cherche = (v, parent, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v) cherche(x, parent, prof + 1); return; }
+    for (const k of Object.keys(v)) {
+      const x = v[k], kl = k.toLowerCase();
+      if (x && typeof x === 'object') { cherche(x, k, prof + 1); continue; }
+      if (!transporteur && typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())
+          && ((SUIVI_PARENT_TRANSP.test(String(parent || '')) && /^(?:name|title|label)$/.test(kl)) || /^(?:carrier|carrier_name|carrier_title|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/.test(kl))) transporteur = x.trim().slice(0, 80);
+      if (!suivi && (SUIVI_NUMERO.test(kl) || (SUIVI_PARENT_NUMERO.test(String(parent || '')) && /^(?:code|number|numero|id)$/.test(kl)))) suivi = suiviNumero(x);
+    }
+  };
+  cherche(a, '', 0);
+  return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
+}
+// </suivi-regle>
+
+const SUIVI_QUOI = ['journey', 'escrow', 'code'];
+const FORMES_SUIVI = 'panel_formes_suivi';
+const FORMES_SUIVI_MEMO = 'vrmFormesSuivi';
+const FORMES_SUIVI_MAX = 300;
+const SUIVI_NOTIF_AGE_MAX_MS = 72 * 3600000;
+// La FORME des réponses, par voie : `{ v: 1, journey: { forme, etat, at, ver, n },
+// escrow: {…}, code: {…} }`. `etat` : 'reconnue' (des étapes lues) · 'inconnue'
+// (rien d'exploitable : seule la forme est gardée) · 'forme' (le code de retrait,
+// dont on ne garde jamais que la forme). Lire-fusionner-réécrire GARDÉ : une
+// lecture ratée n'écrit RIEN (elle effacerait les formes déjà apprises). Une
+// forme déjà vue (même signature, même état, moins de 24 h) ne relit même pas la
+// base (mémo dans `chrome.storage.local`, §4.9).
+// Rend true (écrit) · false (rien de neuf) · null (la base n'a pas répondu ou a refusé).
+async function rangerFormeSuivi(quoi, forme, etat) {
+  try {
+    if (!SUIVI_QUOI.includes(quoi)) return false;
+    const f = nettoyerFormeSuivi(forme);
+    if (!Object.keys(f).length) return false;
+    const sig = Object.keys(f).sort().map((k) => k + ':' + f[k]).join(',');
+    let memo = {};
+    try { memo = (await chrome.storage.local.get(FORMES_SUIVI_MEMO))[FORMES_SUIVI_MEMO] || {}; } catch (_) { memo = {}; }
+    const m = memo[quoi];
+    if (m && m.sig === sig && m.etat === etat && Date.now() - Number(m.at || 0) < 24 * 3600000) return false;
+    const rows = await sbGet(`app_data?id=eq.${FORMES_SUIVI}&select=data`);
+    if (rows === null) { noterDiag('suivi_forme_lecture_ratee'); return null; }
+    const cur = (rows[0] && rows[0].data) || {};
+    const avant = (cur[quoi] && typeof cur[quoi] === 'object') ? cur[quoi] : {};
+    const union = Object.assign({}, avant.forme && typeof avant.forme === 'object' ? avant.forme : {});
+    let neuves = 0;
+    for (const k of Object.keys(f)) {
+      if (union[k] === undefined) { if (Object.keys(union).length < FORMES_SUIVI_MAX) { union[k] = f[k]; neuves++; } continue; }
+      const t = [...new Set(String(union[k]).split('|').concat(f[k].split('|')))].join('|').slice(0, 60);
+      if (t !== union[k]) { union[k] = t; neuves++; }
+    }
+    const recente = Date.now() - Date.parse(avant.at || '') < 24 * 3600000;
+    let ecrit = false;
+    if (neuves || avant.etat !== etat || !recente) {
+      const out = Object.assign({}, cur, { v: 1, [quoi]: { forme: union, etat, at: new Date().toISOString(), ver: EXT_VERSION, n: Number(avant.n || 0) + 1 } });
+      const ok = await supabaseUpsert('app_data', [{ id: FORMES_SUIVI, data: out }], 'id');
+      if (ok === false) { noterDiag('suivi_forme_ecriture_ratee'); return null; }
+      noterDiag(`suivi_forme_${quoi}_${etat}`);
+      ecrit = true;
+    }
+    memo[quoi] = { sig, etat, at: Date.now() };
+    try { await chrome.storage.local.set({ [FORMES_SUIVI_MEMO]: memo }); } catch (_) {}
+    return ecrit;
+  } catch (_) { return null; }
+}
+
+// Écrire ou non une capture de suivi, par rapport à ce qui est déjà rangé.
+// « Écriture seulement si la dernière étape change » ; une capture plus pauvre
+// (sans dernière étape datée) ou plus ANCIENNE ne remplace jamais une plus riche
+// (§4.2) ; la même étape au même instant dite autrement par une AUTRE voie (le
+// suivi et la page de commande ne l'écrivent peut-être pas pareil) ne réécrit
+// rien — sinon les deux voies se renverraient la ligne à chaque visite.
+// `nouveau` : une étape PLUS RÉCENTE est apparue (ce qui sonne). La toute
+// première lecture d'un colis (`avant` absent) est la ligne de base : rangée,
+// jamais « nouvelle ».
+const cleEvtSuivi = (e) => (e ? `${e.at || ''}|${e.t || ''}|${e.code || ''}` : '');
+function decisionSuivi(avant, neuf) {
+  if (!neuf || (!neuf.dernier && !(neuf.etapes || []).length)) return { ecrire: false, raison: 'vide' };
+  if (!avant) return { ecrire: true, nouveau: false, raison: 'premiere' };
+  const ad = avant.dernier || null, nd = neuf.dernier || null;
+  if (!nd) return { ecrire: false, raison: ad ? 'plus_pauvre' : 'sans_date' };
+  const ams = ad ? Date.parse(ad.at) : NaN, nms = Date.parse(nd.at);
+  if (ad && cleEvtSuivi(ad) === cleEvtSuivi(nd)) return { ecrire: false, raison: 'inchange' };
+  if (ad && nms < ams) return { ecrire: false, raison: 'plus_ancien' };
+  if (ad && nms === ams) {
+    if ((neuf.source || '') !== (avant.source || '') || (neuf.etapes || []).length < (avant.etapes || []).length) return { ecrire: false, raison: 'meme_instant' };
+    return { ecrire: true, nouveau: false, raison: 'reformule' };
+  }
+  return { ecrire: true, nouveau: true, raison: 'nouveau' };
+}
+
+// Range le CONTRAT (`harvest_{uid}_suivi_{tx}`) pour un achat PROUVÉ de ce compte.
+// Rend true (écrit) · false (rien de neuf) · null (la base n'a pas répondu ou a
+// refusé : rien n'est rangé, la lecture suivante réessaiera).
+async function rangerSuivi(uid, tx, contrat, source, forme) {
+  try {
+    if (!uid || !/^\d{4,20}$/.test(String(tx || '')) || !contrat) return false;
+    const id = `harvest_${uid}_suivi_${tx}`;
+    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source`);
+    if (rows === null) { noterDiag('suivi_lecture_ratee'); return null; }       // pas su : on n'écrase rien
+    const r0 = rows[0];
+    const avant = r0 ? { dernier: (r0.d && typeof r0.d === 'object') ? r0.d : null, etapes: Array.isArray(r0.e) ? r0.e : [], source: r0.s || '' } : null;
+    const neuf = { etapes: contrat.etapes || [], dernier: contrat.dernier || null, source };
+    const dec = decisionSuivi(avant, neuf);
+    if (!dec.ecrire) { noterDiag(`suivi_${dec.raison}`); return false; }
+    const data = { v: 1, tx: String(tx), source, capturedAt: new Date().toISOString(),
+      etapes: neuf.etapes.slice(0, 30), dernier: neuf.dernier,
+      transporteur: contrat.transporteur || null, suivi: contrat.suivi || null,
+      forme: nettoyerFormeSuivi(forme) };
+    const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
+    if (ok === false) { noterDiag('suivi_ecriture_ratee'); return null; }
+    noterDiag(`suivi_ecrit_${source}`);
+    notifierApp({ type: 'maj', quoi: 'suivi', uid: String(uid), tx: String(tx) });
+    if (dec.nouveau && neuf.dernier && Date.parse(neuf.dernier.at) > Date.now() - SUIVI_NOTIF_AGE_MAX_MS) {
+      await mettreNotifSuivi(uid, tx);
+      await envoyerNotifsSuivi();
+    }
+    return true;
+  } catch (_) { return null; }
+}
+
+// Les achats de CE compte (sa liste `orders_purchased`), par transaction ; `null`
+// = pas su (la base n'a pas répondu) — on ne décide rien.
+async function achatsDuCompte(uid) {
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_purchased&select=v:data->payload->my_orders`);
+  if (!Array.isArray(rows)) return null;
+  const liste = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
+  const out = new Map();
+  for (const o of liste) if (o && /^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))) out.set(String(o.transaction_id), o);
+  return out;
+}
+
+// La voie PASSIVE : ce que la page a reçu (forme + contenu allégé), relayé par
+// content.js. Le compte est celui du COOKIE de l'onglet (`garde`), jamais celui
+// que dirait le message. Le contenu n'est rangé que pour un ACHAT de ce compte.
+async function noterSuiviPage(domain, msg) {
+  try {
+    const quoi = String((msg && msg.quoi) || '');
+    const id = String((msg && msg.id) || '');
+    if (!SUIVI_QUOI.includes(quoi) || !/^\d{4,20}$/.test(id)) return false;
+    noterDiag(`suivi_vu_${quoi}`);
+    const uid = await activeAccountId(domain);
+    if (!uid) { noterDiag('suivi_sans_compte'); return false; }
+    if (await compteNonCapte(uid)) return false;
+    const forme = nettoyerFormeSuivi(msg.forme);
+    if (quoi === 'code') { await rangerFormeSuivi('code', forme, 'forme'); return false; }   // le code de retrait : sa FORME seulement
+    const contrat = contratSuivi(allegerSuivi(msg.allege));
+    await rangerFormeSuivi(quoi, forme, contrat ? 'reconnue' : 'inconnue');
+    if (!contrat) { noterDiag(`suivi_forme_inattendue_${quoi}`); return false; }
+    const achats = await achatsDuCompte(uid);
+    if (achats === null) { noterDiag('suivi_achats_pas_lus'); return false; }
+    const cands = quoi === 'escrow' ? [msg.txCorps, id] : [id];
+    const tx = cands.map((x) => String(x == null ? '' : x)).find((x) => /^\d{4,20}$/.test(x) && achats.has(x));
+    if (!tx) { noterDiag(`suivi_pas_un_achat_${quoi}`); return false; }
+    return await rangerSuivi(uid, tx, contrat, quoi === 'escrow' ? 'escrow' : 'passif', forme);
+  } catch (_) { return false; }
+}
+
+// ── « 📦 UNE ÉTAPE DE PLUS » : LA FILE DES NOTIFICATIONS (5.214) ─────────────
+// La forme exacte de la 5.204 (`vrmRetraitNotifs`) : la file vit dans
+// `chrome.storage.local` (§4.9) ; l'extension ne dit au serveur QUE la
+// transaction et le compte — il relit la ligne au nom du vendeur et décide (une
+// fois par étape, catégorie « suivi »). Un envoi raté (réseau, 5xx, session
+// absente) est retenté à la visite suivante, 24 h au plus ; un refus jugé (4xx
+// autre que 401/429) est oublié. Sans session VRM : rien ne part (on garde).
+const SUIVI_NOTIFS = 'vrmSuiviNotifs';
+const NOTIF_SUIVI_MAX_MS = 24 * 3600000;
+async function mettreNotifSuivi(uid, tx) {
+  try {
+    if (!/^\d{1,20}$/.test(String(uid || '')) || !/^\d{4,20}$/.test(String(tx || ''))) return;
+    const f = (await chrome.storage.local.get(SUIVI_NOTIFS))[SUIVI_NOTIFS] || {};
+    const k = `${uid}:${tx}`;
+    f[k] = { uid: String(uid), tx: String(tx), at: (f[k] && f[k].at) || Date.now(), essais: (f[k] && f[k].essais) || 0 };
+    await chrome.storage.local.set({ [SUIVI_NOTIFS]: f });
+  } catch (_) {}
+}
+async function envoyerNotifsSuivi() {
+  try {
+    const f = (await chrome.storage.local.get(SUIVI_NOTIFS))[SUIVI_NOTIFS] || {};
+    const cles = Object.keys(f);
+    if (!cles.length) return 0;
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('suivi_notif_sans_session'); return 0; }   // pas su : on garde
+    let n = 0;
+    for (const k of cles.slice(0, 5)) {
+      const e = f[k] || {};
+      if (!(Date.now() - Number(e.at || 0) <= NOTIF_SUIVI_MAX_MS)) { delete f[k]; noterDiag('suivi_notif_abandon_24h'); continue; }
+      let status = 0;
+      try {
+        const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+        const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+          body: JSON.stringify({ action: 'suivi', tx: String(e.tx), uid: String(e.uid) }) });
+        clearTimeout(t); status = r.status;
+      } catch (_) { status = 0; }
+      if (status >= 200 && status < 300) { delete f[k]; n++; noterDiag('suivi_notif_envoyee'); }
+      else if (status >= 400 && status < 500 && status !== 401 && status !== 429) { delete f[k]; noterDiag(`suivi_notif_refus_${status}`); }
+      else { f[k] = { ...e, essais: Number(e.essais || 0) + 1 }; noterDiag(`suivi_notif_ko_${status || 'reseau'}`); }
+    }
+    await chrome.storage.local.set({ [SUIVI_NOTIFS]: f });
+    return n;
+  } catch (_) { return 0; }
+}
+
 // ══ À CONFIRMER AVANT LA DATE LIMITE (5.204, 21 octobre) ═════════════════════
 // MESURÉ en lecture seule sur sa base (21 oct.) : le seul message qui porte une
 // date limite de confirmation est l'action « Confirmation nécessaire » —
@@ -6028,6 +6479,10 @@ async function visiteVinted() {
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
+    // 5.214 : le suivi que Vinted montre de ses achats en cours (« Suivre le
+    // colis »), puis les notifications « une étape de plus » restées en file.
+    await capterSuivisAchats(uid);
+    await envoyerNotifsSuivi();
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -6542,11 +6997,12 @@ async function compterLectureUn(uid, plafond) {
 // qu'elles ont quelque chose à lire. Chaque lecteur prioritaire note ce qu'il
 // lui RESTE (`vrmLecturesDues`) ; « pas su » (jamais noté, ou noté il y a plus
 // d'une heure) garde la réserve entière. Le plafond total ne bouge pas (20/h).
-const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…}, preuve:{…} } }
+const LECTURES_DUES = 'vrmLecturesDues';          // { [uid]: { versement:{reste,at}, releve:{…}, retrait:{…}, preuve:{…}, suivi:{…} } }
 const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
 // Les lecteurs prioritaires et ce qu'une visite peut lire pour chacun. Lu à
 // l'appel (les constantes vivent plus bas dans le fichier).
-const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE });
+// 5.214 : le suivi Vinted des achats en cours (`capterSuivisAchats`, 3 par visite).
+const lecteursPrioritaires = () => ({ versement: VERSEMENT_MAX_PAR_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE, suivi: SUIVI_MAX_PAR_VISITE });
 // ⚠️⚠️ REVUE DE LA 5.167 — LA RELECTURE PUBLIQUE ÉTAIT DANS LA CLASSE DES PHOTOS.
 //    Après une republication (30 annonces neuves dont il manque les photos),
 //    `tickPhotos` vidait le budget à la minute 0, et les autres comptes attendaient
@@ -8163,6 +8619,88 @@ async function capterRetraits(uid) {
     await chrome.storage.local.set({ vrmRetraitFaits: memo });
     // « Pas su » ce qui est déjà en base ⇒ on ne dit rien (la réserve reste).
     if (dejaSu) await noterLecturesDues(uid, 'retrait', attend.filter(aLire).length);
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ═══ LE SUIVI DES ACHATS EN COURS, LU ACTIVEMENT (23 octobre, 5.214) ═══════
+// La forme exacte de `capterRetraits` / `capterConfirmations` : une LECTURE de
+// ses propres achats (§3 l'autorise), au nom du compte du COOKIE de l'onglet
+// (`gardeLecture`, classe « colis » : elle entre dans la réserve de lecture),
+// dans la file Vinted (une requête à la fois), 3 par visite, jamais la même
+// transaction deux fois en 3 h (mémo dans `chrome.storage.local`, ôté sur un
+// échec passager — `memoApresEchec`), rien pendant une pause, et un 429/403
+// arrête tout. Les achats suivis : ceux qui ne sont PAS finis — en route,
+// déposés au point relais, qui attendent son geste (`needs_action`) — et un
+// achat « livré » seulement si sa dernière étape rangée a moins de 3 jours
+// (« pas su » ⇒ on ne le relit pas : un achat livré n'a plus rien à dire).
+// « Pas su » (achats ou suivis illisibles) ⇒ on ne lit RIEN chez Vinted.
+const SUIVI_MAX_PAR_VISITE = 3;
+const SUIVI_RETRY_MS = 3 * 60 * 60 * 1000;
+const SUIVI_LIVRE_RECENT_MS = 3 * 86400000;
+const SUIVI_ACHAT_MAX_J = 45;
+const SUIVI_FINI = /finalis|termin|annul|rembours|non\s+r[ée]clam|retourn[ée]e?\s+[àa]\s+l['’]exp/i;
+const SUIVI_EN_ROUTE = /exp[ée]di[ée]|achemin|en\s+transit|en\s+route|en\s+cours\s+de\s+livraison|pris\s+en\s+charge/i;
+function achatASuivre(o, derniers, maintenant) {
+  if (!o || !/^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))) return false;
+  const st = String(o.status || ''), tus = String(o.transaction_user_status || '');
+  if (SUIVI_FINI.test(st) || tus === 'completed' || tus === 'failed') return false;
+  const d = Date.parse(o.date || '');
+  if (Number.isFinite(d) && d < maintenant - SUIVI_ACHAT_MAX_J * 86400000) return false;
+  if (/livr[ée]e/i.test(st) && !/pas\s+encore/i.test(st)) {
+    const da = derniers.get(String(o.transaction_id));
+    return Number.isFinite(da) && da > maintenant - SUIVI_LIVRE_RECENT_MS;
+  }
+  return tus === 'needs_action' || AT_RELAY(st) || SUIVI_EN_ROUTE.test(st);
+}
+async function capterSuivisAchats(uid) {
+  try {
+    if (!uid) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const achats = await achatsDuCompte(uid);
+    if (achats === null) return 0;                                         // pas su
+    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at`);
+    if (suivis === null) return 0;                                         // pas su
+    const derniers = new Map();
+    for (const r of suivis) {
+      const tx = (/_suivi_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
+      const ms = Date.parse((r && r.da) || '');
+      if (tx && Number.isFinite(ms)) derniers.set(tx, ms);
+    }
+    const maintenant = Date.now();
+    const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
+      .sort((a, b) => (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0));
+    if (!cibles.length) { await noterLecturesDues(uid, 'suivi', 0); return 0; }
+    const memo = (await chrome.storage.local.get('vrmSuiviFaits')).vrmSuiviFaits || {};
+    for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
+    const aLire = (o) => { const tx = String(o.transaction_id); return !(memo[tx] && Date.now() - Number(memo[tx]) < SUIVI_RETRY_MS); };
+    let n = 0, ecrits = 0;
+    for (const o of cibles) {
+      if (n >= SUIVI_MAX_PAR_VISITE) break;
+      if (!aLire(o)) continue;
+      const tx = String(o.transaction_id);
+      const refus = await gardeLecture(uid, acc, 'colis');
+      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Suivi d'un achat non lu : ${refus.error}`); break; }
+      memo[tx] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}/shipment/journey_summary`);
+      if (!rep || !rep.ok || !rep.json) { noterDiag(`suivi_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(memo, tx, rep, SUIVI_RETRY_MS)) break; continue; }
+      if (estErreurVinted(rep.json)) { noterDiag('suivi_erreur_vinted'); continue; }
+      const forme = formeSuivi(rep.json);
+      const contrat = contratSuivi(allegerSuivi(rep.json));
+      await rangerFormeSuivi('journey', forme, contrat ? 'reconnue' : 'inconnue');
+      if (!contrat) { noterDiag('suivi_forme_inattendue_journey'); continue; }   // la forme est gardée, le contenu non (pas su)
+      const r = await rangerSuivi(uid, tx, contrat, 'journey', forme);
+      // Lu mais PAS rangé (notre base) : relu à la visite suivante, et on s'arrête.
+      if (r === null) { delete memo[tx]; break; }
+      if (r) ecrits++;
+    }
+    await chrome.storage.local.set({ vrmSuiviFaits: memo });
+    await noterLecturesDues(uid, 'suivi', cibles.filter(aLire).length);
+    if (ecrits) logActivity(`📦 Suivi Vinted relu pour ${ecrits} achat${ecrits > 1 ? 's' : ''}`);
     return n;
   } catch (_) { return 0; }
 }

@@ -266,9 +266,15 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     if (u === '222') return Array.from({ length: 150 }, (_, i) => art(500000 + i, i === 3 ? { is_closed: true, item_closing_action: 'sold' } : {}));
     return [art(Number(u) * 100 + 7, { title: 'Republiée ' + u })];
   };
+  // 23 oct. (5.214) : `capterSuivisAchats` (le suivi Vinted des achats, classe
+  // « colis ») passe AVANT la relecture dans la visite et note ce qui lui reste
+  // à lire. Jamais noté ⇒ « pas su » ⇒ ses 3 places restent réservées (le sens
+  // sûr) et la relecture a 3 lectures de moins. Ces scénarios rejouent l'ordre
+  // de la visite : le suivi est passé, il n'a plus rien à lire.
+  const duesSuivi = () => ({ vrmLecturesDues: { '111': { suivi: { reste: 0, at: Date.now() } } } });
   const monter = (o = {}) => {
     const lignes = o.lignes || baseLignes();
-    const f = faireFond({ src: BG, lignes, connecte: '111', comptes: COMPTES, store: o.store || {}, lectureKO: o.lectureKO,
+    const f = faireFond({ src: BG, lignes, connecte: '111', comptes: COMPTES, store: Object.assign(duesSuivi(), o.store || {}), lectureKO: o.lectureKO,
       vinted: (r) => {
         const w = /\/api\/v2\/wardrobe\/(\d+)\/items\?page=(\d+)&per_page=(\d+)/.exec(r.chemin);
         if (!w) return o.autre ? o.autre(r) : { status: 404, body: {} };
@@ -496,7 +502,7 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
   // L'onglet quitte Vinted pendant la relecture (il clique vers Leboncoin dans cet onglet).
   const ongletQuiPart = (o = {}) => {
     const onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }];
-    const f = faireFond({ src: BG, lignes: baseLignes(), connecte: '111', comptes: COMPTES, store: {}, onglets,
+    const f = faireFond({ src: BG, lignes: baseLignes(), connecte: '111', comptes: COMPTES, store: duesSuivi(), onglets,
       vinted: (r) => {
         const w = /\/api\/v2\/wardrobe\/(\d+)\/items\?page=(\d+)&per_page=(\d+)/.exec(r.chemin);
         if (!w) return { status: 404, body: {} };

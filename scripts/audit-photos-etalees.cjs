@@ -61,7 +61,7 @@ const pages = (j) => j.vinted.filter((x) => /^\/items\/\d+$/.test(x.chemin)).len
 
 // Le fond, sur une copie du fichier (mutation), avec l'horloge pilotée.
 function monter(src, { lignesInit = lignes(), vinted = vintedOk, store = {}, t0 = Date.now(), duesNulles = true } = {}) {
-  if (duesNulles) store.vrmLecturesDues = { [UID]: Object.fromEntries(['versement', 'releve', 'retrait', 'preuve', 'enligne'].map((k) => [k, { reste: 0, at: t0 }])) };
+  if (duesNulles) store.vrmLecturesDues = { [UID]: Object.fromEntries(['versement', 'releve', 'retrait', 'preuve', 'suivi', 'enligne'].map((k) => [k, { reste: 0, at: t0 }])) };
   const f = faireFond({ src, lignes: lignesInit, vinted, store, connecte: UID });
   f.h = { t: t0 }; f.ctx.__horloge = f.h;
   vm.runInContext('Date.now = function () { return globalThis.__horloge.t; };', f.ctx);
@@ -149,7 +149,7 @@ async function scenarioLot(src, { lectureKO = false } = {}) {
   let ko2 = lectureKO;
   const f = faireFond({ src, lignes: lignes(12), vinted: vintedOk, connecte: UID,
     lectureKO: (u) => ko2 && /vinted_item_details/.test(u) && !/listings/.test(u),
-    store: { vrmLecturesDues: { [UID]: Object.fromEntries(['versement', 'releve', 'retrait', 'preuve', 'enligne'].map((k) => [k, { reste: 0, at: Date.now() }])) } } });
+    store: { vrmLecturesDues: { [UID]: Object.fromEntries(['versement', 'releve', 'retrait', 'preuve', 'suivi', 'enligne'].map((k) => [k, { reste: 0, at: Date.now() }])) } } });
   // Le plan se lit une fois (base debout), puis les écritures ratent si `lectureKO`.
   if (lectureKO) { ko2 = false; await f.ctx.planPhotos(UID); ko2 = true; }
   const ecrits = () => f.j.posts.filter((ids) => ids.includes('vinted_item_details')).length;
