@@ -2646,6 +2646,41 @@ function masqueeSurVinted(it) { return !!(it && it.is_hidden && !it.is_closed &&
 function masqueesDuCompte(fermees, suppIds, capDressing) {
   return (Array.isArray(fermees) ? fermees : []).filter((it) => masqueeSurVinted(it) && !supprimeeApres(suppIds, it.id, capDressing));
 }
+// ⚠️⚠️ 23 OCT. (relecture) — UNE MASQUÉE DÉCLARÉE PARTIE N'EST PLUS SUR L'ÉTAGÈRE.
+// « Elle n'est plus là » (sur une ligne qui nomme la masquée) et « Retirer » (annonces
+// disparues) rangent la déclaration dans `vinted_pairs_lost`. Sans ce jugement, la
+// masquée qu'il venait de déclarer partie redevenait « toujours chez toi » : un
+// numéro brûlé et un carton à réécrire pour rien (doublon réglé contre une paire
+// absente). IDENTITÉ d'abord : une entrée qui porte l'identifiant d'annonce (`id`)
+// ne vise QUE cette annonce, quelle que soit sa clé. Une entrée ANCIENNE (numéro
+// seul) ne vaut pour elle que si AUCUNE autre fiche ne porte ce numéro : sinon on
+// ne sait pas laquelle des deux est partie, et la garder présente est le sens sûr
+// (deux paires sous un N° est le seul risque irréversible, §5). Fonctions PURES.
+function annonceDeclareePartie(id, fiches, perdues) {
+  if (!perdues || typeof perdues !== 'object') return false;
+  const moi = String(id);
+  for (const k in perdues) { const e = perdues[k]; if (e && e.id != null && String(e.id) === moi) return true; }
+  const n = cleNum(fiches && fiches[moi] && fiches[moi].numero);
+  if (!n) return false;
+  let ancienne = false;
+  for (const k in perdues) { const e = perdues[k]; if (e && e.id == null && cleNum(k) === n) { ancienne = true; break; } }
+  if (!ancienne) return false;
+  for (const autre in (fiches || {})) if (autre !== moi && cleNum((fiches[autre] || {}).numero) === n) return false;
+  return true;
+}
+// La clé où ranger une déclaration : le numéro nu quand aucune autre fiche ne le
+// porte (les lecteurs par NUMÉRO — files Leboncoin et eBay, retours, orphelines —
+// le comprennent comme avant) ; sinon `N°@idAnnonce`, pour ne JAMAIS sortir des
+// files l'AUTRE paire, qui garde ce numéro.
+function cleDeclarationPartie(numero, id, fiches) {
+  const n = cleNum(numero), moi = String(id), brut = String(numero == null ? '' : numero).trim();
+  const autre = !!n && Object.keys(fiches || {}).some((k) => k !== moi && cleNum((fiches[k] || {}).numero) === n);
+  return autre ? `${brut}@${moi}` : brut;
+}
+// Les masquées encore sur l'étagère : toutes, sauf celles déclarées parties.
+function masqueesPresentes(masquees, fiches, perdues) {
+  return (Array.isArray(masquees) ? masquees : []).filter((it) => it && !annonceDeclareePartie(it.id, fiches, perdues));
+}
 // </masquees-regle>
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
@@ -29676,6 +29711,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
   const [renumOpen, setRenumOpen] = useState(false); // modale « Renuméroter à la suite »
   const [dispOpen, setDispOpen] = useState(false);   // panneau « annonces disparues sans vente »
+  const [masqOpen, setMasqOpen] = useState(false);   // panneau « paires masquées par Vinted » (23 oct.)
   const [tourneeOpen, setTourneeOpen] = useState(false); // modale « Planificateur de tournée »
   // Emplacement précis d'un numéro dans le garage 3D (vrm_room_plan) : « Pièce · type ».
   const garageSpotOf = (num) => {
@@ -30935,6 +30971,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
+  // Paires déclarées PERDUES (litige, annonce disparue qu'on retire du stock, masquée
+  // « Elle n'est plus là »). ⚠️ Déclarée ICI : `disparues` et les annonces masquées
+  // présentes (`masqueesSurEtagere`) la lisent pendant le rendu, et un useState
+  // déclaré après aurait planté l'app (variable pas encore initialisée, §4.6).
+  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
   // La liste AFFICHÉE, lue par une relecture sur signal (`loadListings`) : la
   // fermeture de l'écouteur ne voit que l'état de son montage.
   const listingsRef = useRef(listings); listingsRef.current = listings;
@@ -31088,13 +31129,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    `numDoublons`, le règlement des doublons, `vinted_nums_physiques`, les
   //    cartons à vérifier / à réécrire. Jamais pour les totaux « en ligne » ni
   //    les files Leboncoin/eBay. Une même annonce ne compte qu'une fois.
+  // (23 oct.) Une masquée DÉCLARÉE partie (« Elle n'est plus là », « Retirer »,
+  // `annonceDeclareePartie`) n'est plus sur l'étagère : elle sort de TOUT ce qui
+  // protège un numéro, d'un seul endroit (§11).
+  const masqueesSurEtagere = useMemo(() => masqueesPresentes(listings.masquees, numeros, pairsLost),
+  [listings.masquees, numeros, pairsLost]);
   const annoncesPresentes = useMemo(() => {
     const vus = new Set(), out = [];
-    for (const it of [...(listings.items || []), ...(listings.aConfirmer || []), ...(listings.masquees || [])]) {
+    for (const it of [...(listings.items || []), ...(listings.aConfirmer || []), ...masqueesSurEtagere]) {
       const k = it && it.id != null ? String(it.id) : ''; if (!k || vus.has(k)) continue; vus.add(k); out.push(it);
     }
     return out;
-  }, [listings.items, listings.aConfirmer, listings.masquees]);
+  }, [listings.items, listings.aConfirmer, masqueesSurEtagere]);
   const presentesAnnonceIds = useMemo(() => new Set(annoncesPresentes.map(it => String(it.id))), [annoncesPresentes]);
   // Clé (id d'annonce) d'une entrée numéro, par référence — pour le verrouillage.
   // ⚠️ UNE SEULE RÈGLE D'IDENTITÉ (§11) : « quelle annonce est cette vente ? ».
@@ -31450,7 +31496,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // 22 oct. : une annonce MASQUÉE par Vinted est une paire sur l'étagère — elle
     // PORTE son numéro (`<masquees-regle>`). Marquée, pour le dire autrement.
     const dejaAnn = new Set([...(listings.items || []), ...(listings.aConfirmer || [])].map(it => String(it.id)));
-    for (const it of (listings.masquees || [])) {
+    // (23 oct.) Sauf une masquée DÉCLARÉE partie (`masqueesSurEtagere`).
+    for (const it of masqueesSurEtagere) {
       if (dejaAnn.has(String(it.id))) continue;
       const e = numeros[it.id];
       if (e && e.numero != null) add(e.numero, { type: 'annonce', titre: it.title, id: it.id, masquee: true, lu: Number(it._vrmVueMasqueeLe) || null });
@@ -31476,7 +31523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, listings.aConfirmer, listings.masquees, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
+  }, [listings.items, listings.aConfirmer, masqueesSurEtagere, listings.lues, sales.items, numeros, saleOv, garageGrid, hiddenSales, hiddenAccts, labelsCaptes, emailBords]);
 
   // Numéros OCCUPÉS par une paire réellement présente — jamais réattribuables.
   const numsOccupes = useMemo(() => {
@@ -31827,10 +31874,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // compte est fermé) → on les retire, comme celles d'un compte masqué à la main.
   // ⚠️ C'est CETTE liste que doivent utiliser la grille ET le bandeau de stats :
   // sinon le compteur annonce un nombre que la grille ne montre pas.
-  // Paires déclarées PERDUES (litige, ou annonce disparue qu'on retire du stock).
-  // ⚠️ Déclarée ICI et pas plus bas : `disparues` la lit pendant le rendu, et un
-  // useState déclaré après aurait planté l'app (variable pas encore initialisée).
-  const [pairsLost, setPairsLost] = useState(() => load('vinted_pairs_lost', {}));
+  // (`pairsLost` — paires déclarées PERDUES — est déclarée plus haut, à côté de
+  //  `listings` : les annonces masquées présentes la lisent pendant le rendu.)
 
   // ── ANNONCES DISPARUES SANS VENTE (compte masqué / annonce retirée) ───────
   // Vinted masque parfois un compte entier pendant plusieurs jours. Ses annonces
@@ -31858,11 +31903,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    code mort qu'un relecteur « rebranche » un jour en croyant réparer un
       //    oubli, et le rapprochement par ressemblance revient (§5).
     }
+    // (23 oct.) Une annonce MASQUÉE par Vinted n'a pas « disparu » : VRM sait où
+    // elle est (toujours chez lui, `<masquees-regle>`). Elle a SON bloc, avec
+    // « Elle n'est plus là » — la dire ici aussi, c'était deux voix contraires
+    // sur la même paire (« disparue — Retirer » et « présente, à vérifier »).
+    const masqueesIds = new Set((listings.masquees || []).map((it) => String(it.id)));
     const out = [];
     for (const k in numeros) {
       const e = numeros[k]; const raw = String((e && e.numero) || '').trim();
       if (!raw) continue;
       if (onlineIds.has(String(k))) continue;                       // toujours en ligne
+      if (masqueesIds.has(String(k))) continue;                     // masquée par Vinted : son bloc
+      if (annonceDeclareePartie(k, numeros, pairsLost)) continue;   // déclarée partie (par identité)
       if (!presentAcc.has(String((e && e.accountId) || ''))) continue; // compte pas rafraîchi
       if (soldManual.has(String(k))) continue;                      // marquée vendue à la main
       if (emailSoldIds.has(String(k))) continue;                    // vendue d'après les emails
@@ -31879,7 +31931,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, sales.items, numeros, saleOv, soldManual, emailSoldIds, pairsLost, venduesVinted]);
+  }, [listings.items, listings.masquees, sales.items, numeros, saleOv, soldManual, emailSoldIds, pairsLost, venduesVinted]);
 
   // Compte entièrement muet : il a des paires numérotées mais renvoie ZÉRO
   // annonce. C'est la signature d'un compte masqué par Vinted (ou fermé).
@@ -31982,9 +32034,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // panne de synchronisation : leur N° a pu être redonné (`PANNE_NUMEROS`).
   // 22 oct. : les paires MASQUÉES par Vinted sont sur l'étagère, numérotées
   // elles aussi pendant la panne — même filtre que la grille (`garderAnnonce`).
-  const annMasquees = useMemo(() => (listings.masquees || []).filter(garderAnnonce),
+  const annMasquees = useMemo(() => masqueesSurEtagere.filter(garderAnnonce),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [listings.masquees, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  [masqueesSurEtagere, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  // (23 oct.) TOUTES les masquées numérotées, chacune avec son geste : celles
+  // encore comptées sur l'étagère (« Elle n'est plus là ») et celles qu'il a
+  // déclarées parties (« Elle est encore là » répare une erreur). Sans ce bloc,
+  // une masquée qui n'est ni en double ni « à vérifier » n'avait AUCUN chemin
+  // pour être déclarée partie (compte sans annonce en ligne : pas même
+  // « disparues »).
+  const masqueesBloc = useMemo(() => {
+    const surEtagere = new Set(masqueesSurEtagere.map((it) => String(it.id)));
+    const avecNum = (listings.masquees || []).filter(garderAnnonce).filter((it) => String((numeros[it.id] || {}).numero || '').trim());
+    const parties = avecNum.filter((it) => !surEtagere.has(String(it.id)));
+    // Une déclaration de moins de 7 jours compte encore parmi les signalements :
+    // « Elle est encore là » reste à portée la semaine qui suit. Après, le bloc
+    // ne réclame plus rien (pas d'alerte permanente pour une paire partie, §7).
+    const ilYa7j = Date.now() - 7 * 86400e3;
+    const recentes = parties.filter((it) => Object.keys(pairsLost || {}).some((k) => {
+      const e = pairsLost[k]; if (!e || !annonceDeclareePartie(it.id, numeros, { [k]: e })) return false;
+      const t = Date.parse(e.at || ''); return isFinite(t) && t > ilYa7j;
+    })).length;
+    return { presentes: avecNum.filter((it) => surEtagere.has(String(it.id))), parties, recentes };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.masquees, masqueesSurEtagere, numeros, pairsLost, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
   const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer, ...annMasquees].filter((it) => ficheAVerifier(numeros[it.id])),
   [annBase, annAConfirmer, annMasquees, numeros]);
   // Les paires qui ont reçu un numéro NEUF (doublon réglé) et dont le carton
@@ -32092,6 +32165,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (faits.length) toast(`Numéros en double réglés : ${faits.join(' · ')} — écris le nouveau sur le carton`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudReady, conflitsNum, listings.items, listings.loading, listings.incomplet, sales.items, sales.failedUids]);
+  // (23 oct.) Le bloc des paires MASQUÉES par Vinted : dans « Conseils &
+  // signalements », et sous l'écran vide quand aucune annonce n'est en ligne
+  // (sinon un vendeur dont TOUTES les annonces sont masquées n'avait aucun geste).
+  const blocMasquees = () => (masqueesBloc.presentes.length + masqueesBloc.parties.length) > 0 && (
+          <div data-masquees-bloc={masqueesBloc.presentes.length} style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'11px 13px'}}>
+            <button type="button" onClick={()=>setMasqOpen(v=>!v)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',textAlign:'left',border:'none',background:'transparent',padding:0,cursor:'pointer',fontFamily:'inherit'}}>
+              <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="eye" size={17}/></span>
+              <span style={{flex:1,minWidth:0}}>
+                <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{masqueesBloc.presentes.length > 0
+                  ? `${masqueesBloc.presentes.length} paire${masqueesBloc.presentes.length>1?'s':''} masquée${masqueesBloc.presentes.length>1?'s':''} par Vinted, comptée${masqueesBloc.presentes.length>1?'s':''} sur ton étagère`
+                  : `${masqueesBloc.parties.length} paire${masqueesBloc.parties.length>1?'s':''} masquée${masqueesBloc.parties.length>1?'s':''} par Vinted, déclarée${masqueesBloc.parties.length>1?'s':''} partie${masqueesBloc.parties.length>1?'s':''}`}</span>
+                <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Plus en vente, mais leur numéro reste protégé. Si l'une n'est plus chez toi, dis-le.</span>
+              </span>
+              <span style={{color:C.muted,fontSize:17}}>{masqOpen?'▾':'▸'}</span>
+            </button>
+            {masqOpen && (
+              <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
+                {[...masqueesBloc.presentes.map(it=>({it,partie:false})), ...masqueesBloc.parties.map(it=>({it,partie:true}))].slice(0,60).map(({it,partie})=>(
+                  <div key={it.id} data-masquee-ligne={String(it.id)} data-masquee-partie-faite={partie?'1':undefined} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
+                    <div style={{width:34,height:34,borderRadius:8,background:C.border,flexShrink:0,overflow:'hidden'}}>
+                      {it.photo && <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{(numeros[it.id]||{}).numero} · {it.title||'—'}</div>
+                      <div style={{fontSize:10.5,color:C.muted,marginTop:1}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/>{partie?' · déclarée partie':''}</div>
+                    </div>
+                    {partie
+                      ? <button type="button" data-masquee-encore={String(it.id)} onClick={()=>masqueeEncoreLa(it)} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Elle est encore là</button>
+                      : <button type="button" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Elle n'est plus là</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+  );
   const marquerReattribueEcrit = (it) => {
     const f = numeros[String(it.id)] || {};
     if (!f.reattribue) return;
@@ -32105,6 +32213,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}</span>
           <button type="button" onClick={() => marquerReattribueEcrit(it)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 8, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est écrit</button>
+          {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={() => masqueePlusLa(it)} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Elle n'est plus là</button> : null}
         </div>); })}
     </div>);
   const confirmerCarton = async (it) => {
@@ -32261,8 +32370,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // immédiatement). Compte ce qui vit derrière le dépliant « signalements » —
   // le numéro en double, lui, s'affiche seul et n'est pas compté ici.
   const nAutresSignalements = useMemo(
-    () => comptesMuets.length + (disparues.length ? 1 : 0) + blockedList.length,
-    [comptesMuets, disparues, blockedList]);
+    () => comptesMuets.length + (disparues.length ? 1 : 0) + ((masqueesBloc.presentes.length || masqueesBloc.recentes) ? 1 : 0) + blockedList.length,
+    [comptesMuets, disparues, masqueesBloc, blockedList]);
   // Stats d'en-tête : nb d'annonces + valeur totale en ligne + engagement dispo.
   // ── LITIGES / RETOURS : que devient le NUMÉRO de la paire ? ────────────────
   // Statuts réellement renvoyés par Vinted dans ce cas : « Retour initié »,
@@ -32302,6 +32411,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const unmarkPairLost = (num) => {
     const n = String(num || '').trim(); if (!n) return;
     setPairsLost(prev => { const u = { ...prev }; delete u[n]; save('vinted_pairs_lost', u); return u; });
+  };
+  // ── « ELLE N'EST PLUS LÀ » (23 oct., relecture) ─────────────────────────
+  // Une déclaration de paire partie porte TOUJOURS l'identifiant de l'annonce
+  // (`annonceDeclareePartie` juge par lui), et se range sous le numéro nu, ou
+  // sous `N°@id` quand une autre fiche porte ce numéro (`cleDeclarationPartie` :
+  // l'autre paire, qui le garde, ne doit pas sortir des files Leboncoin/eBay).
+  const declarerPartie = (id, numero, title) => {
+    const cle0 = cleDeclarationPartie(numero, id, numeros); if (!cle0) return;
+    setPairsLost(prev => {
+      // Une entrée déjà là pour une AUTRE annonce n'est jamais écrasée.
+      const cle = prev[cle0] && prev[cle0].id != null && String(prev[cle0].id) !== String(id) ? `${String(numero).trim()}@${id}` : cle0;
+      const u = { ...prev, [cle]: { ...(prev[cle] || {}), at: new Date().toISOString(), title: title || '', id: String(id) } }; save('vinted_pairs_lost', u); return u;
+    });
+  };
+  // Le geste, sur une ligne qui nomme une annonce MASQUÉE par Vinted. Confirmé :
+  // si la paire est en fait sur l'étagère, l'autre paire au même N° le garde.
+  const masqueePlusLa = async (it) => {
+    const id = String(it.id), f = numeros[id] || {}, n = String(f.numero || '').trim();
+    if (!n) return;
+    const autre = Object.keys(numeros).some((k) => k !== id && cleNum((numeros[k] || {}).numero) === cleNum(n));
+    const ok = await askConfirm({ title: `La paire N°${n} n'est plus chez toi ?`,
+      desc: `« ${String(it.title || f.title || '').slice(0, 60)} » — Vinted l'a masquée, et VRM la comptait encore sur ton étagère.\n\n`
+        + `• Elle ne comptera plus comme présente. Son numéro reste pris : il ne sera jamais redonné.\n`
+        + (autre ? `• L'autre paire au N°${n} le garde : pas de numéro neuf pour elle.\n` : '')
+        + `\nÀ ne faire que si cette paire n'est plus sur ton étagère.`,
+      ok: "Elle n'est plus là" });
+    if (!ok) return;
+    declarerPartie(id, n, f.title || it.title);
+    toast(`N°${n} : plus comptée sur ton étagère`);
+  };
+  // L'erreur se répare : « Elle est encore là » retire la déclaration de CETTE
+  // annonce (et une entrée ancienne sans identifiant qui ne visait qu'elle).
+  const masqueeEncoreLa = (it) => {
+    const id = String(it.id), n = cleNum((numeros[id] || {}).numero);
+    setPairsLost(prev => {
+      const u = { ...prev };
+      for (const k of Object.keys(u)) {
+        const e = u[k];
+        if (e && e.id != null ? String(e.id) === id : (n && cleNum(k) === n && annonceDeclareePartie(id, numeros, { [k]: e }))) delete u[k];
+      }
+      save('vinted_pairs_lost', u); return u;
+    });
+    toast('Elle compte de nouveau sur ton étagère');
   };
 
   // Retours que tu as PHYSIQUEMENT récupérés (coché à la main : Vinted ne dit
@@ -32523,6 +32675,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!numeroReprenable(e.numero)) continue;
       if (presentesAnnonceIds.has(String(k))) continue;          // en ligne OU à confirmer : pas orpheline
       if (pairsLost[String(e.numero)]) continue;
+      if (annonceDeclareePartie(k, numeros, pairsLost)) continue;   // (23 oct.) déclarée partie, clé `N°@id`
       orphans.push({ key: k, e, vendue: pairesVendues.has(String(k)) });
     }
     if (!orphans.length) return [];
@@ -39024,6 +39177,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       → N°{nextNumero}
                     </button>
+                    {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Elle n'est plus là</button> : null}
                   </div>
                 ))}
               </div>
@@ -39096,6 +39250,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
             action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:10}}>Ouvrir Vinted ↗</a>}/>
         )}
+        {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {blocAEcrire()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '4px 12px 10px', marginBottom: 12 }}>
@@ -39111,7 +39266,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
             {aVerifierCarton.map((it) => (
-              <LigneVerifCarton key={it.id} it={it} fiche={numeros[it.id] || {}} preuve={ebayVerif && ebayVerif.preuves ? ebayVerif.preuves[String(it.id)] : ''}
+              <LigneVerifCarton key={it.id} it={it} fiche={numeros[it.id] || {}} onPlusLa={masqueePlusLa} preuve={ebayVerif && ebayVerif.preuves ? ebayVerif.preuves[String(it.id)] : ''}
                 onConfirmer={confirmerCarton} onCorriger={corrigerCarton}/>
             ))}
           </details>
@@ -39252,7 +39407,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? 'rangée au stock' : 'pas au stock'}</div>
                     </div>
                     <button type="button" title="La paire n'est plus à vendre : on libère son numéro pour une autre paire."
-                      onClick={()=>{ setPairsLost(prev=>{ const u={...prev,[d.numero]:{ at:new Date().toISOString(), title:d.e.title||'' }}; save('vinted_pairs_lost',u); return u; }); toast(`N°${d.numero} retirée du stock`); }}
+                      onClick={()=>{ declarerPartie(d.id, d.numero, d.e.title||''); toast(`N°${d.numero} retirée du stock`); }}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       Retirer
                     </button>
@@ -39267,6 +39422,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           );
         })()}
+        {blocMasquees()}
         {/* Compte bloqué par Vinted : détecté à la synchro (401/403). Ses annonces
             sont retirées automatiquement — on te dit lequel et tu peux le retirer. */}
         {blockedList.length>0 && (
@@ -40318,6 +40474,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div key={c.numero} data-conflit-num={c.numero} style={{marginTop:8,fontSize:11.5,color:C.text}}>
                 <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
                   <span key={i} data-conflit-porteur={p.masquee?'masquee':p.type}>{i>0?' · ':''}{p.type==='annonce'?(p.masquee?'masquée par Vinted, toujours chez toi':'en ligne'):p.type==='vente'?'à expédier':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                ))}
+                {c.porteurs.filter(p=>p.type==='annonce'&&p.masquee).map((p,_i,l)=>(
+                  <div key={'m'+p.id} style={{marginTop:4}}>
+                    <button type="button" data-masquee-partie={String(p.id)} onClick={()=>masqueePlusLa({ id:p.id, title:p.titre })} style={{border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:8,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer'}}>{l.length>1?`« ${String(p.titre||'').slice(0,24)} » n'est plus là`:"La masquée n'est plus là"}</button>
+                  </div>
                 ))}
                 {item && <div data-conflit-fautive={String(item.id)} style={{marginTop:4,lineHeight:1.45}}>
                   La panne du 18 octobre a redonné ce numéro à « {String(item.title||'').slice(0,40)} », alors qu'il était déjà sur {autres.map(nomPorteur).join(' et ')}.{' '}
@@ -44468,7 +44629,7 @@ function LeboncoinScreen() {
 //    (api/_lib/push.js). Ce n'est donc pas un filtre d'affichage : la
 //    notification n'est pas envoyée du tout.
 // Une ligne de « Numéros à vérifier sur tes cartons » (écran Annonces).
-function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
+function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa }) {
   const [v, setV] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const agir = async (f) => { if (occupe) return; setOccupe(true); try { await f(); } finally { setOccupe(false); } };
@@ -44491,6 +44652,7 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
         <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 8, border: 'none', background: C.text, color: C.card, fontSize: 12.5, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>
+        {it._vrmMasquee && onPlusLa ? <button type="button" data-masquee-partie={String(it.id)} disabled={occupe} onClick={() => agir(() => onPlusLa(it))} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Elle n'est plus là</button> : null}
       </div>
     </div>
   );
@@ -48440,8 +48602,10 @@ function AppCoeur() {
       for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
       // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
       const supp=await lireSupprimeesTous();
+      // (23 oct.) Sauf celles déclarées parties (« Elle n'est plus là ») : la même règle que l'écran Annonces.
+      const fichesM=load('vinted_annonce_numeros',{})||{}, perduesM=load('vinted_pairs_lost',{})||{};
       for(const r of lstRows){ const k=/^harvest_(\d+)_listings$/.exec(String((r&&r.id)||'')); const res=k?lu.parCompte.get(k[1]):null; if(!res) continue;
-        for(const it of masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r))) masquees.add(String(it.id)); }
+        for(const it of masqueesPresentes(masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r)), fichesM, perduesM)) masquees.add(String(it.id)); }
     }catch(_){ enLigne=null; aConfirmer=null; masquees=null; } }
     let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(o); } } } }
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;

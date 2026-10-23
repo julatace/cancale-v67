@@ -257,9 +257,49 @@ qu'aucune règle n'en désigne une.
   règle « annulée avant l'envoi » disparaît, prouvé). **Non mesuré** : le rendu
   sur sa vraie base (aucune fixture ici) ; une masquée vendue hors Vinted fait
   renuméroter l'autre pour rien (un carton à réécrire, jamais deux paires sous
-  un N°) — « elle n'est plus là » la règle. Les annonces « disparues » d'une
-  lecture publique (`_vrmAbsente` : supprimées, vendues OU masquées après la
-  lecture du dressing) ne sont PAS comptées : rien ne dit qu'elles sont masquées.
+  un N°) — le geste « Elle n'est plus là » (ci-dessous) la règle. Les annonces
+  « disparues » d'une lecture publique (`_vrmAbsente` : supprimées, vendues OU
+  masquées après la lecture du dressing) ne sont PAS comptées : rien ne dit
+  qu'elles sont masquées.
+  ⚠️⚠️ **RELECTURE (22-23 octobre) — DEUX DÉFAUTS DE CE CORRECTIF, REPRODUITS,
+  CORRIGÉS.** (1) Une masquée DÉCLARÉE partie (« Retirer » des annonces
+  disparues, `vinted_pairs_lost`) redevenait « toujours chez toi » : `porteursNum`,
+  `annoncesPresentes`, « à vérifier » et `vinted_nums_physiques` ne lisaient pas
+  `pairsLost` — un numéro brûlé et un carton à réécrire pour rien (reproduit :
+  N°51 masquée déclarée partie ⇒ la paire en ligne passait N°53). (2) Le geste
+  « elle n'est plus là » que ce paragraphe nommait **n'existait pas** (0
+  occurrence dans le build) : une masquée sans doublon, ou d'un compte sans
+  annonce en ligne, n'avait aucun chemin. ⇒ Dans `<masquees-regle>` :
+  `annonceDeclareePartie` (IDENTITÉ d'abord : une entrée qui porte `id` ne vise
+  que cette annonce ; une entrée ANCIENNE, numéro seul, ne vaut que si AUCUNE
+  autre fiche ne porte ce N° — sinon gardée présente, le sens sûr),
+  `cleDeclarationPartie` (clé nue quand le N° est à elle seule, sinon `N°@id` :
+  les files Leboncoin/eBay et les retours lisent `vinted_pairs_lost` PAR NUMÉRO,
+  la clé nue en sortirait l'AUTRE paire, qui garde ce N°) et `masqueesPresentes`.
+  `masqueesSurEtagere` (un seul endroit, §11) alimente `annoncesPresentes`,
+  `porteursNum`, « à vérifier » et la recherche ; « Retirer » range désormais
+  l'identifiant ; les masquées sortent de « disparues sans vente » (deux voix
+  contraires sur la même paire). Le geste **« Elle n'est plus là »**, confirmé
+  (il dit que l'autre paire au même N° le garde), est sur la ligne « à vérifier »,
+  le bloc des doublons d'Annonces, le bloc rouge de Colis, « à écrire », et dans
+  un bloc **« N paires masquées par Vinted, comptées sur ton étagère »**
+  (Annonces → Stock et ajustements → Conseils & signalements ; sous « Aucune
+  annonce en ligne » quand tout est masqué), qui garde aussi les déclarées
+  parties avec **« Elle est encore là »** (compté parmi les signalements 7 jours
+  après la déclaration, pas au-delà). Mesuré (lecture seule) :
+  `vinted_pairs_lost` de Julien ne porte que des numéros B (B23…B540) — aucune
+  entrée ancienne ambiguë sur 15, 39, 51, 52, 59, 73. **Tranché** : le cas
+  « entrée ancienne sans identifiant + deux fiches au même N° » (le R3 du
+  relecteur) garde la masquée présente et renumérote l'autre — on ne devine pas
+  laquelle est partie. Preuves : `numeros-doublons.cjs` I/J/J2/K/K2/L (**20
+  rouges** sur fcc80cb, tout vert après ; règle débranchée, `masqueesSurEtagere`
+  = toutes les masquées ⇒ **11 rouges**) ; `audit-masquees-numeros.cjs` F/G
+  (23 contrôles, 2 rouges sur fcc80cb, 6 mutations sur 6 dont `sans_identite`,
+  `ancienne_sans_garde`, `cle_nue`) ; `audit-supprimees.cjs` servait une forme
+  que le code ne lit plus (§6.3 : `dressingEnLigne` appelle `masqueesDuCompte`,
+  absent du `vm` ⇒ l'écran rendait `[]`, 3 rouges depuis fcc80cb) — il charge le
+  bloc. **Non mesuré** : le rendu sur sa vraie base ; la mutation `filelbc`
+  d'`audit-supprimees` a une ancre périmée, déjà sur `main`.
 
 ### Les chiffres
 - **Le chiffre faux est la porte pour le corriger.** « Coût d'achat · 1/184

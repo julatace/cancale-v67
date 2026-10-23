@@ -15,6 +15,12 @@
 //   · masquée numérotée la première face à une annonce en ligne numérotée après
 //     ⇒ la règle du 20 octobre déplace l'annonce en ligne (pas la masquée) ;
 //   · la recherche « Tout sur le N° » voit les deux paires et dit « en double ».
+//   · (23 oct., relecture) une masquée DÉCLARÉE partie (`vinted_pairs_lost`)
+//     n'est plus présente : par IDENTITÉ (entrée qui porte l'id d'annonce), ou
+//     par une entrée ancienne (numéro seul) quand AUCUNE autre fiche ne porte ce
+//     N° — sinon gardée (sens sûr). La clé d'une déclaration est le numéro nu,
+//     ou `N°@id` quand une autre fiche porte ce N° (l'autre paire ne sort pas
+//     des files Leboncoin/eBay).
 // `--prouve` réaffaiblit la règle de trois façons : chacune doit passer au ROUGE.
 // Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie()`.
 const fs = require('fs'), path = require('path'), os = require('os');
@@ -54,6 +60,12 @@ const MUTATIONS = {
   suppression_ignoree: { app: (s) => s.replace('masqueeSurVinted(it) && !supprimeeApres(suppIds, it.id, capDressing)', 'masqueeSurVinted(it)') },
   // La recherche « Tout sur le N° » ne la compte pas parmi les porteurs.
   recherche_sans_masquee: { rech: (s) => s.replace("|| a.etat === 'masquee') porteurs.push", ') porteurs.push') },
+  // (23 oct.) L'identifiant de la déclaration n'est plus lu : seule la clé compte.
+  sans_identite: { app: (s) => s.replace("for (const k in perdues) { const e = perdues[k]; if (e && e.id != null && String(e.id) === moi) return true; }", '') },
+  // Une entrée ANCIENNE vaut même quand une autre fiche porte ce N° (on devine laquelle est partie).
+  ancienne_sans_garde: { app: (s) => s.replace("for (const autre in (fiches || {})) if (autre !== moi && cleNum((fiches[autre] || {}).numero) === n) return false;", '') },
+  // La clé nue toujours : l'AUTRE paire au même N° sortirait des files Leboncoin/eBay.
+  cle_nue: { app: (s) => s.replace('return autre ? `${brut}@${moi}` : brut;', 'return brut;') },
 };
 
 async function charger(srcRech) {
@@ -79,13 +91,16 @@ async function lancer(mut) {
     N = new Function(code + '\nreturn { cleNum, conflitsDeNumeros, doublonsAReattribuer };')();
   });
   await essaie('la règle des annonces masquées existe (<masquees-regle>)', async () => {
-    const code = [bloc(app, 'supprimees-regle'), bloc(app, 'enligne-regle'), bloc(app, 'masquees-regle')].join('\n');
+    const code = [extraire(app, 'cleNum'), bloc(app, 'supprimees-regle'), bloc(app, 'enligne-regle'), bloc(app, 'masquees-regle')].join('\n');
     // eslint-disable-next-line no-new-func
-    R = new Function(code + '\nreturn { enLigneDuCompte, masqueesDuCompte };')();
+    R = new Function(code + '\nreturn { enLigneDuCompte, masqueesDuCompte, '
+      + "annonceDeclareePartie: typeof annonceDeclareePartie === 'function' ? annonceDeclareePartie : null, "
+      + "cleDeclarationPartie: typeof cleDeclarationPartie === 'function' ? cleDeclarationPartie : null, "
+      + "masqueesPresentes: typeof masqueesPresentes === 'function' ? masqueesPresentes : null };")();
     dit(true, 'la règle des annonces masquées existe (<masquees-regle>)');
   });
   if (!N) return;
-  R = R ? Object.assign({}, N, R) : Object.assign({}, N, { enLigneDuCompte: null, masqueesDuCompte: null });
+  R = R ? Object.assign({}, N, R) : Object.assign({}, N, { enLigneDuCompte: null, masqueesDuCompte: null, annonceDeclareePartie: null, cleDeclarationPartie: null, masqueesPresentes: null });
   const ids = (l) => l.map((x) => String(x.id)).sort().join(',');
 
   if (R.masqueesDuCompte) await essaie('A', async () => {
@@ -127,6 +142,28 @@ async function lancer(mut) {
     dit(c.length === 1, 'deux paires présentes sous le N°51 : un doublon', String(c.length));
     const a = R.doublonsAReattribuer(c, fiches);
     dit(a.length === 1 && a[0].id === '10339428900' && a[0].ancien === '51', 'la plus ancienne (la masquée) garde, l\'annonce en ligne du 18 change', JSON.stringify(a));
+  });
+  await essaie('F', async () => {
+    console.log('\n── F. (23 oct.) Une masquée DÉCLARÉE partie n\'est plus présente');
+    dit(typeof R.annonceDeclareePartie === 'function' && typeof R.masqueesPresentes === 'function', 'la règle « déclarée partie » existe (<masquees-regle>)');
+    if (!R.annonceDeclareePartie || !R.masqueesPresentes) return;
+    const fiches = { m15: { numero: '15' }, m51: { numero: '51' }, e51: { numero: '51' }, m73: { numero: '73' }, e73: { numero: '73' } };
+    const ms = [{ id: 'm15' }, { id: 'm51' }, { id: 'm73' }];
+    const garde = (perdues) => R.masqueesPresentes(ms, fiches, perdues).map((x) => x.id).sort().join(',');
+    dit(garde({}) === 'm15,m51,m73' && garde(null) === 'm15,m51,m73', 'rien de déclaré (ou pas su) : toutes présentes', garde({}));
+    dit(garde({ 15: { at: 'x' } }) === 'm51,m73', 'entrée ANCIENNE, N° unique (« Retirer » d\'avant) : la masquée part', garde({ 15: { at: 'x' } }));
+    dit(garde({ '51@m51': { id: 'm51' } }) === 'm15,m73', 'entrée qui porte l\'identifiant : la masquée part (doublon)', garde({ '51@m51': { id: 'm51' } }));
+    dit(garde({ 51: { id: 'm51' } }) === 'm15,m73', 'l\'identifiant suffit, quelle que soit la clé', garde({ 51: { id: 'm51' } }));
+    dit(garde({ 73: { at: 'x' } }) === 'm15,m51,m73', 'entrée ANCIENNE sans identifiant, deux fiches au N°73 : on ne devine pas, elle reste', garde({ 73: { at: 'x' } }));
+    dit(garde({ '51@e51': { id: 'e51' } }) === 'm15,m51,m73', 'la déclaration d\'une AUTRE annonce ne la retire pas', garde({ '51@e51': { id: 'e51' } }));
+    dit(R.annonceDeclareePartie('m15', fiches, { 15: { at: 'x' } }) === true && R.annonceDeclareePartie('e51', fiches, { '51@m51': { id: 'm51' } }) === false, 'jugement par annonce', '');
+  });
+  await essaie('G', async () => {
+    console.log('\n── G. (23 oct.) La clé d\'une déclaration ne sort pas l\'AUTRE paire des files');
+    if (!R.cleDeclarationPartie) { dit(false, 'cleDeclarationPartie existe'); return; }
+    const fiches = { m15: { numero: '15' }, m51: { numero: '51' }, e51: { numero: '051' } };
+    dit(R.cleDeclarationPartie('15', 'm15', fiches) === '15', 'N° porté par elle seule : la clé nue (lue par les files)', R.cleDeclarationPartie('15', 'm15', fiches));
+    dit(R.cleDeclarationPartie('51', 'm51', fiches) === '51@m51', 'N° porté aussi par une autre fiche (même clé de numéro) : `51@m51`', R.cleDeclarationPartie('51', 'm51', fiches));
   });
   await essaie('E', async () => {
     console.log('\n── E. « Tout sur le N° » voit la masquée');
