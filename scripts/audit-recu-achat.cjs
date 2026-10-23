@@ -28,6 +28,11 @@
 //      « Commande mise à jour », « Confirmation requise », « Retourne ta
 //      commande » ne créent AUCUNE ligne `email_achat_*` ; un vrai reçu, une.
 //      (Déjà vrai avant ce chantier — mesuré : aucune après le 3 août.)
+//      Et (revue du 23 oct.) ce que la route range comme achat — « Merci pour
+//      ton achat », « Tu as acheté », sans « Montant payé » — l'app le LISTE
+//      (§11), et la feuille en montre le texte ;
+//   7. (revue du 23 oct.) une ligne de frais « Transaction … » ne finit pas le
+//      bloc ; la carte « •••• 4242 » et l'heure « 10 h 47 » sont insécables.
 // `--mutation=…` réaffaiblit la règle : chaque mutation doit faire passer au
 // moins un contrôle au rouge.
 //   connus · somme · signe · nonrecu · jete · txtexte · mode
