@@ -147,8 +147,14 @@ const { demasquerRelais } = await import('file://' + path.resolve(__dirname, '..
     const decl = {};
     for (const n of ast.program.body) if (n.type === 'VariableDeclaration') for (const d of n.declarations) if (d.id && ['codeRetrait', 'reclassifyTrack'].includes(d.id.name)) decl[d.id.name] = 'const ' + src.slice(d.start, d.end) + ';';
     const etat = await import('file://' + path.join(R, 'api/_lib/etat-colis-email.js'));
+    // (23 oct.) `reclassifyTrack` relit aussi le lieu et la date limite des
+    // lignes gardées par la règle partagée (api/_lib/retrait-colis.js, §11) :
+    // le banc la lui donne telle quelle (absente sur un arbre d'avant ⇒ rien).
+    let retrait = {};
+    try { retrait = await import('file://' + path.join(R, 'api/_lib/retrait-colis.js')); } catch (_) { retrait = {}; }
     const ctx = { etatColisDepuisTexte: etat.etatColisDepuisTexte, normaliserSuivi: etat.normaliserSuivi,
-      codeRetraitTournure: (t) => (modRegle && modRegle.codeRetraitTournure ? modRegle.codeRetraitTournure(t) : '') };
+      codeRetraitTournure: (t) => (modRegle && modRegle.codeRetraitTournure ? modRegle.codeRetraitTournure(t) : ''),
+      lieuDepuisExtrait: retrait.lieuDepuisExtrait, limiteRetraitDepuisTexte: retrait.limiteRetraitDepuisTexte, LIEU_AU_FUTUR: retrait.LIEU_AU_FUTUR };
     vm.createContext(ctx);
     vm.runInContext(`${decl.codeRetrait}\n${decl.reclassifyTrack}\nthis.reclassifyTrack=reclassifyTrack;this.codeRetrait=codeRetrait;`, ctx);
     const ligne = { carrier: 'chronopost', suivi: '09440000000001', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: 'Votre colis VINTED est arrivé en relais Pickup', code: null,
