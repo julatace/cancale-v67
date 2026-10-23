@@ -340,3 +340,19 @@
 @media(min-width:1024px){.vrm-day-lower>.vrm-day-recent{grid-row:1 / span 2;}.vrm-day-lower>.vrm-day-performance{grid-column:2;grid-row:1;}.vrm-day-lower>.vrm-day-stock{grid-column:2;grid-row:2;}}
 @media(max-width:767px){.vrm-repartition-visuel{grid-template-columns:74px minmax(0,1fr);gap:10px;}.vrm-repartition-anneau{width:74px;}.vrm-repartition-visuel [data-repart-ligne]{grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important;}.vrm-repartition-visuel [data-repart-ligne]>div{display:none;}}
 .vrm-finance-page .vrm-day-help-toggle{font-size:13px;}
+.vrm-analyses-ventes{border-top:1px solid var(--vrm-line);padding-top:14px;margin-top:4px;}
+.vrm-analyses-ventes h3{font-size:15px;margin:0;}
+.vrm-analyses-perimetre{font-size:11px;line-height:1.5;color:var(--vrm-muted);margin:5px 0 12px;}
+.vrm-analyses-duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.vrm-analyse-mini{min-width:0;}
+.vrm-analyse-mini+div{border-left:1px solid var(--vrm-line);padding-left:14px;}
+.vrm-analyse-mini h4{font-size:12px;line-height:1.5;margin:0 0 10px;}
+.vrm-analyse-mini .vrm-repartition-anneau{margin:0 auto 12px;width:82px;}
+.vrm-analyse-mini ul{list-style:none;margin:0;padding:0;}
+.vrm-analyse-mini li{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin:6px 0;font-size:11px;}
+.vrm-analyse-mini li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vrm-analyse-mini li b{white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums;}
+.vrm-analyse-mini small,.vrm-analyse-mini p{font-size:11px;line-height:1.5;color:var(--vrm-muted);}
+.vrm-analyse-mini small{display:block;margin-top:10px;}
+.vrm-day-performance .vrm-analyses-ventes{border-top:0;margin-top:0;padding-top:0;}
+.vrm-day-performance .vrm-performance-chiffres{border-top:1px solid var(--vrm-line);margin-top:14px;padding-bottom:0;}
