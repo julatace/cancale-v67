@@ -63,6 +63,15 @@ const ROWS = [
   ligne('email_track_vinted_VGSBANC000001', TRACK_VG),
   ligne('panel_colis_relais', {}),
 ];
+// (revue du 23 oct., défauts 9 et 13) Deux colis « à vérifier » de plus : un
+// Mondial Relay SANS date limite arrivé il y a 10 jours (plus que la garde de
+// Mondial Relay, 5 j) et un colis dont la date limite écrite était hier.
+const ROWS_D = ROWS.concat([
+  ligne('email_track_mondialrelay_MR555000111', { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '5555', lieu: 'Relais Vieux Cancale', carrier: 'mondialrelay',
+    suivi: 'MR555000111', artTitle: '', receivedAt: iso(Date.now() - 10 * 864e5), limite: null }),
+  ligne('email_track_chronopost_XW666000111FR', { status: 'available', statusLabel: 'Arrivé au point de retrait', code: '6666', lieu: 'Presse Hier Cancale', carrier: 'chronopost',
+    suivi: 'XW666000111FR', artTitle: '', receivedAt: iso(Date.now() - 3 * 864e5), limite: jour(-1) }),
+]);
 
 const srv = http.createServer((q, r) => {
   let f = decodeURIComponent(q.url.split('?')[0]); if (f === '/' || !path.extname(f)) f = '/index.html';
@@ -91,7 +100,7 @@ async function brancher(ctx, etat) {
     if (/\/rest\/v1\/rpc\//.test(u)) return json(route, null);
     if (!/\/rest\/v1\/app_data/.test(u)) return json(route, [], { 'content-range': '*/0' });
     if (etat.suiviKO && /email_track/.test(decodeURIComponent(u))) return route.fulfill({ status: 502, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>502</html>' });
-    const r = servir(ROWS, u, h);
+    const r = servir(etat.rows || ROWS, u, h);
     return json(route, r.body, { 'content-range': r.range });
   });
   await ctx.route(/supabase\.co\/auth\/v1\//, (route) => {
@@ -208,6 +217,38 @@ async function main() {
         dit(r.vue === 'sans-photo' && r.lignes === 1, 'hors ligne : « aucune copie gardée », dit une fois', `vue ${r.vue} · ${r.lignes} ligne(s)`);
         dit(!/Nike Air Max 1 banc|4321|C49341/.test(r.t), 'aucune donnée partielle présentée comme ta journée');
         dit(!/Tout est à jour/i.test(r.t), 'jamais « Tout est à jour » hors ligne');
+        await ctx.close();
+      });
+
+      // ── D. (revue du 23 oct.) « à retirer » hors ligne = la tuile en ligne ──
+      console.log(`\n── ${T} · D. les colis « à vérifier » ne comptent pas dans « à retirer » hors ligne`);
+      await essaie(`${T} D`, async () => {
+        const ctx = await nav.newContext(opts);
+        await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
+        const etat = { hors: false, rows: ROWS_D };
+        await brancher(ctx, etat);
+        await ctx.addInitScript(([s, uid]) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', uid); } catch (_) {} }, [SESSION, UID_A]);
+        const pg = await ctx.newPage();
+        await ouvrirEnLigne(pg);
+        let photo = null;
+        for (let i = 0; i < 40 && !(photo = await photoDe(pg, UID_A)); i++) await pg.waitForTimeout(500);
+        await pg.waitForTimeout(1500);
+        const tuile = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); return t ? t.getAttribute('data-n') : null; });
+        etat.hors = true; await ctx.setOffline(true);
+        await pg.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+        await pg.waitForSelector('[data-hors-ligne]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(1000);
+        const r = await pg.evaluate(() => {
+          const ret = document.querySelector('[data-hl-retirer]'), av = document.querySelector('[data-hl-a-verifier]');
+          return { retirer: ret ? ret.getAttribute('data-hl-retirer') : null, aVerifier: av ? av.getAttribute('data-hl-a-verifier') : null,
+            raisons: [...document.querySelectorAll('[data-hl-raison]')].map((x) => ({ r: x.getAttribute('data-hl-raison'), t: x.innerText })), texte: document.body.innerText,
+            codes: ['5555', '6666'].filter((c) => !!document.querySelector(`[data-hl-code="${c}"]`)) };
+        });
+        dit(tuile === '2' && r.retirer === tuile, 'hors ligne, « À retirer » dit le MÊME nombre que la tuile en ligne (les colis « à vérifier » n\'y sont pas)', `en ligne ${tuile} · hors ligne ${r.retirer}`);
+        dit(r.aVerifier === '2' && r.codes.length === 2, 'les deux colis « à vérifier » ont leur bloc à part, avec leur code (peut-être encore au relais)', `bloc ${r.aVerifier} · codes ${r.codes.join(',')}`);
+        const tl = r.raisons.find((x) => x.r === 'trop_long'), dd = r.raisons.find((x) => x.r === 'delai_depasse');
+        dit(!!tl && /plus de 5 jours/.test(tl.t) && !!dd && /délai de retrait dépassé/.test(dd.t), 'chacun dit SA raison : « plus de 5 jours » (garde Mondial Relay, sans date limite) · « délai de retrait dépassé »', JSON.stringify(r.raisons.map((x) => x.r + ': ' + x.t.replace(/\n/g, ' ¦ ').slice(0, 90))));
+        dit(!/hors délai/i.test(r.texte), 'jamais « hors délai » sur un colis sans date limite (le mot n\'est plus écrit hors ligne)');
         await ctx.close();
       });
 

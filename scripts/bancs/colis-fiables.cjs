@@ -88,6 +88,27 @@ const ROWS = [
   track('email_track_chronopost_XW000000009TS', { carrier: 'chronopost', suivi: 'XW000000009TS', subject: 'Information sur votre colis XW000000009TS', receivedAt: j(0.1), account: 'compte_a', code: null, lieu: 'les prochains jours dans votre Relais Pickup', limite: null }),
 ];
 
+// ── REVUE DU 23 OCTOBRE : une autre base (valeurs INVENTÉES) ────────────────
+// · défaut 5 : un « disponible » dont la route n'a lu ni code, ni lieu, ni QR
+//   (seulement son n° de suivi) — il doit être montré, « code pas lu » ;
+// · défaut 10 : l'achat 9602 (compte_b, « à vérifier ») porte son code dans la
+//   conversation — il compte dans « N ont encore leur code » ;
+// · défaut 11 : compte_c relu il y a 3 jours, un colis à retirer — l'âge est dit
+//   par la ligne de fraîcheur, pas redit sous sa carte ;
+// · défaut 14 : un « disponible » de 83 jours (à vérifier) et 20 achats anciens
+//   finalisés — Ma journée ne lit pas leurs transactions.
+const ACCOUNTS_R = ACCOUNTS.concat([{ id: 3, vinted_user_id: '333', login: 'compte_c', domain: 'www.vinted.fr', updated_at: iso(NOW) }]);
+const VIEUX = Array.from({ length: 20 }, (_, i) => ({ transaction_id: 9700 + i, conversation_id: 7700 + i, title: `Ancien achat ${i}`, price: { amount: '20', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: j(40 + 2 * i) }));
+const ROWS_R = ROWS.map((r) => {
+  if (r.id === 'panel_colis_relais') return { ...r, data: { ...r.data, '9602': { code: 'C22222', lieu: 'Presse Banc, 2 Rue Exemple, 35000 Rennes', at: j(9.5), url: 'https://www.vinted.fr/inbox/7602' }, '9605': { code: 'C33333', lieu: 'Bar Banc, 3 Rue Exemple, 35000 Rennes', at: j(3), url: 'https://www.vinted.fr/inbox/7605' } } };
+  if (r.id === 'harvest_111_orders_purchased') return { ...r, data: { ...r.data, payload: { my_orders: ACHATS_A.concat(VIEUX) } } };
+  return r;
+}).concat([
+  { id: 'harvest_333_orders_purchased', data: { capturedAt: j(3), payload: { my_orders: [{ transaction_id: 9605, conversation_id: 7605, title: 'Adidas Samba taille 41', price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: j(4) }] } } },
+  track('email_track_mondialrelay_30000010', { carrier: 'mondialrelay', suivi: '30000010', subject: 'Votre colis 30000010 est disponible 📦', receivedAt: j(1), account: 'compte_a', code: null, lieu: null, limite: null }),
+  track('email_track_vinted_1790000000000011', { carrier: 'vinted', suivi: '1790000000000011', subject: 'Ton colis est arrivé à la consigne', receivedAt: j(83), account: 'compte_a', code: 'B00011', lieu: 'Consigne Banc, 11 Rue Exemple, 35000 Rennes', limite: null }),
+]);
+
 const SESSION = { access_token: 'session-colis-fiables', refresh_token: 'r', totp: [], expires_at: NOW + 30 * 86400000, user: { id: '11111111-1111-4111-8111-111111111111', email: 'colis@example.test', totp: [] } };
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -118,7 +139,11 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function preparer(b, vp, quand, sombre) {
+// Options de la revue du 23 oct. : `rows` (une autre base servie), `suivis`
+// ('ko' : la lecture des e-mails de suivi répond 503 ; un nombre : elle tarde
+// d'autant de ms), `journal` (tableau qui reçoit chaque URL lue).
+async function preparer(b, vp, quand, sombre, opts = {}) {
+  const ROWS_S = opts.rows || ROWS;
   const mobile = vp.width < 600;
   const ctx = await b.newContext({ viewport: vp, ...(mobile ? { isMobile: true, hasTouch: true } : {}), locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block' });
   await ctx.clock.install({ time: new Date(quand) });
@@ -131,16 +156,21 @@ async function preparer(b, vp, quand, sombre) {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const rep = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return rep([]);
+    if (opts.journal) opts.journal.push(u);
+    if (/id=like\.email_track_/.test(u)) {
+      if (opts.suivis === 'ko' || (opts.etat && opts.etat.suivis === 'ko')) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
+      if (Number.isFinite(opts.suivis)) return new Promise((res) => setTimeout(res, opts.suivis)).then(() => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ROWS_S.filter((r) => /^email_track_/.test(r.id)).map((r) => ({ ...r, updated_at: iso(NOW) }))) }));
+    }
     if (/select=owner/.test(u)) return rep([]);
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return rep(ACCOUNTS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return rep(opts.accounts || ACCOUNTS);
     if (/\/rest\/v1\/rpc\//.test(u)) return rep(null);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data/.test(sel) && !/^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(NOW), cap: r.data && r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return rep(ROWS.filter((r) => r.id === eq[1]).map(forme));
-    const ins = /id=in\.\(([^)]*)\)/.exec(u); if (ins) { const ids = ins[1].split(','); return rep(ROWS.filter((r) => ids.includes(r.id)).map(forme)); }
+    if (eq) return rep(ROWS_S.filter((r) => r.id === eq[1]).map(forme));
+    const ins = /id=in\.\(([^)]*)\)/.exec(u); if (ins) { const ids = ins[1].split(','); return rep(ROWS_S.filter((r) => ids.includes(r.id)).map(forme)); }
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return rep(ROWS.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return rep(ROWS_S.filter((r) => re.test(r.id)).map(forme)); }
     return rep([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(r.request().url().includes('mode=confidentialite') ? { ok: true, uid: SESSION.user.id } : { ok: true, pret: true, obligatoire: false, acces: true }) }));
@@ -212,7 +242,21 @@ async function main() {
         dit(r3 && r3.raison === 'delai_depasse' && !carte('09440000000003'), `${T} date limite écrite et passée ⇒ « délai dépassé », pas « à retirer » (arrivé il y a 4 jours seulement)`, r3 && r3.raison);
         const r4 = L.aVerif.find((x) => x.suivi === '1790000000000004');
         dit(r4 && r4.raison === 'trop_long' && /A90067/.test(r4.t), `${T} sans date limite et 11 jours au relais ⇒ « à vérifier », son code reste visible`, r4 && r4.raison);
-        dit(L.aVerif.some((x) => x.raison === 'trop_long' && /Salomon XT-6/.test(x.t) && /il y a 9 j/.test(x.t)), `${T} l'achat Vinted lu « déposé » il y a 9 j ⇒ « à vérifier », l'âge de la lecture est dit`);
+        // (revue du 23 oct., défaut 3) La garde de SON transporteur (Vinted Go : 6 j),
+        // plus « 7 jours » pour tous.
+        dit(r4 && /plus de 6 jours/.test(r4.t) && !/plus de 7 jours/.test(r4.t), `${T} … la raison dit la garde de Vinted Go (« plus de 6 jours »), pas « 7 jours » pour tous`, r4 && r4.t.replace(/\n/g, ' ¦ ').slice(0, 160));
+        // (revue du 23 oct., défaut 2) La publication relue par le widget porte, pour
+        // chaque colis compté, son transporteur et son IDENTITÉ (n° de suivi, ou
+        // compte + transaction) — jamais un code ni un lieu.
+        const pc = (L.publie && L.publie.colis) || [];
+        const id1 = pc.find((c) => c[3] === 'e:30000001'), idV = pc.find((c) => c[3] === 'v:111:9601');
+        dit(!!id1 && id1[2] === 'mondialrelay' && !!idV && pc.every((c) => typeof c[3] === 'string' && /^(e|v|k):/.test(c[3])), `${T} la publication porte l'identité et le transporteur de chaque colis (e:30000001 mondialrelay, v:111:9601)`, JSON.stringify(pc).slice(0, 220));
+        dit(!JSON.stringify(pc).includes('123456') && !/Vannes|Cancale/.test(JSON.stringify(pc)), `${T} … sans aucun code ni lieu`);
+        // (revue du 23 oct., défaut 11) L'âge de la lecture est dit UNE fois — par la
+        // ligne de fraîcheur qui nomme compte_b —, plus sous la ligne du colis.
+        const salo = L.aVerif.find((x) => x.raison === 'trop_long' && /Salomon XT-6/.test(x.t));
+        dit(!!salo, `${T} l'achat Vinted lu « déposé » il y a 9 j ⇒ « à vérifier »`);
+        dit(salo && !/il y a 9 j/.test(salo.t) && (L.texte.match(/il y a 9 j/g) || []).length === 1, `${T} … l'âge de la lecture (9 j) est dit UNE fois — par la ligne qui nomme compte_b —, pas sous chaque colis`, `×${(L.texte.match(/il y a 9 j/g) || []).length} · ligne : ${salo ? salo.t.replace(/\n/g, ' ¦ ').slice(0, 140) : 'absente'}`);
         dit(!/\bperdus?\b/i.test(L.texte), `${T} le mot « perdu » n'apparaît nulle part`);
         // ── repartis : par le transporteur, ou par la commande liée par IDENTITÉ
         dit(L.repartis.some((x) => x.suivi === '30000006'), `${T} « retourné à l'expéditeur » (écrit par le transporteur) ⇒ « reparti »`);
@@ -246,9 +290,91 @@ async function main() {
       const L = await lire(pg);
       const r1 = L.aVerif.find((x) => x.suivi === '30000001');
       dit(!L.cartes.some((c) => c.suivi === '30000001') && r1 && r1.raison === 'delai_depasse', '27 oct. : le Mondial Relay dont la limite (26/10) est passée n\'est plus « à retirer » — « délai dépassé », à vérifier', r1 ? r1.raison : 'absent');
-      dit(L.total === '3' && L.aVerifier === '4', '27 oct. : « à retirer » 3, « à vérifier » 4', `total=${L.total} · à vérifier=${L.aVerifier}`);
+      // (revue du 23 oct., défaut 3) Le Mondial Relay SANS date limite arrivé le 21 :
+      // le 27, 6 jours > la garde de Mondial Relay (5) ⇒ « à vérifier » (la garde
+      // unique de 7 jours le laissait « à retirer » deux jours de trop).
+      const r8 = L.aVerif.find((x) => x.suivi === '30000008');
+      dit(r8 && r8.raison === 'trop_long' && /plus de 5 jours/.test(r8.t) && !L.cartes.some((c) => c.suivi === '30000008'), '27 oct. : le Mondial Relay sans date limite arrivé il y a 6 jours dépasse la garde de Mondial Relay (5 j) ⇒ « à vérifier », plus « à retirer »', r8 ? r8.t.replace(/\n/g, ' ¦ ').slice(0, 140) : 'absent des « à vérifier »');
+      dit(L.total === '2' && L.aVerifier === '5', '27 oct. : « à retirer » 2, « à vérifier » 5', `total=${L.total} · à vérifier=${L.aVerifier}`);
       dit(r1 && /123456/.test(r1.t), '27 oct. : son code reste visible (il est peut-être encore au relais)');
       dit(!errs.length, '27 oct. aucune erreur d\'app', errs[0]);
+      await ctx.close();
+    });
+    // ════ REVUE DU 23 OCTOBRE ═══════════════════════════════════════════════
+    for (const P of [{ vp: { width: 390, height: 844 }, nom: 'revue 390' }, { vp: { width: 1512, height: 950 }, nom: 'revue 1512' }]) {
+      const T = P.nom;
+      await essaie(T, async () => {
+        const journal = [];
+        const { ctx, pg, errs } = await preparer(b, P.vp, NOW, false, { rows: ROWS_R, accounts: ACCOUNTS_R, journal });
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('.vrm-pickup-point, [data-pickup-total]').first().waitFor({ timeout: 20000 });
+        await pg.waitForTimeout(2500);
+        const L = await lire(pg);
+        const c10 = L.cartes.find((c) => c.suivi === '30000010');
+        // défaut 5
+        dit(!!c10 && /30000010/.test(c10.t), `${T} [défaut 5] un « disponible » sans code, lieu ni QR lus (seulement son n° de suivi) EST montré`, c10 ? '' : 'absent');
+        const D5 = await pg.evaluate(() => { const c = [...document.querySelectorAll('.vrm-pickup-card')].find((x) => x.querySelector('[data-colis-suivi="30000010"]')); return c ? { pasLu: !!c.querySelector('[data-colis-code-pas-lu]'), suivre: !!c.querySelector('[data-colis-suivre]'), haut: (c.querySelector('[data-colis-suivre]') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height } : null; });
+        dit(D5 && D5.pasLu && D5.suivre && D5.haut >= 44, `${T} … « code pas lu — ouvre l'e-mail du transporteur », avec « Suivi ↗ » (44 px)`, JSON.stringify(D5));
+        dit(L.total === '6', `${T} … et il compte : « à retirer » 6 (1, 2, 8, 10, Asics, Samba)`, `total=${L.total}`);
+        // défaut 10
+        const nCode = await pg.evaluate(() => [...document.querySelectorAll('[data-a-verifier-code="oui"]')].length);
+        const phrase = (/(\d+) ont encore leur code ou leur QR/.exec(L.texte) || [])[1];
+        dit(phrase === '4' && nCode === 4, `${T} [défaut 10] « 4 ont encore leur code » : la même règle que les lignes (e-mails ET colis vus par Vinted)`, `phrase=${phrase} · lignes=${nCode}`);
+        // défaut 11
+        const D11 = await pg.evaluate(() => ({ fr: (document.querySelector('[data-fraicheur-achats]') || {}).getAttribute ? document.querySelector('[data-fraicheur-achats]').getAttribute('data-fraicheur-achats') : null, ages: [...document.querySelectorAll('[data-capture-age]')].map((x) => x.getAttribute('data-capture-age')) }));
+        dit(D11.fr && /333:3/.test(D11.fr) && !D11.ages.length, `${T} [défaut 11] compte_c relu il y a 3 j : dit par la ligne de fraîcheur, pas redit sous la carte de son colis`, JSON.stringify(D11));
+        dit(!errs.length, `${T} aucune erreur d'app`, errs[0]);
+        // défaut 14 : Ma journée ne décompresse pas les transactions des vieux achats
+        journal.length = 0;
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(4500);
+        const txLus = new Set(); for (const u of journal) { const m = /id=in\.\(([^)]*)\)/.exec(u); if (m && /_txn_/.test(m[1])) m[1].split(',').forEach((x) => txLus.add(x)); }
+        const vieuxLus = [...txLus].filter((x) => /_txn_97\d\d$/.test(x)).length;
+        dit(txLus.size > 0 && vieuxLus === 0 && txLus.size <= 6, `${T} [défaut 14] Ma journée lit les transactions des seuls achats utiles (un « disponible » de 83 j n'élargit plus la fenêtre)`, `${txLus.size} transactions lues dont ${vieuxLus} anciennes`);
+        await ctx.close();
+      });
+    }
+    // défaut 6 : la lecture des e-mails de suivi échoue — rien ne disparaît en silence.
+    await essaie('revue suivis KO', async () => {
+      const etat = { suivis: 'ko' };
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { etat });
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+      await pg.locator('.vrm-pickup-point, [data-pickup-total], [data-suivis-ko]').first().waitFor({ timeout: 20000 }).catch(() => {});
+      await pg.waitForTimeout(3000);
+      const K = await pg.evaluate(() => { const p = document.querySelector('[data-achats-onglet="attente"]'); const seg = [...document.querySelectorAll('.vrm-seg-btn')].find((x) => /À retirer/.test(x.innerText));
+        return { n: p ? p.getAttribute('data-n') : null, seg: seg ? seg.innerText : '', ko: document.querySelector('[data-suivis-ko]') ? document.querySelector('[data-suivis-ko]').getAttribute('data-suivis-ko') : null, texte: document.body.innerText,
+                 btn: (() => { const r = document.querySelector('[data-suivis-reessayer]'); return r ? r.getBoundingClientRect().height : 0; })() }; });
+      dit(K.n === '—' && !/À retirer\s*\d/.test(K.seg), '[défaut 6] e-mails de suivi illisibles : « À retirer » dit « — », jamais un total partiel', `data-n=${K.n} · « ${K.seg.replace(/\n/g, ' ')} »`);
+      dit(K.ko === 'jamais' && /n'ont pas pu être lus/.test(K.texte) && K.btn >= 44, '[défaut 6] … la panne est DITE, avec « Réessayer » (44 px)', `ko=${K.ko} · bouton ${K.btn}px`);
+      dit(!/aucun email de suivi reçu/i.test(K.texte), '[défaut 6] … jamais « aucun email de suivi reçu »');
+      // « Réessayer » sur la MÊME page (pas un rechargement, qui relirait de toute façon).
+      etat.suivis = 'ok';
+      const btn = pg.locator('[data-suivis-reessayer]');
+      if (await btn.count()) await btn.first().click();
+      await pg.waitForTimeout(2500);
+      const L = await lire(pg);
+      dit(L.total === '4' && !(await pg.locator('[data-suivis-ko]').count()), '[défaut 6] « Réessayer » relit sur place : les colis d\'e-mail reviennent (4), le message part', `total=${L.total}`);
+      etat.suivis = 'ko';
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(3500);
+      const J = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); return { n: t ? t.getAttribute('data-n') : null, titre: t ? t.getAttribute('title') : null }; });
+      dit(J.n === '' && /pas lus/.test(J.titre || ''), '[défaut 6] Ma journée : la case « À retirer » dit « — » (pas « 1 »), et pourquoi', JSON.stringify(J));
+      dit(!errs.length, 'revue suivis KO : aucune erreur d\'app', errs[0]);
+      await ctx.close();
+    });
+    // défaut 12 : pendant la lecture des e-mails de suivi, Ma journée ne montre
+    // pas le total partiel des seuls colis vus par Vinted.
+    await essaie('revue suivis lents', async () => {
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { suivis: 6000 });
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+      await pg.waitForTimeout(1500);
+      const A = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null }; });
+      dit(A.n === '' && A.job == null, '[défaut 12] e-mails de suivi en cours de lecture : « À retirer » dit « — » et aucune ligne « à vérifier » partielle', JSON.stringify(A));
+      await pg.waitForTimeout(7000);
+      const B = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null }; });
+      dit(B.n === '4' && B.job === '3', '[défaut 12] … une fois lus : 4 à retirer, 3 à vérifier', JSON.stringify(B));
+      dit(!errs.length, 'revue suivis lents : aucune erreur d\'app', errs[0]);
       await ctx.close();
     });
   } finally { if (b) await b.close(); srv.close(); }

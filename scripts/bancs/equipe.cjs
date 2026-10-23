@@ -82,6 +82,11 @@ const reset = ({ installe = true, statutM = 'actif', W_membre = true } = {}) => 
       ligne(V, 'harvest_111_billing', { payload: { main: { amount: '281.94' }, escrow: { amount: '2235.80' } } }),
       ligne(V, 'email_bord_9001', { numero: '12', filename: 'bordereau.pdf', transaction: '9001', modele: 'Nike Air Max 90', dateLimite: '23/10/2026', receivedAt: '2026-10-16T10:00:00Z', pdfB64: PDF_B64 }),
       ligne(V, 'panel_colis_relais', { 8001: { code: '734512', lieu: 'Tabac du Port — Cancale' } }),
+      // (revue du 23 oct., défaut 15) Deux colis arrivés par e-mail : l'un dans les
+      // délais, l'autre arrivé il y a 10 jours sans date limite (plus que la garde
+      // de Mondial Relay) — « à vérifier », jamais caché.
+      ligne(V, 'email_track_mondialrelay_30000101', { type: 'suivi', status: 'available', statusLabel: 'Arrivé au point de retrait', carrier: 'mondialrelay', suivi: '30000101', subject: 'Votre colis 30000101 est disponible', receivedAt: new Date(Date.now() - 864e5).toISOString(), code: '515151', lieu: 'Bar du Port, 1 Rue Exemple, 35260 Cancale', limite: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10) }),
+      ligne(V, 'email_track_mondialrelay_30000102', { type: 'suivi', status: 'available', statusLabel: 'Arrivé au point de retrait', carrier: 'mondialrelay', suivi: '30000102', subject: 'Votre colis 30000102 est disponible', receivedAt: new Date(Date.now() - 10 * 864e5).toISOString(), code: '424242', lieu: 'Presse du Port, 2 Rue Exemple, 35260 Cancale', limite: null }),
       ligne(V, 'email_sale_9001', { prix: '42.00', acheteur: 'acheteur_secret' }),
       // W a SA boutique : un bordereau à elle (jamais mêlé à ceux de V).
       ligne(W, 'main', { vrm_prenom: 'Wendy' }),
@@ -326,6 +331,11 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
         dit(/Nike Air Max 90/.test(t) && /N°12/.test(t), 'le titre et le N° du bordereau sont dits');
         const code = await pg.evaluate(() => { const e = document.querySelector('[data-equipe-code="8001"]'); return e ? e.innerText.trim() : ''; });
         dit(code === '734512', 'à retirer : le code de retrait est affiché', code);
+        // (revue du 23 oct., défaut 15) Un colis d'e-mail gardé plus longtemps que ne
+        // le fait son transporteur : « à vérifier », avec son code — plus filtré.
+        const av = await pg.evaluate(() => ({ dans: [...document.querySelectorAll('[data-equipe-track]')].map((e) => e.innerText), verif: [...document.querySelectorAll('[data-equipe-track-a-verifier]')].map((e) => ({ r: e.getAttribute('data-equipe-track-a-verifier'), t: e.innerText })) }));
+        dit(av.dans.length === 1 && /515151/.test(av.dans[0]), 'codes reçus par e-mail : le colis dans les délais', JSON.stringify(av.dans.map((x) => x.slice(0, 60))));
+        dit(av.verif.length === 1 && av.verif[0].r === 'trop_long' && /424242/.test(av.verif[0].t) && /plus de 5 jours/.test(av.verif[0].t), 'le colis arrivé il y a 10 jours (Mondial Relay garde 5 j) est « à vérifier », avec son code — plus caché', JSON.stringify(av.verif.map((x) => x.r + ': ' + x.t.replace(/\n/g, ' ¦ ').slice(0, 90))));
         dit(!MONTANTS.test(t), 'AUCUN montant affiché (ni prix, ni solde, ni acheteur)', (t.match(MONTANTS) || [''])[0]);
         const n = nav_(B.journal);
         const interdits = n.filter((j) => /id=eq\.main|vinted_accounts|_txn_|_billing|orders_(sold|purchased)|email_sale_/.test(j.u));

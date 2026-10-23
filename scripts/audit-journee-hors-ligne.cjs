@@ -20,7 +20,11 @@ const MUTATIONS = {
   'partielle-acceptee': ["  if (s.colisRelaisLu !== true) return false;", "  if (false) return false;"],
   'echecs-ignores': ["    && !(Array.isArray(l.failedUids) && l.failedUids.length);", "    && true;"],
   'autre-vendeur': ["p.uid !== uid ||", ""],
-  'soir-faux': ["if (j <= 0) enRetard++; else if (j === 1) demain++;", "if (j < 0) enRetard++; else if (j === 1) demain++;"],
+  // (ancre suivie le 23 oct. : depuis la date ESTIMÉE du 22 oct., la ligne porte
+  // `aVerifier` — l'ancre d'avant était introuvable, la mutation ne prouvait rien).
+  'soir-faux': ["if (j <= 0) { if (e.estimee === true) aVerifier++; else enRetard++; } else if (j === 1) demain++;", "if (j < 0) { if (e.estimee === true) aVerifier++; else enRetard++; } else if (j === 1) demain++;"],
+  // (revue du 23 oct.) Une photo v1 relue sans sortir ses « hors délai » de « à retirer ».
+  'v1-melange': ["const reste = p.retirer.filter((r) => !(r && r.horsDelai));", "const reste = p.retirer;"],
 };
 
 function stockage() { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), _m: m }; }
@@ -65,6 +69,18 @@ async function verifier(fichier) {
   const soir = M.listeDuSoir(photo, at);
   dit(soir && soir.n === 4 && soir.enRetard === 2 && soir.demain === 1, 'la liste du soir : en retard demain = limite aujourd\'hui ou avant ; limite demain', JSON.stringify(soir));
   dit(M.listeDuSoir(null) === null, 'pas de photo : pas de liste du soir (jamais un zéro inventé)');
+  // (revue du 23 oct., défauts 9 et 13) « à retirer » et « à vérifier » : deux
+  // listes. Une photo v1 (qui les mêlait) est relue CONVERTIE.
+  const p2 = M.construirePhoto({ uid: A, at, retirer: [{ titre: 'R', code: '1111', limite: '2026-10-30' }],
+    aVerifier: [{ titre: 'V', code: '2222', raison: 'trop_long', garde: 5 }], nAVerifier: 3 });
+  dit(p2 && p2.nRetirer === 1 && p2.retirer[0].limite === '2026-10-30' && p2.nAVerifier === 3 && p2.aVerifier[0].raison === 'trop_long' && p2.aVerifier[0].garde === 5, 'photo v2 : « à retirer » seul compté, « à vérifier » à part avec sa raison et sa garde', p2 ? JSON.stringify({ n: p2.nRetirer, v: p2.nAVerifier }) : '');
+  const st3 = stockage();
+  st3.setItem(M.clePhoto(A), JSON.stringify({ v: 1, uid: A, at, envoyer: [], nEnvoyer: 0, nePasPoster: 0, nRetirer: 3,
+    retirer: [{ titre: 'X', code: '1', horsDelai: false }, { titre: 'Y', code: '2', horsDelai: true }, { titre: 'Z', code: '3', horsDelai: true }] }));
+  const p3 = M.lirePhoto(A, st3);
+  dit(p3 && p3.nRetirer === 1 && p3.retirer.length === 1 && p3.nAVerifier === 2 && p3.aVerifier.length === 2, 'une photo v1 relue : ses colis « hors délai » sortent de « à retirer » (le compte suit)', p3 ? JSON.stringify({ n: p3.nRetirer, v: p3.nAVerifier }) : 'refusée');
+  const st4 = stockage(); st4.setItem(M.clePhoto(A), JSON.stringify({ v: 1, uid: B, at, envoyer: [], retirer: [] }));
+  dit(M.lirePhoto(A, st4) === null, 'une photo v1 au nom d\'un autre vendeur reste refusée');
 
   // Le service worker : réserve gardée à l'activation, `/hl-qr` servi.
   const sw = fs.readFileSync(path.join(R, 'public', 'sw.js'), 'utf8');

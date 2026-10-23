@@ -38,7 +38,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
-import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J} from '../api/_lib/retrait-colis.js';
+import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 // La date limite d'envoi AVEC son heure (22 octobre) : UNE règle pour Colis, Ma
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
@@ -11197,6 +11197,10 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
         detail={detail}/>
     );
   }
+  // ⚠️ (revue du 23 oct.) Les e-mails de suivi PAS LUS (lecture ratée ou en
+  // cours) ne sont pas « aucun e-mail de suivi reçu » : « pas su » ne vaut pas
+  // « rien » (§4.1). L'écran Achats dit la panne une fois, avec « Réessayer ».
+  if (!Array.isArray(tracking)) return null;
   // ── QUAND TOUT VA BIEN : une ligne, pas un tableau. Le détail reste à un clic.
   return (
     <details style={{marginBottom:10}}>
@@ -12743,6 +12747,31 @@ function QrHorsLigne({ qr, code }) {
   return <img data-hl-qr={etat} src={src} alt="QR de retrait" width={92} height={92} onLoad={() => setEtat('ok')} onError={() => setEtat('ko')}
     style={{flexShrink:0,width:92,height:92,borderRadius:10,background:'#fff',border:`1px solid ${C.border}`,objectFit:'contain'}}/>;
 }
+// Une ligne de colis hors ligne (à retirer, ou à vérifier). La raison d'un colis
+// « à vérifier » vient de LA règle (`etatRetrait`) : « délai dépassé le … » si
+// une date limite a été LUE, sinon « plus de N jours au point relais » (la garde
+// de son transporteur) — jamais « hors délai » sans date limite (revue du 23 oct.).
+function LigneRetraitHorsLigne({ r, i, quand, grise, maintenant, verifier = false }) {
+  const jj = (j) => new Date(j + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+  const reste = !verifier && r.limite ? joursAvantJour(r.limite, maintenant) : null;
+  const delai = verifier
+    ? (r.raison === 'delai_depasse' ? `délai de retrait dépassé${r.limite ? ` le ${jj(r.limite)}` : ''}`
+      : r.raison === 'trop_long' ? `au point relais depuis plus de ${Number.isFinite(r.garde) ? r.garde : GARDE_MAX_J} jours` : 'à vérifier')
+    : (reste == null ? '' : reste < 0 ? `délai de retrait passé (${jj(r.limite)})` : reste === 0 ? "à retirer aujourd'hui" : `à retirer avant le ${jj(r.limite)}`);
+  return (
+    <div data-hl-retrait={verifier ? 'a-verifier' : ''} data-hl-raison={verifier ? (r.raison || 'inconnue') : undefined} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || r.lieu || r.transporteur || 'Colis'}</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[r.titre ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte, delai].filter(Boolean).join(' · ')}</div>
+        {r.code
+          ? <div data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:19,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px'}}>{r.code}</div>
+          : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
+        <div style={{marginTop:8}}><button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>{verifier ? "Je l'ai eu" : "Je l'ai retiré"}</button></div>
+      </div>
+      <QrHorsLigne qr={r.qr} code={r.code}/>
+    </div>
+  );
+}
 function JourneeHorsLigne({ uid, tab }) {
   const [, tic] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
@@ -12809,24 +12838,22 @@ function JourneeHorsLigne({ uid, tab }) {
         {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
       </div>
       {tete('À retirer', photo.nRetirer)}
+      {/* (revue du 23 oct.) Les mêmes colis que la tuile « À retirer » en ligne ;
+          la date limite LUE (et elle seule) est dite. Les colis « à vérifier »
+          ont leur bloc, en dessous, avec leur raison. */}
       <div data-hl-retirer={photo.nRetirer} style={carte}>
         {photo.retirer.length === 0
           ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à retirer à {quand}.</div>
-          : photo.retirer.map((r, i) => (
-            <div key={i} data-hl-retrait="" style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || r.lieu || r.transporteur || 'Colis'}</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[r.titre ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte].filter(Boolean).join(' · ')}{r.horsDelai ? ' · hors délai' : ''}</div>
-                {r.code
-                  ? <div data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:19,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 12px'}}>{r.code}</div>
-                  : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas encore reçu à {quand}.</div>}
-                <div style={{marginTop:8}}><button type="button" disabled aria-disabled="true" data-hl-geste="" style={grise}>Je l'ai retiré</button></div>
-              </div>
-              <QrHorsLigne qr={r.qr} code={r.code}/>
-            </div>
-          ))}
+          : photo.retirer.map((r, i) => <LigneRetraitHorsLigne key={i} r={r} i={i} quand={quand} grise={grise} maintenant={maintenant}/>)}
         {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
       </div>
+      {(photo.nAVerifier || 0) > 0 && (<>
+        {tete('À vérifier', photo.nAVerifier)}
+        <div data-hl-a-verifier={photo.nAVerifier} style={carte}>
+          <div style={{fontSize:12,color:C.muted,padding:'8px 0 4px',lineHeight:1.45}}>Sans doute {photo.nAVerifier > 1 ? 'repartis' : 'reparti'} chez le vendeur — pas comptés dans « à retirer ».{photo.aVerifier.length ? ` ${photo.aVerifier.length > 1 ? 'Ceux-ci ont' : 'Celui-ci a'} encore un code ou un QR : il est peut-être encore au relais.` : ''}</div>
+          {photo.aVerifier.map((r, i) => <LigneRetraitHorsLigne key={i} r={r} i={i + 1} quand={quand} grise={grise} maintenant={maintenant} verifier/>)}
+        </div>
+      </>)}
     </div>
   );
 }
@@ -26095,6 +26122,9 @@ const moyennesParModele = (commandes, ecarte) => {
 // les filtres d'ancienneté/lieu) → trois nombres différents pour les mêmes colis.
 // Tout passe désormais par ces fonctions, module-level, lisibles de partout.
 const colisKey = (t) => String((t && (t.suivi || t.subject)) || '').trim();
+// (revue du 23 oct.) Au-delà de ce nombre de jours, la ligne de fraîcheur d'Achats
+// nomme le compte : ses colis ne le redisent pas (§7).
+const FRAICHEUR_ACHATS_J = 2;
 // (23 oct.) Les 14 jours supposés (`PICKUP_MAX_DAYS`) et la grâce de 10 jours
 // après la limite sont retirés : la garde MESURÉE est de 4 à 7 jours, et la
 // règle vit dans api/_lib/retrait-colis.js (`etatRetrait`, `GARDE_MAX_J`).
@@ -26178,9 +26208,11 @@ const sensColis = (t, envoyes) => {
 //     peut-être encore là — le colis du 21 août l'était deux jours après sa
 //     limite) mais ne compte plus jamais dans « à retirer ». Un colis caché est
 //     un colis perdu ; un colis compté « à retirer » à tort fait courir pour rien.
+// (revue du 23 oct.) + la garde mesurée de SON transporteur (`gardeDe` : Mondial
+// Relay 5 j, Vinted Go 6 j, Chronopost 4 j) quand l'e-mail n'a pas de date limite.
 const etatColisEmail = (t, maintenant = Date.now()) => {
   const a = arriveeColisEmail(t);
-  return etatRetrait({ limite: (t && t.limite) || null, arriveeMs: a ? a.ms : null }, maintenant);
+  return etatRetrait({ limite: (t && t.limite) || null, arriveeMs: a ? a.ms : null, transporteur: (t && t.carrier) || '' }, maintenant);
 };
 // Disponible, à lui (pas un colis qu'il a posté), pas coché « retiré ».
 const isColisEnAttente = (t, collected, envoyes) => {
@@ -29847,6 +29879,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return null;
   };
   const [tracking, setTracking] = useState(null); // suivi colis (emails Mondial Relay / Chronopost)
+  // (revue du 23 oct.) TROIS ÉTATS : `tracking === null` = pas encore lu ;
+  // `trackingKO` = la dernière lecture a échoué (la base n'a pas répondu). Une
+  // lecture ratée ne vide rien (on garde la dernière liste lue) et ne se tait
+  // pas : avant, les colis d'e-mail disparaissaient, « À retirer » disait 0 et
+  // la réception « aucun email de suivi reçu ».
+  const [trackingKO, setTrackingKO] = useState(false);
+  const lireSuivis = (opts) => fetchEmailTracking(opts)
+    .then(t => { if (t) { setTracking(t); setTrackingKO(false); } else setTrackingKO(true); return t; })
+    .catch(() => { setTrackingKO(true); return null; });
   const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
   const [receiptView, setReceiptView] = useState(null); // reçu affiché dans une modale in-app
   const [lotView, setLotView] = useState(null); // détail d'un lot : { loading, order, items }
@@ -30665,13 +30706,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // par une fenêtre fixe : sans colis d'e-mail en attente, Ma journée ne lit
   // que les n° de suivi des achats au point relais (banc `vitesse.cjs` : 455
   // transactions lues pour 140 au point relais avec une fenêtre de 60 jours).
+  // ⚠️ (revue du 23 oct.) Bornée par les colis encore À RETIRER seulement : un
+  // « disponible » de 83 jours jamais coché (« à vérifier ») élargissait la
+  // fenêtre à presque tous les achats — mesuré sur sa copie : 98 transactions
+  // décompressées sur Ma journée au lieu de 3 (§4.4), pour aucun lien (0 des
+  // 1 290 transactions réelles ne porte de n° de suivi). Un retour écrit par le
+  // transporteur n'élargit rien non plus.
   const txSuivisColis = useMemo(() => {
     const s = new Set(vintedToPickup.map(o => String(o.transaction_id)));
     let plusAncien = Infinity;
     for (const t of (tracking || [])) {
-      if (!t || (t.status !== 'available' && t.status !== 'retour')) continue;
-      if (collected && collected.has(colisKey(t))) continue;
-      if (sensColis(t, suivisEnvoyes) === 'sortant') continue;
+      if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
+      if (etatColisEmail(t).etat !== 'a_retirer') continue;
       const a = arriveeColisEmail(t);
       const ms = a && Number.isFinite(a.ms) ? a.ms : Date.parse(t.receivedAt || '');
       plusAncien = Math.min(plusAncien, Number.isFinite(ms) ? ms : Date.now() - 60 * 86400000);
@@ -30695,6 +30741,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // relais » il y a 9 jours, le colis y était déjà il y a 9 jours. Mesuré le
   // 23 oct. : la Salomon XT6 de jujuf38 (achats relus le 14, arrivée lue le 9)
   // était comptée « à retirer » quatorze jours après — sans doute repartie.
+  // (revue du 23 oct.) L'ÂGE DE LA DERNIÈRE LECTURE DES ACHATS d'un compte, UNE
+  // règle pour la ligne « Achats relus il y a N j sur X » (Achats) et pour la
+  // mention de chaque colis : un compte nommé par la ligne ne se redit plus sous
+  // chacun de ses colis (§7 — mesuré : « État lu par Vinted il y a 9 j » ×3 sous
+  // « Achats relus il y a 9 j sur jujuf38 »).
+  // (revue du 23 oct.) « A encore son code ou son QR » : UNE règle pour la phrase
+  // et pour chaque ligne du bloc « à vérifier » (e-mail : code ou QR lisible ;
+  // vu par Vinted : code ou QR lus dans la conversation).
+  const aEncoreCode = (x) => {
+    if (!x) return false;
+    if (x.kind === 'email') return !!(codeRetrait(x.t && x.t.code) || qrVivant(x.t));
+    const r = relaisDe(x.o); return !!(r && (codeRetrait(r.code) || r.qr));
+  };
+  const joursAchatsRelus = (uid) => { const cap = uid ? _harvestSeen[`${uid}_orders_purchased`] : null; return Number.isFinite(cap) ? Math.floor((Date.now() - cap) / 86400000) : null; };
   const etatColisVinted = (o, maintenant = Date.now()) => {
     const arr = arriveeColisVinted(relaisDe(o));
     const uid = o && o._acc ? String(o._acc.vinted_user_id) : '';
@@ -30776,7 +30836,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (estAVerifier(e)) { aVerifier.push({ kind: 'email', t, e, o: cmd }); continue; }
       // Colis RÉELLEMENT à retirer = on sait OÙ aller, ou on a un code, ou un QR
       // (règle d'avant, `isColisRetirable`) : écarte les lignes de suivi parasites.
-      if (!(cleanLieu(t.lieu).nom || codeRetrait(t.code) || qrImage(t))) continue;
+      // ⚠️ (revue du 23 oct.) …OU UN N° DE SUIVI. Un colis « disponible » dont la
+      // route n'a lu ni le code (forme inconnue : « Votre PIN retrait | 931 207 »),
+      // ni le lieu, ni le QR était JETÉ — invisible partout tant qu'il était
+      // récent, alors que sa notification « 📍 arrivé » était partie (et il
+      // réapparaissait « à vérifier » une semaine plus tard). Le n° de suivi est
+      // une identité, et la route range « info » un « disponible » sans suivi :
+      // ce n'est pas un parasite. Il est montré, « code pas lu ».
+      if (!(cleanLieu(t.lieu).nom || codeRetrait(t.code) || qrImage(t) || normaliserSuivi(t.suivi))) continue;
       emailList.push(t);
     }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
@@ -30851,6 +30918,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const urgents = emailList.filter(t => { const e = etatColisEmail(t, maintenant); return Number.isFinite(e.jours) && e.jours <= 1; }).length;
     const sansCodeList = extra.filter(o => { const r = relaisDe(o); return !(r && codeRetrait(r.code)); });
     const sansCode = sansCodeList.length;
+    // (revue du 23 oct.) Les colis d'e-mail dont le code n'a pas été lu (ni code
+    // ni QR) : ils ne sont pas « prêts », et ce n'est pas la conversation Vinted
+    // qui les donnera — le code est dans l'e-mail du transporteur.
+    const sansCodeEmail = emailList.filter(t => !codeRetrait(t.code) && !qrImage(t)).length;
     // ⚠️ SUR QUEL COMPTE SE CONNECTER — il en a NEUF. L'extension va chercher
     // les codes toute seule, mais UNIQUEMENT pour le compte connecté dans
     // l'onglet : « passe sur Vinted avec le bon compte » sans dire lequel, c'est
@@ -30871,8 +30942,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vient de `cleanLieu(t.lieu)` (§11, la même source que les groupes de
     //    l'écran Achats), jamais deviné : un email sans lieu n'ajoute rien.
     const lieux = [...new Set(emailList.map(t => (cleanLieu(t.lieu).nom || '').trim()).filter(Boolean))];
-    return { emailList, extra, attente, attenteMail, aVerifier, repartis, horsDelai, urgents, sansCode, comptesSansCode, lieux,
-             prets: emailList.length + (extra.length - sansCode),
+    return { emailList, extra, attente, attenteMail, aVerifier, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux,
+             prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisEnvoyes, txSuivisColis]);
@@ -30889,8 +30960,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (api/_lib/retrait-colis.js, `retirerPublie`) au moment où il s'affiche —
       // une limite qui passe pendant que l'app est fermée sort le colis de son
       // compte sans attendre la prochaine ouverture. Aucune identité, aucun code.
-      const colis = pickupUnion.emailList.map(t => { const a = arriveeColisEmail(t); return [t.limite || '', a ? a.ms : 0]; })
-        .concat(pickupUnion.extra.map(o => { const e = etatColisVinted(o); return ['', e.arriveeMs || 0]; }));
+      // ⚠️ (revue du 23 oct.) + le TRANSPORTEUR (sa garde, sans date limite) et
+      // l'IDENTITÉ de chaque colis — le n° de suivi (`e:`), sinon la transaction
+      // Vinted (`v:{compte}:{tx}`), sinon la clé de l'e-mail (`k:`, que le widget
+      // ne sait pas relire : il le DIT). Sans elle, un colis retiré ou reparti
+      // pendant que l'app est fermée restait compté jusqu'à la prochaine ouverture,
+      // présenté comme complet. Jamais un code, jamais un lieu.
+      const colis = pickupUnion.emailList.map(t => { const a = arriveeColisEmail(t); const su = normaliserSuivi(t.suivi);
+          return [t.limite || '', a ? a.ms : 0, t.carrier || '', su ? 'e:' + su : 'k:' + colisKey(t)]; })
+        .concat(pickupUnion.extra.map(o => { const e = etatColisVinted(o); const uid = String((o._acc && o._acc.vinted_user_id) || '');
+          return ['', e.arriveeMs || 0, '', uid ? `v:${uid}:${o.transaction_id}` : 'k:v' + o.transaction_id]; }));
       // `vus` : les colis d'e-mail « au point relais » que l'app a VUS à cette
       // publication (leur identité : n° de suivi, sinon le sujet — `colisKey`),
       // quelle que soit sa décision. Le widget n'ajoute que les colis arrivés
@@ -33892,7 +33971,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Ma journée aussi (revue visuelle du 17 oct.) : sans les emails de suivi,
   // sa tuile « À retirer » comptait les seuls colis vus par Vinted (1) quand
   // l'écran Achats en montrait 2 — la même notion, deux nombres (§11).
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) fetchEmailTracking().then(t => { if (t) setTracking(t); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='achats'||curSub==='journee') && tracking===null) lireSuivis(); /* eslint-disable-next-line */ }, [sub]);
   // ── LES N° DE SUIVI DES ACHATS, LUS POUR CE QUE L'ÉCRAN EN FAIT (22 oct.) ──
   // Ma journée ne s'en sert QUE pour sortir de « à retirer » un achat déjà
   // retiré selon l'email du transporteur (`pickupUnion` → `extra`, qui ne
@@ -34041,7 +34120,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee') loadOrders('sold', setSales, false, { silencieux: true });
-      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys, false, { silencieux: true }); fetchEmailTracking().then(t => { if (t) setTracking(t); }); }
+      if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
       if (curSub === 'annonces' || curSub === 'journee') loadListings();
       if (curSub === 'messages' || curSub === 'journee') loadConvs();
     };
@@ -35186,17 +35265,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
         return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee' };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
-      // (23 oct.) Les colis « à vérifier » d'e-mail gardent leur code hors ligne
-      // (il est peut-être encore au relais), marqués « hors délai ».
-      const horsDelai = new Set(pickupUnion.aVerifier.filter(x => x.kind === 'email').map(x => x.t));
-      const retirer = pickupUnion.emailList.concat([...horsDelai]).map((t) => ({
+      // ⚠️ (revue du 23 oct.) « À RETIRER » = EXACTEMENT ce que la tuile compte
+      // en ligne (`pickupUnion.emailList` + `extra`, §11). Les colis « à
+      // vérifier » (délai dépassé, garde du transporteur dépassée) étaient mêlés
+      // à cette liste, marqués « hors délai » — y compris sans date limite : le
+      // compte hors ligne disait 5 quand la tuile disait 2. Ils ont leur liste,
+      // avec leur VRAIE raison ; ceux qui ont encore leur code ou leur QR
+      // seulement (peut-être encore au relais), vus par e-mail OU par Vinted.
+      const ligneEmail = (t) => ({
         titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: codeRetrait(t.code), qr: qrImage(t) || '',
-        transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', horsDelai: horsDelai.has(t),
-      })).concat(pickupUnion.extra.map((o) => {
+        transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', limite: t.limite || '', compte: compteDuColisEmail(t) || '',
+      });
+      const ligneVinted = (o) => {
         const r = relaisDe(o);
         return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '' };
-      }));
-      const photo = construirePhoto({ uid, at: Date.now(), envoyer, retirer, nePasPoster: colisEb.nePasPoster.length });
+      };
+      const retirer = pickupUnion.emailList.map(ligneEmail).concat(pickupUnion.extra.map(ligneVinted));
+      const aVerifier = pickupUnion.aVerifier.filter(aEncoreCode)
+        .map((x) => ({ ...(x.kind === 'email' ? ligneEmail(x.t) : ligneVinted(x.o)), raison: x.e.etat, garde: Number.isFinite(x.e.garde) ? x.e.garde : null }));
+      const photo = construirePhoto({ uid, at: Date.now(), envoyer, retirer, aVerifier, nAVerifier: pickupUnion.aVerifier.length, nePasPoster: colisEb.nePasPoster.length });
       if (photo && ecrirePhoto(uid, photo, localStorage)) rechaufferQr(photo);
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36890,15 +36977,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(pickupCount){
           // (23 oct.) Les colis hors délai ne sont plus « à retirer » (ils sont
           // « à vérifier », ligne à part) : l'urgence, c'est le DERNIER JOUR.
-          const hd=pickupUnion.urgents||0, pr=pickupUnion.prets, sc=pickupUnion.sansCode;
+          const hd=pickupUnion.urgents||0, pr=pickupUnion.prets, sc=pickupUnion.sansCode, sce=pickupUnion.sansCodeEmail||0;
           const lx=pickupUnion.lieux||[];
           // « chez X » quand tous les colis retirables sont au MÊME relais ;
           // sinon le nombre de relais (jamais un seul nom qui en cacherait
           // d'autres — §5, mieux vaut un blanc qu'un faux).
           const ou = lx.length===1 ? ` chez ${lx[0]}` : lx.length>1 ? ` dans ${lx.length} points relais` : '';
           const sub = hd>0 ? `${hd} à retirer aujourd'hui ou demain, dernier délai — va ${hd>1?'les':'le'} chercher${lx.length===1?` chez ${lx[0]}`:''}`
-            : pr>0 && sc>0 ? `${pr} avec ton code${ou} · ${sc} en attente de leur code`
+            : pr>0 && (sc>0 || sce>0) ? [`${pr} avec ton code${ou}`, sc>0 ? `${sc} en attente de leur code` : '', sce>0 ? `${sce} dont le code n'a pas été lu (il est dans l'e-mail du transporteur)` : ''].filter(Boolean).join(' · ')
             : pr>0 ? `Tu as le code — plus qu'à aller ${pr>1?'les':'le'} chercher${ou}`
+            : sce>0 && sc===0 ? `Le code n'a pas été lu : il est dans l'e-mail du transporteur${ou}`
             : (()=>{ const cs = (pickupUnion.comptesSansCode||[]).map(a=>accName(a)).filter(Boolean);
                      const qui = cs.length===1 ? `sur ${cs[0]}` : cs.length>1 ? `sur ${cs.slice(0,3).join(', ')}${cs.length>3?'…':''}` : 'avec le bon compte';
                      const e = extSaitLireCodes();
@@ -37001,7 +37089,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sub:`La date limite d'envoi est passée${lateV && lateE ? ` (dont ${lateE} eBay)` : ''} — à poster en priorité`,
             tab:'cat_bord', prio:0.15 });
         }
-        if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.urgents) {
+        if (!caseVisible(dispoJournee, 'retirer') && pickupCount && pickupUnion.urgents && tracking !== null) {
           const hd = pickupUnion.urgents, lx = pickupUnion.lieux || [];
           jobs.push({ id:'retrait-dernier-jour', n:hd, icon:'box', color:C.warn, urgent:true,
             title:`${hd} colis à retirer aujourd'hui ou demain`,
@@ -37011,11 +37099,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (23 oct.) « À VÉRIFIER » : délai de retrait dépassé, ou arrivé depuis
         // plus longtemps que ce qu'un point relais garde. Jamais compté « à
         // retirer » ; une ligne, le geste dans Achats (§7).
-        if ((pickupUnion.aVerifier||[]).length) {
+        // (revue du 23 oct.) Pas avant que les e-mails de suivi soient lus : le
+        // nombre serait celui des seuls colis vus par Vinted, et il changerait
+        // sous ses yeux une seconde plus tard.
+        if (tracking !== null && (pickupUnion.aVerifier||[]).length) {
           const nv = pickupUnion.aVerifier.length;
           jobs.push({ id:'retrait-a-verifier', n:nv, icon:'box', color:C.warn,
             title:`${nv} colis à vérifier — sans doute ${nv>1?'repartis':'reparti'} chez le vendeur`,
-            sub:`Délai de retrait dépassé ou plus de ${GARDE_MAX_J} jours au point relais : ${nv>1?'regarde-les':'regarde-le'} dans Achats (coche « Je l'ai eu » si c'est le cas)`,
+            // (revue du 23 oct.) Plus de « 7 jours » écrit pour tous : chaque
+            // transporteur a SA garde (`gardeDe`), dite dans Achats, colis par colis.
+            sub:`Délai de retrait dépassé, ou gardé plus longtemps que ne le fait son point relais : ${nv>1?'regarde-les':'regarde-le'} dans Achats (coche « Je l'ai eu » si c'est le cas)`,
             tab:'cat_achats', prio:0.6 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
@@ -37080,7 +37173,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const achatsKO = !!buys.error || (Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u));
         const T = [
           { id:'envoyer', ic:'truck', l:'À envoyer', t:tuiles.envoyer, tab:'cat_bord', pasSu: loading || pasLuComptes || (accounts.length>0 && sales.items==null) || ((ko || colisEb === null) && !(tuiles.envoyer && tuiles.envoyer.n)) },
-          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', pasSu: loading || pasLuComptes || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
+          // (revue du 23 oct.) E-mails de suivi pas encore lus (ou lecture ratée)
+          // ⇒ « — » : un total fait des seuls colis vus par Vinted est partiel.
+          { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'cat_achats', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Achats pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
           { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
@@ -37150,7 +37245,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const n = x.t ? x.t.n : 0;
               const vif = !x.pasSu && n > 0;
               return (
-                <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+                <button key={x.id} type="button" data-tuile={x.id} data-n={x.pasSu ? '' : String(n)} data-ebay={(x.id === 'envoyer' || x.id === 'messages') && x.t && x.t.ebay !== undefined ? (x.t.ebay === null ? 'passu' : String(x.t.ebay)) : undefined} title={x.pasSu ? (x.titrePasSu || 'Pas encore lu') : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
                   style={{borderLeft: k ? `1px solid ${C.border}` : 'none'}}>
                   <span className="vrm-day-bar-ic" style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={18}/></span>
                   <span className="vrm-display vrm-day-bar-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
@@ -37326,7 +37421,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         for (const x of T) {
           const n = x.t ? x.t.n : 0, vif = !x.pasSu && n > 0;
           W[x.id] = (!baseKO && !premierJour) ? (
-            <button type="button" className="vrm-day-card vrm-w-tuile" data-widget-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? 'Pas encore lu' : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
+            <button type="button" className="vrm-day-card vrm-w-tuile" data-widget-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={x.pasSu ? (x.titrePasSu || 'Pas encore lu') : (x.t && x.t.sub) || ''} onClick={()=>onNav&&onNav(x.tab)}
               style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
               <span style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
               <span className="vrm-display vrm-w-tuile-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
@@ -37400,7 +37495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
                   introNeuf={<>Ta journée est vide parce qu'aucun compte Vinted n'est encore relié, pas parce qu'il n'y a rien à faire. VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà.</>}/>
-              : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && !(tuiles.messages && tuiles.messages.n > 0)
+              : (tuiles.envoyer && tuiles.envoyer.n === 0 && colisEb != null && tuiles.retirer && tuiles.retirer.n === 0 && tracking !== null && !(tuiles.messages && tuiles.messages.n > 0)
                   ? <div data-tout-a-jour="" style={{fontSize:12.5,color:C.muted,margin:'-4px 2px 14px'}}><span style={{fontWeight:600,color:C.text}}>Tout est à jour.</span> Rien à expédier ni à retirer.</div>
                   : null)
             )}
@@ -38275,8 +38370,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // statut Vinted, déjà partagée par Ma journée et cet onglet, §11) —
             // compter les achats « au relais » à la place donnait 2 en haut et
             // « 4 colis à retirer » en dessous, sur le même écran.
-            return [['attente','À retirer',pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
-            <button type="button" key={id} className="vrm-seg-btn" onClick={()=>setAFilter(id)} aria-pressed={aFilter===id}>{label}{cnt?<span className="vrm-seg-n"> {cnt}</span>:null}</button>
+            // (revue du 23 oct.) E-mails de suivi pas lus ⇒ « — », jamais un total
+            // partiel (les colis d'e-mail manqueraient) présenté comme complet.
+            return [['attente','À retirer',tracking===null?'—':pickupUnion.total],['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id}>{label}{cnt?<span className="vrm-seg-n"> {cnt}</span>:null}</button>
           )); })()}
         </div>
         {/* ⚠️⚠️ UN ACHAT EN LITIGE NE SE CACHE PAS DERRIÈRE « TOUS » (revue du
@@ -38415,11 +38512,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             jujuf38 relu il y a 9 j, julatace35260 il y a 6 j. Un colis arrivé
             depuis sur ces comptes n'est pas encore ici, et un « déposé en point
             relais » lu à l'époque a pu changer. On le dit, avec le geste. */}
+        {/* (revue du 23 oct.) LES E-MAILS DE SUIVI N'ONT PAS PU ÊTRE LUS : on le
+            dit UNE fois, avec le geste. Les colis vus par Vinted restent
+            affichés ; ceux arrivés par e-mail (codes, lieux, dates limites) ne
+            sont pas là — et le compte « À retirer » dit « — ». */}
+        {aFilter==='attente' && trackingKO && (
+          <div data-suivis-ko={tracking===null?'jamais':'ancienne'} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',fontSize:12,color:C.text,border:`1px solid ${C.warn}`,background:`${C.warn}0e`,borderRadius:10,padding:'8px 12px',marginBottom:10,lineHeight:1.45}}>
+            <span style={{flex:'1 1 220px'}}>{tracking===null
+              ? <>Les e-mails de suivi n'ont pas pu être lus : les colis arrivés par e-mail (codes, lieux, dates limites) ne sont pas affichés ici. Rien n'est perdu.</>
+              : <>La dernière lecture des e-mails de suivi a échoué : ce que tu vois vient de la lecture d'avant.</>}</span>
+            <button type="button" data-suivis-reessayer="" onClick={()=>lireSuivis({ force:true })} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'6px 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>
+          </div>
+        )}
         {aFilter==='attente' && (()=>{
           const vieux = (accounts||[]).filter(a => a && !acctOff(a.vinted_user_id)).map(a => {
-            const cap = _harvestSeen[`${a.vinted_user_id}_orders_purchased`];
-            return Number.isFinite(cap) ? { a, j: Math.floor((Date.now() - cap) / 86400000) } : null;
-          }).filter(x => x && x.j >= 2).sort((x, y) => y.j - x.j);
+            const j = joursAchatsRelus(String(a.vinted_user_id));
+            return j != null ? { a, j } : null;
+          }).filter(x => x && x.j >= FRAICHEUR_ACHATS_J).sort((x, y) => y.j - x.j);
           if (!vieux.length) return null;
           return (
             <div data-fraicheur-achats={vieux.map(x => `${x.a.vinted_user_id}:${x.j}`).join(',')} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'}}>
@@ -38470,7 +38579,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             À LA DERNIÈRE LECTURE de ce compte, pas forcément aujourd'hui :
                             au-delà d'un jour, on dit depuis quand (le compte n'est relu
                             que quand Chrome est connecté dessus). */}
-                        {(()=>{ const e = etatColisVinted(o); const cap = e.capMs; if (!cap) return null; const j = Math.floor((Date.now()-cap)/86400000); if (j < 1) return null;
+                        {/* (revue du 23 oct.) Seulement si la ligne de fraîcheur du haut
+                            ne nomme pas déjà ce compte (≥ FRAICHEUR_ACHATS_J jours). */}
+                        {(()=>{ const e = etatColisVinted(o); const cap = e.capMs; if (!cap) return null; const j = Math.floor((Date.now()-cap)/86400000); if (j < 1 || j >= FRAICHEUR_ACHATS_J) return null;
                           return <div data-capture-age={j} style={{fontSize:11,color:C.muted,marginTop:1}}>État lu par Vinted il y a {j} j — il a pu changer depuis</div>; })()}
                         {/* ⚠️ « Il manque des infos utiles » (Julien). Le prix et
                             la date SONT portés par la commande Vinted (§5 retrait :
@@ -38768,7 +38879,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               chaque ligne, c'était trois fois la même phrase sur
                               un écran de téléphone. Ne reste que ce qui est propre
                               à CE colis. */}
-                          {!code && !qrImage(t) && <div style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas encore reçu</div>}
+                          {/* (revue du 23 oct.) Un colis d'e-mail sans code lu : le code
+                              EST dans l'e-mail du transporteur (« disponible »), c'est
+                              VRM qui n'a pas su le lire — pas « pas encore reçu ». */}
+                          {!code && !qrImage(t) && <div data-colis-code-pas-lu="" style={{fontSize:11,color:C.muted,marginTop:1}}>Code pas lu — ouvre l'e-mail du transporteur{t.suivi?' (ou le suivi du colis)':''}</div>}
                           {/* Le n° de suivi sur SA ligne, en chiffres lisibles :
                               au comptoir c'est ce qu'on demande quand le scan
                               ou le code ne passe pas. */}
@@ -38841,6 +38955,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <CodeRetraitCopiable label={ident?"Code d’ouverture":"Code de retrait"} code={code}/>
                             )}
                           </div>
+                        )}
+                        {/* (revue du 23 oct.) Ni code ni QR lus : le suivi du transporteur, d'un geste. */}
+                        {!code && !ident && !qrVivant(t) && t.suivi && (
+                          <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" data-colis-suivre="" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:10,padding:'5px 10px',fontSize:12,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Suivi ↗</a>
                         )}
                         <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
                       </div>
@@ -39053,22 +39171,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <Icon name="alert" size={16} color={C.warn}/>{pickupUnion.aVerifier.length} colis à vérifier — sans doute {pickupUnion.aVerifier.length>1?'repartis':'reparti'} chez le vendeur
             </div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.45}}>
-              Délai de retrait dépassé, ou plus de {GARDE_MAX_J} jours au point relais (un point relais garde un colis 4 à 7 jours, d'après tes e-mails).
+              Délai de retrait dépassé, ou au point relais depuis plus longtemps que son transporteur ne garde un colis (mesuré sur tes e-mails : Chronopost 4 jours, Mondial Relay 5, Vinted Go 6 ; {GARDE_MAX_J} pour les autres).
               Ils ne comptent plus dans « à retirer ». <b>Si tu l'as eu, coche « Je l'ai eu »</b> ; sinon, la conversation Vinted de la commande dit s'il est reparti et si tu es remboursé.
-              {(()=>{ const n=pickupUnion.aVerifier.filter(x=>x.kind==='email'&&(codeRetrait(x.t.code)||qrVivant(x.t))).length;
+              {/* (revue du 23 oct.) Le compte suit la MÊME règle que les lignes
+                  (`aEncoreCode`) : un colis vu par Vinted dont la conversation
+                  porte le code compte aussi — avant, seuls les e-mails comptaient. */}
+              {(()=>{ const n=pickupUnion.aVerifier.filter(aEncoreCode).length;
                 return n ? <> {n>1?`${n} ont encore leur code ou leur QR`:'1 a encore son code ou son QR'} ci-dessous : il est peut-être encore au relais.</> : null; })()}
             </div>
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.aVerifier.map((x,i)=>{
                 const raison = (()=>{
                   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' ? x.t.limite : null; const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
-                  return `au point relais depuis plus de ${GARDE_MAX_J} jours`;
+                  // (revue du 23 oct.) La garde de SON transporteur (`x.e.garde`).
+                  const g = Number.isFinite(x.e.garde) ? x.e.garde : GARDE_MAX_J;
+                  return `au point relais depuis plus de ${g} jours`;
                 })();
                 if (x.kind==='email') {
                   const t=x.t; const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
                   const arr=arriveeColisEmail(t); const cpt=compteDuColisEmail(t);
                   return (
-                    <div key={'e'+(colisKey(t)||i)} data-oublie="" data-a-verifier-raison={x.e.etat} data-colis-suivi={t.suivi||''} data-arrive-le={arr?jourLocal(arr.ms):'inconnue'} data-arrive-sur={arr?arr.sur:''} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
+                    <div key={'e'+(colisKey(t)||i)} data-oublie="" data-a-verifier-code={aEncoreCode(x)?'oui':'non'} data-a-verifier-raison={x.e.etat} data-colis-suivi={t.suivi||''} data-arrive-le={arr?jourLocal(arr.ms):'inconnue'} data-arrive-sur={arr?arr.sur:''} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
                       <CarrierBadge carrier={t.carrier} size={20}/>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -39095,12 +39218,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const o=x.o; const rel=relaisDe(o); const cd=rel?codeRetrait(rel.code):''; const href=(rel&&(rel.qr||rel.url))||lienConv(o);
                 const jCap = x.e.capMs ? Math.floor((Date.now()-x.e.capMs)/86400000) : null;
                 return (
-                  <div key={'v'+(o.transaction_id||i)} data-a-verifier-vinted={String(o.transaction_id||'')} data-a-verifier-raison={x.e.etat} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
+                  <div key={'v'+(o.transaction_id||i)} data-a-verifier-vinted={String(o.transaction_id||'')} data-a-verifier-code={aEncoreCode(x)?'oui':'non'} data-a-verifier-raison={x.e.etat} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:8,padding:'8px 10px'}}>
                     <div style={{flex:'1 1 150px',minWidth:0}}>
                       <div style={{fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Colis'}</div>
                       <div style={{fontSize:11,color:C.muted,overflowWrap:'anywhere'}}>
                         {o._acc?`${accName(o._acc)} · `:''}<b style={{color:C.warn,fontWeight:600}}>{raison}</b>
-                        {jCap!=null && jCap>=1 ? ` · Vinted disait « déposé en point relais » il y a ${jCap} j (dernière lecture de ce compte)` : ''}
+                        {/* (revue du 23 oct.) Un compte déjà nommé par la ligne de fraîcheur ne se redit pas ici. */}
+                        {jCap!=null && jCap>=1 && jCap<FRAICHEUR_ACHATS_J ? ` · Vinted disait « déposé en point relais » il y a ${jCap} j (dernière lecture de ce compte)` : ''}
                       </div>
                     </div>
                     <div className="vrm-oublie-gestes">
@@ -46580,6 +46704,12 @@ function ColisEquipe({ vendeur, de, onPropre }) {
     const plusieurs = new Set([...ventes, ...achats].map(compte)).size > 1;
     // (23 oct.) La règle de l'écran Achats (§11) : à retirer, pas « à vérifier ».
     const tracks = (d.tracks || []).filter((t) => t.status === 'available' && etatColisEmail(t).etat === 'a_retirer');
+    // ⚠️ (revue du 23 oct.) …ET LES « À VÉRIFIER » NE DISPARAISSENT PAS. Un colis
+    // dont la date limite est passée, ou gardé plus longtemps que ne le fait son
+    // transporteur, était simplement filtré : l'aide ne le voyait plus du tout,
+    // code compris — or il est peut-être encore au relais. Il a sa ligne, avec
+    // SA raison, et ne compte dans aucun « à retirer » (§11, écran Achats).
+    const tracksAVerifier = (d.tracks || []).filter((t) => t.status === 'available' && estAVerifier(etatColisEmail(t)));
     const imprimer = async (o, row, numero) => {
       const k = String(o.transaction_id);
       setMsg((m) => ({ ...m, [k]: 'Préparation…' }));
@@ -46644,6 +46774,24 @@ function ColisEquipe({ vendeur, de, onPropre }) {
               {/* « aaaa-mm-jj » s'écrivait tel quel (revue visuelle du 17 oct.) :
                   la date se lit comme sur l'écran Achats ; illisible ⇒ rien. */}
               {joursAvant(t.limite) != null && <div data-equipe-limite="" style={{ fontSize: 12.5, color: C.muted, marginTop: 3 }}>à retirer avant le {new Date(String(t.limite) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>}
+              {code ? <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
+              {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
+            </div>
+          );
+        })}
+      </>)}
+      {tracksAVerifier.length > 0 && (<>
+        <div style={h3}>À vérifier · {tracksAVerifier.length}</div>
+        <div data-equipe-a-verifier={tracksAVerifier.length} style={{ fontSize: 12.5, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>Sans doute {tracksAVerifier.length > 1 ? 'repartis' : 'reparti'} chez le vendeur — pas comptés dans « à retirer ». S'il y a un code, le colis est peut-être encore au relais.</div>
+        {tracksAVerifier.map((t, i) => {
+          const code = codeRetrait(t.code); const qr = qrImage(t); const e = etatColisEmail(t);
+          const raison = e.etat === 'delai_depasse'
+            ? `délai de retrait dépassé${t.limite ? ` le ${new Date(String(t.limite).slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : ''}`
+            : `au point relais depuis plus de ${Number.isFinite(e.garde) ? e.garde : GARDE_MAX_J} jours`;
+          return (
+            <div key={'v' + (t.suivi || '') + i} data-equipe-track-a-verifier={e.etat} style={carte}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${cleanLieu(t.lieu).nom || t.lieu}` : ''}</div>
+              <div style={{ fontSize: 12.5, color: C.warn, marginTop: 3 }}>{raison}{t.suivi ? ` · n° ${t.suivi}` : ''}</div>
               {code ? <div style={{ fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
               {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
             </div>
