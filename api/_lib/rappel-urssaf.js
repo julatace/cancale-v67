@@ -43,5 +43,7 @@ export function notificationUrssaf({ today, main }) {
     return { envoyer: false, raison: toutNote ? 'déjà notée « déclarée »' : 'rien à déclarer ce mois-ci' };
   }
   // La phrase et le montant de Ma journée, mot pour mot (`text`, `sub`).
-  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, url, montant: r.apayer, raison: r.apayer == null ? 'sans ligne publiée — rappel sans montant' : 'avec le montant publié' };
+  // (22 oct., revue) Une ligne publiée trop tôt (avant la période, ou sans aucun
+  // de ses mois avant sa fin) ne donne AUCUN montant — jamais « au moins 0,00 € ».
+  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, url, montant: r.apayer, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
 }

@@ -132,6 +132,45 @@ const formulaire = async (pg) => {
   return pg.evaluate(() => { const f = document.querySelector('[data-decl-form]'); return f ? f.innerText : null; });
 };
 
+// (22 oct., revue) Le contraste RENDU (WCAG) d'un texte sur ce qui est vraiment
+// peint derrière lui : couleurs du texte et des fonds remontés jusqu'au premier
+// fond opaque, un dégradé compté par sa PIRE couleur, l'alpha composé. Vu par
+// le relecteur : à 390 px, le choix « Je n'ai pas de dépenses à noter / Ajouter
+// une dépense » sortait à 1,7:1 sur le bandeau sombre de Ma journée.
+const contrastes = (pg, sels) => pg.evaluate((liste) => {
+  const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+  const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+  const sur = (h, bas) => ({ r: h.r * h.a + bas.r * (1 - h.a), g: h.g * h.a + bas.g * (1 - h.a), b: h.b * h.a + bas.b * (1 - h.a), a: 1 });
+  const out = {};
+  for (const sel of liste) {
+    const e = document.querySelector(sel);
+    if (!e) { out[sel] = null; continue; }
+    const couches = [];
+    for (let p = e; p; p = p.parentElement) {
+      const st = getComputedStyle(p);
+      if (st.backgroundImage && st.backgroundImage !== 'none') {
+        const cs = (st.backgroundImage.match(/rgba?\([^)]+\)/g) || []).map(parse).filter(Boolean);
+        if (cs.length) { couches.push(cs); if (cs.every((c) => c.a >= 1)) break; }
+      }
+      const bg = parse(st.backgroundColor);
+      if (bg && bg.a > 0) { couches.push([bg]); if (bg.a >= 1) break; }
+    }
+    let fonds = [{ r: 255, g: 255, b: 255, a: 1 }];
+    for (const L of couches.reverse()) fonds = L.flatMap((c) => fonds.map((f) => sur(c, f)));
+    const t = parse(getComputedStyle(e).color);
+    const r = Math.min(...fonds.map((f) => { const tc = sur(t, f); const a = lum(tc), b = lum(f); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); }));
+    out[sel] = { ratio: Math.round(r * 100) / 100, couleur: getComputedStyle(e).color };
+  }
+  return out;
+}, sels);
+const SELS_CHOIX = ['[data-depenses-choix] > span', '[data-depenses-aucune]', '[data-depenses-ajouter]'];
+const juge = (cs, quoi) => {
+  const faibles = Object.entries(cs).filter(([, v]) => !v || !(v.ratio >= 4.5));
+  dit(!faibles.length, `${quoi} : le choix des dépenses se lit (contraste ≥ 4,5:1 sur ce qui est peint derrière)`,
+    Object.entries(cs).map(([k, v]) => `${k.replace(/\[data-depenses-|\]|> /g, '')} ${v ? v.ratio + ':1 ' + v.couleur : 'absent'}`).join(' · '));
+};
+
 (async () => {
   let b;
   try {
@@ -226,6 +265,7 @@ const formulaire = async (pg) => {
         dit(!!a && a.depenses === 'jamais', `E ${T} : Ma journée sait que rien n'a jamais été noté (depenses=jamais)`, JSON.stringify(a));
         dit(/avant tes dépenses/i.test(txt), `E ${T} : le net se dit « avant tes dépenses »`, txt.replace(/\n/g, ' | ').slice(0, 160));
         dit(await pg.locator('[data-journee-benef] [data-depenses-choix]').count() === 1, `E ${T} : le choix est proposé, une fois`);
+        juge(await contrastes(pg, SELS_CHOIX), `E ${T} (clair)`);
         if (await pg.locator('[data-depenses-aucune]').count()) {
           await touche(pg, '[data-depenses-aucune]', vp);
           await pg.waitForTimeout(2600);
@@ -239,6 +279,18 @@ const formulaire = async (pg) => {
           dit(!!c && c.depenses === 'aucune' && (await pg.locator('[data-depenses-choix]').count()) === 0, `E ${T} : Comptabilité lit la même réponse, sans reposer la question`, JSON.stringify(c && { depenses: c.depenses }));
         }
         dit(errs.length === 0, `E ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
+        await ctx.close();
+      });
+
+      if (vp.width < 600) await essaie(`E2 ${T}`, async () => {
+        console.log('E2. Le même choix, en SOMBRE, sur téléphone : il se lit');
+        const opts = { main: mainDe({ vinted_dark: true }) };
+        const { ctx, pg } = await rendre(b, vp, opts);
+        await pg.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); } catch (_) {} });
+        await aller(pg, 'journee', '[data-depenses-choix]', 3500);
+        const theme = await pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
+        dit(theme === 'dark', `E2 ${T} : l'app est bien en sombre`, String(theme));
+        juge(await contrastes(pg, SELS_CHOIX), `E2 ${T} (sombre)`);
         await ctx.close();
       });
 
