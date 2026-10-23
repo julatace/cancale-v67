@@ -41,6 +41,7 @@ export const WIDGETS_JOURNEE = {
   recentes: { nom: 'Dernières ventes', desc: 'Les photos de tes dernières ventes', tailles: ['grand', 'pleine'], carte: false },
   stock:    { nom: 'Stock actuel', desc: 'Annonces en ligne et prix d’achat renseignés', tailles: ['moyen', 'grand', 'pleine'] },
   jours14:  { nom: '14 derniers jours', desc: 'Vendu et reçu, jour par jour', tailles: ['moyen', 'grand', 'pleine'] },
+  performance: { nom: 'Performance', desc: 'Ventes du mois, prix moyen, marques et pays des acheteurs', tailles: ['moyen', 'grand', 'pleine'] },
   urssaf:   { nom: 'Déclaration URSSAF', desc: 'Le rappel de la prochaine échéance (sorti de « À faire »)', tailles: ['grand', 'pleine', 'moyen'], carte: false },
   envoyer:  { nom: 'À envoyer', desc: 'Petite case : le nombre de colis à poster', tailles: ['petit'] },
   retirer:  { nom: 'À retirer', desc: 'Petite case : le nombre de colis à aller chercher', tailles: ['petit'] },

@@ -6,5 +6,5 @@ try {
   var d = JSON.parse(localStorage.getItem('vinted_dark') || 'false') === true;
   document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
   var m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.setAttribute('content', d ? '#07090D' : '#F4F3EF');
+  if (m) m.setAttribute('content', d ? '#122329' : '#F1F3F0');
 } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }

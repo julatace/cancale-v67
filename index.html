@@ -18,7 +18,7 @@
        en sombre donnait une barre d'état BLANC CASSÉ au-dessus d'une app noire
        — mesuré : `theme-color = #F5F8F6` alors que les cartes étaient à
        `rgb(26,31,39)`. Une seule balise, sans `media`, pilotée par le choix. -->
-  <meta name="theme-color" content="#07090D" />
+  <meta name="theme-color" content="#122329" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/vrm-apple-touch-icon-v4.png" />
   <link rel="icon" type="image/png" href="/vrm-icon-v4-192.png" />
@@ -48,7 +48,7 @@
        contenu (vercel.json) refuse tout script en ligne. -->
   <script src="/demarrage-theme.js"></script>
   <style>
-    body{margin:0;padding:0;background:#F4F3EF;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    body{margin:0;padding:0;background:#F1F3F0;font-family:'Inter','SF Pro Text',system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
        mais c'est ce qui fait la différence entre « feuille de papier » et
@@ -57,16 +57,16 @@
     /* ⚠️ LE CHOIX DE L'APP GAGNE SUR LA PRÉFÉRENCE DU SYSTÈME. `data-theme` est
        posé par le script de démarrage ci-dessous (donc AVANT le premier
        rendu), et sa spécificité passe devant la règle `body` du média.
-       ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#07090D) : le média
+       ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#122329) : le média
        utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
-    html[data-theme="dark"]  body{ background:#07090D; background-image:none; }
-    html[data-theme="light"] body{ background:#F4F3EF; background-image:none; }
+    html[data-theme="dark"]  body{ background:#122329; background-image:none; }
+    html[data-theme="light"] body{ background:#F1F3F0; background-image:none; }
     /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
        Il n'était posé nulle part : la date d'« Import des emails » dans
        Réglages s'affichait en boîte blanche au milieu de l'app sombre. */
     html[data-theme="dark"]  { color-scheme: dark; }
     html[data-theme="light"] { color-scheme: light; }
-    @media (prefers-color-scheme: dark){ body{background:#07090D;background-image:none;} }
+    @media (prefers-color-scheme: dark){ body{background:#122329;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
     /* ── COURBES & DURÉES, nommées UNE fois (cohésion : une app « composée »
        réutilise les mêmes ressorts partout au lieu d'en réinventer à chaque

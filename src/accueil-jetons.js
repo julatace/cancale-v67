@@ -9,25 +9,25 @@
 //    écrans dessinés et le film.
 // Les textes secondaires et le bouton ardoise restent contrastés sur le fond minéral.
 export const K = {
-  bg: '#F2F5F3',           // fond clair (contenu de la maquette)
-  surface: '#FFFFFF',
-  card: '#FFFFFF',
-  card2: '#EDF2EF',        // puce / zone intérieure
+  bg: '#F1F3F0',           // fond clair (contenu de la maquette)
+  surface: '#FDFEFC',
+  card: '#FDFEFC',
+  card2: '#EAF0EC',        // puce / zone intérieure
   line: 'rgba(18,27,44,0.09)',
   line2: 'rgba(18,27,44,0.15)',
-  text: '#243D43',         // encre (15:1 sur le fond)
-  muted: '#52636B',        // 6:1
-  faint: '#52636B',        // 5:1 — jamais sous AA
-  cta: '#2B4548',          // ardoise de marque, texte blanc contrasté
-  accent: '#355F61',
+  text: '#213B41',         // encre (15:1 sur le fond)
+  muted: '#53696D',        // 6:1
+  faint: '#53696D',        // 5:1 — jamais sous AA
+  cta: '#244E54',          // ardoise de marque, texte blanc contrasté
+  accent: '#426E7C',
   accentSoft: 'rgba(53,95,97,0.12)',
   warn: '#B45309',         // ambre lisible sur clair (texte)
   warnDot: '#F59E0B',      // la pastille ambre (décor, pas du texte)
-  paper: '#FFFFFF',
-  ink: '#243D43',
+  paper: '#FDFEFC',
+  ink: '#213B41',
   // ── Ardoise du rail et du héros ──
-  rail: '#21343E',
-  rail2: '#192C34',
+  rail: '#24464B',
+  rail2: '#193B43',
   railText: '#F0F5F2',
   railMuted: '#B0C5BC',
   railLine: 'rgba(255,255,255,0.08)',

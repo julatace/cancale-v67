@@ -1,11 +1,11 @@
 /* Direction claire Minéral. Chargée après la feuille historique.
    La classe de bouton est opt-in : aucune modification du display des rails,
    mini-actions, chiffres cliquables ou menus historiques. */
-:root[data-theme="light"] { --vrm-focus:#2458E6; }
-:root[data-theme="light"] body { background:#F2F5F5; }
+:root[data-theme="light"] { --vrm-focus:#244E54; }
+:root[data-theme="light"] body { background:#F1F3F0; }
 :root[data-theme="light"] body::before { content:none; }
-:root[data-theme="light"] ::selection { background:rgba(36,88,230,.14); }
-:root[data-theme="light"] :focus-visible { outline:2px solid #2458E6; outline-offset:3px; }
+:root[data-theme="light"] ::selection { background:rgba(36,78,84,.16); }
+:root[data-theme="light"] :focus-visible { outline:2px solid #244E54; outline-offset:3px; }
 .vrm-button {
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
   min-height:44px; max-width:100%; padding:11px 18px; border-radius:8px;
@@ -1247,9 +1247,9 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 }
 
 /* Les montants quittent le tracé : une légende dédiée ne peut pas chevaucher les mois. */
-.vrm-chart-caption { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 16px; padding:8px 0 0; font-size:12px; color:var(--vrm-muted); }
+.vrm-chart-caption { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 16px; padding:8px 0 0; font-size:13px; color:var(--vrm-muted); }
 .vrm-chart-caption > span { min-width:0; overflow-wrap:anywhere; }
-.vrm-chart-caption strong { color:var(--vrm-ink); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; max-width:100%; }
+.vrm-chart-caption strong { color:var(--vrm-ink); font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; max-width:100%; }
 .vrm-chart-month { cursor:pointer; }
 .vrm-chart-month:focus-visible { outline:2px solid var(--vrm-accent); outline-offset:-2px; }
 @media(max-width:767px) {
@@ -1257,7 +1257,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-day-recu-n,.vrm-day-wallet-n,.vrm-day-stock-total strong { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
   .vrm-day-k,.vrm-day-note,.vrm-day-meta { overflow-wrap:anywhere; }
   .vrm-day-wallet { grid-template-columns:minmax(0,1fr) !important; }
-  .vrm-chart-caption { font-size:12px; gap:4px 8px; }
+  .vrm-chart-caption { font-size:13px; gap:4px 8px; }
 }
 
 /* Identité VRM fixe : le logo n'est plus un sélecteur d'image. */
@@ -1268,7 +1268,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-app-shell .vrm-header-logo { width:44px; height:44px; }
   .vrm-app-shell .vrm-header-logo > img.vrm-logo { width:40px !important; height:40px !important; border-radius:0; object-fit:contain; }
 }
-.vrm-chart-compare { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:12px; color:var(--vrm-muted); padding-top:6px; }
+.vrm-chart-compare { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:13px; color:var(--vrm-muted); padding-top:6px; }
 .vrm-chart-compare strong { font-weight:500; font-variant-numeric:tabular-nums; max-width:100%; overflow-wrap:anywhere; }
 .vrm-filter-recap { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--vrm-muted); }
 .vrm-filter-recap button,.vrm-chat-shortcuts button { background:transparent; border:0; color:var(--vrm-accent); font:600 12px/1.4 Inter,system-ui,sans-serif; cursor:pointer; padding:8px 0; }
