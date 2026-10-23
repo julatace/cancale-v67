@@ -1,4 +1,4 @@
-// LE BLOC « COLIS JAMAIS RETIRÉS », rendu pour la PREMIÈRE fois au banc.
+// LE BLOC « COLIS JAMAIS RETIRÉS » (devenu « À VÉRIFIER » le 23 oct.), rendu au banc.
 // Julien : « il n'y a pas tous les codes de retrait ». Mesuré sur la vraie
 // base : 6 colis rangés ici, dont **3 portent un QR** — et le bloc n'affichait
 // que le code. Le QR, seul moyen de retrait d'un casier Pickup, ne s'affichait
@@ -114,19 +114,22 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // dans trois autres listes de l'écran (à retirer, cochés en gris…), et un code
   // de 4 à 6 chiffres peut traîner ailleurs : compté sur la page, un QR absent du
   // bloc pouvait être « trouvé » dans la liste voisine — vert par accident.
+  // (23 oct.) Le bloc « colis jamais retirés » (> 14 j) est devenu « À VÉRIFIER »
+  // (délai de retrait écrit dépassé, ou plus de 7 j au relais — la garde mesurée).
+  // Il porte `data-a-verifier` ; ce qu'il doit montrer ne change pas : chaque
+  // code, chaque QR, et combien peuvent encore être retirés. Un colis de plus de
+  // 14 jours y est toujours (14 > 7) : les exigences de ce banc restent entières.
   const v=await pg.evaluate(()=>{
-    const titre=[...document.querySelectorAll('div')].find(d=>/^\s*\d+ colis jamais retir/.test(d.textContent||'') && (d.textContent||'').length<40);
-    const bloc=titre?titre.parentElement:null;
-    return {txt:document.body.innerText||'', bloc:bloc?(bloc.innerText||''):'',
+    const bloc=document.querySelector('[data-a-verifier]');
+    return {txt:document.body.innerText||'', bloc:bloc?(bloc.innerText||''):'', n:bloc?bloc.getAttribute('data-a-verifier'):null,
       qr:bloc?bloc.querySelectorAll('button[aria-label="Afficher le QR de retrait en grand"]').length:0};
   });
   // ⚠️ On ne compare PAS au compte de ma propre réplique des règles : elle est
   // plus grossière que celle de l'app (le sens entrant/sortant se lit sur le
   // sujet de l'email). Ce qui doit être vrai, c'est qu'AUCUN code et AUCUN QR
   // ne reste caché — c'est exactement la plainte de Julien.
-  const mTitre=/(\d+) colis jamais retir/.exec(v.txt);
-  dit(!!mTitre, 'le bloc des colis jamais retirés est rendu',
-    mTitre?('affiché : '+mTitre[1]+' · ma réplique en comptait '+vieux.length):'titre introuvable');
+  dit(v.n!=null && +v.n>=vieux.length, 'le bloc des colis à vérifier (jamais retirés) est rendu, et les porte tous',
+    v.n!=null?('affiché : '+v.n+' · ma réplique en comptait au moins '+vieux.length):'bloc introuvable');
   dit(v.qr>=avecQR, 'chaque QR encore disponible est affiché', v.qr+' bouton(s) QR pour '+avecQR+' QR en base');
   vieux.filter(d=>codeOk(d.code)).forEach(d=>
     dit(v.bloc.includes(String(d.code).trim()), 'le code '+d.code+' est affiché'));

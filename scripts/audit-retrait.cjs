@@ -57,7 +57,10 @@ dit(/\|\|\s*lienConv\(o\)/.test(APP), 'chaque colis à retirer propose sa conver
 // pouvait apparaître ailleurs dans un commentaire et faire passer l'audit sur
 // le code d'avant (vu en montant la preuve).
 const j = APP.search(/const rendus\s*=/);
-const B = j < 0 ? '' : APP.slice(j, j + 3200);
+// (23 oct.) Le bloc a grandi (les colis repartis par un signal CERTAIN : le
+// transporteur, ou la commande liée par identité) : on le lit jusqu'à sa fin
+// (la fermeture de son IIFE), plus sur une fenêtre de taille fixe.
+const B = j < 0 ? '' : APP.slice(j, Math.max(j + 3200, APP.indexOf('})()}', j)));
 dit(/non r\[ée\]clam\/i\.test\(o\.status/.test(B),
   'les commandes « non réclamées » sont repérées sur le statut Vinted',
   'mesuré : 3 achats, 84,94 €, qui ne sortaient sur AUCUN onglet');
@@ -74,9 +77,14 @@ dit(/lienConv\(o\)/.test(B), 'chaque ligne ouvre sa conversation — là où ça
 // et ce bloc n'affichait QUE le code. Le QR, seul moyen d'ouvrir un casier
 // Pickup, ne s'affichait alors NULLE PART dans l'app.
 {
-  const i = APP.indexOf('colis jamais retirés');
-  const B = i < 0 ? '' : APP.slice(i, i + 4200);
-  dit(B.length > 200, 'le bloc des colis jamais retirés existe');
+  // (23 oct.) « Colis jamais retirés » (> 14 j) est devenu « À VÉRIFIER »
+  // (délai de retrait écrit dépassé, ou plus de 7 jours au point relais — la
+  // garde mesurée). Le bloc se trouve par son attribut, plus par son titre (un
+  // commentaire qui cite l'ancien titre le faisait lire au mauvais endroit) ;
+  // ce qu'il doit montrer ne change pas : chaque code, chaque QR.
+  const i = APP.indexOf('data-a-verifier={pickupUnion');
+  const B = i < 0 ? '' : APP.slice(i, i + 9000);
+  dit(B.length > 200, 'le bloc des colis à vérifier (jamais retirés) existe');
   dit(/qrVivant\(t\)/.test(B), 'il affiche le QR quand il y en a un',
     'sans ça, 3 QR valides ne s\'affichaient nulle part');
   dit(/codeRetrait\(t\.code\)/.test(B), 'et le code de retrait');

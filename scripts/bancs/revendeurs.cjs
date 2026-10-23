@@ -438,7 +438,10 @@ async function brancher(p){
   check(await p.getByText('Colis en route',{exact:true}).isVisible(),'colis expédié conservé au suivi');check(await p.getByText('Colis finalisé',{exact:true}).count()===0,'colis finalisé retiré des colis actifs');check(await p.locator('.vrm-lbc-package').count()===1,'seul le colis non expédié propose le bordereau');
   for(const width of [320,390,1440]){await p.setViewportSize({width,height:900});check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement colis '+width);}
   rows.push({id:'email_track_pickup1',data:{id:'pickup1',carrier:'mondial',status:'available',lieu:'Relais Centre',artTitle:'Paire crème taille 42',code:'001234',suivi:'TRACK-01',receivedAt:maintenant,limite:new Date(Date.now()+3*86400000).toISOString().slice(0,10)}},
-   {id:'email_track_pickup2',data:{id:'pickup2',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire argent taille 43',code:'004567',code2:'009876',consigne:true,suivi:'TRACK-02',receivedAt:maintenant,limite:new Date(Date.now()-86400000).toISOString().slice(0,10)}},
+   {id:'email_track_pickup2',data:{id:'pickup2',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire argent taille 43',code:'004567',code2:'009876',consigne:true,suivi:'TRACK-02',receivedAt:maintenant,limite:new Date(Date.now()+86400000).toISOString().slice(0,10)}},
+   // (23 oct.) Une date limite écrite et PASSÉE ⇒ « à vérifier » (règle partagée,
+   // api/_lib/retrait-colis.js), plus « à retirer » : un colis à part le porte.
+   {id:'email_track_pickup5',data:{id:'pickup5',carrier:'mondial',status:'available',lieu:'Relais Sud',artTitle:'Paire limite passée',code:'003300',suivi:'TRACK-05',receivedAt:maintenant,limite:new Date(Date.now()-86400000).toISOString().slice(0,10)}},
    {id:'email_track_pickup3',data:{id:'pickup3',carrier:'chronopost',status:'available',lieu:'Consigne Centre',artTitle:'Paire à codes longs',code:'AA0012345678',code2:'AB0098765432',consigne:true,suivi:'TRACK-03',receivedAt:maintenant}},
    {id:'email_track_pickup4',data:{id:'pickup4',carrier:'mondial',status:'available',lieu:'Relais Nord',artTitle:'Colis sans code',suivi:'TRACK-MISSING',receivedAt:maintenant}});
   await p.goto(base+'/?tab=cat_achats');await p.getByRole('button',{name:'Copier code de retrait 001234',exact:true}).waitFor();
@@ -449,8 +452,11 @@ async function brancher(p){
   check(await p.locator('.vrm-pickup-card').count()===4, 'quatre colis à retirer, sans mélange des codes');
   check(await p.getByRole('button',{name:'Copier identifiant 009876',exact:true}).isVisible(),'identifiant de consigne visible séparément');
   check(await p.getByRole('button',{name:'Copier code d’ouverture 004567',exact:true}).isVisible(),'code d’ouverture visible séparément');
-  check((await p.locator('main').innerText()).includes('délai dépassé'),'échéance dépassée reste visible');
-  check(!(await p.locator('main').innerText()).includes('TRACK-MISSING'),'numéro de suivi absent des codes affichés');
+  check(/délai de retrait dépassé/.test(await p.locator('main').innerText()) && (await p.locator('main').innerText()).includes('003300'),'échéance dépassée reste visible (« à vérifier », avec son code)');
+  // (23 oct.) Le n° de suivi est désormais sur la ligne du colis (c'est le seul
+  // numéro de l'e-mail et de la notification) : la règle est qu'il ne passe
+  // jamais pour un CODE (aucun bouton « Copier … » ne le porte).
+  check(await p.locator('button').evaluateAll(bs=>!bs.some(x=>/TRACK-MISSING/.test((x.getAttribute('aria-label')||'')+' '+x.innerText))),'numéro de suivi absent des codes affichés');
   check(await p.getByText('n° TRACK-MISSING',{exact:true}).count()===1,'numéro de suivi conservé dans les détails');
   check(await p.locator('.vrm-pickup-method').evaluateAll(es=>es.every(e=>!e.open)),'explications repliées par défaut');
   check(await p.locator('.vrm-pickup-details').evaluateAll(es=>es.every(e=>!e.open)),'suivi et dates secondaires dans les détails');
