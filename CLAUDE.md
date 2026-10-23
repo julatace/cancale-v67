@@ -12314,6 +12314,41 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   ⚠️ Le drapeau `DEMANDE_SAISIE_PRIX` vit au niveau **module** : au moment du
   clic l'écran Annonces n'est pas monté, un `dispatchEvent` serait perdu.
 
+### Les feuilles sous la barre du bas, sur iPhone : la vraie cause (23 octobre)
+Julien, sur iPhone : la feuille « Reçu d'achat » passe SOUS la barre du bas, qui
+en cache la fin. Même plainte le 30 sept. (« Se déconnecter ») et le 2 oct.
+(« CSV / PDF introuvables »), traitée feuille par feuille par des portails.
+- **Mesuré** (code de WebKit, `StyleAdjuster.cpp`) : sur iPhone seulement
+  (`ENABLE_WEBKIT_OVERFLOW_SCROLLING_CSS_PROPERTY`), un élément qui défile et
+  porte `-webkit-overflow-scrolling: touch` reçoit un z-index 0 — un contexte
+  d'empilement. `<main className="vrm-main">` le portait depuis la coque
+  (28 sept.) : **toute** feuille rendue dans l'écran était peinte dans la couche
+  de `<main>`, sous la barre du bas (z-index 60) et l'en-tête, quel que soit son
+  z-index. Chromium ignore la propriété : aucun banc ne pouvait le voir.
+  Le zoom 0,8 n'y est pour rien (il est d'ailleurs ramené à 1 par
+  `styles-iphone.css`).
+- **Corrigé à la racine** : la propriété est retirée de `<main>` (depuis iOS 13
+  le défilement à inertie est natif, elle ne servait plus qu'à piéger). Les ~40
+  feuilles rendues dans l'écran sortent toutes d'un coup, le bloc du reçu n'est
+  pas touché. ⚠️ **Ne jamais remettre `-webkit-overflow-scrolling: touch` sur un
+  conteneur qui peut contenir une feuille** (les quelques autres qui la portent
+  — rangées défilantes, corps de feuilles — n'en contiennent aucune).
+- **Et un défaut de tous les navigateurs** : « 📦 Paires du lot » (z-index 80)
+  s'ouvrait depuis le tiroir d'une vente (`vrm-ledger-drawer-host`, z-index 150,
+  dans `document.body`)… dessous. Passée à 1300.
+- **Preuve** : banc `feuilles-coque.cjs` (ports 9211-9220, fixtures + reçus
+  inventés) — en 390 tactile il APPLIQUE la règle de WebKit (style en ligne posé
+  par React et règles de la feuille livrée), en 1512 rien. 15 feuilles ouvertes
+  comme Julien (reçu, note, outils d'Annonces, passeport, rapport comptable,
+  registre, paires du lot, « Tout imprimer », nouvelle facture, « Supprimer ce
+  compte »…) : rien par-dessus (coins et bas du panneau, haut du voile), bas du
+  contenu touchable, boutons à 44 px. **26 rouges sur le build de bf0a9c8**
+  (24 iPhone, 2 ordinateur — le lot), 0 après ; mutation « propriété remise sur
+  `<main>` » ⇒ 24 rouges, « lot à 80 » ⇒ 4.
+- **Non mesuré** : un vrai iPhone (pas de WebKit d'iOS ici : c'est sa règle,
+  lue dans son code, que le banc applique) ; les feuilles qu'aucune donnée de
+  banc n'ouvre (Stock, bordereau tamponné, fiche Leboncoin sans extension).
+
 ---
 
 ### Le zip de l'extension — le défaut le plus coûteux du projet

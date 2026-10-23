@@ -41319,8 +41319,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
       {/* Reçu d'achat DANS l'app (pas de nouvel onglet à fermer) */}
       {/* Détail d'un LOT : les paires vendues ensemble, avec leur N° si connu. */}
+      {/* zIndex 1300 (et plus 80) : elle s'ouvre depuis le tiroir d'une vente
+          (`vrm-ledger-drawer-host`, z-index 150, dans document.body) — à 80 elle
+          s'ouvrait DESSOUS, sur tous les navigateurs (banc feuilles-coque.cjs). */}
       {lotView && (
-        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:1300,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotView(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px 28px'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
@@ -50304,7 +50307,17 @@ function AppCoeur() {
         // `minHeight:0` est indispensable : sans lui, un enfant de flex refuse
         // de rétrécir et le conteneur ne défile pas (il s'étire).
         flex:'1 1 auto', minHeight:0, overflowY:'auto', overflowX:'hidden',
-        WebkitOverflowScrolling:'touch', overscrollBehaviorY:'contain',
+        // ⚠️⚠️ JAMAIS `WebkitOverflowScrolling:'touch'` ICI (23 oct.). Sur iPhone,
+        // WebKit donne un z-index 0 — un contexte d'empilement — à tout élément
+        // qui défile et porte cette propriété (StyleAdjuster.cpp, « Touch
+        // overflow scrolling creates a stacking context », iOS seulement). Posée
+        // sur <main> depuis la coque (28 sept.), elle enfermait TOUTES les
+        // feuilles de l'écran sous la barre du bas (z-index 60), quel que soit
+        // leur z-index : le « Reçu d'achat », « Supprimer ce compte », le rapport
+        // comptable… dont la fin et les boutons passaient dessous. Depuis iOS 13
+        // le défilement à inertie est natif : elle ne servait plus qu'à piéger.
+        // Banc `feuilles-coque.cjs`, qui applique la règle de WebKit.
+        overscrollBehaviorY:'contain',
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
