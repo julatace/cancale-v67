@@ -12134,6 +12134,9 @@ INACTIVES (annonces terminées SANS vente, qu'eBay garde 60 à 90 jours).
   détail brut, « pas lu » rangé vide). Banc `bancs/ebay-inactives.cjs` (port
   `BANC_PORT`, 390 tactile + 1512, données inventées, 44 contrôles) : **43 rouges
   sur le build de 789401d** (le 44ᵉ y lève), et 8 mutations de l'écran rouges.
+  ⚠️ §6.3 : `ebay-parcours.mjs` exécute `handleSync` dans un `vm` avec ses
+  dépendances injectées — il sert maintenant `rangerInactives` (sinon
+  `ReferenceError`, sur une route intacte).
 - ⚠️ **Non mesuré — rien n'a été envoyé à eBay** : la forme de `UnsoldList` vient
   de la doc d'eBay (présence de `WatchCount`, `GalleryURL`, `EndTime`, `SKU`,
   `RelistedItemID`, la limite réelle de `DurationInDays`) ; surtout, qu'eBay émette
