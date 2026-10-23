@@ -31317,10 +31317,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out;
   }, [photosTxAchats, suivisVinted, suivisManuels]);
-  const relireSuivisVinted = async () => {
+  // Les lectures rendent leur valeur (`null` = pas su) ; les poser se fait à part,
+  // pour que Ma journée pose les deux dans le MÊME rendu (§ vitesse : chaque
+  // rendu de cet écran coûte au téléphone).
+  const lireSuivisVintedVal = async () => {
     try {
       const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at`, { strict: true });
-      if (!Array.isArray(rows)) { setSuivisVinted(null); return; }
+      if (!Array.isArray(rows)) return null;
       const m = {};
       for (const r of rows) {
         const mm = /^harvest_(\w+?)_suivi_(\w+)$/.exec(String(r.id || '')); if (!mm) continue;
@@ -31329,9 +31332,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         m[`${uid}:${txId}`] = { uid, tx: txId, suivi: normaliserSuivi(r.suivi) || '', transporteur: String(r.transporteur || ''),
           nv: nouvelleVinted({ dernier: { t: r.dt, at: r.dat }, cap: r.cap }) };
       }
-      setSuivisVinted(prev => JSON.stringify(prev) === JSON.stringify(m) ? prev : m);
-    } catch (_) { setSuivisVinted(null); }
+      return m;
+    } catch (_) { return null; }
   };
+  const poserSuivisVinted = (m) => setSuivisVinted(prev => (m && prev && JSON.stringify(prev) === JSON.stringify(m)) ? prev : m);
+  const relireSuivisVinted = async () => { poserSuivisVinted(await lireSuivisVintedVal()); };
   // L'entrée d'index d'UN achat, seulement si elle est du MÊME compte (identité).
   const entreeSuiviAchat = (o) => {
     if (!o) return null;
@@ -31341,16 +31346,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return e;
   };
   const nouvelleDe = (o) => { const e = entreeSuiviAchat(o); return (e && e.nv) || null; };
-  const relireSuivisManuels = async () => {
+  const lireSuivisManuelsVal = async () => {
     try {
       const rows = await lireTout(`id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at`, { strict: true });
-      if (!Array.isArray(rows)) { setSuivisManuels(null); return; }
-      const l = rows.map(r => ({ id: String(r.id), suivi: normaliserSuivi(r.suivi), transporteur: String(r.transporteur || 'autre'), cp: normaliserCodePostal(r.cp), tx: r.tx ? String(r.tx) : '', uid: r.uid ? String(r.uid) : '', at: r.at || '' }))
+      if (!Array.isArray(rows)) return null;
+      return rows.map(r => ({ id: String(r.id), suivi: normaliserSuivi(r.suivi), transporteur: String(r.transporteur || 'autre'), cp: normaliserCodePostal(r.cp), tx: r.tx ? String(r.tx) : '', uid: r.uid ? String(r.uid) : '', at: r.at || '' }))
         .filter(x => x.suivi && x.id === idSuiviManuel(x.transporteur, x.suivi))
         .sort((a, b) => String(b.at).localeCompare(String(a.at)));
-      setSuivisManuels(prev => JSON.stringify(prev) === JSON.stringify(l) ? prev : l);
-    } catch (_) { setSuivisManuels(null); }
+    } catch (_) { return null; }
   };
+  const poserSuivisManuels = (l) => setSuivisManuels(prev => (l && prev && JSON.stringify(prev) === JSON.stringify(l)) ? prev : l);
+  const relireSuivisManuels = async () => { poserSuivisManuels(await lireSuivisManuelsVal()); };
   // Lue au montage, et RELUE quand l'extension prévient qu'un code vient d'être
   // lu dans une conversation (`maj retrait`, 5.155) — avant, elle n'était lue
   // qu'une fois : un code arrivé pendant qu'il regardait l'écran n'apparaissait
@@ -34796,7 +34802,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // l'ouverture et quand l'extension prévient (`maj suivi`). Scalaires seulement.
   useEffect(() => {
     if (curSub !== 'achats' && curSub !== 'journee') return;
-    relireSuivisVinted(); relireSuivisManuels();
+    let stop = false;
+    Promise.all([lireSuivisVintedVal(), lireSuivisManuelsVal()]).then(([v, m]) => { if (stop) return; poserSuivisVinted(v); poserSuivisManuels(m); });
+    return () => { stop = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);
   // La réponse de la route des emails mis de côté (la MÊME que Réglages lit,
