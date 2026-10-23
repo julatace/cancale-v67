@@ -329,11 +329,15 @@ async function abonnement(req, res) {
   // 22 oct. — les mentions de l'éditeur : trois états (`null` = pas su). Vides ⇒
   // le paiement est fermé (comme `prixConforme: false`) ; la LISTE de ce qui
   // manque ne part qu'au propriétaire, le seul qui peut la remplir.
-  const manque = mentionsManquantes(await lireMentions());
+  const lues = await lireMentions();
+  const manque = mentionsManquantes(lues);
   return repondre(res, 200, {
     ok: true,
     mentionsCompletes: manque === null ? null : manque.length === 0,
     mentionsManquantes: acc.proprietaire ? (manque === null ? null : manque.map((x) => x.libelle)) : undefined,
+    // 23 oct. (revue) : pourquoi « pas su » (l'erreur de lecture du fichier) —
+    // au propriétaire seul, comme la liste ; un vendeur n'en lit rien.
+    mentionsErreur: acc.proprietaire && manque === null ? String((lues && lues.erreur) || 'illisible') : undefined,
     proprietaire: acc.proprietaire,
     configure: stripePret(),
     modeTest: stripePret() ? stripeModeTest() : null,

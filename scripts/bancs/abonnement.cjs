@@ -39,7 +39,10 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
 const PRIX = { montant: 12.99, devise: 'eur', intervalle: 'month' };
-const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, prixConforme: true, prixStripe: null, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true };
+// ⚠️ 23 oct. — la forme du VRAI serveur : `mentionsCompletes` est TOUJOURS
+//    présent (true · false · null). L'omettre servait un état que le serveur ne
+//    rend jamais (§6.3), et l'app doit lire « absent » comme « pas su ».
+const base = { ok: true, proprietaire: false, configure: true, modeTest: true, obligatoire: false, prix: PRIX, prixConforme: true, prixStripe: null, statut: null, finPeriode: null, annuleFinPeriode: false, peutGerer: false, actif: false, acces: true, mentionsCompletes: true };
 const FACTURES = { ok: true,
   carte: { marque: 'visa', fin: '4242', mois: 12, annee: 2027 },
   factures: [
@@ -63,7 +66,11 @@ const ETATS = {
   // le paiement (503 `mentions-legales`) ; la liste ne part qu'au propriétaire.
   mentionsVides: { ...base, mentionsCompletes: false },
   proprietaireMentionsVides: { ...base, proprietaire: true, actif: true, mentionsCompletes: false, mentionsManquantes: ['SIRET', 'médiateur de la consommation'] },
-  proprietaireMentionsPasSu: { ...base, proprietaire: true, actif: true, mentionsCompletes: null, mentionsManquantes: null },
+  proprietaireMentionsPasSu: { ...base, proprietaire: true, actif: true, mentionsCompletes: null, mentionsManquantes: null, mentionsErreur: "Unexpected identifier 'Exemple'" },
+  // 23 oct. (revue) — mentions ILLISIBLES (editeur.js mal écrit : une apostrophe
+  // dans une chaîne entre apostrophes). Le serveur REFUSE le paiement (503
+  // `mentions-legales`, « pas su » = fermé) : l'écran ne doit rien proposer.
+  vendeurMentionsPasSu: { ...base, mentionsCompletes: null },
   // Revue du 11 octobre — ce que le VRAI serveur rend dans les états de la
   // transition (audit-abonnement.cjs exécute api/compte.js) :
   //  · un ANCIEN abonné (résilié, client Stripe) quand le prix diffère : ses
@@ -171,7 +178,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     console.log('\n── La carte suit ce que le serveur sait');
     const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire',
       ancienPrixDifferent: 'non-branche', actifPrixDifferent: 'actif', actifAncienPrix: 'actif', proprietaireUsd: 'proprietaire', proprietairePaliers: 'proprietaire',
-      mentionsVides: 'non-branche', proprietaireMentionsVides: 'proprietaire', proprietaireMentionsPasSu: 'proprietaire' };
+      mentionsVides: 'non-branche', proprietaireMentionsVides: 'proprietaire', proprietaireMentionsPasSu: 'proprietaire', vendeurMentionsPasSu: 'non-branche' };
     for (const [nom, rendu] of Object.entries(attendus)) {
       await essaie(nom, async () => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS[nom] });
@@ -193,6 +200,11 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
           dit(r.raison === 'mentions' && !r.sab && !r.cgv && b.length === 0 && /pas encore ouvert/i.test(t) && !/SIRET|médiateur|editeur/i.test(t),
             '  mentions vides : le paiement est dit fermé, ni case ni bouton, et aucun détail au vendeur', JSON.stringify(r) + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         }
+        if (nom === 'vendeurMentionsPasSu') {
+          const r = await pg.evaluate(() => { const e = document.querySelector('[data-abonnement]'); return { raison: e && e.getAttribute('data-raison'), sab: !!document.querySelector('[data-sabonner]'), cgv: !!document.querySelector('[data-case-cgv]') }; });
+          dit(r.raison === 'mentions' && !r.sab && !r.cgv && b.length === 0 && /pas encore ouvert/i.test(t) && !/12,99/.test(t) && !/editeur|apostrophe/i.test(t),
+            '  vendeur, mentions ILLISIBLES (le serveur refuse 503) : paiement dit fermé, ni case ni « S’abonner », aucun prix ni détail', JSON.stringify(r) + ' / ' + b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
+        }
         if (nom === 'proprietaireMentionsVides') {
           const w = await pg.evaluate(() => { const e = document.querySelector('[data-mentions-manquantes]'); return e ? { n: e.getAttribute('data-mentions-manquantes'), t: e.innerText } : null; });
           dit(!!w && w.n === '2' && /SIRET/.test(w.t) && /médiateur/.test(w.t) && /editeur\.js/.test(w.t) && /fermé/.test(w.t), '  propriétaire : la liste de ce qui manque et où le remplir', w ? w.t.replace(/\n/g, ' ').slice(0, 200) : 'rien');
@@ -200,6 +212,10 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         if (nom === 'proprietaireMentionsPasSu') {
           const w = await pg.evaluate(() => { const e = document.querySelector('[data-mentions-manquantes]'); return e ? { n: e.getAttribute('data-mentions-manquantes'), t: e.innerText } : null; });
           dit(!!w && w.n === 'pas-su' && /pas pu relire/.test(w.t), '  propriétaire, mentions illisibles : « pas pu relire », jamais « complet »', w ? w.t : 'rien');
+          // 23 oct. (revue) : la cause MESURÉE (l'erreur que le serveur a lue)
+          // et la plus probable, avec le fichier à corriger — pas un « pas pu » muet.
+          dit(!!w && /editeur\.js/.test(w.t) && /Unexpected identifier 'Exemple'/.test(w.t) && /apostrophe/.test(w.t),
+            '  … avec le fichier, l’erreur lue par le serveur et la cause la plus courante (une apostrophe)', w ? w.t.replace(/\n/g, ' ').slice(0, 220) : 'rien');
         }
         if (nom === 'proprietaire') dit(!(await pg.evaluate(() => !!document.querySelector('[data-mentions-manquantes]'))), '  propriétaire, mentions complètes ou pas dites : aucune alerte de mentions');
         // ── Revue du 11 octobre ──────────────────────────────────────────────
@@ -383,6 +399,8 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         ['prix Stripe ≠ CGV', { ...ETATS.prixDifferent, obligatoire: true, acces: false }],
         ['Stripe pas branché', { ...ETATS.nonBranche, obligatoire: true, acces: false }],
         ['mentions légales vides', { ...ETATS.mentionsVides, obligatoire: true, acces: false }],
+        // 23 oct. (revue) : « pas su » côté serveur = fermé (503) ; la porte aussi.
+        ['mentions légales ILLISIBLES (pas su)', { ...ETATS.vendeurMentionsPasSu, obligatoire: true, acces: false }],
       ]) {
         await essaie(`porte paiement fermé ${nom} ${largeur}`, async () => {
           const { ctx, pg, appels, erreurs } = await ouvrir(nav, { abo, tab: 'journee', largeur });

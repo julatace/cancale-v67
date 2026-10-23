@@ -11814,9 +11814,43 @@ mais rend `ads: []`. La mise en pause a été VUE dans ses gestes (23/09, 5.106)
   ou aucun onglet Vinted ⇒ rien. `audit-liaison-visite.cjs` (vrai
   `background.js`) : 10 contrôles, **5 rouges sur l'avant** ; mutations
   `sans-appel`, `toujours`, `sans-onglet`, `contourne-gardes` rouges.
+- **Revue du 23 octobre (nuit) — deux défauts reproduits, corrigés.**
+  1. ⚠️ **Mentions ILLISIBLES (« pas su ») : le serveur refusait le paiement (503),
+     la porte et la carte « Mon compte » proposaient quand même les deux cases et
+     « S'abonner »** (reproduit avec un `editeur.js` rempli à la main d'une
+     apostrophe dans une chaîne entre apostrophes : `nom: 'Julien d'Exemple'` ⇒
+     le fichier ne se charge plus, `mentionsCompletes: null`). C'est le défaut de
+     la revue du 11 octobre refait sur « pas su ». ⇒ L'app traite `null` (et
+     absent) comme le serveur : FERMÉ (`mentionsCompletes !== true`, porte et
+     carte, `data-raison="mentions"`). ≠ `prixConforme: null` (Stripe muet,
+     passager, le serveur relit au clic) : un fichier illisible le reste.
+     Le propriétaire lit l'erreur MESURÉE (`mentionsErreur`, à lui seul :
+     « Unexpected identifier 'Exemple' ») et la cause la plus courante
+     (l'apostrophe, avec le geste : des guillemets droits) ; `lireMentions` rend
+     `{erreur}` au lieu de `null` (`mentionsManquantes` rend toujours `null` ⇒
+     fermé). Banc `abonnement.cjs` (la forme du serveur : `mentionsCompletes`
+     toujours présent dans `base`) : **7 rouges sur le build de 39a9042**, 109
+     verts après ; mutation « `=== false` » ⇒ 6 rouges.
+     `audit-mentions-paiement.cjs` : + un `editeur.js` à apostrophe dans une
+     copie (fermé, vendeur sans l'erreur, propriétaire avec) — 1 rouge sur
+     39a9042 (l'erreur au propriétaire est neuve), mutations `erreur-a-tous`,
+     `sans-cause`, `passu-ouvert` rouges.
+  2. **§7 : le compte à rebours s'écrivait deux fois** (« … dans 57 secondes »
+     au-dessus de « Réessaie dans 57 s »). Là où un bouton grisé porte le
+     décompte (inscription, mot de passe oublié, « Renvoyer » d'un compte pas
+     confirmé, fenêtre « Changer mon email »), la phrase dit la cause SANS chiffre
+     (`TEXTE_DELAI_EMAIL_BOUTON`) ; ailleurs (aucun bouton ne le porte) elle
+     garde le nombre. Banc `attente-email.cjs` : contrôle qui COMPTE les nombres
+     de secondes à l'écran (1, jamais 2) + scénario D « Changer mon email »
+     (session de banc, `PUT /user` refusé) ; **12 rouges sur le build de
+     39a9042**, vert après ; mutation « phrase avec chiffre » ⇒ 8 rouges.
+     ⚠️ Son `pause(ms)` valait 0 ms (`pause(_pg, ms)` appelée à un argument) :
+     corrigé ; il charge maintenant `_porte-banc.cjs`.
 - **Non mesuré** : la vraie réponse de GoTrue au rendu (le texte vient de son
   code) ; Stripe réel ; la page de rétractation relue par un juriste ; la
-  visite relancée dans un vrai Chrome. `audit-extension-zip` est rouge tant que
+  visite relancée dans un vrai Chrome ; que Vercel embarque bien
+  `public/legal/editeur.js` dans la fonction (import dynamique au chemin
+  littéral : sinon `mentionsErreur` le dira au propriétaire). `audit-extension-zip` est rouge tant que
   la version n'est pas montée et le zip refait (à l'intégration).
 - **Gestes de Julien** : remplir `public/legal/editeur.js` (les 10 champs, dont
   le médiateur) ET `src/contact.js` — tant qu'ils sont vides, personne ne peut
