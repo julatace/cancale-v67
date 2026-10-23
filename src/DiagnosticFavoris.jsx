@@ -27,6 +27,9 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
     {etat.erreur&&<p role="alert">{etat.erreur}</p>}
     {etat.rapport&&<>
       <p role="status">{etat.rapport.reception==='aucune_capture'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis réessaie.':'Capture reçue. Tu peux partager ce diagnostic pour terminer le raccordement.'}</p>
+      {etat.rapport.traces?.versionExtension&&<p>Version enregistrée dans les traces : {etat.rapport.traces.versionExtension}.</p>}
+      {etat.rapport.traces?.observations?.some(x=>x.statut===401||x.statut===403)&&<p>Une lecture des notifications a été refusée par Vinted. Vérifie que le bon compte est accessible sur Vinted avant de réessayer.</p>}
+      {etat.rapport.traces?.observations?.some(x=>x.statut===429)&&<p>Vinted demande de ralentir. Attends avant de relancer la lecture.</p>}
       <button type="button" onClick={copier}>Copier le diagnostic</button>
       <pre tabIndex="0" aria-label="Diagnostic technique des favoris">{JSON.stringify(etat.rapport,null,2)}</pre>
     </>}
