@@ -15332,6 +15332,10 @@ function departDePreregle(p, maintenant) {
 // qu'on ne connaît pas s'affiche tel quel plutôt que d'être deviné.
 const NOMS_FRAIS_EBAY = { InsertionFee: 'mise en vente', SchedulingFee: 'programmation', GalleryFee: 'galerie', GalleryPlusFee: 'galerie plus', SubtitleFee: 'sous-titre', BoldFee: 'gras', FeaturedFee: 'mise en avant', InternationalInsertionFee: 'mise en vente internationale', ListingDesignerFee: 'modèle d\'annonce' };
 const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+// (23 octobre, revue) Un prix eBay avec SA devise : « 95,00 € », « 95,00 USD »,
+// devise inconnue ⇒ aucun symbole. UNE règle pour la carte des annonces et les
+// inactives (§11) — `eurEbay` ajoutait « € » à un prix en dollars (« 95,00 € USD »).
+const prixEbayTexte = (n, c) => Number(n).toFixed(2).replace('.', ',') + (c ? ` ${c === 'EUR' ? '€' : c}` : '');
 // Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
 // montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
 // programmée), la mise en vente, puis tout autre frais non nul.
@@ -17633,7 +17637,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce terminée sur eBay.');if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
-  const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?n.toFixed(2).replace('.',',')+(c?` ${c==='EUR'?'€':c}`:''):'';};
+  const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?prixEbayTexte(n,c):'';};
   const j = (() => { const t = Date.parse(it.depuis || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); })();
   const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
   const d = it.detail || {};
@@ -18531,6 +18535,216 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
   );
 }
 
+// ── eBay · INACTIVES : terminées SANS vente (23 octobre) ─────────────────────
+// Julien demandait si les onglets de l'app eBay sont dans VRM : il manquait
+// « Inactives » — les annonces terminées sans vente, qu'eBay garde 60 à 90 jours.
+// LECTURE SEULE : VRM ne remet RIEN en vente (une remise en vente peut coûter des
+// frais d'insertion chez eBay — §2, §3) ; chaque ligne mène à SA page eBay.
+// La liste vient de `ebay_inactives{_clé}`, rangée par la synchro et la relecture
+// sans geste, dans le MÊME GetMyeBaySelling que les annonces en ligne (aucun
+// appel de plus). TROIS états — jamais lue · lue vide · lue — et « pas su » ;
+// plus (revue du 23 octobre) « ancienne ».
+// ⚠️ Rien de ce qui PROTÈGE ne lit cette liste (garde de publication, anti
+//    double vente, règles d'offre) : une inactive n'est pas en vente.
+// ⚠️ Le N° seulement par le SKU (`numEbayLu`), lu avec la date de PUBLICATION :
+//    une annonce d'avant la remise à zéro (013) parle de l'ancienne série (§5).
+// ⚠️ « Retirer d'eBay » une paire vendue sur Vinted l'envoie ICI. « Remettre en
+//    vente » n'est donc pas proposé pour une paire vendue ailleurs (`ventes`), ni
+//    pour une paire déjà de retour sur eBay sous une AUTRE annonce (`dejaSurEbay`,
+//    `relanceeEn`), ni tant que ses ventes n'ont pas pu être vérifiées : le lien
+//    reste, il dit « Voir sur eBay ».
+// ⚠️⚠️ (revue du 23 octobre) UNE CAPTURE ANCIENNE N'EST PAS LA LISTE DU JOUR. Un
+//    conteneur `UnsoldList` absent vaut « pas lu » (décision : la dernière
+//    capture n'est jamais écrasée par une liste vide) — mais alors rien ne la
+//    remplaçait ni ne la vieillissait : rangée il y a 95 jours, elle s'affichait
+//    « Inactives (1) · ces 60 derniers jours » au-dessus d'une annonce terminée il
+//    y a 100 jours, avec « Remettre en vente ». Une capture est ANCIENNE quand
+//    elle n'a pas été relue depuis 24 h, ou quand les annonces EN LIGNE du même
+//    compte ont été relues APRÈS elle (plus de 15 min d'écart : la route les
+//    range dans le MÊME appel — eBay ne l'a donc pas rendue à cette relecture).
+//    Ancienne ⇒ l'âge est dit (« lue le … »), aucun « (N) », « Voir sur eBay »
+//    seulement. Et une annonce terminée hors de la fenêtre de 60 jours n'est
+//    jamais montrée (la route ne la range plus non plus).
+// ⚠️ (revue) « La liste se lit à la prochaine relecture » n'est pas promis quand
+//    une relecture des annonces a DÉJÀ eu lieu sans rendre la liste : eBay ne la
+//    rend peut-être pas quand il n'y a rien (non mesuré) — on dit ce qui est su.
+// ⚠️ (revue, §7) Une panne déjà dite sur l'écran (ventes illisibles, registre
+//    eBay illisible) n'est pas redite ici : `dejaDit` porte ce que l'écran a
+//    déjà écrit ; la section garde ses `data-*` (le banc les lit).
+const INACTIVES_PAGE = 20;
+const INACTIVES_JOURS = 60;   // la fenêtre demandée à eBay (`DurationInDays`, api/ebay.js)
+const INACTIVES_FRAICHE_MS = 24 * 3600000;   // au-delà, une capture est « ancienne »
+const INACTIVES_ECART_MS = 15 * 60000;       // annonces en ligne relues plus tard que ça ⇒ eBay n'a pas rendu les inactives
+const URL_ITEM_EBAY = (id) => /^\d{1,19}$/.test(String(id || '')) ? `https://www.ebay.fr/itm/${id}` : '';
+// « Terminée dans la fenêtre » : une fin illisible est GARDÉE (eBay l'a mise
+// dans sa liste des 60 jours — mieux vaut un blanc qu'un faux).
+const dansFenetreInactives = (fin, maintenant) => { const t = Date.parse(fin || ''); return !Number.isFinite(t) || t >= maintenant - INACTIVES_JOURS * 86400000; };
+function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku }) {
+  const E = EBAY_SKIN;
+  // undefined en cours · null registre illisible · { lignes: [{compte, ligne}] }
+  const [lu, setLu] = React.useState(undefined);
+  const [voirTout, setVoirTout] = React.useState(false);
+  React.useEffect(() => {
+    if (comptesEbay === undefined) return undefined;
+    if (comptesEbay === null) { setLu(null); return undefined; }
+    let stop = false;
+    lireEbayParCompte('ebay_inactives', 'items:data->items,complet:data->>complet,capturedAt:data->>capturedAt', comptesEbay)
+      .then((r) => { if (!stop) setLu(r || null); }, () => { if (!stop) setLu(null); });
+    return () => { stop = true; };
+  }, [comptesEbay, tick]);
+  const maintenant = Date.now();
+  const comptesVue = lu && Array.isArray(lu.lignes) ? lu.lignes.filter((x) => !vue || vue === '*' || (x.compte && x.compte.ref === vue)) : [];
+  const illisibles = comptesVue.filter((x) => x.ligne === undefined).map((x) => x.compte);
+  const jamais = comptesVue.filter((x) => x.ligne === null).map((x) => x.compte);
+  // Les comptes LUS, chacun avec l'âge de SA capture.
+  const lues = comptesVue.filter((x) => x.ligne && typeof x.ligne === 'object').map((x) => {
+    const cap = Number(x.ligne.capturedAt);
+    const ann = annoncesLuesA && typeof annoncesLuesA.get === 'function' ? annoncesLuesA.get(x.compte && x.compte.ref) : undefined;
+    const ancienne = !(cap > 0) || maintenant - cap > INACTIVES_FRAICHE_MS || (Number.isFinite(ann) && ann - cap > INACTIVES_ECART_MS);
+    return { ...x, cap: cap > 0 ? cap : null, ancienne };
+  });
+  const fraiches = lues.filter((x) => !x.ancienne), anciennes = lues.filter((x) => x.ancienne);
+  const lignes = lues.flatMap((x) => marquerEbay(Array.isArray(x.ligne.items) ? x.ligne.items : [], x.compte).map((l) => (l && typeof l === 'object' ? { ...l, _ancienne: x.ancienne } : l)))
+    .filter((l) => l && /^\d{1,19}$/.test(String(l.itemId || '')) && dansFenetreInactives(l.fin, maintenant))
+    .sort((a, b) => (Date.parse(b.fin || '') || 0) - (Date.parse(a.fin || '') || 0));
+  const etat = lu === undefined ? 'charge'
+    : (lu === null || illisibles.length) ? 'pas-su'
+    : !lues.length ? 'jamais'
+    : !fraiches.length ? 'ancienne'
+    : lignes.length ? 'lu' : 'vide';
+  // Le CHIFFRE seulement quand la liste est entière ET du jour (§5 : un total
+  // partiel présenté comme complet est pire qu'un total absent).
+  const entiere = etat === 'lu' && !jamais.length && !anciennes.length && fraiches.every((x) => String(x.ligne.complet) !== 'false');
+  const plafond = etat === 'lu' && !jamais.length && !anciennes.length && !entiere;   // eBay en a plus que la page lue
+  const melange = Array.isArray(comptesEbay) && comptesEbay.length >= 2 && new Set(lignes.map((l) => l._compte)).size > 1;
+  const plusieurs = comptesVue.length >= 2;
+  const nomsDe = (l) => l.map((c) => nomCompteEbay(c)).join(', ');
+  // Une relecture des annonces a-t-elle déjà eu lieu pour ces comptes jamais lus ?
+  const relusSansListe = jamais.filter((c) => { const ann = annoncesLuesA && typeof annoncesLuesA.get === 'function' ? annoncesLuesA.get(c.ref) : undefined; return Number.isFinite(ann) && ann > 0; });
+  const sousEtatJamais = jamais.length && relusSansListe.length === jamais.length ? 'non-rendue' : 'pas-relue';
+  const vendus = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus : null;
+  // Ventes pas vérifiées : « pas su » (une source illisible) ou en cours (on
+  // attend, sans rien dire). Dans les deux cas, pas de « Remettre en vente ».
+  const pasSuVentes = ventes && Array.isArray(ventes.pasSu) ? ventes.pasSu : [];
+  const ventesPasSu = !vendus || pasSuVentes.length > 0;
+  const ventesEnCours = !!(ventes && ventes.enCours);
+  // §7 : ce que l'écran a DÉJÀ dit de cette panne n'est pas redit ici.
+  const dits = new Set(Array.isArray(dejaDit) ? dejaDit : []);
+  const nonDits = pasSuVentes.filter((l) => !dits.has(l) && !(l === 'tes annonces Leboncoin' && dits.has('tes ventes Leboncoin')));
+  const verifDiteAilleurs = dits.size > 0 && nonDits.length === 0;
+  const enLigneVinted = enLigne && typeof enLigne.has === 'function' && Array.isArray(paires);
+  const idsSurEbay = surEbay && surEbay.ids && typeof surEbay.ids.has === 'function' ? surEbay.ids : null;
+  const parNumSurEbay = surEbay && surEbay.parNum && typeof surEbay.parNum.get === 'function' ? surEbay.parNum : null;
+  // Une inactive reliée par son SKU a besoin du verdict « vendue ailleurs ? » :
+  // l'écran le fait lire (`aVerifier`) même sans aucune annonce en ligne.
+  const avecSku = lignes.some((l) => numDeSkuEbay(l.sku));
+  React.useEffect(() => { if (onSku) onSku(avecSku); }, [avecSku]);
+  const vues = voirTout ? lignes : lignes.slice(0, INACTIVES_PAGE);
+  let attenteVerif = 0;
+  const lienS = { flexShrink: 0, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 2px', fontSize: 12.5, fontWeight: 700, color: E.accentSoft, textDecoration: 'none', whiteSpace: 'nowrap' };
+  const rendues = vues.map((l) => {
+    const t = Date.parse(l.fin || '');
+    const finJour = Number.isFinite(t) ? partsParis(t).date : '';
+    const pub = Date.parse(l.depuis || '');
+    const n = numEbayLu(l.sku, l.itemId, Number.isFinite(pub) ? pub : null, l.depuis);
+    const vendue = n && vendus ? vendus.get(n) : null;
+    // (revue) La MÊME annonce vue en ligne (ou programmée) ET inactive : les deux
+    // captures se contredisent — « à relire », jamais « de nouveau en vente ».
+    const memeEnLigne = !!(idsSurEbay && idsSurEbay.has(String(l.itemId)));
+    // « Déjà de nouveau en vente » seulement sous une AUTRE annonce (ou la même
+    // paire sous un autre N°, `via`) — une identité d'annonce, §5.
+    const d = !memeEnLigne && n && dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(n) : null;
+    const autres = n && parNumSurEbay ? parNumSurEbay.get(n) : null;
+    const deja = d && (d.via || !autres || [...autres].some((id) => id !== String(l.itemId))) ? d : null;
+    const relancee = /^\d{1,19}$/.test(String(l.relanceeEn || '')) ? String(l.relanceeEn) : '';
+    const surVinted = !!(n && enLigneVinted && paires.some((p) => cleNum(p.num) === n));
+    const verifManque = !!(n && !vendue && (ventesPasSu || ventesEnCours));
+    if (n && !vendue && ventesPasSu) attenteVerif++;
+    const relancer = !l._ancienne && !vendue && !deja && !relancee && !memeEnLigne && !verifManque;
+    const url = URL_ITEM_EBAY(l.itemId);
+    const prix = Number(String(l.price || '').replace(',', '.'));
+    const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
+      : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
+      : relancee ? 'déjà remise en vente sur eBay'
+      : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
+      : surVinted ? 'encore en ligne sur Vinted' : '';
+    return (
+      <div key={(l._compte || '') + l.itemId} data-ebay-inactive={l.itemId} data-inactive-num={n || ''} data-inactive-fin={finJour}
+        data-inactive-compte={l._compte || ''}
+        {...(l._ancienne ? { 'data-inactive-ancienne': '1' } : {})}
+        {...(vendue ? { 'data-inactive-vendue': vendue } : {})}
+        {...(memeEnLigne || relancee || deja ? { 'data-inactive-deja': memeEnLigne ? 'a-relire' : relancee ? 'relancee' : (deja.etat || 'en-vente') } : {})}
+        {...(surVinted ? { 'data-inactive-vinted': 'en-ligne' } : {})}
+        style={{ display: 'flex', flexWrap: 'wrap', gap: '0 10px', alignItems: 'center', padding: '6px 0', borderTop: `1px solid ${E.border}` }}>
+        <PhotoVente src={l.photo || null} size={44} />
+        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{ color: n ? E.text : E.muted, fontWeight: 700 }}>{n ? `N°${n}` : 'pas reliée'}</span> · {l.title || l.itemId}</div>
+          <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
+            {/* (revue) Le prix avec SA devise, la règle de la carte des annonces (§11). */}
+            {Number.isFinite(prix) && prix > 0 ? <><span data-inactive-prix="1">{prixEbayTexte(prix, l.currency)}</span>{' · '}</> : ''}
+            {finJour ? `terminée le ${jourParisTexte(finJour)}` : 'date de fin inconnue'}
+            {Number.isInteger(l.observateurs) && l.observateurs > 0 ? ` · ${l.observateurs} observateur${l.observateurs > 1 ? 's' : ''}` : ''}
+            {melange ? ` · ${nomCompteEbay((comptesEbay || []).find((c) => c.ref === l._compte) || { pseudo: l._pseudo })}` : ''}
+            {etatLigne ? <span data-inactive-etat="1">{` · ${etatLigne}`}</span> : null}
+          </div>
+        </div>
+        {url && (relancer
+          ? <a href={url} target="_blank" rel="noreferrer" data-inactive-relancer={url} style={lienS}>Remettre en vente sur eBay ↗</a>
+          : <a href={url} target="_blank" rel="noreferrer" data-inactive-voir={url} style={lienS}>Voir sur eBay ↗</a>)}
+      </div>
+    );
+  });
+  // Pas d'eBay relié (ou pas encore su) et rien de rangé : on ne promet pas une
+  // relecture qui n'aura pas lieu. (Après les crochets : un retour anticipé
+  // avant eux changerait leur nombre d'un rendu à l'autre.)
+  if (connected !== true && (etat === 'charge' || etat === 'jamais')) return null;
+  // §7 : le registre eBay illisible est déjà dit par l'écran (« Je n'ai pas pu
+  // lire tes annonces eBay ») — ici, une pastille, pas une phrase de plus.
+  const pasSuDitAilleurs = etat === 'pas-su' && comptesEbay === null;
+  const fraichesVides = fraiches.filter((x) => !lignes.some((l) => l._compte === x.compte.ref));
+  const noteVide = fraichesVides.length > 0 && (etat === 'vide' || anciennes.length > 0 || jamais.length > 0);
+  const quandCap = (c) => (c ? 'le ' + quandParisTexte(c) : 'à une date inconnue');
+  const plusVieille = anciennes.reduce((m, x) => (x.cap != null && (m == null || x.cap < m) ? x.cap : m), null);
+  const petit = { fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 4 };
+  return (
+    <div data-ebay-inactives={etat}
+      {...(entiere ? { 'data-ebay-inactives-n': lignes.length } : {})}
+      {...(plafond ? { 'data-ebay-inactives-aumoins': lignes.length } : {})}
+      {...(jamais.length ? { 'data-inactives-jamais': sousEtatJamais, 'data-inactives-jamais-comptes': jamais.map((c) => c.ref).join(',') } : {})}
+      {...(anciennes.length ? { 'data-inactives-anciennes': anciennes.map((x) => x.compte.ref).join(','), ...(plusVieille != null ? { 'data-inactives-lue-le': partsParis(plusVieille).date } : {}) } : {})}
+      {...(attenteVerif > 0 ? { 'data-inactives-verif': attenteVerif } : {})}
+      {...(pasSuDitAilleurs || (attenteVerif > 0 && verifDiteAilleurs) ? { 'data-inactives-dit': 'ecran' } : {})}
+      style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 auto', fontSize: 16, fontWeight: 800, color: E.text }}>
+          Inactives sur eBay{entiere ? ` (${lignes.length})` : plafond ? ` (au moins ${lignes.length})` : ''}{' '}
+          <Pourquoi label="Inactives : pourquoi VRM ne remet rien en vente">Les annonces terminées sans vente ces {INACTIVES_JOURS} derniers jours, telles qu'eBay les garde. VRM ne les remet pas en vente lui-même : une remise en vente peut coûter des frais d'insertion chez eBay — c'est toi qui décides, sur eBay.</Pourquoi>
+        </div>
+        {pasSuDitAilleurs && <span data-inactives-pastille="pas-lue" style={{ fontSize: 11.5, fontWeight: 700, color: E.muted, border: `1px solid ${E.border}`, borderRadius: 999, padding: '2px 8px' }}>pas lue</span>}
+      </div>
+      {etat === 'charge' && <div style={{ fontSize: 12.5, color: E.muted }}>Chargement…</div>}
+      {etat === 'jamais' && <div data-inactives-note="jamais" style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5 }}>{sousEtatJamais === 'non-rendue'
+        ? `Pas encore rendue par eBay${plusieurs ? ` (${nomsDe(jamais)})` : ''} : VRM la demande à chaque relecture eBay (toute seule, l'app ouverte) ; eBay ne la rend peut-être pas tant qu'il n'y a aucune annonce terminée sans vente.`
+        : 'Pas encore lue — elle se lit avec la relecture eBay (toute seule, l\'app ouverte).'}</div>}
+      {etat === 'pas-su' && !pasSuDitAilleurs && <div data-inactives-note="pas-su" data-inactives-illisibles={illisibles.map((c) => c.ref).join(',')} style={{ fontSize: 12.5, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces inactives{illisibles.length && Array.isArray(comptesEbay) && comptesEbay.length >= 2 ? ` (${nomsDe(illisibles)})` : ''} — rien n'est perdu, réessaie dans un instant.</div>}
+      {noteVide && <div data-inactives-note="vide" style={{ ...petit, fontSize: 12.5 }}>Aucune annonce terminée sans vente ces {INACTIVES_JOURS} derniers jours{plusieurs && fraichesVides.length < comptesVue.length ? ` sur ${nomsDe(fraichesVides.map((x) => x.compte))}` : ''}.</div>}
+      {anciennes.length > 0 && <div data-inactives-note="ancienne" style={petit}>{anciennes.length === 1
+        ? `Lue ${quandCap(anciennes[0].cap)}${plusieurs ? ` (${nomCompteEbay(anciennes[0].compte)})` : ''} — pas relue depuis : elle a pu changer sur eBay. La remise en vente se fait sur eBay.`
+        : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis : elles ont pu changer sur eBay. La remise en vente se fait sur eBay.`}</div>}
+      {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours · la remise en vente se fait sur eBay.</div>}
+      {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
+      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces paires sont vendues` : 'une de ces paires est vendue'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
+      {rendues}
+      {!voirTout && lignes.length > INACTIVES_PAGE && (
+        <button type="button" data-inactives-plus="1" onClick={() => setVoirTout(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 4, border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 8, padding: '0 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Voir plus — {INACTIVES_PAGE} affichées sur {lignes.length}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── eBay · ANNONCES (captées par l'API officielle) ──────────────────────────
 // Julien : « l'extension ne capte rien, pourtant j'ai des annonces » — en fait
 // elles ÉTAIENT captées (ebay_listings), mais aucun onglet ne les montrait (le
@@ -18858,6 +19072,15 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // retrait automatique et la garde de publication — le sélecteur ne change que
   // ce qu'on VOIT (`vue`), jamais ce qui protège.
   const [items, setItems] = React.useState(undefined); // undefined=en cours · null=pas su · []=lu
+  // (23 octobre) Les INACTIVES se chargent seules ; ce compteur les fait relire
+  // à chaque rechargement de l'écran (après une synchro, une publication).
+  const [inactivesTick, setInactivesTick] = React.useState(0);
+  const [inactivesSku, setInactivesSku] = React.useState(false);   // une inactive reliée par son SKU ⇒ vérifier les ventes
+  // (23 octobre, revue) QUAND les annonces en ligne de chaque compte ont été
+  // rangées (ref → ms · null jamais · undefined illisible) : la route range les
+  // inactives dans le MÊME appel ; des annonces relues plus tard qu'elles disent
+  // qu'eBay ne les a pas rendues à cette relecture (`EbayInactives`).
+  const [annoncesLuesA, setAnnoncesLuesA] = React.useState(null);
   // ── LA RÈGLE D'OFFRE (9 octobre) : `ebay_offres{_clé}` de chaque compte. ──
   // `regles` : undefined en cours · { map, illisibles }. Les gestes posent un
   // état LOCAL (`reglesLocales`, même clé `${ref}:${itemId}`) qui prime sur la
@@ -18984,10 +19207,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const charger = React.useCallback(async () => {
     lireBrouillonsEbay().then((b) => setBrouillons(b));
     if (comptesEbay === undefined) return;
+    setInactivesTick((t) => t + 1);
     chargerProgrammees();
     if (comptesEbay === null) { setItems(null); setCommandes(null); setRegles({ map: new Map(), illisibles: new Set(['*']) }); setVentesEbayLues(null); return; }
     const [L, O, RG] = await Promise.all([
-      lireEbayTous('ebay_listings', 'items:data->items', 'items', comptesEbay),
+      lireEbayTous('ebay_listings', 'items:data->items,capturedAt:data->>capturedAt', 'items', comptesEbay),
       // Les commandes eBay : seulement la liste (§4.4), pour « vendue sur eBay » —
       // et (9 octobre) QUAND elles ont été relues (la fenêtre où eBay vend
       // sans que VRM le voie, dite à côté des règles d'offre).
@@ -18995,6 +19219,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       lireReglesEbay(comptesEbay),
     ]);
     setRegles(RG); setReglesLocales(new Map()); setPrixLocaux(new Map());
+    setAnnoncesLuesA(L && Array.isArray(L.lignes) ? new Map(L.lignes.map(({ compte, ligne }) => [compte.ref, ligne === undefined ? undefined : (ligne && Number(ligne.capturedAt) > 0 ? Number(ligne.capturedAt) : null)])) : null);
     setVentesEbayLues(O ? new Map(O.lignes.map(({ compte, ligne }) => [compte.ref, ligne === undefined ? undefined : (ligne && Number(ligne.capturedAt) > 0 ? Number(ligne.capturedAt) : null)])) : null);
     // Annonces : les comptes lisibles sont montrés, l'illisible est NOMMÉ ;
     // tous illisibles ⇒ « pas su » (comme avant).
@@ -19054,7 +19279,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     || (Array.isArray(commandes) && commandes.some((o) => o && Array.isArray(o.lineItems) && o.lineItems.some((li) => li && numDeSkuEbay(li.sku))))
     || listeProgrammees.some((p) => p && numDeSkuEbay(p.sku))
     || !!(brouillons && typeof brouillons === 'object' && Object.keys(brouillons).length)
-    || connected === true || !!ouvrirBrouillon;
+    || connected === true || !!ouvrirBrouillon || inactivesSku;
   // Les ventes Leboncoin (5 Ko, projetées §4.4) : une paire vendue LÀ-BAS ne se
   // programme pas sur eBay. TROIS états : `undefined` en cours · `null` pas su
   // (la base n'a pas répondu) · objet lu (`{}` = aucune vente captée).
@@ -19324,6 +19549,22 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     }
     return m;
   }, [pris, programmees, listeProgrammees, paires]);
+  // (23 octobre, revue) Les annonces eBay EN LIGNE ou PROGRAMMÉES, par
+  // identifiant et par N° : une inactive n'est « déjà de nouveau en vente » que
+  // sous une AUTRE annonce, et la MÊME annonce vue des deux côtés est « à relire ».
+  const surEbayIds = React.useMemo(() => {
+    const ids = new Set(), parNum = new Map();
+    const ajoute = (x) => {
+      if (!x || x.itemId == null) return;
+      const id = String(x.itemId); ids.add(id);
+      const k = numEbayLu(x.sku, x.itemId, null, x.depuis);
+      if (k) { if (!parNum.has(k)) parNum.set(k, new Set()); parNum.get(k).add(id); }
+    };
+    for (const a of (Array.isArray(items) ? items : [])) ajoute(a);
+    for (const x of ((programmees && typeof programmees === 'object' && Array.isArray(programmees.enLigne)) ? programmees.enLigne : [])) ajoute(x);
+    for (const p of listeProgrammees) ajoute(p);
+    return { ids, parNum };
+  }, [items, programmees, listeProgrammees]);
   const surSku = React.useCallback((itemId, sku) => {
     setItems((l) => Array.isArray(l) ? l.map((a) => String(a.itemId) === String(itemId) ? { ...a, sku } : a) : l);
   }, []);
@@ -19388,7 +19629,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // (16 oct., « premium » au téléphone) La LISTE des annonces est l'information
   // principale de l'écran : la mise en vente reste en haut, les brouillons et les
   // programmées passent SOUS la liste (`outilsSuite`), les notes aussi.
-  const outilsSuite = (<>
+  // (23 octobre, revue) Une FONCTION de ce que l'écran a déjà dit d'une panne
+  // (`dits`, les sources de `lignePasSu` et du bloc des règles) : les inactives
+  // ne la redisent pas (§7). Appelée là où ces lignes sont calculées.
+  const outilsSuite = (dits) => (<>
     <EbayBrouillons brouillons={brouillons} connected={connected} paires={paires} vue={vueSeule ? vue : '*'} comptesPub={comptesPub}
       onModifier={(d) => setOuvrirBrouillon({ ...d })}
       onPlanifier={(ids) => setPlanif(ids)}
@@ -19409,10 +19653,13 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         setProgrammees((p) => (p && typeof p === 'object' ? { ...p, items: (p.items || []).filter((x) => String(x.itemId) !== itemId) } : p));
         remettreBrouillon(itemId);
       }} />
+    {/* (23 octobre) Les annonces terminées SANS vente — lecture seule. */}
+    <EbayInactives comptesEbay={comptesEbay} tick={inactivesTick} vue={vueSeule ? vue : '*'} connected={connected}
+      ventes={ventesConnues} dejaSurEbay={dejaSurEbay} surEbay={surEbayIds} annoncesLuesA={annoncesLuesA} dejaDit={dits}
+      paires={paires} enLigne={enLigne} onSku={setInactivesSku} />
   </>);
   // (16 octobre, revue) « Vendre une paire » vient EN PREMIER, avant les
   // alertes : c'est le geste qu'on vient faire ici. `outils` ne garde que la suite.
-  const outils = outilsSuite;
   // Annuler la programmation d'une paire vendue sur Vinted : la réponse d'eBay
   // est dite telle quelle (l'annulation par l'API n'est pas garantie).
   const annulerVendue = async (d) => {
@@ -19693,15 +19940,15 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     );
   })();
   if (baseKO) return wrap(<>{head()}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un instant.</div></>);
-  if (items === undefined) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
-  if (items === null) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
+  if (items === undefined) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Chargement…</div></>);
+  if (items === null) return wrap(<>{head()}{publier}{alertes}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10 }}>Je n'ai pas pu lire tes annonces eBay. Réessaie dans un instant.</div></>);
   // Les annonces du compte affiché (ou de tous) — l'union reste derrière pour
   // ce qui protège (`dv`, `pris`, `dejaSurEbay`).
   const itemsVue = items.filter((a) => dansVue(a));
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outils}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (section « Compte ») et synchronise.'}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Pas d\'annonce en ligne sur ce compte eBay.' : 'Pas encore d\'annonce eBay en ligne.'} {connected === true ? 'Mets une paire en vente ci-dessus — elle apparaîtra ici.' : 'Connecte ton compte eBay (section « Compte ») et synchronise.'}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -19922,7 +20169,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux paires : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
       </div>
     )}
-      {outilsSuite}
+      {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
     </div>
   </>);
 }
