@@ -30,6 +30,12 @@
 const { metaVersData } = require('./_meta.cjs');
 const { chromium } = require('playwright');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
+const TEINTES = (() => {
+  const src = ['src/App.jsx', 'src/themeMineral.js'].map((f) => { try { return fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8'); } catch (_) { return ''; } }).join('\n');
+  const rgb = (h) => { const n = parseInt(h.slice(1), 16); return `rgb(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255})`; };
+  const lis = (cle) => [...new Set([...src.matchAll(new RegExp(cle + "\\s*:\\s*['\"](#[0-9a-fA-F]{6})['\"]", 'g'))].map((m) => rgb(m[1])))];
+  return { ROUGE: lis('danger'), AMBRE: lis('warn') };
+})();
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6301;
 
@@ -164,8 +170,11 @@ async function sain(pg, ecran) {
         });
         dit(j.n === '5', 'Ma journée : « À envoyer » vaut 5', 'lu ' + j.n);
         dit(!!j.job && j.job.n === '4', 'Ma journée : une ligne compte les 4 colis pressés (en retard, estimée dépassée, aujourd’hui, demain) — pas celui dû dans 5 jours', JSON.stringify(j.job));
-        // §7 : danger = #C0392B (clair) / #FF6B6B (sombre) ; avertissement = #A15C00 / #FFB23E.
-        const ROUGE = ['rgb(192, 57, 43)', 'rgb(255, 107, 107)'], AMBRE = ['rgb(161, 92, 0)', 'rgb(255, 178, 62)'];
+        // §7 : danger / avertissement LUS dans les palettes de l'app (App.jsx et la
+        // palette Perle, themeMineral.js) — jamais recopiés : la palette change
+        // (23 oct. : l'ambre Perle est #965900) et un banc qui garde l'ancienne
+        // teinte crie au loup.
+        const { ROUGE, AMBRE } = TEINTES;
         dit(!!j.job && !j.teintes.some((x) => ROUGE.includes(x)) && j.teintes.some((x) => AMBRE.includes(x)), 'Ma journée : la ligne « colis-limite » est AMBRE, jamais rouge (§7 : le rouge est pour deux paires sous un même N°)', j.teintes.filter((x) => ROUGE.includes(x) || AMBRE.includes(x)).join(' · ') || 'ni rouge ni ambre');
         dit(!!j.job && j.job.heure === '07:00' && /en retard — c'était avant 7 h aujourd'hui/.test(j.job.txt) && /Lima Runner/.test(j.job.txt), 'Ma journée : la ligne dit l’heure du plus pressé et le nomme (« en retard — c’était avant 7 h aujourd’hui »)', j.job ? j.job.txt.slice(0, 160) : 'ligne absente');
         await pg.screenshot({ path: path.join(os.tmpdir(), 'colis-heure-journee-' + vp.width + '.png'), fullPage: true }).catch(() => {});
