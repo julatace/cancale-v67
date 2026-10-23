@@ -96,7 +96,7 @@
  .vrm-main .vrm-achats .vrm-pickup-codes:has(>.vrm-pickup-code:nth-child(2)){grid-column:2/4!important;grid-row:2;flex-wrap:wrap;}
 }
 .vrm-main .vrm-achats .vrm-pickup-point>div:last-child{display:block!important;}
-.vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-code,.vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>.vrm-pickup-code{flex:0 0 auto!important;width:max-content!important;min-width:110px!important;grid-template-columns:max-content 14px!important;}
-@media(max-width:767px){.vrm-main .vrm-achats .vrm-pickup-card>.vrm-pickup-code,.vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>.vrm-pickup-code{min-width:88px!important;}}
+.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{flex:0 0 auto!important;width:max-content!important;min-width:110px!important;max-width:none!important;grid-template-columns:max-content 14px!important;}
+@media(max-width:767px){.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{min-width:88px!important;}}
 :root:not([data-theme=dark]) .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#dce9df!important;color:#213b41!important;}
 @media(min-width:1000px){.vrm-message-workspace .vrm-msg-av{width:36px!important;height:36px!important;border-radius:50%!important;}.vrm-message-workspace .vrm-msg-av img{border-radius:50%!important;}}

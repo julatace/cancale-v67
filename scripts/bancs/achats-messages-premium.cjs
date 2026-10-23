@@ -219,7 +219,7 @@ const capturer = async (pg, nom, vp) => {
               if (!info || !code || !bouton) return null;
               const a=info.getBoundingClientRect(), b=code.getBoundingClientRect(), c=bouton.getBoundingClientRect();
               const chiffre=code.querySelector('strong').getBoundingClientRect(), copie=code.querySelector('small').getBoundingClientRect();
-              return {aligne:b.left>=a.right-1&&chiffre.right<=copie.left+1, compact:c.height<=48, code:code.querySelector('strong')?.innerText};
+              return {aligne:b.left>=a.right-1&&chiffre.right<=copie.left+1&&chiffre.left>=b.left&&copie.right<=b.right+1, compact:c.height<=48, code:code.querySelector('strong')?.innerText};
             }).filter(Boolean));
             dit(lignes.length>0 && lignes.every(x=>x.aligne&&x.compact), `${T} codes à droite des articles et confirmation compacte`, JSON.stringify(lignes));
           }
