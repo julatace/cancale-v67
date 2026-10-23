@@ -10962,7 +10962,10 @@ Julien : « trouve autre chose pour la carte, il y a besoin d'une API key ». CA
 **Mesuré (lecture seule, `panel_diag_capture` de Julien, extension 5.211)** :
 `vinted_frein_429` = 23 = `photos_page_refuse_429` = 23 — les 23 « trop de
 demandes » venaient TOUS d'une page d'annonce lue pour ses photos ; paliers de
-pause 1/2/3 : 24/2/1 ; `visite_en_pause` = 119 visites sautées ; dernière pause le
+pause 1/2/3 : 24/2/1, soit **27 pauses = 23 (les 429, tous d'une page photo) + 4
+(des 403, `vinted_frein_403` = 4, sur d'AUTRES requêtes : aucun
+`photos_page_refuse_403`)** — rien n'est promis sur la disparition des pauses ;
+`visite_en_pause` = 119 visites sautées ; dernière pause le
 22 à 05:10 (`quoi: page`). Cause : `capterPhotosAnnonces` lisait jusqu'à 20 pages
 d'affilée, sans écart, à chaque minute (`tickPhotos`) ET à la fin de chaque visite.
 Et sur ses **49 annonces en ligne, 4** ont leur description dans
@@ -11008,6 +11011,55 @@ montés** (à l'intégration) : `audit-extension-zip` et le contrôle de version
 d'`audit-preuve-vente` sont rouges tant que la 5.211 n'est pas montée et le zip
 régénéré ; les 65 autres audits qui exécutent l'extension sont verts. **Geste de Julien**, une fois l'extension installée : ouvrir
 « Modifier » puis « Enregistrer » sur ses annonces déjà en ligne.
+
+**Revue du 23 octobre — quatre défauts reproduits sur 5f6943d, corrigés** (même branche, extension toujours non montée) :
+- ⚠️⚠️ **Un message « fiche » se FORGEAIT.** `content.js` relaie tout message
+  étiqueté de la page : n'importe quel script de vinted.fr postait `{kind:'fiche',
+  itemId: <n'importe laquelle de ses annonces>}` SANS aucune requête chez Vinted,
+  le texte remplaçait la description rangée et partait dans les files Leboncoin et
+  eBay, publié sous son nom (reproduit : « Paye-moi hors plateforme… » dans la file).
+  Le rapport du chantier disait « au pire une de ses annonces jusqu'à sa prochaine
+  modification » : c'était sous-estimé. ⇒ `ficheDeLaPage` juge l'ONGLET émetteur
+  (`sender`, posé par le navigateur) : une modification n'est rangée que de l'onglet
+  qui montre CETTE annonce (`/items/{id}/edit` ou `/items/{id}`) ou qui l'a ouverte
+  en édition il y a moins de 30 min (`vrmOngletsAnnonces`, noté par
+  `tabs.onUpdated` : la page peut changer d'adresse juste après l'enregistrement) ;
+  une publication, que de l'onglet dont la réservation de numéro vient d'être liée
+  à CETTE annonce (`vrmOngletsPublications`, posé par `noterPublication`) ; sans
+  provenance, rien. ⚠️ **Reste, dit tel quel** : un script de la page peut changer
+  l'adresse de SON onglet (`history.pushState`) vers `/items/{X}/edit` puis forger
+  la fiche de X — la falsification vaut pour l'annonce que montre l'onglet, plus
+  pour toutes ses annonces de n'importe quelle page ; et un tel script peut de toute
+  façon modifier l'annonce chez Vinted lui-même, avec sa session.
+- **La fiche ignorait « Non, ignorer ce compte »** et les comptes supprimés
+  définitivement : `noterFicheVinted` passe maintenant par `compteNonCapte` (la
+  porte des cinq autres captures, 5.191) ; cookie illisible ⇒ on capte, comme elles.
+- **Vinted lent ⇒ la même annonce partait plusieurs fois d'affilée** (4 tours
+  d'alarme pendant qu'une page tarde : `800@0s, 800@240s ×3`). `tickPhotos` est
+  SÉRIALISÉ (promesse en vol + verrou daté `vrmPhotosTour` de 3 min dans
+  `chrome.storage.local`, qui survit à un redémarrage du service worker) ; le mémo
+  de l'annonce est enregistré AVANT la requête (`majMemoPhotos`, clé par clé sur la
+  valeur relue) ; l'écart de 45 s se compte depuis la RÉPONSE ; et `vintedGetHtml`
+  est borné à 30 s (`AbortController`) — sans ça une page muette tenait la file
+  Vinted entière (bordereaux, réponses, ventes derrière elle).
+- **« Les photos étaient la SEULE cause des pauses » était faux** (commentaire et
+  ce dossier) : 23 des 27 (tous les 429) ; 4 sont des 403 ailleurs. Corrigé.
+- **Prouvé** : `audit-fiche-modif.cjs` 35 contrôles — **7 rouges sur 5f6943d**
+  (copie `git archive`, audit lancé depuis elle), 0 après, 3 mutations nouvelles
+  rouges (onglet ignoré, publication sans réservation, compte refusé ignoré) ;
+  `audit-photos-etalees.cjs` 43 contrôles — **7 rouges sur 5f6943d**, 0 après,
+  5 mutations nouvelles rouges (tours non sérialisés, verrou retiré, mémo après la
+  page, écart depuis le départ, page sans délai). `_fond-vm.cjs` passe le signal
+  d'interruption au faux Vinted (non énumérable). Les 70 audits qui exécutent
+  l'extension relancés un par un : verts sauf les 2 attendus tant que la version
+  n'est pas montée (`audit-extension-zip`, contrôle de version
+  d'`audit-preuve-vente`) ; bancs `badge`, `popup`, `session`, `numero-vinted`
+  verts. **Non mesuré** : l'adresse exacte de la page de modification de Vinted
+  (`/items/{id}/edit` supposée, `/items/edit/{id}` acceptée aussi — jamais vue
+  d'ici) et que `sender.tab.url` d'un vrai Chrome la porte au moment du relais
+  (une navigation APRÈS l'enregistrement est couverte par `vrmOngletsAnnonces`) :
+  une fiche refusée à tort se verra au compteur `fiche_onglet_refuse` de
+  `panel_diag_capture` ; la durée réelle d'une page photo chez lui.
 
 ---
 
