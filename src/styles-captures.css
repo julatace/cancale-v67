@@ -100,3 +100,10 @@
 @media(max-width:767px){.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>button.vrm-pickup-code,.vrm-app-shell .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>button.vrm-pickup-code{min-width:88px!important;}}
 :root:not([data-theme=dark]) .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{background:#dce9df!important;color:#213b41!important;}
 @media(min-width:1000px){.vrm-message-workspace .vrm-msg-av{width:36px!important;height:36px!important;border-radius:50%!important;}.vrm-message-workspace .vrm-msg-av img{border-radius:50%!important;}}
+
+.vrm-favoris-diagnostic{margin:0 0 12px;border:1px solid var(--vrm-line);border-radius:8px;background:var(--vrm-surface);padding:0 12px;color:var(--vrm-ink);font-size:12px;}
+.vrm-favoris-diagnostic>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:600;}
+.vrm-favoris-diagnostic p{color:var(--vrm-muted);line-height:1.6;}
+.vrm-favoris-diagnostic button{font:inherit;min-height:44px;padding:8px 12px;margin:0 8px 10px 0;border:1px solid var(--vrm-line);border-radius:6px;background:var(--vrm-card2);color:var(--vrm-ink);cursor:pointer;}
+.vrm-favoris-diagnostic button:disabled{opacity:.55;cursor:default;}
+.vrm-favoris-diagnostic pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;font-size:11px;padding:10px;background:var(--vrm-card2);border-radius:6px;}

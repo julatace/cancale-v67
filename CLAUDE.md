@@ -101,7 +101,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
 | supprimer une annonce automatiquement | irréversible et sans confirmation côté Vinted. |
-| envoyer des messages en série aux favoris | **Vinted ne dit jamais QUI a mis en favori** (mesuré : aucun endpoint, aucun champ). Il n'y a pas de destinataire. La remise aux favoris de Vinted, elle, touche tout le monde en un clic. |
+| messages automatiques aux favoris | **Nouvelle demande explicite du 23 octobre** : Julien souhaite 10 destinataires maximum par heure et par compte et accepte le risque. Le compteur des annonces ne donne pas les identités ; le capteur de notifications peut en recevoir, mais son rapprochement avec la conversation reste à vérifier. Aucun envoi actif à cette date. Voir `docs/passation/2026-10-23-favoris.md` pour les limites et la suite. |
 
 **Ce qui EST autorisé et automatique** : générer un bordereau et récupérer son
 PDF (ça n'engage aucun argent, la vente est faite, le colis doit partir), et
