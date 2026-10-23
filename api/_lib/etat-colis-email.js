@@ -37,7 +37,14 @@ function lire(texte){
  const t=normaliser(texte);if(!t)return null;
  const negatif=/(?:n[' ]a\s+pas|n[' ]avez\s+pas|pas\s+encore|non)\s+(?:ete\s+)?(?:retire|recupere|receptionne)|(?:n'a|n'avez)\s+(?:toujours\s+|encore\s+)?pas\s+(?:encore\s+)?(?:ete\s+)?(?:retire|recupere|receptionne)/.test(t);
  const retrait=/\b(?:a|ont)\s+(?:bien\s+)?ete\s+(?:retire|recupere)|\b(?:vous\s+)?avez\s+(?:bien\s+)?(?:retire|recupere)|merci\s+d'avoir\s+(?:bien\s+)?(?:retire|recupere)|\bcolis\s+(?:bien\s+)?(?:retire|recupere)|\b(?:retire|recupere)\s+(?:le\s+\d|par\s+(?:l'acheteur|le\s+destinataire|vous))|retrait\s+(?:du|de\s+votre|de\s+ton)\s+colis\s+(?:confirme|effectue)|remis\s+(?:au\s+destinataire|en\s+mains?\s+propres)/.test(t);
- if(retrait&&!negatif)return 'delivered';
+ // (23 oct.) RETIRÉ PAR LE DESTINATAIRE, en néerlandais (DPD, mesuré : « Uw pakket
+ // is afgehaald door de ontvanger » — le destinataire est NOMMÉ). ⚠️ L'espagnol
+ // « Tu envío ha sido recogido » n'y est PAS, exprès : « recogido » dit aussi la
+ // RELÈVE par le transporteur — mesuré, 6 des 8 lignes portent le n° d'une
+ // « Confirmation du dépôt de votre colis » (ses propres envois). Sans preuve
+ // que c'est le destinataire, ce n'est pas un retrait (une ligne « info »).
+ const retireNl=/\b(?:af|op)gehaald\s+door\s+de\s+ontvanger\b/.test(t);
+ if((retrait||retireNl)&&!negatif)return 'delivered';
  // (23 oct.) LE COLIS EST REPARTI CHEZ L'EXPÉDITEUR — seulement dans une phrase
  // qui le CONSTATE (passé ou présent), jamais dans une phrase qui pose une
  // condition ou annonce l'avenir : « s'il n'est pas retiré, il sera retourné »,

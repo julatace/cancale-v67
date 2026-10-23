@@ -47,8 +47,10 @@ const MUTATIONS = {
   'premiere-date': ['api/_lib/retrait-colis.js', "  if (!cands.length) return null;", "  if (!cands.length) return null; return cands[0].date;"],
   'annee-avant-absente': ['api/_lib/retrait-colis.js', "for (const y of [r.y - 1, r.y, r.y + 1]) {", "for (const y of [r.y, r.y + 1]) {"],
   'widget-sans-identite': ['api/widget.js', "    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(", "    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, null && sortisDepuisPhoto("],
-  'widget-retire-ignore': ['api/widget.js', "        if (x.s === 'delivered') return true;", ""],
-  'widget-retour-ignore': ['api/widget.js', "        if (x.s === 'retour' && (!arr || !Number.isFinite(d) || d >= arr)) return true;", ""],
+  // (23 oct., soir) Le widget lit LA règle partagée par n° de suivi
+  // (api/_lib/suivi-colis.js, `sortiParSuivis`) : les deux mutations la visent.
+  'widget-retire-ignore': ['api/_lib/suivi-colis.js', "    if (f.retire) return 'retire';", ""],
+  'widget-retour-ignore': ['api/_lib/suivi-colis.js', "    if (f.retours.some((d) => !Number.isFinite(arriveeMs) || !arriveeMs || d == null || d >= arriveeMs)) reparti = true;", ""],
   'widget-vinted-releve-ignore': ['api/widget.js', "      return (pubAt != null && Number.isFinite(cap) && cap > pubAt) ? true : false;", "      return false;"],
   'widget-photo-muette': ['api/widget.js', "      pickupPhoto: pubRetirer && pubRetirer.nonRelus > 0 &&", "      pickupPhoto: false &&"],
 };
