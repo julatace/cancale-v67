@@ -26,6 +26,19 @@ import { decoderEntitesHtml } from './entites-html.js';
 // « à retirer » : il est « à vérifier » (sans doute reparti ou déjà retiré).
 // Ce n'est PAS une date : c'est un seuil d'affichage, et il est écrit comme tel.
 export const GARDE_MAX_J = 7;
+// (revue du 23 oct.) LA GARDE MESURÉE DE CHAQUE TRANSPORTEUR, quand l'e-mail
+// n'a pas d'échéance lisible : Mondial Relay 5 j (21/10 → « RETRAIT JUSQU'AU
+// 26/10 »), Vinted Go 6 j (arrivé le 19/09, « avant le 25/09/2026 »), Chronopost
+// la plus COURTE mesurée, 4 j (25/08 → 29/08, 19/09 → 23/09). Avec 7 j pour
+// tous, le Mondial Relay 38235759 (« RETRAIT JUSQU'AU 26/10 », date jamais
+// rangée) restait « à retirer » le 27 et le 28, deux jours après son départ.
+// Au-delà, le colis passe « à vérifier » : TOUJOURS VISIBLE avec son code — seul
+// son compte « à retirer » change. Ce n'est pas une date : c'est un seuil.
+export const GARDE_PAR_TRANSPORTEUR = { mondialrelay: 5, vinted: 6, chronopost: 4 };
+export const gardeDe = (transporteur) => {
+  const g = GARDE_PAR_TRANSPORTEUR[String(transporteur || '').toLowerCase().trim()];
+  return Number.isFinite(g) ? g : GARDE_MAX_J;
+};
 
 const MOIS = { janvier: 1, fevrier: 2, février: 2, mars: 3, avril: 4, mai: 5, juin: 6, juillet: 7,
   aout: 8, août: 8, septembre: 9, octobre: 10, novembre: 11, decembre: 12, décembre: 12 };
@@ -62,7 +75,9 @@ function jourDeReception(recuLe) {
 function avecAnnee(jour, mois, recuLe) {
   const r = jourDeReception(recuLe);
   if (!r) return null;
-  for (const y of [r.y, r.y + 1]) {
+  // (revue du 23 oct.) L'année d'AVANT aussi : « jusqu'au 31/12 » reçu le
+  // 1er janvier est la veille (la borne annoncée), pas une date de l'an prochain.
+  for (const y of [r.y - 1, r.y, r.y + 1]) {
     const t = dateValide(y, mois, jour);
     if (t == null) continue;
     const ecartJ = Math.round((t - r.t) / 86400000);
@@ -75,29 +90,53 @@ function avecAnnee(jour, mois, recuLe) {
 
 // LA DATE LIMITE DE RETRAIT écrite dans l'e-mail, ou null.
 // `recuLe` (ISO) sert seulement à une date écrite sans année.
+// ⚠️ (revue du 23 oct.) TOUTES les dates « jusqu'au / avant le » sont relevées,
+// pas la première venue : « Offre valable jusqu'au 15/11 » au-dessus de
+// « RETRAIT JUSQU'AU 26/10 » gardait le colis « à retirer » jusqu'au 15/11. On
+// préfère celle qui suit un mot de RETRAIT (« retrait », « retirer »,
+// « récupère ») ; à défaut, celles de la fenêtre [veille, +30 j] de la
+// réception. Plusieurs dates qui se contredisent ⇒ rien (on ne devine pas).
+const MOT_RETRAIT = /retrait|retir|r[ée]cup[ée]r|r[ée]cup[eè]re/i;
 export function limiteRetraitDepuisTexte(texte, recuLe) {
   // Les lignes gardées d'un ancien e-mail portent encore leurs entités
   // (« jusqu&rsquo;au ») : décodées d'abord, comme la route le fait (§11).
   const all = decoderEntitesHtml(texte || '');
   if (!all) return null;
+  const cands = [];
+  const note = (date, m) => {
+    if (!date) return;
+    const avant = all.slice(Math.max(0, m.index - 40), m.index + m[0].length);
+    cands.push({ date, retrait: MOT_RETRAIT.test(avant) });
+  };
   // 1) Avec l'année (formes d'avant : « jusqu'au vendredi 21 août 2026 »,
   //    « jusqu'au 21/08/2026 », « À retirer avant le 29/09/2026 »).
-  const mTxt = all.match(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)\\s+(\\d{4})`, 'i'));
-  if (mTxt) {
-    const mo = MOIS[mTxt[2].toLowerCase()];
-    if (mo && dateValide(+mTxt[3], mo, +mTxt[1]) != null) return `${mTxt[3]}-${pad(mo)}-${pad(+mTxt[1])}`;
+  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)\\s+(\\d{4})`, 'gi'))) {
+    const mo = MOIS[m[2].toLowerCase()];
+    if (mo && dateValide(+m[3], mo, +m[1]) != null) note(`${m[3]}-${pad(mo)}-${pad(+m[1])}`, m);
   }
-  const mNum = all.match(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})[\\/.](\\d{1,2})[\\/.](\\d{4})`, 'i'));
-  if (mNum && dateValide(+mNum[3], +mNum[2], +mNum[1]) != null) return `${mNum[3]}-${pad(+mNum[2])}-${pad(+mNum[1])}`;
+  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})[\\/.](\\d{1,2})[\\/.](\\d{4})`, 'gi'))) {
+    if (dateValide(+m[3], +m[2], +m[1]) != null) note(`${m[3]}-${pad(+m[2])}-${pad(+m[1])}`, m);
+  }
   // 2) SANS l'année (23 oct., mesuré : Mondial Relay « RETRAIT JUSQU'AU 26/10 »).
-  const nNum = all.match(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})[\\/.](\\d{1,2})(?![\\/.]?\\d)`, 'i'));
-  if (nNum) { const l = avecAnnee(+nNum[1], +nNum[2], recuLe); if (l) return l; }
-  const nTxt = all.match(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)(?!\\s+\\d{4})`, 'i'));
-  if (nTxt) {
-    const mo = MOIS[nTxt[2].toLowerCase()];
-    if (mo) { const l = avecAnnee(+nTxt[1], mo, recuLe); if (l) return l; }
+  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})[\\/.](\\d{1,2})(?![\\/.]?\\d)`, 'gi'))) {
+    note(avecAnnee(+m[1], +m[2], recuLe), m);
   }
-  return null;
+  for (const m of all.matchAll(new RegExp(`${AV}\\s+${JOURS}\\s*(\\d{1,2})\\s+([a-zà-ÿ]+)(?!\\s+\\d{4})`, 'gi'))) {
+    const mo = MOIS[m[2].toLowerCase()];
+    if (mo) note(avecAnnee(+m[1], mo, recuLe), m);
+  }
+  if (!cands.length) return null;
+  const r = jourDeReception(recuLe);
+  const dansFenetre = (d) => {
+    if (!r) return true;
+    const t = tJour(d); if (t == null) return false;
+    const e = Math.round((t - r.t) / 86400000);
+    return e >= -1 && e <= 30;
+  };
+  const unique = (l) => { const d = [...new Set(l.map((c) => c.date))]; return d.length === 1 ? d[0] : null; };
+  const duRetrait = cands.filter((c) => c.retrait);
+  if (duRetrait.length) return unique(duRetrait) || unique(duRetrait.filter((c) => dansFenetre(c.date)));
+  return unique(cands.filter((c) => dansFenetre(c.date)));
 }
 
 // LE LIEU tel que l'e-mail l'écrit dans les lignes gardées autour d'un code
@@ -132,23 +171,38 @@ export const LIEU_AU_FUTUR = /prochains?\s+jours|prochainement|d[èe]s\s+(?:son|
 //   limite     : 'AAAA-MM-JJ' ou null (lue dans l'e-mail, jamais devinée) ;
 //   arriveeMs  : l'arrivée (ou une borne : « arrivé au plus tard ») ;
 //   aujourdhui : 'AAAA-MM-JJ' (le jour de l'appelant ; par défaut celui de l'appareil).
-const jourDe = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+// ⚠️ (revue du 23 oct.) LE JOUR À L'HEURE DE PARIS, pas celui du processus : sur
+// Vercel (UTC), une arrivée à 00 h 30 à Paris tombait la VEILLE, et le widget
+// disait « à vérifier » un jour avant l'app (§11 : un nombre, deux écrans).
+let FMT_PARIS = null;
+const jourDe = (ms) => {
+  try {
+    FMT_PARIS = FMT_PARIS || new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const p = FMT_PARIS.formatToParts(new Date(ms));
+    const v = (k) => (p.find((x) => x.type === k) || {}).value;
+    if (v('year') && v('month') && v('day')) return `${v('year')}-${v('month')}-${v('day')}`;
+  } catch (_) { /* repli : le jour de l'appareil */ }
+  const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 const tJour = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? dateValide(+m[1], +m[2], +m[3]) : null; };
 export function joursAvantLimite(limite, aujourdhui) {
   const fin = tJour(limite), auj = tJour(aujourdhui);
   if (fin == null || auj == null) return null;
   return Math.round((fin - auj) / 86400000);
 }
-export function etatRetrait({ limite = null, arriveeMs = null } = {}, maintenant = Date.now(), aujourdhui = null) {
+//   transporteur : 'mondialrelay' · 'chronopost' · 'vinted' (Vinted Go) · autre ⇒
+//                  la garde mesurée de ce transporteur (`gardeDe`), sinon GARDE_MAX_J.
+export function etatRetrait({ limite = null, arriveeMs = null, transporteur = '' } = {}, maintenant = Date.now(), aujourdhui = null) {
   const auj = aujourdhui || jourDe(maintenant);
   const j = limite ? joursAvantLimite(limite, auj) : null;
   if (j != null) return j < 0 ? { etat: 'delai_depasse', jours: j } : { etat: 'a_retirer', jours: j };
+  const garde = gardeDe(transporteur);
   if (Number.isFinite(arriveeMs) && arriveeMs > 0) {
     const age = joursAvantLimite(auj, jourDe(arriveeMs));
-    if (age != null && age > GARDE_MAX_J) return { etat: 'trop_long', age };
-    return { etat: 'a_retirer', age };
+    if (age != null && age > garde) return { etat: 'trop_long', age, garde };
+    return { etat: 'a_retirer', age, garde };
   }
-  return { etat: 'a_retirer' };
+  return { etat: 'a_retirer', garde };
 }
 export const estAVerifier = (e) => !!e && (e.etat === 'delai_depasse' || e.etat === 'trop_long');
 
@@ -157,25 +211,41 @@ export const estAVerifier = (e) => !!e && (e.etat === 'delai_depasse' || e.etat 
 export function urgenceTri(e) {
   if (!e) return Infinity;
   if (Number.isFinite(e.jours)) return e.jours;
-  if (Number.isFinite(e.age)) return GARDE_MAX_J - e.age;
+  if (Number.isFinite(e.age)) return (Number.isFinite(e.garde) ? e.garde : GARDE_MAX_J) - e.age;
   return Infinity;
 }
 
 // ── CE QUE L'APP PUBLIE, RELU PAR LE WIDGET (§11) ────────────────────────────
 // L'app publie `vrm_colis_retirer.colis` = la liste des colis qu'elle compte
-// « à retirer » ([limite|'', arriveeMs|0]). Le widget la RELIT avec la règle
-// ci-dessus au moment où il s'affiche : un colis dont la limite passe pendant
-// que l'app est fermée sort de son compte, sans attendre la prochaine ouverture.
+// « à retirer » : [limite|'', arriveeMs|0, transporteur|'', identité]. Le widget
+// la RELIT avec la règle ci-dessus au moment où il s'affiche : un colis dont la
+// limite passe pendant que l'app est fermée sort de son compte, sans attendre la
+// prochaine ouverture.
+// ⚠️ (revue du 23 oct.) ET UN COLIS QUI EST SORTI DU POINT RELAIS DEPUIS LA PHOTO
+// en sort aussi : l'identité de chaque colis compté (« e:<n° de suivi> » pour un
+// colis d'e-mail, « v:<compte>:<transaction> » pour un achat Vinted) est publiée,
+// et `sorti(identité, entrée)` dit ce que le widget a RELU depuis : true (retiré,
+// reparti, plus au point relais) · false (toujours là) · null (pas su : identité
+// absente — une publication d'avant — ou lecture ratée). Sans cette relecture,
+// un colis retiré ou reparti après la dernière ouverture de l'app restait compté
+// « à retirer » jusqu'à sa date limite, et le nombre se disait complet. Ce que le
+// widget n'a pas pu relire est COMPTÉ (`nonRelus`) : l'appelant le dit.
 // Absente ou illisible ⇒ null (« pas su » : l'appelant retombe sur ce qu'il sait).
-export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null) {
+export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null) {
   if (!pub || typeof pub !== 'object' || !Array.isArray(pub.colis)) return null;
-  let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0;
+  let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0, sortis = 0, nonRelus = 0;
   for (const c of pub.colis) {
     if (!Array.isArray(c)) return null;
-    const e = etatRetrait({ limite: c[0] || null, arriveeMs: Number(c[1]) || null }, maintenant, aujourdhui);
+    const cle = typeof c[3] === 'string' ? c[3] : '';
+    if (typeof sorti === 'function') {
+      const s = cle ? sorti(cle, c) : null;
+      if (s === true) { sortis++; continue; }
+      if (s !== false) nonRelus++;
+    }
+    const e = etatRetrait({ limite: c[0] || null, arriveeMs: Number(c[1]) || null, transporteur: c[2] || '' }, maintenant, aujourdhui);
     if (estAVerifier(e)) { aVerifier++; continue; }
     n++;
     if (Number.isFinite(e.jours) && e.jours <= 1) urgents++;
   }
-  return { n, aVerifier, urgents, at: Number.isFinite(pub.at) ? pub.at : null };
+  return { n, aVerifier, urgents, sortis, nonRelus, at: Number.isFinite(pub.at) ? pub.at : null };
 }

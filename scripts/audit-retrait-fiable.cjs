@@ -23,17 +23,34 @@ const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const MUTATIONS = {
   'limite-ignoree': ['api/_lib/retrait-colis.js', 'const j = limite ? joursAvantLimite(limite, auj) : null;', 'const j = null;'],
   'limite-passee-a-retirer': ['api/_lib/retrait-colis.js', "return j < 0 ? { etat: 'delai_depasse', jours: j }", "return j < 0 ? { etat: 'a_retirer', jours: j }"],
-  'annee-absente': ['api/_lib/retrait-colis.js', '  if (nNum) { const l = avecAnnee(+nNum[1], +nNum[2], recuLe); if (l) return l; }', ''],
-  'widget-sans-nouveaux': ['api/widget.js', 'const nouveauxEmail = pubRetirer ? await colisEmailDepuis(m.vrm_colis_retirer, retiresMain, today) : 0;', 'const nouveauxEmail = 0;'],
+  'annee-absente': ['api/_lib/retrait-colis.js', '    note(avecAnnee(+m[1], +m[2], recuLe), m);', ''],
+  'widget-sans-nouveaux': ['api/widget.js', 'const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus) : 0;', 'const nouveauxEmail = 0;'],
   'widget-rappel-double': ['api/widget.js', "    if (cle && vus.has(cle)) continue;", ''],
   'widget-sans-vinted': ['api/widget.js', "    const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today) : 0;", '    const nouveauxVinted = 0;'],
   'widget-vinted-masque': ['api/widget.js', "    if (u && masques.has(u)) continue;", ''],
   'entites-en-espace': ['api/_lib/entites-html.js', "export function decoderEntitesHtml(s) {\n  return String(s == null ? '' : s)", "export function decoderEntitesHtml(s) {\n  return String(s == null ? '' : s).replace(/&[#a-z0-9]+;/gi, ' ')"],
   'annonce-sans-code-a-retirer': ['api/email-inbound.js', "  if (status === 'available' && !code && annonceArriveeFuture(all)) { status = 'transit'; label = 'En transit'; lieu = null; }", ''],
   'retour-cle-commune': ['api/email-inbound.js', "  if (t.status === 'retour') return `retour-${id}`;", ''],
-  'retour-sans-statut': ['api/_lib/etat-colis-email.js', " if(retour)return 'retour';", ''],
+  'retour-sans-statut': ['api/_lib/etat-colis-email.js', " if(phrases(texte).some(estUnRetour))return 'retour';", ''],
   'app-limite-extrait': ['src/App.jsx', "if(!d.limite&&(d.extraitCode||d.extraitLieu)){", "if(false){"],
   'app-annonce-a-retirer': ['src/App.jsx', "if(d.status==='available'&&d.lieu&&LIEU_AU_FUTUR.test(d.lieu)&&!codeRetrait(d.code)&&!d.qrB64&&!d.qrUrl)return", "if(false)return"],
+  // ── revue du 23 oct. ──
+  'rappel-expire-present': ['api/_lib/etat-colis-email.js', "(?:est|a)\\s+(?:bien\\s+)?(?:depasse|expire|ecoule)", "(?:est\\s+|a\\s+)?(?:bien\\s+)?(?:depasse|expire|ecoule)"],
+  'retour-sans-condition': ['api/_lib/etat-colis-email.js', "const estUnRetour=(ph)=>!CONDITION.test(ph)&&", "const estUnRetour=(ph)=>"],
+  'rappel-sujet-ignore': ['api/_lib/etat-colis-email.js', "if(parCorps==='retour'&&(SUJET_RAPPEL.test(s)||", "if(parCorps==='retour'&&(false||"],
+  'attend-ignore': ['api/_lib/etat-colis-email.js', "||phrases(corps).some((p)=>!CONDITION.test(p)&&ATTEND.test(p))))return 'available';", "))return 'available';"],
+  'ordre-ignore': ['api/_lib/etat-colis-email.js', "if(!plusRecent&&precedent?.status==='available'&&", "if(false&&precedent?.status==='available'&&"],
+  'retour-ressuscite': ['api/_lib/etat-colis-email.js', "if(!plusRecent&&precedent?.status==='retour'&&", "if(false&&precedent?.status==='retour'&&"],
+  'date-email-ignoree': ['api/email-inbound.js', "const plusRecent = !!(emailAt && prevLigne", "const plusRecent = !!(false && emailAt && prevLigne"],
+  'garde-unique': ['api/_lib/retrait-colis.js', "return Number.isFinite(g) ? g : GARDE_MAX_J;", "return GARDE_MAX_J;"],
+  'jour-du-processus': ['api/_lib/retrait-colis.js', "    if (v('year') && v('month') && v('day')) return", "    if (false) return"],
+  'premiere-date': ['api/_lib/retrait-colis.js', "  if (!cands.length) return null;", "  if (!cands.length) return null; return cands[0].date;"],
+  'annee-avant-absente': ['api/_lib/retrait-colis.js', "for (const y of [r.y - 1, r.y, r.y + 1]) {", "for (const y of [r.y, r.y + 1]) {"],
+  'widget-sans-identite': ['api/widget.js', "    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(", "    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, null && sortisDepuisPhoto("],
+  'widget-retire-ignore': ['api/widget.js', "        if (x.s === 'delivered') return true;", ""],
+  'widget-retour-ignore': ['api/widget.js', "        if (x.s === 'retour' && (!arr || !Number.isFinite(d) || d >= arr)) return true;", ""],
+  'widget-vinted-releve-ignore': ['api/widget.js', "      return (pubAt != null && Number.isFinite(cap) && cap > pubAt) ? true : false;", "      return false;"],
+  'widget-photo-muette': ['api/widget.js', "      pickupPhoto: pubRetirer && pubRetirer.nonRelus > 0 &&", "      pickupPhoto: false &&"],
 };
 if (process.argv.includes('--prouve')) {
   let ok = 0;
@@ -87,7 +104,7 @@ global.fetch = async (url, opts = {}) => {
   const filtresMeta = [...u.searchParams.entries()].filter(([k]) => /^meta->>/.test(k)).map(([k, v]) => [k.slice(7), v.replace(/^eq\./, '')]);
   const lignes = [...base.entries()].map(([k, d]) => { const i = k.indexOf('|'); return { owner: k.slice(0, i), id: k.slice(i + 1), data: d }; })
     .filter((l) => (!own || l.owner === own) && (exact ? l.id === exact : like ? like.test(l.id) : true))
-    .filter((l) => filtresMeta.every(([k, v]) => String(l.data && l.data[k]) === v));
+    .filter((l) => filtresMeta.every(([k, v]) => { const x = String(l.data && l.data[k]); const m = /^in\.\((.*)\)$/.exec(v); return m ? m[1].split(',').map((y) => y.replace(/^"|"$/g, '')).includes(x) : x === v; }));
   if (sel && sel !== 'data' && sel !== 'id,data' && sel !== 'owner,data') {
     return rep(lignes.map((l) => {
       const o = {};
@@ -276,6 +293,113 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     dit(c.pickup === 3, 'widget : la liste de l\'app relue (1 dans le délai, 1 limite passée ⇒ sortie) + le colis e-mail ET l\'achat Vinted arrivés APRÈS la publication = 3', `pickup=${c.pickup} · nouveaux=${c.pickupNouveaux}`);
     dit(c.pickupNouveaux === 2, 'widget : deux nouveaux — ni le rappel d\'un colis déjà compté, ni un colis d\'avant la publication, ni un coché retiré, ni un colis envoyé, ni un délai dépassé, ni un achat déjà vu, ni un compte masqué', `nouveaux=${c.pickupNouveaux}`);
     dit(c.pickupAVerifier === 1 && c.pickupSource === 'app' && c.pickupAuMoins === false, 'widget : « à vérifier » dit à part, la source est l\'app', `aVerifier=${c.pickupAVerifier} source=${c.pickupSource} auMoins=${c.pickupAuMoins}`);
+  });
+
+  // ══ REVUE DU 23 OCTOBRE ═══════════════════════════════════════════════════
+  await essaie('revue — un rappel n\'est pas un retour (règle)', async () => {
+    const E = await importer('api/_lib/etat-colis-email.js');
+    const ec = E.etatColisDepuisTexte;
+    // Quatre tournures CONDITIONNELLES ou au présent (des rappels) : jamais « retour ».
+    const conds = [
+      ['Rappel : récupère ton colis avant le 26/10/2026', "Ton colis t'attend dans la consigne Vinted Go. Attention : ton délai de retrait expire demain."],
+      ['Mise à jour de votre colis', "Si votre colis n'a pas été retiré dans les délais, il sera retourné à l'expéditeur."],
+      ['Mise à jour de votre colis', "Si ton colis n'a pas été récupéré à temps, il repartira chez le vendeur."],
+      ['Mise à jour de votre colis', "Passé ce délai, si le colis n'a pas été retiré dans le délai, il est retourné à l'expéditeur."],
+      ['Libère de la place dans la consigne : récupère ton colis sans attendre !', "Une fois le délai de retrait dépassé, il sera renvoyé au vendeur et tu seras remboursé."],
+    ];
+    for (const [sj, b] of conds) dit(ec(sj, b) !== 'retour', `rappel « ${b.slice(0, 60)}… » ⇒ pas « reparti »`, ec(sj, b));
+    dit(ec('Info colis', 'Ton délai de retrait expire demain.') !== 'retour', '« expire demain » (présent, sans accent) n\'est pas « a expiré »', ec('Info colis', 'Ton délai de retrait expire demain.'));
+    dit(ec('Info colis', "Si votre colis n'a pas été retiré dans les délais, il sera retourné à l'expéditeur.") !== 'retour', 'une phrase qui commence par « si » ne constate rien');
+    dit(ec('Rappel : récupère ton colis avant le 26/10/2026', "Votre colis est en cours de retour vers l'expéditeur.") === 'available', 'le SUJET d\'un rappel : le colis attend encore, quoi que dise une phrase du corps', ec('Rappel : récupère ton colis avant le 26/10/2026', "Votre colis est en cours de retour vers l'expéditeur."));
+    dit(ec('Mise à jour', "Ton colis t'attend encore à la consigne. Le délai de garde est dépassé.") === 'available', 'un corps qui dit que le colis t\'attend encore n\'est pas un retour');
+    // L'autre sens : un VRAI retour reste un retour.
+    dit(ec('Mise à jour', "Votre colis n'a pas été retiré dans les délais. Il a été retourné à l'expéditeur.") === 'retour', 'l\'autre sens : un retour CONSTATÉ (au passé, sans condition) reste « reparti »');
+    dit(ec("Votre colis 1 a été retourné à l'expéditeur", '') === 'retour' && ec('Info', 'Votre colis est en cours de retour vers l\'expéditeur.') === 'retour', 'l\'autre sens : « retourné », « en cours de retour » au présent restent des retours');
+  });
+
+  await essaie('revue — vraie route : rappel et ordre des e-mails', async () => {
+    base.clear();
+    base.set(`${A}|vrm_email_owners`, { adresses: { 'boite@banc.test': { owner: A } } });
+    const inbound = await importer('api/email-inbound.js');
+    const recoit = async (from, subject, text, quand, sourceDate) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-retrait' }, __recuLe: quand, body: { from, to: 'boite@banc.test', subject, text, html: '', attachments: [], ...(sourceDate ? { sourceDate } : {}) } }, res); return res; };
+    const lignes = (suivi) => [...base.entries()].filter(([k]) => new RegExp(`\\|email_track_.*${suivi}$`).test(k)).map(([, d]) => d);
+    const cles = () => (((base.get(`${A}|push_dedup`) || {}).keys) || []);
+    // 1. Vinted Go : arrivée, puis le rappel « ton délai de retrait expire demain ».
+    const arr = ["Ton colis t'attend à la consigne Vinted Go.", '', 'Saisis le code suivant : X12345', '', 'Numéro de suivi : 1790000000000099', '', 'À retirer avant le 26/10/2026'].join('\n');
+    await recoit('noreply@vinted.com', 'Ton colis est arrivé à la consigne Vinted Go #1790000000000099', arr, '2026-10-20T08:00:00.000Z');
+    const rap = ['Consigne Vinted Go', 'Attention : ton délai de retrait expire demain.', 'Saisis le code suivant : X12345', 'Numéro de suivi : 1790000000000099'].join('\n');
+    const r = await recoit('noreply@vinted.com', 'Rappel : récupère ton colis avant le 26/10/2026 #1790000000000099', rap, '2026-10-25T08:00:00.000Z');
+    const l = lignes('1790000000000099');
+    dit(r.code === 200 && l.length && l.every((x) => x.status === 'available'), 'vraie route : après le rappel « expire demain », la ligne reste « disponible » (pas « reparti »)', l.map((x) => x.status).join(','));
+    dit(!cles().some((k) => /^retour-/.test(k)), 'vraie route : aucune notification « Colis reparti » n\'est partie pour un rappel', cles().join(', '));
+    // 2. Ordre inversé : arrivé en relais Pickup (code), PUIS l'annonce plus ancienne traitée après.
+    const arrCh = "Votre colis XW611500099TS est arrivé en relais Pickup.\nÀ retirer jusqu'au 29/10/2026\ncommuniquez le code de retrait suivant au commerçant : 731204\nTERRA TEST\n11 RUE EXEMPLE\n56000 VANNES";
+    await recoit('noreply@chronopost.fr', 'Votre colis VINTED est arrivé en relais Pickup', arrCh, '2026-10-22T11:28:00.000Z', '2026-10-22T11:27:00.000Z');
+    await recoit('noreply@chronopost.fr', 'Information sur votre colis XW611500099TS', 'Votre colis XW611500099TS sera disponible dans les prochains jours dans votre Relais Pickup.', '2026-10-22T11:28:05.000Z', '2026-10-21T09:00:00.000Z');
+    const lc = lignes('XW611500099TS')[0] || {};
+    dit(lc.status === 'available' && lc.code === '731204', 'l\'annonce (plus ANCIENNE, traitée après) ne fait pas redescendre le colis disponible en « en transit »', `${lc.status} · ${lc.code}`);
+    const arrMr = "Bonjour,\nVotre colis 38230098 est disponible.\n\nPOINT RELAIS®\nTABA'TEST\n12 Rue Exemple\n56000 Vannes\n\nRETRAIT JUSQU'AU 26/10\n\nVotre code de retrait : 123456";
+    await recoit('noreply@mondialrelay.fr', 'Votre colis 38230098 est disponible 📦', arrMr, '2026-10-21T13:33:00.000Z');
+    await recoit('noreply@mondialrelay.fr', 'Votre colis 38230098 est en route 🚚', "Votre colis 38230098 est en cours d'acheminement vers votre Point Relais.", '2026-10-21T15:00:00.000Z');
+    const lm = lignes('38230098')[0] || {};
+    dit(lm.status === 'available' && lm.code === '123456', '« en route » traité après « disponible » (date inconnue) : le colis reste disponible', `${lm.status} · ${lm.code}`);
+    // 3. L'autre sens : un e-mail PROUVÉ plus récent (date Gmail) fait bien changer l'état.
+    await recoit('noreply@mondialrelay.fr', 'Votre colis 38230097 est disponible 📦', arrMr.replace(/38230098/g, '38230097'), '2026-10-21T13:33:00.000Z', '2026-10-21T13:30:00.000Z');
+    await recoit('noreply@mondialrelay.fr', 'Votre colis 38230097 est en route 🚚', "Votre colis 38230097 est en cours d'acheminement vers un autre Point Relais.", '2026-10-22T15:00:00.000Z', '2026-10-22T14:59:00.000Z');
+    const lp = lignes('38230097')[0] || {};
+    dit(lp.status === 'transit' && lp.emailAt === '2026-10-22T14:59:00.000Z', 'l\'autre sens : un e-mail dont la date PROUVE qu\'il est plus récent change l\'état (et la date est gardée)', `${lp.status} · ${lp.emailAt}`);
+    // 4. Un retour constaté ne redevient pas « disponible » sur un e-mail plus ancien.
+    await recoit('noreply@mondialrelay.fr', "Votre colis 38230096 a été retourné à l'expéditeur", "Votre colis 38230096 n'a pas été retiré dans les délais. Il a été retourné à l'expéditeur.", '2026-10-27T09:00:00.000Z', '2026-10-27T08:59:00.000Z');
+    await recoit('noreply@mondialrelay.fr', 'Votre colis 38230096 est disponible 📦', arrMr.replace(/38230098/g, '38230096'), '2026-10-27T09:05:00.000Z', '2026-10-21T13:30:00.000Z');
+    const lr = lignes('38230096')[0] || {};
+    dit(lr.status === 'retour', 'un « disponible » plus ANCIEN traité après le retour ne le fait pas revenir', lr.status);
+  });
+
+  await essaie('revue — garde par transporteur, jour de Paris, date de retrait', async () => {
+    const NOW = Date.parse('2026-10-27T10:00:00Z');
+    const arr = (j) => Date.parse('2026-10-27T10:00:00Z') - j * 86400000;
+    dit(M.etatRetrait({ arriveeMs: arr(6), transporteur: 'mondialrelay' }, NOW).etat === 'trop_long', 'Mondial Relay sans date limite, arrivé il y a 6 j (garde mesurée : 5 j) ⇒ « à vérifier »', JSON.stringify(M.etatRetrait({ arriveeMs: arr(6), transporteur: 'mondialrelay' }, NOW)));
+    dit(M.etatRetrait({ arriveeMs: arr(5), transporteur: 'mondialrelay' }, NOW).etat === 'a_retirer', '… 5 j : encore à retirer');
+    dit(M.etatRetrait({ arriveeMs: arr(5), transporteur: 'chronopost' }, NOW).etat === 'trop_long' && M.etatRetrait({ arriveeMs: arr(6), transporteur: 'vinted' }, NOW).etat === 'a_retirer', 'Chronopost : 4 j (la plus courte mesurée) ; Vinted Go : 6 j');
+    dit(M.etatRetrait({ arriveeMs: arr(6), transporteur: 'autre' }, NOW).etat === 'a_retirer' && M.etatRetrait({ arriveeMs: arr(8), transporteur: 'autre' }, NOW).etat === 'trop_long', 'un transporteur inconnu garde le plafond générique (7 j)');
+    // Le même verdict quel que soit le fuseau du processus (Vercel = UTC, l'app = Paris).
+    const code = `import('file://${path.join(R, 'api/_lib/retrait-colis.js')}').then((M) => { const a = Date.parse('2026-10-15T22:30:00Z'); const e = M.etatRetrait({ arriveeMs: a }, Date.parse('2026-10-23T10:00:00Z'), '2026-10-23'); const p = M.retirerPublie({ colis: [['', a, '', 'e:1']], at: 1 }, Date.parse('2026-10-23T10:00:00Z'), '2026-10-23'); console.log(JSON.stringify([e.etat, p && p.n])); })`;
+    const sous = (tz) => { const r = spawnSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: tz }, encoding: 'utf8' }); return (r.stdout || r.stderr || '').trim(); };
+    const utc = sous('UTC'), paris = sous('Europe/Paris');
+    dit(utc === paris && utc === '["a_retirer",1]', 'arrivé le 16/10 à 00 h 30 (Paris), lu le 23 : même verdict sous TZ=UTC (Vercel) et Europe/Paris (l\'app)', `UTC ${utc} · Paris ${paris}`);
+    const L = M.limiteRetraitDepuisTexte;
+    dit(L("Offre valable jusqu'au 15/11\nRETRAIT JUSQU'AU 26/10", RECU_MR) === '2026-10-26', 'deux dates : celle qui suit « retrait » l\'emporte (pas la première venue)', L("Offre valable jusqu'au 15/11\nRETRAIT JUSQU'AU 26/10", RECU_MR));
+    dit(L("RETRAIT JUSQU'AU 31/12", '2027-01-01T08:00:00Z') === '2026-12-31', '« jusqu\'au 31/12 » reçu le 1er janvier : la veille, pas une date de l\'an prochain', L("RETRAIT JUSQU'AU 31/12", '2027-01-01T08:00:00Z'));
+    dit(L("Retrait jusqu'au 26/10. Retrait jusqu'au 28/10.", RECU_MR) === null, 'deux dates de retrait qui se contredisent ⇒ rien (on ne devine pas)');
+    dit(L("Offre valable jusqu'au 30/12", RECU_MR) === null, 'une date sans mot de retrait hors de la fenêtre [veille, +30 j] ⇒ rien');
+  });
+
+  await essaie('revue — widget : les colis de la photo relus par leur identité', async () => {
+    base.clear();
+    const T0 = Date.parse('2026-10-23T07:00:00Z');   // la photo de l'app (09:00 à Paris)
+    base.set(`${A}|main`, { vrm_widget_token: '', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_sales_hidden: [], vinted_bords_hidden: {}, vrm_colis_collected: [],
+      vrm_colis_retirer: { total: 4, aVerifier: 0, urgents: 0, at: T0, colis: [['2099-01-01', T0, 'mondialrelay', 'e:38230002'], ['', T0, '', 'v:111:7001'], ['2099-01-01', T0, 'chronopost', 'e:09440000000010'], ['2099-01-01', T0, 'mondialrelay', 'e:38230003']], vus: ['38230002', '09440000000010', '38230003'], vusTx: ['7001'] } });
+    // Le 24 : l'extension relit les achats de 111 (7001 n'est plus au point relais)…
+    base.set(`${A}|harvest_111_orders_purchased`, { capturedAt: '2026-10-24T08:00:00Z', resume: { n: 0, at: '2026-10-24T08:00:00Z', txns: [] } });
+    // … le transporteur écrit « retiré » pour 38230002 et « retourné » pour 38230003 —
+    // relayés par Vinted, rangés sur une AUTRE ligne : la ligne Mondial Relay reste
+    // « disponible » (c'est le n° de suivi qui relie) ; 09440000000010 est toujours au relais.
+    base.set(`${A}|email_track_mondialrelay_38230002`, { suivi: '38230002', status: 'available', subject: 'Votre colis 38230002 est disponible', receivedAt: '2026-10-21T13:00:00Z', limite: '2099-01-01', carrier: 'mondialrelay' });
+    base.set(`${A}|email_track_vinted_38230002`, { suivi: '38230002', status: 'delivered', subject: 'Votre colis a été retiré', receivedAt: '2026-10-24T09:00:00Z', carrier: 'vinted' });
+    base.set(`${A}|email_track_mondialrelay_38230003`, { suivi: '38230003', status: 'available', subject: 'Votre colis 38230003 est disponible', receivedAt: '2026-10-21T13:00:00Z', limite: '2099-01-01', carrier: 'mondialrelay' });
+    base.set(`${A}|email_track_vinted_38230003`, { suivi: '38230003', status: 'retour', subject: "Votre colis a été retourné à l'expéditeur", receivedAt: '2026-10-24T09:30:00Z', carrier: 'vinted' });
+    base.set(`${A}|email_track_chronopost_09440000000010`, { suivi: '09440000000010', status: 'available', subject: 'Votre colis VINTED est arrivé en relais Pickup', receivedAt: '2026-10-22T09:00:00Z', limite: '2099-01-01', carrier: 'chronopost' });
+    const w = await importer('api/widget.js');
+    const vraiNow = Date.now; Date.now = () => Date.parse('2026-10-24T10:00:00Z');
+    let c = {};
+    try { const res = faireRes(); await w.default({ method: 'GET', headers: {}, query: {} }, res); c = res.corps || {}; } finally { Date.now = vraiNow; }
+    dit(c.pickup === 1 && c.pickupSortis === 3, 'widget : le colis retiré, le colis reparti (même n° de suivi, autre ligne) et l\'achat Vinted qui n\'est plus au point relais SORTENT du compte ; le Chronopost toujours là reste', `pickup=${c.pickup} sortis=${c.pickupSortis}`);
+    dit(c.pickupPhoto === null, 'widget : tout a été relu ⇒ le nombre n\'est pas présenté comme une photo', `photo=${c.pickupPhoto}`);
+    // Une publication d'AVANT (sans identité) : le nombre est celui de la photo, et le widget le DIT.
+    base.get(`${A}|main`).vrm_colis_retirer = { total: 1, aVerifier: 0, at: T0, colis: [['2099-01-01', T0]], vus: [], vusTx: [] };
+    Date.now = () => Date.parse('2026-10-24T10:00:00Z');
+    try { const res = faireRes(); await w.default({ method: 'GET', headers: {}, query: {} }, res); c = res.corps || {}; } finally { Date.now = vraiNow; }
+    dit(c.pickup === 1 && typeof c.pickupPhoto === 'string', 'widget : un colis qu\'il n\'a pas pu relire reste compté MAIS le nombre se dit « photo du … »', `pickup=${c.pickup} photo=${c.pickupPhoto}`);
   });
 
   console.log(ko ? `\n❌ colis à retirer fiables : ${ko} rouge(s)` : '\n✅ colis à retirer fiables : tout est vert');

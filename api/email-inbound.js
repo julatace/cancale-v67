@@ -796,6 +796,14 @@ async function findBuyPriceByTitle(title) {
 }
 
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
+// (revue du 23 oct.) La date d'un e-mail telle que la boîte l'a reçu (`sourceDate`,
+// posée par le script Gmail), ou null — jamais l'heure du traitement.
+export function dateDeLEmail(corpsBrut) {
+  const s = corpsBrut && typeof corpsBrut === 'object' ? corpsBrut.sourceDate : null;
+  if (!/^\d{4}-/.test(String(s || ''))) return null;
+  const d = Date.parse(s);
+  return Number.isFinite(d) ? new Date(d).toISOString() : null;
+}
 export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString()) {
   const txt = texteUtile(mail);
   const all = (mail.subject || '') + '\n' + txt;
@@ -1853,10 +1861,21 @@ export async function traiterEmail(req, res) {
           if (!track.artTitle && prev.artTitle) track.artTitle = prev.artTitle;
         }
       }
-      Object.assign(track,conserverRetrait(prevLigne,track));
+      // (revue du 23 oct.) LA DATE DE L'E-MAIL (`sourceDate`, la date Gmail) : le
+      // script traite sa boîte du plus récent au plus ancien, et un e-mail plus
+      // ANCIEN traité après un plus récent ne doit pas faire redescendre l'état.
+      const emailAt = dateDeLEmail(corpsBrut);
+      const plusRecent = !!(emailAt && prevLigne && Number.isFinite(Date.parse(prevLigne.emailAt || '')) && Date.parse(emailAt) > Date.parse(prevLigne.emailAt));
+      const garde = conserverRetrait(prevLigne, track, plusRecent);
+      Object.assign(track, garde);
+      // L'état gardé garde le sujet qui l'a posé (le sujet d'un « en route » plus
+      // ancien ne décrit pas un colis disponible).
+      const sujetGarde = (prevLigne?.status === 'delivered' || garde.conserve) ? (prevLigne.subject || subject) : subject;
+      const emailAtLigne = [emailAt, prevLigne && prevLigne.emailAt].filter((x) => Number.isFinite(Date.parse(x || ''))).sort().pop() || null;
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
-        statusLabel: track.label, subject:prevLigne?.status==='delivered'?prevLigne.subject||subject:subject, receivedAt: now,
+        statusLabel: track.label, subject: sujetGarde, receivedAt: now,
+        ...(emailAtLigne ? { emailAt: emailAtLigne } : {}),
         ...(track.status==='delivered'?{retireLe:prevLigne?.status==='delivered'?(prevLigne.retireLe||prevLigne.receivedAt||now):now}:{}),
         ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
