@@ -199,13 +199,16 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
   });
   const verif = [...document.querySelectorAll('[data-a-verifier] [data-oublie]')].map((x) => ({ suivi: x.getAttribute('data-colis-suivi'), raison: x.getAttribute('data-a-verifier-raison'), transp: ligneT(x), t: x.innerText }));
   const repartis = [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => ({ suivi: x.getAttribute('data-reparti-suivi'), transp: ligneT(x), t: x.innerText }));
-  const zones = [...document.querySelectorAll('.vrm-pickup-card, [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-passu], [data-transp-non-lu]')];
+  const zones = [...document.querySelectorAll('.vrm-pickup-card, [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-mr-refus], [data-transp-passu], [data-transp-non-lu]')];
   const rougesVus = [];
   // La pastille de MARQUE d'un transporteur (CarrierBadge : titre + graisse 900,
   // le rouge de Chronopost) n'est pas une alerte : elle est écartée.
   const marque = (el) => el.tagName === 'SPAN' && el.getAttribute('title') && getComputedStyle(el).fontWeight === '900';
   for (const z of zones) for (const el of [z, ...z.querySelectorAll('*')]) { if (marque(el) || (el.parentElement && marque(el.parentElement))) continue; const cs = getComputedStyle(el); if (rouge(cs.color) && (el.innerText || '').trim()) rougesVus.push(`${el.tagName}:${cs.color}:${(el.innerText || '').slice(0, 30)}`); else if (rouge(cs.borderTopColor) && cs.borderTopWidth !== '0px') rougesVus.push(`${el.tagName}[bord]:${cs.borderTopColor}`); else if (rouge(cs.backgroundColor)) rougesVus.push(`${el.tagName}[fond]:${cs.backgroundColor}`); }
-  const mr = document.querySelector('[data-transp-mr]');
+  // Le serveur lit Mondial Relay : seule la phrase du REFUS (`data-transp-mr-refus`)
+  // peut s'écrire ; « ne se lit que depuis ton ordinateur » (`data-transp-mr`), jamais.
+  const mr = document.querySelector('[data-transp-mr-refus]');
+  const mrOrdi = document.querySelector('[data-transp-mr]');
   const passu = document.querySelector('[data-transp-passu]');
   const reessayer = document.querySelector('[data-transp-reessayer]');
   const ajouter = document.querySelector('[data-suivi-ajouter]');
@@ -213,7 +216,8 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
   const onglet = document.querySelector('[data-achats-onglet="attente"]');
   return {
     cartes, verif, repartis, rougesVus,
-    mr: mr ? { n: mr.getAttribute('data-transp-mr-n'), etat: mr.getAttribute('data-transp-mr'), t: mr.innerText } : null,
+    mr: mr ? { n: mr.getAttribute('data-transp-mr-n'), etat: mr.getAttribute('data-transp-mr-refus'), t: mr.innerText } : null,
+    mrOrdi: mrOrdi ? mrOrdi.innerText : null, nMr: document.querySelectorAll('[data-transp-mr-refus]').length,
     passu: passu ? passu.innerText : null, nPassu: document.querySelectorAll('[data-transp-passu]').length, hReessayer: h(reessayer), hAjouter: h(ajouter),
     suivre: [...document.querySelectorAll('.vrm-pickup-card a[data-suivre-colis]')].map((a) => a.getBoundingClientRect().height),
     total: onglet ? onglet.getAttribute('data-n') : null,
@@ -302,7 +306,8 @@ async function navigateur() {
         dit(inc && inc.transp && inc.transp.t.includes(`« ${LIB_INCONNU} »`) && /statut que VRM ne connaît pas/.test(inc.transp.t), `${nom} A : un statut inconnu est recopié TEL QUEL, et ce n'est pas « à retirer »`, inc ? inc.transp && inc.transp.t : 'absent de « à vérifier »');
         dit(inc && inc.transp && inc.transp.color === ambre, `${nom} A : un statut inconnu est en AMBRE`, inc && inc.transp && inc.transp.color);
         // Mondial Relay : la phrase seulement pour la ligne `bloque`.
-        dit(r.mr && r.mr.n === '1' && /refuse en ce moment la lecture du serveur VRM \(1 colis\)/.test(r.mr.t), `${nom} A : « Mondial Relay refuse en ce moment la lecture du serveur » — UNE fois, pour la seule ligne bloquée (pas le code postal inconnu, pas les lues)`, r.mr ? `${r.mr.n} · ${r.mr.t.slice(0, 140)}` : 'absente');
+        dit(r.mr && r.mr.n === '1' && r.nMr === 1 && /refuse en ce moment la lecture du serveur VRM \(1 colis\)/.test(r.mr.t), `${nom} A : « Mondial Relay refuse en ce moment la lecture du serveur » — UNE fois, pour la seule ligne bloquée (pas le code postal inconnu, pas les lues)`, r.mr ? `${r.mr.n} · ${r.mr.t.slice(0, 140)}` : 'absente');
+        dit(!r.mrOrdi, `${nom} A : le serveur lit Mondial Relay ⇒ jamais « Mondial Relay ne se lit que depuis ton ordinateur »`, r.mrOrdi && r.mrOrdi.slice(0, 120));
         dit(bl && bl.transp && bl.transp.etat === 'passu', `${nom} A : la ligne bloquée dit « pas su » sur sa carte (jamais un statut inventé)`, bl && bl.transp && bl.transp.etat);
         dit(r.nPassu === 0, `${nom} A : notre base a répondu : aucune phrase « pas pu être relu »`);
         dit(!r.rougesVus.length, `${nom} A : aucun rouge sur les colis, « à vérifier », « repartis » ni les phrases du transporteur (§7)`, r.rougesVus.slice(0, 4).join(' | '));

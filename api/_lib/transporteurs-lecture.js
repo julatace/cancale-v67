@@ -25,27 +25,31 @@
 // ⚠️⚠️ MONDIAL RELAY — CE QUI A ÉTÉ MESURÉ LE 24 OCTOBRE 2026, depuis dub1
 //    (sandbox Vercel), avec le User-Agent honnête, sans cookie ni jeton :
 //    · 11:19 UTC : `www.mondialrelay.be/fr-be/suivi-de-colis/` 200, mais
-//      `www.mondialrelay.be/api/tracking` 403 en HTML (Cloudflare) ;
-//    · 11:51 UTC : `www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/
+//      `www.mondialrelay.be/api/tracking` 403 en HTML (Cloudflare) — le
+//      serveur ne la lit PAS ;
+//    · 11:51 et 11:53 UTC : `www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/
 //      RechercherJsonResponsive?NumeroExpedition=<n°>&CodePostal=<cp>` (GET,
 //      `Accept: application/json`, `X-Requested-With: XMLHttpRequest`) 200
 //      application/json, 44 867 o, Success:true, pas de `cf-mitigated` ; avec
-//      un autre code postal : 200, Success:false, 1 517 o ;
-//    · 12:0x UTC (une requête de plus, même route) : 200, 44 867 o, 418 ms. Le
-//      fragment `Message` porte la frise `timeline suivi` (5 `<li>`,
-//      `validate` sur les étapes atteintes), un `infos-account` par jour
-//      (`<p>jj/mm/aaaa</p>`), dans `step-suivi` `<p class="center">hh:mm</p>`
-//      puis le libellé, le n° du point relais (`numeroTemp`) et ses horaires
-//      (`points_relais PCL_Details` › `detail-mag`) — mais NI le nom NI
-//      l'adresse du point (chargés par une autre route, jamais appelée).
-//      L'écho : `var numeroExpedition = '<n°>'` et, dans le dataLayer,
-//      `'CodePostal' : '<cp>'`.
-//    ⇒ Le SERVEUR lit Mondial Relay par cette route (`mr-fr-mvc`), le code
-//    postal étant celui du point relais (mêmes sources : lu, e-mail, saisie,
-//    conversation, essai borné). Refusé (403, 429, défi, HTML hors JSON) : une
-//    pause, et le n° part à l'extension (C3), qui lit l'API .be depuis le
-//    navigateur de Julien (`mr-be`, la voie de SECOURS) et relaie la réponse
-//    BRUTE (C4) — jugée ici, avec le contrôle de l'écho (n° ET code postal).
+//      un autre code postal : 200, Success:false (« erreur de saisie »), 1 517 o ;
+//    · 12:0x et 12:28 UTC (même route) : 200, 44 867 o, 418 ms. Le fragment
+//      `Message` porte la frise `timeline suivi` (5 `<li>`, `validate` sur les
+//      étapes atteintes), un `infos-account` par jour (`<p>jj/mm/aaaa</p>`),
+//      dans `step-suivi` `<p class="center">hh:mm</p>` puis le libellé, le n°
+//      du point relais (`numeroTemp`) et ses horaires (`points_relais
+//      PCL_Details` › `detail-mag`) — mais NI le nom NI l'adresse du point
+//      (chargés par une autre route, jamais appelée). L'écho : `var
+//      numeroExpedition = '<n°>'` et, dans le dataLayer, `'CodePostal' : '<cp>'`.
+//    ⇒ Le SERVEUR lit Mondial Relay par cette route (`mr-fr-mvc`), jugée par
+//    `lireReponseMondialRelayMvc` avec l'ÉCHO exigé, le code postal étant celui
+//    du point relais (mêmes sources : lu, e-mail, saisie, conversation, essai
+//    borné). Il ne contourne jamais : un refus (403, 401, 429, défi, HTML hors
+//    JSON) pose la PAUSE de Mondial Relay, et c'est SEULEMENT alors (et pendant
+//    la pause) que le n° part à l'extension (`besoinNavigateur`, C3 — la règle
+//    `aLireParNavigateur`) : elle le lit depuis le navigateur de Julien, par la
+//    MÊME route (`mr-fr-mvc`, son adresse IP), et relaie la réponse BRUTE (C4)
+//    — jugée ici, avec le contrôle de l'écho (n° ET code postal). L'API .be
+//    (`mr-be`), si l'extension la relaie, est jugée par sa propre fonction.
 // MESURÉ LE MÊME JOUR, MÊME UA : Chronopost `ws.chronopost.fr …/trackSkybillV2`
 //    200 text/xml ; Vinted Go `carrier.vintedgo.com/public/v3/tracking_events`
 //    200 application/json (3 lectures à 2 s d'écart ; 404 JSON
@@ -192,8 +196,10 @@ async function corpsBorne(r, max) {
     return String(await r.text()).slice(0, max);
   } catch (_) { return ''; }
 }
-// Mondial Relay : le n° ET le code postal du point relais (sans lui, rien ne
-// part : la route répond Success:false à un code postal faux).
+// `cp` : le code postal du point relais (Mondial Relay seulement ; sans lui,
+// rien ne part : la route répond Success:false à un code postal faux). Le n° et
+// le code postal ont leur FORME (8 chiffres, 5 chiffres) : rien d'autre n'entre
+// dans l'adresse.
 export const urlTransporteur = (carrier, suivi, cp = '') => {
   const n = normaliserSuivi(suivi);
   if (!T.FORME_SUIVI[carrier] || !T.FORME_SUIVI[carrier].test(n)) return null;
@@ -210,7 +216,7 @@ const ENTETES = {
   mondialrelay: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 };
 // Rend { statut, ctype, corps, retryAfter, defi } ou { echec: 'voie'|'suivi'|'reseau' }.
-export async function lireTransporteur(carrier, suivi, cp = '') {
+export async function lireTransporteur(carrier, suivi, { cp = '' } = {}) {
   if (!LECTURE_SERVEUR[carrier]) return { echec: 'voie' };
   const url = urlTransporteur(carrier, suivi, cp);
   if (!url) return { echec: 'suivi' };
@@ -239,6 +245,9 @@ async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, mai
     return apres;
   });
   if (ecrit !== true) return { res: lu.res, etat: (avant && avant.etat) || null, change: false, ecrit };
+  // La base du passage suit ce qui vient d'être écrit (le `besoinNavigateur`
+  // final se juge sur l'état à jour, la même règle que C3).
+  if (b && b.transp instanceof Map) { const t = T.ligneTranspDeMeta({ id, ...apres }); if (t) b.transp.set(t.suivi, t); }
   const change = !!(apres.etat && (!avant || avant.etat !== apres.etat || (avant.detail || null) !== (apres.detail || null)));
   if (apres.essaiRes === 'ok' && change) {
     const k = item.suivi;
@@ -262,41 +271,42 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   if (!b) return { ok: false, raison: 'pas-su', lus: [], besoinNavigateur: [], pause: {} };
   const now = maintenant || Date.now();
   const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50, seul: suivi, force: !!(suivi && force) });
-  const lus = [], besoin = [];
+  const lus = [];
   let nFermeture = 0, nLus = 0;
+  // Chaque transporteur suit SA file ; les trois se lisent en parallèle — par le
+  // SERVEUR, Mondial Relay compris (voie `mr-fr-mvc`). `besoinNavigateur` ne
+  // reçoit un n° que sur REFUS du transporteur (ou pendant sa pause).
   const parC = { chronopost: [], vinted: [], mondialrelay: [] };
   for (const it of items) (parC[it.carrier] || []).push(it);
-  // Le code postal d'un colis Mondial Relay (§1.3), et s'il n'est qu'ESSAYÉ.
-  const cpDe = (it) => {
-    if (it.carrier !== 'mondialrelay') return { cp: '', essai: false };
-    // Un code postal donné par la page (C5) n'est pas prouvé : c'est un ESSAI.
-    const cp = it.cp || (suivi && normaliserSuivi(suivi) === it.suivi && /^\d{5}$/.test(String(cpPage || '')) ? String(cpPage) : '');
-    const t = b.transp.get(it.suivi);
-    const source = it.cp ? it.cpSource : 'essai';
-    return { cp, source, essai: !!cp && source === 'essai' && !(t && t.cp === cp) };
-  };
-  const versNavigateur = (carrier, it, cp) => { if (besoin.length < MAX_C3) besoin.push({ carrier, suivi: it.suivi, cp: carrier === 'mondialrelay' ? cp : null, voie: T.VOIE_DE[carrier] }); };
-  // Chaque transporteur suit SA file ; les trois se lisent en parallèle, par le
-  // serveur (Mondial Relay : la route `_mvc`, voir la mesure en tête).
   const traiterServeur = async (carrier) => {
     for (const it of parC[carrier]) {
       if (Date.now() - t0 > budgetMs || nLus >= max) break;
       if (it.raison === 'fermeture') { if (nFermeture >= MAX_FERMETURE) continue; }
-      const { cp, source: cpSource, essai } = cpDe(it);
-      if (carrier === 'mondialrelay' && !cp) {
-        // Aucun code postal connu : on le DIT (la carte donne le geste), sans requête.
+      // Mondial Relay : le code postal du point relais. Sans lui, AUCUNE requête :
+      // on le DIT (la carte donne le geste).
+      let cp = '', cpSource = '', cpEssaye = '';
+      if (carrier === 'mondialrelay') {
+        const dePage = suivi && normaliserSuivi(suivi) === it.suivi && /^\d{5}$/.test(String(cpPage || '')) ? String(cpPage) : '';
+        cp = it.cp || dePage;
+        cpSource = it.cp ? it.cpSource : (dePage ? 'page' : '');
+        if (!cp) {
+          const t = b.transp.get(it.suivi);
+          if (t && t.essaiRes === 'cp-inconnu') continue;
+          const r = await rangerEssai(b, it, { res: 'cp-inconnu' }, { maintenant: now });
+          lus.push({ carrier, suivi: it.suivi, res: 'cp-inconnu', etat: r.etat, change: false });
+          continue;
+        }
+        // Un code postal ESSAYÉ (un essai borné, ou donné par la page : pas
+        // prouvé pour CE colis), sauf si la ligne l'a déjà prouvé.
         const t = b.transp.get(it.suivi);
-        if (t && t.essaiRes === 'cp-inconnu') continue;
-        const r = await rangerEssai(b, it, { res: 'cp-inconnu' }, { maintenant: now });
-        lus.push({ carrier, suivi: it.suivi, res: 'cp-inconnu', etat: r.etat, change: false });
-        continue;
+        if ((cpSource === 'essai' || cpSource === 'page') && !(t && t.cp === cp)) cpEssaye = cp;
       }
-      if (T.enPause(b.pause, carrier, Date.now())) { versNavigateur(carrier, it, cp); continue; }
+      if (T.enPause(b.pause, carrier, Date.now())) continue;   // l'extension le lit à sa place (besoinNavigateur, plus bas)
       nLus++;
       if (it.raison === 'fermeture') nFermeture++;
-      const rep = await lireTransporteur(carrier, it.suivi, cp);
+      const rep = await lireTransporteur(carrier, it.suivi, { cp });
       if (rep.echec) {
-        const r = await rangerEssai(b, it, { res: 'passu' }, { maintenant: Date.now() });
+        const r = await rangerEssai(b, it, { res: 'passu' }, { maintenant: Date.now(), voie: T.VOIE_SERVEUR[carrier] });
         lus.push({ carrier, suivi: it.suivi, res: 'passu', etat: r.etat, change: false });
         continue;
       }
@@ -304,43 +314,32 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
       if (lu.res === 'bloque') {
         await poserPause(carrier, rep, Date.now());
         b.pause = T.pauseApresRefus(b.pause, carrier, { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
-        versNavigateur(carrier, it, cp);
       } else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') await leverPause(b, carrier);
       // Un code postal ESSAYÉ (pas encore prouvé pour CE colis) : « pas de colis »
-      // ne veut pas dire « n° inconnu » — on note l'essai, sans compter d'échec.
-      if (essai && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };
-      const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture', cp: lu.res === 'ok' ? cp : '', cpSource: carrier === 'mondialrelay' ? (cpSource || '') : '', cpEssaye: essai ? cp : '' });
+      // pour ce couple ne veut pas dire « n° inconnu » — on note l'essai, sans
+      // compter d'échec (sinon trois mauvais essais fermeraient le n° pour toujours).
+      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };
+      const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture', voie: T.VOIE_SERVEUR[carrier], cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye });
       lus.push({ carrier, suivi: it.suivi, res: r.res, etat: r.etat, change: r.change });
     }
   };
-  await Promise.all([
-    traiterServeur('chronopost'),
-    traiterServeur('vinted'),
-    traiterServeur('mondialrelay'),
-  ]);
-  return { ok: true, lus, besoinNavigateur: besoin.slice(0, MAX_C3), pause: T.pausePublique(b.pause) };
+  await Promise.all([traiterServeur('chronopost'), traiterServeur('vinted'), traiterServeur('mondialrelay')]);
+  // Ce que le serveur n'a pas pu lire, pour l'extension : la règle de C3, sur la
+  // base à jour de ce passage (un n° demandé seul : lui seul).
+  const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: b.pause, maintenant: Date.now(), seul: suivi, cpSeul: cpPage, max: MAX_C3 });
+  return { ok: true, lus, besoinNavigateur: besoin, pause: T.pausePublique(b.pause) };
 }
 
 // ── C3 : CE QUE L'EXTENSION DOIT LIRE DEPUIS LE NAVIGATEUR ──────────────────
-// Les n° que le serveur n'a pas pu lire (refusé, ou transporteur en pause),
-// par la voie de SECOURS (`mr-be` pour Mondial Relay, code postal connu).
-// 6 au plus.
+// SEULEMENT ce que le serveur n'a pas pu lire : un n° refusé (`bloque`), ou un
+// transporteur en pause — Mondial Relay compris (avec son code postal, voie
+// `VOIE_DE`, `mr-fr-mvc` : la même route, lue depuis le navigateur). 6 au plus.
 export async function transpALire({ maintenant = null } = {}) {
   const b = await lireBaseTransp();
   if (!b) return null;
   const now = maintenant || Date.now();
-  const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50, pourNavigateur: true });
-  const out = [];
-  for (const it of items) {
-    if (out.length >= MAX_C3) break;
-    // Mondial Relay comme les autres : seulement quand le serveur est refusé
-    // (sa dernière lecture « bloque », ou le transporteur en pause) — et avec
-    // son code postal, sans lequel l'API .be ne répond rien.
-    if (it.carrier === 'mondialrelay' && !it.cp) continue;
-    const t = b.transp.get(it.suivi);
-    if ((t && t.essaiRes === 'bloque') || T.enPause(b.pause, it.carrier, now)) out.push({ carrier: it.carrier, suivi: it.suivi, cp: it.carrier === 'mondialrelay' ? it.cp : null, voie: T.VOIE_DE[it.carrier] });
-  }
-  return { v: 1, items: out, pause: T.pausePublique(b.pause) };
+  const items = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: b.pause, maintenant: now, max: MAX_C3 });
+  return { v: 1, items, pause: T.pausePublique(b.pause) };
 }
 
 // ── C4 : LA RÉPONSE BRUTE RELAYÉE PAR L'EXTENSION ───────────────────────────
@@ -369,6 +368,8 @@ export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
   const now = maintenant || Date.now();
   const t = b.transp.get(suivi) || null;
   const voie = String(x.voie);
+  // La voie relayée choisit l'analyseur : `mr-fr-mvc` (la route `_mvc`, écho
+  // exigé) ou `mr-be` (l'API .be) — la même fonction que nos propres lectures.
   let lu = T.lireReponse(carrier, statut, ctype, x.corps, { suivi, cp, voie });
   let cpSource = '', cpEssaye = '';
   if (carrier === 'mondialrelay') {

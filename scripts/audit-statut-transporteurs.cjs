@@ -6,8 +6,8 @@
 //   · les analyseurs purs (api/_lib/transporteurs.js) sur des réponses
 //     INVENTÉES à la forme MESURÉE le 24 oct. : Chronopost trackSkybillV2 (XML),
 //     Vinted Go v3 (JSON), Mondial Relay par la route `_mvc` de mondialrelay.fr
-//     (JSON qui porte un fragment HTML — la voie du SERVEUR) et par l'API .be
-//     (la voie de SECOURS de l'extension) ;
+//     (JSON qui porte un fragment HTML — la voie du SERVEUR, et celle que C3
+//     annonce à l'extension en secours) et par l'API .be (relayée en C4) ;
 //   · la priorité (le transporteur fait monter, jamais descendre) et les fins
 //     (api/_lib/suivi-colis.js) ;
 //   · la sélection (jamais un n° sortant, jamais un sens « pas su »), le rythme,
@@ -39,18 +39,25 @@ const MUTATIONS = {
   'fermeture-notifie': ['api/_lib/transporteurs-lecture.js', "silence: it.raison === 'fermeture',", 'silence: false,'],
   'expire-lu-livre': ['api/_lib/transporteurs.js', '  if (s === 404) return rendu(', "  if (s === 404 && j && j.error_code === 'shipment_expired') return rendu('ok', { etat: 'livre', etatAt: isoDe(Date.now()) });\n  if (s === 404) return rendu("],
   'relecture-sans-intervalle': ['api/_lib/transporteurs.js', 'export function prochainEssai(t) {\n  if (!t) return 0;', 'export function prochainEssai(t) {\n  return 0;'],
-  'pause-ignoree': ['api/_lib/transporteurs-lecture.js', '      if (T.enPause(b.pause, carrier, Date.now())) { versNavigateur(carrier, it, cp); continue; }', ''],
+  'pause-ignoree': ['api/_lib/transporteurs-lecture.js', '      if (T.enPause(b.pause, carrier, Date.now())) continue;', ''],
   // ── Mondial Relay par le serveur (route `_mvc`) ──
-  'mvc-echo-numero-ignore': ['api/_lib/transporteurs.js', '  if (!mn || numero !== n || !c || (mc && cpRendu !== c)) return', '  if (!c) return'],
-  'mvc-echo-cp-ignore': ['api/_lib/transporteurs.js', '  if (!mn || numero !== n || !c || (mc && cpRendu !== c)) return', '  if (!mn || numero !== n || !c) return'],
+  'mvc-echo-numero-ignore': ['api/_lib/transporteurs.js', '  if (!mN || numero !== n || !c || (mC && cpRendu !== c)) return', '  if (!c) return'],
+  'mvc-echo-cp-ignore': ['api/_lib/transporteurs.js', '  if (!mN || numero !== n || !c || (mC && cpRendu !== c)) return', '  if (!mN || numero !== n || !c) return'],
   'mvc-voie-ignoree': ['api/_lib/transporteurs.js', "  if (carrier === 'mondialrelay') return opts && opts.voie === 'mr-fr-mvc' ?", "  if (carrier === 'mondialrelay') return false ?"],
   'mvc-frise-devinee': ['api/_lib/transporteurs.js', '  if (lis.length !== 5) return', '  if (!lis.length) return'],
-  'mvc-refus-garde': ['api/_lib/transporteurs-lecture.js', '        versNavigateur(carrier, it, cp);\n      } else if', '      } else if'],
+  'mvc-refus-garde': ['api/_lib/transporteurs.js', "  const refusServeur = (t) => !!t && t.essaiRes === 'bloque' && t.essaiSource !== 'extension' && t.essaiSource !== 'page';", '  const refusServeur = (t) => false;'],
   'mvc-lieu-efface': ['api/_lib/transporteurs.js', "    if (lu.lieuNonLu) for (const k of ['lieuNom', 'lieuVille', 'lieuCp']) out[k] = a[k] == null ? '' : a[k];", ''],
   'mvc-entetes-retires': ['api/_lib/transporteurs-lecture.js', "  mondialrelay: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },", ''],
   'mr-serveur-eteint': ['api/_lib/transporteurs.js', 'export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: true });', 'export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: false });'],
-  'c3-mr-toujours': ['api/_lib/transporteurs-lecture.js', "    if (it.carrier === 'mondialrelay' && !it.cp) continue;", "    if (it.carrier === 'mondialrelay') { if (it.cp) out.push({ carrier: it.carrier, suivi: it.suivi, cp: it.cp, voie: 'mr-be' }); continue; }"],
-  'essai-cp-compte-echec': ['api/_lib/transporteurs-lecture.js', "      if (essai && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };", ''],
+  'c3-mr-toujours': ['api/_lib/transporteurs.js', '    if (!(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;', "    if (it.carrier !== 'mondialrelay' && !(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;"],
+  'essai-cp-compte-echec': ['api/_lib/transporteurs-lecture.js', "      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };", ''],
+  // (fusion) C3 annonce à l'extension la route `_mvc` (`mr-fr-mvc`) : la seule
+  // que l'extension 5.217 lit d'abord (de `mr-be`, elle ne passe à `_mvc` qu'en repli).
+  'c3-voie-be': ['api/_lib/transporteurs.js', "export const VOIE_DE = { mondialrelay: 'mr-fr-mvc',", "export const VOIE_DE = { mondialrelay: 'mr-be',"],
+  // (fusion) Le code postal de la page : un ESSAI (jamais « introuvable »), et
+  // il suit le n° demandé seul jusqu'à l'extension.
+  'cp-page-prouve': ['api/_lib/transporteurs-lecture.js', "if ((cpSource === 'essai' || cpSource === 'page') && !(t && t.cp === cp)) cpEssaye = cp;", "if (cpSource === 'essai' && !(t && t.cp === cp)) cpEssaye = cp;"],
+  'c3-cp-page-ignore': ['api/_lib/transporteurs.js', "      const cp = it.cp || (seul && normaliserSuivi(seul) === it.suivi && /^\\d{5}$/.test(String(cpSeul || '')) ? String(cpSeul) : '');", '      const cp = it.cp;'],
   // ── Le widget suit la règle de l'app (§11, trouvé au banc `transporteurs.cjs`) ──
   'widget-transp-dispo-ignore': ['api/widget.js', '      return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;', '      return dispoSuivi.has(k) ? false : true;'],
   'widget-garde-non-levee': ['api/widget.js', ', leveDepuisTransp(suivisLus));', ');'],
@@ -198,7 +205,7 @@ const cpEv = (code, ms, libelle, extra = {}) => ({ code, ms, libelle, office: ex
 const cpXml = (sky, evs, { errorCode = '0' } = {}) => `<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns1:trackSkybillV2Response xmlns:ns1="http://cxf.tracking.soap.chronopost.fr/"><return><errorCode>${errorCode}</errorCode><listEventInfoComp>${evs.map((e) => `<events><code>${e.code}</code><eventDate>${iso(e.ms)}</eventDate><eventLabel>${e.libelle}</eventLabel><officeLabel>${e.office}</officeLabel><zipCode>${e.zip}</zipCode>${Object.entries(e.infos).map(([k, v]) => `<infoCompList><name>${k}</name><value>${v}</value></infoCompList>`).join('')}</events>`).join('')}<skybillNumber>${sky}</skybillNumber></listEventInfoComp></return></ns1:trackSkybillV2Response></soap:Body></soap:Envelope>`;
 // Vinted Go v3 : du plus récent au plus ancien.
 const vgJson = (evs, meta = {}) => JSON.stringify({ tracking_events: evs.map((e, i) => ({ id: 'ev' + i, message: e.message || e.group, timestamp: iso(e.ms), metadata: { address: e.address || '' }, banner_message: null, group_header: null, group: e.group, state: e.state || 'delivery' })), meta });
-// Mondial Relay .be /api/tracking (le secours de l'extension).
+// Mondial Relay .be /api/tracking (relayée par l'extension en C4, voie `mr-be`).
 const mrBe = (numero, cp, k, evs, { deliveryMode = '24R' } = {}) => JSON.stringify({ Expedition: { Numero: Number(numero), DestinataireCodePostal: cp, DeliveryMode: deliveryMode, Evenements: evs.map((e) => ({ Date: paris(e.ms).iso, Libelle: e.libelle, ...(e.dpr ? { DetailPointRelais: { Numero: 99999, Adresse: { Libelle: 'TABAC TEST', CodePostal: '99999', Ville: 'TESTVILLE', CodePays: 'FR' } } } : {}) })), SuiviParEtapes: Object.fromEntries([1, 2, 3, 4, 5].map((i) => [String(i), { Numero: i, Libelle: 'Étape ' + i, ...(i <= k ? { Evenement: { Date: paris(evs[0] ? evs[0].ms : Date.now()).iso } } : {}) }])) }, status: [] });
 // Mondial Relay `_mvc` (la voie du SERVEUR) : JSON qui porte un fragment HTML.
 // Forme MESURÉE le 24 oct. : frise de 5 `<li>`, un `infos-account` par jour,
@@ -262,7 +269,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(r6.res === 'forme' && !!r6.forme, 'une forme inconnue ⇒ « forme », et la forme est GARDÉE (clés, jamais les valeurs)', r6.forme);
   });
 
-  // ══ 3. MONDIAL RELAY — la route `_mvc` (SERVEUR) et l'API .be (SECOURS) ══
+  // ══ 3. MONDIAL RELAY — la route `_mvc` (SERVEUR, et l'extension en secours) et l'API .be (relayée) ══
   await essaie('Mondial Relay (_mvc, la voie du serveur)', async () => {
     const lire = (corps, o = {}) => T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', corps, { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc', ...o });
     const d0 = NOW - 30 * H;
@@ -296,7 +303,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const apres = T.ligneApresEssai(avant, r4, { carrier: 'mondialrelay', suivi: '12345678', voie: 'mr-fr-mvc', maintenant: NOW, cp: '99999', cpSource: 'email' });
     dit(apres.etat === 'disponible' && apres.lieuNom === 'TABAC TEST' && apres.lieuCp === '99999' && apres.voie === 'mr-fr-mvc' && apres.cp === '99999', 'rangée : la ligne garde le lieu qu\'elle avait (jamais effacé par un blanc), la voie et le code postal prouvé', `${apres.etat} ${apres.lieuNom} ${apres.voie} cp=${apres.cp}`);
   });
-  await essaie('Mondial Relay (API .be, le secours de l\'extension)', async () => {
+  await essaie('Mondial Relay (API .be, relayée par l\'extension sous `mr-be`)', async () => {
     const lire = (corps, o = {}) => T.lireReponse('mondialrelay', 200, 'application/json', corps, { suivi: '12345678', cp: '99999', voie: 'mr-be', ...o });
     const d0 = NOW - 30 * H;
     const evs = [{ ms: d0, libelle: 'Colis expédié depuis le site TESTVILLE' }, { ms: d0 + 20 * H, libelle: '5 jours restants pour retirer le colis en Point Relais', dpr: true }];
@@ -365,6 +372,14 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(f1.length === 1 && f1[0].raison === 'fermeture' && f2.length === 0, 'un ancien n° jamais fermé est lu UNE fois (« fermeture »), puis plus jamais', `${f1.map((x) => x.raison)} · ${f2.length}`);
     const mr = sel({ lignes: [ligne({ suivi: '12345678', carrier: 'mondialrelay', status: 'available', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville' })] });
     dit(mr.length === 1 && mr[0].cp === '99999' && mr[0].cpSource === 'email', 'Mondial Relay : le code postal vient du lieu de l\'e-mail « disponible »', JSON.stringify(mr[0] || null));
+    // (fusion) La règle de C3 (`aLireParNavigateur`) : un n° Mondial Relay sans
+    // code postal connu, demandé SEUL par la page avec son code postal, part à
+    // l'extension avec ce code postal (pendant la pause) — jamais un autre n°.
+    const pauseMr = T.pauseApresRefus({}, 'mondialrelay', { statut: 403, ctype: 'text/html', maintenant: NOW });
+    const sansCp = [ligne({ suivi: '12345678', carrier: 'mondialrelay' })];
+    const nav1 = T.aLireParNavigateur({ lignes: sansCp, pause: pauseMr, maintenant: NOW + 1000, seul: '12345678', cpSeul: '99999' });
+    const nav2 = T.aLireParNavigateur({ lignes: sansCp, pause: pauseMr, maintenant: NOW + 1000 });
+    dit(nav1.length === 1 && nav1[0].cp === '99999' && nav1[0].voie === 'mr-fr-mvc' && nav2.length === 0, 'C3 : sans code postal connu, le n° demandé seul part avec le code postal de la page ; sans lui, rien (jamais un code postal deviné)', `${JSON.stringify(nav1)} · ${JSON.stringify(nav2)}`);
   });
 
   // ══ 6. LE RÉSEAU : UN PASSAGE DU SERVEUR (C5), LA PAUSE, C3 ══════════════
@@ -417,7 +432,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(r.ok && mr.length === 1 && u0 && u0.pathname === '/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive' && u0.searchParams.get('NumeroExpedition') === '12345678' && u0.searchParams.get('CodePostal') === '99999', 'Mondial Relay est lu PAR LE SERVEUR, route `_mvc`, avec le n° et le code postal du point relais', mr.map((x) => x.url).join(' · ') || 'aucun appel');
     dit(mr.length === 1 && mr[0].xrw === 'XMLHttpRequest' && /application\/json/.test(mr[0].accept) && !mr[0].cookie, 'les en-têtes de la mesure (Accept JSON, X-Requested-With), aucun cookie, aucun jeton', mr[0] && `${mr[0].accept} · ${mr[0].xrw}`);
     dit(appels.length > 0 && appels.every((x) => /^VRM-suivi\//.test(x.ua) && !/Mozilla|Chrome|Safari/i.test(x.ua)) && appels.every((x) => x.redirect === 'error'), 'un User-Agent HONNÊTE sur chaque requête (jamais celui d\'un navigateur), aucune redirection suivie', [...new Set(appels.map((x) => x.ua))].join(' · '));
-    dit(!appels.some((x) => x.host === 'www.mondialrelay.be'), 'le serveur n\'appelle jamais l\'API .be (refusée au serveur : c\'est le secours de l\'extension)');
+    dit(!appels.some((x) => x.host === 'www.mondialrelay.be'), 'le serveur n\'appelle jamais l\'API .be (refusée au serveur)');
     const lm = ligneT('mondialrelay', '12345678'), lc = ligneT('chronopost', 'XW000000001TS'), lv = ligneT('vinted', '1234567890123456');
     dit(lm && lm.etat === 'disponible' && lm.voie === 'mr-fr-mvc' && lm.cp === '99999' && lm.source === 'serveur' && lm.essaiRes === 'ok', 'la ligne `transp_mondialrelay_12345678` : disponible, voie `mr-fr-mvc`, code postal prouvé', lm && `${lm.etat} ${lm.voie} ${lm.cp} ${lm.source}`);
     dit(lc && lc.etat === 'disponible' && lc.voie === 'cp-ws2' && lv && lv.etat === 'en_route' && lv.voie === 'vg-v3', 'Chronopost et Vinted Go lus et rangés', `${lc && lc.etat} · ${lv && lv.etat}`);
@@ -467,16 +482,16 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const b0 = (r.besoinNavigateur || [])[0] || {};
     dit(p.mondialrelay && Date.parse(p.mondialrelay.jusqua) > Date.now(), '403 ⇒ une PAUSE pour Mondial Relay (`transp_pause`)', JSON.stringify(p.mondialrelay || null));
     dit(lm && lm.essaiRes === 'bloque' && !lm.etat, 'la ligne dit « bloqué », sans état inventé', lm && `${lm.essaiRes} ${lm.etat}`);
-    dit(b0.carrier === 'mondialrelay' && b0.voie === 'mr-be' && b0.cp === '99999' && b0.suivi === '12345678', 'le n° part à l\'extension par la voie de SECOURS (`mr-be`), avec son code postal', JSON.stringify(r.besoinNavigateur));
+    dit(b0.carrier === 'mondialrelay' && b0.voie === 'mr-fr-mvc' && b0.cp === '99999' && b0.suivi === '12345678', 'le n° part à l\'extension (secours) par la route `_mvc` (`mr-fr-mvc`, lue depuis le navigateur), avec son code postal', JSON.stringify(r.besoinNavigateur));
     // Dix minutes plus tard (la page relit un n° au plus toutes les 5 min) :
     const vieillir = () => { const k = `${A}|transp_mondialrelay_12345678`; const d = base.get(k); if (d) base.set(k, { ...d, essai: iso(Date.now() - 10 * 60000) }); };
     vieillir();
     const n0 = appels.filter((x) => /mondialrelay/.test(x.host)).length;
     const r2 = await passage({ suivi: '12345678', force: true });
-    dit(appels.filter((x) => /mondialrelay/.test(x.host)).length === n0 && (r2.besoinNavigateur || []).some((x) => x.suivi === '12345678' && x.voie === 'mr-be'), 'en pause : aucune requête à Mondial Relay, même forcée ; le n° reste pour l\'extension', `${appels.filter((x) => /mondialrelay/.test(x.host)).length - n0} requête(s)`);
+    dit(appels.filter((x) => /mondialrelay/.test(x.host)).length === n0 && (r2.besoinNavigateur || []).some((x) => x.suivi === '12345678' && x.voie === 'mr-fr-mvc'), 'en pause : aucune requête à Mondial Relay, même forcée ; le n° reste pour l\'extension', `${appels.filter((x) => /mondialrelay/.test(x.host)).length - n0} requête(s)`);
     vieillir();
     const c3 = await contexteVendeur.run({ owner: A }, () => L.transpALire());
-    dit(c3 && c3.items.some((x) => x.carrier === 'mondialrelay' && x.voie === 'mr-be' && x.cp === '99999'), 'C3 (`transp-a-lire`) liste ce n° pour l\'extension, voie `mr-be`, sans attendre le recul du serveur (30 min)', JSON.stringify(c3 && c3.items));
+    dit(c3 && c3.items.some((x) => x.carrier === 'mondialrelay' && x.voie === 'mr-fr-mvc' && x.cp === '99999'), 'C3 (`transp-a-lire`) liste ce n° pour l\'extension, voie `mr-fr-mvc`, sans attendre le recul du serveur (30 min)', JSON.stringify(c3 && c3.items));
     for (const [cas, attendu] of [['429', 'bloque'], ['defi', 'bloque']]) {
       resetBase(); await oublis();
       base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr({ status: 'available', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville' }));
@@ -512,6 +527,15 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const le = ligneT('mondialrelay', '12345678');
     const essayeMr = appels.filter((x) => x.host === 'www.mondialrelay.fr').map((x) => new URL(x.url).searchParams.get('CodePostal'));
     dit(essayeMr.join(',') === '11111' && le && le.essaiRes === 'cp-inconnu' && !(Number(le.essais) > 0) && /11111/.test(le.cpEssayes || ''), 'un code postal ESSAYÉ que Mondial Relay refuse ⇒ « code postal inconnu », l\'essai noté, aucun échec compté', le && `${le.essaiRes} essais=${le.essais} essayés=${le.cpEssayes}`);
+    // Un code postal donné par la PAGE (C5) n'est pas prouvé : « pas de colis »
+    // pour ce couple ne compte pas comme « introuvable » (qui fermerait le n°).
+    resetBase(); await oublis();
+    base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr());
+    transporteur = repond();
+    await passage({ suivi: '12345678', force: true, cpPage: '11111' });
+    const lp = ligneT('mondialrelay', '12345678');
+    const essayeP = appels.filter((x) => x.host === 'www.mondialrelay.fr').map((x) => new URL(x.url).searchParams.get('CodePostal'));
+    dit(essayeP.join(',') === '11111' && lp && lp.essaiRes === 'cp-inconnu' && !(Number(lp.essais) > 0) && /11111/.test(lp.cpEssayes || ''), 'un code postal donné par la PAGE et refusé ⇒ « code postal inconnu », l\'essai noté, aucun échec compté', lp && `${lp.essaiRes} essais=${lp.essais} essayés=${lp.cpEssayes}`);
     // Sans aucun code postal : rien ne part, et c'est DIT.
     resetBase(); await oublis();
     base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr());
@@ -547,7 +571,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const d0 = NOW - 30 * H;
     const beOk = { v: 1, carrier: 'mondialrelay', suivi: '12345678', cp: '99999', voie: 'mr-be', statut: 200, ctype: 'application/json', corps: mrBe('12345678', '99999', 4, [{ ms: d0, libelle: '5 jours restants pour retirer le colis en Point Relais', dpr: true }]), at: iso(NOW), source: 'extension' };
     const r1 = await appel('transp-brut', beOk);
-    dit(r1.code === 200 && r1.corps && r1.corps.res === 'ok' && (ligneT('mondialrelay', '12345678') || {}).voie === 'mr-be', 'C4 voie `mr-be` (le secours) : jugée par la même règle, rangée avec SA voie', `${r1.code} ${JSON.stringify(r1.corps)}`);
+    dit(r1.code === 200 && r1.corps && r1.corps.res === 'ok' && (ligneT('mondialrelay', '12345678') || {}).voie === 'mr-be', 'C4 voie `mr-be` (l\'API .be relayée) : jugée par la même règle, rangée avec SA voie', `${r1.code} ${JSON.stringify(r1.corps)}`);
     const mvcOk = { ...beOk, voie: 'mr-fr-mvc', corps: mvcJson('12345678', '99999', 5, [{ ms: d0, libelle: '5 jours restants pour retirer le colis en Point Relais' }, { ms: d0 + 5 * H, libelle: 'Colis livr&#233; au destinataire' }]) };
     const r2 = await appel('transp-brut', mvcOk);
     dit(r2.code === 200 && r2.corps && r2.corps.etat === 'retire' && (ligneT('mondialrelay', '12345678') || {}).voie === 'mr-fr-mvc', 'C4 voie `mr-fr-mvc` acceptée elle aussi (jugée par l\'analyseur `_mvc`)', `${r2.code} ${JSON.stringify(r2.corps)}`);

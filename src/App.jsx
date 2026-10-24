@@ -439,7 +439,9 @@ const CAPACITES_DITES = [
   ['annulee', 'retirer tout seul le bordereau d\'une vente annulée'],
   ['confirmer', 'relever les colis à confirmer (« Tout est OK ») avant leur date limite'],
   ['retraitnotif', 'te prévenir quand elle lit un code de retrait dans une conversation'],
-  ['transp', 'lire le statut de tes colis sur le site du transporteur quand le serveur VRM est refusé'],
+  // (24 oct.) Le serveur lit lui-même Chronopost, Vinted Go et Mondial Relay :
+  // l'extension ne lit que ce qu'un transporteur REFUSE au serveur.
+  ['transp', 'lire depuis ton ordinateur le statut des colis qu\'un transporteur refuse au serveur de VRM'],
   // (revue du 11 octobre) Ce qui manque VRAIMENT : relier une vente qui a son
   // BORDEREAU, une 5.164 le fait déjà (le bordereau porte l'annonce).
   ['preuves', 'aller chercher toute seule la preuve des ventes qui n\'ont pas encore de bordereau (anti double vente)'],
@@ -14920,16 +14922,17 @@ function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne
 // Julien : « tu as juste à regarder sur le site du transporteur, je ne te
 // demande pas le code de retrait mais juste de regarder le statut ». La ligne
 // `transp_{transporteur}_{n°}` est écrite par le SERVEUR seul (Chronopost,
-// Vinted Go et Mondial Relay lus par lui — mesuré le 24 oct. ; refusé, le n°
-// est lu depuis l'ordinateur par l'extension, sa voie de secours). La phrase vient de la règle
+// Vinted Go et Mondial Relay lus par lui — Mondial Relay par sa route `_mvc`,
+// mesurée le 24 oct. ; l'extension ne lit, depuis l'ordinateur, que ce que le
+// transporteur REFUSE au serveur). La phrase vient de la règle
 // partagée (`ligneTransporteur`, api/_lib/transporteurs.js, §11) : le libellé du
 // transporteur RECOPIÉ tel quel, l'âge de la lecture, puis ce qui en découle.
 // Trois états : lu · pas su (le transporteur n'a pas répondu) · jamais lu ;
 // plus cp-inconnu (son geste), expiré, introuvable. Texte neutre ; ambre pour
 // un retour, un incident, un statut inconnu ; jamais de rouge (§7).
 // Rien sur la carte quand c'est dit UNE fois en tête de liste (`TeteTransporteurs`) :
-// lecture de NOTRE base ratée, Mondial Relay refusé au serveur sans extension
-// à jour, un transporteur que VRM ne lit pas.
+// lecture de NOTRE base ratée, Mondial Relay sans extension à jour (si le
+// serveur ne le lisait pas) ou refusé au serveur, un transporteur que VRM ne lit pas.
 const ligneTranspDe = (transp, suivi) => {
   const k = normaliserSuivi(suivi); if (!k || !transp) return null;
   if (transp instanceof Map) return transp.get(k) || null;
@@ -14941,7 +14944,9 @@ function LigneTransporteur({ transp, suivi, carrier, style }) {
   const t = ligneTranspDe(transp, k);
   const c = (t && t.carrier) || carrierLisible(carrier, k);
   if (!c) return null;
-  // Mondial Relay lu par l'extension seule (drapeau éteint) : sans elle, rien à dire ici.
+  // Mondial Relay pas encore lu : « jamais lu » sur la carte, comme les autres,
+  // dès que le SERVEUR le lit (`LECTURE_SERVEUR_TRANSP`, la même valeur que le
+  // serveur, §11) ; sinon la tête de liste dit le geste une fois.
   if (!t && c === 'mondialrelay' && !LECTURE_SERVEUR_TRANSP.mondialrelay && extSait('transp') !== 'ok') return null;
   const l = ligneTransporteur(t, c);
   const age = Number.isFinite(l.age) ? String(Math.max(0, Math.round(l.age / 60000))) : '';
@@ -14952,9 +14957,11 @@ function LigneTransporteur({ transp, suivi, carrier, style }) {
 }
 // En tête de la liste des colis, UNE fois chacune (§7) :
 //   · la lecture de NOTRE base a raté (`transp === null`) ;
-//   · des colis Mondial Relay que le SERVEUR n'a pas pu lire (refusé : sa
-//     dernière lecture « bloque »), et l'extension de CE navigateur ne sait
-//     pas le faire (« depuis ton ordinateur, avec l'extension à jour ») ;
+//   · SI LE SERVEUR NE LISAIT PAS Mondial Relay : des colis Mondial Relay sans
+//     lecture, et l'extension de CE navigateur ne sait pas le faire (« depuis ton
+//     ordinateur, avec l'extension à jour ») — plus jamais dit quand il le lit ;
+//   · Mondial Relay REFUSE en ce moment le serveur (`bloque`) : l'extension le
+//     lit à la place, depuis l'ordinateur — le geste selon CE navigateur ;
 //   · des colis d'un transporteur que VRM ne lit pas (Colissimo, DPD, UPS…).
 // `colis` : [{ carrier, suivi }] — les colis de la liste affichée.
 function TeteTransporteurs({ transp, colis, relire }) {
@@ -14963,17 +14970,13 @@ function TeteTransporteurs({ transp, colis, relire }) {
   if (transp === undefined) return null;
   const liste = Array.isArray(colis) ? colis : [];
   const nonLus = [...new Set(liste.map(x => x && carrierNonLu(x.carrier)).filter(Boolean))];
-  // Lu par le serveur : seuls les colis qu'il n'a pas pu lire (refusé) ont
-  // besoin de l'extension ; sinon (drapeau éteint), tous ceux jamais lus.
   const mrServeur = !!LECTURE_SERVEUR_TRANSP.mondialrelay;
-  const mrSans = (transp === null) ? 0 : liste.filter(x => {
-    if (!x || carrierLisible(x.carrier, x.suivi) !== 'mondialrelay') return false;
-    const t = ligneTranspDe(transp, x.suivi);
-    return mrServeur ? !!(t && t.essaiRes === 'bloque') : !t;
-  }).length;
+  const estMr = x => x && carrierLisible(x.carrier, x.suivi) === 'mondialrelay';
+  const mrSans = (transp === null || mrServeur) ? 0 : liste.filter(x => estMr(x) && !ligneTranspDe(transp, x.suivi)).length;
+  const mrRefus = (transp === null || !mrServeur) ? 0 : new Set(liste.filter(x => { if (!estMr(x)) return false; const t = ligneTranspDe(transp, x.suivi); return !!t && t.essaiRes === 'bloque'; }).map(x => normaliserSuivi(x.suivi))).size;
   const sait = extSait('transp');
   const montrerMr = mrSans > 0 && sait !== 'ok';
-  if (transp !== null && !montrerMr && !nonLus.length) return null;
+  if (transp !== null && !montrerMr && !mrRefus && !nonLus.length) return null;
   const st = {fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 10px'};
   const geste = sansSouris || sait === 'absente'
     ? <>ouvre VRM sur l'ordinateur où l'extension VRM est installée — c'est elle qui lit Mondial Relay.</>
@@ -14984,9 +14987,14 @@ function TeteTransporteurs({ transp, colis, relire }) {
       {relire && <button type="button" data-transp-reessayer="" onClick={relire} style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'0 12px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>Réessayer</button>}
     </div>}
     {montrerMr && <div data-transp-mr={sansSouris ? 'telephone' : sait} data-transp-mr-n={String(mrSans)} style={st}>
-      {mrServeur
-        ? <>Mondial Relay refuse en ce moment la lecture du serveur VRM ({mrSans} colis) : son statut se lit alors depuis ton ordinateur, avec l'extension à jour — {geste}</>
-        : <>Mondial Relay ne se lit que depuis ton ordinateur, avec l'extension à jour ({mrSans} colis) : {geste}</>}
+      Mondial Relay ne se lit que depuis ton ordinateur, avec l'extension à jour ({mrSans} colis) : {geste}
+    </div>}
+    {mrRefus > 0 && <div data-transp-mr-refus={sansSouris ? 'telephone' : sait} data-transp-mr-n={String(mrRefus)} style={st}>
+      Mondial Relay refuse en ce moment la lecture du serveur VRM ({mrRefus} colis) : {sait === 'ok' && !sansSouris
+        ? <>l'extension VRM de ce Chrome les lit à la place, depuis ton ordinateur.</>
+        : sansSouris || sait === 'absente'
+          ? <>l'extension VRM peut les lire à la place — ouvre VRM sur l'ordinateur où elle est installée.</>
+          : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) pour qu'elle les lise depuis ce Chrome.</>}
     </div>}
     {nonLus.length > 0 && <div data-transp-non-lu={nonLus.join(',')} style={st}>
       VRM ne lit pas le suivi de {nonLus.join(' ni de ')} : regarde {nonLus.length > 1 ? 'leurs' : 'ses'} e-mails.
@@ -15238,7 +15246,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
           {choisi === 'mondialrelay' && <input aria-label="Code postal (facultatif)" data-suivi-cp="" value={cp} onChange={e => setCp(e.target.value)} inputMode="numeric" placeholder="Code postal du point relais (facultatif)" style={champ}/>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button type="button" data-suivi-enregistrer="" disabled={envoi} onClick={enregistrer} style={{ ...bouton, borderColor: C.accent, color: C.accent, opacity: envoi ? .5 : 1 }}>{envoi ? 'Enregistrement…' : 'Enregistrer ce suivi'}</button>
-            <span data-suivi-promesse="" style={{ fontSize: 11.5, color: C.muted }}>Il devient « à retirer » quand l'e-mail du transporteur arrive, ou quand VRM lit sur son site qu'il est disponible (Mondial Relay : avec le code postal du point relais).</span>
+            <span data-suivi-promesse="" style={{ fontSize: 11.5, color: C.muted }}>Il devient « à retirer » quand l'e-mail du transporteur arrive, ou quand VRM lit sur son site qu'il est disponible {LECTURE_SERVEUR_TRANSP.mondialrelay ? '(Mondial Relay : avec le code postal du point relais).' : '(Mondial Relay : depuis ton ordinateur, avec l\'extension).'}</span>
           </div>
           {msg && <div data-suivi-msg="" style={{ fontSize: 12.5, color: C.warn }}>{msg}</div>}
         </div>
@@ -35315,7 +35323,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
       // (24 oct., 5.217) Un statut lu chez le transporteur par l'extension
-      // (sa voie de secours, depuis ce navigateur) : on relit les lignes `transp_*`.
+      // (ce qu'il a refusé au serveur, depuis ce navigateur) : on relit les lignes `transp_*`.
       else if (ev.quoi === 'transp') lireTransp();
       // 5.165 : une annonce SUPPRIMÉE sur Vinted (ou le dressing relu) — on
       // oublie la lecture d'avant et l'écran qui les montre se relit, sans squelette.

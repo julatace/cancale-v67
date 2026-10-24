@@ -46,7 +46,7 @@ const USAGES = {
   base: { quoi: 'la base de données de VRM', role: /./, donnee: /./ },
   // (24 oct.) Le statut public d'un colis, lu par le SERVEUR (Chronopost, Vinted Go).
   transp: { quoi: 'statut public des colis, lu par le serveur', role: /statut public des colis/i, donnee: /n° de suivi[\s\S]*serveur VRM/i },
-  // (24 oct., 11:51 UTC) Mondial Relay lu par le SERVEUR : le n° ET le code postal.
+  // (24 oct., suite) Mondial Relay lu par le SERVEUR (route `_mvc`) : n° ET code postal.
   transpmr: { quoi: 'statut public des colis Mondial Relay, lu par le serveur (n° + code postal)', role: /statut public des colis/i, donnee: /code postal[\s\S]*serveur VRM/i },
 };
 // ── La liste FERMÉE des couples (fichier, hôte) écrits dans le code ─────────
@@ -92,8 +92,9 @@ const COUPLES = {
   'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };
 // (24 oct.) Ce que la politique doit dire même si l'hôte n'est pas écrit dans
-// ces fichiers : quand le serveur est refusé, Mondial Relay est lu DEPUIS LE
-// NAVIGATEUR, par l'extension (sa voie de secours), avec le n° ET le code postal.
+// ces fichiers : Mondial Relay est AUSSI lu depuis le navigateur, par
+// l'extension (sa voie de secours, la même route `_mvc`), quand il refuse le
+// serveur — avec le n° ET le code postal.
 const DECLARATIONS = [
   { quoi: 'Mondial Relay (secours : statut lu par l’extension, n° + code postal, depuis le navigateur)', service: /Mondial Relay/, role: /statut public des colis/i, donnee: /code postal[\s\S]*(navigateur|extension)/i },
 ];
@@ -161,7 +162,8 @@ if (PROUVE) {
     ['la ligne jsDelivr retirée', () => [fichiers, sansLigne('jsDelivr')]],
     ['la ligne des photos Discord retirée', () => [fichiers, sansLigne('Photo de profil Discord')]],
     ['la ligne Chronopost / Vinted Go retirée', () => [fichiers, sansLigne('Chronopost \\(groupe La Poste\\)')]],
-    ['la ligne Mondial Relay dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],
+    ['la ligne Mondial Relay ne dit plus le secours par le navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],
+    ['la ligne Mondial Relay ne dit plus que le serveur VRM l’appelle', () => [fichiers, politique.replace('envoyés par le serveur VRM (son adresse IP, pas la tienne) ; en secours, quand Mondial Relay refuse le serveur, ', '')]],
     ['un nouvel hôte contacté par le serveur des transporteurs, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'api/_lib/transporteurs-lecture.js' ? t + '\nconst sonde = () => fetch(`https://suivi.exemple-tiers.com/v1/x`);\n' : t]), politique]],
     ['un nouvel hôte appelé par le navigateur, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'src/App.jsx' ? t + '\nconst sonde = () => fetch(`https://api.exemple-tiers.com/v1/x`);\n' : t]), politique]],
   ];
