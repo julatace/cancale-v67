@@ -35,5 +35,14 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  await f.ctx.lirePageFavoris('111',acc,{cycle,nouveau:true});const faux=await f.ctx.lirePageFavoris('111',acc,{cycle,nouveau:false});check(!faux.ok,'une API qui ignore le numéro de page n’est pas déclarée complète');
  check(f.ctx.sourceNotificationsFavoris('https://evil.invalid/inbox-notifications/v1/notifications','www.vinted.fr')===null,'source étrangère refusée');
  f.setOwner('owner-B');check(await f.ctx.archiveNotifications('111',{payload:{notifications:[]},ownerAttendu:'owner-A'})===null,'changement de propriétaire : aucune archive transférée');
+ f=creer();const contexte='https://www.vinted.fr/items/101/conversation/new?native_target=201';
+ await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:101,opposite_user_id:201}),contexte);
+ let archive=f.rows.get('harvest_111_favoris_archive').data;check(archive.creations.length===1&&archive.creations[0].contexteFavori===contexte,'lien natif et création exacte conservés');
+ await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:999,opposite_user_id:888}));
+ await f.ctx.archiveNotifications('111',{payload:{notifications:[notif(0)]},domain:'www.vinted.fr'});
+ archive=f.rows.get('harvest_111_favoris_archive').data;check(archive.creations.length===1,'une autre création ou une page de notifications ne perd pas la preuve');
+ for(const [item,url] of [[555,contexte],[101,'https://evil.invalid/items/101/conversation/new?native_target=201']])await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:item,opposite_user_id:201}),url);
+ check(f.rows.get('harvest_111_favoris_archive').data.creations.length===1,'autre article et origine étrangère ne deviennent pas des preuves');
+ check(f.reseau.every(x=>!x.u.hostname.endsWith('vinted.fr')),'capturer la preuve ne déclenche aucune requête Vinted');
  console.log(controles+' contrôles archive et pagination réussis');
 })().catch(e=>{console.error(e);process.exitCode=1;});

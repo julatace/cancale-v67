@@ -266,7 +266,7 @@ const capturer = async (pg, nom, vp) => {
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('alert').filter({hasText:'5.218'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.219'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>window.majExtensionFavoris());
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();

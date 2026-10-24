@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.218.0';
+const EXT_ATTENDUE = '5.219.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -13213,7 +13213,7 @@ function etatExtensionFavoris(uid,mesure=null){
   if(!mesure&&codePerime())return {disponible:false,raison:textePerime()};
   if(!mesure&&!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
   const version=e?.ok?String(e.version||''):vmrExtVersion();
-  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.218.`};
+  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.219.`};
   if(e?.vrm?.connecte!==true||String(e.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
   const actif=String(e?.vinted?.uid||'');
   if(actif&&uid&&actif!==String(uid))return {disponible:false,raison:'Le navigateur est connecté à un autre compte Vinted. Connecte le compte sélectionné avant de lancer.'};

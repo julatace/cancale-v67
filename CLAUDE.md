@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — favoris 5.219 :** capture passive du lien natif ouvert avec
+> la création de conversation, archive privée cumulée de 100 contextes maximum.
+> Le destinataire peut être prouvé par le lien exact ou un paramètre numérique
+> dont le rôle est démontré, sans supposer user_id. Voir
+> `docs/passation/2026-10-24-favoris-contexte-natif.md`.
+
 > **24 octobre — destinataire favoris :** lorsque la dernière création native
 > ne prouve aucune paire, repli en lecture sur les identifiants des conversations
 > captées pour le même owner/UID et les articles favoris conservés. Exactitude des

@@ -136,6 +136,20 @@
     try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {}
   };
 
+  // Bind the native creation to the exact favorite link the user opened.
+  // Passive observation only; no navigation and no message is initiated here.
+  const lienContexteFavori = v => {
+    try { const u=new URL(v,location.origin);u.hash='';
+      return u.protocol==='https:'&&!u.username&&!u.password&&/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)&&/^\/items\/[1-9]\d{0,19}\/[a-z_-]{1,40}\/new\/?$/.test(u.pathname)&&u.href.length<=2000?u.href:null;
+    }catch{return null;}
+  };
+  let dernierFavoriClique=null;
+  window.addEventListener('click',e=>{
+    dernierFavoriClique=null;if(!e.isTrusted)return;
+    const a=e.target?.closest?.('a[href]'),url=a&&lienContexteFavori(a.href);
+    if(url)dernierFavoriClique={url,at:Date.now()};
+  },true);
+
   let lastCsrf = null; // dernier x-csrf-token vu (réutilisé pour la moisson active)
   let lastAnon = null; // dernier x-anon-id vu
   const sendCsrf = (headers) => {
@@ -263,7 +277,12 @@
         else { try { b = JSON.stringify(b); } catch (_) { b = String(b); } }
       }
       if (b && b.length > 100000) b = b.slice(0, 100000);
-      post({ kind: 'writereq', method: String(method).toUpperCase(), url, body: b || '' });
+      let contexteFavori=null;
+      try{const u=new URL(url,location.origin);if(String(method).toUpperCase()==='POST'&&u.pathname==='/api/v2/conversations'&&/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)){
+        contexteFavori=dernierFavoriClique&&Date.now()-dernierFavoriClique.at<=5000?dernierFavoriClique.url:lienContexteFavori(location.href);
+        dernierFavoriClique=null;
+      }}catch{}
+      post({ kind: 'writereq', method: String(method).toUpperCase(), url, body: b || '', ...(contexteFavori?{contexteFavori}:{}) });
     } catch (_) {}
   };
 
