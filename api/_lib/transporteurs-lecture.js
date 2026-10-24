@@ -22,15 +22,22 @@
 //   · jamais un n° SORTANT (un colis qu'il a posté : bordereau ou sens), jamais
 //     un sens « pas su » (api/_lib/transporteurs.js, `suivisAInterroger`).
 //
-// ⚠️⚠️ MONDIAL RELAY N'EST PAS LU PAR LE SERVEUR — MESURÉ LE 24 OCTOBRE 2026 À
-//    11:19 UTC, depuis dub1 (sandbox Vercel), avec le User-Agent honnête :
-//    `www.mondialrelay.be/fr-be/suivi-de-colis/` répond 200 (le jeton est là),
-//    mais `www.mondialrelay.be/api/tracking` répond 403 en HTML (Cloudflare).
-//    Le serveur ne contourne pas : il DONNE les n° Mondial Relay dont il connaît
-//    le code postal (`besoinNavigateur`, C3), l'extension les lit depuis le
-//    navigateur de Julien et relaie la réponse BRUTE (C4) — jugée ici, par la
-//    même fonction, avec le contrôle de l'écho (n° ET code postal). Le serveur
-//    n'envoie aucune requête à mondialrelay, jamais.
+// ⚠️⚠️ MONDIAL RELAY — MESURÉ LE 24 OCTOBRE 2026, depuis dub1 (sandbox Vercel),
+//    avec le User-Agent honnête :
+//    · `www.mondialrelay.be/fr-be/suivi-de-colis/` répond 200, mais
+//      `www.mondialrelay.be/api/tracking` répond 403 en HTML (Cloudflare) — le
+//      serveur ne la lit PAS (11:19 UTC) ;
+//    · `www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive`
+//      (GET `?NumeroExpedition=&CodePostal=`, `Accept: application/json`,
+//      `X-Requested-With: XMLHttpRequest`, sans cookie ni jeton) répond 200 en
+//      JSON, deux fois (11:53 et 12:28 UTC) : `Success:true` et un fragment HTML
+//      pour un colis trouvé, `Success:false` (« erreur de saisie ») pour un
+//      mauvais code postal. C'est la voie du SERVEUR (`mr-fr-mvc`), jugée par
+//      `lireReponseMondialRelayMvc`, avec l'ÉCHO du n° (et du code postal).
+//    Le serveur ne contourne jamais : un refus (403, 401, 429, défi, HTML) pose
+//    la PAUSE de Mondial Relay, et c'est SEULEMENT alors (et pendant la pause)
+//    que le n° part dans `besoinNavigateur` (C3) : l'extension le lit depuis le
+//    navigateur de Julien (voie `mr-be`) et relaie la réponse BRUTE (C4).
 // MESURÉ LE MÊME JOUR, MÊME UA : Chronopost `ws.chronopost.fr …/trackSkybillV2`
 //    200 text/xml ; Vinted Go `carrier.vintedgo.com/public/v3/tracking_events`
 //    200 application/json (3 lectures à 2 s d'écart ; 404 JSON
@@ -174,24 +181,29 @@ async function corpsBorne(r, max) {
     return String(await r.text()).slice(0, max);
   } catch (_) { return ''; }
 }
-export const urlTransporteur = (carrier, suivi) => {
+// `cp` : le code postal du point relais (Mondial Relay seulement ; sans lui,
+// aucune adresse). Le n° et le code postal ont leur FORME (8 chiffres, 5
+// chiffres) : rien d'autre n'entre dans l'adresse.
+export const urlTransporteur = (carrier, suivi, cp = '') => {
   const n = normaliserSuivi(suivi);
   if (!T.FORME_SUIVI[carrier] || !T.FORME_SUIVI[carrier].test(n)) return null;
   if (carrier === 'chronopost') return `https://ws.chronopost.fr/tracking-cxf/TrackingServiceWS/trackSkybillV2?language=fr_FR&skybillNumber=${n}`;
   if (carrier === 'vinted') return `https://carrier.vintedgo.com/public/v3/tracking_events/${n}`;
-  return null;   // Mondial Relay : jamais d'ici (voir la mesure en tête)
+  if (carrier === 'mondialrelay') return /^\d{5}$/.test(String(cp || '')) ? `https://www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive?NumeroExpedition=${n}&CodePostal=${cp}` : null;
+  return null;
 };
+const ACCEPT = { chronopost: 'text/xml, application/xml', vinted: 'application/json', mondialrelay: 'application/json' };
 // Rend { statut, ctype, corps, retryAfter, defi } ou { echec: 'voie'|'suivi'|'reseau' }.
-export async function lireTransporteur(carrier, suivi) {
+export async function lireTransporteur(carrier, suivi, { cp = '' } = {}) {
   if (!LECTURE_SERVEUR[carrier]) return { echec: 'voie' };
-  const url = urlTransporteur(carrier, suivi);
+  const url = urlTransporteur(carrier, suivi, cp);
   if (!url) return { echec: 'suivi' };
   return unParTransporteur(carrier, async () => {
     try {
       const r = await fetch(url, {
         redirect: 'error',
         signal: AbortSignal.timeout(DELAI_MS),
-        headers: { 'User-Agent': UA_HONNETE, Accept: carrier === 'chronopost' ? 'text/xml, application/xml' : 'application/json', ...(carrier === 'vinted' ? { 'Accept-Language': 'fr' } : {}) },
+        headers: { 'User-Agent': UA_HONNETE, Accept: ACCEPT[carrier], ...(carrier === 'vinted' ? { 'Accept-Language': 'fr' } : {}), ...(carrier === 'mondialrelay' ? { 'X-Requested-With': 'XMLHttpRequest' } : {}) },
       });
       const h = (k) => { try { return r.headers.get(k) || ''; } catch (_) { return ''; } };
       return { statut: r.status, ctype: h('content-type'), corps: await corpsBorne(r, CORPS_MAX), retryAfter: h('retry-after'), defi: /challenge/i.test(h('cf-mitigated')) };
@@ -202,15 +214,18 @@ export async function lireTransporteur(carrier, suivi) {
 // ── RANGER UN ESSAI (C1), PUIS SONNER S'IL Y A UN CHANGEMENT ─────────────────
 // `lu` : le rendu d'un analyseur. Rend { res, etat, change, ecrit } (ecrit :
 // true · false · null = pas su).
-async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, maintenant = Date.now(), silence = false, cp = '', cpSource = '', cpEssaye = '' } = {}) {
+async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, maintenant = Date.now(), silence = false, cp = '', cpSource = '', cpEssaye = '', voie = '' } = {}) {
   const id = T.cleTransp(item.carrier, item.suivi);
   let avant = null, apres = null;
   const ecrit = await modifierCas(id, (d) => {
     avant = d ? { ...d } : null;
-    apres = T.ligneApresEssai(d, lu, { carrier: item.carrier, suivi: item.suivi, voie: T.VOIE_DE[item.carrier], source, statut, maintenant, cp, cpSource, cpEssaye });
+    apres = T.ligneApresEssai(d, lu, { carrier: item.carrier, suivi: item.suivi, voie: voie || T.VOIE_DE[item.carrier], source, statut, maintenant, cp, cpSource, cpEssaye });
     return apres;
   });
   if (ecrit !== true) return { res: lu.res, etat: (avant && avant.etat) || null, change: false, ecrit };
+  // La base du passage suit ce qui vient d'être écrit (le `besoinNavigateur`
+  // final se juge sur l'état à jour, la même règle que C3).
+  if (b && b.transp instanceof Map) { const t = T.ligneTranspDeMeta({ id, ...apres }); if (t) b.transp.set(t.suivi, t); }
   const change = !!(apres.etat && (!avant || avant.etat !== apres.etat || (avant.detail || null) !== (apres.detail || null)));
   if (apres.essaiRes === 'ok' && change) {
     const k = item.suivi;
@@ -234,67 +249,72 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   if (!b) return { ok: false, raison: 'pas-su', lus: [], besoinNavigateur: [], pause: {} };
   const now = maintenant || Date.now();
   const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50, seul: suivi, force: !!(suivi && force) });
-  const lus = [], besoin = [];
+  const lus = [];
   let nFermeture = 0, nLus = 0;
-  // Chaque transporteur suit SA file ; les trois se lisent en parallèle.
+  // Chaque transporteur suit SA file ; les trois se lisent en parallèle — par le
+  // SERVEUR, Mondial Relay compris (voie `mr-fr-mvc`). `besoinNavigateur` ne
+  // reçoit un n° que sur REFUS du transporteur (ou pendant sa pause).
   const parC = { chronopost: [], vinted: [], mondialrelay: [] };
   for (const it of items) (parC[it.carrier] || []).push(it);
-  const traiterMr = async (it) => {
-    const cp = it.cp || (suivi && normaliserSuivi(suivi) === it.suivi && /^\d{5}$/.test(String(cpPage || '')) ? String(cpPage) : '');
-    if (cp) { if (besoin.length < MAX_C3) besoin.push({ carrier: 'mondialrelay', suivi: it.suivi, cp, voie: 'mr-be' }); return; }
-    // Aucun code postal connu : on le DIT (la carte donne le geste), sans requête.
-    const t = b.transp.get(it.suivi);
-    if (t && t.essaiRes === 'cp-inconnu') return;
-    const r = await rangerEssai(b, it, { res: 'cp-inconnu' }, { maintenant: now });
-    lus.push({ carrier: it.carrier, suivi: it.suivi, res: 'cp-inconnu', etat: r.etat, change: false });
-  };
   const traiterServeur = async (carrier) => {
     for (const it of parC[carrier]) {
       if (Date.now() - t0 > budgetMs || nLus >= max) break;
       if (it.raison === 'fermeture') { if (nFermeture >= MAX_FERMETURE) continue; }
-      if (T.enPause(b.pause, carrier, Date.now())) { if (besoin.length < MAX_C3) besoin.push({ carrier, suivi: it.suivi, cp: null, voie: T.VOIE_DE[carrier] }); continue; }
+      // Mondial Relay : le code postal du point relais. Sans lui, AUCUNE requête :
+      // on le DIT (la carte donne le geste).
+      let cp = '', cpSource = '', cpEssaye = '';
+      if (carrier === 'mondialrelay') {
+        const dePage = suivi && normaliserSuivi(suivi) === it.suivi && /^\d{5}$/.test(String(cpPage || '')) ? String(cpPage) : '';
+        cp = it.cp || dePage;
+        cpSource = it.cp ? it.cpSource : (dePage ? 'page' : '');
+        if (!cp) {
+          const t = b.transp.get(it.suivi);
+          if (t && t.essaiRes === 'cp-inconnu') continue;
+          const r = await rangerEssai(b, it, { res: 'cp-inconnu' }, { maintenant: now, voie: T.VOIE_SERVEUR[carrier] });
+          lus.push({ carrier, suivi: it.suivi, res: 'cp-inconnu', etat: r.etat, change: false });
+          continue;
+        }
+        if (cpSource === 'essai') cpEssaye = cp;
+      }
+      if (T.enPause(b.pause, carrier, Date.now())) continue;   // l'extension le lit à sa place (besoinNavigateur, plus bas)
       nLus++;
       if (it.raison === 'fermeture') nFermeture++;
-      const rep = await lireTransporteur(carrier, it.suivi);
+      const rep = await lireTransporteur(carrier, it.suivi, { cp });
       if (rep.echec) {
-        const r = await rangerEssai(b, it, { res: 'passu' }, { maintenant: Date.now() });
+        const r = await rangerEssai(b, it, { res: 'passu' }, { maintenant: Date.now(), voie: T.VOIE_SERVEUR[carrier] });
         lus.push({ carrier, suivi: it.suivi, res: 'passu', etat: r.etat, change: false });
         continue;
       }
-      const lu = rep.defi ? { res: 'bloque' } : T.lireReponse(carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi });
+      let lu = rep.defi ? { res: 'bloque' } : T.lireReponse(carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, cp, voie: T.VOIE_SERVEUR[carrier] });
       if (lu.res === 'bloque') {
         await poserPause(carrier, rep, Date.now());
         b.pause = T.pauseApresRefus(b.pause, carrier, { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
-        if (besoin.length < MAX_C3) besoin.push({ carrier, suivi: it.suivi, cp: null, voie: T.VOIE_DE[carrier] });
       } else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') await leverPause(b, carrier);
-      const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture' });
+      // Un code postal ESSAYÉ (pas encore prouvé pour CE colis) : « pas de colis »
+      // pour ce couple ne veut pas dire « n° inconnu » — on note l'essai, sans
+      // compter d'échec (sinon trois mauvais essais fermeraient le n° pour toujours).
+      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };
+      const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture', voie: T.VOIE_SERVEUR[carrier], cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye });
       lus.push({ carrier, suivi: it.suivi, res: r.res, etat: r.etat, change: r.change });
     }
   };
-  await Promise.all([
-    traiterServeur('chronopost'),
-    traiterServeur('vinted'),
-    (async () => { for (const it of parC.mondialrelay) { if (lus.length + besoin.length >= 50) break; await traiterMr(it); } })(),
-  ]);
-  return { ok: true, lus, besoinNavigateur: besoin.slice(0, MAX_C3), pause: T.pausePublique(b.pause) };
+  await Promise.all([traiterServeur('chronopost'), traiterServeur('vinted'), traiterServeur('mondialrelay')]);
+  // Ce que le serveur n'a pas pu lire, pour l'extension : la règle de C3, sur la
+  // base à jour de ce passage (un n° demandé seul : lui seul).
+  const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: b.pause, maintenant: Date.now(), seul: suivi, max: MAX_C3 });
+  return { ok: true, lus, besoinNavigateur: besoin, pause: T.pausePublique(b.pause) };
 }
 
 // ── C3 : CE QUE L'EXTENSION DOIT LIRE DEPUIS LE NAVIGATEUR ──────────────────
-// Mondial Relay (code postal connu), et les n° Chronopost / Vinted Go que le
-// serveur n'a pas pu lire (refusé, ou transporteur en pause). 6 au plus.
+// SEULEMENT ce que le serveur n'a pas pu lire : un n° refusé (`bloque`), ou un
+// transporteur en pause — Mondial Relay compris (avec son code postal, voie
+// `mr-be` : celle de l'extension). 6 au plus.
 export async function transpALire({ maintenant = null } = {}) {
   const b = await lireBaseTransp();
   if (!b) return null;
   const now = maintenant || Date.now();
-  const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50 });
-  const out = [];
-  for (const it of items) {
-    if (out.length >= MAX_C3) break;
-    if (it.carrier === 'mondialrelay') { if (it.cp) out.push({ carrier: it.carrier, suivi: it.suivi, cp: it.cp, voie: 'mr-be' }); continue; }
-    const t = b.transp.get(it.suivi);
-    if ((t && t.essaiRes === 'bloque') || T.enPause(b.pause, it.carrier, now)) out.push({ carrier: it.carrier, suivi: it.suivi, cp: null, voie: T.VOIE_DE[it.carrier] });
-  }
-  return { v: 1, items: out, pause: T.pausePublique(b.pause) };
+  const items = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: b.pause, maintenant: now, max: MAX_C3 });
+  return { v: 1, items, pause: T.pausePublique(b.pause) };
 }
 
 // ── C4 : LA RÉPONSE BRUTE RELAYÉE PAR L'EXTENSION ───────────────────────────
@@ -322,7 +342,7 @@ export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
   if (!estAchatDuVendeur(b, carrier, suivi)) return { status: 409, corps: { error: 'inconnu' } };
   const now = maintenant || Date.now();
   const t = b.transp.get(suivi) || null;
-  let lu = T.lireReponse(carrier, statut, ctype, x.corps, { suivi, cp });
+  let lu = T.lireReponse(carrier, statut, ctype, x.corps, { suivi, cp, voie: x.voie });
   let cpSource = '', cpEssaye = '';
   if (carrier === 'mondialrelay') {
     const connu = T.codePostalPourMondialRelay({ suivi, transp: t, lignes: b.lignes.filter((l) => suiviDeLigne(l) === suivi), manuels: b.manuels, relaisLieux: relaisDe(b)(suivi), prouves: [], maintenant: now, essai: false });
