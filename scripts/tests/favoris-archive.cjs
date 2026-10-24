@@ -45,12 +45,12 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  check(f.rows.get('harvest_111_favoris_archive').data.creations.length===1,'autre article et origine étrangère ne deviennent pas des preuves');
  check(f.reseau.every(x=>!x.u.hostname.endsWith('vinted.fr')),'capturer la preuve ne déclenche aucune requête Vinted');
  f=creer();await f.ctx.archiveNotifications('111',{payload:{notifications:[{...notif(0),link:'/items/101/conversation/new?native_target=201'}]},domain:'www.vinted.fr'});
- const onglets=[];f.ctx.sbGet=async q=>{check(q.includes('owner=eq.owner-A')&&q.includes('harvest_111_notifications'),'l’ouverture relit uniquement la capture privée demandée');return [];};
+ const onglets=[];let navigation=async()=>{};f.ctx.chrome.tabs.query=async()=>[{id:99,url:'https://www.vinted.fr/notifications'}];f.ctx.chrome.scripting.executeScript=async o=>{check(o.world==='MAIN'&&o.args[0]==='https://www.vinted.fr/items/101/conversation/new?native_target=201','seul le lien natif exact est recherché dans la page');if(o.args[1])await navigation();return [{result:{trouve:true}}];};f.ctx.sbGet=async q=>{check(q.includes('owner=eq.owner-A')&&q.includes('harvest_111_notifications'),'l’ouverture relit uniquement la capture privée demandée');return [];};
  f.ctx.chrome.tabs.create=async o=>{onglets.push(o);return{id:99};};f.ctx.chrome.tabs.remove=async()=>{};
- f.ctx.chrome.tabs.update=async(id,o)=>{check(id===99&&o.url==='https://www.vinted.fr/items/101/conversation/new?native_target=201','la navigation utilise le lien capté, jamais une URL fournie par le client');await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:101,opposite_user_id:201}),null,99);};
+ f.ctx.chrome.tabs.update=async(id,o)=>{check(id===99&&o.active===true&&!o.url,'activation de l’onglet existant sans navigation document');};navigation=async()=>{await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:101,opposite_user_id:201}),null,99);};
  let ouvert=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0',url:'https://evil.invalid/'});
  check(ouvert.ok&&ouvert.json.preuve==='confirmee','l’ouverture attend le reçu réel d’archivage du contexte');
- check(onglets.length===1&&onglets[0].url==='about:blank','le contexte est placé dans un onglet neuf avant la navigation native');
+ check(onglets.length===0,'aucun nouvel onglet ne charge la route interne en document');
  check(f.rows.get('harvest_111_favoris_archive').data.creations[0].contexteFavori==='https://www.vinted.fr/items/101/conversation/new?native_target=201','une redirection qui retire le contexte de la page ne le perd plus');
  check(f.reseau.every(x=>!x.u.hostname.endsWith('vinted.fr')),'le bouton ne déclenche aucune requête API Vinted de notre code');
  f.ctx.getStoredAccounts=async()=>[{vinted_user_id:'111',domain:'www.vinted.fr'}];
@@ -65,12 +65,12 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  check(!(await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-B',notificationId:'n0'})).ok&&onglets.length===nombre,'autre propriétaire : aucun onglet');
  check(!(await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'inconnue'})).ok&&onglets.length===nombre,'notification inconnue : aucun onglet');
  const refuse=await f.ctx.executerPourApp({uid:'111',method:'POST',endpoint:'/vrm/favoris/ouvrir',body:{owner:'owner-A',notificationId:'n0'}},{origin:'https://evil.invalid'});check(!refuse.ok&&onglets.length===nombre,'l’opération interne reste fermée aux autres sites');
- f.ctx.chrome.tabs.update=async()=>{await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:999,opposite_user_id:201}),null,99);};
+ navigation=async()=>{await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:999,opposite_user_id:201}),null,99);};
  ouvert=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(ouvert.ok&&ouvert.json.preuve==='non_confirmee'&&ouvert.json.raison==='contexte_ou_format_incompatible','un autre article ne produit pas un faux reçu positif');
  f.ctx.compteNonCapte=async()=>false;f.ctx.conversationFusionnee=async(id,p)=>p;f.ctx.sbGet=async()=>[];
  f.ctx.chrome.tabs.get=async()=>({id:99,url:'https://www.vinted.fr/inbox/900'});
  const fil={conversation:{id:900,transaction:{item_id:101},opposite_user:{id:201},messages:[{entity_type:'message',entity:{body:'message de démonstration'}}]}};
- f.ctx.chrome.tabs.update=async()=>{const ack=await f.envoyer({from:'cancale-content',domain:'www.vinted.fr',kind:'harvest',type:'conversation',id:'900',body:JSON.stringify(fil),url:'https://www.vinted.fr/api/v2/conversations/900',method:'GET',httpStatus:200},{origin:'https://www.vinted.fr',url:'https://www.vinted.fr/inbox/900',frameId:0,tab:{id:99,url:'https://www.vinted.fr/inbox/900'}});check(ack?.recu===true,'le vrai relais garde le canal ouvert jusqu’à la conservation de la capture');};
+ navigation=async()=>{const ack=await f.envoyer({from:'cancale-content',domain:'www.vinted.fr',kind:'harvest',type:'conversation',id:'900',body:JSON.stringify(fil),url:'https://www.vinted.fr/api/v2/conversations/900',method:'GET',httpStatus:200},{origin:'https://www.vinted.fr',url:'https://www.vinted.fr/inbox/900',frameId:0,tab:{id:99,url:'https://www.vinted.fr/inbox/900'}});check(ack?.recu===true,'le vrai relais garde le canal ouvert jusqu’à la conservation de la capture');};
  ouvert=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(ouvert.ok&&ouvert.json.preuve==='confirmee','une conversation déjà existante peut confirmer le lien sans nouvelle création');
  const lectures=f.rows.get('harvest_111_favoris_archive').data.lecturesLiees;check(lectures.length===1&&lectures[0].method==='GET'&&lectures[0].recipientId==='201','la lecture garde sa provenance GET, sans fabriquer un POST');
  const zone=f.ctx.chrome.storage.session||f.ctx.chrome.storage.local;
@@ -81,5 +81,6 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  f.ctx.chrome.tabs.get=async()=>({id:99,url:'https://www.vinted.fr/inbox/900'});
  for(const [m,st] of [['POST',200],['GET',403]])await f.ctx.capterLectureFavori('111','www.vinted.fr','900',fil,'/api/v2/conversations/900',99,'owner-A',m,st);
  check((await zone.get('vrmFavoriOnglet_99')).vrmFavoriOnglet_99.etat==='attente','une écriture ou un refus HTTP ne devient pas une preuve de lecture');
+ f.ctx.chrome.tabs.query=async()=>[];const absent=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(!absent.ok&&absent.json.message.includes('notifications sur Vinted')&&onglets.length===0,'lien absent : refus explicite sans route directe de secours');
  console.log(controles+' contrôles archive et pagination réussis');
 })().catch(e=>{console.error(e);process.exitCode=1;});

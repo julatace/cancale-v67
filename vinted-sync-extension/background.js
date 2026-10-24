@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.220.0';
+const CODE_VERSION = '5.221.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1706,6 +1706,17 @@ function pageFavoriNative(v,domain='www.vinted.fr'){
   u.hash='';return {url:u.href,itemId:m[1]};
  }catch{return null;}
 }
+// Only activate an existing, visible native anchor. These notification URLs
+// can be client-side routes: loading them as a new document may return 404.
+// No guessed router, href rewrite, API request or message submission.
+function suivreFavoriAffiche(cible,activer=false){
+ const normaliser=v=>{try{const u=new URL(v,location.href);if(u.origin!==location.origin)return null;u.hash='';u.searchParams.sort();return u.href;}catch{return null;}};
+ const attendu=normaliser(cible);if(!attendu)return {trouve:false};
+ const liens=[...document.querySelectorAll('a[href]')].filter(a=>normaliser(a.href)===attendu&&a.getClientRects().length&&getComputedStyle(a).visibility!=='hidden'&&getComputedStyle(a).display!=='none');
+ if(liens.length!==1)return {trouve:false};
+ if(activer){liens[0].scrollIntoView({block:'center'});liens[0].click();}
+ return {trouve:true};
+}
 async function ouvrirFavoriNatif(uid,acc,body){
  const s=await authToken(),owner=s?.user_id;
  const refus=message=>({ok:false,status:409,json:{message}});
@@ -1718,12 +1729,20 @@ async function ouvrirFavoriNatif(uid,acc,body){
  for(const d of ds){if(d.payload.notifications.length>10000)return refus('La capture est trop volumineuse pour être vérifiée.');for(const n of d.payload.notifications)if(n.id===body.notificationId&&/favori|favourit/i.test(String(n.body||''))){const p=pageFavoriNative(n.link,d.domain);if(!p)return refus('Le lien natif de ce favori n’est pas reconnu.');liens.push(p);}}
  if(!liens.length||new Set(liens.map(p=>p.url)).size!==1)return refus('Le lien de ce favori n’est pas unique dans les captures.');
  if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))return refus('Le compte connecté a changé. Aucun onglet ouvert.');
- let tab=null,navigue=false;
+ let tab=null;
  try{
-  tab=await chrome.tabs.create({url:'about:blank',active:true});if(!Number.isInteger(tab?.id)||tab.id<0)throw Error();
+  const cible=new URL(liens[0].url);
+  const ouverts=await chrome.tabs.query({url:`${cible.origin}/*`});
+  for(const t of ouverts||[]){
+   if(!Number.isInteger(t.id)||t.id<0)continue;
+   try{const r=await chrome.scripting.executeScript({target:{tabId:t.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});if(r?.[0]?.result?.trouve===true){tab=t;break;}}catch{}
+  }
+  if(!tab)return refus('Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie. Le favori doit être affiché dans la liste Vinted ; son lien ne peut pas être chargé directement. Aucun message envoyé.');
   await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now()}});
   if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
-  await chrome.tabs.update(tab.id,{url:liens[0].url});navigue=true;
+  await chrome.tabs.update(tab.id,{active:true});
+  const activation=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,true]});
+  if(activation?.[0]?.result?.trouve!==true)throw Error();
   for(let i=0;i<40;i++){
     if((await loadSession())?.user_id!==owner)return refus('La session VRM a changé pendant l’ouverture.');
     const record=(await stockageFavorisOnglets().get(cleOngletFavori(tab.id)))?.[cleOngletFavori(tab.id)];
@@ -1732,7 +1751,7 @@ async function ouvrirFavoriNatif(uid,acc,body){
   }
   return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:'en_attente',raison:'capture_pas_recue'}};
  }catch{
-  if(tab?.id!=null){await stockageFavorisOnglets().remove(cleOngletFavori(tab.id)).catch(()=>{});if(!navigue)await chrome.tabs.remove(tab.id).catch(()=>{});}
+  if(tab?.id!=null)await stockageFavorisOnglets().remove(cleOngletFavori(tab.id)).catch(()=>{});
   return refus('L’ouverture dans Vinted n’a pas abouti. Aucun message envoyé.');
  }
 }
