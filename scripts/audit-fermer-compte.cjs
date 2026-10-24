@@ -113,6 +113,7 @@ global.fetch = async (url, opts = {}) => {
     base.communaute = base.communaute.filter((x) => x.owner !== o);
     return rep(avant - base.communaute.length);
   }
+  if(m==='GET'&&u.includes('id=like.favoris_file_*'))return pannes.has('favoris')?rep({},503):rep([]);
   const mr = /\/rest\/v1\/(app_data|vinted_accounts|detourage_usage)\?(.*)$/.exec(u);
   if (mr && m === 'DELETE') {
     deletes.push(u);
@@ -306,6 +307,10 @@ const rienTouche = () => deletes.length === 0 && !appelsStripe.some((x) => x.m !
     dit(c.ok === false && r.code >= 500 && base.utilisateurs.has(A) && /carte de la communauté/.test(c.message || ''), 'communauté illisible : fermeture INCOMPLÈTE, dite, compte de connexion gardé', c.message);
   });
 
+  await essaie('file favoris indisponible',async()=>{
+    reset();pannes.add('favoris');const r=await fermer('aa.bb.A',{confirmation:'vendeuse.a@exemple.test'});
+    dit(r.code===503&&r.corps.ok===false&&base.utilisateurs.has(A)&&base.app_data.some(x=>x.owner===A&&x.id==='main'),'file favoris non effacée : compte conservé et fermeture non annoncée');
+  });
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
   process.exit(ko ? 1 : 0);
 })();

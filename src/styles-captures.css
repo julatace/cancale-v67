@@ -140,6 +140,10 @@
 .vrm-favoris-remise button[aria-pressed=true]{background:var(--vrm-accent,#244e54);color:var(--vrm-on-accent,#fff);}
 .vrm-favoris-apercu{margin:12px 0;padding:12px;background:var(--vrm-card2);border:1px solid var(--vrm-line);border-radius:6px;}
 .vrm-favoris-apercu output{display:block;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;margin-top:8px;}
+.vrm-favoris-automatisation{margin-top:12px;padding:12px;border:1px solid var(--vrm-line);border-radius:8px;background:var(--vrm-card2);font-size:12px;overflow-wrap:anywhere;}
+.vrm-favoris-automatisation p{font-size:11px;line-height:1.5;color:var(--vrm-muted);margin:8px 0;}
+.vrm-favoris-automatisation button{margin:4px 6px 4px 0;max-width:100%;white-space:normal;}
+.vrm-favoris-automatisation>summary{display:flex;align-items:center;min-height:44px;font-weight:600;cursor:pointer;}
 @media(max-width:767px){.vrm-favoris-remise input{font-size:16px;}}
 
 .vrm-favoris-cadence{margin:14px 0 8px;max-width:280px;}

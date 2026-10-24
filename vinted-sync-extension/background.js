@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.214.0';
+const CODE_VERSION = '5.215.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3241,10 +3241,11 @@ function requeteVinted(quoi, fn) {
 }
 
 // Un GET Vinted authentifie pour un compte donne (depuis le navigateur).
-async function vintedGet(acc, endpoint) {
+async function vintedGet(acc, endpoint, options = {}) {
   return requeteVinted('api', async () => {
     try {
       const res = await fetch(`https://${acc.domain || 'www.vinted.fr'}${endpoint}`, {
+        ...(options.timeoutMs?{signal:AbortSignal.timeout(options.timeoutMs)}:{}),
         method: 'GET',
         credentials: 'omit',
         headers: {
@@ -3320,7 +3321,7 @@ async function refreshIfActive(acc) {
 // Un appel Vinted authentifie AVEC CORPS (POST/PUT/PATCH) pour executer une
 // action (repondre, offre, prix...). Meme auth que vintedGet. Sur 401, si le
 // compte est l'actif du navigateur, on renouvelle le token et on rejoue.
-async function vintedSend(acc, method, endpoint, body) {
+async function vintedSend(acc, method, endpoint, body, options = {}) {
   const domain = acc.domain || 'www.vinted.fr';
   const payload = (body != null && String(method).toUpperCase() !== 'GET')
     ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined;
@@ -3331,6 +3332,7 @@ async function vintedSend(acc, method, endpoint, body) {
   const doCall = () => requeteVinted('api', async () => {
     try {
       const res = await fetch(`https://${domain}${endpoint}`, {
+        ...(options.timeoutMs?{signal:AbortSignal.timeout(options.timeoutMs)}:{}),
         method: method || 'POST',
         credentials: 'omit',
         headers: {
@@ -3349,7 +3351,7 @@ async function vintedSend(acc, method, endpoint, body) {
     } catch (_) { return { status: 0, ok: false, json: null }; }
   });
   let rep = await doCall();
-  if (rep.status === 401) { const r = await refreshIfActive(acc); if (r) rep = await doCall(); }
+  if (rep.status === 401 && !options.sansRejeu) { const r = await refreshIfActive(acc); if (r) rep = await doCall(); }
   return rep;
 }
 
@@ -6631,6 +6633,7 @@ const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new UR
 // supprime, rien d'arbitraire. Une LECTURE ne compte pas dans le plafond
 // horaire (elle n'engage rien) ; un geste, si.
 const EXEC_PERMIS = [
+  { methode: 'POST', chemin: /^\/vrm\/favoris$/ , favori: true }, // internal operation; never forwarded as a URL
   { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
   { methode: 'GET',  chemin: /^\/api\/v2\/conversations\/\d+$/, lecture: true }, // lire le fil
   // 5.183 : accepter VEND la paire — une commande venue du téléphone n'est
@@ -6705,12 +6708,51 @@ async function executerPourApp(msg, sender) {
   const r = await avecVinted(async () => {
     arret = await gardeStricte(msg.uid, acc, { lecture: true });
     if (arret) return null;
+    if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
     return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
   });
   if (arret) return arret;
   if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, data: r.json,
            error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+async function executerMessageFavori(uid,acc,body){
+  const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
+  const rep=(resultat,status=0)=>({ok:resultat==='envoye',status,json:{resultat}});
+  if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
+  const jeton=body.jeton;
+  const session=await authToken();if(!session?.access_token)return rep('refuse',401);
+  // Single-use server authorization. Two extensions or devices cannot consume
+  // it twice; response loss never triggers a second grant request.
+  let grant;
+  try{
+    const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'consommer',jeton:body.jeton}),signal:AbortSignal.timeout(12000)});
+    if(!r.ok)return rep('refuse',r.status);grant=await r.json();
+  }catch{return rep('incertain');}
+  if(!grant?.ok||String(grant.uid)!==String(uid)||!grant.travail)return rep('refuse');
+  body=grant.travail;
+  if(!body||!id(body.itemId)||!id(body.recipientId)||String(uid)===body.recipientId||typeof body.initiator!=='string'||!body.initiator||body.initiator.length>80||typeof body.message!=='string'||!body.message.trim()||body.message.length>2000)return rep('refuse',400);
+  if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+  // Native three-field format observed in the seller's browser. No guessed
+  // create-and-send format, no auto retry even on a failed transport response.
+  const creation=await vintedSend(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{sansRejeu:true,timeoutMs:12000});
+  if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
+  const convId=String(creation.json?.conversation?.id||'');
+  if(!id(convId))return rep('incertain',creation.status);
+  if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+  const lu=await vintedGet(acc,`/api/v2/conversations/${convId}`,{timeoutMs:12000}),c=lu.json?.conversation;
+  // Both identities must be in the actual thread immediately before reply.
+  const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||'');
+  if(!lu.ok||String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status);
+  try{
+    const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
+    if(!r.ok)return rep('refuse',r.status);const j=await r.json();if(!j.ok||!j.autorise||String(j.uid)!==String(uid))return rep('refuse');
+  }catch{return rep('refuse');} // no reply has been sent yet
+  const arret=await gardeStricte(uid,acc); // second write also consumes an action
+  if(arret)return rep('refuse');
+  const r=await vintedSend(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:body.message,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{sansRejeu:true,timeoutMs:12000});
+  if(r.ok&&r.json?.code===0)return rep('envoye',r.status);
+  return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
 }
 let _fileVinted = Promise.resolve();
 function avecVinted(fn) {

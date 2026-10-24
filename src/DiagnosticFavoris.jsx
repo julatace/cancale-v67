@@ -20,7 +20,7 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
     catch { if (requete.current === numero) setEtat(x=>({...x,retour:'Copie indisponible : sélectionne le texte ci-dessous.'})); }
   };
   return <details className="vrm-favoris-diagnostic"><summary>Préparer les messages aux favoris</summary>
-    <p>Envois automatiques non activés. Cette vérification sert à relier les notifications aux bonnes conversations, sans envoyer de message.</p>
+    <p>Cette vérification sert à relier les notifications aux bonnes conversations, sans envoyer de message. Le statut des envois apparaît dans la file du compte.</p>
     <p>Sur Vinted, ouvre la cloche puis un favori avec ce compte, comme tu le fais habituellement. Reviens ensuite ici, sans envoyer de message de test. Le diagnostic contient uniquement les noms et types des champs, sans pseudo, message, lien ou identifiant personnel.</p>
     {!uid&&<p>Choisis le compte Vinted à vérifier dans le sélecteur de compte.</p>}
     <button type="button" disabled={!uid||!owner||etat.occupe} onClick={verifier}>{etat.occupe?'Vérification…':'Vérifier la capture des notifications'}</button>

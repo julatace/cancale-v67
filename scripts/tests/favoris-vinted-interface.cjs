@@ -70,7 +70,7 @@ const racine=path.resolve(__dirname,'../..');
   check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'aucun débordement horizontal');
   const petits=await p.locator('button,a,.vrm-favoris-check').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&r.height<44;}).length);
   check(petits===0,'cibles tactiles au moins 44 px');
-  check((await p.locator('.vrm-favoris-compose').innerText()).includes('n’est pas encore activé'),'envoi direct non promis');
+  check(await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).count()===0,'aucun lancement sans moteur relié au composant');
   if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'favoris-'+largeur+'.png'),fullPage:true});}
   await p.getByRole('button',{name:'Masquer',exact:true}).click();check(await p.locator('.vrm-favoris-rows').count()===0,'liste repliable pour retrouver la messagerie');
   await p.getByRole('button',{name:'Afficher les favoris'}).click();await p.locator('.vrm-favoris-rows article').first().waitFor();

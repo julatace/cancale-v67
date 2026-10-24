@@ -60,7 +60,7 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
   const rows = await r.json();
   if (ownerActuel() !== owner) throw Error('La session a changé. Relance la vérification.');
   if (!Array.isArray(rows) || rows.length > 1 || rows.some(x => x?.owner !== owner)) throw Error('La lecture du compte n’a pas été confirmée.');
-  const entete = {diagnostic: 'VRM-favoris-structure-v4', envoisAutomatiques: 'non_actives', listeComplete: 'non_verifiee'};
+  const entete = {diagnostic: 'VRM-favoris-structure-v4', envoisAutomatiques: 'statut_dans_la_file', listeComplete: 'non_verifiee'};
   if (!rows.length) {
     let traces = {etat:'lecture_indisponible'};
     let reponse;
