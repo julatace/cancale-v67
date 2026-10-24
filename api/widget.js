@@ -8,7 +8,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
-import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META } from './_lib/suivi-colis.js';
+import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, dansFenetreLecteurs } from './_lib/suivi-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -322,16 +322,23 @@ const normSuivi = (v) => String(v || '').toUpperCase().replace(/[\s\u00a0-]+/g, 
 // (`relireLigneMeta`, api/_lib/suivi-colis.js) : « sera disponible dans les
 // prochains jours » ou « arrive aujourd'hui », sans code ni QR, est en route —
 // pas à retirer ; un sujet « disponible » d'une ligne « info » est à retirer.
+// (24 oct.) + le statut lu chez le TRANSPORTEUR (lignes `transp_*`, scalaires,
+// la règle de l'app — §11) : un colis que le transporteur dit retiré, reparti,
+// ou « à vérifier » sort du compte « à retirer », comme dans l'app. Illisible ⇒
+// `transp: null` (« pas su » : un colis de la photo dont rien d'autre ne dit la
+// fin est alors « pas relu », jamais « toujours là »).
 async function lireSuivisEmail() {
-  const [dispo0, partis0] = await Promise.all([
+  const [dispo0, partis0, transp0] = await Promise.all([
     fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${SELECT_SUIVI_META}`)),
     fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
+    fetchPaginated(scoped(`app_data?id=like.transp_*&select=${SELECT_TRANSP_META}`)),
   ]);
-  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null };
+  const transp = Array.isArray(transp0) ? transp0.map(ligneTranspDeMeta).filter((t) => t && dansFenetreLecteurs(t)) : null;
+  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null, transp };
   const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);
-  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)) };
+  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)), transp };
 }
-const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant' });
+const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant', transp: lu && Array.isArray(lu.transp) ? lu.transp : [] });
 async function colisEmailDepuis(pub, retires, today, lu) {
   const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
   if (pubAt == null) return 0;
@@ -378,6 +385,7 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
       if (!Array.isArray(dispo) || !Array.isArray(partis)) return null;
       const arr = Number(c && c[1]) || 0;
       if (sortiParSuivis([k], fins, arr || null)) return true;
+      if (!lu || !Array.isArray(lu.transp)) return null;            // le transporteur pas lu : pas su
       return dispoSuivi.has(k) ? false : true;
     }
     if (cle.startsWith('v:')) {

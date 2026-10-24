@@ -267,7 +267,7 @@ function chargeApp(noms, injecte) {
   await essaie('règles de l\'app (src/App.jsx, Babel)', async () => {
     const etat = await importer('api/_lib/etat-colis-email.js');
     const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'finsColis', 'suivisRetires', 'colisRetireAilleurs', 'trackUrl'],
-      { normaliserSuivi: etat.normaliserSuivi, finsDesLignes: S.finsDesLignes, suiviDeLigne: S.suiviDeLigne, lienSuivi: S.lienSuivi, sortiParSuivi: S.sortiParSuivi });
+      { normaliserSuivi: etat.normaliserSuivi, finsDesLignes: S.finsDesLignes, suiviDeLigne: S.suiviDeLigne, lienSuivi: S.lienSuivi, sortiParSuivi: S.sortiParSuivi, sensDeLigne: S.sensDeLigne });
     const manque = ['finsColis', 'suivisRetires', 'colisRetireAilleurs', 'colisKey', 'trackUrl'].filter((n) => !app[n] || app['__err_' + n]);
     dit(!manque.length, 'les règles de l\'app se chargent', manque.join(', '));
     if (manque.length) return;

@@ -226,7 +226,7 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
   await essaie('règles de l\'app', async () => {
     const AR = await importer('api/_lib/arrivee-colis.js');
     const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'etatColisEmail', 'isColisEnAttente', 'isColisActive'],
-      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait });
+      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait, sensDeLigne: (await importer('api/_lib/suivi-colis.js')).sensDeLigne });
     const NOW = Date.parse('2026-10-23T08:00:00Z');
     const t = (o) => ({ status: 'available', subject: 'Votre colis 1 est disponible', ...o });
     const passe = t({ suivi: '1', limite: '2026-10-22', receivedAt: '2026-10-19T08:00:00Z' });
