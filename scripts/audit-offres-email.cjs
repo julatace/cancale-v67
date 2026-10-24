@@ -1,26 +1,5 @@
-// ⚠️⚠️ CONTRÔLE PERMANENT — LES OFFRES REÇUES PAR EMAIL SONT RENDUES, UNE FOIS.
-//
-// Mesuré le 22 octobre (lecture seule, sa vraie base) : 248 offres `email_offer_*`
-// ces 14 derniers jours (17 sur le dernier jour, 5 comptes) — et 0 offre en
-// attente dans une conversation captée sur la même période (3 en tout, la plus
-// récente du 15 septembre). Or la règle `offresAtraiter` n'était plus RENDUE
-// nulle part depuis le 13 octobre (13f6c89 a retiré le bloc de Messages, la
-// cloche est retirée le 17) : ses offres ne s'affichaient plus du tout.
-//
-// Ce contrôle exige :
-//   1. que la règle soit APPELÉE au rendu (pas seulement définie — un composant
-//      ou une règle jamais rendue ne lève rien, §4.11) ;
-//   2. que la lecture reste en SCALAIRES (§4.4 : `extrait` jamais rapatrié),
-//      bornée à la fenêtre, et qu'une page ratée vaille « pas su » ;
-//   3. que « c'est fait » soit un réglage synchronisé, rattrapé à l'arrivée du
-//      nuage (§5.49) ;
-//   4. que la MÊME offre vue par email et dans sa conversation ne s'écrive
-//      qu'une fois — par IDENTITÉ (compte, acheteur, montant, fenêtre ; le
-//      titre seulement EN PLUS), jamais par ressemblance (§5). Exécuté dans un
-//      `vm` sur la VRAIE fonction : on juge ce qu'elle rend.
-//
-// `--mutation sansqui` : la règle réaffaiblie qui ne demande plus l'acheteur ;
-// `--mutation titreseul` : la règle réduite au titre. Les deux doivent être ROUGES.
+// 24 octobre : retrait explicite du bloc email dans Messages.
+// La capture email et les règles de rapprochement sont conservées.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const racine = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
@@ -32,22 +11,11 @@ const essaie = (quoi, fn) => { try { return fn(); } catch (e) { dit(false, quoi,
 // Les commentaires ne comptent pas : un audit lit le CODE (leçon des sondes).
 const CODE = APP.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 
-// ── 1. La règle est RENDUE ───────────────────────────────────────────────────
-// (La définition s'écrit `offresAtraiter = (` : seul un APPEL écrit `offresAtraiter(`.)
-const appels = (CODE.match(/offresAtraiter\(/g) || []).length;
-const defs = (CODE.match(/const offresAtraiter = \(/g) || []).length;
-dit(defs === 1 && appels >= 1, 'la règle `offresAtraiter` est appelée au rendu (pas seulement définie)', `${appels} appel(s)`);
-dit(/data-offres-messages=\{/.test(CODE), 'le bloc « offres à trancher » est rendu en tête de Messages');
-
-// ── 2. La lecture ────────────────────────────────────────────────────────────
-const lecture = (CODE.match(/lireTout\(`id=like\.email_offer_\*[^`]*`[^)]*\)/) || [])[0] || '';
-dit(!!lecture, 'les offres email sont relues (Messages)', lecture ? '' : 'aucune lecture de `email_offer_*`');
-dit(!!lecture && /meta->>receivedAt=gte\.\$\{depuis\}/.test(lecture) && /select=[^`]*meta->>/.test(lecture) && !/select=data|extrait/.test(lecture), 'en scalaires, bornées à la fenêtre — jamais `extrait` ni la ligne entière (§4.4)', lecture.slice(0, 140));
-dit(!!lecture && /strict:\s*true/.test(lecture), 'une page ratée vaut « pas su », jamais une demi-liste', '');
-
-// ── 3. « c'est fait » ────────────────────────────────────────────────────────
-dit(/SYNC_KEYS[\s\S]{0,4000}'vinted_offers_done'/.test(CODE) || /'vinted_offers_done',/.test(CODE), '« c’est fait » est un réglage synchronisé (`vinted_offers_done`)');
-dit(/onCloudReady\(\(\) => setOffresFaites\(/.test(CODE), 'et il est rattrapé à l’arrivée du nuage (§5.49)');
+// La messagerie doit rester centrée sur les conversations et leurs offres.
+dit(!/data-offres-messages/.test(CODE), 'plus de bloc historique des offres email dans Messages');
+dit(!/lireTout\(`id=like\.email_offer_\*/.test(CODE), 'plus de lecture dédiée à ce bloc supprimé');
+dit(/data-conv=/.test(CODE) && /data-offre-liste=/.test(CODE), 'les conversations et leurs offres restent rendues');
+dit(/'vinted_offers_done',/.test(CODE), 'les choix déjà synchronisés ne sont pas effacés');
 
 // ── 4. Une offre, une fois — par identité ────────────────────────────────────
 const morceau = (re, quoi) => { const m = re.exec(APP); if (!m) { dit(false, `${quoi} introuvable dans App.jsx`); return null; } return m[0]; };

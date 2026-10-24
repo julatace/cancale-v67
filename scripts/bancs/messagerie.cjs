@@ -260,33 +260,8 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
       dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
       dit(/compte_a/.test(fige.txt) && !/compte_b/.test(fige.txt) && /messagerie Vinted/.test(fige.txt), 'elle nomme compte_a (pas compte_b, à jour) et dit le geste : ouvrir sa messagerie Vinted', fige.txt);
-      // 1 bis. Les offres reçues par email, en tête (proposition 6).
-      await r.pg.waitForTimeout(800);
-      const ofs = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), txt: b.innerText, ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')) } : null; });
-      // ⚠️ Le bloc « offres reçues par email » avait été RETIRÉ par 13f6c89
-      //    (13 octobre) ; rebranché le 22 octobre (248 offres email en 14 jours,
-      //    0 offre en attente dans une conversation captée). Il est EXIGÉ.
-      dit(!!ofs, 'les offres reçues par email sont rendues en tête de Messages (rebranchées le 22 octobre)');
-      if (ofs) dit(ofs && ofs.n === '1' && JSON.stringify(ofs.ids) === '["email_offer_o1"]', 'en tête de Messages : l’offre récente, ni la vieille, ni celle réglée par une vente', JSON.stringify(ofs && ofs.ids));
-      if (ofs) dit(ofs && /45,00 €/.test(ofs.txt) && /acheteuse_9/.test(ofs.txt) && /toutes sur compte_a/.test(ofs.txt), 'le montant, qui la propose, et le compte où répondre', ofs && ofs.txt.slice(0, 200));
-      if (ofs) dit(ofs && /1 autre déjà réglée/.test(ofs.txt), 'celle réglée par une vente est mise de côté, et c’est DIT', ofs && ofs.txt.slice(0, 260));
-      if (ofs) dit(ofs && /tes Samba se revendent 55,00 € en moyenne \(3 ventes\)/.test(ofs.txt), 'le repère est celui du MODÈLE, dit comme tel (jamais « ton prix » deviné par le titre)', ofs && ofs.txt.slice(0, 300));
-      if (ofs) dit(ofs && !/remise|ton prix/i.test(ofs.txt), 'aucune remise ni « ton prix » inventés (l’email ne dit pas quelle paire)');
-      if (ofs && tel) {
-        // (22 oct., revue) Les gestes d'une offre se touchent au doigt : 44 px
-        // AFFICHÉS au moins (le lien « Répondre sur Vinted » en faisait 26).
-        const cibles = await r.pg.evaluate(() => [...document.querySelectorAll('[data-offres-messages] [data-offre-email] a, [data-offres-messages] [data-offre-email] button')].map((el) => { const q = el.getBoundingClientRect(); return { t: el.innerText.trim().slice(0, 24), h: Math.round(q.height), css: el.offsetHeight, zoom: getComputedStyle(document.querySelector('.vrm-main') || document.body).zoom }; }));
-        dit(cibles.length >= 2 && cibles.every((c) => c.h >= 44), 'REVUE : au doigt, « Répondre sur Vinted » et « c’est fait » font 44 px au moins', JSON.stringify(cibles));
-      }
-      if (ofs) {
-        await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-offres-' + (tel ? 390 : 1512) + '.png') });
-        await r.pg.click('[data-offre-traitee="email_offer_o1"]');
-        await r.pg.waitForTimeout(900);   // l'écriture locale est différée de 500 ms (`save`)
-        const apres = await r.pg.evaluate(() => ({ bloc: !!document.querySelector('[data-offres-messages]'), memo: (() => { try { return JSON.parse(localStorage.getItem('vinted_offers_done') || '[]'); } catch (_) { return []; } })() }));
-        // (22 oct.) La clé d'une offre rangée est SON identité, la ligne email
-        // (`email_offer_o1`) — plus « date|titre ».
-        dit(!apres.bloc && apres.memo.includes('email_offer_o1'), '« c’est fait » la range (par son identité), et le choix est gardé', JSON.stringify(apres));
-      }
+      // 24 octobre : retrait explicite de l'historique email, même lorsque les données existent.
+      dit(await r.pg.locator('[data-offres-messages], [data-offre-email]').count() === 0, 'aucun bloc des offres email au-dessus des conversations');
       // 2. l'offre en attente
       await r.pg.click('[data-conv="301"]');
       await r.pg.waitForTimeout(1200);
@@ -380,8 +355,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const r = await rendre(b, { version: '5.135.0', tel, lignes });
       await r.pg.waitForTimeout(1200);
       const ofs = await r.pg.evaluate(() => { const b = document.querySelector('[data-offres-messages]'); return b ? { n: b.getAttribute('data-offres-messages'), conv: (b.querySelector('[data-offres-dans-conversation]') || {}).getAttribute?.('data-offres-dans-conversation') || null, txt: b.innerText, ids: [...b.querySelectorAll('[data-offre-email]')].map((x) => x.getAttribute('data-offre-email')).sort() } : null; });
-      dit(ofs && JSON.stringify(ofs.ids) === JSON.stringify(['email_offer_o1', 'email_offer_o6', 'email_offer_o7']), 'la même offre (même compte, même acheteuse, même montant) n’est pas réécrite ; sans acheteur, ou à un autre montant, elle reste', JSON.stringify(ofs && ofs.ids));
-      dit(ofs && ofs.conv === '1' && /1 autre est sur sa conversation ci-dessous/.test(ofs.txt), 'et c’est DIT, une fois', ofs && ofs.txt.slice(0, 260));
+      dit(ofs === null, 'les offres email restent absentes, même avec une offre déjà présente dans sa conversation');
       const pastille = await r.pg.evaluate(() => { const x = document.querySelector('[data-messagerie] [data-conv="301"]'); return x ? x.getAttribute('data-conv-offre') : null; });
       dit(pastille === '45', 'la conversation garde sa pastille « Offre 45 € en attente » (c’est là qu’on la tranche)', String(pastille));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
