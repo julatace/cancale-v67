@@ -14,6 +14,13 @@
 //    Vinted, ou l'autre site si l'onglet a navigué (`onglets[i].url` est lu à
 //    chaque injection, `location` la suit ; une requête partie hors de Vinted
 //    est notée dans `j.horsVinted` et reçoit la réponse de ce site : 403).
+//  · 5.217 : un faux TRANSPORTEUR (`transporteur(req)` → { status, body,
+//    headers } — Mondial Relay, Chronopost, Vinted Go) qui note chaque requête
+//    (adresse, en-têtes, `credentials`, `redirect`) et combien sont en vol ; un
+//    faux VRM (`vrm(req)` pour `https://vrm.center/api/…`, corps lu) ; l'API
+//    `permissions` (`permis` : vrai · faux · 'muet' · fonction(origine) — absente
+//    si `permis` n'est pas donné, comme avant) ; toute AUTRE adresse est notée
+//    dans `j.ailleurs` et répond 404.
 //  Aucune donnée réelle : tout est inventé (le dépôt est public).
 //  `--src chemin` (dans `process.argv`) exécute une autre copie du fichier —
 //  c'est la preuve sur le code d'AVANT (§6.1).
@@ -63,13 +70,15 @@ function filtreOk(row, u) {
 // `vinted(req)` → { status, body } (body : objet → JSON, chaîne → texte).
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
-  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
+  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null,
+  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
   const SRC = fs.readFileSync(src || cheminSource(), 'utf8');
   let ecouteur = null;
-  const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [] };
+  const j = { vinted: [], enVol: 0, maxEnVol: 0, posts: [], evts: [], diags: [], journal: [], tampon: { n: {}, rates: {} }, horsVinted: [], injections: 0, minuteries: [],
+    transp: [], transpEnVol: 0, transpMaxEnVol: 0, vrmApi: [], ailleurs: [], permisContains: [], permisRequetes: [], permisAjout: [] };
   // `chrome.storage.onChanged` à état (20 octobre : la boîte aux lettres du relais de la page l'utilise).
   const ecoutesStockage = [];
   // 22 oct. : les écouteurs de `chrome.tabs.onUpdated` (une page Vinted qui charge) — `ongletMaj` les rejoue.
@@ -80,6 +89,42 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     return { ok: status >= 200 && status < 400, status, headers: { get: () => ctype },
       json: async () => JSON.parse(texte), text: async () => texte, clone() { return this; },
       arrayBuffer: async () => Buffer.from(texte).buffer };
+  };
+  // Une réponse avec de VRAIS en-têtes (`get` par nom, insensible à la casse) :
+  // `rep()` rend le type pour N'IMPORTE QUEL nom, ce qui ferait lire un
+  // `cf-mitigated` à toute réponse de transporteur.
+  const repH = (status, body, headers = {}) => {
+    const texte = typeof body === 'string' ? body : JSON.stringify(body == null ? null : body);
+    const h = {}; for (const k of Object.keys(headers || {})) h[k.toLowerCase()] = String(headers[k]);
+    if (h['content-type'] === undefined) h['content-type'] = typeof body === 'string' ? 'text/plain' : 'application/json';
+    return { ok: status >= 200 && status < 300, status, headers: { get: (k) => (h[String(k).toLowerCase()] !== undefined ? h[String(k).toLowerCase()] : null) },
+      json: async () => JSON.parse(texte), text: async () => texte, clone() { return this; },
+      arrayBuffer: async () => Buffer.from(texte).buffer };
+  };
+  const HOTES_TRANSP = /^https:\/\/(?:www\.mondialrelay\.(?:fr|be)|ws\.chronopost\.fr|carrier\.vintedgo\.com|www\.chronopost\.fr|vintedgo\.com)\//;
+  const appelTransporteur = async (url, opts) => {
+    const u = new URL(url);
+    const entree = { url, hote: u.host, chemin: u.pathname + u.search, methode: String((opts && opts.method) || 'GET').toUpperCase(),
+      headers: copie((opts && opts.headers) || {}), credentials: opts && opts.credentials, redirect: opts && opts.redirect, cache: opts && opts.cache, at: Date.now() };
+    j.transp.push(entree);
+    j.transpEnVol++; j.transpMaxEnVol = Math.max(j.transpMaxEnVol, j.transpEnVol);
+    await new Promise((r) => setTimeout(r, 3));
+    let r;
+    try { r = transporteur ? await transporteur(entree) : null; } finally { j.transpEnVol--; }
+    if (r && r.reseau) throw new TypeError('Failed to fetch');
+    r = r || { status: 404, body: '' };
+    return repH(r.status, r.body, r.headers || {});
+  };
+  const appelVrm = async (url, opts) => {
+    const u = new URL(url);
+    let corps = null; try { corps = opts && opts.body ? JSON.parse(opts.body) : null; } catch (_) { corps = opts && opts.body; }
+    const entree = { url, mode: u.searchParams.get('mode'), methode: String((opts && opts.method) || 'GET').toUpperCase(),
+      headers: copie((opts && opts.headers) || {}), corps, octets: opts && opts.body ? Buffer.byteLength(String(opts.body)) : 0, at: Date.now() };
+    j.vrmApi.push(entree);
+    let r = vrm ? await vrm(entree) : null;
+    if (r && r.reseau) throw new TypeError('Failed to fetch');
+    r = r || { status: 404, body: { error: 'introuvable' } };
+    return repH(r.status, r.body, { 'content-type': 'application/json' });
   };
   const appelVinted = async (url, opts, origine) => {
     const u = String(url);
@@ -138,7 +183,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
         return appelVinted('https://www.vinted.fr' + u0, opts, 'page');
       }
       if (/^https:\/\/[^/]*vinted\.(fr|com|it|de)\//.test(u0)) return appelVinted(u0, opts, 'fond');
-      if (!/\/rest\/v1\//.test(u0)) return rep(404, {});
+      if (/^https:\/\/vrm\.center\/api\//.test(u0)) return appelVrm(u0, opts);
+      if (HOTES_TRANSP.test(u0)) return appelTransporteur(u0, opts);
+      if (!/\/rest\/v1\//.test(u0)) { j.ailleurs.push({ url: u0, methode: String(opts.method || 'GET').toUpperCase() }); return rep(404, {}); }
       if ((opts.method || 'GET') === 'POST') {
         let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
         j.posts.push(rows.map((r) => r.id));
@@ -163,6 +210,34 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       return rep(200, sortie.filter((r) => filtreOk(r, u)).map((r) => projette(r, sel)));
     },
   };
+  // L'API `permissions` (5.217) : seulement si l'audit la décrit — sinon elle
+  // manque, comme avant (le fond se tait : « pas su »).
+  if (permis !== undefined) {
+    const permisDe = (o) => (typeof permis === 'function' ? permis(o) : permis);
+    const accordes = new Set();
+    ctx.chrome.permissions = {
+      contains(q, cb) {
+        const origins = (q && q.origins) || [];
+        j.permisContains.push(origins.slice());
+        const vals = origins.map((o) => (accordes.has(o) ? true : permisDe(o)));
+        if (vals.some((v) => v === 'muet')) return typeof cb === 'function' ? undefined : new Promise(() => {});
+        const v = vals.every((x) => x === true);
+        if (typeof cb === 'function') { Promise.resolve().then(() => cb(v)); return; }
+        return Promise.resolve(v);
+      },
+      request(q, cb) {
+        const origins = (q && q.origins) || [];
+        j.permisRequetes.push(origins.slice());
+        const ok = permisAccorde === undefined ? false : !!(typeof permisAccorde === 'function' ? permisAccorde(origins) : permisAccorde);
+        if (ok) for (const o of origins) accordes.add(o);
+        if (ok) setTimeout(() => { for (const f of j.permisAjout) { try { f({ origins }); } catch (_) {} } }, 0);
+        if (typeof cb === 'function') { Promise.resolve().then(() => cb(ok)); return; }
+        return Promise.resolve(ok);
+      },
+      onAdded: { addListener(f) { j.permisAjout.push(f); } },
+      onRemoved: { addListener() {} },
+    };
+  }
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
   // `retirer` (20 octobre) : imite un navigateur à qui il MANQUE des API
   // (Orion iPhone, Safari, Firefox pour Android) — chaque chemin pointé

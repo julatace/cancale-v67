@@ -244,7 +244,9 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     await essaie(`profil ${nom}`, async () => {
       let f = null, leve = null;
       const appels = { sync: 0, active: 0, photos: 0, relais: 0, capture: 0 };
-      try { f = faireFond({ src: SRC_G, retirer, vinted: vintedBanc }); } catch (e) { leve = e; }
+      // 5.217 : chaque profil a l'API `permissions` (Chrome, Firefox, Safari et
+      // Orion l'exposent) et ses sites accordés — la section J juge le refus.
+      try { f = faireFond({ src: SRC_G, retirer, vinted: vintedBanc, permis: true }); } catch (e) { leve = e; }
       dit(!!f && !leve, `${nom} : le fond démarre sans lever`, leve ? String(leve.message || leve) : '');
       if (!f) return;
       f.ctx.captureAllAccounts = async () => { appels.sync++; };
@@ -329,6 +331,37 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     f2.ctx.chrome.tabs.sendMessage = (id, m, cb) => { if (m && m.vrm === 'fetchPage') { tente += 100; } if (cb) cb(); };
     const r2 = await f2.ctx.pageActiveFetch();
     dit(tente === 1 && !r2, 'un refus ordinaire (onglet fermé) reste un refus, comme sur Chrome — aucun relais', String(tente));
+  });
+
+  // ── J. Le suivi chez les transporteurs (5.217) : sans permission, SILENCE ──
+  //    Firefox peut laisser non accordées les permissions d'hôte MV3 ; Orion
+  //    iPhone n'expose peut-être pas l'API des permissions. Dans les deux cas le
+  //    fond ne demande RIEN (ni à VRM, ni au transporteur) et l'état le dit
+  //    (`transporteurs` · `transporteurs-passu`). L'autre sens : permis, il lit.
+  await essaie('transporteurs selon le navigateur', async () => {
+    const ITEMS = [{ carrier: 'chronopost', suivi: 'XW000000001TS', cp: null, voie: 'cp-ws2' }, { carrier: 'mondialrelay', suivi: '12345678', cp: '35260', voie: 'mr-be' }];
+    const transporteur = (e) => (/mondialrelay\.be\/fr-be/.test(e.url)
+      ? { status: 200, body: '<div id="tracking" token="AAAA:BBBB"></div>', headers: { 'content-type': 'text/html' } }
+      : { status: 200, body: '{"ok":1}', headers: { 'content-type': /chronopost/.test(e.url) ? 'text/xml' : 'application/json' } });
+    const vrm = (r) => (r.mode === 'transp-a-lire' ? { status: 200, body: { v: 1, items: ITEMS, pause: {} } } : { status: 200, body: { ok: true, res: 'lu', etat: 'transit', change: false } });
+    const CAS = [
+      { nom: 'Firefox (ordinateur)', firefox: true, retirer: [], permis: false, indispo: 'transporteurs' },
+      { nom: 'Firefox pour Android', firefox: true, retirer: PROFILS['firefox-android'], permis: false, indispo: 'transporteurs' },
+      { nom: 'Safari iOS', retirer: PROFILS['safari-ios'], permis: false, indispo: 'transporteurs' },
+      { nom: 'Orion iPhone (API des permissions absente)', retirer: PROFILS['orion-ios'].concat('permissions'), permis: false, indispo: 'transporteurs-passu' },
+    ];
+    for (const c of CAS) {
+      const f = faireFond({ src: SRC_G, retirer: c.retirer, vinted: vintedBanc, permis: c.permis, transporteur, vrm, firefox: c.firefox ? { compat: COMPAT } : null });
+      const r = typeof f.ctx.transpTick === 'function' ? await f.ctx.transpTick('audit', true) : 'absent';
+      dit(f.j.transp.length === 0 && f.j.vrmApi.length === 0, `${c.nom} : sans permission, aucune requête (ni VRM, ni transporteur)`, JSON.stringify({ r, t: f.j.transp.length, v: f.j.vrmApi.map((x) => x.mode) }));
+      const etat = await f.envoyer({ from: 'vmr-bridge', action: 'etat' }, APP_SENDER);
+      dit(!!(etat && etat.nav && (etat.nav.indispo || []).includes(c.indispo)), `${c.nom} : l'état le dit (\`${c.indispo}\`)`, JSON.stringify(etat && etat.nav));
+    }
+    // L'autre sens, dans le Firefox imité (chrome.* à rappels seuls + compat) : permis, il lit.
+    const g = faireFond({ src: SRC_G, retirer: PROFILS['firefox-android'], vinted: vintedBanc, permis: true, transporteur, vrm, firefox: { compat: COMPAT } });
+    if (typeof g.ctx.transpTick === 'function') await g.ctx.transpTick('audit', true);
+    dit(g.j.transp.some((x) => /ws\.chronopost\.fr/.test(x.url)) && g.j.vrmApi.some((x) => x.mode === 'transp-brut') && g.j.vinted.length === 0,
+      'Firefox pour Android, permission accordée : le suivi est lu et relayé — Vinted pas touché', JSON.stringify({ t: g.j.transp.map((x) => x.hote), v: g.j.vrmApi.map((x) => x.mode) }));
   });
 
   // ── H. Les scripts de la page, exécutés : le relais (content.js ↔ inject.js),
