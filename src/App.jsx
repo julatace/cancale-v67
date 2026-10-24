@@ -390,7 +390,11 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-const EXT_CAPACITES = { suivivinted: '5.214.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+// ⚠️ `suivivinted` (le suivi Vinted des achats, `capterSuivisAchats`) : 5.215,
+//    PAS 5.214 — la 5.214.0 PUBLIÉE par `main` (ad1b43b, PR #661, 23 oct.) n'a
+//    pas `capterSuivisAchats`, et c'est elle qui tourne chez Julien. À 5.214,
+//    l'app lui promettait « l'extension relève le suivi » (revue du 24 oct.).
+const EXT_CAPACITES = { suivivinted: '5.215.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -14864,13 +14868,20 @@ function LigneArrivee({arr, style}) {
 // (`codePostalLu`, jamais deviné). Ce n'est que le site du transporteur : rien
 // n'est promis ici. Transporteur sans page de suivi connue ⇒ « Chercher ce n° de
 // suivi ↗ » (une recherche, dite comme telle). 44 px au doigt (§7).
-function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne}) {
+// ⚠️ (revue du 24 oct.) `court` : dans une rangée de gestes qui ne revient pas à
+//    la ligne (« colis à vérifier »), le libellé long (258 px) poussait le CODE
+//    de retrait hors de l'écran à 390 px. Le libellé court dit « Suivre ↗ »
+//    (« Chercher ↗ » pour une recherche) ; le texte long reste pour le lecteur
+//    d'écran et au survol (`aria-label`, `title`).
+function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne, court = false}) {
   const l = lienSuivi(transporteur, suivi, codePostal);
   if (!l) return null;
+  const long = l.site ? 'Suivre sur le site du transporteur ↗' : 'Chercher ce n° de suivi ↗';
   return <a className="vrm-suivre-colis" href={l.url} target="_blank" rel="noreferrer"
-    data-suivre-colis={normaliserSuivi(suivi)} data-suivre-site={l.site ? 'transporteur' : 'recherche'} data-suivre-cp={l.codePostal || ''} {...(attrs || {})}
-    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',padding:'0 12px',marginTop:enLigne?0:6,flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,background:'transparent',fontSize:12.5,fontWeight:600,textDecoration:'none',maxWidth:'100%'}}>
-    <Icon name="truck" size={14} style={{color:C.muted,flexShrink:0}}/>{l.site ? 'Suivre sur le site du transporteur ↗' : 'Chercher ce n° de suivi ↗'}
+    data-suivre-colis={normaliserSuivi(suivi)} data-suivre-site={l.site ? 'transporteur' : 'recherche'} data-suivre-cp={l.codePostal || ''} data-suivre-court={court ? '' : undefined}
+    {...(court ? { 'aria-label': `${long.replace(/ ↗$/, '')} (n° ${normaliserSuivi(suivi)})`, title: long.replace(/ ↗$/, '') } : {})} {...(attrs || {})}
+    style={{display:'inline-flex',alignItems:'center',gap:6,minHeight:44,boxSizing:'border-box',padding:court?'0 10px':'0 12px',marginTop:enLigne?0:6,flexShrink:0,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,background:'transparent',fontSize:12.5,fontWeight:600,textDecoration:'none',maxWidth:'100%',whiteSpace:'nowrap'}}>
+    <Icon name="truck" size={14} style={{color:C.muted,flexShrink:0}}/>{court ? (l.site ? 'Suivre ↗' : 'Chercher ↗') : long}
   </a>;
 }
 // (23 oct.) « DERNIÈRE NOUVELLE DE VINTED » — l'étape écrite par Vinted sur la
@@ -14882,11 +14893,16 @@ function BoutonSuivreColis({transporteur, suivi, codePostal = '', attrs, enLigne
 const ageCourtMs = (ms) => { if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.round(ms / 60000); if (m < 60) return `${Math.max(1, m)} min`; const h = Math.round(m / 60); return h < 48 ? `${h} h` : `${Math.round(h / 24)} j`; };
 function LigneNouvelleVinted({nv}) {
   if (!nv || !nv.t) return null;
+  // ⚠️ (revue du 24 oct.) « relevé », pas « lu » : `capturedAt` est l'heure où
+  //    l'extension a RANGÉ la ligne — elle ne la réécrit que si la dernière étape
+  //    CHANGE. Une ligne relue à chaque visite sans changement passait pour « lue
+  //    il y a 3 j ». Une étape sans date est recopiée telle quelle et DITE sans
+  //    date (`sansDate`), jamais datée de la lecture.
   const quand = Number.isFinite(nv.at) ? new Date(nv.at).toLocaleString('fr-FR', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
   const lu = Number.isFinite(nv.cap) ? ageCourtMs(Date.now() - nv.cap) : '';
-  return <div className="vrm-nouvelle-vinted" data-nouvelle-vinted={nv.t} data-nouvelle-at={Number.isFinite(nv.at) ? new Date(nv.at).toISOString() : ''}
+  return <div className="vrm-nouvelle-vinted" data-nouvelle-vinted={nv.t} data-nouvelle-at={Number.isFinite(nv.at) ? new Date(nv.at).toISOString() : ''} data-nouvelle-sans-date={nv.sansDate ? '' : undefined}
     style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.4,overflowWrap:'anywhere'}}>
-    Vinted : « <span style={{color:C.text}}>{nv.t}</span> »{quand ? ` — ${quand}` : ''}{lu ? ` (lu il y a ${lu})` : ''}
+    Vinted : « <span style={{color:C.text}}>{nv.t}</span> »{quand ? ` — ${quand}` : (nv.sansDate ? ' — étape sans date (Vinted ne la date pas)' : '')}{lu ? ` (relevé il y a ${lu})` : ''}
   </div>;
 }
 // (23 oct.) « AJOUTER UN N° DE SUIVI » — Julien : « enregistrer le numéro de
@@ -14903,6 +14919,7 @@ function LigneNouvelleVinted({nv}) {
 // ligne dit « suivi ajouté — en attente d'une nouvelle » tant qu'aucun e-mail
 // au même n° n'est arrivé.
 const NOMS_SAISIE = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', autre: 'Autre transporteur' };
+const NOMS_CHOIX = { autre: 'Autre' };   // le segment, à 390 px : quatre libellés tiennent sur la ligne
 async function lireLigneSuiviManuel(id) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=data`, { headers: sbAuth() });
@@ -14930,20 +14947,127 @@ async function retirerSuiviManuel(id) {
     return r.ok;
   } catch (_) { return false; }
 }
-// Ce que les e-mails disent déjà de ce n° (le plus récent, toutes clés) —
-// jamais plus : un n° ajouté à la main n'est pas une preuve d'arrivée.
-const etapeSuiviManuel = (suivi, tracking) => {
-  if (!Array.isArray(tracking)) return null;
+// La raison d'un colis « à vérifier », dite sur sa ligne ET pour un n° ajouté à
+// la main (une phrase, §11).
+const raisonAVerifier = (x) => {
+  if (!x || !x.e) return 'à voir';
+  if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : null; const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
+  // (revue du 23 oct.) La garde de SON transporteur (`x.e.garde`).
+  const g = Number.isFinite(x.e.garde) ? x.e.garde : GARDE_MAX_J;
+  return `au point relais depuis plus de ${g} jours`;
+};
+// ── OÙ EN EST UN N° AJOUTÉ À LA MAIN (revue du 24 oct.) ─────────────────────
+// La MÊME règle que l'écran (§11) : on regarde dans quelle liste de
+// `pickupUnion` le colis de ce n° se trouve — jamais le statut de l'e-mail le
+// plus récent seul (un rappel « disponible » reçu APRÈS un « retiré » disait
+// « il est dans « à retirer » » d'un colis qui n'y était pas, et un colis au
+// délai dépassé, dans « à vérifier », disait la même chose — §5).
+//   · dans `emailList` / `extra` ⇒ « à retirer » ;
+//   · dans `aVerifier` ⇒ « à vérifier » (sa raison) ;
+//   · dans `repartis` ⇒ reparti chez l'expéditeur ;
+//   · fini (retiré sous n'importe quelle clé, `finis`, ou coché « retiré ») ⇒ retiré ;
+//   · sinon le statut du dernier e-mail, SANS dire de quelle liste il fait partie.
+// `raison(x)` : la raison d'un « à vérifier », la même que celle du bloc.
+function etapeDuSuiviManuel(n, { union, fins, tracking, collected, index, raison } = {}) {
+  const k = normaliserSuivi(n); if (!k || !union) return null;
+  const deLigne = (t) => suiviDeLigne(t) === k;
+  const deAchat = (o) => !!o && suivisAchat(o, index || {}).map(normaliserSuivi).includes(k);
+  const dans = (x) => x && (x.kind === 'email' ? deLigne(x.t) : deAchat(x.o));
+  if ((union.emailList || []).some(deLigne) || (union.extra || []).some(deAchat)) return { ou: 'a-retirer', texte: 'arrivé au point de retrait — il est dans « à retirer »' };
+  const av = (union.aVerifier || []).find(dans);
+  if (av) return { ou: 'a-verifier', texte: `à vérifier (${raison ? raison(av) : 'à voir'}) — il est dans « colis à vérifier »` };
+  if ((union.repartis || []).some(dans)) return { ou: 'reparti', texte: "reparti chez l'expéditeur" };
+  const f = fins && fins.get ? fins.get(k) : null;
+  const coche = (tracking || []).some((t) => t && deLigne(t) && collected && collected.has(colisKey(t)));
+  if ((union.finis || []).includes('e:' + k) || (f && f.retire) || coche || (union.attenteMail || []).some(deLigne) || (union.attente || []).some(deAchat)) return { ou: 'retire', texte: coche ? 'tu l’as coché retiré' : 'retiré' };
   let der = null;
-  for (const t of tracking) {
-    if (!t || suiviDeLigne(t) !== suivi) continue;
-    const d = Date.parse(t.receivedAt || '') || 0;
+  for (const t of (Array.isArray(tracking) ? tracking : [])) {
+    if (!t || !deLigne(t)) continue;
+    const d = Date.parse(t.emailAt || t.receivedAt || '') || 0;
     if (!der || d > der.d) der = { d, st: t.status };
   }
   if (!der) return null;
-  return ({ available: 'arrivé au point de retrait — il est dans « à retirer »', delivered: 'retiré', retour: "reparti chez l'expéditeur", transit: 'en route', info: 'une nouvelle du transporteur' })[der.st] || 'une nouvelle du transporteur';
-};
-function SuivisManuels({ liste, tracking, achats, accName, relire }) {
+  const mot = ({ available: 'un e-mail « arrivé au point de retrait »', delivered: 'retiré', retour: "reparti chez l'expéditeur", transit: 'en route', info: 'une nouvelle du transporteur' })[der.st] || 'une nouvelle du transporteur';
+  return { ou: 'email', texte: mot };
+}
+// ── LE SUIVI VINTED DES ACHATS, DIT UNE FOIS (§7), ET SA PROMESSE GARDÉE ─────
+// (revue du 24 oct.) « L'extension le relève à ta prochaine visite » se disait
+// à toute extension 5.214 — non connectée à VRM (la visite s'arrête sans
+// session), au code périmé, en double, et pour six colis alors qu'elle n'en lit
+// que trois par visite. La forme de `ligneSansPreuve` (eBay → Annonces), §11 :
+//   · la promesse seulement si l'extension de CE navigateur sait le faire
+//     (`extSait`), rien ne la bloque (`raisonExtGlobale` — la phrase de
+//     l'indicateur, une voix), connectée à CE compte VRM, code à jour, seule ;
+//   · « au fil de tes visites » quand un compte a plus de colis que ce qu'elle
+//     lit par visite (`SUIVI_PAR_VISITE` = `SUIVI_MAX_PAR_VISITE` de
+//     background.js, comparé par audit-suivi-colis) ; chaque compte NOMMÉ (la
+//     lecture active ne lit que le compte connecté dans Chrome) ;
+//   · la FORME jamais reconnue (`panel_formes_suivi.journey.etat === 'inconnue'`)
+//     remplace la promesse : l'extension a vu la page et ne sait pas la lire ;
+//   · une ligne RELEVÉE sans étape datée n'est pas « pas encore relevée » : elle
+//     se dit à part, et sa dernière étape est recopiée sur la carte, sans date.
+// Trois états pour la forme aussi : `undefined` en cours · `null` pas su · lu.
+const SUIVI_PAR_VISITE = 3;
+async function lireFormesSuivi() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_formes_suivi&select=je:data->journey->>etat,ja:data->journey->>at`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json(); if (!Array.isArray(j)) return null;
+    const x = j[0] || {};
+    return { journey: x.je ? String(x.je) : '', at: x.ja || '' };
+  } catch (_) { return null; }
+}
+function EtatSuiviVinted({ achats, suivisVinted, etatDe, accName, relire }) {
+  // 5.188 : un téléphone qui a l'extension (Firefox pour Android) fait le geste ICI.
+  const sansSouris = useSansSouris() && !vmrExtPresent();
+  const [, majExt] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => onVmrExt(majExt), []);
+  const [formes, setFormes] = React.useState(undefined);
+  const aLire = Array.isArray(achats) && achats.length > 0 && suivisVinted != null;
+  React.useEffect(() => { if (!aLire) return; let stop = false; lireFormesSuivi().then((f) => { if (!stop) setFormes(f); }); return () => { stop = true; }; }, [aLire, suivisVinted]);
+  if (!Array.isArray(achats) || !achats.length || suivisVinted === undefined) return null;
+  const bouton = { border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: 44 };
+  if (suivisVinted === null) return <div data-suivi-vinted-etat="passu" style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>Le suivi Vinted de tes achats n'a pas pu être lu — la base n'a pas répondu ; rien n'est perdu. <button type="button" onClick={relire} style={bouton}>Réessayer</button></div>;
+  const aucune = achats.filter((o) => etatDe(o) === 'aucune');
+  const sansDate = achats.filter((o) => etatDe(o) === 'sans-date');
+  if (!aucune.length && !sansDate.length) return null;
+  const cap = extSait('suivivinted');
+  const ailleurs = cap === 'absente' || sansSouris;
+  const blocage = cap === 'ok' && !ailleurs ? raisonExtGlobale(false, { cap: 'suivivinted', role: 'relève le suivi de tes achats' }) : null;
+  const promet = cap === 'ok' && !ailleurs && !blocage && connexionExtensionVrm() === 'ok' && !codePerime() && !__vmrPlusieurs;
+  const formeJ = formes === undefined ? 'encours' : (formes === null ? 'passu' : (formes.journey || ''));
+  const parCompte = new Map();
+  for (const o of aucune) { const a = o && o._acc; const k = a ? String(a.vinted_user_id || '') : ''; const e = parCompte.get(k) || { a, n: 0 }; e.n++; parCompte.set(k, e); }
+  const noms = [...parCompte.values()].map((e) => (e.a ? accName(e.a) : 'ce compte') + (parCompte.size > 1 ? ` (${e.n})` : ''));
+  const ce = parCompte.size === 1 ? (noms[0] || 'ce compte') : `chacun de ces comptes (${noms.join(', ')})`;
+  const un = aucune.length === 1;
+  const plusParCompte = Math.max(0, ...[...parCompte.values()].map((e) => e.n));
+  const quand = plusParCompte > SUIVI_PAR_VISITE ? 'au fil de tes visites' : 'à ta prochaine visite';
+  const geste = 'touche « Suivre le colis » dans la commande sur vinted.fr';
+  let phrase = null;
+  if (aucune.length) {
+    const tete = `${un ? '1 colis vu par Vinted n’a' : `${aucune.length} colis vus par Vinted n'ont`} pas encore de suivi Vinted relevé${parCompte.size === 1 && noms[0] ? ` (${noms[0]})` : ''}.`;
+    const suite = promet
+      ? (formeJ === 'inconnue'
+        ? `L'extension a vu la page de suivi de Vinted mais ne sait pas encore la lire — ${geste}.`
+        : `L'extension de ce navigateur le relève toute seule sur vinted.fr, connecté sur ${ce} — ${SUIVI_PAR_VISITE} par visite, donc ${quand}.`)
+      : ailleurs
+        ? `Il se relève avec l'extension VRM, sur l'ordinateur où elle est installée, connecté sur ${ce} — ou ${geste}.`
+        : cap === 'retard'
+          ? `L'extension installée ici ne le relève pas encore : mets-la à jour (${EXT_CAPACITES.suivivinted} ou plus). En attendant, ${geste}.`
+          : `${blocage ? blocage.texte : "Je vérifie que l'extension de ce navigateur est connectée à ton compte VRM."} Tant que ce n'est pas réglé, elle ne relève rien : ${geste}.`;
+    phrase = <>{tete} {suite}</>;
+  }
+  const nSD = sansDate.length;
+  return <div data-suivi-vinted-etat={cap} data-suivi-vinted-sans={aucune.length} data-suivi-vinted-sans-date={nSD}
+    data-suivi-vinted-promesse={aucune.length && promet && formeJ !== 'inconnue' ? '1' : '0'} data-suivi-vinted-blocage={blocage ? blocage.code : ''} data-suivi-vinted-forme={formeJ}
+    data-suivi-vinted-quand={aucune.length && promet ? (plusParCompte > SUIVI_PAR_VISITE ? 'fil' : 'prochaine') : ''}
+    style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>
+    {phrase}
+    {nSD > 0 && <div data-suivi-vinted-sans-date-texte="" style={{marginTop: phrase ? 4 : 0}}>{nSD > 1 ? `${nSD} colis ont` : '1 colis a'} un suivi relevé par l'extension, mais Vinted ne donne pas de date pour ses étapes : la dernière étape relevée est recopiée sur {nSD > 1 ? 'leur carte' : 'sa carte'}, sans date.</div>}
+  </div>;
+}
+function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe }) {
   const [ouvert, setOuvert] = React.useState(false);
   const [n, setN] = React.useState('');
   const [tr, setTr] = React.useState('');
@@ -14980,11 +15104,20 @@ function SuivisManuels({ liste, tracking, achats, accName, relire }) {
         <div data-suivi-form="" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <input aria-label="N° de suivi" data-suivi-saisie="" value={n} onChange={e => { setN(e.target.value); setTr(''); setMsg(''); }} placeholder="N° de suivi (ex. 8 chiffres pour Mondial Relay)" autoCapitalize="characters" autoComplete="off" style={champ}/>
           {valide && (
-            <div data-suivi-transporteur={choisi || 'a-choisir'} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>
-              {deForme && !tr ? <>Transporteur reconnu à la forme du n° : <b style={{ color: C.text }}>{NOMS_SAISIE[deForme]}</b>. </> : <>Quel transporteur ? La forme de ce n° ne le dit pas.</>}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                {TRANSPORTEURS_SAISIE.map(k => <button key={k} type="button" data-suivi-choix={k} aria-pressed={choisi === k} onClick={() => setTr(k)} style={{ ...bouton, fontSize: 12.5, background: choisi === k ? C.text : 'transparent', color: choisi === k ? C.card : C.text }}>{NOMS_SAISIE[k]}</button>)}
-              </div>
+            <div data-suivi-transporteur={choisi || 'a-choisir'} data-suivi-transporteur-phrase={!deForme ? (tr ? 'choisi' : 'ambigu') : (!tr || tr === deForme ? 'forme' : 'autre')} style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>
+              {/* (revue du 24 oct.) TROIS CAS, TROIS PHRASES : après un clic, l'écran
+                  disait « La forme de ce n° ne le dit pas » d'un n° dont la forme le
+                  disait. Reconnu (choisi ou non) · un autre choisi · ambigu. */}
+              {deForme
+                ? (!tr || tr === deForme
+                  ? <>Transporteur reconnu à la forme du n° : <b style={{ color: C.text }}>{NOMS_SAISIE[deForme]}</b>.</>
+                  : <>Tu as choisi <b style={{ color: C.text }}>{NOMS_SAISIE[tr]}</b> (la forme du n° faisait penser à {NOMS_SAISIE[deForme]}).</>)
+                : (tr ? <>Tu as choisi <b style={{ color: C.text }}>{NOMS_SAISIE[tr]}</b>.</> : <>Quel transporteur ? La forme de ce n° ne le dit pas.</>)}
+              {/* (revue du 24 oct.) LA FORME COMMUNE D'UN CHOIX (§7) : `Segmente` —
+                  le segment actif à la règle commune (jamais un bouton blanc plein
+                  en sombre). */}
+              <Segmente label="Transporteur" plein value={choisi} onChange={setTr} style={{ marginTop: 6, marginBottom: 0 }}
+                options={TRANSPORTEURS_SAISIE.map(k => ({ v: k, l: NOMS_CHOIX[k] || NOMS_SAISIE[k], data: { 'data-suivi-choix': k } }))}/>
             </div>
           )}
           {choisi === 'mondialrelay' && <input aria-label="Code postal (facultatif)" data-suivi-cp="" value={cp} onChange={e => setCp(e.target.value)} inputMode="numeric" placeholder="Code postal du point relais (facultatif)" style={champ}/>}
@@ -14998,18 +15131,21 @@ function SuivisManuels({ liste, tracking, achats, accName, relire }) {
       {Array.isArray(liste) && liste.length > 0 && (
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {liste.map(m => {
-            const etape = etapeSuiviManuel(m.suivi, tracking);
+            const et = etapeDe ? etapeDe(m.suivi) : null;
+            const etape = et && et.texte;
             const lie = m.tx ? (Array.isArray(achats) ? achats.find(o => String(o.transaction_id) === m.tx && (!m.uid || String((o._acc && o._acc.vinted_user_id) || '') === m.uid)) : null) : null;
             return (
-              <div key={m.id} data-suivi-manuel={m.suivi} data-suivi-etape={etape ? 'nouvelle' : 'attente'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+              <div key={m.id} data-suivi-manuel={m.suivi} data-suivi-etape={etape ? 'nouvelle' : 'attente'} data-suivi-ou={et ? et.ou : ''} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflowWrap: 'anywhere' }}>{NOMS_SAISIE[m.transporteur] || 'Transporteur'} · n° <span style={{ fontFamily: 'ui-monospace,monospace' }}>{m.suivi}</span></div>
-                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{etape ? `Dernière nouvelle par e-mail : ${etape}` : 'Suivi ajouté — en attente d’une nouvelle'}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{etape ? (et.ou === 'email' ? `Dernière nouvelle par e-mail : ${etape}` : `Ce colis : ${etape}`) : 'Suivi ajouté — en attente d’une nouvelle'}</div>
                 {m.tx && <div data-suivi-lie={m.tx} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Relié à : {lie ? `${lie.title || 'Achat'}${lie._acc ? ` (${accName(lie._acc)})` : ''}` : `l'achat ${m.tx}`}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
                   <BoutonSuivreColis transporteur={m.transporteur} suivi={m.suivi} codePostal={m.cp} enLigne/>
                   {!m.tx && <button type="button" data-suivi-relier={m.suivi} onClick={() => setRelierPour(p => p === m.id ? '' : m.id)} style={bouton}>Relier à un achat</button>}
                   {m.tx && <button type="button" data-suivi-delier={m.suivi} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: null, uid: null }); if (!r.ok) setMsg(r.msg); relire(); }} style={bouton}>Délier</button>}
-                  <button type="button" data-suivi-retirer={m.suivi} onClick={async () => { if (!window.confirm(`Retirer le suivi n° ${m.suivi} ? Les e-mails déjà reçus ne changent pas.`)) return; if (!(await retirerSuiviManuel(m.id))) setMsg("Le suivi n'a pas pu être retiré — la base n'a pas répondu."); relire(); }} style={{ ...bouton, color: C.muted }}>Retirer</button>
+                  {/* (revue du 24 oct.) « Retirer », dans l'onglet « À retirer », se lisait
+                      « je l'ai retiré » : le bouton efface le SUIVI, il le dit. */}
+                  <button type="button" data-suivi-retirer={m.suivi} onClick={async () => { if (!window.confirm(`Ne plus suivre le n° ${m.suivi} ? Le suivi ajouté est effacé ; les e-mails déjà reçus ne changent pas.`)) return; if (!(await retirerSuiviManuel(m.id))) setMsg("Le suivi n'a pas pu être effacé — la base n'a pas répondu."); relire(); }} style={{ ...bouton, color: C.muted }}>Ne plus suivre ce n°</button>
                 </div>
                 {relierPour === m.id && (
                   <div data-suivi-choix-achat="" style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -31286,7 +31422,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const v of Object.values(suivisVinted || {})) {
       if (!v || !v.tx || !v.uid) continue;
       const e = out[`${v.uid}:${v.tx}`] || (out[`${v.uid}:${v.tx}`] = { uid: v.uid });
-      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null });
+      // (revue du 24 oct.) `ligne` : la ligne EXISTE (l'extension l'a relevée),
+      // même sans étape datée — « relevé, sans date » n'est pas « pas relevé ».
+      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true });
     }
     // Un n° ajouté à la main et relié à CET achat (son clic), sous le même compte.
     for (const m of (Array.isArray(suivisManuels) ? suivisManuels : [])) {
@@ -31302,15 +31440,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // rendu de cet écran coûte au téléphone).
   const lireSuivisVintedVal = async () => {
     try {
-      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at`, { strict: true });
+      // `de` : le libellé de l'étape la plus RÉCENTE (`etapes[0]`, contrat du
+      // 23 oct.) — recopié, présenté « sans date », quand Vinted ne date rien.
+      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t`, { strict: true });
       if (!Array.isArray(rows)) return null;
       const m = {};
       for (const r of rows) {
         const mm = /^harvest_(\w+?)_suivi_(\w+)$/.exec(String(r.id || '')); if (!mm) continue;
         const uid = mm[1], txId = mm[2];
         if (r.tx && String(r.tx) !== txId) continue;          // une ligne qui contredit son identifiant ne relie rien
+        const nv = nouvelleVinted({ dernier: { t: r.dt, at: r.dat }, cap: r.cap });
+        const nd = nv ? null : nouvelleVinted({ dernier: { t: r.de, at: null }, cap: r.cap });
         m[`${uid}:${txId}`] = { uid, tx: txId, suivi: normaliserSuivi(r.suivi) || '', transporteur: String(r.transporteur || ''),
-          nv: nouvelleVinted({ dernier: { t: r.dt, at: r.dat }, cap: r.cap }) };
+          nv, nvSansDate: nd ? { t: nd.t, at: null, cap: nd.cap, sansDate: true } : null };
       }
       return m;
     } catch (_) { return null; }
@@ -31325,7 +31467,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (e.uid && uid && String(e.uid) !== uid) return null;
     return e;
   };
-  const nouvelleDe = (o) => { const e = entreeSuiviAchat(o); return (e && e.nv) || null; };
+  // Ce que la carte recopie : la dernière étape DATÉE, sinon la dernière étape
+  // relevée SANS date (dite comme telle). `etatSuiviDe` : 'nouvelle' (une étape
+  // datée) · 'sans-date' (la ligne existe, Vinted ne date pas) · 'aucune'.
+  const nouvelleDe = (o) => { const e = entreeSuiviAchat(o); return (e && (e.nv || e.nvSansDate)) || null; };
+  const etatSuiviDe = (o) => { const e = entreeSuiviAchat(o); return e && e.nv ? 'nouvelle' : (e && e.ligne ? 'sans-date' : 'aucune'); };
   const lireSuivisManuelsVal = async () => {
     try {
       const rows = await lireTout(`id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at`, { strict: true });
@@ -31713,6 +31859,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisEnvoyes, txSuivisColis]);
+  // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
+  // n° ajouté à la main (`etapeDuSuiviManuel`).
+  const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes), [tracking, suivisEnvoyes]);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -39955,21 +40104,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             carte reliée : « Vinted : « … » ». Ici seulement ce qui MANQUE, et le
             geste — la promesse « l'extension le relève » n'est faite qu'à une
             extension qui sait le faire (`extSait('suivivinted')`). */}
-        {aFilter==='attente' && (()=>{
-          const vinted = [...pickupUnion.extra, ...pickupUnion.aVerifier.filter(x=>x.kind==='vinted').map(x=>x.o)];
-          if (!vinted.length || suivisVinted === undefined) return null;
-          if (suivisVinted === null) return <div data-suivi-vinted-etat="passu" style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>Le suivi Vinted de tes achats n'a pas pu être lu — la base n'a pas répondu ; rien n'est perdu. <button type="button" onClick={relireSuivisVinted} style={{border:'none',background:'transparent',color:C.accent,fontWeight:700,cursor:'pointer',fontFamily:'inherit',padding:0,minHeight:44}}>Réessayer</button></div>;
-          const sans = vinted.filter(o=>!nouvelleDe(o)).length;
-          if (!sans) return null;
-          const cap = extSait('suivivinted');
-          return <div data-suivi-vinted-etat={cap} data-suivi-vinted-sans={sans} style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>
-            {sans>1?`${sans} colis vus par Vinted n'ont`:'1 colis vu par Vinted n’a'} pas encore de suivi Vinted relevé.{' '}
-            {cap==='ok' ? "L'extension le relève à ta prochaine visite sur Vinted, sur le compte connecté dans Chrome."
-              : cap==='retard' ? "Mets l'extension VRM à jour pour qu'elle le relève — ou touche « Suivre le colis » dans la commande sur vinted.fr."
-              : "Il se relève avec l'extension VRM, sur l'ordinateur où elle est installée — ou touche « Suivre le colis » dans la commande sur vinted.fr."}
-          </div>;
-        })()}
-        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} achats={buysBase} accName={accName} relire={relireSuivisManuels}/>}
+        {aFilter==='attente' && <EtatSuiviVinted achats={[...pickupUnion.extra, ...pickupUnion.aVerifier.filter(x=>x.kind==='vinted').map(x=>x.o)]}
+          suivisVinted={suivisVinted} etatDe={etatSuiviDe} accName={accName} relire={relireSuivisVinted}/>}
+        {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} achats={buysBase} accName={accName} relire={relireSuivisManuels}
+          etapeDe={(n)=>etapeDuSuiviManuel(n,{union:pickupUnion,fins:finsSuivis,tracking,collected,index:indexSuivisAchats,raison:raisonAVerifier})}/>}
         {aFilter==='attente' && (pickupUnion.aVerifier||[]).length>0 && (
           <div data-oublies={pickupUnion.aVerifier.length} data-a-verifier={pickupUnion.aVerifier.length} style={{border:`1px solid ${C.warn}`,background:`${C.warn}0e`,borderRadius:10,padding:'12px 14px',marginBottom:10}}>
             <div style={{fontSize:14,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:7}}>
@@ -39986,12 +40124,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:7}}>
               {pickupUnion.aVerifier.map((x,i)=>{
-                const raison = (()=>{
-                  if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' ? x.t.limite : null; const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
-                  // (revue du 23 oct.) La garde de SON transporteur (`x.e.garde`).
-                  const g = Number.isFinite(x.e.garde) ? x.e.garde : GARDE_MAX_J;
-                  return `au point relais depuis plus de ${g} jours`;
-                })();
+                const raison = raisonAVerifier(x);
                 if (x.kind==='email') {
                   const t=x.t; const cl=cleanLieu(t.lieu); const code=codeRetrait(t.code);
                   const arr=arriveeColisEmail(t); const cpt=compteDuColisEmail(t);
@@ -40015,7 +40148,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <img src={qi} alt="QR de retrait" onError={()=>noterImgMorte(qi)} style={{width:'100%',height:'100%',objectFit:'contain'}}/>
                         </button>
                       ) : null; })()}
-                      <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} enLigne attrs={{'data-oublie-verifier':''}}/>
+                      <BoutonSuivreColis transporteur={t.carrier} suivi={t.suivi} codePostal={codePostalLu(t)} enLigne court attrs={{'data-oublie-verifier':''}}/>
                       <button type="button" title="Je l'avais récupéré" data-oublie-eu="" onClick={()=>markCollected(t)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>
                       </div>
                     </div>
@@ -40035,7 +40168,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <LigneNouvelleVinted nv={nouvelleDe(o)}/>
                     </div>
                     <div className="vrm-oublie-gestes">
-                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} enLigne/> : null; })()}
+                      {(()=>{ const e=entreeSuiviAchat(o); const su=suivisAchat(o, indexSuivisAchats)[0]; return su ? <BoutonSuivreColis transporteur={(e&&e.transporteur)||transporteurDeForme(su)||''} suivi={su} enLigne court/> : null; })()}
                       {cd && <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.text,fontFamily:'ui-monospace,monospace',border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 7px'}}>{cd}</span>}
                       {href && <a href={href} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:'5px 9px',fontSize:11.5,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Conversation ↗</a>}
                       <button type="button" title="Je l'avais récupéré" onClick={()=>markPickupDone(o)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>✓ Je l'ai eu</button>

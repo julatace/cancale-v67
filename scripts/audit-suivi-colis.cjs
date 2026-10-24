@@ -560,6 +560,21 @@ function chargeApp(noms, injecte) {
     dit(pushes.length === 1 && /✅/.test(pushes[0].title) && /cat_achats/.test(pushes[0].url || ''), 'l\'autre sens : un achat retiré sonne « ✅ », vers Achats', JSON.stringify(pushes.map((p) => [p.title, p.url])));
   });
 
+  // (revue du 24 oct., n° 10) « 3 par visite » à l'écran : le chiffre de
+  // l'EXTENSION (`SUIVI_MAX_PAR_VISITE`, background.js), jamais un second.
+  // Une extension qui n'a pas encore `capterSuivisAchats` (ce chantier-ci avant
+  // sa fusion avec le chantier extension) n'a rien à comparer : c'est
+  // audit-coherence qui est rouge alors (la capacité cite une fonction absente).
+  await essaie('revue n° 10 — le rythme dit par l\'app est celui de l\'extension', async () => {
+    const APP = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+    let EXT = ''; try { EXT = fs.readFileSync(process.env.AUDIT_EXT_BG || path.join(R, 'vinted-sync-extension', 'background.js'), 'utf8'); } catch (_) { EXT = ''; }
+    const a = (/const SUIVI_PAR_VISITE = (\d+);/.exec(APP) || [])[1];
+    dit(!!a, 'l\'app porte son rythme (`SUIVI_PAR_VISITE`)', a);
+    if (!/function capterSuivisAchats\b/.test(EXT)) { console.log('⚠️ background.js n\'a pas encore `capterSuivisAchats` : rythme comparé à la fusion avec le chantier extension'); return; }
+    const e = (/const SUIVI_MAX_PAR_VISITE = (\d+);/.exec(EXT) || [])[1];
+    dit(a && e && a === e, `l'app dit « ${a} par visite », l'extension en lit ${e} (SUIVI_MAX_PAR_VISITE)`);
+  });
+
   console.log(ko ? `\n❌ suivi des colis : ${ko} rouge(s)` : '\n✅ suivi des colis : tout est vert');
   process.exit(ko ? 1 : 0);
 })();

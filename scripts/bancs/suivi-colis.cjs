@@ -82,7 +82,9 @@ const BASE = () => [
 const SESSION = { access_token: 'session-suivi-colis', refresh_token: 'r', totp: [], expires_at: NOW + 30 * 86400000, user: { id: '11111111-1111-4111-8111-111111111111', email: 'suivi@example.test', totp: [] } };
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 180)); } };
+// `BANC_SEUL=E,F` : ne joue que ces sections (une preuve ciblée, une mutation).
+const seul = (x) => !process.env.BANC_SEUL || process.env.BANC_SEUL.split(',').includes(x);
+const essaie = async (nom, f) => { if (!seul(String(nom).replace(/^(\d+ \w+ |\d+ )/, '').trim().charAt(0))) return; try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 180)); } };
 
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.onnx': 'application/octet-stream' };
 const srv = http.createServer((q, r) => {
@@ -117,8 +119,12 @@ async function preparer(b, vp, sombre, opts = {}) {
   const ctx = await b.newContext({ viewport: vp, ...(mobile ? { isMobile: true, hasTouch: true } : {}), locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  pg.on('dialog', (d) => d.accept());
+  const dialogues = []; pg.on('dialog', (d) => { dialogues.push(d.message()); d.accept(); });
   const ecrits = [];
+  // (revue du 24 oct.) Un faux pont d'extension (le vrai dialogue `ready` /
+  // `etat`), pour juger la PROMESSE « l'extension le relève » : version, session
+  // VRM connectée ou non, code périmé (état sans `code`), deux copies.
+  if (opts.pont) await pg.addInitScript(PONT, opts.pont);
   await pg.addInitScript(([s, dark]) => { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vinted_dark', dark ? 'true' : 'false'); }, [SESSION, !!sombre]);
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
@@ -144,6 +150,7 @@ async function preparer(b, vp, sombre, opts = {}) {
     }
     if (m !== 'GET') return rep([]);
     if (/id=like\.harvest_\*_suivi_\*/.test(u) && opts.suivisVinted === 'ko') return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
+    if (/id=eq\.panel_colis_relais/.test(u) && opts.relaisKo) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"indisponible"}' });
     if (/select=owner/.test(u)) return rep([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return rep(ACCOUNTS);
     if (/\/rest\/v1\/rpc\//.test(u)) return rep(null);
@@ -157,7 +164,19 @@ async function preparer(b, vp, sombre, opts = {}) {
     return rep([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(r.request().url().includes('mode=confidentialite') ? { ok: true, uid: SESSION.user.id } : { ok: true, pret: true, obligatoire: false, acces: true }) }));
-  return { ctx, pg, errs, ROWS, ecrits };
+  return { ctx, pg, errs, ROWS, ecrits, dialogues };
+}
+function PONT(o) {
+  const version = o.version, connecte = o.connecte !== false;
+  const code = o.perime ? {} : { code: version };
+  const post = (m) => window.postMessage(m, '*');
+  window.addEventListener('message', (e) => {
+    const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+    if (d.__vmr === 'ping') { post({ __vmr: 'ready', version, ext: 'ext-a' }); if (o.deux) post({ __vmr: 'ready', version: '5.164.0', ext: 'ext-b' }); }
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: Object.assign({ ok: true, version, ext: 'ext-a', vrm: connecte ? { ok: true, connecte: true, email: 'suivi@example.test', user_id: '11111111-1111-4111-8111-111111111111' } : { ok: true, connecte: false }, vinted: { uid: '111', login: 'compte_banc' }, cmds: {} }, code) });
+  });
+  post({ __vmr: 'ready', version, ext: 'ext-a' });
+  if (o.deux) post({ __vmr: 'ready', version: '5.164.0', ext: 'ext-b' });
 }
 
 const ouvrir = async (pg, errs) => {
@@ -209,6 +228,9 @@ async function navigateur() {
         const a1 = parConv('7601')[0], a2 = parConv('7602')[0];
         dit(!!a1 && !!a2, `${nom} : les deux achats au même titre sont montrés, chacun sa carte`);
         dit(a1 && a1.nv.length === 1 && a1.nv[0] === NV_9601, `${nom} : « Vinted : « … » » sur la carte de SON achat (9601), le texte tel quel`, a1 && a1.nv.join(' | '));
+        // (revue du 24 oct., n° 15) `capturedAt` est l'heure du RELEVÉ (la ligne
+        // n'est réécrite que si l'étape change) : jamais « lu il y a ».
+        dit(a1 && /\(relevé il y a /.test(a1.t) && !/\(lu il y a /.test(a1.t), `${nom} : l'âge sous la nouvelle Vinted dit « relevé il y a », pas « lu il y a »`, a1 && (a1.t.match(/\((?:lu|relevé) il y a [^)]*\)/) || [''])[0]);
         dit(a2 && a2.nv.length === 0 && !r.nNouvelles.includes(NV_AUTRE), `${nom} : JAMAIS sur l'achat au même titre (9602), ni la ligne d'un autre compte`, a2 && a2.nv.join(' | '));
         const e64 = parSuivi('30000064')[0];
         dit(e64 && e64.nv.length === 1 && e64.nv[0] === NV_9604 && r.nNouvelles.filter((x) => x === NV_9604).length === 1, `${nom} : l'e-mail relié à la commande 9604 par le CODE de retrait porte SA nouvelle, une fois`, e64 && e64.nv.join(' | '));
@@ -289,7 +311,171 @@ async function navigateur() {
         await ctx.close();
       });
     }
+    await revue24(b);
   } finally { await b.close(); }
+}
+
+// ── REVUE DU 24 OCTOBRE : ce qui était faux à l'écran, chaque cas rouge sur le
+// build d'avant (§6.1). Données INVENTÉES à la forme mesurée.
+const etatSuivi = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-suivi-vinted-etat]'); return e ? { etat: e.getAttribute('data-suivi-vinted-etat'), sans: e.getAttribute('data-suivi-vinted-sans'), sansDate: e.getAttribute('data-suivi-vinted-sans-date'), promesse: e.getAttribute('data-suivi-vinted-promesse'), blocage: e.getAttribute('data-suivi-vinted-blocage'), forme: e.getAttribute('data-suivi-vinted-forme'), quand: e.getAttribute('data-suivi-vinted-quand'), t: e.innerText } : null; });
+const PROMESSE = /relève toute seule|le relève à ta prochaine visite/;
+// La couleur de fond VUE d'un élément (on remonte tant qu'elle est transparente),
+// en luminance relative (0 noir · 1 blanc). Lit rgb() et color(srgb …).
+const LUMINANCE = (el) => {
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  for (let e = el; e; e = e.parentElement) {
+    const v = getComputedStyle(e).backgroundColor;
+    let m = /^rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(v), r, g, b, a = 1;
+    if (m) { r = +m[1] / 255; g = +m[2] / 255; b = +m[3] / 255; a = m[4] != null ? +m[4] : 1; }
+    else if ((m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/.exec(v))) { r = +m[1]; g = +m[2]; b = +m[3]; a = m[4] != null ? +m[4] : 1; }
+    else continue;
+    if (a < 0.5) continue;
+    return { L: 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b), v };
+  }
+  return { L: null, v: '' };
+};
+async function revue24(b) {
+  const V = '5.215.0';
+  // ── E. La PROMESSE « l'extension le relève » n'est faite qu'à une extension
+  // qui peut la tenir (défauts n° 5, 6, 8, 10, 11) ──
+  const E = [
+    ['E1 connectée, à jour', { pont: { version: V } }, (r) => r && r.promesse === '1' && r.quand === 'prochaine' && PROMESSE.test(r.t) && /compte_banc/.test(r.t) && /3 par visite/.test(r.t), 'promesse faite, compte nommé, « 3 par visite »'],
+    ['E2 pas connectée à VRM', { pont: { version: V, connecte: false } }, (r) => r && r.promesse !== '1' && !PROMESSE.test(r.t) && /Suivre le colis/.test(r.t), 'aucune promesse, le geste qui marche'],
+    ['E3 code périmé', { pont: { version: V, perime: true } }, (r) => r && r.promesse !== '1' && !PROMESSE.test(r.t), 'aucune promesse'],
+    ['E4 deux extensions', { pont: { version: V, deux: true } }, (r) => r && r.promesse !== '1' && !PROMESSE.test(r.t), 'aucune promesse'],
+    ['E5 la 5.214 de production', { pont: { version: '5.214.0' } }, (r) => r && r.etat === 'retard' && !PROMESSE.test(r.t) && /5\.215\.0/.test(r.t), '« en retard » : la 5.214.0 publiée n\'a pas capterSuivisAchats'],
+  ];
+  for (const [nom, o, ok, quoi] of E) {
+    await essaie(nom, async () => {
+      const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, o);
+      await ouvrir(pg, errs); await pg.waitForTimeout(2500);
+      const r = await etatSuivi(pg);
+      dit(ok(r), `${nom} : ${quoi}`, r && `${r.etat} · promesse=${r.promesse} · ${r.t.slice(0, 220)}`);
+      dit(!errs.length, `${nom} : aucune erreur d'app`, errs[0]);
+      await ctx.close();
+    });
+  }
+  await essaie('E6 six colis sans suivi', async () => {
+    const rows = BASE();
+    const i = rows.findIndex((r) => r.id === 'harvest_111_orders_purchased');
+    rows[i] = JSON.parse(JSON.stringify(rows[i]));     // jamais la liste partagée ACHATS
+    for (let k = 0; k < 5; k++) rows[i].data.payload.my_orders.push(achat(9610 + k, 7610 + k, 'Paire banc ' + k));
+    const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, { pont: { version: V }, rows });
+    await ouvrir(pg, errs); await pg.waitForTimeout(2500);
+    const r = await etatSuivi(pg);
+    dit(r && r.sans === '6' && !/prochaine visite/.test(r.t) && /au fil de tes visites/.test(r.t), 'E6 : 6 colis sans suivi pour 3 lus par visite ⇒ « au fil de tes visites », jamais « à ta prochaine visite »', r && r.t.slice(0, 220));
+    await ctx.close();
+  });
+  await essaie('E7 forme jamais reconnue', async () => {
+    const rows = BASE();
+    rows.push({ id: 'panel_formes_suivi', data: { v: 1, journey: { forme: { 'steps[].label_text': 'string' }, etat: 'inconnue', at: j(0.1), ver: V, n: 3 } } });
+    const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, { pont: { version: V }, rows });
+    await ouvrir(pg, errs); await pg.waitForTimeout(2500);
+    const r = await etatSuivi(pg);
+    dit(r && !PROMESSE.test(r.t) && /ne sait pas encore la lire/.test(r.t) && /Suivre le colis/.test(r.t), 'E7 : la page de suivi vue mais pas lisible ⇒ « ne sait pas encore la lire », jamais la promesse', r && r.t.slice(0, 220));
+    await ctx.close();
+  });
+  await essaie('E8 ligne relevée sans étape datée', async () => {
+    const rows = BASE();
+    rows.push({ id: 'harvest_111_suivi_9602', data: { v: 1, tx: '9602', source: 'journey', capturedAt: j(0.05), transporteur: 'Mondial Relay', suivi: null, etapes: [{ t: 'Colis en cours de livraison', at: null, code: null }], dernier: null, forme: {} } });
+    const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, { pont: { version: V }, rows });
+    await ouvrir(pg, errs); await pg.waitForTimeout(2500);
+    const r = await etatSuivi(pg);
+    const carte = (await lire(pg)).cartes.find((c) => c.conv.some((h) => h.endsWith('/inbox/7602')));
+    dit(r && r.sans === '0' && r.sansDate === '1' && !PROMESSE.test(r.t) && /ne donne pas de date/.test(r.t), 'E8 : relevé sans étape datée ≠ « pas encore relevé » : dit à part, sans promesse', r && `${r.sans}/${r.sansDate} · ${r.t.slice(0, 200)}`);
+    dit(carte && carte.nv.length === 1 && carte.nv[0] === 'Colis en cours de livraison' && /sans date/.test(carte.t), 'E8 : sa dernière étape est recopiée sur SA carte, dite sans date', carte && carte.nv.join(' | '));
+    await ctx.close();
+  });
+  // ── F. 390 px : la rangée « à vérifier » ne pousse plus le code hors de l'écran (n° 9) ──
+  // `vieux` : les achats relus il y a 8 jours (la garde Mondial Relay est de
+  // 5 jours) ⇒ les colis vus par Vinted passent « à vérifier » eux aussi.
+  const rowsAV = (vieux = false) => {
+    const rows = BASE();
+    rows.push(track('email_track_mondialrelay_30000090', { carrier: 'mondialrelay', suivi: '30000090', subject: 'Votre colis 30000090 est disponible 📦', code: '909090', lieu: 'Bar Banc, 5 Rue Exemple, 35260 Cancale', receivedAt: j(9), arriveLe: j(9), limite: new Date(NOW - 3 * 86400000).toISOString().slice(0, 10) }));
+    const i = rows.findIndex((r) => r.id === 'harvest_111_orders_purchased');
+    rows[i] = JSON.parse(JSON.stringify(rows[i]));
+    rows[i].data.payload.my_orders.push({ ...achat(9620, 7620, 'Salomon XT6 grise taille 41'), date: j(12) });
+    if (vieux) rows[i].data.capturedAt = j(8);
+    rows.push({ id: 'harvest_111_suivi_9620', data: { v: 1, tx: '9620', source: 'journey', capturedAt: j(0.1), transporteur: 'Mondial Relay', suivi: '30000099', etapes: [], forme: {}, dernier: { t: 'Le colis a été déposé au point relais', at: j(10), code: null } } });
+    return rows;
+  };
+  for (const [nom, sombre] of [['390 clair', false], ['390 sombre', true]]) {
+    await essaie(`F ${nom}`, async () => {
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, sombre, { rows: rowsAV(true) });
+      await ouvrir(pg, errs);
+      const g = await pg.evaluate(() => {
+        const W = window.innerWidth;
+        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: (c.innerText || c.getAttribute('aria-label') || c.tagName).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
+      });
+      const tous = g.flat();
+      dit(g.length >= 2 && tous.length >= 4, `F ${nom} : les rangées « à vérifier » (e-mail et Vinted) sont rendues`, `${g.length} rangée(s)`);
+      dit(tous.every((x) => x.ok), `F ${nom} : chaque geste de « à vérifier » tient dans l'écran (rien à gauche de 0 ni à droite du bord)`, tous.filter((x) => !x.ok).map((x) => `${x.t}@${x.l}..${x.r}`).join(' · '));
+      dit(tous.some((x) => x.t === '909090' && x.ok), `F ${nom} : le code de retrait 909090 est visible`);
+      dit(!errs.length, `F ${nom} : aucune erreur d'app`, errs[0]);
+      await ctx.close();
+    });
+  }
+  // ── G. Un n° ajouté à la main dit OÙ est son colis, par la règle de l'écran (n° 12) ──
+  for (const [nom, vp] of [['390', { width: 390, height: 844 }], ['1512', { width: 1512, height: 950 }]]) {
+    await essaie(`G ${nom}`, async () => {
+      const rows = rowsAV();
+      for (const n of ['30000054', '30000090', '30000051']) rows.push({ id: `colis_suivi_mondialrelay_${n}`, data: { suivi: n, transporteur: 'mondialrelay', codePostal: null, at: j(0.1), majAt: j(0.1) } });
+      const { ctx, pg, errs, ROWS, dialogues } = await preparer(b, vp, false, { rows });
+      await ouvrir(pg, errs);
+      const m = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-suivi-manuel]')].map((x) => [x.getAttribute('data-suivi-manuel'), { ou: x.getAttribute('data-suivi-ou'), t: x.innerText }])));
+      const r54 = m['30000054'], r90 = m['30000090'], r51 = m['30000051'];
+      dit(r54 && !/il est dans « à retirer »/.test(r54.t) && /retiré/.test(r54.t), `G ${nom} : 30000054, « retiré » sous une autre clé puis rappel : dit retiré, jamais « il est dans « à retirer » »`, r54 && r54.t.split('\n').slice(0, 2).join(' | '));
+      dit(r90 && !/il est dans « à retirer »/.test(r90.t) && /à vérifier \(délai de retrait dépassé/.test(r90.t), `G ${nom} : 30000090, délai dépassé : « à vérifier (délai de retrait dépassé…) »`, r90 && r90.t.split('\n').slice(0, 2).join(' | '));
+      dit(r51 && /il est dans « à retirer »/.test(r51.t), `G ${nom} : 30000051, toujours au relais : « il est dans « à retirer » »`, r51 && r51.t.split('\n').slice(0, 2).join(' | '));
+      // ── I. « Ne plus suivre ce n° », pas « Retirer » (n° 16) ──
+      const btn = pg.locator('[data-suivi-retirer="30000051"]');
+      dit((await btn.innerText()).trim() === 'Ne plus suivre ce n°', `I ${nom} : le bouton qui efface un suivi dit « Ne plus suivre ce n° » (dans l'onglet « À retirer », « Retirer » se lit « je l'ai retiré »)`, await btn.innerText());
+      await btn.click();
+      await pg.waitForTimeout(800);
+      dit(dialogues.some((d) => /Ne plus suivre le n° 30000051/.test(d)) && !ROWS.some((x) => x.id === 'colis_suivi_mondialrelay_30000051'), `I ${nom} : la confirmation est gardée, et le suivi est effacé après elle`, dialogues.join(' | '));
+      dit(!errs.length, `G ${nom} : aucune erreur d'app`, errs[0]);
+      await ctx.close();
+    });
+  }
+  // ── H. Le choix du transporteur : la phrase suit le choix (n° 13), le sombre (n° 14) ──
+  for (const [nom, sombre] of [['390 clair', false], ['390 sombre', true]]) {
+    await essaie(`H ${nom}`, async () => {
+      const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, sombre);
+      await ouvrir(pg, errs);
+      await pg.locator('[data-suivi-ajouter]').click();
+      await pg.locator('[data-suivi-saisie]').fill('30000071');
+      const t1 = await pg.locator('[data-suivi-transporteur]').innerText();
+      // Le choix actif mesuré AVANT tout clic (un clic laisse le survol et le
+      // focus, qui changent la couleur) : la forme du n° l'a choisi.
+      const actif0 = await pg.locator('[data-suivi-choix="mondialrelay"]').evaluate((e, f) => ({ pressed: e.getAttribute('aria-pressed'), ...new Function('return ' + f)()(e) }), LUMINANCE.toString());
+      await pg.locator('[data-suivi-choix="chronopost"]').click();
+      const t2 = await pg.locator('[data-suivi-transporteur]').innerText();
+      await pg.locator('[data-suivi-choix="mondialrelay"]').click();
+      const t3 = await pg.locator('[data-suivi-transporteur]').innerText();
+      dit(/reconnu à la forme du n° : Mondial Relay/.test(t1), `H ${nom} : 8 chiffres ⇒ « reconnu à la forme : Mondial Relay »`, t1.split('\n')[0]);
+      dit(!/ne le dit pas/.test(t2) && /Tu as choisi Chronopost/.test(t2) && /faisait penser à Mondial Relay/.test(t2), `H ${nom} : il en choisit un autre ⇒ « Tu as choisi Chronopost (la forme faisait penser à Mondial Relay) », jamais « ne le dit pas »`, t2.split('\n')[0]);
+      dit(!/ne le dit pas/.test(t3) && /reconnu à la forme/.test(t3), `H ${nom} : il reprend celui de la forme ⇒ « reconnu à la forme »`, t3.split('\n')[0]);
+      const actif = await pg.locator('[data-suivi-choix="mondialrelay"]').evaluate((e) => ({ pressed: e.getAttribute('aria-pressed') }));
+      dit(actif.pressed === 'true' && actif0.pressed === 'true', `H ${nom} : le choix actif est dit (aria-pressed)`);
+      if (sombre) dit(actif0.L != null && actif0.L < 0.5, `H ${nom} : en sombre, le choix actif n'est pas un aplat blanc (luminance < 0,5)`, `${actif0.v} · L=${actif0.L != null && actif0.L.toFixed(3)}`);
+      const larges = await pg.evaluate(() => [...document.querySelectorAll('[data-suivi-choix]')].map((e) => { const r = e.getBoundingClientRect(); return r.right <= window.innerWidth + 0.5 && r.left >= -0.5 && r.height >= 43.5; }));
+      dit(larges.length === 4 && larges.every(Boolean), `H ${nom} : les quatre choix tiennent dans l'écran, 44 px au doigt`);
+      dit(!errs.length, `H ${nom} : aucune erreur d'app`, errs[0]);
+      await ctx.close();
+    });
+  }
+  // ── K. La publication pour le rappel du matin ne dit pas « aucun fini » sur
+  // une lecture ratée (n° 3) : `panel_colis_relais` illisible ⇒ `finis: null` ──
+  await essaie('K', async () => {
+    for (const [nom, o] of [['lu', {}], ['relais illisible', { relaisKo: true }]]) {
+      const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 950 }, false, o);
+      await ouvrir(pg, errs); await pg.waitForTimeout(1500);
+      const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return 'illisible'; } });
+      if (nom === 'lu') dit(pub && Array.isArray(pub.finis) && pub.finis.includes('e:30000054'), 'K : tout lu ⇒ la publication porte les colis finis (30000054 retiré sous une autre clé)', pub && JSON.stringify(pub.finis));
+      else dit(pub && pub.finis === null && Number.isFinite(pub.total), 'K : `panel_colis_relais` illisible ⇒ `finis: null` (« pas su »), jamais une liste qui passerait pour complète', pub && JSON.stringify(pub.finis));
+      await ctx.close();
+    }
+  });
 }
 
 // ── D. Le cron du matin, la vraie route : « 📍 Dernier jour » une fois ──────────
