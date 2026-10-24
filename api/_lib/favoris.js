@@ -45,7 +45,7 @@ export async function routeFavoris(req,res){
           parId.set(n.id,{...avant,...n});
         }
         const complete={...capture,payload:{...capture.payload,notifications:[...parId.values()]}};
-        const opts={uid,capture:complete,trace:lire(ids[1]),selection:c.selection};let targets;
+        const opts={uid,capture:complete,trace:lire(ids[1]),selection:c.selection,traces:archive?.creations||[]};let targets;
         try{targets=resoudreCiblesFavoris(opts);}catch(e){
           if(e.code!=='favoris_preuve_absente')throw e;
           const conversations=await lirePreuvesConversationsFavoris(req,{owner,uid,capture:complete,selection:c.selection});

@@ -59,6 +59,11 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
   user=V;archiveSeule=true;assert.equal((await call('lancer',{selection:['n2']})).code,200,'une notification archivée reste sélectionnable quand la capture courante a changé');
   const avant=[...base.values()][0].tentatives.length;
   assert.equal(await effacerFavorisDe(U),1);const reste=[...base.values()][0];assert.equal(reste.groupes[U],undefined);assert.ok(reste.groupes[V]);assert.deepEqual(reste.proprietaires,[V]);assert.equal(reste.tentatives.length,avant,'effacement conserve le quota partagé');
+  await call('arreter');
+  captures[0].payload.notifications.push({id:'n3',user_id:777,body:'Camille a ajouté ton article à ses favoris.',link:'/items/103/conversation/new?native_target=203'});
+  captures[0].creations=[{uid:'123',method:'POST',path:'/api/v2/conversations',body:JSON.stringify({initiator:'native-fixture',item_id:103,opposite_user_id:203}),contexteFavori:'https://www.vinted.fr/items/103/conversation/new?native_target=203'}];
+  assert.equal((await call('lancer',{selection:['n3']})).code,200,'la route utilise le lien natif conservé même si user_id est différent et la dernière création sans rapport');
+  assert.equal([...base.values()][0].groupes[V].jobs.find(j=>j.notificationId==='n3').recipientId,'203');
   panne=true;assert.equal((await call()).code,503,'base indisponible : aucun succès supposé');assert.equal(await effacerFavorisDe(V),null,'effacement non confirmé quand la base échoue');
   assert.equal(appels.some(x=>x.u.hostname.includes('vinted')),false);
  }finally{global.fetch=ancien;if(cle===undefined)delete process.env.SUPABASE_SERVICE_KEY;else process.env.SUPABASE_SERVICE_KEY=cle;}

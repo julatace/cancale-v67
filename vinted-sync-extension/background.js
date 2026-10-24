@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.218.0';
+const CODE_VERSION = '5.219.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1663,9 +1663,9 @@ function fusionArchiveFavoris(avant,payload,{uid,domain,url,cycle=null,page=null
     if(page!==1&&sync.suivante!==page)throw Error('La lecture a changé dans une autre fenêtre.');
     sync={id:cycle,totalPages:tp,pagesLues:page,suivante:page+1,complete:page>=tp,at:Date.now()};
   }
-  return {archiveVersion:1,type:'notifications',uid:String(uid),domain,capturedAt:new Date().toISOString(),sourceUrl:sourceNotificationsFavoris(url,domain)||avant?.sourceUrl||null,payload:{notifications},limite,sync,archiveRev:(Number.isSafeInteger(avant?.archiveRev)?avant.archiveRev:0)+1};
+  return {archiveVersion:1,type:'notifications',uid:String(uid),domain,capturedAt:new Date().toISOString(),sourceUrl:sourceNotificationsFavoris(url,domain)||avant?.sourceUrl||null,payload:{notifications},creations:Array.isArray(avant?.creations)?avant.creations.slice(-100):[],limite,sync,archiveRev:(Number.isSafeInteger(avant?.archiveRev)?avant.archiveRev:0)+1};
 }
-async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAttendu=null,lecture=false}){
+async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAttendu=null,lecture=false,creation=null}){
   const s=await authToken();if(!s?.access_token||!s.user_id||ownerAttendu&&s.user_id!==ownerAttendu)return null;
   const owner=s.user_id,id=`harvest_${uid}_favoris_archive`,base=`${SUPABASE_URL}/rest/v1/app_data`,filtre=`owner=eq.${encodeURIComponent(owner)}&id=eq.${id}`;
   const headers={apikey:SUPABASE_KEY,Authorization:`Bearer ${s.access_token}`,'Content-Type':'application/json'};
@@ -1676,7 +1676,12 @@ async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAtte
       const r=await fetch(`${base}?${filtre}&select=id,owner,data`,{headers,signal:AbortSignal.timeout(12000)});if(!r.ok)return null;
       const rows=await r.json();if(!await encore()||!Array.isArray(rows)||rows.length>1||rows.some(x=>x.owner!==owner||x.id!==id))return null;
       const avant=rows[0]?.data||null;if(lecture)return {data:avant,owner};
-      const data=fusionArchiveFavoris(avant,payload,{uid,domain,url,cycle,page});
+      const data=fusionArchiveFavoris(avant,payload||(creation?{notifications:[]}:null),{uid,domain:domain||avant?.domain,url,cycle,page});
+      if(creation){
+        if(String(creation.uid)!==String(uid)||creation.method!=='POST'||creation.path!=='/api/v2/conversations'||!creation.contexteFavori)return null;
+        const preuve={uid:String(uid),method:'POST',path:'/api/v2/conversations',body:creation.body,contexteFavori:creation.contexteFavori,capturedAt:creation.capturedAt};
+        data.creations=[...data.creations.filter(x=>x.contexteFavori!==preuve.contexteFavori||x.body!==preuve.body),preuve].slice(-100);
+      }
       const cond=Number.isSafeInteger(avant?.archiveRev)?`data->>archiveRev=eq.${avant.archiveRev}`:'data->>archiveRev=is.null';
       if(!await encore())return null;
       const w=await fetch(rows.length?`${base}?${filtre}&${cond}&select=id` :base,{method:rows.length?'PATCH':'POST',headers:{...headers,Prefer:rows.length?'return=representation':'return=minimal'},body:JSON.stringify(rows.length?{data,updated_at:new Date().toISOString()}:{owner,id,data,updated_at:new Date().toISOString()}),signal:AbortSignal.timeout(12000)});
@@ -2413,7 +2418,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'receipt' && msg.b64) {
     storeReceipt(domain, msg.url, msg.b64);
   } else if (msg.kind === 'writereq' && msg.url) {
-    storeWriteReq(domain, msg.method, msg.url, msg.body);
+    storeWriteReq(domain, msg.method, msg.url, msg.body, msg.contexteFavori);
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses);
   } else if (msg.kind === 'suppression' && msg.itemId) {
@@ -2553,7 +2558,8 @@ function formeCorps(body) {
   if (j !== null && typeof j === 'object') walk(j, '', 0); else if (j !== null) out.push('(racine):' + typ(j));
   return out;
 }
-async function storeWriteReq(domain, method, url, body) {
+async function storeWriteReq(domain, method, url, body, contexteFavori=null) {
+  const scope=await authToken();if(!scope?.user_id)return;
   const uid = await activeAccountId(domain);
   if (!uid) return;
   let path = url;
@@ -2568,7 +2574,15 @@ async function storeWriteReq(domain, method, url, body) {
   const key = (path.replace(/\/\d+/g, '/_id').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 60)) || 'root';
   const data = { uid, method, url: WREQ_SENSIBLE.test(path) ? path : url, path, body: body || '', capturedAt: new Date().toISOString() };
   if (forme) data.forme = forme;
-  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id');
+  if(method==='POST'&&path==='/api/v2/conversations'&&/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(hote)&&typeof contexteFavori==='string'){
+    try{const c=JSON.parse(data.body),u=new URL(contexteFavori);u.hash='';
+      const m=/^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(u.pathname);
+      const id=v=>Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:null;
+      if(m&&m[1]===id(c.item_id)&&id(c.opposite_user_id)&&id(c.opposite_user_id)!==String(uid)&&Object.keys(c).sort().join(',')==='initiator,item_id,opposite_user_id'&&typeof c.initiator==='string'&&c.initiator.length>0&&c.initiator.length<=80&&u.protocol==='https:'&&!u.username&&!u.password&&/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)&&u.href.length<=2000)data.contexteFavori=u.href;
+    }catch{}
+  }
+  await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id',scope.user_id);
+  if(data.contexteFavori&&String(await compteConnecte(domain))===String(uid))await archiveNotifications(uid,{domain,ownerAttendu:scope.user_id,creation:data});
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
