@@ -329,7 +329,7 @@ export async function transpALire({ maintenant = null } = {}) {
   const b = await lireBaseTransp();
   if (!b) return null;
   const now = maintenant || Date.now();
-  const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50 });
+  const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50, pourNavigateur: true });
   const out = [];
   for (const it of items) {
     if (out.length >= MAX_C3) break;

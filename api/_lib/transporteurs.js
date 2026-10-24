@@ -611,7 +611,10 @@ export function codePostalPourMondialRelay({ suivi, transp = null, lignes = [], 
 //   prouves  — les codes postaux prouvés chez ce vendeur ;
 //   pause    — la ligne `transp_pause` ;
 // Rend [{ carrier, suivi, cp, cpSource, raison: 'actif'|'fermeture'|'page', prioritaire }].
-export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [], vinted = [], envoyes = [], relaisDe = null, prouves = [], maintenant = Date.now(), max = 6, parTransporteur = 6, seul = null, force = false, avecFermeture = true } = {}) {
+// `pourNavigateur` (C3) : un n° que le SERVEUR vient de se voir refuser
+// (« bloque ») est dû pour l'extension 5 min après cet essai — sans attendre le
+// recul du serveur (30 min et plus), qui ne vaut que pour lui.
+export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [], vinted = [], envoyes = [], relaisDe = null, prouves = [], maintenant = Date.now(), max = 6, parTransporteur = 6, seul = null, force = false, avecFermeture = true, pourNavigateur = false } = {}) {
   const envoyesN = new Set((envoyes || []).map(normaliserSuivi).filter(Boolean));
   const par = new Map();   // n° → { carrier, lignes, entrant, sortant, dernierMs, manuel, vinted }
   const ajoute = (k, carrier, o) => {
@@ -679,6 +682,7 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     let quand = raison === 'page' ? (msDe(t && t.essai) != null ? msDe(t.essai) + RELECTURE_PAGE_MS : 0) : prochainEssai(t);
     // Un code postal APPRIS depuis (saisi, lu dans un e-mail) : le n° redevient lisible tout de suite.
     if (t && t.essaiRes === 'cp-inconnu' && cp && cpSource !== 'essai') quand = 0;
+    if (pourNavigateur && t && t.essaiRes === 'bloque' && msDe(t.essai) != null) quand = Math.min(quand, msDe(t.essai) + RELECTURE_PAGE_MS);
     if (!(quand <= maintenant)) continue;
     const dispo = (t && t.etat === 'disponible') || e.lignes.some((l) => (l.status != null ? l.status : l.s) === 'available');
     const prio = raison === 'page' ? 0 : raison === 'fermeture' ? 3 : dispo ? 1 : 2;
