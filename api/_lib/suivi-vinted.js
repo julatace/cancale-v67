@@ -17,23 +17,41 @@
 //      achat ⇒ 404, rien ne sonne ;
 //   4. la préférence « suivi » (Réglages → Notifications, la préférence existante,
 //      coupée par défaut) ;
-//   5. le mémo anti-doublon `push_dedup`, en TROIS états : la clé est l'empreinte
-//      de l'étape (transaction + instant + libellé + code) — une fois par étape ;
-//      mémo illisible ⇒ 503 (rien n'est envoyé, l'extension renverra) ; la clé est
-//      ÉCRITE avant l'envoi, et seulement si l'écriture a réussi on envoie (une
-//      notification en double ne se rattrape pas ; une retardée, si).
-// Une étape de plus de 72 h ne sonne pas (pas de rattrapage). Abonnement coupé :
-// `sendPushToAll` se tait déjà.
+//   5. l'arrivée au point relais n'est annoncée qu'UNE fois, toutes voies
+//      confondues (revue du 24 oct.) : si l'e-mail du transporteur ou la
+//      conversation Vinted l'ont déjà annoncée — par une IDENTITÉ : la
+//      transaction (`relais-tx{tx}-*`), le n° de suivi de la ligne
+//      (`relais-{n°}-*`), le code de retrait lu dans la conversation
+//      (`retrait-code-{CODE}`) — on se tait ; sinon on pose `relais-…-sans`
+//      pour qu'un e-mail SANS code venu ensuite ne re-sonne pas (un message qui
+//      apporte le CODE sonne une fois de plus, la règle du 21 oct.) ;
+//   6. la RÉSERVATION de l'étape, ATOMIQUE (revue du 24 oct. : lire puis écrire
+//      `push_dedup` laissait deux appels simultanés envoyer chacun la sienne) :
+//      une ligne par transaction, `push_suivi_{tx}`, écrite par COMPARER-ET-
+//      ÉCHANGER sur `data.rev` (PATCH filtré, insertion `ignore-duplicates`) —
+//      seul celui dont l'écriture est revenue envoie. La clé de l'étape est la
+//      transaction + le LIBELLÉ normalisé, jamais l'instant : la même étape vue
+//      par deux voies (le suivi, la page de la commande) à deux instants voisins
+//      ne sonne qu'une fois. Illisible ⇒ 503 (rien n'est envoyé, l'extension
+//      renverra) ; une notification en double ne se rattrape pas ; une retardée, si.
+// Une étape de plus de 72 h ne sonne pas (pas de rattrapage), ni une étape datée
+// dans le FUTUR (une livraison estimée n'est pas un évènement). Abonnement
+// coupé : `sendPushToAll` se tait déjà.
 // ────────────────────────────────────────────────────────────────────────────
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive } from './push.js';
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
+import { etatColisDepuisTexte, normaliserSuivi } from './etat-colis-email.js';
+import { cleCodeRetrait } from '../email-inbound.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
 export const SUIVI_NOTIF_AGE_MAX_MS = 72 * 3600000;
+// Une étape datée plus loin que ça dans l'avenir n'est pas arrivée (horloges
+// décalées de quelques minutes tolérées).
+export const SUIVI_FUTUR_TOLERE_MS = 10 * 60000;
 
 // Une lecture AU NOM du vendeur de la requête : `null` = pas su (la base n'a pas
 // répondu, ou pas de vendeur) ; un tableau sinon.
@@ -59,11 +77,64 @@ async function ecrire(id, data) {
     return !!(r && r.ok);
   } catch (_) { return false; }
 }
+// COMPARER-ET-ÉCHANGER sur `data.rev`, au nom du vendeur (la forme de
+// `modifierDonnee` et `modifierSubs`). `modifier(d)` reçoit `null` (ligne
+// absente) ou l'objet lu et rend l'objet à écrire (sans `rev` : posé ici) ou
+// `undefined` (rien à écrire). Il peut être appelé plusieurs fois.
+// Rend true (écrit par NOUS) · false (rien à écrire) · null (pas su : une
+// lecture ou une écriture a échoué, ou toujours devancé — rien n'est affirmé).
+async function modifierCas(id, modifier, essais = 6) {
+  const owner = proprietaireCourant();
+  if (!owner || !/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
+  const tete = { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json' };
+  for (let n = 0; n < essais; n++) {
+    const rows = await lire(`app_data?id=eq.${id}&select=data`);
+    if (rows === null) return null;
+    const present = !!rows[0];
+    const d = present ? (rows[0].data || {}) : null;
+    const nouveau = modifier(d);
+    if (nouveau === undefined) return false;
+    const rev0 = (d && Number.isSafeInteger(d.rev) && d.rev >= 0) ? d.rev : null;
+    const data = { ...nouveau, rev: (rev0 || 0) + 1 };
+    try {
+      if (!present) {
+        const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+          method: 'POST', headers: { ...tete, Prefer: 'resolution=ignore-duplicates,return=representation' },
+          body: JSON.stringify([{ owner, id, data }]),
+        });
+        if (!w.ok) return null;
+        const out = await w.json().catch(() => null);
+        if (!Array.isArray(out)) return null;
+        if (out.length >= 1) return true;
+        continue;                                   // créée entre-temps : on relit
+      }
+      const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;
+      const w = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&owner=eq.${encodeURIComponent(owner)}&${cond}&select=id`, {
+        method: 'PATCH', headers: { ...tete, Prefer: 'return=representation' }, body: JSON.stringify({ data }),
+      });
+      if (!w.ok) return null;
+      const out = await w.json().catch(() => null);
+      if (!Array.isArray(out)) return null;
+      if (out.length >= 1) return true;
+      // 0 ligne : un autre a écrit entre notre lecture et la nôtre — on relit
+      // (une attente fixe et courte : notre base, pas Vinted).
+      await new Promise((ok) => setTimeout(ok, 25 * (n + 1)));
+    } catch (_) { return null; }
+  }
+  return null;
+}
 // Ce qui part sur le téléphone : un texte court, sans balise ni caractère de contrôle.
 const propre = (s, n) => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
+// Le libellé d'une étape, tel qu'on le compare : sans accents, sans casse, sans
+// ponctuation — « Disponible au point relais. » et « disponible au point
+// relais » sont la même étape.
+export const libelleEtape = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// La clé d'une étape : la transaction et son LIBELLÉ, jamais l'instant ni le code
+// (la page de la commande et le suivi ne datent ni ne codent la même étape pareil).
 export function empreinteEtape(tx, e) {
-  return crypto.createHash('sha256').update(`${tx}|${(e && e.at) || ''}|${(e && e.t) || ''}|${(e && e.code) || ''}`).digest('hex').slice(0, 16);
+  return crypto.createHash('sha256').update(`${tx}|${libelleEtape(e && e.t)}`).digest('hex').slice(0, 16);
 }
 export function notifSuivi(titre, dernier, tx) {
   const t = propre(dernier && dernier.t, 140);
@@ -87,7 +158,7 @@ export async function notifierSuiviVinted(tx, uid) {
   if (comptes === null) return { status: 503, raison: 'pas-su' };
   if (!comptes.some((c) => String(c && c.vinted_user_id) === uid)) return { status: 403, raison: 'compte' };
   // 2. Sa ligne de suivi.
-  const lignes = await lire(`app_data?id=eq.harvest_${uid}_suivi_${tx}&select=d:data->dernier,tx:data->>tx`);
+  const lignes = await lire(`app_data?id=eq.harvest_${uid}_suivi_${tx}&select=d:data->dernier,tx:data->>tx,s:data->>suivi`);
   if (lignes === null) return { status: 503, raison: 'pas-su' };
   const l = lignes[0];
   if (!l) return { status: 404, raison: 'inconnu' };
@@ -97,6 +168,7 @@ export async function notifierSuiviVinted(tx, uid) {
   const at = Date.parse(dernier.at || '');
   if (!Number.isFinite(at)) return { status: 200, envoye: false, raison: 'sans-date' };
   if (!(at > Date.now() - SUIVI_NOTIF_AGE_MAX_MS)) return { status: 200, envoye: false, raison: 'ancien' };
+  if (at > Date.now() + SUIVI_FUTUR_TOLERE_MS) return { status: 200, envoye: false, raison: 'futur' };
   // 3. La commande ACHETÉE de cette transaction (son titre) — par l'identité.
   const achats = await lire(`app_data?id=eq.harvest_${uid}_orders_purchased&select=v:data->payload->my_orders`);
   if (achats === null) return { status: 503, raison: 'pas-su' };
@@ -107,15 +179,46 @@ export async function notifierSuiviVinted(tx, uid) {
   if (!(await pushCategorieActive('suivi'))) return { status: 200, envoye: false, raison: 'preference' };
   const n = notifSuivi(commande.title, dernier, tx);
   if (!n) return { status: 200, envoye: false, raison: 'sans-etape' };
-  // 5. Une fois par étape : le mémo en trois états, la clé écrite AVANT l'envoi.
+  // 5. L'arrivée au point relais : déjà annoncée par l'e-mail ou la conversation ?
+  const relais = etatColisDepuisTexte(dernier.t) === 'available';
+  const n0 = normaliserSuivi(l.s || '');
+  const numero = /^[A-Z0-9]{6,40}$/.test(n0) ? n0 : '';
+  const aliasRelais = relais ? [`relais-tx${tx}-sans`, ...(numero ? [`relais-${numero}-sans`] : [])] : [];
+  if (relais) {
+    let memo = await lire('app_data?id=eq.push_dedup&select=data');
+    if (memo === null) memo = await lire('app_data?id=eq.push_dedup&select=data');   // un hoquet : on relit une fois
+    if (memo === null) return { status: 503, raison: 'pas-su' };
+    const keys = (memo[0] && memo[0].data && Array.isArray(memo[0].data.keys)) ? memo[0].data.keys : [];
+    const prefixes = [`relais-tx${tx}-`, ...(numero ? [`relais-${numero}-`] : [])];
+    // Le code lu dans la conversation de CETTE transaction (une identité) : la
+    // clé que l'e-mail ou la conversation ont posée en l'annonçant.
+    const pc = await lire('app_data?id=eq.panel_colis_relais&select=data');
+    if (pc === null) return { status: 503, raison: 'pas-su' };
+    const ent = pc[0] && pc[0].data && pc[0].data[tx];
+    const cleCode = ent && ent.code ? cleCodeRetrait(ent.code) : '';
+    if (keys.some((k) => typeof k === 'string' && (prefixes.some((p) => k.startsWith(p)) || (cleCode && k === cleCode)))) {
+      return { status: 200, envoye: false, raison: 'relais-deja' };
+    }
+  }
+  // 6. Une fois par étape : la réservation ATOMIQUE, écrite AVANT l'envoi.
   const cle = `suivi-${tx}-${empreinteEtape(tx, dernier)}`;
-  let memo = await lire('app_data?id=eq.push_dedup&select=data');
-  if (memo === null) memo = await lire('app_data?id=eq.push_dedup&select=data');   // un hoquet : on relit une fois
-  if (memo === null) return { status: 503, raison: 'pas-su' };
-  const keys = (memo[0] && memo[0].data && Array.isArray(memo[0].data.keys)) ? memo[0].data.keys : [];
-  if (keys.includes(cle)) return { status: 200, envoye: false, raison: 'deja' };
-  const ok = await ecrire('push_dedup', { keys: [cle, ...keys.filter((k) => k !== cle)].slice(0, 300) });
-  if (!ok) return { status: 503, raison: 'pas-su' };
+  const reserve = await modifierCas(`push_suivi_${tx}`, (d) => {
+    const keys = (d && Array.isArray(d.keys)) ? d.keys.filter((k) => typeof k === 'string') : [];
+    if (keys.includes(cle)) return undefined;
+    return { v: 1, tx, keys: [cle, ...keys].slice(0, 30), at: new Date().toISOString() };
+  });
+  if (reserve === null) return { status: 503, raison: 'pas-su' };
+  if (reserve === false) return { status: 200, envoye: false, raison: 'deja' };
+  // L'arrivée est annoncée : un e-mail ou une conversation SANS code venus
+  // ensuite se tairont (au mieux : un raté ici ne coûte qu'une notification de plus).
+  if (aliasRelais.length) {
+    await modifierCas('push_dedup', (d) => {
+      const keys = (d && Array.isArray(d.keys)) ? d.keys : [];
+      const neuves = aliasRelais.filter((k) => !keys.includes(k));
+      if (!neuves.length) return undefined;
+      return { ...(d || {}), keys: [...neuves, ...keys].slice(0, 300) };
+    });
+  }
   const r = await sendPushToAll(n);
   if (r && r.coupe) return { status: 200, envoye: false, raison: 'abonnement' };
   // « Envoyée » seulement si un appareil l'a reçue (clé du serveur absente,
