@@ -1,3 +1,4 @@
+import {formesLiensNotifications} from './favorisVinted.js';
 // Préparer le raccordement des favoris à leurs conversations sans supposer
 // la forme du flux Vinted et sans exporter son contenu privé.
 const CHAMPS = new Set(('payload data notifications notification items item user actor sender recipient from_user entity target link url action type event id user_id item_id conversation_id transaction_id entry_id body title message text created_at updated_at created_at_ts pagination page total_pages current_page next_page count code status attributes parameters content path href button buttons actions target_url read is_read details icon image entity_type subject params web_url entities context meta event_type notification_type').split(' '));
@@ -59,7 +60,7 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
   const rows = await r.json();
   if (ownerActuel() !== owner) throw Error('La session a changé. Relance la vérification.');
   if (!Array.isArray(rows) || rows.length > 1 || rows.some(x => x?.owner !== owner)) throw Error('La lecture du compte n’a pas été confirmée.');
-  const entete = {diagnostic: 'VRM-favoris-structure-v2', envoisAutomatiques: 'non_actives', listeComplete: 'non_verifiee'};
+  const entete = {diagnostic: 'VRM-favoris-structure-v3', envoisAutomatiques: 'non_actives', listeComplete: 'non_verifiee'};
   if (!rows.length) {
     let traces = {etat:'lecture_indisponible'};
     let reponse;
@@ -79,5 +80,5 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
   }
   const d = rows[0].data;
   if (!d || d.type !== 'notifications' || String(d.uid) !== String(uid) || !d.payload || typeof d.payload !== 'object') throw Error('La capture ne confirme pas le compte et le type attendus.');
-  return {...entete, reception: 'capture_disponible', ...structureNotifications(d.payload)};
+  return {...entete, reception: 'capture_disponible', ...structureNotifications(d.payload), liens:formesLiensNotifications(d.payload)};
 }

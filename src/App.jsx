@@ -1,3 +1,4 @@
+import FavorisVinted from './FavorisVinted.jsx';
 import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
@@ -37152,6 +37153,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const msgRelais = etatRelais().niveau === 'vivant';
   const msgRelaisVinted = msgRelais ? vintedAgissant() : null;
   const msgCompteActif = msgRelais ? String((msgRelaisVinted && msgRelaisVinted.uid) || '') : (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
+  const favorisUid = String(compteSel && compteSel!=='*' ? compteSel : msgCompteActif || '');
+  const favorisCompte = accounts.find(a=>String(a.vinted_user_id)===favorisUid);
+
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
   const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : (msgRelaisVinted && msgRelaisVinted.login) || ''; };
@@ -40787,7 +40791,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
-        <DiagnosticFavoris uid={String(msgCompteActif || (compteSel && compteSel!=='*' ? compteSel : ''))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
+        <FavorisVinted key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
+        <DiagnosticFavoris key={'diag-favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
