@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT — 5.214 : LE SUIVI QUE VINTED MONTRE DE SES ACHATS, ET LA NOTIFICATION
+//  AUDIT — 5.215 : LE SUIVI QUE VINTED MONTRE DE SES ACHATS, ET LA NOTIFICATION
 //  D'UNE ÉTAPE DE PLUS (node scripts/audit-suivi-vinted.cjs [--mutation nom])
 //
 //  Julien : « enregistrer le numéro de suivi et tracer le colis » ; « que ça me
@@ -24,13 +24,27 @@
 //   E. la file des notifications : une seule fois, seulement sur une étape
 //      PLUS RÉCENTE, gardée sur un échec / sans session, oubliée après 24 h,
 //      rien au-delà de 72 h ;
-//   F. `capterSuivisAchats` : 3 par visite, une requête Vinted à la fois, la
-//      garde du compte, pause / frein, mémo de 3 h, « pas su » ⇒ rien lu ;
+//   F. `capterSuivisAchats` : 3 par visite, 6 par heure, une requête Vinted à
+//      la fois, la garde du compte, pause / frein, mémo de 3 h, « pas su » ⇒
+//      rien lu, jamais un achat livré ;
 //   G. la VRAIE route `api/push.js` { action: 'suivi', tx, uid } : relit AU NOM
 //      du vendeur, trois états, autre vendeur refusé, préférence coupée, > 72 h,
-//      une fois par étape (mémo `push_dedup` écrit avant l'envoi).
-//  Mutations (§6.1) : `--mutation liste-blanche|achat|premiere|inchange|par-visite|
-//  memo-3h|garde|lecture-ratee|deja|age|vendeur|memo-passu|preference`.
+//      une fois par étape (la réservation `push_suivi_{tx}` écrite AVANT l'envoi,
+//      par comparer-et-échanger) ;
+//   H–K. (revue du 24 octobre, extension 5.215) deux réponses en même temps
+//      (une écriture et un appel par étape, la file et les formes sérialisées) ;
+//      une étape datée dans l'AVENIR n'est jamais la dernière ; une ligne de base
+//      sans date ne sonne pas quand les dates arrivent ; la page de la commande
+//      (escrow) est FUSIONNÉE au suivi, jamais à sa place ; la borne de 24 h
+//      suit l'étape à annoncer ; la liste blanche lave aussi « remis à … »,
+//      « déposé par … », un code « est le … » et un code sous une clé d'état ;
+//      le suivi ne prend pas les lectures de l'argent et des colis (6 par heure,
+//      sous leur réserve) ; une forme jamais reconnue n'est lue qu'une fois ; un
+//      achat déjà arrivé n'est plus relu. Côté route : la réservation de l'étape
+//      est ATOMIQUE (comparer-et-échanger), la clé est le LIBELLÉ (jamais
+//      l'instant), l'arrivée au point relais déjà annoncée par l'e-mail ou la
+//      conversation se tait, une étape datée dans l'avenir ne sonne pas.
+//  Mutations (§6.1) : `--mutation nom` (la liste : `--mutation ?`).
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { faireFond, projette } = require('./_fond-vm.cjs');
@@ -44,6 +58,9 @@ const F = {
 };
 
 // ── RÉAFFAIBLIR UNE RÈGLE (§6.1) ────────────────────────────────────────────
+// Les lignes exactes de la règle que deux mutations réaffaiblissent.
+const REMIS = "    .replace(/\\b(remis(?:e|es)?\\s+[àa]|d[ée]pos[ée](?:e|es|s)?\\s+par|livr[ée](?:e|es|s)?\\s+[àa])(?![a-zà-ÿ])\\s*:?\\s*(?:(?!\\s(?:au|aux|en|dans|chez|depuis|via)\\b)[^,.;\\n…])+/gi, '$1 …');";
+const PERSONNE = 'const SUIVI_PARENT_PERSONNE = /(?:contact|person|recipient|destinataire|owner|user|customer|client|buyer|seller|sender|expediteur|receiver|holder|member|membre)/i;';
 const MUTATIONS = {
   // la liste blanche ne retire plus rien (la page ET le fond : la règle reste la même des deux côtés)
   'liste-blanche': [['inject', `const garde = marche(racine, '', 0) || {};`, `const garde = JSON.parse(JSON.stringify(racine || {}));`],
@@ -51,28 +68,71 @@ const MUTATIONS = {
   // le fond rangerait une transaction sans vérifier que c'est un ACHAT de ce compte
   achat: [['bg', `.find((x) => /^\\d{4,20}$/.test(x) && achats.has(x));`, `.find((x) => /^\\d{4,20}$/.test(x));`]],
   // la toute première lecture d'un colis sonnerait (une rafale à l'installation)
-  premiere: [['bg', `if (!avant) return { ecrire: true, nouveau: false, raison: 'premiere' };`, `if (!avant) return { ecrire: true, nouveau: true, raison: 'premiere' };`]],
-  // une capture identique réécrirait et sonnerait
-  inchange: [['bg', `if (ad && cleEvtSuivi(ad) === cleEvtSuivi(nd)) return { ecrire: false, raison: 'inchange' };`, ``]],
+  premiere: [['bg', `return { ecrire: true, nouveau: false, raison: 'premiere',`, `return { ecrire: true, nouveau: true, raison: 'premiere',`]],
+  // une capture identique réécrirait
+  inchange: [['bg', `const { etapes, change } = fusionEtapesSuivi(avant.etapes, neuf.etapes, voiesDifferentes);`, `const { etapes } = fusionEtapesSuivi(avant.etapes, neuf.etapes, voiesDifferentes); const change = true;`]],
   // plus de borne par visite
   'par-visite': [['bg', `const SUIVI_MAX_PAR_VISITE = 3;`, `const SUIVI_MAX_PAR_VISITE = 30;`]],
   // plus de mémo de 3 h
   'memo-3h': [['bg', `const aLire = (o) => { const tx = String(o.transaction_id); return !(memo[tx] && Date.now() - Number(memo[tx]) < SUIVI_RETRY_MS); };`, `const aLire = (o) => true;`]],
   // plus de garde (compte du cookie, pause, budget)
-  garde: [['bg', `const refus = await gardeLecture(uid, acc, 'colis');\n      if (refus) { if (refus.code !== 'vinted-pause') logActivity(\`⚠️ Suivi d'un achat non lu`, `const refus = null;\n      if (refus) { if (refus.code !== 'vinted-pause') logActivity(\`⚠️ Suivi d'un achat non lu`]],
+  garde: [['bg', `const refus = await gardeLecture(uid, acc, 'suivi');`, `const refus = null;`]],
   // une lecture ratée de la ligne vaudrait « rien encore »
   'lecture-ratee': [['bg', `const rows = await sbGet(\`app_data?id=eq.\${id}&select=d:data->dernier`, `let rows = await sbGet(\`app_data?id=eq.\${id}&select=d:data->dernier`],
                     ['bg', `if (rows === null) { noterDiag('suivi_lecture_ratee'); return null; }       // pas su : on n'écrase rien`, `if (rows === null) rows = [];`]],
-  // la route oublierait le mémo anti-doublon
-  deja: [['lib', `if (keys.includes(cle)) return { status: 200, envoye: false, raison: 'deja' };`, ``]],
+  // la route oublierait que l'étape est déjà réservée
+  deja: [['lib', `if (reserve === false) return { status: 200, envoye: false, raison: 'deja' };`, ``]],
   // la route sonnerait pour une étape ancienne
   age: [['lib', `if (!(at > Date.now() - SUIVI_NOTIF_AGE_MAX_MS)) return { status: 200, envoye: false, raison: 'ancien' };`, ``]],
   // la route ne vérifierait plus que le compte Vinted est à CE vendeur
   vendeur: [['lib', `if (!comptes.some((c) => String(c && c.vinted_user_id) === uid)) return { status: 403, raison: 'compte' };`, ``]],
-  // un mémo illisible vaudrait « jamais envoyé »
-  'memo-passu': [['lib', `if (memo === null) return { status: 503, raison: 'pas-su' };`, `if (memo === null) memo = [];`]],
+  // une réservation illisible vaudrait « jamais envoyée »
+  'memo-passu': [['lib', `if (reserve === null) return { status: 503, raison: 'pas-su' };`, ``]],
   // la préférence « suivi » ne serait plus lue
   preference: [['lib', `if (!(await pushCategorieActive('suivi'))) return { status: 200, envoye: false, raison: 'preference' };`, ``]],
+  // ── revue du 24 octobre ──
+  // la réservation n'est plus atomique (écriture sans condition, insertion qui écrase)
+  cas: [['lib', "const cond = rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`;", "const cond = 'id=not.is.null';"],
+        ['lib', `Prefer: 'resolution=ignore-duplicates,return=representation' },`, `Prefer: 'resolution=merge-duplicates,return=representation' },`]],
+  // la route sonnerait pour une étape datée dans l'avenir
+  'futur-route': [['lib', `if (at > Date.now() + SUIVI_FUTUR_TOLERE_MS) return { status: 200, envoye: false, raison: 'futur' };`, ``]],
+  // l'arrivée au point relais déjà annoncée par l'e-mail ou la conversation ne ferait plus taire la route
+  relais: [['lib', `if (keys.some((k) => typeof k === 'string' && (prefixes.some((p) => k.startsWith(p)) || (cleCode && k === cleCode)))) {`, `if (false) {`]],
+  // la clé de l'étape reprend l'instant et le code (deux voies, deux clés)
+  'cle-instant': [['lib', "update(`${tx}|${libelleEtape(e && e.t)}`)", "update(`${tx}|${(e && e.at) || ''}|${libelleEtape(e && e.t)}|${(e && e.code) || ''}`)"]],
+  // une étape datée jusqu'à un jour dans l'avenir redevient une étape (la livraison estimée)
+  futur: [['inject', `const SUIVI_FUTUR_MS = 10 * 60000;`, `const SUIVI_FUTUR_MS = 86400000;`], ['bg', `const SUIVI_FUTUR_MS = 10 * 60000;`, `const SUIVI_FUTUR_MS = 86400000;`]],
+  // « remis à … », « déposé par … » ne sont plus lavés
+  'remis-a': [['inject', REMIS, `    .replace(/(?!)/g, '');`], ['bg', REMIS, `    .replace(/(?!)/g, '');`]],
+  // une valeur d'état qui n'a pas la forme d'un code machine redevient un code (jamais lavé)
+  'code-machine': [['inject', `if (typeof v === 'string' && !SUIVI_CODE_MACHINE.test(v.trim())) return { sorte: 'texte', v };`, `if (typeof v === 'string' && v.length > 40) return { sorte: 'texte', v };`],
+                   ['bg', `if (typeof v === 'string' && !SUIVI_CODE_MACHINE.test(v.trim())) return { sorte: 'texte', v };`, `if (typeof v === 'string' && v.length > 40) return { sorte: 'texte', v };`],
+                   ['inject', `if ((typeof x === 'string' && SUIVI_CODE_MACHINE.test(x.trim()) && x !== t) || typeof x === 'number')`, `if ((typeof x === 'string' && x.trim() && x.length <= 40 && x !== t) || typeof x === 'number')`],
+                   ['bg', `if ((typeof x === 'string' && SUIVI_CODE_MACHINE.test(x.trim()) && x !== t) || typeof x === 'number')`, `if ((typeof x === 'string' && x.trim() && x.length <= 40 && x !== t) || typeof x === 'number')`]],
+  // « est le 482913 » n'est plus reconnu comme un code
+  'est-le': [['inject', `(?:[:：=]|est(?:\\s+(?:le|la))?|is)?`, `(?:[:：=]|est|is)?`], ['bg', `(?:[:：=]|est(?:\\s+(?:le|la))?|is)?`, `(?:[:：=]|est|is)?`]],
+  // le nom d'un contact sous un parent « pickup » repasse pour celui du point relais
+  personne: [['inject', PERSONNE, `const SUIVI_PARENT_PERSONNE = /(?!)/;`], ['bg', PERSONNE, `const SUIVI_PARENT_PERSONNE = /(?!)/;`]],
+  // le rangement d'un colis n'est plus sérialisé
+  'chaine-suivi': [['bg', `const suite = avant.then(() => rangerSuiviUn(uid, tx, contrat, source, forme), () => rangerSuiviUn(uid, tx, contrat, source, forme));`, `const suite = rangerSuiviUn(uid, tx, contrat, source, forme);`]],
+  // la file des notifications n'est plus sérialisée
+  'chaine-notifs': [['bg', `function unNotifSuiviALaFois(fn) {\n  const suite = _chaineNotifsSuivi.then(() => fn(), () => fn());`, `function unNotifSuiviALaFois(fn) {\n  const suite = Promise.resolve().then(() => fn());`]],
+  // les formes ne sont plus écrites une à la fois
+  'chaine-formes': [['bg', `const suite = _chaineFormesSuivi.then(() => rangerFormeSuiviUn(quoi, forme, etat), () => rangerFormeSuiviUn(quoi, forme, etat));`, `const suite = rangerFormeSuiviUn(quoi, forme, etat);`]],
+  // la borne de 24 h reste celle de la PREMIÈRE mise en file de l'achat
+  'borne-24h': [['bg', `f[k] = { uid: String(uid), tx: String(tx), at: Date.now(), essais: 0 };`, `f[k] = { uid: String(uid), tx: String(tx), at: (f[k] && f[k].at) || Date.now(), essais: (f[k] && f[k].essais) || 0 };`]],
+  // la ligne de base sans date : la première date lue sonnerait
+  'base-sans-date': [['bg', `else nouveau = !(avant.etapes || []).some((e) => e && libelleSuivi(e.t) === libelleSuivi(dernier.t));`, `else nouveau = true;`]],
+  // une capture remplace les étapes au lieu de les fusionner (l'escrow d'une étape efface le suivi)
+  'escrow-remplace': [['bg', `const { etapes, change } = fusionEtapesSuivi(avant.etapes, neuf.etapes, voiesDifferentes);`, `const { etapes, change } = { etapes: trierEtapesSuivi((neuf.etapes || []).filter((e) => e && e.t)), change: true };`]],
+  // le suivi redevient une lecture prioritaire, sans plafond horaire
+  budget: [['bg', `const refus = await gardeLecture(uid, acc, 'suivi');`, `const refus = await gardeLecture(uid, acc, 'colis');`], ['bg', `const SUIVI_MAX_HEURE = 6;`, `const SUIVI_MAX_HEURE = 600;`]],
+  // une forme jamais reconnue est relue toutes les 3 h sur chaque achat
+  'forme-inconnue': [['bg', `    if (await formeSuiviInconnue()) {`, `    if (false) {`],
+                     ['bg', `        noterDiag('suivi_forme_inattendue_journey');\n        break;`, `        noterDiag('suivi_forme_inattendue_journey');\n        continue;`],
+                     ['bg', `        memo[tx] = Date.now() + SUIVI_INCONNU_MS - SUIVI_RETRY_MS;`, `        memo[tx] = Date.now();`]],
+  // un achat déjà arrivé (dernière étape « disponible ») est relu quand même
+  arrive: [['bg', `  if (da && SUIVI_ARRIVE.test(da.t || '')) return false;`, ``]],
 };
 const iM = process.argv.indexOf('--mutation');
 const MUT = iM > 0 ? process.argv[iM + 1] : '';
@@ -208,6 +268,10 @@ function brancherPush(f, etat) {
   };
   f.ctx.authToken = async () => (etat.session ? { user_id: 'owner-banc', access_token: 'jeton.banc.suivi', expires_at: Date.now() + 3600000 } : null);
 }
+// La règle telle qu'elle est écrite dans la PAGE (inject.js), exécutée seule, et
+// telle que le fond l'exécute.
+const Ri = (() => { const i = F.inject.indexOf('// <suivi-regle>'), j = F.inject.indexOf('// </suivi-regle>'); if (i < 0 || j < i) return null; return vm.runInContext(F.inject.slice(i, j) + '\n;({ allegerSuivi, contratSuivi })', vm.createContext({ console })); })();
+const f0Regle = () => faireFond({ src: BG, lignes: {} }).ctx;
 const pagesVers = async (f, messages) => { for (const m of messages) { await f.envoyer(m, TAB); await pause(40); } };
 const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
 
@@ -299,7 +363,8 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
         dit(formePropre(l.forme), 'la forme rangée : des types seulement', JSON.stringify(l.forme).slice(0, 160));
         dit(fuite(l).length === 0, 'la ligne rangée ne porte aucune donnée personnelle', fuite(l).join(', '));
         const cles = Object.keys(l).sort().join();
-        dit(cles === 'capturedAt,dernier,etapes,forme,source,suivi,transporteur,tx,v', 'aucune autre clé que celles du CONTRAT', cles);
+        dit(cles === 'capturedAt,dernier,etapes,forme,n,source,suivi,transporteur,tx,v', 'aucune autre clé que celles du CONTRAT (et `n`, le nombre d’étapes)', cles);
+        dit(l.n === l.etapes.length, '`n` = le nombre d’étapes rangées (un scalaire, lu par l’app sans les décompresser)', `${l.n} ${l.etapes.length}`);
       }
       const pf = lignes.panel_formes_suivi || {};
       dit(pf.v === 1 && pf.journey && formePropre(pf.journey.forme) && pf.journey.etat === 'reconnue' && fuite(pf).length === 0, 'panel_formes_suivi : la forme du suivi, « reconnue », sans valeur', JSON.stringify(pf).slice(0, 200));
@@ -439,19 +504,26 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       const l1 = lusJ(f);
       dit(l1.length === 3, 'au plus 3 suivis lus par visite', l1.length);
       dit(f.j.maxEnVol <= 1, 'une requête Vinted à la fois (la file commune, même avec d’autres lectures en même temps)', f.j.maxEnVol);
-      dit(!l1.some((v) => /3100000001[03]|31000000099|31000000011/.test(v.chemin)), 'jamais une commande finalisée, un achat pas encore expédié, une VENTE, ni un « livré » de plus de 3 jours', l1.map((v) => v.chemin.split('/')[4]).join(' '));
+      dit(!l1.some((v) => /3100000001[0-3]|31000000099/.test(v.chemin)), 'jamais une commande finalisée, un achat pas encore expédié, une VENTE, ni un achat livré', l1.map((v) => v.chemin.split('/')[4]).join(' '));
       dit(l1.length === 3 && l1.every((v) => lignes[`harvest_111_suivi_${v.chemin.split('/')[4]}`]), 'chaque suivi lu est rangé', Object.keys(lignes).filter((k) => /_suivi_/.test(k)).join(' '));
       const dues = ((f.store.vrmLecturesDues || {})['111'] || {}).suivi;
-      dit(dues && dues.reste === 3, 'ce qui reste à lire entre dans la réserve de lecture (6 à suivre − 3 lus)', JSON.stringify(dues));
+      dit(!dues, 'le suivi n’entre pas dans la réserve des lectures prioritaires (il revient sans cesse : ce n’est pas un rattrapage)', JSON.stringify(dues));
       await f.ctx.capterSuivisAchats('111');
       const l2 = lusJ(f);
-      dit(l2.length === 6 && !l2.slice(3).some((v) => l1.map((x) => x.chemin).includes(v.chemin)), 'la visite suivante lit les suivants (pas les mêmes avant 3 h)', l2.length);
+      dit(l2.length === 5 && !l2.slice(3).some((v) => l1.map((x) => x.chemin).includes(v.chemin)), 'la visite suivante lit les suivants (pas les mêmes avant 3 h)', l2.length);
       await f.ctx.capterSuivisAchats('111');
-      dit(lusJ(f).length === 6, 'tout est dans le mémo de 3 h : plus aucune lecture', lusJ(f).length);
+      dit(lusJ(f).length === 5, 'tout est dans le mémo de 3 h : plus aucune lecture', lusJ(f).length);
+      // trois heures passent (le mémo ET les compteurs de l'heure)
       for (const k of Object.keys(f.store.vrmSuiviFaits || {})) f.store.vrmSuiviFaits[k] = Date.now() - 3 * 3600000 - 60000;
+      for (const c of ['vrmSuiviLus', 'vrmLectures']) for (const k of Object.keys(f.store[c] || {})) f.store[c][k] = f.store[c][k].map((t) => t - 3 * 3600000 - 60000);
       const avant = f.j.posts.length;
       await f.ctx.capterSuivisAchats('111');
-      dit(lusJ(f).length === 9 && f.j.posts.slice(avant).every((ids) => !ids.some((id) => /_suivi_/.test(id))), 'après 3 h : relus, et rien de neuf n’est réécrit', `${lusJ(f).length} ${JSON.stringify(f.j.posts.slice(avant))}`);
+      dit(lusJ(f).length === 8 && f.j.posts.slice(avant).every((ids) => !ids.some((id) => /_suivi_/.test(id))), 'après 3 h : relus, et rien de neuf n’est réécrit', `${lusJ(f).length} ${JSON.stringify(f.j.posts.slice(avant))}`);
+      // 6 par heure au plus, sur un compte (10 achats en route, trois visites)
+      const ach = []; for (let i = 0; i < 10; i++) ach.push(commande(String(33000000000 + i), 'Colis expédié', 'waiting', 10 + i));
+      const fh = faireFond({ src: BG, lignes: { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: ach } } }, vinted: vintedSuivi() });
+      for (let v = 0; v < 3; v++) await fh.ctx.capterSuivisAchats('111');
+      dit(lusJ(fh).length === 6, '6 lectures du suivi par heure au plus (trois visites : 3, 3, 0)', lusJ(fh).length);
     });
     await essaie('F2', async () => {
       // un 429 : on s'arrête, la pause est posée, la transaction n'est pas bloquée 3 h
@@ -498,7 +570,7 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       const pushes = [];
       webpush.setVapidDetails = () => {};
       webpush.sendNotification = async (sub, body) => { pushes.push(JSON.parse(body)); return { statusCode: 201 }; };
-      const base = new Map(); let pannes = new Set(), acces = true; const lectures = [];
+      const base = new Map(); let pannes = new Set(), acces = true, latence = 0; const lectures = [];
       const comptes = [{ owner: OWNER, vinted_user_id: '111' }, { owner: AUTRE, vinted_user_id: '222' }];
       const rep = (corps, status = 200) => new Response(typeof corps === 'string' ? corps : JSON.stringify(corps), { status, headers: { 'content-type': 'application/json' } });
       const filtrer = (u) => {
@@ -527,6 +599,7 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
           return rep(comptes.filter((c) => (!own || c.owner === own) && (!vid || c.vinted_user_id === vid)).map((c) => ({ vinted_user_id: c.vinted_user_id })));
         }
         if (u.pathname !== '/rest/v1/app_data') return rep([]);
+        if (latence) await pause(latence);
         if (m === 'POST') {
           const rows = JSON.parse(opts.body || '[]'); const sansEcraser = /ignore-duplicates/.test(prefer); const rendus = [];
           for (const r of rows) { const cle = `${r.owner || OWNER}|${r.id}`; if (sansEcraser && base.has(cle)) continue; base.set(cle, r.data); rendus.push(r); }
@@ -598,9 +671,9 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       reset(); pannes.add(`harvest_111_suivi_${TX}`);
       const r6 = await appel(TX, '111');
       dit(r6.code === 503 && pushes.length === 0, 'la ligne de suivi illisible ⇒ 503 (pas su : l’extension renverra), rien ne sonne', `HTTP ${r6.code} · ${pushes.length}`);
-      reset(); pannes.add('push_dedup');
+      reset(); pannes.add(`push_suivi_${TX}`);
       const r7 = await appel(TX, '111');
-      dit(r7.code === 503 && pushes.length === 0, 'le mémo anti-doublon illisible ⇒ 503, rien ne sonne (jamais deux fois)', `HTTP ${r7.code} · ${pushes.length}`);
+      dit(r7.code === 503 && pushes.length === 0, 'la réservation de l’étape illisible ⇒ 503, rien ne sonne (jamais deux fois)', `HTTP ${r7.code} · ${pushes.length}`);
       reset(); pannes.add('vinted_accounts');
       const r7b = await appel(TX, '111');
       dit(r7b.code === 503 && pushes.length === 0, 'les comptes illisibles ⇒ 503, rien ne sonne', `HTTP ${r7b.code} · ${pushes.length}`);
@@ -620,9 +693,219 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       reset(); base.delete(`${OWNER}|push_subs`);
       const r14 = await appel(TX, '111');
       dit(r14.code === 200 && r14.corps && r14.corps.envoye === false && r14.corps.raison === 'aucun-appareil', 'aucun appareil abonné ⇒ jamais « envoyée »', JSON.stringify(r14.corps));
+      // ── (revue du 24 oct.) deux appels en même temps pour la même étape
+      // (une première étape d'abord : la copie des préférences est en place, les
+      //  deux appels suivants vont du même pas jusqu'à la réservation)
+      reset(); await appel(TX, '111');
+      base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(0.5, 'Colis livré'));
+      latence = 4;
+      const [c1, c2] = await Promise.all([appel(TX, '111'), appel(TX, '111')]);
+      latence = 0;
+      dit(pushes.length === 2 && [c1, c2].filter((r) => r.corps && r.corps.envoye).length === 1, 'deux appels SIMULTANÉS pour la même étape ⇒ UNE notification (la réservation est atomique)', `${pushes.length - 1} · ${JSON.stringify([c1.corps, c2.corps])}`);
+      const r15 = await appel(TX, '111');
+      dit(pushes.length === 2 && r15.corps && r15.corps.raison === 'deja', 'puis redemandée : « déjà »', JSON.stringify(r15.corps));
+      // la MÊME étape vue par une autre voie, à un autre instant (et un autre code)
+      base.set(`${OWNER}|harvest_111_suivi_${TX}`, { ...suivi(0.4), dernier: { t: 'Colis LIVRÉ.', at: H(0.4), code: 'autre' } });
+      const r16 = await appel(TX, '111');
+      dit(pushes.length === 2 && r16.corps && r16.corps.raison === 'deja', 'la même étape à un autre instant (une autre voie) ⇒ rien de plus (la clé est le libellé)', JSON.stringify(r16.corps));
+      // une étape datée dans l'avenir
+      reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, suivi(-3, 'Livraison prévue'));
+      const r17 = await appel(TX, '111');
+      dit(pushes.length === 0 && r17.corps && r17.corps.raison === 'futur', 'une étape datée dans l’AVENIR (une prévision) ⇒ rien ne sonne', JSON.stringify(r17.corps));
+      // l'arrivée au point relais : déjà annoncée par l'e-mail ou la conversation ?
+      const relaisL = () => ({ ...suivi(1, 'Colis disponible au point relais'), suivi: 'TB12345678FR' });
+      const casRelais = [
+        ['par la transaction (la conversation)', { push_dedup: { keys: [`relais-tx${TX}-code`] } }],
+        ['par le n° de suivi (l’e-mail du transporteur)', { push_dedup: { keys: ['relais-TB12345678FR-sans'] } }],
+        ['par le code de retrait lu dans la conversation', { push_dedup: { keys: ['retrait-code-C48291'] }, panel_colis_relais: { [TX]: { code: 'C48291', at: H(1) } } }],
+      ];
+      for (const [quoi, extra] of casRelais) {
+        reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, relaisL());
+        for (const [k, v] of Object.entries(extra)) base.set(`${OWNER}|${k}`, v);
+        const r = await appel(TX, '111');
+        dit(pushes.length === 0 && r.corps && r.corps.raison === 'relais-deja', `l’arrivée au point relais déjà annoncée ${quoi} ⇒ rien ne sonne`, `${pushes.length} ${JSON.stringify(r.corps)}`);
+      }
+      reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, relaisL());
+      const r18 = await appel(TX, '111');
+      const dd = (base.get(`${OWNER}|push_dedup`) || {}).keys || [];
+      dit(pushes.length === 1 && dd.includes(`relais-tx${TX}-sans`) && dd.includes('relais-TB12345678FR-sans'), 'jamais annoncée ⇒ UNE notification, et l’e-mail ou la conversation SANS code venus ensuite se tairont', `${pushes.length} ${JSON.stringify(dd)} ${JSON.stringify(r18.corps)}`);
+      reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, relaisL()); pannes.add('panel_colis_relais');
+      const r19 = await appel(TX, '111');
+      dit(r19.code === 503 && pushes.length === 0, 'les codes lus dans les conversations illisibles ⇒ 503 (pas su), rien ne sonne', `HTTP ${r19.code}`);
+      reset(); base.set(`${OWNER}|harvest_111_suivi_${TX}`, relaisL()); pannes.add('push_dedup');
+      const r20 = await appel(TX, '111');
+      dit(r20.code === 503 && pushes.length === 0, 'le mémo des arrivées illisible ⇒ 503, rien ne sonne', `HTTP ${r20.code}`);
+
       reset();
       const r12 = await appel('12ab', '111'); const r13 = await appel(TX, 'abc');
       dit(r12.code === 400 && r13.code === 400 && pushes.length === 0, 'une transaction ou un compte mal formés ⇒ 400', `${r12.code} ${r13.code}`);
+    });
+
+    // ═══ H ═══════════════════════════════════════════════════════════════════
+    console.log('\n── H. (revue du 24 oct.) Deux réponses en même temps : une écriture et un appel par étape, rien de perdu');
+    const pushLent = (f, etat, ms = 150) => {
+      const f0 = f.ctx.fetch;
+      f.ctx.fetch = async (u, o = {}) => {
+        if (/vrm\.center\/api\/push/.test(String(u))) {
+          const b = JSON.parse(o.body || '{}'); etat.appels.push(b);
+          await pause(typeof ms === 'function' ? ms(b) : ms);
+          const st = etat.statutDe ? etat.statutDe(b) : 200;
+          return { ok: st < 400, status: st, json: async () => ({}) };
+        }
+        return f0(u, o);
+      };
+      f.ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton.banc.suivi', expires_at: Date.now() + 3600000 });
+    };
+    const msgJ = (tx, etapes) => ({ from: 'cancale-content', domain: 'www.vinted.fr', kind: 'suivi', quoi: 'journey', id: tx, forme: { 'shipment.journey[].title': 'string' },
+      allege: { transaction_id: Number(tx), shipment: { carrier: { name: 'Transporteur Banc' }, journey: etapes.map(([h, t, c]) => ({ title: t, date: H(h), status_code: c })) } } });
+    const ligneBase = (tx, h = 30, t = 'Commande expédiée') => ({ v: 1, tx, source: 'passif', capturedAt: H(20), etapes: [{ t, at: H(h), code: 'shipped' }], dernier: { t, at: H(h), code: 'shipped' }, transporteur: null, suivi: null, forme: {} });
+    await essaie('H', async () => {
+      // a. la même réponse reçue deux fois en même temps (le bouton « Suivre le colis » rouvert)
+      const l1 = { ...lignesDeBase(), [`harvest_111_suivi_${TXA}`]: ligneBase(TXA) };
+      const f1 = faireFond({ src: BG, lignes: l1 }); const e1 = { appels: [] }; pushLent(f1, e1);
+      const m1 = msgJ(TXA, [[30, 'Commande expédiée', 'shipped'], [2, 'Colis disponible au point relais', 'at_pickup']]);
+      await Promise.all([f1.envoyer(m1, TAB), f1.envoyer(m1, TAB)]); await pause(600);
+      dit(e1.appels.length === 1 && ecrits(f1, `harvest_111_suivi_${TXA}`) === 1, 'la même étape vue deux fois en même temps : UNE écriture, UN appel au serveur', `appels=${e1.appels.length} écritures=${ecrits(f1, `harvest_111_suivi_${TXA}`)}`);
+      // b. deux achats, une étape neuve chacun, en même temps
+      const l2 = { ...lignesDeBase(), [`harvest_111_suivi_${TXA}`]: ligneBase(TXA), [`harvest_111_suivi_${TXB}`]: ligneBase(TXB) };
+      const f2 = faireFond({ src: BG, lignes: l2 }); const e2 = { appels: [] }; pushLent(f2, e2);
+      await Promise.all([f2.envoyer(msgJ(TXA, [[30, 'Commande expédiée', 'shipped'], [2, 'Colis disponible au point relais', 'at_pickup']]), TAB),
+                         f2.envoyer(msgJ(TXB, [[30, 'Commande expédiée', 'shipped'], [3, 'Colis en cours de livraison', 'out']]), TAB)]);
+      await pause(900);
+      const par = e2.appels.map((b) => b.tx).sort();
+      dit(JSON.stringify(par) === JSON.stringify([TXA, TXB].sort()) && !Object.keys(f2.store.vrmSuiviNotifs || {}).length, 'deux achats en même temps : un appel CHACUN, aucun perdu, aucun en double, la file vide', `${JSON.stringify(par)} · file ${JSON.stringify(f2.store.vrmSuiviNotifs)}`);
+      // c. un envoi lent ; un autre achat mis en file pendant ; le second envoi échoue (503)
+      const f3 = faireFond({ src: BG, lignes: {} }); const e3 = { appels: [], statutDe: (b) => (b.tx === TXB ? 503 : 200) };
+      pushLent(f3, e3, (b) => (b.tx === TXA && e3.appels.filter((x) => x.tx === TXA).length === 1 ? 300 : 5));
+      await f3.ctx.mettreNotifSuivi('111', TXA);
+      const p1 = f3.ctx.envoyerNotifsSuivi(); await pause(30);
+      await f3.ctx.mettreNotifSuivi('111', TXB);
+      const p2 = f3.ctx.envoyerNotifsSuivi();
+      await Promise.all([p1, p2]);
+      dit(JSON.stringify(e3.appels.map((b) => b.tx)) === JSON.stringify([TXA, TXB]) && JSON.stringify(Object.keys(f3.store.vrmSuiviNotifs || {})) === JSON.stringify([`111:${TXB}`]), 'un envoi en cours ne renvoie pas, n’efface pas : A une fois, B (503) gardé dans la file', `${JSON.stringify(e3.appels.map((b) => b.tx))} · file ${JSON.stringify(Object.keys(f3.store.vrmSuiviNotifs || {}))}`);
+      // d. deux formes reçues ensemble (le suivi ET le code de retrait)
+      let deux = 0;
+      for (let i = 0; i < 4; i++) {
+        const f4 = faireFond({ src: BG, lignes: lignesDeBase() });
+        await Promise.all([f4.envoyer({ ...msgJ(TXA, [[1, 'En route', 'x']]), forme: { 'shipment.journey[].title': 'string', 'shipment.journey[].date': 'string' } }, TAB),
+                           f4.envoyer({ from: 'cancale-content', domain: 'www.vinted.fr', kind: 'suivi', quoi: 'code', id: TXA, forme: { code: 'string', qr_code_url: 'string' } }, TAB)]);
+        await pause(150);
+        const pf = f4.lignes.panel_formes_suivi || {};
+        if (pf.journey && pf.code) deux++;
+      }
+      dit(deux === 4, 'deux formes reçues ensemble : panel_formes_suivi garde les DEUX (4 essais sur 4)', `${deux}/4`);
+    });
+
+    // ═══ I ═══════════════════════════════════════════════════════════════════
+    console.log('\n── I. (revue du 24 oct.) Les étapes : jamais une prévision, la ligne de base sans date, l’escrow FUSIONNÉ, la borne de 24 h');
+    await essaie('I', async () => {
+      // a. une livraison ESTIMÉE (datée dans le futur) n'est jamais la dernière
+      const la = lignesDeBase(); const fa = faireFond({ src: BG, lignes: la }); const ea = { appels: [] }; pushLent(fa, ea, 5);
+      await pagesVers(fa, [msgJ(TXA, [[30, 'Commande expédiée', 'shipped'], [-20, 'Livraison estimée', 'estimated']])]);
+      const d1 = (la[`harvest_111_suivi_${TXA}`] || {}).dernier || {};
+      dit(/exp[ée]di/.test(d1.t || '') && !(la[`harvest_111_suivi_${TXA}`].etapes || []).some((e) => /estim/i.test(e.t)), 'une étape datée dans l’avenir n’est ni la dernière, ni rangée', JSON.stringify(la[`harvest_111_suivi_${TXA}`]));
+      await pagesVers(fa, [msgJ(TXA, [[30, 'Commande expédiée', 'shipped'], [0.1, 'Colis disponible au point relais', 'at_pickup'], [-20, 'Livraison estimée', 'estimated']])]);
+      await pause(200);
+      const d2 = (la[`harvest_111_suivi_${TXA}`] || {}).dernier || {};
+      dit(/disponible/.test(d2.t || '') && ea.appels.length === 1, 'la vraie étape suivante est rangée et annoncée (une fois)', `${JSON.stringify(d2)} · appels=${ea.appels.length}`);
+      const ce = f0Regle().contratSuivi({ steps: [{ title: 'Livraison prévue', estimated_delivery_date: H(-30), date: H(2) }] });
+      dit(ce && ce.dernier && ce.dernier.at === H(2), 'une clé de prévision (estimated_…) ne date jamais une étape', JSON.stringify(ce));
+      // b. la ligne de base n'avait que des étapes SANS date ; les mêmes, datées ensuite : rien ne sonne
+      const lb = lignesDeBase(); const fb = faireFond({ src: BG, lignes: lb }); const eb = { appels: [] }; pushLent(fb, eb, 5);
+      await pagesVers(fb, [{ ...msgJ(TXA, []), allege: { shipment: { steps: [{ title: 'Commande expédiée', status: 'shipped' }, { title: 'Colis disponible au point relais', status: 'at_pickup' }] } } }]);
+      await pagesVers(fb, [msgJ(TXA, [[40, 'Commande expédiée', 'shipped'], [5, 'Colis disponible au point relais', 'at_pickup']])]);
+      await pause(200);
+      const lbb = lb[`harvest_111_suivi_${TXA}`] || {};
+      dit(eb.appels.length === 0 && lbb.dernier && /disponible/.test(lbb.dernier.t) && lbb.etapes.length === 2, 'des étapes rangées sans date, puis datées : la ligne prend les dates, rien ne sonne (ce n’est pas une étape de plus)', `appels=${eb.appels.length} ${JSON.stringify(lbb.etapes)}`);
+      // c. le suivi (4 étapes), puis la page de la commande (escrow, la MÊME étape à −110 min), puis le suivi relu
+      const lc = lignesDeBase(); const fc = faireFond({ src: BG, lignes: lc }); const ec = { appels: [] }; pushLent(fc, ec, 5);
+      const M = (m) => m / 60;
+      const J4 = [[M(4000), 'Commande expédiée', 'shipped'], [M(2500), 'Pris en charge', 'in_transit'], [M(600), 'En cours de livraison', 'out'], [M(120), 'Disponible au point relais', 'at_pickup']];
+      await pagesVers(fc, [msgJ(TXA, J4.slice(0, 3))]);
+      await pagesVers(fc, [msgJ(TXA, J4)]); await pause(100);
+      const esc = { from: 'cancale-content', domain: 'www.vinted.fr', kind: 'suivi', quoi: 'escrow', id: ESC, txCorps: TXA, forme: { 'shipment.status': 'number' },
+        allege: { transaction_id: Number(TXA), shipment: { id: 9, status: 4, status_title: 'Disponible au point relais', status_updated_at: H(M(110)) } } };
+      await pagesVers(fc, [esc]); await pause(100);
+      const lcc = lc[`harvest_111_suivi_${TXA}`] || {};
+      dit((lcc.etapes || []).length === 4 && lcc.source !== 'escrow', 'la page de la commande (une étape) ne remplace pas les 4 étapes du suivi, ni sa source', `${(lcc.etapes || []).length} étapes · source ${lcc.source}`);
+      dit(ec.appels.length === 1, 'la MÊME étape vue par deux voies à 10 min d’écart : une seule notification', `appels=${ec.appels.length}`);
+      const nAvant = ecrits(fc, `harvest_111_suivi_${TXA}`);
+      await pagesVers(fc, [msgJ(TXA, J4)]);
+      dit(ecrits(fc, `harvest_111_suivi_${TXA}`) === nAvant && (lc[`harvest_111_suivi_${TXA}`].etapes || []).length === 4, 'le suivi relu ensuite : inchangé (rien n’est refusé, rien ne bouge)', `${ecrits(fc, `harvest_111_suivi_${TXA}`) - nAvant}`);
+      // d. une notification restée 25 h en file, puis une étape NEUVE : elle part (la borne suit l'étape)
+      const ld = { ...lignesDeBase(), [`harvest_111_suivi_${TXA}`]: ligneBase(TXA, 27) };
+      const fd = faireFond({ src: BG, lignes: ld, store: { vrmSuiviNotifs: { [`111:${TXA}`]: { uid: '111', tx: TXA, at: Date.now() - 25 * 3600000, essais: 3 } } } });
+      const ed = { appels: [] }; pushLent(fd, ed, 5);
+      await pagesVers(fd, [msgJ(TXA, [[27, 'Commande expédiée', 'shipped'], [1, 'Colis disponible au point relais', 'at_pickup']])]); await pause(200);
+      dit(ed.appels.length === 1 && !Object.keys(fd.store.vrmSuiviNotifs || {}).length, 'une étape neuve après 25 h d’échecs : envoyée (la borne de 24 h part de l’étape à annoncer)', `appels=${ed.appels.length} · diags ${fd.j.diags.filter((d) => /suivi_notif/.test(d)).join(' ')}`);
+      // e. la ligne dit combien d'étapes elle porte (un scalaire, pour l'app)
+      dit(Number(lcc.n) === (lcc.etapes || []).length && Number(lbb.n) === 2, 'la ligne porte `n` = le nombre d’étapes', `${lcc.n} ${lbb.n}`);
+    });
+
+    // ═══ J ═══════════════════════════════════════════════════════════════════
+    console.log('\n── J. (revue du 24 oct.) La liste blanche lave aussi ce qu’aucune autre clé ne nommait');
+    await essaie('J', async () => {
+      const R = f0Regle();
+      const NOMS = ['Jeanne', 'Inventée', 'INVENTEE', 'Vendeurdubanc', '482913'];
+      const cas = {
+        'un nom seulement dans le libellé (« remis à … »)': { journey: [{ title: 'Colis remis à Jeanne Inventée', date: H(1) }] },
+        'un nom en capitales (« remis à : M INVENTEE »)': { journey: [{ title: 'Livraison effectuée - remis à : M INVENTEE', date: H(1) }] },
+        'le code « est le … »': { journey: [{ title: 'Disponible au relais', subtitle: 'Ton code de retrait est le 482913', date: H(1) }] },
+        'un code sous une clé d’état (« Code de retrait : … »)': { journey: [{ title: 'Disponible', status: 'Code de retrait : 482913', date: H(1) }] },
+        'un contact sous un parent « pickup »': { pickup_contact: { name: 'Jeanne Inventée' }, journey: [{ title: 'Disponible', date: H(1) }] },
+        'l’expéditeur nommé (« déposé par … »)': { journey: [{ title: 'Colis déposé par Marc Vendeurdubanc au point relais', date: H(5) }] },
+      };
+      for (const [quoi, corps] of Object.entries(cas)) {
+        for (const [ou, Rx] of [['page', Ri], ['fond', R]]) {
+          const a = Rx.allegerSuivi(corps), c = Rx.contratSuivi(a);
+          const s = JSON.stringify([a, c]);
+          const vus = NOMS.filter((x) => s.includes(x));
+          dit(vus.length === 0 && c && c.etapes.length >= 1, `${quoi} (${ou}) : rien ne sort, l’étape reste`, `${vus.join(',')} · ${JSON.stringify(c && c.etapes)}`);
+        }
+      }
+      const c2 = R.contratSuivi(R.allegerSuivi({ journey: [{ title: 'Colis déposé par Marc Vendeurdubanc au point relais', date: H(5) }] }));
+      dit(c2 && /au point relais/.test(c2.etapes[0].t), 'ce qui suit la personne reste (« … au point relais »)', JSON.stringify(c2 && c2.etapes));
+      const c3 = R.contratSuivi(R.allegerSuivi({ journey: [{ title: 'Colis remis au transporteur', date: H(5), status: 'in_transit' }] }));
+      dit(c3 && c3.etapes[0].t === 'Colis remis au transporteur' && c3.etapes[0].code === 'in_transit', 'l’autre sens : « remis au transporteur » et un code machine restent tels quels', JSON.stringify(c3 && c3.etapes));
+    });
+
+    // ═══ K ═══════════════════════════════════════════════════════════════════
+    console.log('\n── K. (revue du 24 oct.) Le suivi ne prend pas la place de l’argent et des colis ; une forme inconnue ne se relit pas');
+    await essaie('K', async () => {
+      // a. 35 achats en route (mesuré sur un de ses comptes), une heure de visites ; un colis arrive au relais
+      const achats = [];
+      for (let i = 0; i < 35; i++) achats.push({ transaction_id: 32000000000 + i, title: 'Achat ' + i, status: "Commande expédiée et en cours d'acheminement ! ", transaction_user_status: 'waiting', date: H(24 + i), conversation_id: 800000 + i });
+      const lk = { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: achats } }, harvest_111_orders_sold: { type: 'orders_sold', payload: { my_orders: [] } } };
+      const fk = faireFond({ src: BG, lignes: lk, vinted: (e) => {
+        if (/journey_summary/.test(e.chemin)) return { status: 200, body: { journey: [{ title: 'Colis en route', date: H(2), status_code: 'in_transit' }] } };
+        if (/\/conversations\/\d+/.test(e.chemin)) return { status: 200, body: { conversation: { id: 1, messages: [] } } };
+        return { status: 404, body: {} };
+      } });
+      for (let v = 1; v <= 12; v++) {
+        if (v === 8) lk.harvest_111_orders_purchased.payload.my_orders.push({ transaction_id: 32999999999, title: 'Colis au relais', status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action', date: H(30), conversation_id: 899999 });
+        for (const n of ['capterPreuvesVente', 'capterRetraits', 'capterConfirmations', 'capterDatesVersement', 'capterReleves', 'capterSuivisAchats']) await fk.ctx[n]('111');
+      }
+      const lus = fk.j.vinted.filter((e) => /journey_summary/.test(e.chemin)).length;
+      const code = fk.j.vinted.filter((e) => /\/conversations\/899999/.test(e.chemin)).length;
+      dit(code >= 1, 'le code du colis arrivé au point relais est lu, malgré 35 achats en route', `lectures de sa conversation : ${code}`);
+      dit(lus <= 6, 'le suivi lit 6 achats au plus dans l’heure, sur un compte', `${lus} lecture(s)`);
+      const rP = await faireFond({ src: BG, lignes: {} }).ctx.reserveLectures('111', 'photos');
+      dit(rP === 16, 'la réserve que les photos laissent ne compte pas le suivi (16, pas 19)', `réserve=${rP}`);
+      // b. une forme jamais reconnue : une lecture de mesure, pas 12 toutes les 3 h
+      const ach2 = []; for (let i = 0; i < 12; i++) ach2.push({ transaction_id: 34000000000 + i, title: 'Achat ' + i, status: "Commande expédiée et en cours d'acheminement ! ", transaction_user_status: 'waiting', date: H(24 + i) });
+      const fi = faireFond({ src: BG, lignes: { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: ach2 } } },
+        vinted: (e) => (/journey_summary/.test(e.chemin) ? { status: 200, body: { journey_summary: { steps: [{ key: 'shipped', happened_at: H(30) }, { key: 'parcel_at_pickup', happened_at: H(1) }] }, code: 0 } } : { status: 404, body: {} }) });
+      const vieillir = (ms) => { for (const c of ['vrmSuiviFaits']) { const m = fi.store[c] || {}; for (const k of Object.keys(m)) m[k] -= ms; } for (const c of ['vrmLectures', 'vrmSuiviLus']) { const l = fi.store[c] || {}; for (const k of Object.keys(l)) l[k] = l[k].map((t) => t - ms); } };
+      const parPeriode = [];
+      for (let p = 0; p < 4; p++) { const avant = fi.j.vinted.length; for (let v = 0; v < 6; v++) await fi.ctx.capterSuivisAchats('111'); parPeriode.push(fi.j.vinted.length - avant); vieillir(3 * 3600000 + 60000); }
+      dit(parPeriode.reduce((a, b) => a + b, 0) <= 1 && ((fi.lignes.panel_formes_suivi || {}).journey || {}).etat === 'inconnue', 'une forme jamais reconnue : une seule lecture de mesure (pas une par achat toutes les 3 h)', JSON.stringify(parPeriode));
+      // c. un achat dont la dernière étape rangée est déjà une ARRIVÉE n'est plus relu
+      const lr = { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: [{ transaction_id: 35000000001, title: 'Arrivé', status: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais", transaction_user_status: 'needs_action', date: H(30) }, { transaction_id: 35000000002, title: 'En route', status: 'Colis expédié', transaction_user_status: 'waiting', date: H(30) }] } },
+        harvest_111_suivi_35000000001: { v: 1, tx: '35000000001', source: 'journey', capturedAt: H(2), etapes: [{ t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }], dernier: { t: 'Colis disponible au point relais', at: H(3), code: 'at_pickup' }, transporteur: null, suivi: null, forme: {} } };
+      const fr = faireFond({ src: BG, lignes: lr, vinted: vintedSuivi() });
+      await fr.ctx.capterSuivisAchats('111');
+      const chemins = lusJ(fr).map((v) => v.chemin.split('/')[4]);
+      dit(JSON.stringify(chemins) === JSON.stringify(['35000000002']), 'un achat déjà arrivé au point relais n’est plus relu ; celui en route, si', JSON.stringify(chemins));
     });
   } finally {
     nettoyer();
