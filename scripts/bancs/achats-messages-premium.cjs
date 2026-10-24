@@ -270,14 +270,14 @@ const capturer = async (pg, nom, vp) => {
           await pg.getByRole('alert').filter({hasText:'5.221'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>window.controleOuverture=t}}));
-          await pg.getByRole('button',{name:'Ouvrir ce favori pour vérifier sur Vinted',exact:true}).click();
+          await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
           await pg.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
           const avantMaj=await pg.evaluate(()=>JSON.parse(window.controleOuverture));
           dit(avantMaj.extension==='5.216.0'&&avantMaj.etape==='connexion'&&avantMaj.code==='extension_a_actualiser',`${T} refus avant ouverture : version mesurée et cause conservées`);
           dit(await pg.evaluate(()=>!window.favorisOuvertures?.length&&!window.favorisExec?.length),`${T} précontrôle refusé : aucune ouverture ni message`);
           await pg.evaluate(()=>window.majExtensionFavoris());
-          await pg.getByRole('button',{name:'Ouvrir ce favori pour vérifier sur Vinted',exact:true}).click();
+          await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
           await pg.getByText('Lien enregistré',{exact:true}).waitFor();
           dit(await pg.evaluate(()=>window.favorisOuvertures?.length===1&&window.favorisOuvertures[0].body.notificationId==='favori-banc-1'&&!('url' in window.favorisOuvertures[0].body)),`${T} le bouton vérifie le favori capté par son identifiant, sans URL libre`);
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} vérifier le lien ne lance aucun message`);
