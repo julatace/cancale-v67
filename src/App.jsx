@@ -1,3 +1,5 @@
+import FavorisVinted from './FavorisVinted.jsx';
+import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
@@ -10591,7 +10593,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 // complet, §5). Sur téléphone, douze valeurs ne tiennent pas côte à côte : on
 // n'écrit que le meilleur mois, le dernier et celui qu'on a touché ; les
 // autres sont dans l'infobulle et au toucher (`onChoisir`).
-function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
+function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
   const ref=React.useRef(null);
   const [W,setW]=React.useState(340);
   const [compact,setCompact]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
@@ -10621,13 +10623,14 @@ function CourbeMois({ mois, valeur = (m) => m.eur, format = (v) => `${Math.round
   return <div ref={ref} className="vrm-chart-months" style={{width:'100%',minWidth:0}}>
     <svg {...{[attr]:''}} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="group"
       aria-label={mois.map((m,i)=>`${m.long||m.nomComplet||cleDe(m)} ${format(vals[i])}`).join(' · ')} style={{display:'block',maxWidth:'100%'}}>
-      <defs><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
+      <defs><linearGradient id={`area${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent} stopOpacity=".20"/><stop offset="1" stopColor={C.accent} stopOpacity=".01"/></linearGradient><linearGradient id={`bars${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.accent}/><stop offset="1" stopColor={C.accent} stopOpacity=".65"/></linearGradient></defs>
       {[0,.5,1].map(f=><line key={f} x1={left} x2={W-right} y1={Y(max*f)} y2={Y(max*f)} stroke={C.border} strokeWidth="1" strokeDasharray={f?'3 5':undefined}/>)}
+      {presentation==='ligne'&&<g aria-hidden="true" pointerEvents="none"><path d={`M ${X(0)} ${base} L ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')} L ${X(n-1)} ${base} Z`} fill={`url(#area${uid})`}/><path d={`M ${vals.map((v,i)=>`${X(i)} ${Y(v)}`).join(' L ')}`} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/></g>}
       {mois.map((m,i)=>{const cle=cleDe(m),actif=i===lu,bar=Math.max(2,Math.min(compact?22:34,col*.55));const label=`${m.long||m.nomComplet||cle} · ${format(vals[i])}${m.enCours?' (en cours)':''}`;return <g key={cle} data-mois={cle} data-valeur={Math.round(vals[i]*100)} role="button" tabIndex="0" aria-label={label} aria-pressed={actif} className="vrm-chart-month" onClick={()=>choisir(m,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choisir(m,i);}}}>
         <title>{label}</title>
-        {actif&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
+        {actif&&presentation!=='ligne'&&<rect x={X(i)-col/2+2} y="2" width={Math.max(1,col-4)} height={H-2} rx="6" fill={C.bg}/>}
         <rect x={X(i)-col/2} y="0" width={col} height={H} fill="transparent"/>
-        <rect data-month-bar="" x={X(i)-bar/2} y={Y(vals[i])} width={bar} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={`url(#bars${uid})`} opacity={actif||i===meilleur?1:m.enCours?.45:.65}/>
+        {presentation==='ligne'?<circle cx={X(i)} cy={Y(vals[i])} r={actif?5:3} fill={actif?C.accent:C.card} stroke={C.accent} strokeWidth="2"/>:<rect data-month-bar="" x={X(i)-bar/2} y={Y(vals[i])} width={bar} height={Math.max(1,base-Y(vals[i]))} rx="3" fill={`url(#bars${uid})`} opacity={actif||i===meilleur?1:m.enCours?.45:.65}/>}
         {(i%pas===0||i===n-1)&&<text x={X(i)} y={H-8} textAnchor="middle" fontSize="11" fontWeight={actif?600:400} fill={actif?C.text:C.muted}>{court(m)}</text>}
       </g>;})}
     </svg>
@@ -10899,6 +10902,7 @@ const ICON_PATHS = {
   tag:   <><path d="M3.5 11.2V4.5a1 1 0 0 1 1-1h6.7a1 1 0 0 1 .7.3l8.3 8.3a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L3.8 11.9a1 1 0 0 1-.3-.7Z"/><circle cx="8" cy="8" r="1.4"/></>,
   cash:  <><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/></>,
   bag:   <><path d="M4.6 8.4h14.8l-1.1 11.4a2 2 0 0 1-2 1.8H7.7a2 2 0 0 1-2-1.8L4.6 8.4Z"/><path d="M8.7 10V6.9a3.3 3.3 0 0 1 6.6 0V10"/></>,
+  copy:  <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"/></>,
   doc:   <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></>,
   chat:  <><path d="M20.5 11.6c0 4-3.8 7.2-8.5 7.2-1 0-2-.15-2.9-.42L4 20.5l1.3-3.5A6.8 6.8 0 0 1 3.5 11.6C3.5 7.6 7.3 4.4 12 4.4s8.5 3.2 8.5 7.2Z"/></>,
   home:  <><path d="M3.5 10.4 12 3.6l8.5 6.8"/><path d="M5.6 12v7.5a1 1 0 0 0 1 1h10.8a1 1 0 0 0 1-1V12"/></>,
@@ -14885,7 +14889,7 @@ function CodeRetraitCopiable({label,code}) {
     catch { setEtat('Copie indisponible'); }
   }}>
     <span>{label}</span><strong className="vrm-sensible" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
-    <small aria-live="polite">{etat || 'Copier'}</small>
+    <small aria-live="polite"><Icon name="copy" size={14}/><span>{etat || 'Copier'}</span></small>
   </button>;
 }
 
@@ -20960,7 +20964,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
 
   return (
-    <div className="vrm-finance-page" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+    <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <div>
         <h2 style={{margin:0,color:C.text,fontSize:28,fontWeight:600,letterSpacing:-0.5}}>Statistiques</h2>
         <div style={{fontSize:13,color:C.muted,marginTop:2}}>Tes ventes, ton évolution, tes résultats</div>
@@ -21105,7 +21109,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:11,color:C.muted,marginTop:4}}>Toutes plateformes · ventes en cours comprises</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
             <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
-            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" legende={false}/></div>
+            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
@@ -21165,7 +21169,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const totPlat = plateformes.reduce((s2,p)=>s2+(p.ca||0),0);
         const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
         return (
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
+          <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>Finalisé par plateforme</div>
               {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
@@ -21387,7 +21391,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       })()}
 
       {/* Ce qui se vend : marque, taille, modèle, pays, temps de vente (17 oct.). */}
-      <RepartitionsVentes panelOff={panelOff}/>
+      <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
       <BoostRentable panelOff={panelOff}/>
@@ -28383,6 +28387,13 @@ const repartitionsVentes = ({ ventes, txn, items, dates, ecarte }) => {
   }
   return R;
 };
+function AnalysesStatistiques({panelOff}) {
+ const [detail,setDetail]=React.useState(false);
+ return <section className="vrm-stats-analyses" data-stats-carte="repartitions" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18}}>
+  <h3>Répartition des ventes</h3><RepartitionsVentes panelOff={panelOff} apercu/>
+  <details onToggle={e=>setDetail(e.currentTarget.open)}><summary>Tailles, modèles et délais de vente</summary>{detail&&<RepartitionsVentes panelOff={panelOff}/>}</details>
+ </section>;
+}
 function PerformanceJournee({panelOff,onNav,moisN,moisEur,partiel}) {
  return <section className="vrm-day-performance vrm-day-card" aria-label="Performance des ventes" style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
   <div className="vrm-day-head"><h3>Analyses des ventes</h3><button type="button" onClick={()=>onNav?.('dashboard')}>Statistiques ›</button></div>
@@ -28412,12 +28423,12 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
     <p className="vrm-analyses-perimetre">Vinted · toutes périodes · données reçues</p>
     <div className="vrm-analyses-duo">{[['marques','Marques vendues'],['pays','Pays des acheteurs']].map(([cle,titre])=>{
       const bloc=R[cle];const lignes=bloc?Object.values(bloc.par).sort((a,b)=>b.n-a.n):[];
-      const top=lignes.slice(0,3);const nom=k=>cle==='pays'?nomPays(k):k;
+      const top=lignes.slice(0,5);const nom=k=>cle==='pays'?nomPays(k):k;
       const attente=cle==='pays'&&extras===undefined;
       return <div key={cle} className="vrm-analyse-mini" data-analyse={cle}><h4>{titre}</h4>
         {attente?<p>Lecture des pays…</p>:!bloc?<p>Lecture indisponible.</p>:!bloc.n?<p>{cle==='pays'?'Aucun pays reçu.':'Aucune marque identifiée.'}</p>:<>
           <RepartitionAnneau elements={top.map(e=>({...e,k:nom(e.k)}))} total={bloc.n}/>
-          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)} %</b></li>)}{lignes.length>3&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)} %</b></li>}</ul>
+          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)} %</b></li>)}{lignes.length>5&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)} %</b></li>}</ul>
           <small>{bloc.n} sur {R.total} ventes renseignées</small>
         </>}
       </div>;
@@ -33750,9 +33761,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Une paire dans les favoris de plusieurs personnes mais non vendue est la
   // candidate idéale à la REMISE NATIVE de Vinted : une baisse de prix prévient
   // d'un coup TOUS ceux qui l'ont mise en favori (§3 : « la remise aux favoris
-  // touche tout le monde en un clic »). On ne connaît PAS qui a mis en favori
-  // (Vinted ne le dit pas, §3) — seulement le NOMBRE (`favourites`), jamais une
-  // identité (§5). L'action reste un LIEN vers l'annonce : VRM ne change jamais
+  // touche tout le monde en un clic »). Cette liste d'annonces ne porte que
+  // le NOMBRE (`favourites`), pas les identités. Le flux notifications est
+  // distinct et son raccordement est en préparation (23 octobre).
+  // L'action reste un LIEN vers l'annonce : VRM ne change jamais
   // le prix (§3). `annBase` = annonces en ligne (une vendue en est déjà sortie,
   // donc « pas encore vendue »). On n'en remet pas celles déjà dans le repricing
   // (un seul conseil par paire, §7).
@@ -34353,47 +34365,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { fini = true; };
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
-  // ── LES OFFRES REÇUES, EN TÊTE DE MESSAGES (proposition 6, 6 octobre) ─────
-  // Mesuré : 37 offres en 14 jours, toutes connues par EMAIL (`email_offer_*`),
-  // et seulement 3 conversations captées portent une offre en attente — vieilles.
-  // Leur lecture avait été retirée le 3 octobre (573 offres / 142 Ko à chaque
-  // ouverture, plus rien ne les affichait). On ne lit que les 14 derniers jours,
-  // en SCALAIRES (§4.4), et seulement sur cet écran.
-  // ⚠️ L'email ne porte AUCUN identifiant d'annonce (mesuré 0/518) : on n'écrit
-  //    donc pas « ton prix » ni « la remise demandée » — les déduire du titre
-  //    serait le rapprochement par ressemblance interdit (§5). Le repère montré
-  //    est celui du MODÈLE (prix moyen de revente), dit comme tel.
-  // Trois états : `undefined` en cours · `null` pas su · tableau.
-  // ⚠️⚠️ (22 octobre) CE BLOC AVAIT DISPARU LE 13 OCTOBRE (« Simplifier les
-  //    écrans revendeurs », 13f6c89) avec la cloche, et la règle
-  //    `offresAtraiter` n'était plus rendue NULLE PART. Mesuré (lecture seule) :
-  //    248 offres email ces 14 derniers jours, 17 sur le dernier jour, sur
-  //    5 comptes — et 0 offre en attente dans une conversation captée sur la
-  //    même période (3 en tout, la plus récente du 15 septembre). Les offres ne
-  //    s'affichaient donc plus du tout. Rebranché, ici seulement.
-  const [offresEmail, setOffresEmail] = useState(undefined);
-  const [offresToutes, setOffresToutes] = useState(false);
-  const [offresFaites, setOffresFaites] = useState(() => new Set(load('vinted_offers_done', []) || []));
-  // Réglage SYNCHRONISÉ lu au montage : rattrapé à l'arrivée du nuage, et
-  // seulement s'il est resté vide (une offre rangée pendant le chargement
-  // n'est jamais écrasée — §5.49).
-  useEffect(() => onCloudReady(() => setOffresFaites((v) => v.size ? v : new Set(load('vinted_offers_done', []) || []))), []);
-  useEffect(() => {
-    if (curSub !== 'messages') return;
-    let stop = false;
-    const depuis = new Date(Date.now() - OFFRE_FENETRE_J * 86400000).toISOString().slice(0, 10);
-    // SCALAIRES seulement (§4.4) : `extrait` (le morceau brut de l'email) n'est
-    // jamais rapatrié. Une page ratée ⇒ `null` (pas su), jamais une demi-liste.
-    lireTout(`id=like.email_offer_*&meta->>receivedAt=gte.${depuis}&select=id,article:meta->>article,montant:meta->>montant,qui:meta->>qui,uid:meta->>uid,account:meta->>account,receivedAt:meta->>receivedAt`, { strict: true })
-      .then((l) => { if (!stop) setOffresEmail(Array.isArray(l) ? l : null); })
-      .catch(() => { if (!stop) setOffresEmail(null); });
-    return () => { stop = true; };
-  }, [curSub]);
-  // L'identité d'une offre rangée (« c'est fait ») : la ligne email elle-même.
-  // ⚠️ Avant le 13 octobre la clé était `receivedAt|article` : on la relit
-  //    aussi, pour qu'une offre déjà rangée avec l'ancienne clé ne revienne pas.
-  const cleOffre = (of) => String((of && of.id) || '');
-  const offreTraitee = (of) => setOffresFaites((prev) => { const u = new Set(prev); u.add(cleOffre(of)); save('vinted_offers_done', [...u].slice(-500)); return u; });
   useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
@@ -37182,6 +37153,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const msgRelais = etatRelais().niveau === 'vivant';
   const msgRelaisVinted = msgRelais ? vintedAgissant() : null;
   const msgCompteActif = msgRelais ? String((msgRelaisVinted && msgRelaisVinted.uid) || '') : (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
+  const favorisUid = String(compteSel && compteSel!=='*' ? compteSel : msgCompteActif || '');
+  const favorisCompte = accounts.find(a=>String(a.vinted_user_id)===favorisUid);
+
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
   const msgNomActif = () => { const a = (accounts||[]).find(x=>String(x.vinted_user_id)===msgCompteActif); return a ? accName(a) : (msgRelaisVinted && msgRelaisVinted.login) || ''; };
@@ -39187,7 +39161,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {cd&&(
                         <CodeRetraitCopiable label="Code de retrait" code={cd}/>
                       )}
-                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                      <button className="vrm-pickup-collect" type="button" onClick={()=>markPickupDone(o)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" data-pickup-sans-code={cd?undefined:''} style={{flexShrink:0,marginLeft:cd?undefined:'auto',border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                     </div>
                     );
           };
@@ -39378,7 +39352,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const casier = !!t.consigne || !!ident;
                     const jours = joursAvant(t.limite);
                     return (
-                      <div className="vrm-pickup-card" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
+                      <div className="vrm-pickup-card vrm-pickup-row" key={i} style={{display:'flex',gap:11,alignItems:'center',flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',marginBottom:7}}>
                         {thumb(photoColis(t))}
                         <div style={{flex:'1 1 150px',minWidth:0}}>
                           {/* ⚠️ LE N° DE SUIVI ÉTAIT ÉCRIT DEUX FOIS — vu en capture, pas à la
@@ -39474,7 +39448,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             de retrait était un QR mort ne laissait RIEN à présenter
                             au comptoir — vu en capture sur 09447431562792. */}
                         {(code||ident) && (
-                          <div style={{flexShrink:0,display:'flex',gap:6}}>
+                          <div className="vrm-pickup-codes" style={{flexShrink:0,display:'flex',gap:6}}>
                             {ident && (
                               <CodeRetraitCopiable label="Identifiant" code={ident}/>
                             )}
@@ -39487,7 +39461,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {!code && !ident && !qrVivant(t) && t.suivi && (
                           <a href={trackUrl(t.carrier||'', String(t.suivi))} target="_blank" rel="noreferrer" data-colis-suivre="" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:10,padding:'5px 10px',fontSize:12,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Suivi ↗</a>
                         )}
-                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>✓ J’ai retiré</button>
+                        <button className="vrm-pickup-collect" type="button" onClick={()=>markCollected(t)} title="J'ai retiré ce colis" aria-label="J’ai retiré ce colis" style={{flexShrink:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}><span aria-hidden="true">✓</span><span className="vrm-pickup-collect-label"> J’ai retiré</span></button>
                       </div>
                     );
                   })}
@@ -40817,77 +40791,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
-        {/* ── LES OFFRES REÇUES PAR EMAIL, EN TÊTE (rebranché le 22 octobre) ──
-            La règle `offresAtraiter` (compte, chronologie, titre non ambigu)
-            écarte celles qu'une vente a réglées et le DIT ; « c'est fait » range
-            une offre (`vinted_offers_done`). Une offre que sa conversation montre
-            déjà (même compte, même acheteur, même montant — `memeOffre`, jamais
-            le titre seul) n'est pas écrite deux fois. */}
-        {(()=>{
-          if (offresEmail === undefined || !Array.isArray(sales.items)) return null;   // on attend de savoir lesquelles sont déjà réglées
-          // La panne de la base se dit UNE fois, par le bloc de la coque (§7).
-          if (offresEmail === null) return baseKO ? null : <div data-offres-messages="passu" style={{fontSize:12,color:C.muted,marginBottom:10}}>Les offres reçues par email n'ont pas pu être lues pour l'instant — rouvre cet écran dans un moment.</div>;
-          // Un compte écarté (son choix) ou retiré n'a plus rien à lui dire ;
-          // « retiré » ne se juge que sur une liste de comptes LUE, et une offre
-          // sans compte connu reste (pas su ≠ autre compte).
-          const comptesLus = accountsReady && !baseKO;
-          const desComptes = offresEmail.filter((of) => { const u = String((of && of.uid) || ''); if (!u) return true;
-            if (acctOff(u)) return false;
-            return !(comptesLus && !accountUids.has(u)); });
-          // Les offres « c'est fait » rangées avant le 22 octobre portaient la clé
-          // `receivedAt|article` : elles comptent toujours comme rangées.
-          const faites = new Set(offresFaites);
-          for (const of of desComptes) if (offresFaites.has(`${of.receivedAt || ''}|${of.article || ''}`)) faites.add(cleOffre(of));
-          const { gardees, reglees } = offresAtraiter(desComptes, sales.items, faites, cleOffre);
-          // Les offres en attente vues dans une conversation captée (même source
-          // que la pastille de la liste) ; pas su ⇒ on ne retire rien.
-          const convOffres = (offresConv instanceof Map && Array.isArray(convs.items))
-            ? convs.items.flatMap((c) => { const u = String((c._acc && c._acc.vinted_user_id) || ''); const off = offresConv.get(`${u}_${c.id}`); return off ? [{ uid: u, login: (c.opposite_user && c.opposite_user.login) || '', prix: off.prix, ts: off.ts, titre: off.titre || '' }] : []; })
-            : null;
-          const { affichees, dansConversation } = offresEmailHorsConversations(gardees, convOffres);
-          if (!affichees.length) return null;
-          // Le repère du MODÈLE (jamais le prix de LA paire : l'email ne dit pas laquelle).
-          const repere = moyennesParModele(sales.items, acctOffOf);
-          const nomModele = (k) => k.replace(/\b\w/g, (c) => c.toUpperCase());
-          const quand = (d)=>{ const t=Date.parse(d||''); if(!t) return ''; const h=(Date.now()-t)/3600000; return h<1?"à l'instant":h<24?`il y a ${Math.round(h)} h`:`il y a ${Math.round(h/24)} j`; };
-          const tri = [...affichees].sort((a,b)=> (Date.parse(b.receivedAt||0)||0) - (Date.parse(a.receivedAt||0)||0));
-          const comptes = new Set(tri.map((o)=>String(o.uid||o.account||'')));
-          const visibles = offresToutes ? tri : tri.slice(0, 6);
-          const pl = (n, s, p) => (n > 1 ? p : s);
-          return (
-            <div data-offres-messages={tri.length} style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:12,overflow:'hidden'}}>
-              <div style={{padding:'10px 12px 6px'}}>
-                <div style={{fontSize:14,fontWeight:700,color:C.text}}><span style={{color:C.accent}}>{tri.length}</span> {pl(tri.length,'offre','offres')} à trancher</div>
-                <div style={{fontSize:11.5,color:C.muted,marginTop:2,lineHeight:1.4}}>
-                  Reçues par email ces {OFFRE_FENETRE_J} derniers jours{comptes.size===1&&tri[0].account?` · toutes sur ${tri[0].account}`:''}. On y répond sur Vinted, sur le compte nommé.
-                  {reglees.length>0 ? <span data-offres-reglees={reglees.length}>{` ${reglees.length} autre${reglees.length>1?'s':''} déjà réglée${reglees.length>1?'s':''} par une vente, mise${reglees.length>1?'s':''} de côté.`}</span> : null}
-                  {dansConversation.length>0 ? <span data-offres-dans-conversation={dansConversation.length}>{` ${dansConversation.length} ${pl(dansConversation.length,'autre est','autres sont')} sur ${pl(dansConversation.length,'sa conversation','leur conversation')} ci-dessous.`}</span> : null}
-                </div>
-              </div>
-              {visibles.map((of,i)=>{
-                const m = euroOffre(of.montant); const k = extractModel(of.article); const r = k && repere[k];
-                return (
-                  <div key={of.id||i} data-offre-email={of.id} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 12px',borderTop:`1px solid ${C.border}`}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{m!=null?<b>{fmtE(m)}</b>:'Une offre'}{of.qui?` · ${of.qui}`:''}</div>
-                      <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{of.article||'—'}</div>
-                      <div style={{fontSize:11,color:C.muted}}>{quand(of.receivedAt)}{comptes.size>1&&of.account?` · ${of.account}`:''}{r && r.n>=REPERE_MIN ? ` · repère : tes ${nomModele(k)} se revendent ${fmtE(r.s/r.n)} en moyenne (${r.n} ventes)` : ''}</div>
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',gap:5,flexShrink:0}}>
-                      <a href="https://www.vinted.fr/inbox" target="_blank" rel="noreferrer" data-offre-repondre="" style={{textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,color:C.text,textAlign:'center',display:'inline-flex',alignItems:'center',justifyContent:'center',boxSizing:'border-box',minHeight:32}}>Répondre sur Vinted</a>
-                      <button type="button" data-offre-traitee={of.id} onClick={()=>offreTraitee(of)} style={{border:'none',background:'transparent',color:C.muted,fontSize:11.5,cursor:'pointer',fontFamily:'inherit',textDecoration:'underline',minHeight:32}}>c'est fait</button>
-                    </div>
-                  </div>
-                );
-              })}
-              {tri.length > visibles.length && (
-                <button type="button" data-offres-voir-tout={tri.length} onClick={()=>setOffresToutes(true)} style={{display:'block',width:'100%',border:'none',borderTop:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'10px 12px',fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                  Voir les {tri.length} offres
-                </button>
-              )}
-            </div>
-          );
-        })()}
+        <FavorisVinted key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
+        <DiagnosticFavoris key={'diag-favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
