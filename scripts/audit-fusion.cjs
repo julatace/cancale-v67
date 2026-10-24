@@ -175,6 +175,15 @@ const CAS = [
       await c.noterSuppression('www.vinted.fr', '10010527192', 200, new Date().toISOString());
     },
     garde: (d) => d.ids && d.ids['9900000001'] && d.ids['9900000002'] && d.ids['10010527192'] },
+  // 23 octobre (5.214) : la FORME des réponses de suivi Vinted (`journey_summary`,
+  // `escrow_orders/{id}/shipment`, `parcel_collection_code`) — la mesure qui dira
+  // où vivent les étapes d'un colis. Une lecture ratée ne doit pas effacer ce qui
+  // a été appris des AUTRES voies.
+  { id: 'panel_formes_suivi',
+    avant: { v: 1, journey: { forme: { 'journey_summary.steps[].title': 'string' }, etat: 'reconnue', at: new Date(Date.now() - 2 * 86400000).toISOString(), n: 3 } },
+    quoi: 'les formes de suivi déjà apprises',
+    geste: (c) => c.rangerFormeSuivi('escrow', { 'shipment.status': 'number' }, 'inconnue'),
+    garde: (d) => d.journey && d.journey.forme && d.journey.forme['journey_summary.steps[].title'] === 'string' && d.escrow && d.escrow.forme && d.escrow.forme['shipment.status'] === 'number' },
   { id: 'lbc_accounts', avant: { accounts: { a1: { login: 'x' }, a2: { login: 'y' } } },
     quoi: 'ses comptes Leboncoin déjà vus',
     geste: (c) => c.storeLbcAccount({ id: 'a3', login: 'z' }),
