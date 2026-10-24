@@ -1,6 +1,7 @@
 import React from 'react';
 import {lireFavorisVinted,preparerMessageFavori,ageFavori,contactFavori} from './favorisVinted.js';
 import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris} from './reglagesFavoris.js';
+import {controleOuvertureFavori} from './favorisOuverture.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
 // secours par l'extension, pictogramme), fourni par l'app. Sans lui, aucune
@@ -15,7 +16,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[reglages,setReglages]=React.useState({});
   const [historique,setHistorique]=React.useState(null),[filtre,setFiltre]=React.useState('tous'),[recherche,setRecherche]=React.useState(''),[maintenant,setMaintenant]=React.useState(Date.now()),[importation,setImportation]=React.useState(false);
-  const [ouverture,setOuverture]=React.useState(''),[verifications,setVerifications]=React.useState({}),[controle,setControle]=React.useState(null),[controleEnvoi,setControleEnvoi]=React.useState(null);
+  const [ouverture,setOuverture]=React.useState(''),[verifications,setVerifications]=React.useState({}),[controle,setControle]=React.useState(null),[controleEnvoi,setControleEnvoi]=React.useState(null),[erreurOuverture,setErreurOuverture]=React.useState('');
   const ouvrirEnCours=React.useRef(false),retourVinted=React.useRef(false);
   const importEnCours=React.useRef(false),annulerImport=React.useRef(false);
   const reglagesLus=React.useRef(false),edition=React.useRef(0),sauvegarde=React.useRef(false);
@@ -23,7 +24,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const apercu=preparerMessageFavori(message,reduction);
   const requete=React.useRef(0),occupe=React.useRef(false);
   const scope=owner+':'+uid, data=etat.scope===scope?etat.data:undefined;
-  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setImportation(false);setOuverture('');setVerifications({});setControle(null);setControleEnvoi(null);ouvrirEnCours.current=false;retourVinted.current=false;setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setReduction('');setIntervalle('6');setReglages({});reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);return()=>{requete.current++;};},[uid,owner]);
+  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setImportation(false);setOuverture('');setVerifications({});setControle(null);setControleEnvoi(null);setErreurOuverture('');ouvrirEnCours.current=false;retourVinted.current=false;setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setReduction('');setIntervalle('6');setReglages({});reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);return()=>{requete.current++;};},[uid,owner]);
   const charger=async()=>{
     if(occupe.current||sauvegarde.current)return;
     const n=++requete.current;occupe.current=true;setEtat({scope,charge:true});setSelection([]);setRetour('');
@@ -75,15 +76,13 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
 
   const ouvrir=async x=>{
     if(ouvrirEnCours.current||importEnCours.current||historique?.vue?.active||ownerActuel()!==owner)return;
-    ouvrirEnCours.current=true;const n=requete.current;setOuverture(x.id);setVerifications(v=>({...v,[x.id]:'en_attente'}));setRetour('Ouverture du favori dans Vinted…');
+    ouvrirEnCours.current=true;retourVinted.current=false;setErreurOuverture('');setControle(null);setControleEnvoi(null);const n=requete.current;setOuverture(x.id);setVerifications(v=>({...v,[x.id]:'en_attente'}));setRetour('Ouverture du favori dans Vinted…');
     try{const r=await ouvrirFavori(x);if(ownerActuel()!==owner||n!==requete.current)return;
-      const preuve=['confirmee','non_confirmee','en_attente'].includes(r?.data?.preuve)?r.data.preuve:'ouverture_non_confirmee';
-      const raison=['contexte_ou_format_incompatible','enregistrement_non_confirme','capture_pas_recue'].includes(r?.data?.raison)?r.data.raison:'';
-      setControle({diagnostic:'VRM-favoris-controle-v1',extension:/^\d+\.\d+\.\d+$/.test(r?.data?.version||'')?r.data.version:'non_confirmee',ouvert:r?.data?.ouvert===true,preuve,raison});
+      setControle(controleOuvertureFavori(r));
       if(!r?.ok)throw Error(r?.data?.message||r?.error||'L’ouverture n’a pas été confirmée.');
       setVerifications(v=>({...v,[x.id]:r.data?.preuve||'en_attente'}));
       retourVinted.current=true;setRetour(r.data?.preuve==='confirmee'?'Le lien natif a été enregistré. Reviens ici pour actualiser la sélection. Aucun message envoyé.':'Vinted est ouvert. La capture n’est pas encore confirmée. Reviens ici après le chargement. Aucun message envoyé.');
-    }catch(e){if(ownerActuel()===owner&&n===requete.current)setRetour(e.message);}
+    }catch(e){if(ownerActuel()===owner&&n===requete.current){setErreurOuverture(e.message||'La vérification n’a pas abouti.');setVerifications(v=>({...v,[x.id]:'non_confirmee'}));setControle(c=>c||controleOuvertureFavori({ok:false,controleOuverture:{etape:'exception'}}));setRetour('');}}
     finally{if(ownerActuel()===owner&&n===requete.current){ouvrirEnCours.current=false;setOuverture('');if(retourVinted.current&&document.visibilityState==='visible'&&document.hasFocus())setTimeout(()=>{if(retourVinted.current&&!ouvrirEnCours.current&&ownerActuel()===owner&&n===requete.current){retourVinted.current=false;charger();}},600);}}
   };
   React.useEffect(()=>{const retour=()=>{if(retourVinted.current&&!ouvrirEnCours.current&&ownerActuel()===owner){retourVinted.current=false;charger();}};window.addEventListener('focus',retour);return()=>window.removeEventListener('focus',retour);},[owner,uid]);
@@ -138,6 +137,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       </>}
     </>}
     {uid&&owner&&executerFavori&&<AutomatisationFavoris onErreur={setControleEnvoi} masquerSansSelection key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/>}
+    {erreurOuverture&&<p role="alert" className="vrm-favoris-note"><strong>Vérification interrompue : </strong>{erreurOuverture}</p>}
     {retour&&<p role="status">{retour}</p>}
     {(controleEnvoi||controle&&controle.preuve!=='confirmee')&&<button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(JSON.stringify({...(controle||{diagnostic:'VRM-favoris-controle-v1'}),...(controleEnvoi?{lancement:controleEnvoi}:{})},null,2));setRetour('Contrôle copié, sans identifiant, lien ni message privé.');}catch{setRetour('Copie indisponible dans ce navigateur.');}}}>Copier le contrôle</button>}
   </section>;

@@ -44,6 +44,14 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check(controle.lancement.code==='favoris_preuve_absente'&&controle.lancement.diagnostic.selection===1,'le contrôle contient la cause réelle du lancement refusé');
  check(!JSON.stringify(controle).includes('secret-prive')&&!JSON.stringify(controle).includes('987654321'),'les champs inconnus et valeurs hors limites ne sont pas copiés');
 
+ await p.getByRole('searchbox',{name:'Rechercher un favori'}).fill('');
+ await ouvrir.click();await p.evaluate(()=>window.accuserOuverture({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}}));
+ await p.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
+ check(await p.getByRole('alert').filter({hasText:'Ouvre les notifications sur Vinted'}).count()===1,'un refus réel d’ouverture est affiché comme une erreur, pas un état discret');
+ check(await p.getByText('Capture en attente',{exact:true}).count()===0,'une ouverture refusée ne reste pas affichée en attente');
+ await p.getByRole('button',{name:'Copier le contrôle',exact:true}).click();const refus=await p.evaluate(()=>JSON.parse(window.controleCopie));
+ check(refus.extension==='5.221.0'&&refus.code==='notifications_non_affichees'&&refus.etape==='commande'&&!refus.lancement,'la version mesurée et le refus sont copiés, sans recycler le lancement précédent');
+
  check(await p.evaluate(()=>window.envois===0&&window.pages===2),'loading history never dispatches a message');
  check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');
  if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'historique-'+width+'.png'),fullPage:true});}await p.close();}}

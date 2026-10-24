@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — refus ouverture favoris :** correctif côté site uniquement.
+> Le contrôle conserve la version mesurée et la catégorie de refus au lieu de
+> tout rendre « non confirmé » ; erreur visible et ancien contrôle effacé.
+> Extension reste 5.221. Cas client pas encore résolu.
+> Voir `docs/passation/2026-10-24-favoris-refus-ouverture.md`.
+
 > **24 octobre — favoris 5.221 :** correction du parcours « Page not found N°72 ».
 > Activation du lien exact déjà affiché dans les notifications Vinted, sans
 > chargement direct de la route interne ni message. Liste absente : refus expliqué.
