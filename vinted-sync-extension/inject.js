@@ -370,12 +370,24 @@
 const SUIVI_TEXTES = ['title', 'status_title', 'state_title', 'event_title', 'label', 'libelle', 'status_label', 'state_label', 'event_label', 'headline', 'message', 'status_message', 'description', 'event_description', 'status_text', 'text', 'summary', 'subtitle'];
 const SUIVI_CODES = ['status_code', 'event_code', 'state_code', 'event_type', 'status', 'state', 'statut', 'etat', 'step', 'step_type', 'event_status', 'current_status', 'shipment_status', 'tracking_status'];
 const SUIVI_DATE = /(?:^|_)(?:date|time|datetime|timestamp|at|ts|heure|happened|occurred)(?:_|$)/i;
-const SUIVI_LIMITE = /(?:^|_)(?:deadline|until|expires?|expiry|limit|limite)(?:_|$)/i;
+const SUIVI_LIMITE = /(?:^|_)(?:deadline|until|expires?|expiry|limit|limite|estimated|estimation|expected|eta|planned|promised|scheduled|prevue?|prevision(?:nelle)?)(?:_|$)/i;
+// Une étape n'a eu lieu que si sa date est passée (quelques minutes d'horloge
+// décalée tolérées) : une étape datée dans le FUTUR — une livraison estimée —
+// n'est jamais « la dernière » et ne sonne jamais (revue du 24 octobre).
+const SUIVI_FUTUR_MS = 10 * 60000;
+// Un code ou un statut MACHINE (« at_pickup », « 4 », « in_transit ») : sans
+// espace. Une valeur d'état qui n'en a pas la forme (« Code de retrait :
+// 482913 ») est un TEXTE, et un texte se lave (revue du 24 octobre).
+const SUIVI_CODE_MACHINE = /^[A-Za-z0-9_.:-]{1,40}$/;
 const SUIVI_NUMERO = /^(?:tracking_code|tracking_number|tracking_no|tracking_id|parcel_number|parcel_tracking_number|shipment_tracking_code|numero_suivi|numero_de_suivi)$/i;
 const SUIVI_TRANSP = /^(?:carrier|carrier_name|carrier_title|carrier_code|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/i;
 const SUIVI_PARENT_TRANSP = /(?:carrier|courier|transporteur|shipping_provider|provider)/i;
 const SUIVI_PARENT_RELAIS = /(?:pickup|relay|relais|drop_?off|pudo|locker|parcel_?shop|service_?point)/i;
 const SUIVI_PARENT_NUMERO = /^(?:tracking|suivi|parcel_tracking)$/i;
+// Un parent qui désigne une PERSONNE (le contact du point relais, le
+// destinataire, l'expéditeur) : son `name` n'est ni un transporteur ni un point
+// relais, il reste dehors (revue du 24 octobre : « pickup_contact.name »).
+const SUIVI_PARENT_PERSONNE = /(?:contact|person|recipient|destinataire|owner|user|customer|client|buyer|seller|sender|expediteur|receiver|holder|member|membre)/i;
 const SUIVI_PERSO = /(?:^|_)(?:name|first_?name|last_?name|full_?name|surname|username|login|nickname|email|e_?mail|phone|phone_?number|telephone|tel|mobile|address|adresse|street|street_?name|line\d?|address_?line\d?|house_?number|city|ville|town|postal_?code|post_?code|zip|zip_?code|code|pickup_?code|collection_?code|pin|qr|qr_?code|barcode|password|token|iban)(?:_|$)/i;
 const SUIVI_PAS_PERSO = /(?:country|currency|locale|language|lang|type|status|state)/i;
 const SUIVI_TYPES = ['string', 'number', 'boolean', 'null', 'object', 'array'];
@@ -410,7 +422,8 @@ function nettoyerTexteSuivi(s, interdits) {
     .replace(/(?:\+\d{2}\s?|\b0)[1-9](?:[\s.-]?\d{2}){4}\b/g, '…')
     .replace(/\b\d{1,4}\s*(?:bis|ter)?\s*,?\s*(?:rue|avenue|av\.?|bd|boulevard|chemin|place|all[ée]e|impasse|route|quai|cours|square|r[ée]sidence|lotissement|lieu[- ]dit)\b[^,.;\n]*/gi, '…')
     .replace(/\b\d{5}\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:[ -][A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’-]+)*/g, '…')
-    .replace(/((?:\b[Cc]ode|\bCODE|\bPIN|\b[Pp]in)(?:\s+(?:de\s+retrait|retrait|PIN|d['’]acc[èe]s))?\s*(?:[:：=]|est|is)?\s*)([A-Za-z0-9-]{4,})/g, (m, a, b) => (/\d/.test(b) ? a + '…' : m));
+    .replace(/((?:\b[Cc]ode|\bCODE|\bPIN|\b[Pp]in)(?:\s+(?:de\s+retrait|retrait|PIN|d['’]acc[èe]s))?\s*(?:[:：=]|est(?:\s+(?:le|la))?|is)?\s*)([A-Za-z0-9-]{4,})/g, (m, a, b) => (/\d/.test(b) ? a + '…' : m))
+    .replace(/\b(remis(?:e|es)?\s+[àa]|d[ée]pos[ée](?:e|es|s)?\s+par|livr[ée](?:e|es|s)?\s+[àa])(?![a-zà-ÿ])\s*:?\s*(?:(?!\s(?:au|aux|en|dans|chez|depuis|via)\b)[^,.;\n…])+/gi, '$1 …');
   t = t.replace(/\s*(?:…\s*)+/g, ' … ').replace(/\s+/g, ' ').trim();
   return /^[…\s.,;:!?-]*$/.test(t) ? '' : t.slice(0, 200);
 }
@@ -418,14 +431,14 @@ function nettoyerTexteSuivi(s, interdits) {
 function suiviFeuille(cle, parent, v) {
   const k = String(cle).toLowerCase(), p = String(parent || '');
   if (!(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) return null;
-  if (SUIVI_PARENT_TRANSP.test(p) && /^(?:name|title|label|code)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
-  if (SUIVI_PARENT_RELAIS.test(p) && /^(?:name|title|label)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
+  if (SUIVI_PARENT_TRANSP.test(p) && !SUIVI_PARENT_PERSONNE.test(p) && /^(?:name|title|label|code)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
+  if (SUIVI_PARENT_RELAIS.test(p) && !SUIVI_PARENT_PERSONNE.test(p) && /^(?:name|title|label)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
   if (SUIVI_PARENT_NUMERO.test(p) && /^(?:code|number|numero|id)$/.test(k)) { const n = suiviNumero(v); return n ? { sorte: 'numero', v: n } : null; }
   if (SUIVI_NUMERO.test(k)) { const n = suiviNumero(v); return n ? { sorte: 'numero', v: n } : null; }
   if (SUIVI_TRANSP.test(k)) return typeof v === 'string' ? { sorte: 'texte', v } : null;
   if (SUIVI_TEXTES.includes(k)) return typeof v === 'string' ? { sorte: 'texte', v } : null;
   if (SUIVI_CODES.includes(k)) {
-    if (typeof v === 'string' && v.length > 40) return { sorte: 'texte', v };
+    if (typeof v === 'string' && !SUIVI_CODE_MACHINE.test(v.trim())) return { sorte: 'texte', v };
     return { sorte: 'code', v };
   }
   if (SUIVI_DATE.test(k) || SUIVI_LIMITE.test(k)) { const d = suiviDateIso(v); return d ? { sorte: 'date', v: d } : null; }
@@ -516,16 +529,19 @@ function suiviEtape(o) {
   let t = '';
   for (const k of SUIVI_TEXTES) { const x = suiviVal(o, k); if (typeof x === 'string' && x.trim()) { t = x.trim(); break; } }
   if (!t) return null;
-  let at = null;
+  let at = null, futur = false;
   for (const k of Object.keys(o)) {
     if (!SUIVI_DATE.test(k) || SUIVI_LIMITE.test(k)) continue;
-    const d = suiviDateIso(o[k], 86400000);
+    const d = suiviDateIso(o[k], SUIVI_FUTUR_MS);
     if (d) { at = d; break; }
+    if (suiviDateIso(o[k])) futur = true;
   }
+  // Datée seulement dans l'avenir : une prévision, pas une étape.
+  if (!at && futur) return null;
   let code = null;
   for (const k of SUIVI_CODES) {
     const x = suiviVal(o, k);
-    if ((typeof x === 'string' && x.trim() && x.length <= 40 && x !== t) || typeof x === 'number') { code = String(x).trim(); break; }
+    if ((typeof x === 'string' && SUIVI_CODE_MACHINE.test(x.trim()) && x !== t) || typeof x === 'number') { code = String(x).trim(); break; }
   }
   return { t: t.slice(0, 200), at, code };
 }
@@ -570,7 +586,7 @@ function contratSuivi(a) {
       const x = v[k], kl = k.toLowerCase();
       if (x && typeof x === 'object') { cherche(x, k, prof + 1); continue; }
       if (!transporteur && typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())
-          && ((SUIVI_PARENT_TRANSP.test(String(parent || '')) && /^(?:name|title|label)$/.test(kl)) || /^(?:carrier|carrier_name|carrier_title|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/.test(kl))) transporteur = x.trim().slice(0, 80);
+          && ((SUIVI_PARENT_TRANSP.test(String(parent || '')) && !SUIVI_PARENT_PERSONNE.test(String(parent || '')) && /^(?:name|title|label)$/.test(kl)) || /^(?:carrier|carrier_name|carrier_title|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/.test(kl))) transporteur = x.trim().slice(0, 80);
       if (!suivi && (SUIVI_NUMERO.test(kl) || (SUIVI_PARENT_NUMERO.test(String(parent || '')) && /^(?:code|number|numero|id)$/.test(kl)))) suivi = suiviNumero(x);
     }
   };
