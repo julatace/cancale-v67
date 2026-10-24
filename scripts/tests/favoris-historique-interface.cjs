@@ -1,0 +1,31 @@
+// Actual React UI; synthetic pages and receipts, no real Vinted actions.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {build}=require('esbuild'),{chromium}=require('playwright');
+(async()=>{
+ const racine=path.resolve(__dirname,'../..');const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
+ import React from'react';import{createRoot}from'react-dom/client';import Favoris from'./src/FavorisVinted.jsx';
+ const root=createRoot(document.getElementById('root'));window.pages=0;window.envois=0;
+ const note=i=>({id:'n'+i,body:'Camille '+i+' a ajouté ton article à ses favoris.',actor:{login:'Camille '+i},link:'/items/'+(100+i)+'/conversation/new',user_id:200+i,created_at:new Date(Date.now()-7*3600000).toISOString(),is_read:true});
+ window.fetch=async(url,opts={})=>{const ok=x=>({ok:true,json:async()=>x});
+ if(url.startsWith('/api/compte'))return ok({ok:true,serveur:Date.now(),vue:{active:false,jobs:[{notificationId:'n1',etat:'envoye',envoyeLe:Date.now()-10000}]}});
+ if(url.includes('_favoris_archive'))return ok(window.pages?[{owner:'owner-test',data:{archiveVersion:1,uid:'123',type:'notifications',domain:'www.vinted.fr',payload:{notifications:[note(1),...Array.from({length:window.pages+1},(_,i)=>note(i+2))]},sync:{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',pagesLues:window.pages,totalPages:2,complete:window.pages===2},limite:false}}]:[]);
+ if(url.includes('vrm_favoris_reglages_'))return ok([]);
+ return ok([{owner:'owner-test',data:{uid:'123',domain:'www.vinted.fr',type:'notifications',payload:{notifications:[note(1)]}}}]);};
+ root.render(<Favoris uid="123" owner="owner-test" ownerActuel={()=>'owner-test'} base="https://base.invalid" headers={()=>({})} executerFavori={async()=>{window.envois++;throw Error('No real sending');}} verifierExtension={async()=>({disponible:true,canal:'Chrome direct'})} recupererPage={async()=>{window.pages++;return{ok:true,data:{pagesLues:window.pages,totalPages:2,complete:window.pages===2}};}}/>);`},bundle:true,write:false,format:'iife',logLevel:'silent'});
+ const b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});let n=0;const check=(v,m)=>{assert.ok(v,m);n++;};
+ try{for(const width of [320,390,1512]){const p=await b.newPage({viewport:{width,height:950}});await p.setContent('<div id="root"></div>');await p.addStyleTag({content:'body{margin:12px;font-family:Arial}'+fs.readFileSync(path.join(racine,'src/styles-captures.css'),'utf8')});await p.addScriptTag({content:bundle.outputFiles[0].text});
+ await p.getByRole('button',{name:'Afficher les favoris'}).click();await p.locator('.vrm-favoris-rows article').waitFor();await p.getByText('Message déjà envoyé',{exact:true}).waitFor();
+ check(await p.getByRole('checkbox',{name:'Sélectionner Camille 1',exact:true}).isDisabled(),'confirmed sent favorite cannot be selected');
+ check((await p.locator('time').innerText()).includes('7 h'),'native age displayed');
+ await p.getByRole('button',{name:'Récupérer toutes les pages',exact:true}).click();await p.getByRole('status').filter({hasText:'Toutes les pages disponibles ont été récupérées.'}).waitFor();
+ check(await p.locator('.vrm-favoris-rows article').count()===4,'all available pages merged without losing first page');
+ check(await p.getByText('Message déjà envoyé',{exact:true}).count()===1,'is_read never counts as sent');
+ await p.getByRole('button',{name:'Déjà envoyés (1)',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===1,'sent filter');
+ await p.getByRole('button',{name:'À contacter',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===3,'contact filter excludes confirmed sent');
+ await p.getByRole('searchbox',{name:'Rechercher un favori'}).fill('Camille 3');check(await p.locator('.vrm-favoris-rows article').count()===1,'search works across recovered history');
+ await p.getByRole('button',{name:'Sélectionner les 10 premiers'}).click();check(await p.getByRole('checkbox',{checked:true}).count()===1,'selection respects filtered list');
+ check(await p.evaluate(()=>window.envois===0&&window.pages===2),'loading history never dispatches a message');
+ check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');
+ if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'historique-'+width+'.png'),fullPage:true});}await p.close();}}
+ finally{await b.close();}console.log(n+' contrôles historique React réussis');
+})().catch(e=>{console.error(e);process.exitCode=1;});

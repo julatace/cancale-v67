@@ -47,6 +47,10 @@ function contexte(options={}){
  for(const type of ['message','user_message','offer_request_message']){
   c=contexte({dejaContacte:type});r=await c.envoyer();check(r.ok&&r.data.resultat==='ignore'&&r.data.raison==='conversation_deja_contactee','conversation existante ignorée '+type);check(!c.appels.some(x=>x.url.endsWith('/replies')),'aucun message supplémentaire '+type);
  }
+ c=contexte();c.ctx.authEtatRapide=async()=>({connecte:true,user_id:'owner-fixture'});r=await c.versExt({type:'favorisEtat'});check(r.ok&&r.code==='5.218.0','Chrome répond directement sans pont de page');check(c.appels.length===0,'la santé directe ne contacte pas Vinted');
+ c=contexte();r=await c.versExt({type:'favorisExec',uid:UID,endpoint:'/vrm/favoris',body:{jeton}});check(r.ok&&r.data.resultat==='envoye','le canal Chrome adressé exécute l’opération autorisée');
+ c=contexte();r=await c.versExt({type:'favorisExec',uid:UID,endpoint:'/api/v2/conversations/301/replies',body:{jeton}});check(!r.ok&&c.appels.length===0,'le canal direct ne devient pas un relais générique');
+ c=contexte();r=await c.versExt({type:'favorisEtat'},'https://evil.invalid');check(!r.ok&&c.appels.length===0,'origine étrangère refusée aussi pour la santé directe');
  c=contexte({sessionAbsente:true});r=await c.envoyer();check(r.data.raison==='session_extension','session extension absente expliquée');check(c.appels.length===0,'aucun appel Vinted sans session extension');
  c=contexte();r=await c.ctx.executerPourApp({uid:UID,method:'POST',endpoint:'/vrm/favoris',body:{jeton}},{origin:'https://vrm.center.imposteur.invalid'});
  check(!r.ok&&c.appels.length===0,'origine étrangère : aucun grant, aucun Vinted');

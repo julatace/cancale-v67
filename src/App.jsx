@@ -27,6 +27,7 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables } from "./journeeWidgets.js";
+import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
@@ -97,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.217.0';
+const EXT_ATTENDUE = '5.218.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -397,7 +398,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    messages aux favoris) PUBLIÉES par `main` n'ont pas `capterSuivisAchats`.
 //    À 5.214 ou 5.215, l'app promettait « l'extension relève le suivi » à une
 //    extension qui ne le fait pas (revue du 24 oct.).
-const EXT_CAPACITES = { suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+const EXT_CAPACITES = { favorisliste:'5.218.0', suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -6305,7 +6306,7 @@ const onVmrExt = (fn) => { __vmrExtSubs.add(fn); return () => __vmrExtSubs.delet
 // La version retenue est la plus HAUTE vue au dernier tour — jamais « la
 // dernière arrivée », qui changeait d'un rechargement à l'autre.
 const cleDuPont = (d) => (d && d.id ? 'id:' + String(d.id) : 'v:' + String((d && d.version) || ''));
-let __vmrTour = null, __vmrToursFaits = 0;
+let __vmrTour = null, __vmrToursFaits = 0, __vmrPontUnique = '';
 const __vmrAttenteTour = [];
 // Avant le PREMIER compte, on ne sait pas s'il y en a une ou deux : une commande,
 // un envoi ou une session attendent ce premier compte (au plus 2,5 s) — sinon
@@ -6337,6 +6338,7 @@ function sonderPonts(dureeMs = 1500) {
     if (__vmrTour === tour) __vmrTour = null;
     __vmrToursFaits++;
     __vmrAttenteTour.splice(0).forEach((f) => { try { f(); } catch (_) {} });
+    __vmrPontUnique=tour.ponts.size===1&&[...tour.ponts.keys()][0].startsWith('id:')?[...tour.ponts.keys()][0].slice(3):'';
     if (!tour.ponts.size) return;                       // personne n'a répondu : pas de conclusion
     const versions = [...new Set([...tour.ponts.values()].filter(Boolean))].sort(cmpVersion);
     if (versions.length) __vmrExtVersion = versions[versions.length - 1];
@@ -6857,7 +6859,14 @@ async function battementExt() {
   if (!pontSaitRepondreEtat()) return;
   __vmrBattementEnVol = true;
   let r = null;
-  try { r = await vmrEtat(); } finally { __vmrBattementEnVol = false; }
+  try {
+    const id=__vmrPontUnique||__vmrEtat?.ext||'';
+    if(!__vmrPlusieurs&&cmpVersion(vmrExtVersion()||'','5.218.0')>=0){
+      const direct=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},3000);
+      if(direct?.ok&&direct.ext===id)r=direct;
+    }
+    if(!r)r=await vmrEtat(); // read-only fallback, never an action replay
+  } finally { __vmrBattementEnVol = false; }
   if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
   else {
     __vmrRates++;
@@ -13208,35 +13217,53 @@ function useExtVivante() {
   React.useEffect(() => { demarrerRelais(); }, []);
   return { present: vmrExtPresent(), etat: etatAgissant(), jobs: __vmrJobs };
 }
-function etatExtensionFavoris(uid){
+function etatExtensionFavoris(uid,mesure=null){
+  const e=mesure||__vmrEtat;
   if(__vmrPlusieurs)return {disponible:false,raison:textePlusieurs()};
-  if(codePerime())return {disponible:false,raison:textePerime()};
+  if(mesure&&(!e?.code||e.code!==e.version))return {disponible:false,raison:'Le code de l’extension ne correspond pas à sa version. Recharge-la dans Chrome.'};
+  if(!mesure&&codePerime())return {disponible:false,raison:textePerime()};
   if(!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
-  const version=__vmrEtat?.ok?String(__vmrEtat.version||''):vmrExtVersion();
-  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.217.`};
-  if(__vmrEtat?.vrm?.connecte!==true||String(__vmrEtat.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
-  const actif=String(__vmrEtat?.vinted?.uid||'');
+  const version=e?.ok?String(e.version||''):vmrExtVersion();
+  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.218.`};
+  if(e?.vrm?.connecte!==true||String(e.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
+  const actif=String(e?.vinted?.uid||'');
   if(actif&&uid&&actif!==String(uid))return {disponible:false,raison:'Le navigateur est connecté à un autre compte Vinted. Connecte le compte sélectionné avant de lancer.'};
   return {disponible:true,raison:''};
 }
 function FavorisConnectes(props){
-  const [,maj]=React.useReducer(n=>n+1,0);
+  const [,maj]=React.useReducer(n=>n+1,0),transport=React.useRef(null),directVu=React.useRef(null);
   React.useEffect(()=>onVmrExt(maj),[]);
-  const etat=etatExtensionFavoris(props.uid);
+  const mesure=directVu.current&&Date.now()-directVu.current.at<45000?directVu.current.etat:null;
+  const etat=etatExtensionFavoris(props.uid,mesure);
+  React.useEffect(()=>{const t=setInterval(async()=>{if(document.hidden||transport.current?.mode!=='direct')return;const id=transport.current.id;const r=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);if(r?.ok&&r.ext===id){directVu.current={etat:r,at:Date.now()};maj();}},20000);return()=>clearInterval(t);},[props.uid,props.owner]);
   const verifier=async()=>{
     sonderPonts();
     if(__vmrTour)await new Promise(resolve=>{const t=setTimeout(resolve,2500);__vmrAttenteTour.push(()=>{clearTimeout(t);resolve();});});
-    if(__vmrTour)return {disponible:false,raison:'La vérification des extensions est encore en cours. Réessaie dans un instant.'};
-    const frais=await vmrEtat();
-    if(!frais?.ok)return {disponible:false,raison:'L’extension n’a pas répondu à la vérification. Recharge l’extension puis cette page VRM.'};
+    if(__vmrTour||__vmrPlusieurs)return {disponible:false,raison:__vmrPlusieurs?textePlusieurs():'La vérification des extensions est encore en cours.'};
+    const id=__vmrPontUnique||__vmrEtat?.ext||__lier?.id||'';
+    const mesurer=async()=>{
+      const direct=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);
+      if(direct?.ok&&direct.ext===id){transport.current={mode:'direct',id};directVu.current={etat:direct,at:Date.now()};__vmrExtReady=true;__vmrExtVersion=String(direct.version||'');if(direct.code===direct.version)__vmrPerimePont=null;return direct;}
+      transport.current={mode:'pont',id};return vmrEtat(8000);
+    };
+    const frais=await mesurer();
+    if(!frais?.ok)return {disponible:false,raison:'Aucune réponse dans ce profil Chrome. Vérifie que VRM est autorisée sur vrm.center dans les accès de l’extension, puis recharge cette page.'};
     __vmrEtat=frais;__vmrRates=0;__vmrNotifier();
     if(frais.vrm?.connecte!==true||String(frais.vrm?.user_id||'')!==String(AUTH.user?.id||'')){
-      await assurerSessionExtension();
-      const relu=await vmrEtat();if(relu?.ok){__vmrEtat=relu;__vmrNotifier();}
+      await assurerSessionExtension();const relu=await mesurer();if(relu?.ok){__vmrEtat=relu;__vmrNotifier();}
     }
-    const r=etatExtensionFavoris(props.uid);maj();return r;
+    const r=etatExtensionFavoris(props.uid,transport.current?.mode==='direct'?directVu.current?.etat:null);maj();return {...r,canal:transport.current?.mode==='direct'?'Chrome direct':'pont de page'};
   };
-  return <FavorisVinted {...props} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier}/>;
+  const executer=async(t,lire=false)=>{
+    const e=await verifier();if(!e.disponible)return {ok:false,code:'preparation-refusee',error:e.raison};
+    if(lire&&cmpVersion(String((transport.current?.mode==='direct'?directVu.current?.etat:__vmrEtat)?.code||''),'5.218.0')<0)return {ok:false,error:'La récupération complète nécessite l’extension 5.218. Installe-la puis recharge-la dans Chrome.'};
+    if(transport.current?.mode==='direct'){
+      const r=await appelerFavorisDirect(canalExt(),transport.current.id,lire?{type:'favorisLire',uid:props.uid,body:t}:{type:'favorisExec',uid:props.uid,endpoint:'/vrm/favoris',body:{jeton:t.jeton}},90000);
+      return r||{ok:false,error:lire?'La lecture a été interrompue. Les pages déjà reçues sont conservées.':'Accusé de l’extension absent. Aucun renvoi automatique.',incertain:!lire};
+    }
+    return vmrExecUn({uid:props.uid,method:'POST',endpoint:lire?'/vrm/favoris/lire':'/vrm/favoris',body:lire?t:{jeton:t.jeton}},90000);
+  };
+  return <FavorisVinted {...props} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)}/>;
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file

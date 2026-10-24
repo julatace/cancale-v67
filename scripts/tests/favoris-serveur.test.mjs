@@ -6,7 +6,7 @@ const U='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',V='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbb
 const json=(j,status=200)=>new Response(JSON.stringify(j),{status});
 test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et refus inter-propriétaire',async()=>{
  const ancien=global.fetch,cle=process.env.SUPABASE_SERVICE_KEY;process.env.SUPABASE_SERVICE_KEY='sb_secret_fixture';
- let user=U,panne=false,autreCompte=false,base=new Map(),appels=[];
+ let user=U,panne=false,autreCompte=false,archiveSeule=false,base=new Map(),appels=[];
  const ids=['harvest_123_notifications','harvest_123_wreq_api_v2_conversations','vrm_favoris_reglages_123'];
  const captures=[{uid:'123',type:'notifications',domain:'www.vinted.fr',payload:{notifications:[{id:'n1',user_id:201,body:'Camille a ajouté ton article à ses favoris.',link:'/items/101/conversation/new?from_notification=true'},{id:'n2',user_id:202,body:'Camille a ajouté ton article à ses favoris.',link:'/items/102/conversation/new?from_notification=true'}]}},{uid:'123',method:'POST',path:'/api/v2/conversations',body:JSON.stringify({initiator:'native-fixture',item_id:'101',opposite_user_id:'201'})},{version:1,envoisActifs:false,message:'Merci !',pourcentage:10,intervalleMinutes:1}];
  global.fetch=async(url,o={})=>{
@@ -25,7 +25,7 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
    base.set(id,JSON.parse(o.body).data);return json([{id}]);
   }
   assert.equal(u.searchParams.get('owner'),'eq.'+user);
-  return json(ids.map((id,i)=>({id,owner:user,data:captures[i]})));
+  return json(archiveSeule?[{id:'harvest_123_favoris_archive',owner:user,data:{...captures[0],archiveVersion:1}},...ids.slice(1).map((id,i)=>({id,owner:user,data:captures[i+1]}))]:ids.map((id,i)=>({id,owner:user,data:captures[i]})));
  };
  const call=async(action,extra={},token='fixture.session.jwt')=>{
   let code,body;const res={setHeader(){},status(v){code=v;return this;},json(v){body=v;return this;}};
@@ -53,7 +53,7 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
   assert.equal((await call('suivant')).body.travail,undefined,'cadence serveur même après succès');
   assert.equal((await call('arreter')).body.vue.active,false);
   const reprises=await call('lancer',{selection:['n1']});assert.equal(reprises.code,409,'pas de renvoi à la même personne/article');
-  user=V;assert.equal((await call('lancer',{selection:['n2']})).code,200);
+  user=V;archiveSeule=true;assert.equal((await call('lancer',{selection:['n2']})).code,200,'une notification archivée reste sélectionnable quand la capture courante a changé');
   const avant=[...base.values()][0].tentatives.length;
   assert.equal(await effacerFavorisDe(U),1);const reste=[...base.values()][0];assert.equal(reste.groupes[U],undefined);assert.ok(reste.groupes[V]);assert.deepEqual(reste.proprietaires,[V]);assert.equal(reste.tentatives.length,avant,'effacement conserve le quota partagé');
   panne=true;assert.equal((await call()).code,503,'base indisponible : aucun succès supposé');assert.equal(await effacerFavorisDe(V),null,'effacement non confirmé quand la base échoue');

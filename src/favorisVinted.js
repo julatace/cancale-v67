@@ -54,21 +54,43 @@ function photoNotification(n) {
 export function favorisDepuisNotifications(payload,domain='www.vinted.fr') {
   if(!Array.isArray(payload?.notifications))throw Error('La capture reçue ne contient pas de liste de notifications reconnue.');
   const parId=new Map();let autres=0;
-  for(const n of payload.notifications.slice(0,2000)){
+  for(const n of payload.notifications.slice(0,5000)){
     if(!n||typeof n.id!=='string'||!n.id||n.id.length>160){autres++;continue;}
     const body=texte(n.body), simple=body.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
     // On exige une formulation d'ajout en favori, pas le mot « favori »
     // dans un pseudo ou le titre d'un article. Aucune identité déduite du texte.
-    if(!/\b(?:ajoute|ajouter|mis|marque|added|marked)\b.{0,500}\b(?:favoris|favori|favourites?|favorites?)\b/i.test(simple)){autres++;continue;}
+    if(!/\b(?:ajoute|ajouter|mis|marque|enregistre|added|marked|saved)\b.{0,1500}\b(?:favoris|favori|favourites?|favorites?)\b|\b(?:favourited|favorited)\b.{0,500}\b(?:item|article)\b/i.test(simple)){autres++;continue;}
     const acteur=n.actor||n.from_user;
     const nom=acteur&&typeof acteur==='object'?texte(acteur.login||acteur.username||acteur.name):'';
-    const date=typeof n.updated_at==='string'&&Number.isFinite(Date.parse(n.updated_at))?n.updated_at:null;
-    const ligne={id:n.id,body,nom,photo:photoNotification(n),lien:lienFavoriVinted(n.link,domain),date};
+    const date=dateNotificationFavori(n);
+    const lien=lienFavoriVinted(n.link,domain),article=lien&&/^\/items\/([1-9]\d{0,19})\//.exec(new URL(lien).pathname)?.[1];
+    const userId=Number.isSafeInteger(n.user_id)&&n.user_id>0?String(n.user_id):typeof n.user_id==='string'&&/^[1-9]\d{0,19}$/.test(n.user_id)?n.user_id:null;
+    const ligne={id:n.id,body,nom,photo:photoNotification(n),lien,date,...(article&&userId?{identiteNotification:article+':'+userId}:{})};
     const avant=parId.get(n.id);
-    if(!avant||!avant.date||date&&Date.parse(date)>=Date.parse(avant.date))parId.set(n.id,ligne);
+    if(!avant)parId.set(n.id,ligne);
+    else {const dates=[avant.date,date].filter(Boolean).map(Date.parse);parId.set(n.id,{...avant,...ligne,date:dates.length?new Date(Math.min(...dates)).toISOString():null});}
   }
   const totalPages=payload.pagination?.total_pages;
-  return {lignes:[...parId.values()].sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)),autres,limite:payload.notifications.length>2000,totalPages:Number.isSafeInteger(totalPages)&&totalPages>0?totalPages:null};
+  return {lignes:[...parId.values()].sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)),autres,limite:payload.notifications.length>5000,totalPages:Number.isSafeInteger(totalPages)&&totalPages>0?totalPages:null};
+}
+export function dateNotificationFavori(n){
+  for(const v of [n.created_at,n.created_at_ts,n.dateAjoutObservee,n.updated_at]){
+    if(v==null||v==='')continue;const nombre=typeof v==='number'||typeof v==='string'&&/^\d{10,13}$/.test(v)?Number(v):null;
+    const t=nombre==null?Date.parse(v):nombre<1e12?nombre*1000:nombre;
+    if(Number.isFinite(t)&&t>0&&Number.isFinite(new Date(t).getTime()))return new Date(t).toISOString();
+  }return null;
+}
+export function ageFavori(date,maintenant=Date.now()){
+  const t=Date.parse(date||'');if(!Number.isFinite(t))return 'Date indisponible';
+  const s=Math.floor((maintenant-t)/1000);if(s< -120)return 'Heure à vérifier';if(s<60)return 'à l’instant';
+  if(s<3600)return `il y a ${Math.floor(s/60)} min`;if(s<86400)return `il y a ${Math.floor(s/3600)} h`;return `il y a ${Math.floor(s/86400)} j`;
+}
+export function contactFavori(ligne,jobs){
+  if(!Array.isArray(jobs))return null;
+  const candidats=jobs.filter(j=>j.notificationId===ligne.id||ligne.identiteNotification&&j.id===ligne.identiteNotification);
+  const ordre=['envoye','incertain','ignore','reserve','attente','verifie','refuse','annule'];
+  const rang=j=>ordre.includes(j.etat)?ordre.indexOf(j.etat):999;
+  return candidats.sort((a,b)=>rang(a)-rang(b))[0]||null;
 }
 export async function lireFavorisVinted({uid,owner,ownerActuel,base,headers,fetcher=fetch}) {
   if(!owner||ownerActuel()!==owner||!/^\d{1,20}$/.test(String(uid||'')))throw Error('Choisis un compte Vinted dans ta session VRM.');
@@ -77,8 +99,14 @@ export async function lireFavorisVinted({uid,owner,ownerActuel,base,headers,fetc
   const rows=await r.json();
   if(ownerActuel()!==owner)throw Error('La session a changé. Recharge les favoris.');
   if(!Array.isArray(rows)||rows.length>1||rows.some(x=>x?.owner!==owner))throw Error('Le compte de la capture n’a pas été confirmé.');
-  if(!rows.length)return {reception:'absente',lignes:[]};
-  const d=rows[0].data;
-  if(d?.type!=='notifications'||String(d.uid)!==String(uid))throw Error('La capture ne correspond pas au compte demandé.');
-  return {reception:'recue',...favorisDepuisNotifications(d.payload,d.domain||null)};
+  const d=rows[0]?.data;
+  if(d&&(d.type!=='notifications'||String(d.uid)!==String(uid)||!Array.isArray(d.payload?.notifications)))throw Error('La capture ne correspond pas au compte demandé.');
+  const a=await fetcher(`${base}/rest/v1/app_data?id=eq.harvest_${uid}_favoris_archive&owner=eq.${encodeURIComponent(owner)}&select=owner,data`,{headers,cache:'no-store'});
+  if(!a.ok)throw Error('L’historique des favoris n’a pas pu être lu. Réessaie pour éviter une liste incomplète.');
+  const ars=await a.json();if(ownerActuel()!==owner)throw Error('La session a changé. Recharge les favoris.');
+  if(!Array.isArray(ars)||ars.length>1||ars.some(x=>x?.owner!==owner||x.data?.archiveVersion!==1||String(x.data?.uid)!==String(uid)||!Array.isArray(x.data?.payload?.notifications)))throw Error('L’historique ne confirme pas le compte attendu.');
+  const archive=ars[0]?.data;
+  if(!d&&!archive)return {reception:'absente',lignes:[]};
+  const notifications=[...(archive?.payload?.notifications||[]),...(d?.payload?.notifications||[])];
+  return {reception:'recue',...favorisDepuisNotifications({...d?.payload,notifications},d?.domain||archive?.domain||null),archive:archive?{sync:archive.sync,limite:archive.limite,capturedAt:archive.capturedAt}:null};
 }

@@ -1,7 +1,7 @@
 // Vrai inject.js, fetch/XHR simulés. Aucun compte et aucune requête réseau.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(process.env.SOURCE_INJECT||path.join(__dirname,'../vinted-sync-extension/inject.js'),'utf8');
-const posts=[],minuteries=[];let appels=0,fixture={status:200,body:JSON.stringify({notifications:[{id:123,user:{id:456}}]})};
+const posts=[],minuteries=[];let appels=0,fixture={status:200,body:JSON.stringify({notifications:[{id:123,user:{id:918273645}}]})};
 class XHR{
  constructor(){this.events={};}
  open(method,url){this.method=method;this.url=url;}
@@ -21,7 +21,7 @@ let verts=0,rouges=0;const check=(c,t)=>{console.log((c?'✅ ':'❌ ')+t);c?vert
 const pause=()=>new Promise(r=>setImmediate(r));
 const vide=()=>{posts.length=0;minuteries.splice(0,minuteries.length);};
 const lire=async(url,{method='GET',status=200,xhr=false}={})=>{
- vide();fixture={status,body:JSON.stringify({notifications:[{id:123,user:{id:456}}]})};
+ vide();fixture={status,body:JSON.stringify({notifications:[{id:123,user:{id:918273645}}]})};
  const avant=appels;
  if(xhr){const r=new ctx.XMLHttpRequest();r.open(method,url);r.send();assert.equal(r.responseText,fixture.body);}
  else{const r=await ctx.fetch(url,{method});assert.equal(await r.text(),fixture.body);}
@@ -49,7 +49,7 @@ const lire=async(url,{method='GET',status=200,xhr=false}={})=>{
  await lire('https://api.vinted.fr/inbox-notifications/v1/notifications?token=secret',{status:403});
  const trace=posts.find(x=>x.kind==='seen_urls');
  check(!!trace?.reponses?.['GET /inbox-notifications/v1/notifications']&&trace.reponses['GET /inbox-notifications/v1/notifications'].st===403,'le refus du service hors /api est traçable immédiatement');
- check(!!trace&&!JSON.stringify(trace).includes('secret')&&!JSON.stringify(trace).includes('456'),'la trace ne contient ni paramètres ni contenu');
+ check(!!trace&&!JSON.stringify(trace).includes('secret')&&!JSON.stringify(trace).includes('918273645'),'la trace ne contient ni paramètres ni contenu');
  const {faireFond}=require('./_fond-vm.cjs');
  const fond=faireFond();
  const corps=JSON.stringify({notifications:[{id:'900001',conversation_id:'900002',item:{id:'900003'}}]});

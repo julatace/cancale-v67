@@ -27,13 +27,23 @@ export async function routeFavoris(req,res){
       if(!c||typeof c!=='object'||Array.isArray(c)||JSON.stringify(c).length>5000)throw new RefusFavoris('Commande invalide.',400);
       if(c.action==='lancer'){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
-        const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=in.(${ids.join(',')})&select=id,owner,data`);
-        if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||ids.some(id=>rows.filter(x=>x.id===id).length!==1))throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
-        const lire=id=>rows.find(x=>x.id===id).data;
+        const archiveId=`harvest_${uid}_favoris_archive`;
+        const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=in.(${[...ids,archiveId].join(',')})&select=id,owner,data`);
+        if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||ids.slice(1).some(id=>rows.filter(x=>x.id===id).length!==1))throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
+        const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
         const p=validerReglagesFavoris(prefs),message=preparerMessageFavori(p.message,p.pourcentage).message;
         if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
-        const targets=resoudreCiblesFavoris({uid,capture:lire(ids[0]),trace:lire(ids[1]),selection:c.selection});
+        const archive=rows.find(x=>x.id===archiveId)?.data,capture=lire(ids[0])||archive;
+        if(!capture||capture.type!=='notifications'||String(capture.uid)!==uid)throw new RefusFavoris('La capture de ce compte doit être actualisée.');
+        if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))throw new RefusFavoris('L’historique de ce compte doit être vérifié avant de lancer.');
+        const parId=new Map();
+        for(const n of [...(archive?.payload?.notifications||[]),...(capture?.payload?.notifications||[])]){
+          const avant=parId.get(n.id);
+          if(avant&&(String(avant.user_id)!==String(n.user_id)||avant.link!==n.link))throw new RefusFavoris('Une notification a changé d’identité. Actualise avant de lancer.');
+          parId.set(n.id,{...avant,...n});
+        }
+        const targets=resoudreCiblesFavoris({uid,capture:{...capture,payload:{...capture.payload,notifications:[...parId.values()]}},trace:lire(ids[1]),selection:c.selection});
         const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,maintenant,lot});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
