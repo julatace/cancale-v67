@@ -1,7 +1,7 @@
 import {formesLiensNotifications} from './favorisVinted.js';
 // Préparer le raccordement des favoris à leurs conversations sans supposer
 // la forme du flux Vinted et sans exporter son contenu privé.
-const CHAMPS = new Set(('payload data notifications notification items item user actor sender recipient from_user entity target link url action type event id user_id item_id conversation_id transaction_id entry_id body title message text created_at updated_at created_at_ts pagination page total_pages current_page next_page count code status attributes parameters content path href button buttons actions target_url read is_read details icon image entity_type subject params web_url entities context meta event_type notification_type').split(' '));
+const CHAMPS = new Set(('payload data notifications notification items item user actor sender recipient from_user entity target link url action type event id user_id item_id conversation_id transaction_id entry_id body title message text created_at updated_at created_at_ts pagination page total_pages current_page next_page count code status attributes parameters content path href button buttons actions target_url read is_read details icon image entity_type subject params web_url entities context meta event_type notification_type conversation opposite_user_id receiver_id recipient_id sender_id receiver_user_id recipient_user_id source_user_id target_user_id receiver recipient sender initiator reply photo_temp_uuids is_personal_data_sharing_check_skipped').split(' '));
 
 export function structureNotifications(payload) {
   const champs = new Map();
@@ -60,7 +60,7 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
   const rows = await r.json();
   if (ownerActuel() !== owner) throw Error('La session a changé. Relance la vérification.');
   if (!Array.isArray(rows) || rows.length > 1 || rows.some(x => x?.owner !== owner)) throw Error('La lecture du compte n’a pas été confirmée.');
-  const entete = {diagnostic: 'VRM-favoris-structure-v3', envoisAutomatiques: 'non_actives', listeComplete: 'non_verifiee'};
+  const entete = {diagnostic: 'VRM-favoris-structure-v4', envoisAutomatiques: 'non_actives', listeComplete: 'non_verifiee'};
   if (!rows.length) {
     let traces = {etat:'lecture_indisponible'};
     let reponse;
@@ -80,5 +80,27 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
   }
   const d = rows[0].data;
   if (!d || d.type !== 'notifications' || String(d.uid) !== String(uid) || !d.payload || typeof d.payload !== 'object') throw Error('La capture ne confirme pas le compte et le type attendus.');
-  return {...entete, reception: 'capture_disponible', ...structureNotifications(d.payload), liens:formesLiensNotifications(d.payload)};
+  const liens=formesLiensNotifications(d.payload,uid);
+  let creation={etat:'non_recherchee'};
+  if(liens.formes.some(x=>x.mentionFavori&&x.chemin.endsWith('/new'))){
+    const versions=[2,3];
+    const reponses=await Promise.allSettled(versions.map(v=>fetcher(`${base}/rest/v1/app_data?id=eq.harvest_${uid}_wreq_api_v${v}_conversations&owner=eq.${encodeURIComponent(owner)}&select=owner,data`,{headers,cache:'no-store'})));
+    if(ownerActuel()!==owner)throw Error('La session a changé. Relance la vérification.');
+    const traces=[];
+    for(let i=0;i<versions.length;i++){
+      const v=versions[i],r=reponses[i];
+      if(r.status!=='fulfilled'||!r.value.ok){traces.push({api:`v${v}`,etat:'lecture_indisponible'});continue;}
+      let lignes;try{lignes=await r.value.json();}catch{lignes=null;}
+      if(ownerActuel()!==owner)throw Error('La session a changé. Relance la vérification.');
+      if(!Array.isArray(lignes)){traces.push({api:`v${v}`,etat:'lecture_indisponible'});continue;}
+      if(lignes.length>1||lignes.some(x=>x?.owner!==owner||String(x?.data?.uid)!==String(uid)))throw Error('La trace de conversation ne confirme pas le compte attendu.');
+      if(!lignes.length){traces.push({api:`v${v}`,etat:'aucune_creation_observee'});continue;}
+      const trace=lignes[0].data;
+      if(trace.method!=='POST'||String(trace.path||'').replace(/\/$/,'')!==`/api/v${v}/conversations`){traces.push({api:`v${v}`,etat:'trace_non_reconnue'});continue;}
+      let corps;try{corps=typeof trace.body==='string'&&trace.body.length<=100000?JSON.parse(trace.body):null;}catch{corps=null;}
+      traces.push(corps&&typeof corps==='object'?{api:`v${v}`,etat:'forme_observee',succes:'non_confirme',methode:'POST',chemin:`/api/v${v}/conversations`,...structureNotifications(corps)}:{api:`v${v}`,etat:'corps_non_structure'});
+    }
+    creation={etat:'traces_lues',traces};
+  }
+  return {...entete, reception: 'capture_disponible', ...structureNotifications(d.payload), liens, creation};
 }

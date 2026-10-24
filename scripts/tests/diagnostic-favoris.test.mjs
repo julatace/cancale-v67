@@ -76,3 +76,26 @@ test('une panne de lecture des traces reste une panne, pas une absence de requê
  let acteur=owner,appels=0;
  await assert.rejects(lireDiagnosticFavoris({...options(),ownerActuel:()=>acteur,fetcher:async()=>{if(++appels===1)return response([]);acteur=autre;return response([]);}}));
 });
+test('les liens de création et les formes des requêtes observées sont lisibles sans valeurs privées',async()=>{
+ const appels=[];
+ const data={...donnees,payload:{notifications:[{id:'notif-privee',user_id:123,body:'Camille a ajouté ton article à ses favoris.',link:'/items/654321/conversation/new?receiver=987654'}]}};
+ const trace={uid:'123',method:'POST',path:'/api/v2/conversations',body:JSON.stringify({conversation:{item_id:654321,opposite_user_id:987654},reply:{body:'Bonjour secret'}})};
+ const r=await lireDiagnosticFavoris({...options(),fetcher:async(url,o)=>{
+  appels.push({url,o});return response(url.includes('wreq_api_v2')?[{owner,data:trace}]:url.includes('wreq_api_v3')?[]:[{owner,data}]);
+ }});
+ assert.equal(r.diagnostic,'VRM-favoris-structure-v4');assert.equal(r.envoisAutomatiques,'non_actives');
+ assert.equal(r.liens.formes[0].chemin,'/items/{identifiant}/conversation/new');assert.deepEqual(r.liens.formes[0].parametres,['receiver']);
+ assert.equal(r.liens.formes[0].userIdCorrespondAuCompte,true);
+ const t=r.creation.traces.find(x=>x.api==='v2');assert.equal(t.etat,'forme_observee');assert.ok(t.champs.some(x=>x.chemin==='reponse.conversation.opposite_user_id'));
+ for(const secret of ['654321','987654','Bonjour secret','Camille','notif-privee'])assert.equal(JSON.stringify(r).includes(secret),false,secret);
+ assert.equal(appels.length,3);assert.ok(appels.every(x=>new URL(x.url).searchParams.get('owner')==='eq.'+owner&&!x.o.method));
+});
+test('la relation entre user_id et un paramètre est un booléen, jamais un identifiant exporté',async()=>{
+ const data={...donnees,payload:{notifications:[{id:'n',user_id:987654,body:'Camille a ajouté ton article à ses favoris.',link:'/items/654321/conversation/new?receiver=987654'}]}};
+ const r=await lireDiagnosticFavoris({...options(),fetcher:async(url)=>response(url.includes('wreq_')?[]:[{owner,data}])});
+ assert.equal(r.liens.formes[0].userIdCorrespondAuCompte,false);assert.deepEqual(r.liens.formes[0].parametresUserId,['receiver']);assert.equal(JSON.stringify(r).includes('987654'),false);
+});
+test('les écritures observées d’un autre propriétaire ou compte ne rejoignent jamais le rapport',async()=>{
+ const data={...donnees,payload:{notifications:[{id:'n',body:'Camille a ajouté ton article à ses favoris.',link:'/items/654321/conversation/new?receiver=987654'}]}};
+ for(const row of [{owner:autre,data:{uid:'123'}},{owner,data:{uid:'456'}}])await assert.rejects(lireDiagnosticFavoris({...options(),fetcher:async(url)=>response(url.includes('wreq_')?[row]:[{owner,data}])}));
+});
