@@ -27,6 +27,8 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
     {etat.erreur&&<p role="alert">{etat.erreur}</p>}
     {etat.rapport&&<>
       <p role="status">{etat.rapport.reception==='aucune_capture'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis réessaie.':'Capture reçue. Tu peux partager ce diagnostic pour terminer le raccordement.'}</p>
+      {etat.rapport.creation?.traces?.find(t=>t.api==='v2')?.rapprochement?.etat==='article_absent_de_la_capture'&&<p>La dernière conversation captée concerne un autre article que ceux de cette capture. Ce diagnostic ne confirme donc pas le destinataire des favoris sélectionnés.</p>}
+      {etat.rapport.creation?.traces?.find(t=>t.api==='v2')?.rapprochement?.etat==='destinataire_non_confirme'&&<p>L’article correspond, mais le membre de la conversation ne correspond pas au champ utilisé par VRM. Copie le diagnostic ci-dessous pour corriger ce raccordement ; aucun message ne sera envoyé entre-temps.</p>}
       {etat.rapport.traces?.versionExtension&&<p>Version enregistrée dans les traces : {etat.rapport.traces.versionExtension}.</p>}
       {etat.rapport.traces?.observations?.some(x=>x.statut===401||x.statut===403)&&<p>Une lecture des notifications a été refusée par Vinted. Vérifie que le bon compte est accessible sur Vinted avant de réessayer.</p>}
       {etat.rapport.traces?.observations?.some(x=>x.statut===429)&&<p>Vinted demande de ralentir. Attends avant de relancer la lecture.</p>}

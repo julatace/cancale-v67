@@ -1,4 +1,4 @@
-import {formesLiensNotifications} from './favorisVinted.js';
+import {formesLiensNotifications,lienFavoriVinted} from './favorisVinted.js';
 // Préparer le raccordement des favoris à leurs conversations sans supposer
 // la forme du flux Vinted et sans exporter son contenu privé.
 const CHAMPS = new Set(('payload data notifications notification items item user actor sender recipient from_user entity target link url action type event id user_id item_id conversation_id transaction_id entry_id body title message text created_at updated_at created_at_ts pagination page total_pages current_page next_page count code status attributes parameters content path href button buttons actions target_url read is_read details icon image entity_type subject params web_url entities context meta event_type notification_type conversation opposite_user_id receiver_id recipient_id sender_id receiver_user_id recipient_user_id source_user_id target_user_id receiver recipient sender initiator reply photo_temp_uuids is_personal_data_sharing_check_skipped').split(' '));
@@ -53,6 +53,29 @@ export function tracesNotifications(data) {
   return {etat:'lues',versionExtension:/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(data?.ver || '')?data.ver:'non_identifiee',observations:[...familles.values()].slice(0,20)};
 }
 
+
+// Relations only: never export native IDs, usernames, URLs or query values.
+export function rapprochementFavoris(payload,corps,uid,domain='www.vinted.fr'){
+  const id=v=>Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:null;
+  const item=id(corps?.item_id),dest=id(corps?.opposite_user_id);
+  const format=!!item&&!!dest&&dest!==String(uid)&&typeof corps?.initiator==='string'&&!!corps.initiator&&corps.initiator.length<=80&&Object.keys(corps).sort().join(',')==='initiator,item_id,opposite_user_id';
+  if(!format)return {etat:'format_creation_non_reconnu'};
+  let articles=0,personnes=0,paires=0;const autres=new Set(),parametres=new Set();
+  const ns=Array.isArray(payload?.notifications)?payload.notifications:[];
+  for(const n of ns.slice(0,5000)){
+    if(!/favori|favourit/i.test(String(n?.body||'')))continue;
+    const l=lienFavoriVinted(n.link,domain);let u,m;try{u=new URL(l);m=/^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(u.pathname);}catch{continue;}
+    if(!m)continue;
+    const memeItem=m[1]===item,memePersonne=id(n.user_id)===dest;
+    if(memeItem)articles++;if(memePersonne)personnes++;if(memeItem&&memePersonne)paires++;
+    if(memeItem){
+      for(const k of ['actor','from_user','user','sender'])if(id(n[k]?.id)===dest)autres.add(k+'.id');
+      for(const [k,v] of u.searchParams)if(id(v)===dest)parametres.add(['receiver_id','recipient_id','user_id','opposite_user_id','receiver','recipient','user'].includes(k)?k:'parametre_masque');
+    }
+  }
+  return {etat:paires?'relation_observee':!articles?'article_absent_de_la_capture':'destinataire_non_confirme',portee:'capture_courante_uniquement',articlesCorrespondants:articles,personnesCorrespondantes:personnes,pairesCorrespondantes:paires,autresChampsCorrespondants:[...autres].sort(),parametresCorrespondants:[...parametres].sort(),echantillonLimite:ns.length>5000};
+}
+
 export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, headers, fetcher = fetch}) {
   if (!/^\d{1,20}$/.test(String(uid || '')) || !owner || ownerActuel() !== owner) throw Error('Sélectionne un compte Vinted dans ta session VRM.');
   const r = await fetcher(`${base}/rest/v1/app_data?id=eq.harvest_${uid}_notifications&owner=eq.${encodeURIComponent(owner)}&select=owner,data`, {headers, cache: 'no-store'});
@@ -60,7 +83,7 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
   const rows = await r.json();
   if (ownerActuel() !== owner) throw Error('La session a changé. Relance la vérification.');
   if (!Array.isArray(rows) || rows.length > 1 || rows.some(x => x?.owner !== owner)) throw Error('La lecture du compte n’a pas été confirmée.');
-  const entete = {diagnostic: 'VRM-favoris-structure-v4', envoisAutomatiques: 'statut_dans_la_file', listeComplete: 'non_verifiee'};
+  const entete = {diagnostic: 'VRM-favoris-structure-v5', envoisAutomatiques: 'statut_dans_la_file', listeComplete: 'non_verifiee'};
   if (!rows.length) {
     let traces = {etat:'lecture_indisponible'};
     let reponse;
@@ -98,7 +121,7 @@ export async function lireDiagnosticFavoris({uid, owner, ownerActuel, base, head
       const trace=lignes[0].data;
       if(trace.method!=='POST'||String(trace.path||'').replace(/\/$/,'')!==`/api/v${v}/conversations`){traces.push({api:`v${v}`,etat:'trace_non_reconnue'});continue;}
       let corps;try{corps=typeof trace.body==='string'&&trace.body.length<=100000?JSON.parse(trace.body):null;}catch{corps=null;}
-      traces.push(corps&&typeof corps==='object'?{api:`v${v}`,etat:'forme_observee',succes:'non_confirme',methode:'POST',chemin:`/api/v${v}/conversations`,...structureNotifications(corps)}:{api:`v${v}`,etat:'corps_non_structure'});
+      traces.push(corps&&typeof corps==='object'?{api:`v${v}`,etat:'forme_observee',succes:'non_confirme',methode:'POST',chemin:`/api/v${v}/conversations`,...structureNotifications(corps),rapprochement:rapprochementFavoris(d.payload,corps,uid,d.domain)}:{api:`v${v}`,etat:'corps_non_structure'});
     }
     creation={etat:'traces_lues',traces};
   }

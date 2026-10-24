@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {structureNotifications,lireDiagnosticFavoris,tracesNotifications} from '../../src/diagnosticFavoris.js';
+import {structureNotifications,lireDiagnosticFavoris,tracesNotifications,rapprochementFavoris} from '../../src/diagnosticFavoris.js';
 
 const owner='11111111-1111-4111-8111-111111111111';
 const autre='22222222-2222-4222-8222-222222222222';
@@ -83,7 +83,7 @@ test('les liens de création et les formes des requêtes observées sont lisible
  const r=await lireDiagnosticFavoris({...options(),fetcher:async(url,o)=>{
   appels.push({url,o});return response(url.includes('wreq_api_v2')?[{owner,data:trace}]:url.includes('wreq_api_v3')?[]:[{owner,data}]);
  }});
- assert.equal(r.diagnostic,'VRM-favoris-structure-v4');assert.equal(r.envoisAutomatiques,'statut_dans_la_file');
+ assert.equal(r.diagnostic,'VRM-favoris-structure-v5');assert.equal(r.envoisAutomatiques,'statut_dans_la_file');
  assert.equal(r.liens.formes[0].chemin,'/items/{identifiant}/conversation/new');assert.deepEqual(r.liens.formes[0].parametres,['receiver']);
  assert.equal(r.liens.formes[0].userIdCorrespondAuCompte,true);
  const t=r.creation.traces.find(x=>x.api==='v2');assert.equal(t.etat,'forme_observee');assert.ok(t.champs.some(x=>x.chemin==='reponse.conversation.opposite_user_id'));
@@ -98,4 +98,16 @@ test('la relation entre user_id et un paramètre est un booléen, jamais un iden
 test('les écritures observées d’un autre propriétaire ou compte ne rejoignent jamais le rapport',async()=>{
  const data={...donnees,payload:{notifications:[{id:'n',body:'Camille a ajouté ton article à ses favoris.',link:'/items/654321/conversation/new?receiver=987654'}]}};
  for(const row of [{owner:autre,data:{uid:'123'}},{owner,data:{uid:'456'}}])await assert.rejects(lireDiagnosticFavoris({...options(),fetcher:async(url)=>response(url.includes('wreq_')?[row]:[{owner,data}])}));
+});
+
+test('le rapprochement distingue trace périmée, champ différent et relation native sans divulgation',()=>{
+ const corps={initiator:'native',item_id:'987654321',opposite_user_id:'876543210'};
+ const n={id:'notification-privee',body:'Camille a ajouté ton article à ses favoris.',user_id:876543210,link:'/items/987654321/conversation/new?secret-prive=876543210'};
+ const rapport=ns=>rapprochementFavoris({notifications:ns},corps,'123');
+ assert.equal(rapport([n]).etat,'relation_observee');assert.equal(rapport([n]).pairesCorrespondantes,1);
+ assert.equal(rapport([{...n,link:'/items/765432109/conversation/new'}]).etat,'article_absent_de_la_capture');
+ const autre=rapport([{...n,user_id:654321098,actor:{id:876543210}}]);
+ assert.equal(autre.etat,'destinataire_non_confirme');assert.deepEqual(autre.autresChampsCorrespondants,['actor.id']);assert.deepEqual(autre.parametresCorrespondants,['parametre_masque']);
+ assert.equal(rapprochementFavoris({},null,'123').etat,'format_creation_non_reconnu');
+ for(const secret of ['987654321','876543210','654321098','Camille','secret-prive','notification-privee'])assert.equal(JSON.stringify(autre).includes(secret),false);
 });
