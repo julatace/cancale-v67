@@ -11,7 +11,7 @@ function PhotoNotification({src, PhotoVinted}) {
 }
 
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,PhotoVinted=null}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension,PhotoVinted=null}) {
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[reglages,setReglages]=React.useState({});
   const reglagesLus=React.useRef(false),edition=React.useRef(0),sauvegarde=React.useRef(false);
@@ -46,9 +46,17 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     sauvegarde.current=true;const n=requete.current,e=edition.current;setReglages(x=>({...x,sauvegarde:true,erreur:''}));setRetour('');
     try{
       await sauverReglagesFavoris({uid,owner,ownerActuel,base,headers:headers()},contenu);
-      if(n===requete.current&&ownerActuel()===owner){setReglages({prets:true,enregistres:e===edition.current});setRetour(e===edition.current?'Réglages enregistrés pour ce compte. Ils seront utilisés au prochain lancement.':'La version précédente est enregistrée. Tes dernières modifications restent à enregistrer.');}
+      if(n===requete.current&&ownerActuel()===owner){setReglages({prets:true,enregistres:e===edition.current});setRetour(e===edition.current?'Réglages enregistrés pour ce compte. Ils seront utilisés au prochain lancement.':'La version précédente est enregistrée. Tes dernières modifications restent à enregistrer.');if(e===edition.current)return contenu;}
     }catch(e){if(n===requete.current&&ownerActuel()===owner){reglagesLus.current=false;setReglages({prets:false,erreur:e.message});}}
     finally{if(n===requete.current)sauvegarde.current=false;}
+  };
+  const preparerReglages=async()=>{
+    if(!reglages.prets||!reglagesLus.current)throw Error(reglages.erreur||'Actualise les favoris pour lire les réglages de ce compte.');
+    const contenu=validerReglagesFavoris({message,pourcentage:reduction,intervalleMinutes:intervalle});
+    if(reglages.enregistres)return contenu;
+    const sauves=await enregistrer();
+    if(!sauves)throw Error('Enregistrement non confirmé ou texte modifié pendant la sauvegarde. Vérifie ton message avant de relancer.');
+    return sauves;
   };
   return <section className="vrm-favoris-liste" aria-label="Favoris reçus">
     <header><div><h3>Favoris reçus</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={!uid||!owner||etat.charge||reglages.sauvegarde}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button>{data&&<button type="button" disabled={reglages.sauvegarde} onClick={()=>{requete.current++;occupe.current=false;setEtat({});setSelection([]);setRetour('');}}>Masquer</button>}</div></header>
@@ -77,7 +85,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button></div>}
       </>}
     </>}
-    {uid&&owner&&executerFavori&&<AutomatisationFavoris key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} executer={executerFavori} disponible={favorisDisponible}/>}
+    {uid&&owner&&executerFavori&&<AutomatisationFavoris key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension}/>}
     {retour&&<p role="status">{retour}</p>}
   </section>;
 }

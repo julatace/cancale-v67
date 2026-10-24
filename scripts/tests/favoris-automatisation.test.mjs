@@ -60,10 +60,10 @@ test('le quota et la cadence repartent de l’accusé reçu, pas d’une réserv
   d=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'envoye',maintenant:T+50000}).data;
   assert.deepEqual(d.tentatives,[T+50000]);assert.equal(claim(d,T+60000).valeur.travail,undefined);assert.ok(claim(d,T+110000).valeur.travail);
 });
-test('pas de destinataire repris après envoi, refus ou incertitude ; doublons de notification dédupliqués par personne/article',()=>{
+test('dédoublonnage après envoi ; refus relançable seulement par une nouvelle sélection explicite',()=>{
   let d=lancer(null,[cible(1),{...cible(1),notificationId:'autre-notif'}]).data;assert.equal(d.groupes[owner].jobs.length,1);
   d=regler(claim(d).data);assert.throws(()=>lancer(d));assert.throws(()=>lancer(d,[cible(1)],autre),'dédoublonnage partagé entre les propriétaires du même UID');
-  let e=claim(lancer().data).data;e=terminerFile(e,{owner,jeton:'jeton-unique',resultat:'refuse'}).data;assert.throws(()=>lancer(e));
+  let e=claim(lancer().data).data;e=terminerFile(e,{owner,jeton:'jeton-unique',resultat:'refuse'}).data;assert.equal(e.groupes[owner].active,false);const relance=lancer(e);assert.equal(relance.data.groupes[owner].jobs.length,1);assert.equal(relance.data.groupes[owner].jobs[0].etat,'attente');
 });
 test('une nouvelle sélection ne reprend pas le reste interrompu ; les jamais partis annulés peuvent être sélectionnés à nouveau',()=>{
   let d=claim(lancer(null,[cible(1),cible(2)]).data).data;d=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'refuse'}).data;

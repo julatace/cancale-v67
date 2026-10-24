@@ -11,9 +11,9 @@ export function initialiserFile(d){
 }
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
-  return g?{active:g.active,raison:g.raison||'',prochain:d.enCours?null:Math.max(g.prochain||0,(d.tentatives||[]).length>=10?d.tentatives[d.tentatives.length-10]+3600000:0),jobs:g.jobs.map(({id,notificationId,etat})=>({id,notificationId,etat}))}:{active:false,raison:'',prochain:null,jobs:[]};
+  return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0,(d.tentatives||[]).length>=10?d.tentatives[d.tentatives.length-10]+3600000:0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot})=>({id,notificationId,etat,lot,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
 }
-export function lancerFile(d,{owner,targets,message,intervalleMinutes,maintenant}){
+export function lancerFile(d,{owner,targets,message,intervalleMinutes,maintenant,lot=String(maintenant)}){
   d=initialiserFile(d);
   if(!Array.isArray(targets)||!targets.length||targets.length>10||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<1||intervalleMinutes>1440)throw new RefusFavoris('Sélection ou réglages invalides.',400);
   if(!Number.isSafeInteger(maintenant)||maintenant<0)throw new RefusFavoris('Horloge indisponible.',503);
@@ -23,18 +23,18 @@ export function lancerFile(d,{owner,targets,message,intervalleMinutes,maintenant
   if(g.jobs.some(x=>x.etat==='incertain'))throw new RefusFavoris('Vérifie les envois incertains sur Vinted avant de préparer une nouvelle file.');
   // A new launch is exactly its new selection, never an old paused remainder.
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
-  const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>x.etat!=='annule').map(x=>x.itemId+':'+x.recipientId));
+  const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>!['annule','refuse'].includes(x.etat)).map(x=>x.itemId+':'+x.recipientId));
   const nouveaux=[];
-  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,intervalleMinutes});}}
+  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,intervalleMinutes,lot});}}
   if(!nouveaux.length)throw new RefusFavoris('Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.');
   const anciens=g.jobs.filter(x=>!nouveaux.some(n=>n.id===x.id));
   if(anciens.length+nouveaux.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');
-  d.groupes[owner]={...g,jobs:[...anciens,...nouveaux],active:true,raison:''};
+  d.groupes[owner]={...g,jobs:[...anciens,...nouveaux],active:true,raison:'',lot,intervalleMinutes};
   d.proprietaires=Object.keys(d.groupes);
   if(JSON.stringify(d).length>1500000)throw new RefusFavoris('La file a atteint sa capacité.');
   return {data:d,valeur:vueFile(d,owner)};
 }
-export function reserverFile(d,{owner,maintenant,jeton}){
+export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g?.active)return {valeur:{vue:vueFile(d,owner)}};
   if(Object.values(d.groupes).some(x=>x.jobs.some(j=>j.etat==='incertain')))return {valeur:{vue:{...vueFile(d,owner),raison:'Une tentative sur ce compte doit être vérifiée sur Vinted avant la suite.'}}};
@@ -52,24 +52,27 @@ export function reserverFile(d,{owner,maintenant,jeton}){
   if(maintenant<prochain)return {valeur:{vue:{...vueFile(d,owner),prochain}}};
   const j=g.jobs.find(x=>x.etat==='attente');
   if(!j){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
-  j.etat='reserve';d.enCours={owner,id:j.id,jeton,at:maintenant};d.tentatives=[...t,maintenant];
+  j.etat='reserve';d.enCours={owner,id:j.id,jeton,suivi,at:maintenant,prochainAvant:g.prochain||0,globalAvant:d.prochainGlobal||0};d.tentatives=[...t,maintenant];
   g.prochain=maintenant+j.intervalleMinutes*60000;
   d.prochainGlobal=g.prochain;
-  return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton}}};
+  return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton,suivi}}};
 }
-export function terminerFile(d,{owner,jeton,resultat,maintenant}){
+export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
   const j=g.jobs.find(x=>x.id===e.id);
   if(!j)throw new RefusFavoris('La tentative enregistrée nécessite une vérification.');
-  if(!['envoye','refuse','incertain'].includes(resultat))throw new RefusFavoris('Accusé invalide.',400);
-  if(resultat==='envoye'&&!e.autorise)throw new RefusFavoris('Cette tentative n’a pas été autorisée par le serveur.');
+  if(!['envoye','ignore','refuse','incertain'].includes(resultat))throw new RefusFavoris('Accusé invalide.',400);
+  if(['envoye','ignore'].includes(resultat)&&!e.autorise)throw new RefusFavoris('Cette tentative n’a pas été autorisée par le serveur.');
   const fin=Math.max(e.at,Number.isSafeInteger(maintenant)?maintenant:e.at);
-  d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);
-  g.prochain=Math.max(g.prochain||0,fin+j.intervalleMinutes*60000);d.prochainGlobal=g.prochain;
+  if(resultat==='ignore'){
+    d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
+  }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+j.intervalleMinutes*60000);d.prochainGlobal=g.prochain;}
+  const raisons=['compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue'];
+  if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;
-  if(resultat!=='envoye'){g.active=false;g.raison=resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
-  else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='File arrêtée ou terminée. Dernier envoi confirmé.';}
+  if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
+  else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   return {data:d,valeur:vueFile(d,owner)};
 }
 export function consommerFile(d,{owner,jeton,maintenant}){
@@ -77,7 +80,7 @@ export function consommerFile(d,{owner,jeton,maintenant}){
   if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
   const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
   e.autorise=true;
-  return {data:d,valeur:{travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message}}};
+  return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message}}};
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;

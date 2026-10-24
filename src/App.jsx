@@ -97,7 +97,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.216.0';
+const EXT_ATTENDUE = '5.217.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -397,7 +397,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    messages aux favoris) PUBLIÉES par `main` n'ont pas `capterSuivisAchats`.
 //    À 5.214 ou 5.215, l'app promettait « l'extension relève le suivi » à une
 //    extension qui ne le fait pas (revue du 24 oct.).
-const EXT_CAPACITES = { suivivinted: '5.216.0', favoris: '5.215.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+const EXT_CAPACITES = { suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -13207,6 +13207,36 @@ function useExtVivante() {
   React.useEffect(() => onVmrExt(force), []);
   React.useEffect(() => { demarrerRelais(); }, []);
   return { present: vmrExtPresent(), etat: etatAgissant(), jobs: __vmrJobs };
+}
+function etatExtensionFavoris(uid){
+  if(__vmrPlusieurs)return {disponible:false,raison:textePlusieurs()};
+  if(codePerime())return {disponible:false,raison:textePerime()};
+  if(!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
+  const version=__vmrEtat?.ok?String(__vmrEtat.version||''):vmrExtVersion();
+  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.217.`};
+  if(__vmrEtat?.vrm?.connecte!==true||String(__vmrEtat.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
+  const actif=String(__vmrEtat?.vinted?.uid||'');
+  if(actif&&uid&&actif!==String(uid))return {disponible:false,raison:'Le navigateur est connecté à un autre compte Vinted. Connecte le compte sélectionné avant de lancer.'};
+  return {disponible:true,raison:''};
+}
+function FavorisConnectes(props){
+  const [,maj]=React.useReducer(n=>n+1,0);
+  React.useEffect(()=>onVmrExt(maj),[]);
+  const etat=etatExtensionFavoris(props.uid);
+  const verifier=async()=>{
+    sonderPonts();
+    if(__vmrTour)await new Promise(resolve=>{const t=setTimeout(resolve,2500);__vmrAttenteTour.push(()=>{clearTimeout(t);resolve();});});
+    if(__vmrTour)return {disponible:false,raison:'La vérification des extensions est encore en cours. Réessaie dans un instant.'};
+    const frais=await vmrEtat();
+    if(!frais?.ok)return {disponible:false,raison:'L’extension n’a pas répondu à la vérification. Recharge l’extension puis cette page VRM.'};
+    __vmrEtat=frais;__vmrRates=0;__vmrNotifier();
+    if(frais.vrm?.connecte!==true||String(frais.vrm?.user_id||'')!==String(AUTH.user?.id||'')){
+      await assurerSessionExtension();
+      const relu=await vmrEtat();if(relu?.ok){__vmrEtat=relu;__vmrNotifier();}
+    }
+    const r=etatExtensionFavoris(props.uid);maj();return r;
+  };
+  return <FavorisVinted {...props} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier}/>;
 }
 const CMD_ACTIVE = ['file', 'generation', 'pdf', 'relais-attente', 'relais-pris'];
 // Une demande est EN COURS tant que l'extension la dit réellement dans sa file
@@ -41206,7 +41236,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
-        <FavorisVinted key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} favorisDisponible={vmrExtPresent()&&extSait('favoris')==='ok'&&!codePerime()&&!__vmrPlusieurs} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        <FavorisConnectes key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         <DiagnosticFavoris key={'diag-favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
         <div className="vrm-message-workspace"><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>

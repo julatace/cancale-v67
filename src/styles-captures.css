@@ -144,6 +144,14 @@
 .vrm-favoris-automatisation p{font-size:11px;line-height:1.5;color:var(--vrm-muted);margin:8px 0;}
 .vrm-favoris-automatisation button{margin:4px 6px 4px 0;max-width:100%;white-space:normal;}
 .vrm-favoris-automatisation>summary{display:flex;align-items:center;min-height:44px;font-weight:600;cursor:pointer;}
+.vrm-favoris-progression{padding:10px 0;margin-top:8px;border-top:1px solid var(--vrm-line);}
+.vrm-favoris-progress-head{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:11px;}
+.vrm-favoris-progression progress{display:block;appearance:none;width:100%;height:8px;border:0;border-radius:99px;overflow:hidden;background:var(--vrm-line);margin:10px 0;accent-color:var(--vrm-accent,#244e54);}
+.vrm-favoris-progression progress::-webkit-progress-bar{background:var(--vrm-line);border-radius:99px;}
+.vrm-favoris-progression progress::-webkit-progress-value{background:var(--vrm-accent,#244e54);border-radius:99px;transition:width .25s ease;}
+.vrm-favoris-progression progress::-moz-progress-bar{background:var(--vrm-accent,#244e54);border-radius:99px;}
+.vrm-favoris-progression small{display:block;color:var(--vrm-muted);line-height:1.5;}
+@media(prefers-reduced-motion:reduce){.vrm-favoris-progression progress::-webkit-progress-value{transition:none;}}
 @media(max-width:767px){.vrm-favoris-remise input{font-size:16px;}}
 
 .vrm-favoris-cadence{margin:14px 0 8px;max-width:280px;}
