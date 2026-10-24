@@ -8,7 +8,13 @@ const FUTUR=/(?:sera|seront|va\s+etre|vont\s+etre)\s+(?:bientot\s+)?disponibles?
 // (23 oct.) Le texte ANNONCE une arrivée à venir. Sert à la route quand l'e-mail
 // ne porte NI code NI QR : un e-mail d'arrivée en porte toujours un (Mondial
 // Relay le code, Chronopost code + QR, Vinted Go code + QR), une annonce jamais.
-export const annonceArriveeFuture=(texte)=>FUTUR.test(normaliser(texte));
+// (revue du 23 oct., n° 1) « Ton colis arrive aujourd'hui ! #… » (Vinted Go,
+// mesuré : 12 lignes, AUCUNE avec un code, un QR ou un lieu) : l'ARRIVÉE est
+// annoncée — le colis roule encore. ⚠️ Sans accents, « est arrivé » s'écrit
+// « est arrive » : seul « <colis> arrive aujourd'hui / demain » (sans
+// auxiliaire) ou « arrivera » annonce l'avenir.
+const ARRIVEE_A_VENIR=/\b(?:colis|commande|paquet|envoi|article)\s+(?:arrive|arrivent)\s+(?:aujourd'hui|demain|bientot|prochainement|ce\s+(?:matin|midi|soir|jour)|dans\s+(?:la\s+journee|les\s+prochains?\s+jours?))\b|\barriver(?:a|ont)\b/;
+export const annonceArriveeFuture=(texte)=>{const t=normaliser(texte);return FUTUR.test(t)||ARRIVEE_A_VENIR.test(t);};
 // Les PHRASES d'un texte (le retour se juge dans SA phrase, avec ses conditions).
 const phrases=(texte)=>String(texte||'').split(/[.!?;\n\r]+/).map(normaliser).filter(Boolean);
 // Une phrase qui pose une condition, une échéance ou une règle générale.
@@ -37,7 +43,14 @@ function lire(texte){
  const t=normaliser(texte);if(!t)return null;
  const negatif=/(?:n[' ]a\s+pas|n[' ]avez\s+pas|pas\s+encore|non)\s+(?:ete\s+)?(?:retire|recupere|receptionne)|(?:n'a|n'avez)\s+(?:toujours\s+|encore\s+)?pas\s+(?:encore\s+)?(?:ete\s+)?(?:retire|recupere|receptionne)/.test(t);
  const retrait=/\b(?:a|ont)\s+(?:bien\s+)?ete\s+(?:retire|recupere)|\b(?:vous\s+)?avez\s+(?:bien\s+)?(?:retire|recupere)|merci\s+d'avoir\s+(?:bien\s+)?(?:retire|recupere)|\bcolis\s+(?:bien\s+)?(?:retire|recupere)|\b(?:retire|recupere)\s+(?:le\s+\d|par\s+(?:l'acheteur|le\s+destinataire|vous))|retrait\s+(?:du|de\s+votre|de\s+ton)\s+colis\s+(?:confirme|effectue)|remis\s+(?:au\s+destinataire|en\s+mains?\s+propres)/.test(t);
- if(retrait&&!negatif)return 'delivered';
+ // (23 oct.) RETIRÉ PAR LE DESTINATAIRE, en néerlandais (DPD, mesuré : « Uw pakket
+ // is afgehaald door de ontvanger » — le destinataire est NOMMÉ). ⚠️ L'espagnol
+ // « Tu envío ha sido recogido » n'y est PAS, exprès : « recogido » dit aussi la
+ // RELÈVE par le transporteur — mesuré, 6 des 8 lignes portent le n° d'une
+ // « Confirmation du dépôt de votre colis » (ses propres envois). Sans preuve
+ // que c'est le destinataire, ce n'est pas un retrait (une ligne « info »).
+ const retireNl=/\b(?:af|op)gehaald\s+door\s+de\s+ontvanger\b/.test(t);
+ if((retrait||retireNl)&&!negatif)return 'delivered';
  // (23 oct.) LE COLIS EST REPARTI CHEZ L'EXPÉDITEUR — seulement dans une phrase
  // qui le CONSTATE (passé ou présent), jamais dans une phrase qui pose une
  // condition ou annonce l'avenir : « s'il n'est pas retiré, il sera retourné »,
@@ -58,7 +71,7 @@ function lire(texte){
  // ⚠️ Étroit exprès : « il sera disponible JUSQU'AU 26/10 » (un colis qui EST là)
  // ne doit pas passer en transit — seul l'avenir de l'ARRIVÉE compte, et un
  // texte qui dit aussi « est disponible / t'attend » reste une arrivée.
- if(FUTUR.test(t)&&!/\b(?:est|sont)\s+(?:bien\s+)?(?:disponibles?|arrives?)|\bt'attend|vous\s+attend/.test(t))return 'transit';
+ if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&!/\b(?:est|sont)\s+(?:bien\s+)?(?:disponibles?|arrives?)|\bt'attend|vous\s+attend/.test(t))return 'transit';
  const point=/\b(?:livre|arrive|depose)\s+(?:dans\s+(?:le|la)|au|en|chez|a\s+(?:la|une|un))\s+(?:point|relais|consigne|casier|locker|bureau)/.test(t);
  if(point||/disponible|a\s+retirer|(?:vous|t')\s*attend|pret\s+(?:pour\s+le\s+retrait|a\s+etre\s+retire)/.test(t)||negatif)return 'available';
  if(/(?:sera|va etre|doit etre|pret a etre)\s+livre|(?:nous avons|nous avons bien|transporteur a)\s+(?:bien\s+)?recu|receptionne\s+(?:par le transporteur|dans notre)/.test(t))return 'transit';

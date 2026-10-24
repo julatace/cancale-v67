@@ -26,6 +26,11 @@
 //      la relecture garde la place de l'argent. Un seul compte lié : rien à
 //      relire, la relecture le note (reste 0) et les photos n'attendent rien —
 //      d'où l'appel `relireAnnoncesAutresComptes` en tête des cas 2 à 4.
+//   7. (revue du 24 octobre, 5.215) le suivi Vinted des ACHATS n'est pas une
+//      lecture prioritaire : il revient sur chaque achat en route toutes les 3 h.
+//      Il n'entre pas dans la réserve (16 pour les photos, pas 19), il lit sous
+//      celle de l'argent et des colis (7 places, puis « lectures-reservees »), et
+//      l'argent garde ses 13 places.
 //  22 oct. : les photos lisent UNE page par tour (`PHOTOS_PAR_TOUR`) : « le fond
 //  qui tourne » est donc rejoué tour par tour (`tours`), et les bornes jugées sont
 //  les mêmes — le budget horaire n'a pas bougé, il est étalé.
@@ -158,6 +163,18 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     dit(g.slice(0, 3).every((x) => x === null) && g[3] && g[3].code === 'lectures-reservees', 'la relecture lit ses 3 places, pas une de plus (la réserve de l’argent tient)', JSON.stringify(g.map((x) => x && x.code)));
     const a = []; for (let i = 0; i < 13; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
     dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis et les preuves ont toujours leurs 13 places — et le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
+  });
+
+  console.log('── 7. le suivi des achats lit sous la réserve de l’argent et des colis (revue du 24 oct.)');
+  await essaie('suivi', async () => {
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    const rP = await f.ctx.reserveLectures(UID, 'photos');
+    dit(rP === 16, 'la réserve que les photos laissent : 16 (13 pour l’argent et les colis + 3 pour la relecture) — le suivi n’y est pas', `réserve=${rP}`);
+    const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };
+    const g = []; for (let i = 0; i < 8; i++) g.push(await f.ctx.gardeLecture(UID, acc, 'suivi'));
+    dit(g.slice(0, 7).every((x) => x === null) && g[7] && g[7].code === 'lectures-reservees', 'le suivi lit 7 places (20 − 13), pas une de plus', JSON.stringify(g.map((x) => x && x.code)));
+    const a = []; for (let i = 0; i < 13; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
+    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis et les preuves gardent leurs 13 places — le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} budget des lectures : ${ok} vert(s), ${ko} rouge(s)`);

@@ -34,6 +34,7 @@ import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
+import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions } from './_lib/suivi-colis.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -262,6 +263,93 @@ async function bilanDeLaSemaine(maintenant = Date.now()) {
   return { semaine: sem.lundi, vendu: b.vendu.etat, recu: b.recu.etat, colis: b.colis.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
+// ── LES COLIS À RETIRER : « DERNIER JOUR » ET « À VÉRIFIER » (23 octobre) ────
+// Julien : « que ça me prévienne dès qu'il y a une mise à jour d'un colis » ;
+// « il ne doit plus y avoir de problème avec les retraits, je me suis déplacé
+// pour rien ». Au cron du matin (10 h à Paris), pour CE vendeur :
+//   · « 📍 Dernier jour pour retirer … » quand la date limite LUE dans l'e-mail
+//     est aujourd'hui (heure de Paris) ;
+//   · « Colis à vérifier — sans doute reparti : n°… » le jour où un colis passe
+//     sa date limite ou la garde de son transporteur.
+// LA règle de l'app (api/_lib/suivi-colis.js → `etatRetrait`, `gardeDe`, §11).
+// Une fois par colis et par état : mémo `colis_retrait_dedup` lu en TROIS états
+// (illisible ⇒ rien), écrit AVANT l'envoi et confirmé. Préférence « colis »
+// coupée ⇒ rien ; abonnement coupé ⇒ rien (`sendPushToAll`) ; une lecture ratée
+// (lignes de suivi, réglages, bordereaux) ⇒ rien. Jamais un colis retiré,
+// reparti, coché « J'ai retiré », qu'il envoie, ou que l'app a dit fini.
+const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer'];
+const MEMO_RETRAIT_J = 60;
+async function rappelsColisRetrait(maintenant = Date.now()) {
+  const deja = await getRow('colis_retrait_dedup');
+  if (deja === undefined) return 'mémo illisible — rien envoyé';
+  if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';
+  // (revue du 23 oct., n° 2) Les scalaires dont la règle partagée a besoin pour
+  // RELIRE une ligne comme l'app (code, QR, extraits gardés, date de l'e-mail).
+  const [lignes, m, bords] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(available,delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
+    getRowProjete('main', MAIN_RETRAIT),
+    fetchPaginated(scoped('app_data?id=like.email_bord_*&select=suivi:meta->>suivi')),
+  ]);
+  if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords)) return 'lecture ratée — rien envoyé';
+  const mm = objet(m);
+  const pub = objet(mm.vrm_colis_retirer);
+  const today = parisDate(0);
+  const entree = {
+    lignes, collectes: Array.isArray(mm.vrm_colis_collected) ? mm.vrm_colis_collected : [],
+    envoyes: bords.map((b) => b && b.suivi).filter(Boolean), finis: Array.isArray(pub.finis) ? pub.finis : [],
+    maintenant, aujourdhui: today,
+  };
+  // (revue du 23 oct., n° 3) LA FIN D'UN ACHAT, LUE ICI — pas seulement dans la
+  // publication de l'app (`finis`) : absente (app pas ouverte depuis) ou plus
+  // ancienne qu'une capture des achats, « pas su » valait « pas fini », et
+  // « 📍 Dernier jour pour retirer » partait pour un colis déjà retiré. La
+  // commande d'un colis se trouve par IDENTITÉ (code de retrait, n° de suivi),
+  // sa fin par la règle de l'app (`finDeCommandeAchat`). Ces lectures ne partent
+  // que s'il y a un rappel à envoyer ; ratées ⇒ rien n'est envoyé.
+  const candidats = rappelsRetraitDuJour(entree);
+  if (!candidats.length) return { retrait: 'rien à dire', n: 0 };
+  const [relaisRow, suivisV, suivisM] = await Promise.all([
+    getRow('panel_colis_relais'),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi')),
+    fetchPaginated(scoped('app_data?id=like.colis_suivi_%25&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid')),
+  ]);
+  const liens = liensDesLignes(suivisV, suivisM);
+  const relais = relaisRow === undefined ? null : objet(relaisRow);
+  if (liens === null || relais === null) return 'lecture ratée — rien envoyé';
+  const txsPar = new Map();
+  for (const x of candidats) { const t = txDuColis({ suivi: x.suivi, code: x.code }, relais, liens); txsPar.set(x.suivi, t); }
+  const tousTx = [...new Set([...txsPar.values()].flatMap((t) => (t ? [...t] : [])))].filter((t) => /^\d{3,20}$/.test(t));
+  let achats = [], etats = new Map();
+  if (tousTx.length) {
+    const [a, e] = await Promise.all([
+      fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_purchased&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
+      fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${tousTx.join(',')})&select=tx:meta->>id,s:meta->>status,ss:meta->>ship_status_title`)),
+    ]);
+    if (!Array.isArray(a) || !Array.isArray(e)) return 'lecture ratée — rien envoyé';
+    achats = a;
+    for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
+  }
+  const liste = rappelsRetraitDuJour({ ...entree,
+    finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
+  const envoyes = objet(deja && deja.envoyes);
+  const nouveaux = liste.filter((x) => !envoyes[x.cle]);
+  if (!nouveaux.length) return { retrait: 'rien à dire', n: 0 };
+  // Le mémo AVANT l'envoi, et CONFIRMÉ (purgé au-delà de 60 jours).
+  const limiteMemo = parisDate(-MEMO_RETRAIT_J);
+  const memo = {};
+  for (const [k, v] of Object.entries(envoyes)) if (String(v) >= limiteMemo) memo[k] = v;
+  for (const x of nouveaux) memo[x.cle] = today;
+  if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
+  let envoi = null;
+  for (const x of nouveaux) {
+    const t = texteRappelRetrait(x);
+    envoi = await sendPushToAll({ title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: '/?tab=cat_achats' });
+  }
+  // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
+  return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
+    envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+}
+
 // Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
 // vendeur d'une base non cloisonnée). Rend un bilan, n'écrit jamais dans `res`.
 // ── (20 octobre) RELIRE eBAY AVANT DE COMPTER, APP FERMÉE ──────────────────
@@ -329,6 +417,11 @@ async function traiterVendeurApresRelecture() {
     let bilan = null;
     try { bilan = await bilanDeLaSemaine(); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
+    // LES COLIS À RETIRER (23 oct.) — posé AVANT le calcul des colis à poster,
+    // qui se tait quand le résumé manque : un échec ici n'empêche rien d'autre.
+    let retrait = null;
+    try { retrait = await rappelsColisRetrait(); } catch (e) { retrait = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
     // ── LES COLIS DU MATIN : LA RÈGLE DU SOIR, DU WIDGET ET DE L'APP (22 oct.) ──
     // ⚠️⚠️ CE RAPPEL ANNONÇAIT « RIEN À ENVOYER » À TORT. Mesuré le 22 octobre
     // sur sa base : `ship_reminder_dedup` = {total 0} le matin, alors que le
@@ -361,7 +454,7 @@ async function traiterVendeurApresRelecture() {
     else if (!Array.isArray(d.bords)) vintedSkip = 'bordereaux illisibles';
     // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
     // passage suivant, tout lu, ne doit pas se croire « déjà notifié »).
-    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -378,14 +471,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
       await sendPushToAll({ ...txt, tag: 'ship-reminder', url: '/?tab=cat_bord' });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }

@@ -1351,7 +1351,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    forment un groupe poussé à droite — « Je l'ai eu » au même endroit sur chaque
    ligne. Sur téléphone le groupe prend sa propre ligne, toujours. */
 .vrm-oublie-gestes { display:flex; align-items:center; gap:8px; margin-left:auto; flex-wrap:nowrap; }
-@media(max-width:767px) { .vrm-oublie-gestes { flex-basis:100%; justify-content:flex-end; } }
+/* (revue du 24 oct.) À 390 px, une rangée qui ne revient pas à la ligne poussait le code de retrait hors de l'écran : elle revient à la ligne, rien ne rétrécit. */
+@media(max-width:767px) { .vrm-oublie-gestes { flex-basis:100%; justify-content:flex-end; flex-wrap:wrap; row-gap:6px; } }
 /* (19 oct.) Colis en lignes : chaque geste a SA colonne (Imprimer · Imprimé ? ·
    Colis fait · Suivre). En flex, un geste absent faisait glisser les suivants :
    « Colis fait » passait de la 3e à la 2e place d'une ligne à l'autre. */

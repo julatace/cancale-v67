@@ -155,6 +155,8 @@ const { demasquerRelais } = await import('file://' + path.resolve(__dirname, '..
     const ctx = { etatColisDepuisTexte: etat.etatColisDepuisTexte, normaliserSuivi: etat.normaliserSuivi,
       codeRetraitTournure: (t) => (modRegle && modRegle.codeRetraitTournure ? modRegle.codeRetraitTournure(t) : ''),
       lieuDepuisExtrait: retrait.lieuDepuisExtrait, limiteRetraitDepuisTexte: retrait.limiteRetraitDepuisTexte, LIEU_AU_FUTUR: retrait.LIEU_AU_FUTUR };
+    // (revue du 23 oct., n° 2) La relecture vit dans la règle partagée (api/_lib/suivi-colis.js).
+    try { const sc = await import('file://' + path.join(R, 'api/_lib/suivi-colis.js')); ctx.relireLigneSuivi = sc.relireLigneSuivi; } catch (_) {}
     vm.createContext(ctx);
     vm.runInContext(`${decl.codeRetrait}\n${decl.reclassifyTrack}\nthis.reclassifyTrack=reclassifyTrack;this.codeRetrait=codeRetrait;`, ctx);
     const ligne = { carrier: 'chronopost', suivi: '09440000000001', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: 'Votre colis VINTED est arrivé en relais Pickup', code: null,

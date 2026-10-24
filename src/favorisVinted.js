@@ -13,8 +13,9 @@ export function preparerMessageFavori(message,pourcentage='') {
 export function lienFavoriVinted(v,domain='www.vinted.fr') {
   if (typeof v !== 'string' || v.length>2000) return null;
   try {
-    const origine=typeof domain==='string'&&/^(?:www\.)?vinted\.(?:fr|com|it|de)$/i.test(domain)?`https://${domain}`:'https://invalide.invalid';
-    const u=new URL(v,origine);
+    // Domaine illisible : aucune base, une adresse relative est alors refusée.
+    const origine=typeof domain==='string'&&/^(?:www\.)?vinted\.(?:fr|com|it|de)$/i.test(domain)?`https://${domain}`:null;
+    const u=origine?new URL(v,origine):new URL(v);
     if(u.protocol!=='https:'||u.username||u.password||!/^(?:www\.)?vinted\.(?:fr|com|it|de)$/i.test(u.hostname))return null;
     if(!/^\/(?:inbox|member|items|conversations)(?:\/|$)/i.test(u.pathname))return null;
     return u.href;
