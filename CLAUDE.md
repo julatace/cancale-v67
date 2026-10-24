@@ -1,5 +1,12 @@
 # VRM — dossier de passation
 
+> **24 octobre — demande explicite de Julien :** retirer de Messages le bloc
+> « offres à trancher » provenant des emails, ses moyennes par modèle et ses
+> liens génériques Vinted. Les offres dans les conversations restent. Ne pas
+> rétablir ce bloc au nom des consignes du 22 octobre : elles sont remplacées.
+> Voir `docs/passation/2026-10-24-offres-messages.md`.
+
+
 > ⛔⛔ **DÉCISION DE JULIEN, 22 OCTOBRE : PAS DE DOUBLE VÉRIFICATION PAR SMS — C'EST PAYANT.**
 > Mesuré dans la doc Supabase (« Advanced MFA Phone ») : **75 $/mois** pour le premier projet,
 > hors plafond de dépenses, **plus** chaque SMS facturé par Twilio/MessageBird. Julien : « si c'est
