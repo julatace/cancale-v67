@@ -25,6 +25,7 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
    base.set(id,JSON.parse(o.body).data);return json([{id}]);
   }
   assert.equal(u.searchParams.get('owner'),'eq.'+user);
+  if(u.searchParams.get('id')==='like.harvest_123_conv_*')return json([{id:'harvest_123_conv_900',owner:user,uid:'123',conversationId:'900',item:'101',recipient:'201'},{id:'harvest_123_conv_901',owner:user,uid:'123',conversationId:'901',item:'102',recipient:'202'}]);
   return json(archiveSeule?[{id:'harvest_123_favoris_archive',owner:user,data:{...captures[0],archiveVersion:1}},...ids.slice(1).map((id,i)=>({id,owner:user,data:captures[i+1]}))]:ids.map((id,i)=>({id,owner:user,data:captures[i]})));
  };
  const call=async(action,extra={},token='fixture.session.jwt')=>{
@@ -36,7 +37,9 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
   autreCompte=true;assert.equal((await call('lancer',{selection:['n1']})).code,403);assert.equal(base.size,0);autreCompte=false;
   assert.equal((await call('lancer',{selection:['n1'],reglages:{...captures[2],message:'Autre message'}})).code,409,'réglages changés : aperçu périmé refusé');
   assert.equal(base.size,0);
-  assert.equal((await call('lancer',{selection:['n1','n2']})).code,200);
+  captures[1].body=JSON.stringify({initiator:'native-fixture',item_id:999,opposite_user_id:888});
+  assert.equal((await call('lancer',{selection:['n1','n2']})).code,200,'la vraie route utilise les conversations privées lorsque la dernière trace concerne un autre article');
+  assert.ok(appels.some(x=>x.u.searchParams.get('id')==='like.harvest_123_conv_*'));
   const rs=await Promise.all(Array.from({length:30},()=>call('suivant'))),travaux=rs.filter(r=>r.body.travail);
   assert.equal(travaux.length,1,'trente fenêtres : un seul travail délivré');
   const t=travaux[0].body.travail;

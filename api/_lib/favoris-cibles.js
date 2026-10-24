@@ -8,8 +8,9 @@ function lien(n,domain){
 }
 // user_id is NOT assumed to be the recipient. A native creation must first
 // demonstrate the exact (item, opposite_user) relationship on this capture.
+// An already captured native conversation can prove the same exact pair.
 // No title, photo or username matching; no values inferred from masked JSON.
-export function resoudreCiblesFavoris({uid,capture,trace,selection}){
+export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations=[]}){
   if(capture?.type!=='notifications'||String(capture.uid)!==String(uid)||String(trace?.uid)!==String(uid)||trace?.method!=='POST'||trace?.path!=='/api/v2/conversations')throw new RefusFavoris('Ouvre un favori sur Vinted avec ce compte, puis actualise : le raccordement natif doit être confirmé.');
   let corps;try{corps=typeof trace.body==='string'&&trace.body.length<=100000?JSON.parse(trace.body):null;}catch{}
   if(!corps||Object.keys(corps).sort().join(',')!=='initiator,item_id,opposite_user_id'||!id(corps.item_id)||!id(corps.opposite_user_id)||id(corps.opposite_user_id)===String(uid)||typeof corps.initiator!=='string'||!corps.initiator||corps.initiator.length>80)throw new RefusFavoris('La création native de conversation ne confirme pas le format attendu.');
@@ -18,9 +19,11 @@ export function resoudreCiblesFavoris({uid,capture,trace,selection}){
   const favoris=favorisDepuisNotifications(capture.payload,capture.domain);
   const idsFavoris=new Set(favoris.lignes.map(x=>x.id));
   const candidats=(Array.isArray(notifications)?notifications:[]).filter(n=>idsFavoris.has(n.id));
-  const preuves=candidats.filter(n=>lien(n,capture.domain)?.itemId===id(corps.item_id)&&id(n.user_id)===id(corps.opposite_user_id));
+  const paires=new Set(conversations.filter(c=>String(c.uid)===String(uid)&&id(c.conversationId)&&id(c.itemId)&&id(c.recipientId)&&id(c.recipientId)!==String(uid)).map(c=>id(c.itemId)+':'+id(c.recipientId)));
+  paires.add(id(corps.item_id)+':'+id(corps.opposite_user_id));
+  const preuves=candidats.filter(n=>{const l=lien(n,capture.domain),user=id(n.user_id);return l&&user&&paires.has(l.itemId+':'+user);});
   const formes=new Set(preuves.map(n=>lien(n,capture.domain).forme));
-  if(formes.size!==1)throw new RefusFavoris('Le lien entre favori et destinataire n’est pas encore confirmé. Ouvre un favori actuellement présent dans cette liste sur Vinted, puis actualise.');
+  if(formes.size!==1){const e=new RefusFavoris('Le lien entre favori et destinataire n’est pas encore confirmé. Dans la liste, ouvre un favori sur Vinted avec ce compte, puis reviens actualiser. Aucun message envoyé.');if(!formes.size)e.code='favoris_preuve_absente';throw e;}
   const forme=[...formes][0];
   return selection.map(notificationId=>{
     const ns=candidats.filter(n=>n.id===notificationId),n=ns[0],l=lien(n,capture.domain),recipientId=id(n?.user_id);

@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — destinataire favoris :** lorsque la dernière création native
+> ne prouve aucune paire, repli en lecture sur les identifiants des conversations
+> captées pour le même owner/UID et les articles favoris conservés. Exactitude des
+> paires exigée ; aucun titre/pseudo deviné, contrôles natifs inchangés. Voir
+> `docs/passation/2026-10-24-favoris-preuves-conversations.md`.
+
 > **24 octobre — sélection souris :** aucun balayage global à la souris :
 > sélectionner depuis une marge ne change plus de plateforme. Les favoris
 > privilégient une réponse Chrome fraîche sur un ancien battement de page ;

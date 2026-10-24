@@ -2,6 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
+import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
 import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
@@ -43,7 +44,13 @@ export async function routeFavoris(req,res){
           if(avant&&(String(avant.user_id)!==String(n.user_id)||avant.link!==n.link))throw new RefusFavoris('Une notification a changé d’identité. Actualise avant de lancer.');
           parId.set(n.id,{...avant,...n});
         }
-        const targets=resoudreCiblesFavoris({uid,capture:{...capture,payload:{...capture.payload,notifications:[...parId.values()]}},trace:lire(ids[1]),selection:c.selection});
+        const complete={...capture,payload:{...capture.payload,notifications:[...parId.values()]}};
+        const opts={uid,capture:complete,trace:lire(ids[1]),selection:c.selection};let targets;
+        try{targets=resoudreCiblesFavoris(opts);}catch(e){
+          if(e.code!=='favoris_preuve_absente')throw e;
+          const conversations=await lirePreuvesConversationsFavoris(req,{owner,uid,capture:complete,selection:c.selection});
+          targets=resoudreCiblesFavoris({...opts,conversations});
+        }
         const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,maintenant,lot});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
