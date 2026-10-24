@@ -8,8 +8,8 @@
   const TAG = 'CANCALE_VINTED';
 
   // Injecte inject.js dans le MAIN world (via un <script> pointant sur la
-  // ressource web-accessible de l'extension). C'est la seule facon d'observer
-  // les vraies requetes fetch/XHR du site.
+  // ressource web-accessible de l'extension), en secours du script MAIN posé
+  // directement par le manifeste à document_start. Sa garde évite le doublon.
   // ⚠️ 5.162 — LA PAUSE DEMANDÉE PAR VINTED (429/403) VAUT AUSSI POUR LA
   // MOISSON FAITE DANS LA PAGE. Elle est rangée par le fond dans
   // `chrome.storage.local` (`vrmPauseVinted`) ; `inject.js` (monde MAIN) n'y a
@@ -54,6 +54,7 @@
     if (event.source !== window) return;
     const d = event.data;
     if (!d || d.__tag !== TAG) return;
+    if(d.kind==='injectReady'){injecte=true;direPause();return;}
     try {
       const m = {};
       for (const k of Object.keys(d)) {

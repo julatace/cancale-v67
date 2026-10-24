@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — favoris 5.220 :** corps des objets Request et URL désormais
+> captés ; hook MAIN au démarrage ; bouton de vérification lié à un onglet
+> avant redirection, reçu réel et contrôle copiable des échecs de lancement.
+> Le diagnostic v5 seul ne couvre pas ces preuves. Aucun succès client affirmé.
+> Voir `docs/passation/2026-10-24-favoris-request-ouverture.md`.
+
 > **24 octobre — favoris 5.219 :** capture passive du lien natif ouvert avec
 > la création de conversation, archive privée cumulée de 100 contextes maximum.
 > Le destinataire peut être prouvé par le lien exact ou un paramètre numérique

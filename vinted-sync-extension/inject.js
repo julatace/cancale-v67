@@ -241,7 +241,7 @@
     if (!h) return;
     if (h.type === 'notifications' && (String(method).toUpperCase() !== 'GET' || (status != null && (status < 200 || status >= 300)))) return;
     // On limite la taille pour ne pas saturer (les reponses Vinted sont petites).
-    if (text && text.length < 800000) post({ kind: 'harvest', type: h.type, id: h.id, url, body: text });
+    if (text && text.length < 800000) post({ kind: 'harvest', type: h.type, id: h.id, url, body: text,method:String(method).toUpperCase(),httpStatus:status });
   };
 
   // CAPTURE PASSIVE DES REQUETES D'ECRITURE. Toujours de l'OBSERVATION pure : on
@@ -251,7 +251,19 @@
   // le bruit (tracking/metrics) et on ne garde que les vraies actions API.
   const WRITE_METHODS = /^(POST|PUT|PATCH|DELETE)$/i;
   const WRITE_NOISE = /(track|metric|event|impression|visit|telemetr|analytic|log|pageview|consent)/i;
-  const sendWriteReq = (method, url, body) => {
+  const contexteCreation = (method,url) => {
+    try {const u=new URL(url,location.origin);if(String(method).toUpperCase()!=='POST'||u.pathname!=='/api/v2/conversations'||!/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(u.hostname))return null;
+      const lien=dernierFavoriClique&&Date.now()-dernierFavoriClique.at<=5000?dernierFavoriClique.url:lienContexteFavori(location.href);dernierFavoriClique=null;return lien;
+    }catch{return null;}
+  };
+  const corpsRequestBorne = async request => {
+    const lecteur=request.body?.getReader?.();if(!lecteur)return '';
+    const blocs=[];let taille=0;
+    try{for(;;){const {done,value}=await lecteur.read();if(done)break;taille+=value.byteLength;if(taille>100000){lecteur.cancel().catch(()=>{});return null;}blocs.push(value);}
+      const total=new Uint8Array(taille);let pos=0;for(const b of blocs){total.set(b,pos);pos+=b.byteLength;}return new TextDecoder().decode(total);
+    }finally{lecteur.releaseLock();}
+  };
+  const sendWriteReq = (method, url, body, contexteFavori=null) => {
     try {
       if (!WRITE_METHODS.test(method || '')) return;
       if (!/\/api\//.test(url || '')) return;
@@ -277,11 +289,6 @@
         else { try { b = JSON.stringify(b); } catch (_) { b = String(b); } }
       }
       if (b && b.length > 100000) b = b.slice(0, 100000);
-      let contexteFavori=null;
-      try{const u=new URL(url,location.origin);if(String(method).toUpperCase()==='POST'&&u.pathname==='/api/v2/conversations'&&/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)){
-        contexteFavori=dernierFavoriClique&&Date.now()-dernierFavoriClique.at<=5000?dernierFavoriClique.url:lienContexteFavori(location.href);
-        dernierFavoriClique=null;
-      }}catch{}
       post({ kind: 'writereq', method: String(method).toUpperCase(), url, body: b || '', ...(contexteFavori?{contexteFavori}:{}) });
     } catch (_) {}
   };
@@ -706,12 +713,16 @@ function contratSuivi(a) {
   if (origFetch) {
     window.fetch = function (input, init) {
       try {
-        const url = (typeof input === 'string') ? input : (input && input.url) || '';
+        const url = (typeof input === 'string') ? input : input instanceof URL ? input.href : (input && input.url) || '';
         if (init && init.headers) sendCsrf(init.headers);
         else if (input && input.headers) sendCsrf(input.headers);
         const method = (init && init.method) || (input && input.method) || 'GET';
         const corpsEnvoye = init && init.body;
-        sendWriteReq(method, url, corpsEnvoye);
+        const contexte=contexteCreation(method,url);
+        const estCreation=String(method).toUpperCase()==='POST'&&/\/api\/v2\/conversations(?:\?|$)/.test(url);
+        if(estCreation&&corpsEnvoye===undefined&&typeof Request!=='undefined'&&input instanceof Request){
+          try{const copie=input.clone();corpsRequestBorne(copie).then(body=>{if(body!==null)sendWriteReq(method,url,body,contexte);}).catch(()=>{});}catch{}
+        }else sendWriteReq(method, url, corpsEnvoye,contexte);
         const p = origFetch.apply(this, arguments);
         noteSeen(url); // diagnostic : TOUT appel API, pas seulement ceux qui matchent
         p.then((res) => {
@@ -743,7 +754,7 @@ function contratSuivi(a) {
     const origSend = XHR.prototype.send;
     const origSetHeader = XHR.prototype.setRequestHeader;
     XHR.prototype.open = function (method, url) {
-      this.__cancaleUrl = url;
+      this.__cancaleUrl = typeof url==='string'?url:String(url||'');
       this.__cancaleMethod = method;
       return origOpen.apply(this, arguments);
     };
@@ -756,7 +767,7 @@ function contratSuivi(a) {
         const url = this.__cancaleUrl || '';
         // Capte aussi le csrf/anon posé via setRequestHeader (déjà relayé plus
         // haut) pour la moisson active.
-        sendWriteReq(this.__cancaleMethod, url, bodyArg);
+        sendWriteReq(this.__cancaleMethod, url, bodyArg,contexteCreation(this.__cancaleMethod,url));
         noteSeen(url); // diagnostic : TOUT appel API (XHR aussi)
         this.addEventListener('load', function () {
           try {
@@ -957,4 +968,5 @@ function contratSuivi(a) {
   // chaque retour au premier plan (throttlé par ACTIVE_TTL).
   setTimeout(activeHarvest, 6000);
   try { document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(activeHarvest, 3000); }); } catch (_) {}
+  post({kind:'injectReady'});
 })();

@@ -33,3 +33,10 @@ test('preuves contradictoires, paramètres multiples, origine étrangère et des
  assert.throws(()=>resoudreCiblesFavoris({...opts,trace:{...native(),body:JSON.stringify({initiator:'native',item_id:101,opposite_user_id:123})}}));
  const d=structuredClone(capture);d.payload.notifications.push({...notification(),id:'autre',user_id:999});assert.throws(()=>resoudreCiblesFavoris({...opts,capture:d}));
 });
+
+test('une lecture du fil affiché confirme le destinataire sans nouvelle création native',()=>{
+ const actuel=native(99);delete actuel.contexteFavori;
+ const lecture={uid,method:'GET',path:'/api/v2/conversations/900',conversationId:'900',itemId:'101',recipientId:'201',contexteFavori:native().contexteFavori};
+ assert.equal(resoudreCiblesFavoris({...opts,trace:actuel,traces:[],lectures:[lecture],selection:['n1']})[0].recipientId,'201');
+ for(const faux of [{...lecture,uid:'456'},{...lecture,method:'POST'},{...lecture,path:'/api/v2/conversations/999'},{...lecture,itemId:'555'},{...lecture,contexteFavori:'https://evil.invalid/items/101/conversation/new?native_target=201'}])assert.throws(()=>resoudreCiblesFavoris({...opts,trace:actuel,lectures:[faux],selection:['n1']}));
+});

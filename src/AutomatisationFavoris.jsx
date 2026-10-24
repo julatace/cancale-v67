@@ -1,13 +1,14 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false}){
-  const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
+export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false,onErreur}){
+  const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
+  React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null);},[erreur,controleErreur]);
   const courant=()=>vivant.current&&ownerActuel()===owner;
   const adopter=j=>{if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(Array.isArray(j.vue?.jobs)&&onEtat)onEtat(j.vue);};
   const api=async(action,donnees={},h=headers())=>{
     const r=await fetch(`/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:action?'POST':'GET',headers:{...h,'Content-Type':'application/json'},cache:'no-store',signal:AbortSignal.timeout(15000),...(action?{body:JSON.stringify({action,...donnees})}:{})});
-    const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||'La file n’a pas été confirmée.');return j;
+    const j=await r.json();if(!r.ok||!j.ok){const e=Error(j.message||'La file n’a pas été confirmée.');e.code=j.code;e.diagnostic=j.diagnostic;throw e;}return j;
   };
   const lire=async()=>{
     if(mutation.current||busy.current)return;const n=++lecture.current;
@@ -52,7 +53,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   };
   React.useEffect(()=>{if(!vue?.active)return;avancer();const t=setInterval(avancer,15000);return()=>clearInterval(t);},[vue?.active,disponible]);
   const agir=async action=>{
-    if(!courant()||mutation.current)return;mutation.current=true;++lecture.current;setOccupe(true);setErreur('');
+    if(!courant()||mutation.current)return;mutation.current=true;++lecture.current;setOccupe(true);setErreur('');setControleErreur(null);
     try{
       let configuration=reglages;
       if(action==='lancer'){
@@ -69,7 +70,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       setPhase(action==='lancer'?'Préparation de la sélection':'Mise à jour de la file');
       const j=await api(action,action==='lancer'?{selection,reglages:configuration}:{});
       if(courant()){adopter(j);pauseLocale.current=false;}
-    }catch(e){if(courant())setErreur(e.message);}
+    }catch(e){if(courant()){setErreur(e.message);const diagnostic={};for(const k of ['notifications','tracesNatives','pairesNatives','formesUserId','liensExacts','parametresConfirmes','selection'])if(Number.isSafeInteger(e.diagnostic?.[k])&&e.diagnostic[k]>=0&&e.diagnostic[k]<=10000)diagnostic[k]=e.diagnostic[k];setControleErreur({code:['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?e.code:'non_precise',diagnostic});}}
     finally{mutation.current=false;if(courant()){setOccupe(false);setPhase('');}}
   };
   const p=progressionFavoris(vue,horloge+decalage.current);
@@ -80,7 +81,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
     <summary>Envoi automatique aux favoris</summary>
     <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
-    <p>Garde cet écran ouvert et visible, avec l’extension 5.219 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
+    <p>Garde cet écran ouvert et visible, avec l’extension 5.220 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
     {!disponible&&<p>{raisonExtension||'La connexion à l’extension sera vérifiée au lancement.'}</p>}
     {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">
@@ -92,7 +93,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     </div>}
     {vue?.raison&&<p>{vue.raison}</p>}{raisons.map(x=><p role="alert" key={x}>{x}</p>)}
     {!!p.incertains&&!vue?.active&&<button type="button" disabled={occupe} onClick={()=>agir('clore')}>J’ai vérifié sur Vinted · ne pas renvoyer</button>}
-    {erreur&&<p role="alert">{erreur}</p>}
+    {erreur&&<p role="alert"><strong>Dernière tentative : </strong>{erreur}</p>}
     <button type="button" disabled={occupe||busy.current} onClick={lire}>Actualiser la file</button>
   </details>;
 }
