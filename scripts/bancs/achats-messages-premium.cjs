@@ -107,13 +107,19 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
   let version = '5.216.0';
-  window.majExtensionFavoris=()=>{version='5.217.0';post({__vmr:'ready',version});};
-  const post = (m) => window.postMessage({id:'extension-banc-unique',...m}, '*');
+  window.majExtensionFavoris=()=>{version='5.218.0';post({__vmr:'ready',version});};
+  const post = (m) => window.postMessage({id:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',...m}, '*');
+  Object.defineProperty(window.chrome,'runtime',{configurable:true,value:{sendMessage:(id,m,cb)=>{
+    if(id!=='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')return cb(null);
+    if(m.type==='favorisEtat')return cb({ok:true,ext:id,version,code:version,vrm:{ok:true,connecte:true,email:'banc@vrm.test',user_id:'0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b'},vinted:{uid:'111',login:'julatace35260'},cmds:{}});
+    if(m.type==='favorisExec'){window.favorisExec=window.favorisExec||[];window.favorisExec.push(m);return cb({ok:true,status:200,data:{resultat:'envoye'}});}
+    cb(null);
+  }}});
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
     if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: true, expiree: false, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */, cloisonne: false } });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, code:version, vrm: { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ }, vinted: { uid: '111', login: 'julatace35260' }, cmds: {} } });
+    if (d.__vmr === 'etat'&&version==='5.216.0') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, code:version, vrm: { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ }, vinted: { uid: '111', login: 'julatace35260' }, cmds: {} } });
     if (d.__vmr === 'exec') {
       window.favorisExec=window.favorisExec||[];if(d.endpoint==='/vrm/favoris')window.favorisExec.push(d);
       const m = /conversations\/(\d+)$/.exec(d.endpoint || '');
@@ -260,7 +266,7 @@ const capturer = async (pg, nom, vp) => {
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('alert').filter({hasText:'5.217'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.218'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>window.majExtensionFavoris());
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();

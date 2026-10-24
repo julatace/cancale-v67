@@ -11,7 +11,7 @@ const racine=path.resolve(__dirname,'../..');
  window.reglagesSauves={};
  window.fetch=async(url,opts)=>{
   window.appels.push({url,opts});if(window.attente)await new Promise(r=>window.liberer=r);
-  const u=new URL(url);
+  const u=new URL(url);if(url.includes('_favoris_archive'))return{ok:true,json:async()=>[]};
   if(url.includes('vrm_favoris_reglages_')||opts.method==='POST'){
     if(opts.method==='POST'){const row=JSON.parse(opts.body);window.reglagesSauves[row.owner+'|'+row.id]=row;return{ok:!window.erreurSauvegarde,json:async()=>[row]};}
     const id=(u.searchParams.get('id')||'').slice(3),owner=(u.searchParams.get('owner')||'').slice(3),row=window.reglagesSauves[owner+'|'+id];

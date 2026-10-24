@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.217.0';
+const CODE_VERSION = '5.218.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -638,6 +638,7 @@ async function deconnexionAdressee(msg) {
   await saveSession(null);
   return { ok: true };
 }
+let dernierPontFavoris=0;
 try {
   chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
     const src = (sender && (sender.origin || sender.url)) || '';
@@ -650,6 +651,9 @@ try {
         if (msg.type === 'liaison') { sendResponse(await demanderLiaison(msg)); return; }
         if (msg.type === 'session') { sendResponse(await recevoirSessionAdressee(msg)); return; }
         if (msg.type === 'deconnexion') { sendResponse(await deconnexionAdressee(msg)); return; }
+        if(msg.type==='favorisEtat'){const e=await etatPourApp();sendResponse(e);if(Date.now()-dernierPontFavoris>60000){dernierPontFavoris=Date.now();reinjecterPont().catch(()=>{});}return;}
+        if(msg.type==='favorisExec'&&msg.endpoint==='/vrm/favoris'){sendResponse(await executerPourApp({...msg,method:'POST'},sender));return;}
+        if(msg.type==='favorisLire'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/lire'},sender));return;}
         if (msg.type === 'code') { let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {} sendResponse({ ok: true, code: CODE_VERSION, ext }); return; }
         sendResponse({ ok: false, code: 'inconnu' });
       } catch (e) { sendResponse({ ok: false, code: 'erreur' }); }
@@ -1625,7 +1629,84 @@ function estErreurVinted(p) {
     && typeof p.message_code === 'string' && typeof p.code === 'number' && p.code !== 0);
 }
 
-async function storeHarvest(domain, type, id, body) {
+// Notifications: one archive per owner and Vinted account. Each page is
+// merged with CAS; a late page or another browser cannot erase the others.
+function sourceNotificationsFavoris(url,domain){
+  if(typeof url!=='string'||url.length>4000)return null;
+  try{const u=new URL(url,`https://${domain}`);if(u.protocol!=='https:'||u.username||u.password||! /^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)||!/^\/(?:api\/v\d+\/(?:user_)?notifications|inbox-notifications\/v\d+\/notifications)\/?$/.test(u.pathname))return null;return u.href;}catch{return null;}
+}
+function notificationCompacte(n){
+  if(!n||typeof n.id!=='string'||!n.id||n.id.length>160||typeof n.body!=='string')return null;
+  const r={id:n.id,body:n.body.slice(0,2000)};
+  for(const k of ['link','created_at','updated_at','created_at_ts','user_id','is_read'])if(['string','number','boolean'].includes(typeof n[k]))r[k]=typeof n[k]==='string'?n[k].slice(0,2000):n[k];
+  const auteur=n.actor||n.from_user;if(auteur&&typeof auteur==='object'){const login=auteur.login||auteur.username||auteur.name;if(typeof login==='string')r.actor={login:login.slice(0,160)};}
+  let visites=0;const chercher=(v,prof=0)=>{
+    if(++visites>80||prof>4||!v||typeof v!=='object')return null;
+    for(const k of ['photo','image','avatar','thumbnail','icon','photo_url','image_url','url'])if(typeof v[k]==='string'&&v[k].length<=2000){try{const u=new URL(v[k]);if(u.protocol==='https:'&&!u.username&&!u.password&&/^images\d*\.vinted\.net$/.test(u.hostname))return u.href;}catch{}}
+    for(const x of Object.values(v).slice(0,20)){const u=chercher(x,prof+1);if(u)return u;}return null;
+  };const photo=chercher(n);if(photo)r.image={url:photo};return r;
+}
+function fusionArchiveFavoris(avant,payload,{uid,domain,url,cycle=null,page=null}){
+  if(!Array.isArray(payload?.notifications))throw Error('Liste de notifications non reconnue.');
+  if(avant&&(avant.archiveVersion!==1||String(avant.uid)!==String(uid)||!Array.isArray(avant.payload?.notifications)))throw Error('Archive non reconnue pour ce compte.');
+  const parId=new Map();const date=n=>{for(const v of [n.created_at,n.created_at_ts,n.dateAjoutObservee,n.updated_at]){const t=typeof v==='number'?(v<1e12?v*1000:v):Date.parse(v||'');if(Number.isFinite(t)&&t>0)return t;}return 0;};
+  for(const n of avant?.payload?.notifications||[])parId.set(n.id,n);
+  for(const brut of payload.notifications.slice(0,500)){const n=notificationCompacte(brut);if(!n)continue;const ancien=parId.get(n.id);const ts=Math.min(...[date(ancien||{}),date(n)].filter(x=>x>0));if(Number.isFinite(ts))n.dateAjoutObservee=new Date(ts).toISOString();parId.set(n.id,{...ancien,...n});}
+  let notifications=[...parId.values()].sort((a,b)=>date(b)-date(a)),limite=!!avant?.limite||notifications.length>5000||payload.notifications.length>500;notifications=notifications.slice(0,5000);
+  let taille=JSON.stringify(notifications).length;while(taille>300000&&notifications.length){limite=true;notifications.splice(Math.max(0,notifications.length-100));taille=JSON.stringify(notifications).length;}
+  let sync=avant?.sync||null;
+  if(!cycle&&sync?.complete&&payload.notifications.some(n=>!(avant.payload.notifications||[]).some(x=>x.id===n.id)))sync={...sync,complete:false,suivante:1,pagesLues:0};
+  if(cycle){
+    if(page!==1&&sync?.id!==cycle)throw Error('Une autre lecture a remplacé celle-ci. Reprends la liste.');
+    const tp=Number(payload.pagination?.total_pages),cp=Number(payload.pagination?.current_page);
+    if(!Number.isSafeInteger(tp)||tp<1||tp>10000||cp!==page)throw Error('La pagination retournée par Vinted ne confirme pas la page demandée.');
+    if(page!==1&&sync.suivante!==page)throw Error('La lecture a changé dans une autre fenêtre.');
+    sync={id:cycle,totalPages:tp,pagesLues:page,suivante:page+1,complete:page>=tp,at:Date.now()};
+  }
+  return {archiveVersion:1,type:'notifications',uid:String(uid),domain,capturedAt:new Date().toISOString(),sourceUrl:sourceNotificationsFavoris(url,domain)||avant?.sourceUrl||null,payload:{notifications},limite,sync,archiveRev:(Number.isSafeInteger(avant?.archiveRev)?avant.archiveRev:0)+1};
+}
+async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAttendu=null,lecture=false}){
+  const s=await authToken();if(!s?.access_token||!s.user_id||ownerAttendu&&s.user_id!==ownerAttendu)return null;
+  const owner=s.user_id,id=`harvest_${uid}_favoris_archive`,base=`${SUPABASE_URL}/rest/v1/app_data`,filtre=`owner=eq.${encodeURIComponent(owner)}&id=eq.${id}`;
+  const headers={apikey:SUPABASE_KEY,Authorization:`Bearer ${s.access_token}`,'Content-Type':'application/json'};
+  const encore=async()=>String((await loadSession())?.user_id||'')===String(owner);
+  for(let essai=0;essai<8;essai++){
+    if(!await encore())return null;
+    try{
+      const r=await fetch(`${base}?${filtre}&select=id,owner,data`,{headers,signal:AbortSignal.timeout(12000)});if(!r.ok)return null;
+      const rows=await r.json();if(!await encore()||!Array.isArray(rows)||rows.length>1||rows.some(x=>x.owner!==owner||x.id!==id))return null;
+      const avant=rows[0]?.data||null;if(lecture)return {data:avant,owner};
+      const data=fusionArchiveFavoris(avant,payload,{uid,domain,url,cycle,page});
+      const cond=Number.isSafeInteger(avant?.archiveRev)?`data->>archiveRev=eq.${avant.archiveRev}`:'data->>archiveRev=is.null';
+      if(!await encore())return null;
+      const w=await fetch(rows.length?`${base}?${filtre}&${cond}&select=id` :base,{method:rows.length?'PATCH':'POST',headers:{...headers,Prefer:rows.length?'return=representation':'return=minimal'},body:JSON.stringify(rows.length?{data,updated_at:new Date().toISOString()}:{owner,id,data,updated_at:new Date().toISOString()}),signal:AbortSignal.timeout(12000)});
+      if(w.status===409)continue;if(!w.ok)return null;
+      if(rows.length){const out=await w.json();if(!Array.isArray(out))return null;if(!out.length)continue;}
+      return {data,owner};
+    }catch{return null;}
+  }return null;
+}
+async function lirePageFavoris(uid,acc,body){
+  const cycle=body?.cycle;if(typeof cycle!=='string'||!/^[a-f0-9-]{36}$/i.test(cycle))return {ok:false,status:400,json:null};
+  const lu=await archiveNotifications(uid,{lecture:true});if(!lu)return {ok:false,status:503,json:{message:'Archive indisponible. Aucune page effacée.'}};
+  const a=lu.data,source=sourceNotificationsFavoris(a?.sourceUrl,acc.domain||'www.vinted.fr');
+  if(!source)return {ok:false,status:409,json:{message:'Ouvre la cloche Vinted avec cette extension, puis reviens compléter les favoris. L’adresse de la liste doit être observée une fois.'}};
+  const page=body.nouveau===true?1:a?.sync?.id===cycle?a.sync.suivante:1;
+  if(a?.sync?.id===cycle&&a.sync.complete&&!body.nouveau)return {ok:true,status:200,json:{complete:true,pagesLues:a.sync.pagesLues,totalPages:a.sync.totalPages,limite:a.limite}};
+  const stop=await gardeLecture(uid,acc,'enligne');if(stop)return {ok:false,status:429,json:{message:stop.error,arret:'budget'}};
+  if(await gardeStricte(uid,acc,{lecture:true}))return {ok:false,status:409,json:{message:'Le compte Vinted connecté a changé.'}};
+  const u=new URL(source);let nomPage=['page','page_number','current_page'].find(k=>u.searchParams.has(k))||'page';u.searchParams.set(nomPage,String(page));
+  const r=await vintedGet({...acc,domain:u.hostname},u.pathname+u.search,{timeoutMs:12000,notifications:true});
+  if(!r.ok||!Array.isArray(r.json?.notifications))return {ok:false,status:r.status,json:{message:'Vinted n’a pas retourné une page lisible. Les favoris déjà reçus restent conservés.'}};
+  if(!Number.isSafeInteger(Number(r.json.pagination?.total_pages))||Number(r.json.pagination?.total_pages)<1||Number(r.json.pagination?.current_page)!==page)return {ok:false,status:409,json:{message:'Vinted ne confirme pas la page demandée. Les favoris déjà reçus sont conservés.'}};
+  const s=await archiveNotifications(uid,{payload:r.json,domain:acc.domain||'www.vinted.fr',url:source,cycle,page,ownerAttendu:lu.owner});
+  if(!s)return {ok:false,status:503,json:{message:'L’enregistrement de la page n’est pas confirmé. Actualise avant de reprendre.'}};
+  const d=s.data;return {ok:true,status:200,json:{complete:!!d.sync?.complete,pagesLues:d.sync?.pagesLues,totalPages:d.sync?.totalPages,limite:d.limite,arret:d.limite?'capacite':''}};
+}
+
+async function storeHarvest(domain, type, id, body, sourceUrl=null) {
+  const scopeNotif=type==='notifications'?await authToken():null;
+  if(type==='notifications'&&!scopeNotif?.user_id)return;
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
@@ -1741,7 +1822,8 @@ async function storeHarvest(domain, type, id, body) {
   if (CLE_LISTE[type]) data.nItems = ((parsed && parsed[CLE_LISTE[type]]) || []).length;
   data.resume = resumeCommandes(type, parsed) || undefined;   // même règle que la voie active
   if (type === 'orders_sold' && data.resume) { try { data.resume = retirerDuResume(data.resume, await transactionsQuiNeSExpedientPlus(uid)); } catch (_) {} }
-  const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id');
+  const ecrit = await supabaseUpsert('app_data', [{ id: rowId, data }], 'id', scopeNotif?.user_id||null);
+  if(type==='notifications'&&ecrit!==false)await archiveNotifications(uid,{payload:parsed,domain,url:sourceUrl,ownerAttendu:scopeNotif.user_id});
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
   noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
@@ -2325,7 +2407,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // On rattache le csrf au compte actif (mise a jour legere).
     captureDomain(domain);
   } else if (msg.kind === 'harvest' && msg.body) {
-    storeHarvest(domain, msg.type, msg.id, msg.body);
+    storeHarvest(domain, msg.type, msg.id, msg.body, msg.url);
   } else if (msg.kind === 'label' && msg.b64) {
     storeLabel(domain, msg.url, msg.b64);
   } else if (msg.kind === 'receipt' && msg.b64) {
@@ -3260,6 +3342,7 @@ async function vintedGet(acc, endpoint, options = {}) {
           'Accept': 'application/json, text/plain, */*',
           'Accept-Language': 'fr-FR,fr;q=0.9',
           'locale': 'fr-FR',
+          ...(options.notifications?{'platform':'web','x-next-app':'marketplace-web'}:{}),
         },
       });
       let json = null;
@@ -7236,6 +7319,7 @@ const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new UR
 // supprime, rien d'arbitraire. Une LECTURE ne compte pas dans le plafond
 // horaire (elle n'engage rien) ; un geste, si.
 const EXEC_PERMIS = [
+  {methode:'POST',chemin:/^\/vrm\/favoris\/lire$/,lecture:true,favorisListe:true},
   { methode: 'POST', chemin: /^\/vrm\/favoris$/ , favori: true }, // internal operation; never forwarded as a URL
   { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
   { methode: 'GET',  chemin: /^\/api\/v2\/conversations\/\d+$/, lecture: true }, // lire le fil
@@ -7311,6 +7395,7 @@ async function executerPourApp(msg, sender) {
   const r = await avecVinted(async () => {
     arret = await gardeStricte(msg.uid, acc, { lecture: true });
     if (arret) return null;
+    if(permis.favorisListe)return lirePageFavoris(msg.uid,acc,msg.body);
     if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
     return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
   });
@@ -7537,7 +7622,7 @@ async function etatPourApp() {
   const vintedPasSu = uid === PAS_SU;
   const PAUSE_PAS_SUE = {};
   const [e, cmds, login, pause] = await Promise.all([
-    authEtatRapide(1500).catch(() => null),
+    avecDelai(authEtatRapide(1500),1800,null).catch(() => null),
     avecDelai(lireCmds(), 300, {}).catch(() => ({})),
     uid && !vintedPasSu ? avecDelai(loginDe(String(uid), { attendreMs: 250 }), 300, '').catch(() => '') : Promise.resolve(''),
     avecDelai(pauseVinted(), 300, PAUSE_PAS_SUE).catch(() => PAUSE_PAS_SUE),

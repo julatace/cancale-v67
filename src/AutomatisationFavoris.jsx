@@ -1,10 +1,10 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension}){
+export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat}){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
-  const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0);
+  const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
   const courant=()=>vivant.current&&ownerActuel()===owner;
-  const adopter=j=>{if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();setHorloge(Date.now());setVue(j.vue);};
+  const adopter=j=>{if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(Array.isArray(j.vue?.jobs)&&onEtat)onEtat(j.vue);};
   const api=async(action,donnees={},h=headers())=>{
     const r=await fetch(`/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:action?'POST':'GET',headers:{...h,'Content-Type':'application/json'},cache:'no-store',signal:AbortSignal.timeout(15000),...(action?{body:JSON.stringify({action,...donnees})}:{})});
     const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||'La file n’a pas été confirmée.');return j;
@@ -21,6 +21,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   },[uid,owner]);
   React.useEffect(()=>{if(!vue?.active)return;const t=setInterval(()=>setHorloge(Date.now()),1000);return()=>clearInterval(t);},[vue?.active]);
   const avancer=async()=>{
+    if(prochaine.current>Date.now()+decalage.current)return;
     if(!courant()||busy.current||mutation.current||pauseLocale.current||!vue?.active||!disponible||document.visibilityState==='hidden'||typeof executer!=='function')return;
     busy.current=true;++lecture.current;const h=headers();setPhase('Vérification du prochain envoi');
     try{
@@ -32,7 +33,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
           const r=await executer(t);
           if(r?.ok&&['envoye','ignore'].includes(r.data?.resultat))resultat=r.data.resultat;
           else if(r?.data?.resultat==='refuse')resultat='refuse';
-          if(['vinted-pause','vinted-absent','vinted-autre','plafond','plafond-bordereaux','perime','plusieurs','non-autorise','origine'].includes(r?.code))resultat='refuse';
+          if(['vinted-pause','vinted-absent','vinted-autre','plafond','plafond-bordereaux','perime','plusieurs','non-autorise','origine','preparation-refusee'].includes(r?.code))resultat='refuse';
           if(RAISONS_FAVORIS[r?.data?.raison])raison=r.data.raison;
           else if(r?.code==='vinted-autre')raison='compte_vinted_different';
           else if(r?.code==='vinted-absent')raison='compte_vinted_absent';
@@ -78,7 +79,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
     <summary>Envoi automatique aux favoris</summary>
     <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
-    <p>Garde cet écran ouvert et visible, avec l’extension 5.217 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
+    <p>Garde cet écran ouvert et visible, avec l’extension 5.218 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
     {!disponible&&<p>{raisonExtension||'L’extension n’est pas encore confirmée. Le bouton vérifie sa connexion avant de lancer.'}</p>}
     {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">

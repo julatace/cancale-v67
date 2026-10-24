@@ -1,5 +1,5 @@
 import React from 'react';
-import {lireFavorisVinted,preparerMessageFavori} from './favorisVinted.js';
+import {lireFavorisVinted,preparerMessageFavori,ageFavori,contactFavori} from './favorisVinted.js';
 import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris} from './reglagesFavoris.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
@@ -11,15 +11,17 @@ function PhotoNotification({src, PhotoVinted}) {
 }
 
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension,PhotoVinted=null}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension,recupererPage,PhotoVinted=null}) {
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[reglages,setReglages]=React.useState({});
+  const [historique,setHistorique]=React.useState(null),[filtre,setFiltre]=React.useState('tous'),[recherche,setRecherche]=React.useState(''),[maintenant,setMaintenant]=React.useState(Date.now()),[importation,setImportation]=React.useState(false);
+  const importEnCours=React.useRef(false),annulerImport=React.useRef(false);
   const reglagesLus=React.useRef(false),edition=React.useRef(0),sauvegarde=React.useRef(false);
   const change=()=>{edition.current++;setRetour('');setReglages(x=>x.prets?{...x,enregistres:false,erreur:''}:x);};
   const apercu=preparerMessageFavori(message,reduction);
   const requete=React.useRef(0),occupe=React.useRef(false);
   const scope=owner+':'+uid, data=etat.scope===scope?etat.data:undefined;
-  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setSelection([]);setMessage('');setReduction('');setIntervalle('6');setReglages({});reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);return()=>{requete.current++;};},[uid,owner]);
+  React.useEffect(()=>{requete.current++;occupe.current=false;setEtat({});setHistorique(null);setImportation(false);setFiltre('tous');setRecherche('');annulerImport.current=true;setSelection([]);setMessage('');setReduction('');setIntervalle('6');setReglages({});reglagesLus.current=false;edition.current=0;sauvegarde.current=false;setRetour('');setMax(50);return()=>{requete.current++;};},[uid,owner]);
   const charger=async()=>{
     if(occupe.current||sauvegarde.current)return;
     const n=++requete.current;occupe.current=true;setEtat({scope,charge:true});setSelection([]);setRetour('');
@@ -37,7 +39,36 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     catch(e){if(n===requete.current&&ownerActuel()===owner)setEtat({scope,erreur:e.message});}
     finally{if(n===requete.current)occupe.current=false;}
   };
-  const lignes=data?.lignes||[],visibles=lignes.slice(0,max);
+  const lignes=data?.lignes||[],jobs=historique?.scope===scope?historique.vue.jobs:undefined;
+  const statut=x=>contactFavori(x,jobs),bloque=x=>['envoye','ignore','incertain','verifie','reserve','attente'].includes(statut(x)?.etat);
+  const filtrees=lignes.filter(x=>(filtre==='tous'||filtre==='envoyes'&&statut(x)?.etat==='envoye'||filtre==='contacter'&&!bloque(x))&&(!recherche.trim()||`${x.nom} ${x.body}`.toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr'))));
+  const visibles=filtrees.slice(0,max);
+  React.useEffect(()=>{if(!data)return;setMaintenant(Date.now());const t=setInterval(()=>setMaintenant(Date.now()),60000);return()=>clearInterval(t);},[data]);
+  React.useEffect(()=>{if(!jobs)return;setSelection(anciens=>{const nouveaux=anciens.filter(id=>{const x=lignes.find(n=>n.id===id);return x&&!['envoye','ignore','incertain','verifie'].includes(contactFavori(x,jobs)?.etat);});return nouveaux.length===anciens.length?anciens:nouveaux;});},[historique,data]);
+  const importer=async()=>{
+    if(importEnCours.current||occupe.current||sauvegarde.current)return;
+    if(!recupererPage){setRetour('La récupération des pages nécessite l’extension 5.218.');return;}
+    const generation=requete.current;importEnCours.current=true;annulerImport.current=false;setImportation(true);setSelection([]);setRetour('Connexion à Vinted…');
+    const ancien=data?.archive?.sync,cycle=ancien&&!ancien.complete?ancien.id:(globalThis.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.floor(Math.random()*16);return (c==='x'?r:(r&3)|8).toString(16);}));let nouveau=!ancien||ancien.complete,texteFinal='';
+    try{
+      for(let i=0;i<30;i++){
+        if(annulerImport.current||generation!==requete.current||ownerActuel()!==owner)break;
+        const r=await recupererPage({cycle,nouveau});
+        if(!r?.ok)throw Error(r?.data?.message||r?.error||'La lecture a été interrompue. Les pages déjà reçues restent conservées.');
+        const d=r.data||{};if(!Number.isSafeInteger(d.pagesLues)||!Number.isSafeInteger(d.totalPages)||d.pagesLues<1||d.totalPages<d.pagesLues||typeof d.complete!=='boolean')throw Error('La progression de lecture n’est pas reconnue. Les favoris déjà reçus sont conservés.');setRetour(`${d.pagesLues||0} / ${d.totalPages||'?'} pages récupérées…`);nouveau=false;
+        if(d.limite){texteFinal='La capacité de l’archive est atteinte. Les pages lues restent conservées, mais la liste n’est pas exhaustive.';break;}
+        if(d.complete){texteFinal='Toutes les pages disponibles ont été récupérées.';break;}
+        if(i===29)texteFinal='Une première partie est conservée. Clique à nouveau pour reprendre les pages restantes.';
+      }
+      if(annulerImport.current)texteFinal='Lecture arrêtée. Les pages déjà reçues restent conservées.';
+    }catch(e){texteFinal=e.message;}
+    finally{
+      importEnCours.current=false;
+      if(generation===requete.current&&ownerActuel()===owner){await charger();if(generation+1===requete.current){setImportation(false);setRetour(texteFinal);}}
+    }
+  };
+  const tester=async()=>{if(!verifierExtension)return;setRetour('Vérification de la connexion…');try{const r=await verifierExtension();if(ownerActuel()===owner)setRetour(r.disponible?`Connexion vérifiée · ${r.canal||'extension'}`:r.raison);}catch{if(ownerActuel()===owner)setRetour('La vérification n’a pas abouti. Réessaie dans ce profil Chrome.');}};
+
   const choisir=id=>{setRetour('');setSelection(s=>s.includes(id)?s.filter(x=>x!==id):s.length<10?[...s,id]:s);};
   const copier=async()=>{if(ownerActuel()!==owner||apercu.erreur||!apercu.message)return;const n=requete.current;try{await navigator.clipboard.writeText(apercu.message);if(n===requete.current)setRetour('Message copié. Tu peux le coller dans la conversation sur Vinted.');}catch{if(n===requete.current)setRetour('Copie indisponible : sélectionne le texte de l’aperçu.');}};
   const enregistrer=async()=>{
@@ -59,19 +90,20 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     return sauves;
   };
   return <section className="vrm-favoris-liste" aria-label="Favoris reçus">
-    <header><div><h3>Favoris reçus</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={!uid||!owner||etat.charge||reglages.sauvegarde}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button>{data&&<button type="button" disabled={reglages.sauvegarde} onClick={()=>{requete.current++;occupe.current=false;setEtat({});setSelection([]);setRetour('');}}>Masquer</button>}</div></header>
+    <header><div><h3>Favoris reçus</h3><small>{nomCompte||(uid?'Compte Vinted sélectionné':'Choisis le compte à consulter')}</small></div><div className="vrm-favoris-actions"><button type="button" onClick={charger} disabled={!uid||!owner||etat.charge||reglages.sauvegarde||importation}>{etat.charge?'Lecture…':data?'Actualiser':'Afficher les favoris'}</button>{data&&<button type="button" disabled={reglages.sauvegarde||importation} onClick={()=>{requete.current++;occupe.current=false;setEtat({});setSelection([]);setRetour('');}}>Masquer</button>}</div></header>
     {!uid&&<p className="vrm-favoris-note">Choisis un compte Vinted dans le sélecteur au-dessus pour afficher ses favoris.</p>}
     {etat.scope===scope&&etat.erreur&&<p role="alert">{etat.erreur}</p>}
     {data&&<>
-      <p className="vrm-favoris-note">{data.reception==='absente'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis actualise.':`${lignes.length} favori${lignes.length>1?'s':''} reconnu${lignes.length>1?'s':''} dans la capture reçue. Historique complet non vérifié.`}{data.totalPages>1?` Vinted indique ${data.totalPages} pages de notifications.`:''}</p>
-      {!!lignes.length&&<><div className="vrm-favoris-selection"><span>{selection.length} sélectionné{selection.length>1?'s':''} · 10 maximum par préparation</span><button type="button" onClick={()=>{setSelection(visibles.slice(0,10).map(x=>x.id));setRetour('');}}>Sélectionner les 10 premiers</button>{!!selection.length&&<button type="button" onClick={()=>setSelection([])}>Tout décocher</button>}</div>
+      <p className="vrm-favoris-note">{data.reception==='absente'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis actualise.':`${lignes.length} favori${lignes.length>1?'s':''} reçu${lignes.length>1?'s':''}. ${data.archive?.sync?.complete&&!data.archive?.limite?'Toutes les pages de la dernière lecture sont conservées.':'Historique à compléter.'}`}{data.totalPages>1?` Vinted indique ${data.totalPages} pages de notifications.`:''}</p>
+      <div className="vrm-favoris-outils">{recupererPage&&<button type="button" onClick={importer} disabled={importation||etat.charge||historique?.vue?.active}>{importation?'Récupération…':data.archive?.sync&&!data.archive.sync.complete?'Compléter les pages restantes':'Récupérer toutes les pages'}</button>}{importation&&<button type="button" onClick={()=>{annulerImport.current=true;}}>Arrêter la lecture</button>}{verifierExtension&&<button type="button" onClick={tester} disabled={importation}>Tester la connexion</button>}</div>
+      {!!lignes.length&&<><div className="vrm-favoris-filtres"><label>Rechercher un favori<input type="search" value={recherche} onChange={e=>{setRecherche(e.target.value);setMax(50);}} placeholder="Nom, article…"/></label><div role="group" aria-label="Filtrer les favoris">{[['tous','Tous'],['contacter','À contacter'],['envoyes','Déjà envoyés']].map(([id,label])=><button type="button" key={id} aria-pressed={filtre===id} onClick={()=>{setFiltre(id);setMax(50);}}>{label}{id==='tous'?` (${lignes.length})`:id==='envoyes'?` (${lignes.filter(x=>statut(x)?.etat==='envoye').length})`:''}</button>)}</div></div><div className="vrm-favoris-selection"><span>{selection.length} sélectionné{selection.length>1?'s':''} · 10 maximum par préparation</span><button type="button" onClick={()=>{setSelection(visibles.filter(x=>!bloque(x)).slice(0,10).map(x=>x.id));setRetour('');}}>Sélectionner les 10 premiers</button>{!!selection.length&&<button type="button" onClick={()=>setSelection([])}>Tout décocher</button>}</div>
       <div className="vrm-favoris-rows">{visibles.map(x=><article key={x.id} className={selection.includes(x.id)?'is-selected':''}>
-        <label className="vrm-favoris-check"><input type="checkbox" aria-label={`Sélectionner ${x.nom||x.body.slice(0,100)}`} checked={selection.includes(x.id)} disabled={!selection.includes(x.id)&&selection.length>=10} onChange={()=>choisir(x.id)}/></label>
+        <label className="vrm-favoris-check"><input type="checkbox" aria-label={`Sélectionner ${x.nom||x.body.slice(0,100)}`} checked={selection.includes(x.id)} disabled={importation||bloque(x)||!selection.includes(x.id)&&selection.length>=10} onChange={()=>choisir(x.id)}/></label>
         <PhotoNotification src={x.photo} PhotoVinted={PhotoVinted}/>
-        <div className="vrm-favoris-texte">{x.nom&&<strong title={x.nom}>{x.nom}</strong>}<p title={x.body}>{x.nom&&x.body.startsWith(x.nom+' ')?x.body.slice(x.nom.length).trim():x.body}</p>{x.date&&<time dateTime={x.date}>{new Date(x.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</time>}</div>
+        <div className="vrm-favoris-texte">{x.nom&&<strong title={x.nom}>{x.nom}</strong>}<p title={x.body}>{x.nom&&x.body.startsWith(x.nom+' ')?x.body.slice(x.nom.length).trim():x.body}</p><div className="vrm-favoris-meta"><time dateTime={x.date||undefined} title={x.date?'Date indiquée par la notification : '+new Date(x.date).toLocaleString('fr-FR'):undefined}>{ageFavori(x.date,maintenant)}</time>{statut(x)?.etat==='envoye'?<span className="vrm-favoris-badge is-envoye" title={statut(x).envoyeLe?`Envoi confirmé le ${new Date(statut(x).envoyeLe).toLocaleString('fr-FR')}`:'Envoi VRM confirmé'}>Message déjà envoyé</span>:statut(x)?.etat==='ignore'?<span className="vrm-favoris-badge">Conversation commencée</span>:statut(x)?.etat==='incertain'?<span className="vrm-favoris-badge">Envoi à vérifier</span>:['attente','reserve'].includes(statut(x)?.etat)?<span className="vrm-favoris-badge">Dans la file</span>:null}</div></div>
         {x.lien?<a href={x.lien} target="_blank" rel="noreferrer" aria-label="Ouvrir la notification sur Vinted"><span>Ouvrir sur Vinted</span><svg className="vrm-favoris-ouvrir-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>:<small>Lien indisponible</small>}
       </article>)}</div>
-      {visibles.length<lignes.length&&<button type="button" onClick={()=>setMax(x=>x+50)}>Afficher les suivants</button>}
+      {!visibles.length&&<p>Aucun favori ne correspond à ce filtre.</p>}{visibles.length<filtrees.length&&<button type="button" onClick={()=>setMax(x=>x+50)}>Afficher les suivants</button>}
       {!!selection.length&&<div className="vrm-favoris-compose"><details className="vrm-favoris-parametres" open={!reglages.enregistres}><summary>{reglages.enregistres?'Réglages enregistrés · modifier':'Paramétrer ce compte'}</summary><label>Ton message<textarea maxLength={2000} rows={3} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Écris ton message personnalisé…"/></label>
         <div className="vrm-favoris-remise"><label>Réduction proposée (%)<input type="text" inputMode="numeric" maxLength={6} value={reduction} onChange={e=>{setReduction(e.target.value);change();}} placeholder="Facultative"/></label><div role="group" aria-label="Pourcentages de réduction">{[5,10,15,20].map(p=><button type="button" key={p} aria-pressed={apercu.pourcentage===p} onClick={()=>{setReduction(String(p));change();}}>−{p} %</button>)}{reduction&&<button type="button" onClick={()=>{setReduction('');change();}}>Sans réduction</button>}</div></div>
         <small>La remise est proposée dans le texte. Le prix de l’annonce reste inchangé et aucune offre de prix Vinted n’est créée.</small>
@@ -85,7 +117,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button></div>}
       </>}
     </>}
-    {uid&&owner&&executerFavori&&<AutomatisationFavoris key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension}/>}
+    {uid&&owner&&executerFavori&&<AutomatisationFavoris key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/>}
     {retour&&<p role="status">{retour}</p>}
   </section>;
 }

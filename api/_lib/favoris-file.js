@@ -11,7 +11,7 @@ export function initialiserFile(d){
 }
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
-  return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0,(d.tentatives||[]).length>=10?d.tentatives[d.tentatives.length-10]+3600000:0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot})=>({id,notificationId,etat,lot,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
+  return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0,(d.tentatives||[]).length>=10?d.tentatives[d.tentatives.length-10]+3600000:0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
 }
 export function lancerFile(d,{owner,targets,message,intervalleMinutes,maintenant,lot=String(maintenant)}){
   d=initialiserFile(d);
@@ -71,6 +71,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   const raisons=['compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue'];
   if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;
+  j.traiteLe=fin;if(resultat==='envoye')j.envoyeLe=fin;
   if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   return {data:d,valeur:vueFile(d,owner)};

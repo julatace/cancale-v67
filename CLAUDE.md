@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — favoris 5.218 :** archive privée cumulée avec révision atomique,
+> lecture paginée depuis une source native observée, dates relatives, filtres et
+> messages déjà envoyés confirmés. Chrome peut joindre directement l’extension
+> quand le relais de page est muet. Aucun rejeu après un envoi sans accusé.
+> Voir `docs/passation/2026-10-24-favoris-historique-chrome.md`.
+
 > **24 octobre — correctif favoris 5.217 :** bouton de lancement avec vérification
 > fraîche de l'extension et sauvegarde au clic, fil déjà commencé ignoré sans
 > message, barre par lot avec étapes et compte à rebours. Les anciens moteurs

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {favorisDepuisNotifications,lienFavoriVinted,lireFavorisVinted,formesLiensNotifications} from '../../src/favorisVinted.js';
+const lireSansArchive=opts=>lireFavorisVinted({...opts,fetcher:(url,o)=>url.includes('_favoris_archive')?Promise.resolve({ok:true,json:async()=>[]}):opts.fetcher(url,o)});
 const favori=(x={})=>({id:'notif-1',body:'<b>Camille</b> a ajout&eacute; ton article à ses favoris.',link:'/inbox/987',user_id:123,updated_at:'2026-10-24T10:00:00Z',illustration:{url:'https://images1.vinted.net/photo.jpeg'},...x});
 test('une ligne conserve la notification, sa photo et son vrai lien sans déduire un destinataire',()=>{
  const r=favorisDepuisNotifications({notifications:[favori()],pagination:{total_pages:3}});
@@ -17,7 +18,7 @@ test('une offre et un titre qui contient favoris ne deviennent pas des favoris r
 });
 test('les mêmes identités sont dédupliquées, deux favoris similaires restent deux lignes',()=>{
  const r=favorisDepuisNotifications({notifications:[favori(),favori({updated_at:'2026-10-24T11:00:00Z',is_read:true}),favori({id:'notif-2'})]});
- assert.equal(r.lignes.length,2);assert.equal(r.lignes[0].date,'2026-10-24T11:00:00Z');
+ assert.equal(r.lignes.length,2);assert.equal(r.lignes[0].date,'2026-10-24T10:00:00.000Z');
 });
 test('les liens non Vinted et les images non fournies par le CDN sont écartés',()=>{
  for(const u of ['javascript:alert(1)','https://autre.invalid/inbox/1','https://www.vinted.fr.autre.invalid/inbox/1','https://www.vinted.fr/api/v2/conversations/1','http://www.vinted.fr/inbox','https://user:secret@www.vinted.fr/inbox'])assert.equal(lienFavoriVinted(u),null,u);
@@ -35,17 +36,17 @@ test('le diagnostic des liens ne révèle ni identifiant, ni pseudo, ni valeur d
 });
 test('forme absente et liste vide sont distinctes et le parcours est borné',()=>{
  assert.throws(()=>favorisDepuisNotifications({code:0}));assert.equal(favorisDepuisNotifications({notifications:[]}).lignes.length,0);
- const r=favorisDepuisNotifications({notifications:Array.from({length:2200},(_,i)=>favori({id:String(i)}))});assert.equal(r.lignes.length,2000);assert.equal(r.limite,true);
+ const r=favorisDepuisNotifications({notifications:Array.from({length:5200},(_,i)=>favori({id:String(i)}))});assert.equal(r.lignes.length,5000);assert.equal(r.limite,true);
 });
 test('la lecture est exacte, propriétaire inclus, et ne fait aucune écriture',async()=>{
  let appel;const owner='owner-test';
- const r=await lireFavorisVinted({uid:'123',owner,ownerActuel:()=>owner,base:'https://base.invalid',headers:{Authorization:'Bearer test'},fetcher:async(url,opts)=>{appel={url,opts};return {ok:true,json:async()=>[{owner,data:{uid:'123',type:'notifications',payload:{notifications:[favori()]}}}]};}});
+ const r=await lireSansArchive({uid:'123',owner,ownerActuel:()=>owner,base:'https://base.invalid',headers:{Authorization:'Bearer test'},fetcher:async(url,opts)=>{appel={url,opts};return {ok:true,json:async()=>[{owner,data:{uid:'123',type:'notifications',payload:{notifications:[favori()]}}}]};}});
  assert.equal(r.reception,'recue');const u=new URL(appel.url);assert.equal(u.searchParams.get('id'),'eq.harvest_123_notifications');assert.equal(u.searchParams.get('owner'),'eq.owner-test');assert.equal(appel.opts.method,undefined);
 });
 test('autre propriétaire, autre compte, erreur et changement de session ne deviennent pas une liste vide',async()=>{
  const owner='owner-test',args={uid:'123',owner,ownerActuel:()=>owner,base:'https://base.invalid',headers:{}};
- for(const row of [{owner:'autre',data:{uid:'123',type:'notifications'}},{owner,data:{uid:'456',type:'notifications'}},{owner,data:{uid:'123',type:'conversation'}}])await assert.rejects(lireFavorisVinted({...args,fetcher:async()=>({ok:true,json:async()=>[row]})}));
- await assert.rejects(lireFavorisVinted({...args,fetcher:async()=>({ok:false})}));
- let actif=owner;await assert.rejects(lireFavorisVinted({...args,ownerActuel:()=>actif,fetcher:async()=>{actif='autre';return {ok:true,json:async()=>[]};}}));
- const vide=await lireFavorisVinted({...args,fetcher:async()=>({ok:true,json:async()=>[]})});assert.equal(vide.reception,'absente');
+ for(const row of [{owner:'autre',data:{uid:'123',type:'notifications'}},{owner,data:{uid:'456',type:'notifications'}},{owner,data:{uid:'123',type:'conversation'}}])await assert.rejects(lireSansArchive({...args,fetcher:async()=>({ok:true,json:async()=>[row]})}));
+ await assert.rejects(lireSansArchive({...args,fetcher:async()=>({ok:false})}));
+ let actif=owner;await assert.rejects(lireSansArchive({...args,ownerActuel:()=>actif,fetcher:async()=>{actif='autre';return {ok:true,json:async()=>[]};}}));
+ const vide=await lireSansArchive({...args,fetcher:async()=>({ok:true,json:async()=>[]})});assert.equal(vide.reception,'absente');
 });
