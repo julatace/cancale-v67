@@ -2578,7 +2578,7 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null) {
     try{const c=JSON.parse(data.body),u=new URL(contexteFavori);u.hash='';
       const m=/^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(u.pathname);
       const id=v=>Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:null;
-      if(m&&m[1]===id(c.item_id)&&id(c.opposite_user_id)&&id(c.opposite_user_id)!==String(uid)&&Object.keys(c).sort().join(',')==='initiator,item_id,opposite_user_id'&&typeof c.initiator==='string'&&c.initiator.length>0&&c.initiator.length<=80&&u.protocol==='https:'&&!u.username&&!u.password&&/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)&&u.href.length<=2000)data.contexteFavori=u.href;
+      if(m&&m[1]===id(c.item_id)&&id(c.opposite_user_id)&&id(c.opposite_user_id)!==String(uid)&&Object.keys(c).sort().join(',')==='initiator,item_id,opposite_user_id'&&typeof c.initiator==='string'&&c.initiator.length>0&&c.initiator.length<=80&&u.protocol==='https:'&&!u.username&&!u.password&&/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)&&u.href.length<=2000){data.contexteFavori=u.href;data.body=JSON.stringify(c);}
     }catch{}
   }
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id',scope.user_id);
