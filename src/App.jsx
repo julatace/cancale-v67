@@ -13247,18 +13247,20 @@ function FavorisConnectes(props){
     const r=etatExtensionFavoris(props.uid,transport.current?.mode==='direct'?directVu.current?.etat:null);maj();return {...r,canal:transport.current?.mode==='direct'?'Chrome direct':'pont de page'};
   };
   const executer=async(t,lire=false)=>{
-    const e=await verifier();if(!e.disponible)return {ok:false,code:'preparation-refusee',error:e.raison};
+    const e=await verifier();
     const version=String((transport.current?.mode==='direct'?directVu.current?.etat:__vmrEtat)?.code||'');
-    if(lire==='ouvrir'&&cmpVersion(version,EXT_CAPACITES.favorisouvrir)<0)return {ok:false,error:'L’ouverture avec vérification nécessite l’extension 5.221. Mets à jour l’extension existante puis recharge-la.'};
+    const retour=(r,etape)=>lire==='ouvrir'?{...r,controleOuverture:{version,etape}}:r;
+    if(!e.disponible)return retour({ok:false,code:'preparation-refusee',error:e.raison},'connexion');
+    if(lire==='ouvrir'&&cmpVersion(version,EXT_CAPACITES.favorisouvrir)<0)return retour({ok:false,error:'L’ouverture avec vérification nécessite l’extension 5.221. Mets à jour l’extension existante puis recharge-la.'},'version');
     if(lire===true&&cmpVersion(version,'5.218.0')<0)return {ok:false,error:'La récupération complète nécessite une extension à jour. Installe la 5.221 puis recharge-la.'};
     const endpoint=lire==='ouvrir'?'/vrm/favoris/ouvrir':lire?'/vrm/favoris/lire':'/vrm/favoris';
     const body=lire==='ouvrir'?{owner:props.owner,notificationId:t.id}:lire?t:{jeton:t.jeton};
     if(transport.current?.mode==='direct'){
       const type=lire==='ouvrir'?'favorisOuvrir':lire?'favorisLire':'favorisExec';
       const r=await appelerFavorisDirect(canalExt(),transport.current.id,{type,uid:props.uid,endpoint,body},90000);
-      return r||{ok:false,error:lire==='ouvrir'?'L’ouverture n’a pas été confirmée. Vérifie les onglets Vinted avant de réessayer.':lire?'La lecture a été interrompue. Les pages déjà reçues sont conservées.':'Accusé de l’extension absent. Aucun renvoi automatique.',incertain:!lire};
+      return retour(r||{ok:false,error:lire==='ouvrir'?'L’ouverture n’a pas été confirmée. Vérifie les onglets Vinted avant de réessayer.':lire?'La lecture a été interrompue. Les pages déjà reçues sont conservées.':'Accusé de l’extension absent. Aucun renvoi automatique.',incertain:!lire},r?'commande':'transport');
     }
-    return vmrExecUn({uid:props.uid,method:'POST',endpoint,body},90000);
+    const r=await vmrExecUn({uid:props.uid,method:'POST',endpoint,body},90000);return retour(r,r?'commande':'transport');
   };
   return <FavorisVinted {...props} favorisDisponible={etat.disponible} favorisRaison={etat.raison} verifierExtension={verifier} executerFavori={t=>executer(t)} recupererPage={t=>executer(t,true)} ouvrirFavori={typeof canalExt()?.sendMessage==='function'||vmrExtPresent()?t=>executer(t,'ouvrir'):undefined}/>;
 }

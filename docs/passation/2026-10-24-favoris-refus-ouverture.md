@@ -1,0 +1,9 @@
+# Favoris — refus d'ouverture invisible dans le contrôle
+
+Retour réel après 5.221 : le bouton « Vérifier sur Vinted » n'ouvre rien. Contrôle : extension non_confirmee, ouvert false, preuve ouverture_non_confirmee, raison vide. Le lancement indique toujours favoris_preuve_absente. Ce contrôle ne distingue pas un précontrôle refusé (version, session), une notification non affichée, une erreur de transport ou une panne de capture. Ne pas conclure que l'extension est absente ni annoncer le cas client résolu.
+
+Défaut reproduit dans l'interface : une réponse refusée ne porte pas nécessairement data.version. L'app possédait la version mesurée mais ne la transmettait pas au contrôle. Seuls les trois motifs de capture étaient copiés ; les autres erreurs étaient perdues. Le retour était un statut discret et la ligne restait « Capture en attente » malgré un refus.
+
+Correctif côté site uniquement, extension reste 5.221. La version mesurée et l'étape connexion/version/commande/transport accompagnent l'ouverture. Le contrôle copie exclusivement des catégories connues, sans erreur brute ni identifiants privés. La raison complète déjà renvoyée est affichée en alerte « Vérification interrompue ». Un refus met la ligne en capture non confirmée. Une nouvelle vérification efface le contrôle de l'ancien lancement pour éviter de mélanger les tentatives ; une exception ne réutilise pas un ancien reçu positif. Aucun renvoi ni contournement des gardes.
+
+Validation synthétique : tests unitaires contrôle et confidentialité ; React sur trois largeurs avec véritable réponse refusée ; app intégrale avec extension ancienne mesurée, aucun onglet ni envoi et diagnostic précis. Le motif exact dans la session client demeure inconnu tant que le nouveau contrôle ne l'a pas capté. Aucun message Vinted réel de validation.
