@@ -51,6 +51,9 @@ const MUTATIONS = {
   'mr-serveur-eteint': ['api/_lib/transporteurs.js', 'export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: true });', 'export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: false });'],
   'c3-mr-toujours': ['api/_lib/transporteurs-lecture.js', "    if (it.carrier === 'mondialrelay' && !it.cp) continue;", "    if (it.carrier === 'mondialrelay') { if (it.cp) out.push({ carrier: it.carrier, suivi: it.suivi, cp: it.cp, voie: 'mr-be' }); continue; }"],
   'essai-cp-compte-echec': ['api/_lib/transporteurs-lecture.js', "      if (essai && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };", ''],
+  // ── Le widget suit la règle de l'app (§11, trouvé au banc `transporteurs.cjs`) ──
+  'widget-transp-dispo-ignore': ['api/widget.js', '      return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;', '      return dispoSuivi.has(k) ? false : true;'],
+  'widget-garde-non-levee': ['api/widget.js', ', leveDepuisTransp(suivisLus));', ');'],
 };
 const ARG_PROUVE = process.argv.find((x) => x.startsWith('--prouve'));
 if (ARG_PROUVE) {
@@ -580,6 +583,28 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     };
     const sans = await compte(false), avec = await compte(true);
     dit(sans.pickup === 1 && avec.pickup === 0, 'le widget lit la ligne du transporteur : retiré chez Mondial Relay ⇒ 0 à retirer (1 sans elle)', `sans=${sans.pickup} avec=${avec.pickup}`);
+  });
+  // Ce que l'app compte « à retirer » PARCE QUE le transporteur le dit (aucun
+  // e-mail « disponible ») n'est pas « sorti » pour le widget ; et une lecture
+  // « disponible » de moins de 6 h lève la garde de 5 j, comme dans l'app.
+  await essaie('route api/widget : le transporteur dit « disponible » ⇒ toujours compté, la garde levée comme dans l\'app', async () => {
+    const w = (await importer('api/widget.js')).default;
+    const compte = async ({ email, arriveeMs, luMs, limite = '' }) => {
+      resetBase(); await oublis();
+      base.set(`${A}|main`, { vrm_widget_token: '', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_sales_hidden: [], vinted_bords_hidden: {}, vrm_colis_collected: [],
+        vrm_colis_retirer: { total: 1, aVerifier: 0, urgents: 0, at: NOW, colis: [[limite, arriveeMs, 'mondialrelay', 'e:12345678']], vus: ['12345678'], vusTx: [] } });
+      base.set(`${A}|email_track_mondialrelay_12345678`, email);
+      base.set(`${A}|transp_mondialrelay_12345678`, { v: 1, rev: 1, carrier: 'mondialrelay', suivi: '12345678', etat: 'disponible', etatAt: iso(arriveeMs), libelle: 'Colis disponible au Point Relais', lu: iso(luMs), essai: iso(luMs), essaiRes: 'ok', voie: 'mr-fr-mvc', fini: false });
+      const res = faireRes(); await w({ method: 'GET', headers: {}, query: {} }, res);
+      return res.corps || {};
+    };
+    const transit = await compte({ email: ligneMr(), arriveeMs: NOW - 10 * H, luMs: NOW - H });
+    dit(transit.pickup === 1 && transit.pickupSortis === 0, 'un e-mail « en transit » que le transporteur dit disponible : le widget le compte encore (pas « sorti » faute d\'e-mail)', `pickup=${transit.pickup} sortis=${transit.pickupSortis}`);
+    const vieux = ligneMr({ status: 'available', subject: 'Votre colis 12345678 est disponible 📦', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville', receivedAt: iso(NOW - 156 * H), arriveLe: iso(NOW - 156 * H) });
+    const leve = await compte({ email: vieux, arriveeMs: NOW - 156 * H, luMs: NOW - H });
+    dit(leve.pickup === 1, 'arrivé il y a 6,5 j (garde Mondial Relay : 5 j), lu « disponible » il y a 1 h : le widget le compte « à retirer », comme l\'app', `pickup=${leve.pickup} aVérifier=${leve.pickupAVerifier}`);
+    const perime = await compte({ email: vieux, arriveeMs: NOW - 156 * H, luMs: NOW - 8 * H });
+    dit(perime.pickup === 0 && perime.pickupAVerifier === 1, 'l\'autre sens : lu il y a 8 h ⇒ la garde n\'est PAS levée (« à vérifier »)', `pickup=${perime.pickup} aVérifier=${perime.pickupAVerifier}`);
   });
   await essaie('route api/ship-reminders : le cron lit les transporteurs (Mondial Relay par le serveur)', async () => {
     const cron = (await importer('api/ship-reminders.js')).default;

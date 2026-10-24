@@ -16353,7 +16353,14 @@ function relireTransporteursSiVieux({ force = false } = {}) {
       ecrireLocalJson('vrm_transp_vol', { at: maintenant });
       let r = null, j = null;
       try {
-        r = await fetch('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }) });
+        // ⚠️ Un `Request`, pas une adresse : `lecturesPartagees` le laisse passer
+        // SANS vider ses lectures. Un POST vers /api/ y vaut une écriture et vide
+        // tout — à l'ouverture, ce passage refaisait TOUTES les lectures du
+        // démarrage en vol (mesuré au banc vitesse.cjs, Ma journée à 390 px :
+        // 57 → 64 lectures, 6 → 12 en double, les ventes au 3ᵉ aller-retour au
+        // lieu du 2ᵉ). Ce passage n'écrit que les lignes `transp_*` : quand il
+        // rend un changement, on vide les lectures partagées AVANT de prévenir.
+        r = await fetch(new Request('/api/relais?mode=transp', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ v: 1 }) }));
         j = await r.json().catch(() => null);
       } catch (_) { r = null; }
       if (!r || !r.ok || !j || j.ok !== true) {
@@ -16363,7 +16370,10 @@ function relireTransporteursSiVieux({ force = false } = {}) {
         return { fait: false, raison: st ? `http-${st}` : 'reseau' };
       }
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
-      if (change) { try { window.dispatchEvent(new Event('vrm:transp-maj')); } catch (_) {} }
+      if (change) {
+        try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
+        try { window.dispatchEvent(new Event('vrm:transp-maj')); } catch (_) {}
+      }
       return { fait: true, change };
     } catch (_) { return { fait: false, raison: 'erreur' }; }
   })();
