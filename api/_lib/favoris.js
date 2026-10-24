@@ -34,13 +34,15 @@ export async function routeFavoris(req,res){
         const p=validerReglagesFavoris(prefs),message=preparerMessageFavori(p.message,p.pourcentage).message;
         if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
         const targets=resoudreCiblesFavoris({uid,capture:lire(ids[0]),trace:lire(ids[1]),selection:c.selection});
-        decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,maintenant});
+        const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,maintenant,lot});
       }else if(c.action==='suivant'){
-        const jeton=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton});
+        const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,maintenant});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant});
       }else if(c.action==='consommer'){
+        const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
+        if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=216))throw new RefusFavoris('Recharge l’extension 5.216 pour vérifier l’historique avant tout envoi.');
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant});
       }else if(c.action==='verifier'){

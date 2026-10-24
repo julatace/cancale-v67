@@ -106,8 +106,9 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
-  const version = '5.215.0';
-  const post = (m) => window.postMessage(m, '*');
+  let version = '5.215.0';
+  window.majExtensionFavoris=()=>{version='5.216.0';post({__vmr:'ready',version});};
+  const post = (m) => window.postMessage({id:'extension-banc-unique',...m}, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
@@ -258,12 +259,18 @@ const capturer = async (pg, nom, vp) => {
         dit(await pg.getByRole('textbox',{name:'Ton message',exact:true}).count()===1, `${T} sélectionner un favori ouvre la préparation du message`);
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
-          await pg.getByRole('button',{name:'Enregistrer mes réglages',exact:true}).click();
-          await pg.getByRole('status').filter({hasText:'Réglages enregistrés pour ce compte'}).waitFor();
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.216'}).waitFor();
+          dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
+          await pg.evaluate(()=>window.majExtensionFavoris());
+          await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
+          await pg.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor().catch(async e=>{await pg.screenshot({path:path.join(SHOTS,'favoris-echec.png'),fullPage:true});console.log(await pg.locator('.vrm-favoris-liste').innerText());throw e;});
           dit(await pg.evaluate(()=>window.favorisExec?.length===1&&window.favorisExec[0].uid==='111'&&window.favorisExec[0].body.jeton==='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),`${T} le lancement passe une seule autorisation au pont du compte choisi`);
-        }else dit(await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).isDisabled(),`${T} téléphone sans extension : aucun lancement promis`);
+        }else{
+          await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
+          await pg.getByRole('alert').filter({hasText:'extension'}).waitFor();
+          dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} téléphone sans extension : explication et aucun lancement`);
+        }
         await pg.locator('.vrm-favoris-liste').getByRole('button',{name:'Masquer',exact:true}).click();
         dit(await pg.locator('.vrm-favoris-rows').count()===0, `${T} masquer la liste rend la place aux conversations`);
         await pg.selectOption('#vrm-sel-compte', '*');

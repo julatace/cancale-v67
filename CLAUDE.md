@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — correctif favoris 5.216 :** bouton de lancement avec vérification
+> fraîche de l'extension et sauvegarde au clic, fil déjà commencé ignoré sans
+> message, barre par lot avec étapes et compte à rebours. Les anciens moteurs
+> 5.215 ne peuvent plus consommer l'autorisation d'envoi. Voir
+> `docs/passation/2026-10-24-favoris-bouton-progression.md`.
+
 > **24 octobre — messages aux favoris :** Julien demande explicitement l'envoi
 > automatique de son texte aux favoris cochés. File serveur protégée, quota
 > partagé 10/60 minutes et autorisations à usage unique ; extension 5.215.

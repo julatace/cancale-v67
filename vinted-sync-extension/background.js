@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.215.0';
+const CODE_VERSION = '5.216.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -6712,46 +6712,57 @@ async function executerPourApp(msg, sender) {
     return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);
   });
   if (arret) return arret;
-  if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
+  if(permis.favori&&r.json?.resultat==='ignore')logActivity('Favori ignoré : conversation déjà commencée, aucun message envoyé.');
+  else if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, data: r.json,
            error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 async function executerMessageFavori(uid,acc,body){
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
-  const rep=(resultat,status=0)=>({ok:resultat==='envoye',status,json:{resultat}});
+  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison}});
   if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
   const jeton=body.jeton;
-  const session=await authToken();if(!session?.access_token)return rep('refuse',401);
+  const session=await authToken();if(!session?.access_token)return rep('refuse',401,'session_extension');
   // Single-use server authorization. Two extensions or devices cannot consume
   // it twice; response loss never triggers a second grant request.
   let grant;
   try{
-    const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'consommer',jeton:body.jeton}),signal:AbortSignal.timeout(12000)});
-    if(!r.ok)return rep('refuse',r.status);grant=await r.json();
+    const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'consommer',jeton:body.jeton,version:CODE_VERSION}),signal:AbortSignal.timeout(12000)});
+    if(!r.ok)return rep('refuse',r.status,[401,403].includes(r.status)?'session_extension':'autorisation_expiree');grant=await r.json();
   }catch{return rep('incertain');}
   if(!grant?.ok||String(grant.uid)!==String(uid)||!grant.travail)return rep('refuse');
+  const etape=nom=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom});};
   body=grant.travail;
+  etape('autorisation');
   if(!body||!id(body.itemId)||!id(body.recipientId)||String(uid)===body.recipientId||typeof body.initiator!=='string'||!body.initiator||body.initiator.length>80||typeof body.message!=='string'||!body.message.trim()||body.message.length>2000)return rep('refuse',400);
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   // Native three-field format observed in the seller's browser. No guessed
   // create-and-send format, no auto retry even on a failed transport response.
+  etape('conversation');
   const creation=await vintedSend(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{sansRejeu:true,timeoutMs:12000});
   if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
   const convId=String(creation.json?.conversation?.id||'');
-  if(!id(convId))return rep('incertain',creation.status);
+  if(!id(convId))return rep('incertain',creation.status,'creation_non_confirmee');
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+  try{
+    const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
+    if(!r.ok)return rep('refuse',r.status,'autorisation_expiree');const j=await r.json();if(!j.ok||!j.autorise||String(j.uid)!==String(uid))return rep('refuse');
+  }catch{return rep('refuse');} // no reply has been sent yet
+  etape('verification');
   const lu=await vintedGet(acc,`/api/v2/conversations/${convId}`,{timeoutMs:12000}),c=lu.json?.conversation;
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||'');
-  if(!lu.ok||String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status);
-  try{
-    const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
-    if(!r.ok)return rep('refuse',r.status);const j=await r.json();if(!j.ok||!j.autorise||String(j.uid)!==String(uid))return rep('refuse');
-  }catch{return rep('refuse');} // no reply has been sent yet
+  if(!lu.ok||String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
+  etape('historique');
+  if(!Array.isArray(c.messages))return rep('refuse',lu.status,'historique_non_verifie');
+  if(c.messages.some(m=>['message','offer_request_message','offer_request','offer','user_message','reply','text_message'].includes(m?.entity_type)))return rep('ignore',lu.status,'conversation_deja_contactee');
+  const systemes=['offer_request_message','offer_request','offer','transaction','transaction_status','status_message','system','system_message','action','event'];
+  if(c.messages.some(m=>!m||!systemes.includes(m.entity_type))||Number(c.pagination?.total_pages)>1||Number(lu.json?.pagination?.total_pages)>1||lu.json?.has_more===true||c.has_more===true||c.has_more_messages===true||Number(c.message_count)>0||Number(c.total_messages)>c.messages.length)return rep('refuse',lu.status,'historique_non_verifie');
   const arret=await gardeStricte(uid,acc); // second write also consumes an action
   if(arret)return rep('refuse');
+  etape('envoi');
   const r=await vintedSend(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:body.message,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{sansRejeu:true,timeoutMs:12000});
-  if(r.ok&&r.json?.code===0)return rep('envoye',r.status);
+  if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
 }
 let _fileVinted = Promise.resolve();
