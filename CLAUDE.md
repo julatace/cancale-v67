@@ -1,5 +1,13 @@
 # VRM — dossier de passation
 
+> **24 octobre — messages aux favoris :** Julien demande explicitement l'envoi
+> automatique de son texte aux favoris cochés. File serveur protégée, quota
+> partagé 10/60 minutes et autorisations à usage unique ; extension 5.215.
+> Nécessite l'écran VRM ouvert et visible ; pas de relais téléphone pour ce geste.
+> Le raccordement est vérifié sur la capture native puis sur le fil avant réponse.
+> Voir `docs/passation/2026-10-24-automatisation-favoris.md` pour les conditions,
+> essais synthétiques, limites et nettoyage lors de la fermeture du compte.
+
 > **24 octobre — demande explicite de Julien :** retirer de Messages le bloc
 > « offres à trancher » provenant des emails, ses moyennes par modèle et ses
 > liens génériques Vinted. Les offres dans les conversations restent. Ne pas

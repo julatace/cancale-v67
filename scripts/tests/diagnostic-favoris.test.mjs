@@ -29,7 +29,7 @@ test('la lecture cible exactement une ligne et son propriétaire, sans écriture
  assert.equal(u.searchParams.get('id'),'eq.harvest_123_notifications');
  assert.equal(u.searchParams.get('owner'),'eq.'+owner);
  assert.equal(appel.opts.cache,'no-store');assert.equal(appel.opts.method,undefined);
- assert.equal(r.reception,'capture_disponible');assert.equal(r.envoisAutomatiques,'non_actives');assert.equal(r.listeComplete,'non_verifiee');
+ assert.equal(r.reception,'capture_disponible');assert.equal(r.envoisAutomatiques,'statut_dans_la_file');assert.equal(r.listeComplete,'non_verifiee');
  assert.equal(JSON.stringify(r).includes(owner),false);
 });
 test('un compte invalide ou une session différente ne déclenche aucune requête',async()=>{
@@ -83,7 +83,7 @@ test('les liens de création et les formes des requêtes observées sont lisible
  const r=await lireDiagnosticFavoris({...options(),fetcher:async(url,o)=>{
   appels.push({url,o});return response(url.includes('wreq_api_v2')?[{owner,data:trace}]:url.includes('wreq_api_v3')?[]:[{owner,data}]);
  }});
- assert.equal(r.diagnostic,'VRM-favoris-structure-v4');assert.equal(r.envoisAutomatiques,'non_actives');
+ assert.equal(r.diagnostic,'VRM-favoris-structure-v4');assert.equal(r.envoisAutomatiques,'statut_dans_la_file');
  assert.equal(r.liens.formes[0].chemin,'/items/{identifiant}/conversation/new');assert.deepEqual(r.liens.formes[0].parametres,['receiver']);
  assert.equal(r.liens.formes[0].userIdCorrespondAuCompte,true);
  const t=r.creation.traces.find(x=>x.api==='v2');assert.equal(t.etat,'forme_observee');assert.ok(t.champs.some(x=>x.chemin==='reponse.conversation.opposite_user_id'));

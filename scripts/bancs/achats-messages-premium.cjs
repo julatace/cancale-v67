@@ -106,16 +106,17 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
-  const version = '5.190.0';
+  const version = '5.215.0';
   const post = (m) => window.postMessage(m, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
     if (d.__vmr === 'authEtat') post({ __vmr: 'authEtat:result', reqId: d.reqId, etat: { ok: true, connecte: true, expiree: false, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */, cloisonne: false } });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ }, vinted: { uid: '111', login: 'julatace35260' }, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, code:version, vrm: { ok: true, connecte: true, email: 'banc@vrm.test', user_id: '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' /* la session de banc (_porte-banc.cjs) */ }, vinted: { uid: '111', login: 'julatace35260' }, cmds: {} } });
     if (d.__vmr === 'exec') {
+      window.favorisExec=window.favorisExec||[];if(d.endpoint==='/vrm/favoris')window.favorisExec.push(d);
       const m = /conversations\/(\d+)$/.exec(d.endpoint || '');
-      setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data: d.method === 'GET' ? { conversation: (m && fils[m[1]]) || null } : {} }), 50);
+      setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data: d.method === 'GET' ? { conversation: (m && fils[m[1]]) || null } : d.endpoint==='/vrm/favoris'?{resultat:'envoye'}:{} }), 50);
     }
   });
   post({ __vmr: 'ready', version });
@@ -130,21 +131,32 @@ async function ouvrir(b, vp, tab) {
   if (!tel) await pg.addInitScript(PONT, { fils: { 301: FIL } });
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+  const prefsFavoris=new Map();
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
+    if(route.request().method()==='POST'&&u.includes('on_conflict=owner,id')){const row=route.request().postDataJSON();if(row.id?.startsWith('vrm_favoris_reglages_')){prefsFavoris.set(row.id,row);return j([row]);}}
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data,updated_at/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: cap, cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
+    if(eq&&prefsFavoris.has(eq[1]))return j([prefsFavoris.get(eq[1])]);
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  let fileFavoris={active:false,raison:'',jobs:[]};
+  await pg.route('**/api/**',r=>{
+    if(!r.request().url().includes('mode=favoris'))return r.fulfill({status:200,contentType:'application/json',body:'{"pret":true}'});
+    const c=r.request().method()==='POST'?r.request().postDataJSON():{};let out={ok:true,vue:fileFavoris};
+    if(c.action==='lancer'){fileFavoris={active:true,raison:'',jobs:[{id:'j1',notificationId:'favori-banc-1',etat:'attente'}]};out={ok:true,vue:fileFavoris};}
+    if(c.action==='suivant'){fileFavoris={...fileFavoris,jobs:[{id:'j1',notificationId:'favori-banc-1',etat:'reserve'}]};out={ok:true,vue:fileFavoris,travail:{jeton:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}};}
+    if(c.action==='terminer'){fileFavoris={active:false,raison:'',jobs:[{id:'j1',notificationId:'favori-banc-1',etat:c.resultat}]};out={ok:true,vue:fileFavoris};}
+    return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(out)});
+  });
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   return { ctx, pg, errs };
 }
@@ -244,6 +256,14 @@ const capturer = async (pg, nom, vp) => {
         dit(await pg.locator('.vrm-favoris-rows article').count()===1, `${T} la liste des favoris captés est raccordée au compte`);
         await pg.locator('.vrm-favoris-rows input[type=checkbox]').check();
         dit(await pg.getByRole('textbox',{name:'Ton message',exact:true}).count()===1, `${T} sélectionner un favori ouvre la préparation du message`);
+        if(!tel){
+          await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
+          await pg.getByRole('button',{name:'Enregistrer mes réglages',exact:true}).click();
+          await pg.getByRole('status').filter({hasText:'Réglages enregistrés pour ce compte'}).waitFor();
+          await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
+          await pg.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor();
+          dit(await pg.evaluate(()=>window.favorisExec?.length===1&&window.favorisExec[0].uid==='111'&&window.favorisExec[0].body.jeton==='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),`${T} le lancement passe une seule autorisation au pont du compte choisi`);
+        }else dit(await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).isDisabled(),`${T} téléphone sans extension : aucun lancement promis`);
         await pg.locator('.vrm-favoris-liste').getByRole('button',{name:'Masquer',exact:true}).click();
         dit(await pg.locator('.vrm-favoris-rows').count()===0, `${T} masquer la liste rend la place aux conversations`);
         await pg.selectOption('#vrm-sel-compte', '*');

@@ -1,6 +1,7 @@
 import React from 'react';
 import {lireFavorisVinted,preparerMessageFavori} from './favorisVinted.js';
 import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris} from './reglagesFavoris.js';
+import AutomatisationFavoris from './AutomatisationFavoris.jsx';
 function PhotoNotification({src}) {
   const [ko,setKo]=React.useState(false);
   React.useEffect(()=>setKo(false),[src]);
@@ -8,7 +9,7 @@ function PhotoNotification({src}) {
 }
 
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false}) {
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[reglages,setReglages]=React.useState({});
   const reglagesLus=React.useRef(false),edition=React.useRef(0),sauvegarde=React.useRef(false);
@@ -43,7 +44,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     sauvegarde.current=true;const n=requete.current,e=edition.current;setReglages(x=>({...x,sauvegarde:true,erreur:''}));setRetour('');
     try{
       await sauverReglagesFavoris({uid,owner,ownerActuel,base,headers:headers()},contenu);
-      if(n===requete.current&&ownerActuel()===owner){setReglages({prets:true,enregistres:e===edition.current});setRetour(e===edition.current?'Réglages enregistrés pour ce compte. Les envois restent désactivés.':'La version précédente est enregistrée. Tes dernières modifications restent à enregistrer.');}
+      if(n===requete.current&&ownerActuel()===owner){setReglages({prets:true,enregistres:e===edition.current});setRetour(e===edition.current?'Réglages enregistrés pour ce compte. Ils seront utilisés au prochain lancement.':'La version précédente est enregistrée. Tes dernières modifications restent à enregistrer.');}
     }catch(e){if(n===requete.current&&ownerActuel()===owner){reglagesLus.current=false;setReglages({prets:false,erreur:e.message});}}
     finally{if(n===requete.current)sauvegarde.current=false;}
   };
@@ -66,14 +67,15 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         <small>La remise est proposée dans le texte. Le prix de l’annonce reste inchangé et aucune offre de prix Vinted n’est créée.</small>
         {apercu.erreur&&<p role="alert">{apercu.erreur}</p>}
         <label className="vrm-favoris-cadence">Intervalle minimum prévu (minutes)<input type="text" inputMode="numeric" maxLength={6} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/></label>
-        <small>Cadence fixe choisie par toi. Pour l’envoi futur, le plafond de 10 messages sur 60 minutes reste prioritaire ; les refus et demandes de ralentissement de Vinted imposeront une pause.</small>
+        <small>Cadence fixe choisie par toi. Le plafond de 10 messages sur 60 minutes reste prioritaire. Un refus, une demande de ralentissement ou une réponse incertaine interrompt la file.</small>
         {reglages.erreur&&<p role="alert">{reglages.erreur} {!reglagesLus.current&&'Actualise la liste pour relire les réglages.'}</p>}
         <button type="button" disabled={!reglages.prets||reglages.sauvegarde||!apercu.message||!!apercu.erreur} onClick={enregistrer}>{reglages.sauvegarde?'Enregistrement…':'Enregistrer mes réglages'}</button></details>
         {!!apercu.message&&<div className="vrm-favoris-apercu"><strong>Aperçu du message</strong><output aria-label="Aperçu du message">{apercu.message}</output></div>}
 
-        <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button><p>L’envoi direct et automatique depuis VRM n’est pas encore activé. Les liens ouvrent les destinations reçues dans les notifications Vinted.</p></div>}
+        <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button></div>}
       </>}
     </>}
+    {uid&&owner&&executerFavori&&<AutomatisationFavoris key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} executer={executerFavori} disponible={favorisDisponible}/>}
     {retour&&<p role="status">{retour}</p>}
   </section>;
 }

@@ -53,6 +53,8 @@ import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
 import { routeCommunaute, effacerCommunaute } from './_lib/communaute.js';
 import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
+import {routeFavoris} from './_lib/favoris.js';
+import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -871,6 +873,8 @@ async function fermerCompte(req, res) {
   // partent AVANT ses données ; illisible ⇒ rien d'autre n'est effacé, et c'est dit.
   etapes.preuvesAdresse=await effacer(`app_data?owner=eq.00000000-0000-0000-0000-000000000000&id=like.vrm_email_preuve_*&data->>owner=eq.${encodeURIComponent(u.id)}`,SERVICE);
   if(etapes.preuvesAdresse===null)return repondre(res,503,{ok:false,erreur:'preuves-non-effacees',message:'Tes adresses de réception confirmées n’ont pas pu être effacées. Ton compte est conservé pour réessayer.'});
+  etapes.favoris=await effacerFavorisDe(u.id);
+  if(etapes.favoris===null)return repondre(res,503,{ok:false,erreur:'favoris-non-effaces',message:'La file des messages aux favoris n’a pas pu être effacée. Ton compte est conservé pour réessayer.'});
   etapes.donnees = await effacer(`app_data?${filtre}`, SERVICE);
   etapes.comptesVinted = etapes.donnees === null ? null : await effacer(`vinted_accounts?${filtre}`, SERVICE);
   etapes.compteurs = etapes.comptesVinted === null ? null : await effacer(`detourage_usage?${filtre}`, SERVICE);
@@ -1008,6 +1012,10 @@ export default async function handler(req, res) {
     return repondre(res,resultat.ok?200:503,{...resultat,...(resultat.ok?{uid:u.id}:{})});
   }
   if (mode === 'operations') return routeOperations(req, res);
+  if(mode==='favoris'){
+    if(m==='POST')req.body=await lireCorpsJson(req);
+    return routeFavoris(req,res);
+  }
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'webhook') return m === 'POST' ? webhook(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
