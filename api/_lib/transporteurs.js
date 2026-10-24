@@ -18,25 +18,31 @@
 //   · Vinted Go : `carrier.vintedgo.com/public/v3/tracking_events/{n}` répond
 //     200 en JSON (le plus récent d'abord), 404 JSON `shipment_expired` quand le
 //     suivi n'est plus gardé, 404 VIDE pour un n° qui n'est pas à lui.
-//   · Mondial Relay : la page .be répond, son API `/api/tracking` répond 403
-//     HTML (Cloudflare) au serveur — elle n'est donc lue QUE depuis le
-//     navigateur de Julien, par l'extension (C3/C4). Le corps relayé est jugé
-//     ICI, par la même fonction, avec le contrôle de l'ÉCHO (n° ET code postal).
+//   · Mondial Relay : le SERVEUR lit la route `/_mvc/…/RechercherJsonResponsive`
+//     de mondialrelay.fr (JSON qui porte un fragment HTML, mesurée le 24 oct.
+//     à 11:51 puis 12:0x UTC) ; l'API JSON de mondialrelay.be lui répond 403
+//     (Cloudflare) — elle reste la voie de SECOURS de l'extension (C3/C4),
+//     quand la lecture du serveur est refusée. Les deux corps sont jugés ICI,
+//     avec le contrôle de l'ÉCHO (n° ET code postal).
 // ─────────────────────────────────────────────────────────────────────────────
 import { normaliserSuivi } from './etat-colis-email.js';
 
 // ── LES TRANSPORTEURS LUS, LEURS VOIES, LEURS NOMS ──────────────────────────
 export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
-// Une voie = une adresse MESURÉE chez un transporteur. `mr-fr-mvc` (HTML dans du
-// JSON, mondialrelay.fr) est connue de l'extension mais PAS lue ici : analyser
-// du HTML jamais vu serait deviner. Elle est refusée (400 `voie`).
-// Qui lit quoi (mesuré le 24 oct., voir api/_lib/transporteurs-lecture.js) :
-// Chronopost et Vinted Go par le SERVEUR ; Mondial Relay seulement depuis le
-// navigateur de Julien, par l'extension (C3/C4). Une seule valeur, lue par le
-// serveur ET l'app.
-export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: false });
-export const VOIES = { 'mr-be': 'mondialrelay', 'cp-ws2': 'chronopost', 'vg-v3': 'vinted' };
+// Une voie = une adresse MESURÉE chez un transporteur. Qui lit quoi (mesuré le
+// 24 oct., voir api/_lib/transporteurs-lecture.js) : le SERVEUR lit les trois —
+// Chronopost (`cp-ws2`), Vinted Go (`vg-v3`) et Mondial Relay par la route
+// `_mvc` de mondialrelay.fr (`mr-fr-mvc`, JSON qui porte un fragment HTML de
+// forme MESURÉE). Refusé (403, 429, défi, HTML hors JSON), le n° part à
+// l'extension (C3) par sa voie de SECOURS : `mr-be` pour Mondial Relay (l'API
+// JSON de mondialrelay.be, refusée au serveur), la même voie pour les deux
+// autres. Une seule valeur, lue par le serveur ET l'app.
+export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: true });
+export const VOIES = { 'mr-be': 'mondialrelay', 'mr-fr-mvc': 'mondialrelay', 'cp-ws2': 'chronopost', 'vg-v3': 'vinted' };
+// La voie que l'EXTENSION reçoit en C3 (secours) …
 export const VOIE_DE = { mondialrelay: 'mr-be', chronopost: 'cp-ws2', vinted: 'vg-v3' };
+// … et celle que le SERVEUR lit lui-même.
+export const VOIE_SERVEUR = { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3' };
 export const NOM_TRANSPORTEUR = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go' };
 export const nomTransporteur = (c) => NOM_TRANSPORTEUR[String(c || '')] || 'Le transporteur';
 // La FORME d'un n° lisible par transporteur (celles mesurées chez lui). Un n°
@@ -292,13 +298,20 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
 // Les libellés MESURÉS, normalisés (minuscules, sans accents). Le dernier
 // évènement dont le libellé n'est pas ici ⇒ « inconnu » (le libellé recopié
 // tel quel) : le retour à l'expéditeur n'a jamais été vu, il tombera ici.
+// (24 oct.) Mêmes libellés sur la route `_mvc` de mondialrelay.fr, plus deux
+// vus seulement là : « Colis en route vers le point de livraison » (un
+// évènement) et les noms d'étapes de la frise (« Colis remis à Mondial Relay »,
+// « Colis sur l'agence de livraison », « Colis disponible au point de retrait »).
 export const MR_LIBELLES = [
   [/^colis en preparation chez l'expediteur/, 'prepare'],
   [/\bprise? en charge\b/, 'route'],
   [/^colis en cours de traitement sur le site\b/, 'route'],
   [/^colis expedie depuis le site\b/, 'route'],
-  [/^colis en route vers le point de retrait/, 'route'],
+  [/^colis en route vers le point de (?:retrait|livraison)\b/, 'route'],
+  [/^colis remis a mondial relay\b/, 'route'],
+  [/^colis sur l'agence de livraison\b/, 'route'],
   [/^(\d{1,2}) jours? restants? pour retirer le colis\b/, 'disponible'],
+  [/^colis disponible au point de retrait\b/, 'disponible'],
   [/^colis livre\b/, 'livre'],
 ];
 const classeMr = (lib) => { const t = normLibelle(lib); for (const [re, c] of MR_LIBELLES) { const m = re.exec(t); if (m) return { c, jours: m[1] ? Number(m[1]) : null }; } return null; };
@@ -356,11 +369,101 @@ export function lireReponseMondialRelay(statut, ctype, corps, { suivi = '', cp =
   if (k >= 2) return rendu('ok', { ...base, etat: 'en_route' });
   return rendu('ok', { ...base, etat: 'en_route', detail: 'prepare' });
 }
-// Une seule entrée pour les trois (C4 et les lectures du serveur).
+// ══ MONDIAL RELAY — mondialrelay.fr /_mvc/…/RechercherJsonResponsive, lue par
+// le SERVEUR (mesurée le 24 oct., voir api/_lib/transporteurs-lecture.js).
+// Le corps : `{Success, ModelState, Message, Action:'ReplaceDiv', Data}`, où
+// `Message` est un fragment HTML. Ce qui en est lu, et RIEN d'autre :
+//   · `Success: false` ⇒ « pas de colis pour ce n° à ce code postal »
+//     (mesuré : un mauvais code postal rend Success:false) ;
+//   · l'ÉCHO, exigé : `var numeroExpedition = '<n°>'` dans le fragment, égal au
+//     n° demandé ; le `'CodePostal' : '<cp>'` du dataLayer, s'il est là, égal
+//     au code postal demandé (Success:true prouve déjà le couple) ;
+//   · la frise `<ul class="timeline suivi …">` : CINQ `<li>` (la forme mesurée,
+//     les étapes de SuiviParEtapes de .be), l'étape atteinte = le plus haut
+//     `<li class="validate">` ;
+//   · les jours `infos-account` (`<p>jj/mm/aaaa</p>`), puis dans `step-suivi`
+//     `<p class="center">hh:mm</p` suivi du PREMIER `<p>` = l'évènement (le
+//     libellé est écrit deux fois dans le fragment : la seconde est ignorée).
+//     Les jours et les évènements sont écrits du plus récent au plus ancien.
+// Le point relais n'a NI nom NI adresse dans ce fragment (chargés par une
+// autre route, jamais appelée) : `lieuNonLu`, la ligne garde le lieu qu'elle
+// avait. Une forme qui n'est pas celle-là ⇒ « forme », jamais devinée.
+const texteHtml = (s) => xmlTexte(s).replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', cp = '' } = {}) {
+  const n = normaliserSuivi(suivi), c = String(cp || '');
+  const r0 = refus(statut, ctype, corps, { mr: true });
+  if (r0) return rendu(r0);
+  if (Number(statut) !== 200) return rendu('passu');
+  const j = jsonDe(corps);
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return rendu('forme', { forme: 'pas du JSON' });
+  if (j.Success === false) return rendu('introuvable');
+  if (j.Success !== true || typeof j.Message !== 'string') return rendu('forme', { forme: formeDe(j) });
+  const h = j.Message.replace(/<!--[\s\S]*?-->/g, ' ');
+  // L'ÉCHO : la réponse est celle de CE colis, à CE code postal — sinon rejet.
+  const mn = /\bvar\s+numeroExpedition\s*=\s*'(\d{1,12})'/.exec(h);
+  const numero = mn ? mn[1].padStart(8, '0') : '';
+  const mc = /'CodePostal'\s*:\s*'([^']{0,12})'/.exec(h);
+  const cpRendu = mc ? mc[1].replace(/\s+/g, '') : '';
+  if (!mn || numero !== n || !c || (mc && cpRendu !== c)) return rendu('forme', { forme: `echo:${!mn ? 'numero-absent' : numero === n ? 'numero-ok' : 'numero-autre'},${!mc ? 'cp-absent' : cpRendu === c ? 'cp-ok' : 'cp-autre'}` });
+  // La frise : cinq étapes, l'étape atteinte = le plus haut `validate`.
+  const tl = /<ul\b[^>]*\bclass="[^"]*\btimeline\b[^"]*\bsuivi\b[^"]*"[^>]*>([\s\S]*?)<\/ul>/i.exec(h);
+  if (!tl) return rendu('forme', { forme: 'mvc:sans-frise' });
+  const lis = [...tl[1].matchAll(/<li\b([^>]*)>([\s\S]*?)<\/li>/gi)];
+  if (lis.length !== 5) return rendu('forme', { forme: `mvc:frise-${lis.length}` });
+  let k = 0;
+  const etapes = lis.map((m, i) => { const cls = (/\bclass="([^"]*)"/i.exec(m[1]) || [])[1] || ''; if (/\bvalidate\b/.test(cls)) k = i + 1; return texteHtml(m[2]); });
+  // Les évènements : jour, puis heure, puis le premier libellé qui suit.
+  const debut = h.search(/\bclass="[^"]*\binfos-account\b/i);
+  if (debut < 0) return rendu('forme', { forme: 'mvc:sans-jour' });
+  const evs = []; const vus = new Set();
+  let jour = null, heure = null, i = 0;
+  for (const m of h.slice(debut).matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const t = texteHtml(m[1]);
+    const d = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);
+    if (d) { jour = +d[1] >= 1 && +d[1] <= 31 && +d[2] >= 1 && +d[2] <= 12 ? `${d[3]}-${d[2]}-${d[1]}` : null; heure = null; continue; }
+    const hm = /^(\d{2}):(\d{2})$/.exec(t);
+    if (hm) { heure = +hm[1] < 24 && +hm[2] < 60 ? `${hm[1]}:${hm[2]}` : null; continue; }
+    if (!jour || !heure || !t) continue;
+    const at = isoParisVersUtc(`${jour}T${heure}:00`);
+    heure = null;
+    if (!at) continue;
+    const cle = `${at}|${normLibelle(t)}`;
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    evs.push({ i: i++, at, ms: msDe(at), libelle: t });
+  }
+  if (!evs.length) return rendu('forme', { forme: 'mvc:sans-evenement' });
+  // Du plus ancien au plus récent ; à la même minute, l'ordre du fragment
+  // (le plus récent d'abord) est retourné.
+  evs.sort((a, b) => (a.ms - b.ms) || (b.i - a.i));
+  const evenements = garderEvenements(evs.map((e) => ({ at: e.at, code: '', libelle: e.libelle, lieu: '', cp: '' })));
+  const dernier = evs[evs.length - 1];
+  const base = { evenements, cpRendu: cpRendu || c, libelle: propre(dernier.libelle, 160), etatAt: dernier.at, lieuNonLu: true };
+  if (!classeMr(dernier.libelle)) return rendu('ok', { ...base, etat: 'inconnu' });
+  if (k >= 5) {
+    const livre = [...evs].reverse().find((e) => (classeMr(e.libelle) || {}).c === 'livre');
+    // Retiré EN POINT RELAIS (la frise le nomme, ou il y a eu un « jours
+    // restants pour retirer ») ; sinon livré.
+    const relais = /point (?:de retrait|relais)|locker/.test(normLibelle(etapes[3])) || evs.some((e) => (classeMr(e.libelle) || {}).c === 'disponible');
+    return rendu('ok', { ...base, etat: relais ? 'retire' : 'livre', etatAt: (livre && livre.at) || base.etatAt });
+  }
+  if (k === 4) {
+    const arr = [...evs].reverse().find((e) => (classeMr(e.libelle) || {}).c === 'disponible');
+    const at = (arr && arr.at) || base.etatAt;
+    // La limite est DÉDUITE (date de l'évènement + N jours), jamais affirmée.
+    const jours = arr ? classeMr(arr.libelle).jours : null;
+    const limite = Number.isFinite(jours) && msDe(at) ? jourParis(msDe(at) + jours * 86400000) : null;
+    return rendu('ok', { ...base, etat: 'disponible', etatAt: at, limite, limiteSure: false });
+  }
+  if (k >= 2) return rendu('ok', { ...base, etat: 'en_route' });
+  return rendu('ok', { ...base, etat: 'en_route', detail: 'prepare' });
+}
+// Une seule entrée pour les trois (C4 et les lectures du serveur). Mondial
+// Relay a deux voies : `mr-fr-mvc` (le serveur) et `mr-be` (l'extension).
 export function lireReponse(carrier, statut, ctype, corps, opts = {}) {
   if (carrier === 'chronopost') return lireReponseChronopost(statut, ctype, corps, opts);
   if (carrier === 'vinted') return lireReponseVintedGo(statut, ctype, corps, opts);
-  if (carrier === 'mondialrelay') return lireReponseMondialRelay(statut, ctype, corps, opts);
+  if (carrier === 'mondialrelay') return opts && opts.voie === 'mr-fr-mvc' ? lireReponseMondialRelayMvc(statut, ctype, corps, opts) : lireReponseMondialRelay(statut, ctype, corps, opts);
   return rendu('forme', { forme: 'transporteur inconnu' });
 }
 
@@ -377,6 +480,9 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
   if (res === 'ok') {
     out.essais = 0;
     for (const k of ['etat', 'detail', 'etatAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'limite', 'limiteSure']) out[k] = lu[k] === undefined ? null : lu[k];
+    // Une voie qui ne porte pas le lieu (Mondial Relay `mr-fr-mvc`) : la ligne
+    // garde celui qu'elle avait, jamais effacé par un blanc.
+    if (lu.lieuNonLu) for (const k of ['lieuNom', 'lieuVille', 'lieuCp']) out[k] = a[k] == null ? '' : a[k];
     out.libelle = propre(out.libelle, 160); out.lieuNom = propre(out.lieuNom, 80); out.lieuVille = propre(out.lieuVille, 60);
     if (!/^\d{5}$/.test(String(out.lieuCp || ''))) out.lieuCp = '';
     out.limiteSure = !!out.limiteSure;

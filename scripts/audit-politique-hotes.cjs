@@ -34,6 +34,7 @@ const SERVICE = {
   'lgonxzrzjcqthjtbdpzo.supabase.co': /Supabase/,
   'ws.chronopost.fr': /Chronopost/,
   'carrier.vintedgo.com': /Vinted Go/,
+  'www.mondialrelay.fr': /Mondial Relay/,
 };
 const USAGES = {
   achats: { quoi: 'géocodage automatique des points relais (écran Achats)', role: /points? relais/i, donnee: /navigateur/i },
@@ -45,6 +46,8 @@ const USAGES = {
   base: { quoi: 'la base de données de VRM', role: /./, donnee: /./ },
   // (24 oct.) Le statut public d'un colis, lu par le SERVEUR (Chronopost, Vinted Go).
   transp: { quoi: 'statut public des colis, lu par le serveur', role: /statut public des colis/i, donnee: /n° de suivi[\s\S]*serveur VRM/i },
+  // (24 oct., 11:51 UTC) Mondial Relay lu par le SERVEUR : le n° ET le code postal.
+  transpmr: { quoi: 'statut public des colis Mondial Relay, lu par le serveur (n° + code postal)', role: /statut public des colis/i, donnee: /code postal[\s\S]*serveur VRM/i },
 };
 // ── La liste FERMÉE des couples (fichier, hôte) écrits dans le code ─────────
 const LIEN = 'lien ouvert d’un clic par la personne (rien ne part tout seul)';
@@ -78,17 +81,21 @@ const COUPLES = {
   'src/ConfigurerTransfert.jsx|outlook.live.com': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|www.icloud.com': ['lien', LIEN],
   'src/navigateurExtension.js|play.google.com': ['lien', LIEN],
+  // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand
+  // le domaine Vinted reçu n'est pas reconnu — rien ne part.
+  'src/favorisVinted.js|invalide.invalid': ['vrm', 'origine sentinelle .invalid, jamais contactée'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
+  'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
   'api/_lib/transporteurs-lecture.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['politique', 'base'],
   'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };
 // (24 oct.) Ce que la politique doit dire même si l'hôte n'est pas écrit dans
-// ces fichiers : Mondial Relay est lu DEPUIS LE NAVIGATEUR, par l'extension
-// (le serveur est refusé — mesuré le 24 oct.), avec le n° ET le code postal.
+// ces fichiers : quand le serveur est refusé, Mondial Relay est lu DEPUIS LE
+// NAVIGATEUR, par l'extension (sa voie de secours), avec le n° ET le code postal.
 const DECLARATIONS = [
-  { quoi: 'Mondial Relay (statut lu par l’extension, n° + code postal, depuis le navigateur)', service: /Mondial Relay/, role: /statut public des colis/i, donnee: /code postal[\s\S]*(navigateur|extension)/i },
+  { quoi: 'Mondial Relay (secours : statut lu par l’extension, n° + code postal, depuis le navigateur)', service: /Mondial Relay/, role: /statut public des colis/i, donnee: /code postal[\s\S]*(navigateur|extension)/i },
 ];
 
 function couplesDuCode(fichiers) {

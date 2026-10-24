@@ -19,8 +19,8 @@ import { passageTransporteurs, transpALire, appliquerReponseBrute, ENVOI_MAX, MA
 //   POST ?mode=transp       — un passage (l'app ouverte, ou une page de suivi
 //                             ouverte dans l'extension) : C5 ;
 //   GET  ?mode=transp-a-lire — ce que l'extension doit lire depuis le navigateur
-//                             (Mondial Relay, et ce que le serveur n'a pas pu
-//                             lire) : C3 ;
+//                             (ce que le serveur n'a pas pu lire : refusé ou en
+//                             pause ; Mondial Relay par sa voie de secours) : C3 ;
 //   POST ?mode=transp-brut  — la réponse BRUTE relayée par l'extension, jugée
 //                             ici par la même règle : C4.
 // Session du vendeur exigée (jamais un identifiant envoyé par le navigateur),
