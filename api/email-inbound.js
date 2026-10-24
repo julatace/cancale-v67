@@ -37,6 +37,7 @@ import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
 import { codeRetraitTournure } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
+import { suiviDuSujet, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -818,6 +819,18 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   //    pas du tout ».
   const m1 = all.match(/(?:n[°o]|num[ée]ro)\s*(?:d['e]?\s*)?(?:exp[ée]dition|colis|suivi|envoi)\s*[:：\-]?\s*([A-Z0-9]{6,20})/i);
   if (m1) suivi = m1[1];
+  // (23 oct.) Le n° écrit dans le SUJET après « # » (mesuré : Vinted Go « Ton
+  // colis arrive aujourd'hui ! #1234567890123456 », « Libère de la place… #… » —
+  // 16 chiffres ou « 1UW1T3… », que les motifs d'en dessous ne lisent pas). Sans
+  // lui, la ligne restait « info » sans n° : ni identité pour un « retiré », ni
+  // la même ligne que l'e-mail « disponible » du même colis.
+  // ⚠️ (revue du 23 oct., n° 1) Ce n° est une IDENTITÉ, jamais la preuve d'une
+  // arrivée : « Ton colis arrive aujourd'hui ! #… » (sans code, ni QR, ni lieu)
+  // passait « disponible » dès que le n° était lu, et sonnait « 📍 arrivé » avant
+  // que le colis soit là. Le drapeau le dit à la route, qui garde « info » quand
+  // rien d'autre ne prouve l'arrivée.
+  let suiviDuSujetSeul = false;
+  if (!suivi) { suivi = suiviDuSujet(mail.subject) || null; suiviDuSujetSeul = !!suivi; }
   // Vinted Go : suivi de forme « VGS » + chiffres.
   if (!suivi) { const m = all.match(/\b(VGS\d{8,})\b/i); if (m) suivi = m[1].toUpperCase(); }
   if (!suivi && carrier === 'chronopost') {
@@ -1043,7 +1056,7 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     if (bouts.length) extraitCode = [...new Set(bouts)].join(' | ').slice(0, 400);
   }
 
-  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sortant ? { sens: 'sortant' } : {}) };
+  return { suivi, status, label, code, code2, artTitle, lieu, limite, consigne, extraitLieu, extraitCode, ...(sortant ? { sens: 'sortant' } : {}), ...(suiviDuSujetSeul ? { suiviDuSujetSeul: true } : {}) };
 }
 
 // Dimensions d'une image PNG/GIF depuis son en-tête (sans la décoder en entier).
@@ -1462,6 +1475,12 @@ export function cleNotifColis(track, rowId) {
   // (23 oct.) Un colis REPARTI chez l'expéditeur a sa clé : sinon le premier
   // « en transit » (`track-…`) l'aurait consommée et le retour ne sonnerait jamais.
   if (t.status === 'retour') return `retour-${id}`;
+  // (23 oct.) Un colis RETIRÉ aussi : « Suivi du colis » étant activé chez lui,
+  // le premier « en transit » consommait `track-…` et le « retiré » ne sonnait
+  // jamais. Une fois par n°, avec le n°.
+  // (revue du 23 oct., n° 7) Pas un colis qu'il a VENDU : celui-là garde la clé
+  // d'avant (le « retiré » d'une vente n'est pas une nouvelle à lui sonner).
+  if (t.status === 'delivered' && t.sens !== 'sortant') return `retire-${id}`;
   if (t.status !== 'available') return `track-${id}`;
   return `relais-${id}-${codeNotif(t.code) ? 'code' : 'sans'}`;
 }
@@ -1495,6 +1514,8 @@ export function bodyNotifColis(track, carrier) {
   // (23 oct.) Le transporteur ÉCRIT que le colis repart : on le dit, sans dire
   // « perdu » (Vinted rembourse souvent tout seul), avec le geste.
   if (t.status === 'retour') return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : le transporteur écrit qu'il repart chez l'expéditeur. Vérifie le remboursement dans la conversation Vinted.`;
+  // (revue du 23 oct., n° 7) Un colis qu'il a VENDU : c'est l'acheteur qui l'a retiré.
+  if (t.status === 'delivered' && t.sens === 'sortant') return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : l'acheteur a retiré son colis.`;
   // Livré / en transit / info : le message court d'avant, sans changement.
   return `${nom}${t.suivi ? ' — n°' + t.suivi : ''} : ${t.label || ''}.`;
 }
@@ -1837,6 +1858,10 @@ export async function traiterEmail(req, res) {
       // QR / code-barres de retrait : cherché dans les pièces jointes ET dans le
       // HTML embarqué (là où Vinted / Mondial Relay le mettent le plus souvent).
       const qr = extractPickupQr(mail, track.status);
+      // (revue du 23 oct., n° 1) Le n° lu dans le SEUL sujet ne prouve pas que le
+      // colis est arrivé : sans code, ni QR, ni lieu, l'e-mail reste « info »
+      // (comme avant que ce n° soit lu) — le n° reste rangé, pour l'identité.
+      if (track.status === 'available' && track.suiviDuSujetSeul && !track.code && !qr.qrB64 && !qr.qrUrl && !track.lieu) { track.status = 'info'; track.label = 'Info'; }
       const rowId = `email_track_${carrier}_${track.suivi || shortHash(subject)}`;
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
@@ -1872,12 +1897,39 @@ export async function traiterEmail(req, res) {
       // ancien ne décrit pas un colis disponible).
       const sujetGarde = (prevLigne?.status === 'delivered' || garde.conserve) ? (prevLigne.subject || subject) : subject;
       const emailAtLigne = [emailAt, prevLigne && prevLigne.emailAt].filter((x) => Number.isFinite(Date.parse(x || ''))).sort().pop() || null;
+      // (revue du 23 oct., n° 7) LE SENS DU COLIS, PAR IDENTITÉ. Le « retiré » a
+      // sa clé (`retire-N`) depuis le 23 : il sonnait « ✅ Colis livré » (ouvre
+      // Achats) pour les colis qu'il a VENDUS — mesuré, 18 des 32 lignes
+      // « retiré » portent le n° d'un de ses bordereaux. Un colis est SORTANT si
+      // le sujet le dit (confirmation de dépôt…), si la ligne le disait déjà
+      // (même n°), si ce n° est celui d'un de ses bordereaux, ou d'une autre
+      // ligne sortante. ⚠️ Mesuré aussi : le sens n'était JAMAIS rangé (0 ligne
+      // sur 229) — les règles du cron et du widget qui le lisent ne voyaient
+      // rien. Il l'est désormais. Lecture ratée ⇒ on ne sait pas (comme avant).
+      let sensLigne = track.sens === 'sortant' || (prevLigne && prevLigne.sens === 'sortant') ? 'sortant' : null;
+      if (!sensLigne && track.status === 'delivered' && track.suivi) {
+        const k = String(track.suivi).toUpperCase().replace(/[\s\u00a0-]+/g, '');
+        if (/^[A-Z0-9]{6,30}$/.test(k)) {
+          const [bordsK, sortantsK] = await Promise.all([
+            lireLignes(`id=like.email_bord_*&meta->>suivi=eq.${k}&select=id`),
+            lireLignes(`id=like.email_track_*&or=(id.like.*_${k},meta->>suivi.eq.${k})&meta->>sens=eq.sortant&id=neq.${encodeURIComponent(rowId)}&select=id`),
+          ]);
+          if ((Array.isArray(bordsK) && bordsK.length) || (Array.isArray(sortantsK) && sortantsK.length)) sensLigne = 'sortant';
+        }
+      }
+      if (sensLigne) track.sens = sensLigne;
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
         statusLabel: track.label, subject: sujetGarde, receivedAt: now,
+        ...(sensLigne ? { sens: sensLigne } : {}),
         ...(emailAtLigne ? { emailAt: emailAtLigne } : {}),
         ...(track.status==='delivered'?{retireLe:prevLigne?.status==='delivered'?(prevLigne.retireLe||prevLigne.receivedAt||now):now}:{}),
-        ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {}; })()),
+        // (revue du 23 oct., n° 4) La date de l'ARRIVÉE est celle de l'e-mail
+        // (`emailAt`, la date Gmail), pas l'heure du traitement : un « reparti »
+        // traité AVANT l'e-mail d'arrivée (le script lit sa boîte du plus récent
+        // au plus ancien) passait sinon pour écrit avant l'arrivée — et le colis
+        // restait « à retirer ».
+        ...((() => { const a = arriveLeAuRangement(prevLigne, subject, track.status, emailAt || now); return a ? { arriveLe: a } : {}; })()),
         code: track.code || null, code2: track.code2 || null, artTitle: track.artTitle || null, lieu: track.lieu || null,
         limite: track.limite || null, consigne: !!track.consigne,
         ...(track.extraitLieu && !track.lieu ? { extraitLieu: track.extraitLieu } : {}),
@@ -1896,14 +1948,36 @@ export async function traiterEmail(req, res) {
           if (Array.isArray(a) && a.length) return { recuSur: a.map((x) => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 3) };
           return (prevLigne && Array.isArray(prevLigne.recuSur)) ? { recuSur: prevLigne.recuSur } : {}; })()),
       } }]);
+      // (23 oct.) UN « RETIRÉ » RESTE RETIRÉ, D'UNE LIGNE À L'AUTRE. Le même n°
+      // vit parfois sous deux clés (`email_track_chronopost_N`, `…_vinted_N`, ou
+      // une ancienne ligne au n° dans le sujet) : un rappel ou un « disponible »
+      // traité APRÈS un « retiré » (ou un « reparti ») d'une autre ligne ne doit
+      // pas faire sonner « 📍 à retirer ». Lecture ratée ⇒ comme avant (on ne
+      // sait pas : la notification part).
+      let sortiAilleurs = null;
+      if (track.status === 'available' && track.suivi) {
+        const k = String(track.suivi).toUpperCase().replace(/[\s\u00a0-]+/g, '');
+        const autres = /^[A-Z0-9]{6,30}$/.test(k) ? await lireLignes(`id=like.email_track_*&or=(id.like.*_${k},meta->>suivi.eq.${k},meta->>subject.ilike.*${k}*)&id=neq.${encodeURIComponent(rowId)}&select=id,status:meta->>status,receivedAt:meta->>receivedAt,emailAt:meta->>emailAt,subject:meta->>subject,statusLabel:meta->>statusLabel,suivi:meta->>suivi,sens:meta->>sens`) : null;
+        if (Array.isArray(autres)) {
+          // (revue du 23 oct., n° 4) L'arrivée datée par l'e-mail (comme la ligne
+          // rangée) : un retour du même n° écrit APRÈS elle — même traité avant —
+          // fait taire « 📍 ».
+          const a = arriveLeAuRangement(prevLigne, subject, 'available', emailAt || now);
+          sortiAilleurs = sortiParSuivis([k], finsDesLignes(autres, { estSortant: (l) => l.sens === 'sortant' }), Date.parse(a || emailAt || now) || null);
+        }
+      }
       // Notif push selon l'étape du colis.
       // (23 oct.) Un colis reparti chez l'expéditeur ne sonne JAMAIS « 📍 à retirer ».
       const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦', retour: '↩️' };
       const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis', retour: 'Colis reparti chez l’expéditeur' };
-      try { await pushOnce({
-        title: `${icons[track.status]} ${titles[track.status]}`,
+      // (revue du 23 oct., n° 7) Le « retiré » d'un colis qu'il a VENDU : la clé
+      // d'avant (`track-N`, pas de son en plus) et, s'il sonne, ce que c'est —
+      // l'acheteur a retiré son colis, avec Ventes.
+      const venteRetiree = track.status === 'delivered' && sensLigne === 'sortant';
+      if (!sortiAilleurs) try { await pushOnce({
+        title: venteRetiree ? '✅ Ta vente : colis retiré par l’acheteur' : `${icons[track.status]} ${titles[track.status]}`,
         body: bodyNotifColis(track, carrier),
-        tag: cleNotifColis(track, rowId), url: '/?tab=cat_achats',
+        tag: cleNotifColis(track, rowId), url: venteRetiree ? '/?tab=cat_ventes' : '/?tab=cat_achats',
       }, (track.status === 'available' || track.status === 'retour') ? 'colis' : 'suivi', [],
       track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });

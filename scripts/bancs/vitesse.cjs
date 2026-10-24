@@ -285,9 +285,14 @@ const ECRANS = [
           const gj = r.req.filter((x) => x.m === 'GET'), dj = (x) => decodeURIComponent(x.url);
           //  1. #634 (21 oct.) : les n° de suivi de TOUS les achats (560, six lectures
           //     à la suite) pour n'en utiliser que les achats au point relais ;
-          const suivis = new Set();
-          for (const x of gj) if (/select=id,tx:data->payload->transaction->>id,suivi:/.test(dj(x))) { const mm = /id=in\.\(([^)]*)\)/.exec(dj(x)); if (mm) mm[1].split(',').forEach((id) => suivis.add(id)); }
-          dit(suivis.size > 0 && suivis.size <= ACHATS_AU_RELAIS, `${vp.width} px · journee : les n° de suivi lus ne portent que sur les achats au point relais (et ils sont lus)`, `${suivis.size} lus · ${ACHATS_AU_RELAIS} au point relais`);
+          //     (23 oct.) ⇒ et plus AUCUNE transaction n'est lue pour un n° de suivi :
+          //     mesuré, 0 transaction sur 1 290 n'en porte (lecture morte). Les n°
+          //     viennent des lignes de suivi Vinted (`harvest_{uid}_suivi_{tx}`) et
+          //     des n° ajoutés à la main, lus en SCALAIRES, une fois chacun.
+          const txnPourSuivi = gj.filter((x) => /id=in\.\(harvest_[^)]*_txn_/.test(dj(x))).length;
+          const lignesSuivi = gj.filter((x) => /id=like\.(harvest_\*_suivi_\*|colis_suivi_\*)/.test(dj(x)));
+          dit(txnPourSuivi === 0 && lignesSuivi.length >= 2 && lignesSuivi.length <= 2 && lignesSuivi.every((x) => !/select=[^&]*\bdata\b(?!->)/.test(dj(x))),
+            `${vp.width} px · journee : aucun achat dont la transaction est lue pour un n° de suivi ; les lignes de suivi lues en scalaires, une fois chacune`, `${txnPourSuivi} lecture(s) de transactions · ${lignesSuivi.length} lecture(s) de lignes de suivi · ${ACHATS_AU_RELAIS} achats au point relais`);
           //  2. #635 (21 oct.) : la liste noire lue à DEUX adresses (filtrée sur le
           //     vendeur, et pas) — deux lectures que le partage ne peut pas réunir ;
           const noirs = new Set(gj.filter((x) => /id=eq\.vrm_blocked_accounts/.test(dj(x))).map((x) => x.url));
