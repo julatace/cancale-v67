@@ -8,6 +8,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
+import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META } from './_lib/suivi-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -313,21 +314,31 @@ const MAIN_WIDGET = ['vrm_widget_token', 'vinted_pickup_done', 'vinted_bords_hid
 // pour deux usages : les colis arrivés depuis la photo, et ce que sont devenus
 // les colis de la photo (retirés, repartis — `sortisDepuisPhoto`).
 const normSuivi = (v) => String(v || '').toUpperCase().replace(/[\s\u00a0-]+/g, '').trim();
-async function lireSuivisEmail(avecPartis) {
-  const sel = 'id,s:meta->>status,r:meta->>receivedAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier';
-  const [dispo, partis] = await Promise.all([
-    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${sel}`)),
-    avecPartis ? fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour)&select=${sel}`)) : Promise.resolve([]),
+// (23 oct.) LE N° EST L'IDENTITÉ, QUELLE QUE SOIT LA CLÉ DE LA LIGNE, ET IL EST
+// AUSSI LU DANS LE SUJET (« … #1234567890123456 », api/_lib/suivi-colis.js, §11).
+// Les lignes « info » sont relues avec la règle d'aujourd'hui : « Uw pakket is
+// afgehaald door de ontvanger » était rangé « info » — c'est un retrait.
+// ⚠️ (revue du 23 oct., n° 2) Chaque ligne est RELUE avec la règle de l'app
+// (`relireLigneMeta`, api/_lib/suivi-colis.js) : « sera disponible dans les
+// prochains jours » ou « arrive aujourd'hui », sans code ni QR, est en route —
+// pas à retirer ; un sujet « disponible » d'une ligne « info » est à retirer.
+async function lireSuivisEmail() {
+  const [dispo0, partis0] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${SELECT_SUIVI_META}`)),
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
   ]);
-  return { dispo: Array.isArray(dispo) ? dispo : null, partis: Array.isArray(partis) ? partis.filter((x) => x && (x.s === 'delivered' || x.s === 'retour')) : null };
+  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null };
+  const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);
+  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)) };
 }
+const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant' });
 async function colisEmailDepuis(pub, retires, today, lu) {
   const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
   if (pubAt == null) return 0;
   const vus = new Set(Array.isArray(pub.vus) ? pub.vus.map(String) : []);
   const j = lu ? lu.dispo : null;
   if (!Array.isArray(j)) return null;
-  const partisSuivi = new Set((lu.partis || []).map((x) => normSuivi(x.su)).filter(Boolean));
+  const fins = finsDuWidget(lu);
   let n = 0;
   for (const x of j) {
     if (!x) continue;
@@ -337,8 +348,8 @@ async function colisEmailDepuis(pub, retires, today, lu) {
     const cle = String(x.su || x.sj || '').trim();
     if (cle && retires.has(cle)) continue;                           // coché « J'ai retiré »
     if (cle && vus.has(cle)) continue;                               // l'app l'a vu (un rappel réécrit la ligne)
-    if (x.su && partisSuivi.has(normSuivi(x.su))) continue;          // retiré ou reparti (même n° de suivi)
     const arr = Date.parse(x.a || '') || recu;
+    if (sortiParSuivis([suiviDeLigne(x)], fins, arr)) continue;        // retiré, ou reparti depuis son arrivée (même n°)
     const e = etatRetrait({ limite: x.l || null, arriveeMs: arr, transporteur: x.c || '' }, Date.now(), today);
     if (e.etat === 'a_retirer') n++;
   }
@@ -357,7 +368,8 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
   const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
   const retiresN = new Set([...retires].map(normSuivi).filter(Boolean));
   const dispo = lu ? lu.dispo : null, partis = lu ? lu.partis : null;
-  const dispoSuivi = new Set((dispo || []).filter((x) => x && x.se !== 'sortant').map((x) => normSuivi(x.su)).filter(Boolean));
+  const dispoSuivi = new Set((dispo || []).filter((x) => x && x.se !== 'sortant').map(suiviDeLigne).filter(Boolean));
+  const fins = Array.isArray(partis) ? finsDuWidget(lu) : null;
   return (cle, c) => {
     if (cle.startsWith('e:')) {
       const k = normSuivi(cle.slice(2));
@@ -365,12 +377,7 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
       if (retiresN.has(k)) return true;
       if (!Array.isArray(dispo) || !Array.isArray(partis)) return null;
       const arr = Number(c && c[1]) || 0;
-      for (const x of partis) {
-        if (normSuivi(x.su) !== k) continue;
-        if (x.s === 'delivered') return true;
-        const d = Date.parse(x.r || '');
-        if (x.s === 'retour' && (!arr || !Number.isFinite(d) || d >= arr)) return true;
-      }
+      if (sortiParSuivis([k], fins, arr || null)) return true;
       return dispoSuivi.has(k) ? false : true;
     }
     if (cle.startsWith('v:')) {
@@ -562,8 +569,7 @@ export default async function handler(req, res) {
     // Vinted seuls — et on le DIT (`pickupSource: 'vinted'`, « au moins »).
     const retiresMain = new Set(Array.isArray(m.vrm_colis_collected) ? m.vrm_colis_collected.map(String) : []);
     const pubBrute = m.vrm_colis_retirer;
-    const avecEmail = !!(pubBrute && Array.isArray(pubBrute.colis) && pubBrute.colis.some((c) => Array.isArray(c) && typeof c[3] === 'string' && c[3].startsWith('e:')));
-    const suivisLus = (pubBrute && Array.isArray(pubBrute.colis)) ? await lireSuivisEmail(avecEmail) : null;
+    const suivisLus = (pubBrute && Array.isArray(pubBrute.colis)) ? await lireSuivisEmail() : null;
     const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus));
     const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus) : 0;
     const masques = new Set(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden.map(String) : []);

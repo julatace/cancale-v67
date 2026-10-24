@@ -42,7 +42,7 @@ export async function routeFavoris(req,res){
         decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:c.resultat,raison:c.raison,maintenant});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
-        if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=216))throw new RefusFavoris('Recharge l’extension 5.216 pour vérifier l’historique avant tout envoi.');
+        if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant});
       }else if(c.action==='verifier'){

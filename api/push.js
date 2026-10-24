@@ -4,6 +4,9 @@
 //   POST { action:'subscribe',   sub }       → enregistre l'appareil
 //   POST { action:'unsubscribe', endpoint }  → retire l'appareil
 //   POST { action:'test' }                   → envoie une notification d'essai
+//   POST { action:'retrait', tx }            → l'extension a lu un code de retrait neuf (5.204)
+//   POST { action:'suivi', tx, uid }         → l'extension a vu une étape de plus dans le
+//                                              suivi Vinted d'un achat (5.214, _lib/suivi-vinted.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -12,6 +15,7 @@ import { loadSubs, modifierSubs, sendPushToAll, pushConfigure } from './_lib/pus
 import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
+import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -78,6 +82,15 @@ async function traiter(req, res) {
     // transaction ; la ligne est relue ici, au nom de CE vendeur.
     if (body.action === 'retrait') {
       const r = await notifierRetraitConversation(String(body.tx || ''));
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (23 oct., 5.214) L'EXTENSION a vu une étape de plus dans le suivi que
+    // Vinted montre d'un ACHAT : « 📦 <titre> — Vinted : « <étape> » ». Elle ne
+    // donne que la transaction et le compte ; la ligne est relue ici, au nom de
+    // CE vendeur (un compte d'un autre vendeur est refusé), une fois par étape.
+    if (body.action === 'suivi') {
+      const r = await notifierSuiviVinted(body.tx, body.uid);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }

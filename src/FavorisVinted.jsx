@@ -2,14 +2,16 @@ import React from 'react';
 import {lireFavorisVinted,preparerMessageFavori} from './favorisVinted.js';
 import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris} from './reglagesFavoris.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
-function PhotoNotification({src}) {
-  const [ko,setKo]=React.useState(false);
-  React.useEffect(()=>setKo(false),[src]);
-  return src&&!ko?<img src={src} alt="Photo de la notification" loading="lazy" referrerPolicy="no-referrer" onError={()=>setKo(true)}/>:<span className="vrm-favoris-photo" aria-label="Photo indisponible">♡</span>;
+// La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
+// secours par l'extension, pictogramme), fourni par l'app. Sans lui, aucune
+// image : une photo Vinted affichée hors de la règle partirait cassée.
+const PictoFavori = <span className="vrm-favoris-photo" aria-label="Photo indisponible">♡</span>;
+function PhotoNotification({src, PhotoVinted}) {
+  return src&&PhotoVinted?<PhotoVinted src={src} alt="Photo de la notification" loading="lazy" repli={PictoFavori}/>:PictoFavori;
 }
 
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension,PhotoVinted=null}) {
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[reglages,setReglages]=React.useState({});
   const reglagesLus=React.useRef(false),edition=React.useRef(0),sauvegarde=React.useRef(false);
@@ -65,7 +67,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       {!!lignes.length&&<><div className="vrm-favoris-selection"><span>{selection.length} sélectionné{selection.length>1?'s':''} · 10 maximum par préparation</span><button type="button" onClick={()=>{setSelection(visibles.slice(0,10).map(x=>x.id));setRetour('');}}>Sélectionner les 10 premiers</button>{!!selection.length&&<button type="button" onClick={()=>setSelection([])}>Tout décocher</button>}</div>
       <div className="vrm-favoris-rows">{visibles.map(x=><article key={x.id} className={selection.includes(x.id)?'is-selected':''}>
         <label className="vrm-favoris-check"><input type="checkbox" aria-label={`Sélectionner ${x.nom||x.body.slice(0,100)}`} checked={selection.includes(x.id)} disabled={!selection.includes(x.id)&&selection.length>=10} onChange={()=>choisir(x.id)}/></label>
-        <PhotoNotification src={x.photo}/>
+        <PhotoNotification src={x.photo} PhotoVinted={PhotoVinted}/>
         <div className="vrm-favoris-texte">{x.nom&&<strong title={x.nom}>{x.nom}</strong>}<p title={x.body}>{x.nom&&x.body.startsWith(x.nom+' ')?x.body.slice(x.nom.length).trim():x.body}</p>{x.date&&<time dateTime={x.date}>{new Date(x.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</time>}</div>
         {x.lien?<a href={x.lien} target="_blank" rel="noreferrer" aria-label="Ouvrir la notification sur Vinted"><span>Ouvrir sur Vinted</span><svg className="vrm-favoris-ouvrir-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>:<small>Lien indisponible</small>}
       </article>)}</div>

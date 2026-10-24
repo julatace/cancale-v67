@@ -35,11 +35,16 @@
     { re: /\/api\/v\d+\/my_orders/,             type: 'orders'   },
     { re: /\/api\/v\d+\/(?:inbox|conversations)(?:\?|$)/, type: 'inbox' },
     { re: /\/api\/v\d+\/conversations\/(\d+)/,  type: 'conversation' },
-    // Détail d'une transaction (vente/achat) : c'est là que se trouve le VRAI
-    // n° de suivi du colis (shipment / tracking_code), capté passivement quand tu
-    // ouvres une commande ou télécharges un bordereau. Permet à l'app de fiabiliser
-    // le suivi des bordereaux à 100 % (au lieu de le parser depuis l'email). On ne
-    // matche QUE le détail (…/transactions/{id}), pas les sous-chemins (…/shipment/order).
+    // Détail d'une transaction (vente/achat) : son ÉTAT (`status`, `status_title`,
+    // `shipment {id, status, status_title, status_updated_at}`), capté passivement
+    // quand tu ouvres une commande ou télécharges un bordereau. On ne matche QUE le
+    // détail (…/transactions/{id}), pas les sous-chemins (…/shipment/order).
+    // ⚠️⚠️ (23 octobre) CE COMMENTAIRE DISAIT QUE LE N° DE SUIVI DU TRANSPORTEUR
+    //    ÉTAIT ICI (« shipment / tracking_code ») : FAUX, mesuré en lecture seule —
+    //    0 n° de suivi sur 1 290 transactions captées, 0 dans 1 400 conversations,
+    //    0 dans les commandes. Le suivi que Vinted MONTRE de ses achats (le bouton
+    //    « Suivre le colis ») passe par `…/shipment/journey_summary` : voir
+    //    `noteSuivi` plus bas (5.214).
     { re: /\/api\/v\d+\/transactions\/(\d+)(?:\?|$)/, type: 'transaction' },
     { re: /\/api\/v\d+\/users\/current/,        type: 'profile'  },
     // NOTIFICATIONS VINTED (la cloche) — 30 septembre. Mesuré par l'observation
@@ -342,6 +347,309 @@
     } catch (_) {}
   };
 
+// <suivi-regle> — LA MÊME RÈGLE DANS inject.js ET background.js (§11), texte pour
+// texte ; comparées par scripts/audit-suivi-vinted.cjs (23 octobre, 5.214).
+// Le suivi que VINTED montre de SES commandes d'achat (le bouton « Suivre le
+// colis » : `/transactions/{id}/shipment/journey_summary`, et la page d'une
+// commande : `/escrow_orders/{id}/shipment`). Leur FORME n'a jamais été vue :
+//  · `formeSuivi` — les NOMS de clés et les TYPES, jamais une valeur (une clé qui
+//    ressemble à une donnée — e-mail, nombre de 3 chiffres ou plus, longue suite
+//    hexadécimale, espace — devient `{k}`) ;
+//  · `allegerSuivi` — une LISTE BLANCHE de noms de clés : statut, titre /
+//    libellé / message, dates, transporteur, n° de suivi, nom du point relais.
+//    Tout le reste (noms, adresses, e-mails, téléphones, codes de retrait, QR)
+//    est RETIRÉ ; et un texte gardé qui CITE une valeur retirée (le nom du
+//    destinataire, sa rue, le code) la perd aussi (`…`), comme une adresse
+//    e-mail, un téléphone, « code 482913 », « 12 rue … », « 35000 Rennes » ;
+//  · `contratSuivi` — ce qu'on en range (le CONTRAT de `harvest_{uid}_suivi_{tx}`) :
+//    les étapes (30 au plus, la plus RÉCENTE en premier), la dernière DATÉE,
+//    le transporteur et le n° de suivi s'ils y sont. Aucune étape reconnue ⇒
+//    `null` : la forme est gardée, le contenu ne l'est pas (« pas su »). Une
+//    étape sans date lisible n'est jamais « la dernière » (mieux vaut un blanc
+//    qu'un faux) : sans date, rien ne sonne.
+const SUIVI_TEXTES = ['title', 'status_title', 'state_title', 'event_title', 'label', 'libelle', 'status_label', 'state_label', 'event_label', 'headline', 'message', 'status_message', 'description', 'event_description', 'status_text', 'text', 'summary', 'subtitle'];
+const SUIVI_CODES = ['status_code', 'event_code', 'state_code', 'event_type', 'status', 'state', 'statut', 'etat', 'step', 'step_type', 'event_status', 'current_status', 'shipment_status', 'tracking_status'];
+const SUIVI_DATE = /(?:^|_)(?:date|time|datetime|timestamp|at|ts|heure|happened|occurred)(?:_|$)/i;
+const SUIVI_LIMITE = /(?:^|_)(?:deadline|until|expires?|expiry|limit|limite|estimated|estimation|expected|eta|planned|promised|scheduled|prevue?|prevision(?:nelle)?)(?:_|$)/i;
+// Une étape n'a eu lieu que si sa date est passée (quelques minutes d'horloge
+// décalée tolérées) : une étape datée dans le FUTUR — une livraison estimée —
+// n'est jamais « la dernière » et ne sonne jamais (revue du 24 octobre).
+const SUIVI_FUTUR_MS = 10 * 60000;
+// Un code ou un statut MACHINE (« at_pickup », « 4 », « in_transit ») : sans
+// espace. Une valeur d'état qui n'en a pas la forme (« Code de retrait :
+// 482913 ») est un TEXTE, et un texte se lave (revue du 24 octobre).
+const SUIVI_CODE_MACHINE = /^[A-Za-z0-9_.:-]{1,40}$/;
+const SUIVI_NUMERO = /^(?:tracking_code|tracking_number|tracking_no|tracking_id|parcel_number|parcel_tracking_number|shipment_tracking_code|numero_suivi|numero_de_suivi)$/i;
+const SUIVI_TRANSP = /^(?:carrier|carrier_name|carrier_title|carrier_code|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/i;
+const SUIVI_PARENT_TRANSP = /(?:carrier|courier|transporteur|shipping_provider|provider)/i;
+const SUIVI_PARENT_RELAIS = /(?:pickup|relay|relais|drop_?off|pudo|locker|parcel_?shop|service_?point)/i;
+const SUIVI_PARENT_NUMERO = /^(?:tracking|suivi|parcel_tracking)$/i;
+// Un parent qui désigne une PERSONNE (le contact du point relais, le
+// destinataire, l'expéditeur) : son `name` n'est ni un transporteur ni un point
+// relais, il reste dehors (revue du 24 octobre : « pickup_contact.name »).
+const SUIVI_PARENT_PERSONNE = /(?:contact|person|recipient|destinataire|owner|user|customer|client|buyer|seller|sender|expediteur|receiver|holder|member|membre)/i;
+const SUIVI_PERSO = /(?:^|_)(?:name|first_?name|last_?name|full_?name|surname|username|login|nickname|email|e_?mail|phone|phone_?number|telephone|tel|mobile|address|adresse|street|street_?name|line\d?|address_?line\d?|house_?number|city|ville|town|postal_?code|post_?code|zip|zip_?code|code|pickup_?code|collection_?code|pin|qr|qr_?code|barcode|password|token|iban)(?:_|$)/i;
+const SUIVI_PAS_PERSO = /(?:country|currency|locale|language|lang|type|status|state)/i;
+const SUIVI_TYPES = ['string', 'number', 'boolean', 'null', 'object', 'array'];
+function suiviCleSure(k) {
+  const s = String(k == null ? '' : k);
+  return !!s && s.length <= 40 && !/@|\d{3,}|[0-9a-f]{16,}|\s/i.test(s);
+}
+function suiviDateIso(v, futurMs) {
+  if (v == null || v === '' || typeof v === 'boolean') return null;
+  let ms = NaN;
+  if (typeof v === 'number') ms = v < 1e12 ? v * 1000 : v;
+  else {
+    const s = String(v).trim();
+    if (/^\d{9,13}$/.test(s)) { const n = Number(s); ms = n < 1e12 ? n * 1000 : n; }
+    else if (/^\d{4}-\d{2}-\d{2}/.test(s)) ms = Date.parse(s);
+  }
+  if (!Number.isFinite(ms) || ms < Date.UTC(2020, 0, 1) || ms > Date.now() + (futurMs == null ? 60 * 86400000 : futurMs)) return null;
+  return new Date(ms).toISOString();
+}
+function suiviNumero(v) {
+  const s = String(v == null ? '' : v).replace(/[\s-]/g, '').toUpperCase();
+  return /^[A-Z0-9]{6,40}$/.test(s) && /\d/.test(s) ? s : null;
+}
+function nettoyerTexteSuivi(s, interdits) {
+  let t = String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ');
+  for (const x of interdits || []) {
+    const e = String(x).trim();
+    if (e.length < 3) continue;
+    t = t.replace(new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '…');
+  }
+  t = t.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '…')
+    .replace(/(?:\+\d{2}\s?|\b0)[1-9](?:[\s.-]?\d{2}){4}\b/g, '…')
+    .replace(/\b\d{1,4}\s*(?:bis|ter)?\s*,?\s*(?:rue|avenue|av\.?|bd|boulevard|chemin|place|all[ée]e|impasse|route|quai|cours|square|r[ée]sidence|lotissement|lieu[- ]dit)\b[^,.;\n]*/gi, '…')
+    .replace(/\b\d{5}\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’-]+(?:[ -][A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’-]+)*/g, '…')
+    .replace(/((?:\b[Cc]ode|\bCODE|\bPIN|\b[Pp]in)(?:\s+(?:de\s+retrait|retrait|PIN|d['’]acc[èe]s))?\s*(?:[:：=]|est(?:\s+(?:le|la))?|is)?\s*)([A-Za-z0-9-]{4,})/g, (m, a, b) => (/\d/.test(b) ? a + '…' : m))
+    .replace(/\b(remis(?:e|es)?\s+[àa]|d[ée]pos[ée](?:e|es|s)?\s+par|livr[ée](?:e|es|s)?\s+[àa])(?![a-zà-ÿ])\s*:?\s*(?:(?!\s(?:au|aux|en|dans|chez|depuis|via)\b)[^,.;\n…])+/gi, '$1 …');
+  t = t.replace(/\s*(?:…\s*)+/g, ' … ').replace(/\s+/g, ' ').trim();
+  return /^[…\s.,;:!?-]*$/.test(t) ? '' : t.slice(0, 200);
+}
+// Une feuille gardée : `{ sorte, v }`, ou `null` (retirée).
+function suiviFeuille(cle, parent, v) {
+  const k = String(cle).toLowerCase(), p = String(parent || '');
+  if (!(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) return null;
+  if (SUIVI_PARENT_TRANSP.test(p) && !SUIVI_PARENT_PERSONNE.test(p) && /^(?:name|title|label|code)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
+  if (SUIVI_PARENT_RELAIS.test(p) && !SUIVI_PARENT_PERSONNE.test(p) && /^(?:name|title|label)$/.test(k) && typeof v === 'string') return { sorte: 'texte', v };
+  if (SUIVI_PARENT_NUMERO.test(p) && /^(?:code|number|numero|id)$/.test(k)) { const n = suiviNumero(v); return n ? { sorte: 'numero', v: n } : null; }
+  if (SUIVI_NUMERO.test(k)) { const n = suiviNumero(v); return n ? { sorte: 'numero', v: n } : null; }
+  if (SUIVI_TRANSP.test(k)) return typeof v === 'string' ? { sorte: 'texte', v } : null;
+  if (SUIVI_TEXTES.includes(k)) return typeof v === 'string' ? { sorte: 'texte', v } : null;
+  if (SUIVI_CODES.includes(k)) {
+    if (typeof v === 'string' && !SUIVI_CODE_MACHINE.test(v.trim())) return { sorte: 'texte', v };
+    return { sorte: 'code', v };
+  }
+  if (SUIVI_DATE.test(k) || SUIVI_LIMITE.test(k)) { const d = suiviDateIso(v); return d ? { sorte: 'date', v: d } : null; }
+  return null;
+}
+function allegerSuivi(racine) {
+  const interdits = new Set(), aLaver = [];
+  const marche = (v, parent, prof) => {
+    if (prof > 8 || v == null) return undefined;
+    if (Array.isArray(v)) {
+      const out = [];
+      for (const x of v.slice(0, 40)) { const r = marche(x, parent, prof + 1); if (r !== undefined) out.push(r); }
+      return out.length ? out : undefined;
+    }
+    if (typeof v !== 'object') return undefined;
+    const out = {};
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (x && typeof x === 'object') {
+        if (!suiviCleSure(k)) continue;
+        const r = marche(x, k, prof + 1);
+        if (r !== undefined) out[k] = r;
+        continue;
+      }
+      const g = suiviCleSure(k) ? suiviFeuille(k, parent, x) : null;
+      if (g) { out[k] = g.v; if (g.sorte === 'texte') aLaver.push([out, k]); continue; }
+      if (typeof x === 'string' || typeof x === 'number') {
+        const s = String(x).trim();
+        if (s.length >= 3 && ((SUIVI_PERSO.test(k) && !SUIVI_PAS_PERSO.test(k)) || /[\w.+-]+@[\w-]+\.[\w-]+/.test(s))) interdits.add(s.slice(0, 200));
+      }
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
+  const garde = marche(racine, '', 0) || {};
+  const liste = [...interdits].sort((a, b) => b.length - a.length);
+  for (const [o, k] of aLaver) {
+    const t = nettoyerTexteSuivi(o[k], liste);
+    if (t) o[k] = t; else delete o[k];
+  }
+  return garde;
+}
+function formeSuivi(racine) {
+  const out = {};
+  let n = 0;
+  const poser = (c, t) => {
+    if (out[c] === undefined) { if (n < 200) { out[c] = t; n++; } return; }
+    if (!out[c].split('|').includes(t)) out[c] = (out[c] + '|' + t).slice(0, 60);
+  };
+  const marche = (v, chemin, prof) => {
+    if (prof > 8) return;
+    if (Array.isArray(v)) {
+      if (!v.length) { poser(chemin || '(racine)', 'array'); return; }
+      for (const x of v.slice(0, 5)) marche(x, chemin + '[]', prof + 1);
+      return;
+    }
+    if (v && typeof v === 'object') {
+      const cles = Object.keys(v);
+      if (!cles.length) { poser(chemin || '(racine)', 'object'); return; }
+      for (const k of cles.slice(0, 80)) marche(v[k], (chemin ? chemin + '.' : '') + (suiviCleSure(k) ? k : '{k}'), prof + 1);
+      return;
+    }
+    poser(chemin || '(racine)', v === null ? 'null' : typeof v);
+  };
+  marche(racine, '', 0);
+  return out;
+}
+// La forme reçue d'une page (ou d'un message forgé) : seulement des chemins de
+// noms de clés sûrs et des types connus — jamais une valeur.
+function nettoyerFormeSuivi(f) {
+  const out = {};
+  if (!f || typeof f !== 'object' || Array.isArray(f)) return out;
+  let n = 0;
+  for (const c of Object.keys(f)) {
+    if (n >= 200) break;
+    const t = String(f[c] == null ? '' : f[c]);
+    if (!/^[A-Za-z0-9_.[\]{}()-]{1,160}$/.test(c) || /\d{3,}|@/.test(c)) continue;
+    if (!t || !t.split('|').every((x) => SUIVI_TYPES.includes(x))) continue;
+    out[c] = t.slice(0, 60); n++;
+  }
+  return out;
+}
+function suiviVal(o, cle) {
+  for (const k of Object.keys(o)) if (k.toLowerCase() === cle) return o[k];
+  return undefined;
+}
+function suiviEtape(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  let t = '';
+  for (const k of SUIVI_TEXTES) { const x = suiviVal(o, k); if (typeof x === 'string' && x.trim()) { t = x.trim(); break; } }
+  if (!t) return null;
+  let at = null, futur = false;
+  for (const k of Object.keys(o)) {
+    if (!SUIVI_DATE.test(k) || SUIVI_LIMITE.test(k)) continue;
+    const d = suiviDateIso(o[k], SUIVI_FUTUR_MS);
+    if (d) { at = d; break; }
+    if (suiviDateIso(o[k])) futur = true;
+  }
+  // Datée seulement dans l'avenir : une prévision, pas une étape.
+  if (!at && futur) return null;
+  let code = null;
+  for (const k of SUIVI_CODES) {
+    const x = suiviVal(o, k);
+    if ((typeof x === 'string' && SUIVI_CODE_MACHINE.test(x.trim()) && x !== t) || typeof x === 'number') { code = String(x).trim(); break; }
+  }
+  return { t: t.slice(0, 200), at, code };
+}
+function contratSuivi(a) {
+  if (!a || typeof a !== 'object') return null;
+  const groupes = [], seuls = [];
+  const dansGroupe = new Set();
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) {
+      const g = [];
+      for (const x of v) { const e = suiviEtape(x); if (e) { g.push(e); dansGroupe.add(x); } }
+      if (g.length) groupes.push(g);
+      for (const x of v) marche(x, prof + 1);
+      return;
+    }
+    for (const k of Object.keys(v)) marche(v[k], prof + 1);
+  };
+  marche(a, 0);
+  const objets = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v) objets(x, prof + 1); return; }
+    if (!dansGroupe.has(v)) { const e = suiviEtape(v); if (e && e.at) seuls.push(e); }
+    for (const k of Object.keys(v)) objets(v[k], prof + 1);
+  };
+  objets(a, 0);
+  if (seuls.length) groupes.push(seuls);
+  const score = (g) => g.filter((e) => e.at).length * 100 + g.length;
+  let meilleur = null;
+  for (const g of groupes) if (!meilleur || score(g) > score(meilleur)) meilleur = g;
+  if (!meilleur || !meilleur.length) return null;
+  const vues = new Set(), etapes = [];
+  for (const e of meilleur) { const c = `${e.at || ''}|${e.t}|${e.code || ''}`; if (!vues.has(c)) { vues.add(c); etapes.push(e); } }
+  const datees = etapes.filter((e) => e.at).sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
+  const sansDate = etapes.filter((e) => !e.at);
+  const toutes = datees.concat(sansDate).slice(0, 30);
+  let transporteur = null, suivi = null;
+  const cherche = (v, parent, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v) cherche(x, parent, prof + 1); return; }
+    for (const k of Object.keys(v)) {
+      const x = v[k], kl = k.toLowerCase();
+      if (x && typeof x === 'object') { cherche(x, k, prof + 1); continue; }
+      if (!transporteur && typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())
+          && ((SUIVI_PARENT_TRANSP.test(String(parent || '')) && !SUIVI_PARENT_PERSONNE.test(String(parent || '')) && /^(?:name|title|label)$/.test(kl)) || /^(?:carrier|carrier_name|carrier_title|transporteur|courier|courier_name|shipping_provider|provider_name|delivery_company|shipping_company)$/.test(kl))) transporteur = x.trim().slice(0, 80);
+      if (!suivi && (SUIVI_NUMERO.test(kl) || (SUIVI_PARENT_NUMERO.test(String(parent || '')) && /^(?:code|number|numero|id)$/.test(kl)))) suivi = suiviNumero(x);
+    }
+  };
+  cherche(a, '', 0);
+  return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
+}
+// </suivi-regle>
+
+  // ── LE SUIVI QUE VINTED MONTRE DE SES ACHATS (23 octobre, 5.214) ──────────
+  // Julien : « enregistrer le numéro de suivi et tracer le colis » ; « que ça me
+  // prévienne dès qu'il y a une mise à jour d'un colis ». Les transporteurs
+  // n'ouvrent rien de gratuit (mesuré) ; la meilleure source est le suivi que
+  // VINTED montre de SES commandes d'achat. Son navigateur a déjà vu passer
+  // (chemin + statut, jamais le contenu) : `…/transactions/{id}/shipment/
+  // journey_summary` (le bouton « Suivre le colis »), `…/escrow_orders/{id}/
+  // shipment` (la page d'une commande) et `…/parcel_collection_code`. Leur FORME
+  // n'a jamais été vue. On regarde la RÉPONSE que la page vient de recevoir —
+  // AUCUNE requête de plus (§3) — et il ne part d'ici que :
+  //   · la FORME (noms de clés + types, jamais une valeur) ;
+  //   · pour le suivi et l'expédition, le contenu ALLÉGÉ par liste blanche
+  //     (`allegerSuivi`, bloc <suivi-regle> : rien d'un nom, d'une adresse, d'un
+  //     e-mail, d'un téléphone, d'un code de retrait ni d'un QR) ;
+  //   · pour le code de retrait : la forme SEULEMENT — le code lui-même reste
+  //     rangé par le chemin existant (la conversation), rien de plus.
+  // C'est le fond qui décide si la transaction est un ACHAT de CE compte
+  // (identité) ; une vente n'y laisse que sa forme.
+  const RE_SUIVI = [
+    [/^\/api\/v\d+\/transactions\/(\d{4,20})\/shipment\/journey_summary\/?$/, 'journey'],
+    [/^\/api\/v\d+\/escrow_orders\/(\d{4,20})\/shipment\/?$/, 'escrow'],
+    [/^\/api\/v\d+\/transactions\/(\d{4,20})\/shipment\/parcel_collection_code\/?$/, 'code'],
+  ];
+  // `transaction_id` à la racine ou un niveau plus bas : une IDENTITÉ lue dans la
+  // réponse (l'identifiant d'une commande « escrow » n'est peut-être pas celui de
+  // la transaction — le fond essaie les deux, et ne garde que celui qui est un
+  // achat de ce compte).
+  const txDuCorps = (j) => {
+    const essai = (o) => (o && typeof o === 'object' && !Array.isArray(o) && /^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))) ? String(o.transaction_id) : '';
+    if (essai(j)) return essai(j);
+    if (j && typeof j === 'object' && !Array.isArray(j)) for (const k of Object.keys(j)) { const t = essai(j[k]); if (t) return t; }
+    return '';
+  };
+  const noteSuivi = (method, url, status, lireTexte) => {
+    try {
+      if (String(method || 'GET').toUpperCase() !== 'GET') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname)) return;
+      let quoi = null, id = null;
+      for (const [re, q] of RE_SUIVI) { const m = re.exec(U.pathname); if (m) { quoi = q; id = m[1]; break; } }
+      if (!quoi) return;
+      Promise.resolve().then(lireTexte).then((t) => {
+        if (typeof t !== 'string' || !t || t.length > 400000) return;
+        let j = null; try { j = JSON.parse(t); } catch (_) { return; }
+        if (!j || typeof j !== 'object') return;
+        if (typeof j.message_code === 'string' && typeof j.code === 'number' && j.code !== 0) return;   // un refus de Vinted n'est pas une forme
+        const msg = { kind: 'suivi', quoi, id, forme: formeSuivi(j) };
+        if (quoi !== 'code') { msg.allege = allegerSuivi(j); const tc = txDuCorps(j); if (tc) msg.txCorps = tc; }
+        post(msg);
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
   // Convertit un ArrayBuffer en base64 (par morceaux pour eviter le débordement
   // de pile sur les gros PDF).
   const abToB64 = (buf) => {
@@ -392,6 +700,7 @@
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
+            noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             if (/application\/pdf/i.test(ct)) {
@@ -435,6 +744,7 @@
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
+            noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
             // Bordereau PDF via XHR (si Vinted le charge en binaire).

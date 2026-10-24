@@ -106,8 +106,8 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
-  let version = '5.215.0';
-  window.majExtensionFavoris=()=>{version='5.216.0';post({__vmr:'ready',version});};
+  let version = '5.216.0';
+  window.majExtensionFavoris=()=>{version='5.217.0';post({__vmr:'ready',version});};
   const post = (m) => window.postMessage({id:'extension-banc-unique',...m}, '*');
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
@@ -260,7 +260,7 @@ const capturer = async (pg, nom, vp) => {
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('alert').filter({hasText:'5.216'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.217'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>window.majExtensionFavoris());
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();

@@ -44,7 +44,9 @@ const ROWS = [
 const SESSION={access_token:'session-colis-fictive',refresh_token:'r',totp:[],expires_at:Date.now()+3600000,user:{id:'11111111-1111-4111-8111-111111111111',email:'colis@example.test',totp:[]}};
 if(process.env.BANC_RETRAITS){
  ACHATS.forEach((a,i)=>{a.title='Article identique';a.photo='data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="${i?'blue':'red'}"/></svg>`);});
- ACHATS.forEach((a,i)=>ROWS.push({id:`harvest_111_txn_${a.transaction_id}`,data:{payload:{transaction:{id:a.transaction_id,shipment:{tracking_code:i?'11110002':'11110001'},item_photo:{url:a.photo}}}}}));
+ // (23 oct., soir) La photo dans la transaction ; le n° de suivi dans la LIGNE DE
+// SUIVI Vinted (`harvest_{uid}_suivi_{tx}`) — la transaction n'en porte jamais.
+ACHATS.forEach((a,i)=>{ROWS.push({id:`harvest_111_txn_${a.transaction_id}`,data:{payload:{transaction:{id:a.transaction_id,item_photo:{url:a.photo}}}}});ROWS.push({id:`harvest_111_suivi_${a.transaction_id}`,data:{v:1,tx:String(a.transaction_id),source:'journey',capturedAt:new Date().toISOString(),transporteur:'mondialrelay',suivi:i?'11110002':'11110001',etapes:[],dernier:null,forme:{}}});});
 }
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };

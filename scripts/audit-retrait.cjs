@@ -142,7 +142,7 @@ dit(/l'extension va chercher/i.test(APP) || /va chercher les codes toute seule/i
 }
 
 // ── 4. CE QUI ÉTAIT DÉJÀ JUSTE ET DOIT LE RESTER ───────────────────────────
-dit(/const suivisRetires/.test(APP) && /status === 'delivered'/.test(APP),
+dit(/const suivisRetires/.test(APP) && /finsDesLignes/.test(APP) && /=== 'delivered'/.test(fs.readFileSync(path.join(RACINE, 'api/_lib/suivi-colis.js'), 'utf8')),
   'un email « colis retiré » sort le colis de la liste (n° de suivi = identité)');
 dit(/colisRetireAilleurs/.test(APP), 'et il le sort AUSSI de la ligne du second transporteur');
 

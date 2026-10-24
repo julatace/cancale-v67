@@ -56,11 +56,13 @@ const ROWS = [
   { id: 'panel_colis_relais', data: { '9601': { code: 'C11111', lieu: 'Tabac du Port, 4 Quai Gambetta, 35260 Cancale', at: j(1), url: 'https://www.vinted.fr/inbox/7601' } } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: j(0), payload: { my_orders: ACHATS_A } } },
   { id: 'harvest_222_orders_purchased', data: { capturedAt: j(9), payload: { my_orders: ACHATS_B } } },
-  // La transaction de l'achat 9603, telle que l'extension la range (forme lue par
-  // `indexSuivisAchats` : payload.transaction.shipment.tracking_code). Mesuré le
-  // 23 oct. : AUCUNE transaction réelle ne porte encore de n° de suivi — c'est la
-  // forme que le code attend, servie ici pour prouver la règle (Achats ET Ma journée).
-  { id: 'harvest_111_txn_9603', data: { capturedAt: j(1), payload: { transaction: { id: 9603, shipment: { id: 1, status: 600, status_title: "Commande non réclamée - Retournée à l'expéditeur.rice", tracking_code: '30000005' } } } } },
+  // La transaction de l'achat 9603 (son état). ⚠️ (23 oct., soir) Son n° de suivi
+  // n'est PLUS lu dans la transaction : mesuré, 0 transaction réelle sur 1 290 n'en
+  // porte (`shipment.tracking_code`, une lecture morte). Il vient de la LIGNE DE
+  // SUIVI que l'extension relève sur Vinted (`harvest_{uid}_suivi_{tx}`, le
+  // contrat du 23 octobre) — servie juste en dessous, à sa forme.
+  { id: 'harvest_111_txn_9603', data: { capturedAt: j(1), payload: { transaction: { id: 9603, shipment: { id: 1, status: 600, status_title: "Commande non réclamée - Retournée à l'expéditeur.rice" } } } } },
+  { id: 'harvest_111_suivi_9603', data: { v: 1, tx: '9603', source: 'journey', capturedAt: j(1), transporteur: 'mondialrelay', suivi: '30000005', etapes: [{ t: 'Colis retourné à l’expéditeur', at: j(1), code: null }], dernier: { t: 'Colis retourné à l’expéditeur', at: j(1), code: null }, forme: {} } },
   // 1. Mondial Relay, adresse de réception reliée à AUCUN compte. Limite 26/10.
   track('email_track_mondialrelay_30000001', { carrier: 'mondialrelay', suivi: '30000001', artTitle: 'Nike Air Max 90 taille 42', subject: 'Votre colis 30000001 est disponible 📦', receivedAt: iso(Date.parse('2026-10-21T11:33:00Z')), recuSur: ['inconnu@banc.test'], code: '123456', lieu: "TABA'TEST, 12 Rue Exemple, 56000 Vannes", limite: '2026-10-26' }),
   // 2. Chronopost sur compte_a, limite 29/10.
@@ -330,7 +332,11 @@ async function main() {
         await pg.waitForTimeout(4500);
         const txLus = new Set(); for (const u of journal) { const m = /id=in\.\(([^)]*)\)/.exec(u); if (m && /_txn_/.test(m[1])) m[1].split(',').forEach((x) => txLus.add(x)); }
         const vieuxLus = [...txLus].filter((x) => /_txn_97\d\d$/.test(x)).length;
-        dit(txLus.size > 0 && vieuxLus === 0 && txLus.size <= 6, `${T} [défaut 14] Ma journée lit les transactions des seuls achats utiles (un « disponible » de 83 j n'élargit plus la fenêtre)`, `${txLus.size} transactions lues dont ${vieuxLus} anciennes`);
+        // (23 oct., soir) Ma journée ne lit PLUS aucune transaction pour les n° de
+        // suivi (lecture morte, 0 sur 1 290) : ils viennent de la famille des lignes
+        // de suivi Vinted, lue en UNE fois, en scalaires.
+        const suiviLu = journal.some((u) => /id=like\.harvest_\*_suivi_\*/.test(u) && !/select=[^&]*\bdata\b(?!->)/.test(u));
+        dit(vieuxLus === 0 && txLus.size <= 6 && suiviLu, `${T} [défaut 14] Ma journée ne décompresse aucune vieille transaction (les n° de suivi : la ligne de suivi Vinted, en scalaires)`, `${txLus.size} transactions lues dont ${vieuxLus} anciennes · suivi lu : ${suiviLu}`);
         await ctx.close();
       });
     }

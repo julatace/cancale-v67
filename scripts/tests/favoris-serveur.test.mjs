@@ -29,7 +29,7 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
  };
  const call=async(action,extra={},token='fixture.session.jwt')=>{
   let code,body;const res={setHeader(){},status(v){code=v;return this;},json(v){body=v;return this;}};
-  await handler({method:action?'POST':'GET',query:{uid:'123',mode:'favoris'},headers:{authorization:token?'Bearer '+token:''},body:action?{action,...(action==='consommer'?{version:'5.216.0'}:{}),...(action==='lancer'?{reglages:captures[2]}:{}),...extra}:undefined},res);return {code,body};
+  await handler({method:action?'POST':'GET',query:{uid:'123',mode:'favoris'},headers:{authorization:token?'Bearer '+token:''},body:action?{action,...(action==='consommer'?{version:'5.217.0'}:{}),...(action==='lancer'?{reglages:captures[2]}:{}),...extra}:undefined},res);return {code,body};
  };
  try{
   assert.equal((await call(null,{},'')).code,401);
@@ -43,7 +43,7 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
   user=V;const etranger=await call('consommer',{jeton:t.jeton});assert.equal(etranger.code,409);
   const vueAutre=await call();assert.deepEqual(vueAutre.body.vue.jobs,[]);assert.equal(JSON.stringify(vueAutre.body).includes('Merci'),false);
   user=U;
-  assert.equal((await call('consommer',{jeton:t.jeton,version:'5.215.0'})).code,409,'ancien moteur sans contrôle historique refusé');
+  assert.equal((await call('consommer',{jeton:t.jeton,version:'5.216.0'})).code,409,'ancien moteur sans contrôle historique refusé');
   const grants=await Promise.all(Array.from({length:20},()=>call('consommer',{jeton:t.jeton})));
   const uniques=grants.filter(r=>r.code===200);assert.equal(uniques.length,1,'vingt extensions : une seule autorisation consommée');
   assert.equal(uniques[0].body.travail.message,'Merci !\n\nJe te propose une réduction de 10 % sur cet article.');
