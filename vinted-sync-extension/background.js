@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.219.0';
+const CODE_VERSION = '5.220.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -653,6 +653,7 @@ try {
         if (msg.type === 'deconnexion') { sendResponse(await deconnexionAdressee(msg)); return; }
         if(msg.type==='favorisEtat'){const e=await etatPourApp();sendResponse(e);if(Date.now()-dernierPontFavoris>60000){dernierPontFavoris=Date.now();reinjecterPont().catch(()=>{});}return;}
         if(msg.type==='favorisExec'&&msg.endpoint==='/vrm/favoris'){sendResponse(await executerPourApp({...msg,method:'POST'},sender));return;}
+        if(msg.type==='favorisOuvrir'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/ouvrir'},sender));return;}
         if(msg.type==='favorisLire'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/lire'},sender));return;}
         if (msg.type === 'code') { let ext = ''; try { ext = String(chrome.runtime.id || ''); } catch (_) {} sendResponse({ ok: true, code: CODE_VERSION, ext }); return; }
         sendResponse({ ok: false, code: 'inconnu' });
@@ -1663,9 +1664,9 @@ function fusionArchiveFavoris(avant,payload,{uid,domain,url,cycle=null,page=null
     if(page!==1&&sync.suivante!==page)throw Error('La lecture a changé dans une autre fenêtre.');
     sync={id:cycle,totalPages:tp,pagesLues:page,suivante:page+1,complete:page>=tp,at:Date.now()};
   }
-  return {archiveVersion:1,type:'notifications',uid:String(uid),domain,capturedAt:new Date().toISOString(),sourceUrl:sourceNotificationsFavoris(url,domain)||avant?.sourceUrl||null,payload:{notifications},creations:Array.isArray(avant?.creations)?avant.creations.slice(-100):[],limite,sync,archiveRev:(Number.isSafeInteger(avant?.archiveRev)?avant.archiveRev:0)+1};
+  return {archiveVersion:1,type:'notifications',uid:String(uid),domain,capturedAt:new Date().toISOString(),sourceUrl:sourceNotificationsFavoris(url,domain)||avant?.sourceUrl||null,payload:{notifications},creations:Array.isArray(avant?.creations)?avant.creations.slice(-100):[],lecturesLiees:Array.isArray(avant?.lecturesLiees)?avant.lecturesLiees.slice(-50):[],limite,sync,archiveRev:(Number.isSafeInteger(avant?.archiveRev)?avant.archiveRev:0)+1};
 }
-async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAttendu=null,lecture=false,creation=null}){
+async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAttendu=null,lecture=false,creation=null,lectureLiee=null}){
   const s=await authToken();if(!s?.access_token||!s.user_id||ownerAttendu&&s.user_id!==ownerAttendu)return null;
   const owner=s.user_id,id=`harvest_${uid}_favoris_archive`,base=`${SUPABASE_URL}/rest/v1/app_data`,filtre=`owner=eq.${encodeURIComponent(owner)}&id=eq.${id}`;
   const headers={apikey:SUPABASE_KEY,Authorization:`Bearer ${s.access_token}`,'Content-Type':'application/json'};
@@ -1676,11 +1677,15 @@ async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAtte
       const r=await fetch(`${base}?${filtre}&select=id,owner,data`,{headers,signal:AbortSignal.timeout(12000)});if(!r.ok)return null;
       const rows=await r.json();if(!await encore()||!Array.isArray(rows)||rows.length>1||rows.some(x=>x.owner!==owner||x.id!==id))return null;
       const avant=rows[0]?.data||null;if(lecture)return {data:avant,owner};
-      const data=fusionArchiveFavoris(avant,payload||(creation?{notifications:[]}:null),{uid,domain:domain||avant?.domain,url,cycle,page});
+      const data=fusionArchiveFavoris(avant,payload||(creation||lectureLiee?{notifications:[]}:null),{uid,domain:domain||avant?.domain,url,cycle,page});
       if(creation){
         if(String(creation.uid)!==String(uid)||creation.method!=='POST'||creation.path!=='/api/v2/conversations'||!creation.contexteFavori)return null;
         const preuve={uid:String(uid),method:'POST',path:'/api/v2/conversations',body:creation.body,contexteFavori:creation.contexteFavori,capturedAt:creation.capturedAt};
         data.creations=[...data.creations.filter(x=>x.contexteFavori!==preuve.contexteFavori||x.body!==preuve.body),preuve].slice(-100);
+      }
+      if(lectureLiee){
+        if(String(lectureLiee.uid)!==String(uid)||lectureLiee.method!=='GET'||!lectureLiee.contexteFavori)return null;
+        data.lecturesLiees=[...data.lecturesLiees.filter(x=>x.contexteFavori!==lectureLiee.contexteFavori||x.conversationId!==lectureLiee.conversationId),lectureLiee].slice(-50);
       }
       const cond=Number.isSafeInteger(avant?.archiveRev)?`data->>archiveRev=eq.${avant.archiveRev}`:'data->>archiveRev=is.null';
       if(!await encore())return null;
@@ -1691,6 +1696,70 @@ async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAtte
     }catch{return null;}
   }return null;
 }
+// A user-initiated native opening: remember the source before any HTTP/SPA
+// redirect. Never accept a URL from the app; resolve its own captured ID.
+const stockageFavorisOnglets=()=>chrome.storage.session||chrome.storage.local;
+const cleOngletFavori=id=>`vrmFavoriOnglet_${id}`;
+function pageFavoriNative(v,domain='www.vinted.fr'){
+ try{const u=new URL(v,`https://${domain}`),m=/^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(u.pathname);
+  if(!m||u.protocol!=='https:'||u.username||u.password||!/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)||u.href.length>2000)return null;
+  u.hash='';return {url:u.href,itemId:m[1]};
+ }catch{return null;}
+}
+async function ouvrirFavoriNatif(uid,acc,body){
+ const s=await authToken(),owner=s?.user_id;
+ const refus=message=>({ok:false,status:409,json:{message}});
+ if(!owner||body?.owner!==owner||typeof body?.notificationId!=='string'||!body.notificationId||body.notificationId.length>160)return refus('Le compte VRM de l’ouverture n’est pas confirmé.');
+ const a=await archiveNotifications(uid,{lecture:true,ownerAttendu:owner});if(!a)return refus('L’historique ne peut pas être lu. Aucun onglet ouvert.');
+ if(a.data&&(a.data.archiveVersion!==1||String(a.data.uid)!==String(uid)||!Array.isArray(a.data.payload?.notifications)))return refus('L’historique ne confirme pas ce compte.');
+ const raw=await sbGet(`app_data?id=eq.harvest_${uid}_notifications&owner=eq.${owner}&select=owner,data`);
+ if(!Array.isArray(raw)||raw.length>1||raw.some(r=>r.owner!==owner||r.data?.type!=='notifications'||String(r.data?.uid)!==String(uid)||!Array.isArray(r.data?.payload?.notifications)))return refus('La capture ne confirme pas ce compte.');
+ const ds=[a.data,...raw.map(r=>r.data)].filter(Boolean),liens=[];
+ for(const d of ds){if(d.payload.notifications.length>10000)return refus('La capture est trop volumineuse pour être vérifiée.');for(const n of d.payload.notifications)if(n.id===body.notificationId&&/favori|favourit/i.test(String(n.body||''))){const p=pageFavoriNative(n.link,d.domain);if(!p)return refus('Le lien natif de ce favori n’est pas reconnu.');liens.push(p);}}
+ if(!liens.length||new Set(liens.map(p=>p.url)).size!==1)return refus('Le lien de ce favori n’est pas unique dans les captures.');
+ if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))return refus('Le compte connecté a changé. Aucun onglet ouvert.');
+ let tab=null,navigue=false;
+ try{
+  tab=await chrome.tabs.create({url:'about:blank',active:true});if(!Number.isInteger(tab?.id)||tab.id<0)throw Error();
+  await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now()}});
+  if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
+  await chrome.tabs.update(tab.id,{url:liens[0].url});navigue=true;
+  for(let i=0;i<40;i++){
+    if((await loadSession())?.user_id!==owner)return refus('La session VRM a changé pendant l’ouverture.');
+    const record=(await stockageFavorisOnglets().get(cleOngletFavori(tab.id)))?.[cleOngletFavori(tab.id)];
+    if(!record||['confirmee','erreur'].includes(record.etat))return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:record?.etat==='confirmee'?'confirmee':'non_confirmee',raison:record?.raison||''}};
+    await new Promise(r=>setTimeout(r,250));
+  }
+  return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:'en_attente',raison:'capture_pas_recue'}};
+ }catch{
+  if(tab?.id!=null){await stockageFavorisOnglets().remove(cleOngletFavori(tab.id)).catch(()=>{});if(!navigue)await chrome.tabs.remove(tab.id).catch(()=>{});}
+  return refus('L’ouverture dans Vinted n’a pas abouti. Aucun message envoyé.');
+ }
+}
+try{chrome.tabs.onRemoved.addListener(id=>{stockageFavorisOnglets().remove(cleOngletFavori(id)).catch(()=>{});});}catch{}
+
+async function capterLectureFavori(uid,domain,id,payload,url,tabId,owner,method,httpStatus){
+ if(method!=='GET'||!Number.isInteger(httpStatus)||httpStatus<200||httpStatus>=300||!Number.isInteger(tabId)||tabId<0)return;
+ const ident=v=>Number.isSafeInteger(v)&&v>0?String(v):typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:null;
+ const c=payload?.conversation,conv=ident(c?.id),recipient=ident(c?.opposite_user?.id),items=[...new Set([c?.transaction?.item_id,c?.transaction?.item?.id,c?.item?.id].map(ident).filter(Boolean))];
+ if(!conv||conv!==String(id)||!recipient||recipient===String(uid)||items.length!==1)return;
+ try{
+  const src=new URL(url,`https://${domain}`);if(src.protocol!=='https:'||!/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(src.hostname)||!new RegExp('^/api/v[0-9]+/conversations/'+conv+'/?$').test(src.pathname))return;
+  const cle=cleOngletFavori(tabId),attente=(await stockageFavorisOnglets().get(cle))?.[cle];
+  if(!attente||attente.etat!=='attente'||attente.owner!==owner||String(attente.uid)!==String(uid)||Date.now()-attente.at<0||Date.now()-attente.at>60000)return;
+  if(pageFavoriNative(attente.contexteFavori)?.itemId!==items[0])return;
+  // A prefetched thread must not steal the binding: this must be the thread
+  // actually displayed in the browser tab that VRM opened.
+  const tab=await chrome.tabs.get(tabId),visible=new URL(tab.url||'');
+  if(visible.protocol!=='https:'||!/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(visible.hostname)||!new RegExp('^/(?:inbox|conversations)/'+conv+'/?$').test(visible.pathname))return;
+  if((await loadSession())?.user_id!==owner||String(await compteConnecte(domain))!==String(uid))return;
+  await stockageFavorisOnglets().set({[cle]:{...attente,etat:'capture'}});
+  const lectureLiee={uid:String(uid),method:'GET',path:src.pathname.replace(/\/$/,''),conversationId:conv,itemId:items[0],recipientId:recipient,contexteFavori:attente.contexteFavori,capturedAt:new Date().toISOString()};
+  const conserve=await archiveNotifications(uid,{domain,ownerAttendu:owner,lectureLiee});
+  await stockageFavorisOnglets().set({[cle]:{...attente,etat:conserve?'confirmee':'erreur',raison:conserve?'':'enregistrement_non_confirme'}});
+ }catch{}
+}
+
 async function lirePageFavoris(uid,acc,body){
   const cycle=body?.cycle;if(typeof cycle!=='string'||!/^[a-f0-9-]{36}$/i.test(cycle))return {ok:false,status:400,json:null};
   const lu=await archiveNotifications(uid,{lecture:true});if(!lu)return {ok:false,status:503,json:{message:'Archive indisponible. Aucune page effacée.'}};
@@ -1709,9 +1778,9 @@ async function lirePageFavoris(uid,acc,body){
   const d=s.data;return {ok:true,status:200,json:{complete:!!d.sync?.complete,pagesLues:d.sync?.pagesLues,totalPages:d.sync?.totalPages,limite:d.limite,arret:d.limite?'capacite':''}};
 }
 
-async function storeHarvest(domain, type, id, body, sourceUrl=null) {
-  const scopeNotif=type==='notifications'?await authToken():null;
-  if(type==='notifications'&&!scopeNotif?.user_id)return;
+async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,sourceMethod=null,httpStatus=null) {
+  const scopeNotif=['notifications','conversation'].includes(type)?await authToken():null;
+  if(['notifications','conversation'].includes(type)&&!scopeNotif?.user_id)return;
   noterDiag(`recu_${type || 'inconnu'}`);
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag(`abandon_sans_compte_${type || 'inconnu'}`); return; }
@@ -1729,6 +1798,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null) {
     return;
   }
   if (estErreurVinted(parsed)) { noterDiag(`ignore_erreur_vinted_${type || 'inconnu'}`); return; }
+  if(type==='conversation'&&scopeNotif?.user_id)await capterLectureFavori(uid,domain,id,parsed,sourceUrl,tabId,scopeNotif.user_id,sourceMethod,httpStatus);
   // Le corps a parsé : la clé de liste attendue est-elle toujours là ? (sentinelle
   // de dérive de forme, sur le BRUT, avant tout allègement qui pourrait la masquer).
   verifFormeListe(type, parsed, id);
@@ -2412,13 +2482,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // On rattache le csrf au compte actif (mise a jour legere).
     captureDomain(domain);
   } else if (msg.kind === 'harvest' && msg.body) {
-    storeHarvest(domain, msg.type, msg.id, msg.body, msg.url);
+    storeHarvest(domain,msg.type,msg.id,msg.body,msg.url,sender?.frameId>0?null:sender?.tab?.id,msg.method,msg.httpStatus).then(()=>sendResponse({recu:true}),()=>sendResponse({recu:false}));
+    return true;
   } else if (msg.kind === 'label' && msg.b64) {
     storeLabel(domain, msg.url, msg.b64);
   } else if (msg.kind === 'receipt' && msg.b64) {
     storeReceipt(domain, msg.url, msg.b64);
   } else if (msg.kind === 'writereq' && msg.url) {
-    storeWriteReq(domain, msg.method, msg.url, msg.body, msg.contexteFavori);
+    storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
+    return true;
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
     storeSeenUrls(domain, msg.paths, msg.reponses);
   } else if (msg.kind === 'suppression' && msg.itemId) {
@@ -2558,7 +2630,7 @@ function formeCorps(body) {
   if (j !== null && typeof j === 'object') walk(j, '', 0); else if (j !== null) out.push('(racine):' + typ(j));
   return out;
 }
-async function storeWriteReq(domain, method, url, body, contexteFavori=null) {
+async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabId=null) {
   const scope=await authToken();if(!scope?.user_id)return;
   const uid = await activeAccountId(domain);
   if (!uid) return;
@@ -2567,6 +2639,16 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null) {
   try { const U = new URL(url, `https://${domain}`); path = U.pathname; hote = U.hostname; } catch (_) {}
   // Une URL relative part forcément vers Vinted ; une absolue, on vérifie l'hôte.
   if (/^https?:/i.test(String(url)) && !/(^|\.)vinted\.[a-z.]+$/i.test(hote)) return;
+  let ouvertureLiee=null;
+  if(method==='POST'&&path==='/api/v2/conversations'&&Number.isInteger(tabId)&&tabId>=0){
+    const cle=cleOngletFavori(tabId),o=await stockageFavorisOnglets().get(cle),attente=o?.[cle];
+    if(attente){
+      if(attente.owner!==scope.user_id||String(attente.uid)!==String(uid)){await stockageFavorisOnglets().remove(cle);return;}
+      if(attente.etat==='attente'&&Date.now()-attente.at>=0&&Date.now()-attente.at<=60000){
+        contexteFavori=attente.contexteFavori;ouvertureLiee={cle,record:attente};await stockageFavorisOnglets().set({[cle]:{...attente,etat:'capture'}});
+      }
+    }
+  }
   const forme = WREQ_FORME.test(path) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
@@ -2582,7 +2664,9 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null) {
     }catch{}
   }
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_wreq_${key}`, data }], 'id',scope.user_id);
-  if(data.contexteFavori&&String(await compteConnecte(domain))===String(uid))await archiveNotifications(uid,{domain,ownerAttendu:scope.user_id,creation:data});
+  let conserve=null;
+  if(data.contexteFavori&&String(await compteConnecte(domain))===String(uid))conserve=await archiveNotifications(uid,{domain,ownerAttendu:scope.user_id,creation:data});
+  if(ouvertureLiee)await stockageFavorisOnglets().set({[ouvertureLiee.cle]:{...ouvertureLiee.record,etat:conserve?'confirmee':'erreur',raison:conserve?'':!data.contexteFavori?'contexte_ou_format_incompatible':'enregistrement_non_confirme'}});
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -7333,6 +7417,7 @@ const ORIGINE_APP = { test: (src) => { try { return ORIGINES_APP.includes(new UR
 // supprime, rien d'arbitraire. Une LECTURE ne compte pas dans le plafond
 // horaire (elle n'engage rien) ; un geste, si.
 const EXEC_PERMIS = [
+  {methode:'POST',chemin:/^\/vrm\/favoris\/ouvrir$/,lecture:true,favorisOuvrir:true},
   {methode:'POST',chemin:/^\/vrm\/favoris\/lire$/,lecture:true,favorisListe:true},
   { methode: 'POST', chemin: /^\/vrm\/favoris$/ , favori: true }, // internal operation; never forwarded as a URL
   { methode: 'POST', chemin: /^\/api\/v2\/conversations\/\d+\/replies$/ },   // répondre à un message
@@ -7409,6 +7494,7 @@ async function executerPourApp(msg, sender) {
   const r = await avecVinted(async () => {
     arret = await gardeStricte(msg.uid, acc, { lecture: true });
     if (arret) return null;
+    if(permis.favorisOuvrir)return ouvrirFavoriNatif(msg.uid,acc,msg.body);
     if(permis.favorisListe)return lirePageFavoris(msg.uid,acc,msg.body);
     if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
     return methode === 'GET' ? vintedGet(acc, msg.endpoint) : vintedSend(acc, methode, msg.endpoint, msg.body);

@@ -45,7 +45,7 @@ export async function routeFavoris(req,res){
           parId.set(n.id,{...avant,...n});
         }
         const complete={...capture,payload:{...capture.payload,notifications:[...parId.values()]}};
-        const opts={uid,capture:complete,trace:lire(ids[1]),selection:c.selection,traces:archive?.creations||[]};let targets;
+        const opts={uid,capture:complete,trace:lire(ids[1]),selection:c.selection,traces:archive?.creations||[],lectures:archive?.lecturesLiees||[]};let targets;
         try{targets=resoudreCiblesFavoris(opts);}catch(e){
           if(e.code!=='favoris_preuve_absente')throw e;
           const conversations=await lirePreuvesConversationsFavoris(req,{owner,uid,capture:complete,selection:c.selection});
@@ -72,5 +72,5 @@ export async function routeFavoris(req,res){
     const r=await modifierNeutre(cle,decision);
     if(!r)throw new RefusFavoris('État non confirmé. Actualise la file : aucun nouvel envoi ne doit être lancé.',503);
     return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),serveur:maintenant});
-  }catch(e){return res.status(e instanceof RefusFavoris?e.status:503).json({message:e instanceof RefusFavoris?e.message:'La file n’a pas pu être confirmée. Actualise avant toute nouvelle action.'});}
+  }catch(e){return res.status(e instanceof RefusFavoris?e.status:503).json({message:e instanceof RefusFavoris?e.message:'La file n’a pas pu être confirmée. Actualise avant toute nouvelle action.',...(e instanceof RefusFavoris&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?{code:e.code,diagnostic:e.diagnostic}:{})});}
 }

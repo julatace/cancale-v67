@@ -65,7 +65,7 @@ const LIGNES = [
   { id: 'email_track_chronopost_XW476115185FR', data: TRACK },
   { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: ACHATS } } },
   { id: `harvest_${UID2}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: [] } } },
-  { id: `harvest_${UID}_notifications`, owner:'0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b', data:{uid:UID,type:'notifications',domain:'www.vinted.fr',payload:{notifications:[{id:'favori-banc-1',body:'Camille a ajouté ton article à ses favoris.',link:'/inbox/301',user_id:111,updated_at:new Date(MAINT).toISOString()}],pagination:{total_pages:2}}} },
+  { id: `harvest_${UID}_notifications`, owner:'0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b', data:{uid:UID,type:'notifications',domain:'www.vinted.fr',payload:{notifications:[{id:'favori-banc-1',body:'Camille a ajouté ton article à ses favoris.',link:'/items/101/conversation/new?native_target=201',user_id:701,updated_at:new Date(MAINT).toISOString()}],pagination:{total_pages:2}}} },
   { id: `harvest_${UID}_inbox`, data: { capturedAt: cap, payload: { conversations: [
     conv(301, 'margaux_lp', 'Super. Vous feriez 45 € ?', true, 5), conv(303, 'kevin.b', 'Merci, bien reçu, nickel !', false, 26),
     conv(305, 'sneakers_addict_du_35', 'Vous pouvez m’envoyer une photo de la semelle de près ?', true, 50),
@@ -107,11 +107,12 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
   let version = '5.216.0';
-  window.majExtensionFavoris=()=>{version='5.218.0';post({__vmr:'ready',version});};
+  window.majExtensionFavoris=()=>{version='5.220.0';post({__vmr:'ready',version});};
   const post = (m) => window.postMessage({id:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',...m}, '*');
   Object.defineProperty(window.chrome,'runtime',{configurable:true,value:{sendMessage:(id,m,cb)=>{
     if(id!=='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')return cb(null);
     if(m.type==='favorisEtat')return cb({ok:true,ext:id,version,code:version,vrm:{ok:true,connecte:true,email:'banc@vrm.test',user_id:'0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b'},vinted:{uid:'111',login:'julatace35260'},cmds:{}});
+    if(m.type==='favorisOuvrir'){window.favorisOuvertures=window.favorisOuvertures||[];window.favorisOuvertures.push(m);return cb({ok:true,status:200,data:{ouvert:true,preuve:'confirmee',version}});}
     if(m.type==='favorisExec'){window.favorisExec=window.favorisExec||[];window.favorisExec.push(m);return cb({ok:true,status:200,data:{resultat:'envoye'}});}
     cb(null);
   }}});
@@ -266,9 +267,17 @@ const capturer = async (pg, nom, vp) => {
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('alert').filter({hasText:'5.219'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.220'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>window.majExtensionFavoris());
+          await pg.getByRole('button',{name:'Ouvrir ce favori pour vérifier sur Vinted',exact:true}).click();
+          await pg.getByText('Lien enregistré',{exact:true}).waitFor();
+          dit(await pg.evaluate(()=>window.favorisOuvertures?.length===1&&window.favorisOuvertures[0].body.notificationId==='favori-banc-1'&&!('url' in window.favorisOuvertures[0].body)),`${T} le bouton vérifie le favori capté par son identifiant, sans URL libre`);
+          dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} vérifier le lien ne lance aucun message`);
+          await pg.evaluate(()=>window.dispatchEvent(new Event('focus')));
+          await pg.waitForFunction(()=>!document.querySelector('.vrm-favoris-check input:checked'));
+          await pg.getByRole('checkbox',{name:/Sélectionner Camille/}).check();
+
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
           await pg.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor().catch(async e=>{await pg.screenshot({path:path.join(SHOTS,'favoris-echec.png'),fullPage:true});console.log(await pg.locator('.vrm-favoris-liste').innerText());throw e;});
           dit(await pg.evaluate(()=>window.favorisExec?.length===1&&window.favorisExec[0].uid==='111'&&window.favorisExec[0].body.jeton==='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),`${T} le lancement passe une seule autorisation au pont du compte choisi`);

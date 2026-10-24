@@ -180,3 +180,5 @@
 .vrm-messages-sections button:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .vrm-favoris-compose h4{margin:0 0 10px;font-size:13px;}
 @media(max-width:767px){.vrm-messages-sections{width:100%;}.vrm-messages-sections button{flex:1;padding:8px 10px;font-size:12px;}}
+.vrm-favoris-rows .vrm-favoris-ouvrir{grid-column:4;grid-row:1;}
+@media(max-width:767px){.vrm-favoris-rows .vrm-favoris-ouvrir{width:44px;padding:0;}.vrm-favoris-ouvrir>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}}
