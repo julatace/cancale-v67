@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — favoris 5.221 :** correction du parcours « Page not found N°72 ».
+> Activation du lien exact déjà affiché dans les notifications Vinted, sans
+> chargement direct de la route interne ni message. Liste absente : refus expliqué.
+> Voir `docs/passation/2026-10-24-favoris-navigation-interne.md`.
+> Validation synthétique uniquement ; session réelle du vendeur à confirmer.
+
 > **24 octobre — favoris 5.220 :** corps des objets Request et URL désormais
 > captés ; hook MAIN au démarrage ; bouton de vérification lié à un onglet
 > avant redirection, reçu réel et contrôle copiable des échecs de lancement.
