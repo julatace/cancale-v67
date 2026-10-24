@@ -35,7 +35,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
 let RACINE = RACINE_DEPOT;
 if (MUT) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mentions-'));
-  for (const rel of ['api', 'public/legal', 'src/communaute', 'src/operations', 'package.json']) fs.cpSync(path.join(RACINE_DEPOT, rel), path.join(tmp, rel), { recursive: true });
+  for (const rel of ['api', 'public/legal', 'src/communaute', 'src/operations', 'src/favorisVinted.js', 'src/reglagesFavoris.js', 'package.json']) fs.cpSync(path.join(RACINE_DEPOT, rel), path.join(tmp, rel), { recursive: true });
   fs.symlinkSync(path.join(RACINE_DEPOT, 'node_modules'), path.join(tmp, 'node_modules'));
   const muter = (rel, avant, apres) => {
     const p = path.join(tmp, rel); const s = fs.readFileSync(p, 'utf8');
@@ -141,7 +141,7 @@ global.fetch = async (url, o = {}) => {
   // n'est jamais touché.
   await essaie('apostrophe', async () => {
     const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'mentions-apos-'));
-    for (const rel of ['api', 'public/legal', 'src/communaute', 'src/operations', 'package.json']) fs.cpSync(path.join(RACINE, rel), path.join(tmp2, rel), { recursive: true });
+    for (const rel of ['api', 'public/legal', 'src/communaute', 'src/operations', 'src/favorisVinted.js', 'src/reglagesFavoris.js', 'package.json']) fs.cpSync(path.join(RACINE, rel), path.join(tmp2, rel), { recursive: true });
     fs.symlinkSync(path.join(RACINE_DEPOT, 'node_modules'), path.join(tmp2, 'node_modules'));
     const pe = path.join(tmp2, 'public', 'legal', 'editeur.js');
     const src = fs.readFileSync(pe, 'utf8');

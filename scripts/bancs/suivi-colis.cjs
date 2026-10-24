@@ -343,7 +343,8 @@ async function revue24(b) {
     ['E2 pas connectée à VRM', { pont: { version: V, connecte: false } }, (r) => r && r.promesse !== '1' && !PROMESSE.test(r.t) && /Suivre le colis/.test(r.t), 'aucune promesse, le geste qui marche'],
     ['E3 code périmé', { pont: { version: V, perime: true } }, (r) => r && r.promesse !== '1' && !PROMESSE.test(r.t), 'aucune promesse'],
     ['E4 deux extensions', { pont: { version: V, deux: true } }, (r) => r && r.promesse !== '1' && !PROMESSE.test(r.t), 'aucune promesse'],
-    ['E5 la 5.214 de production', { pont: { version: '5.214.0' } }, (r) => r && r.etat === 'retard' && !PROMESSE.test(r.t) && /5\.215\.0/.test(r.t), '« en retard » : la 5.214.0 publiée n\'a pas capterSuivisAchats'],
+    ['E5 la 5.214 de production', { pont: { version: '5.214.0' } }, (r) => r && r.etat === 'retard' && !PROMESSE.test(r.t) && r.t.includes(V), '« en retard » : la 5.214.0 publiée n\'a pas capterSuivisAchats'],
+    ['E5b la 5.215 de production (favoris)', { pont: { version: '5.215.0' } }, (r) => r && r.etat === 'retard' && !PROMESSE.test(r.t) && r.t.includes(V), '« en retard » : la 5.215.0 publiée (messages aux favoris) n\'a pas capterSuivisAchats'],
   ];
   for (const [nom, o, ok, quoi] of E) {
     await essaie(nom, async () => {

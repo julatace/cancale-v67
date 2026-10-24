@@ -20,7 +20,7 @@ const racine=path.resolve(__dirname,'../..');
   return{ok:!window.erreur,json:async()=>[{owner:'owner-test',data:{uid:'123',domain:'www.vinted.fr',type:'notifications',payload:{notifications,pagination:{total_pages:4}}}}]};
  };
  Object.defineProperty(navigator,'clipboard',{value:{writeText:async x=>window.copie=x},configurable:true});
- window.afficher=(uid='123',owner='owner-test')=>root.render(<Favoris uid={uid} owner={owner} ownerActuel={()=>window.owner} base="https://base.invalid" headers={()=>({Authorization:'Bearer fixture'})} nomCompte="Compte de démonstration"/>);window.afficher();`},bundle:true,write:false,format:'iife',logLevel:'silent'});
+ window.afficher=(uid='123',owner='owner-test')=>root.render(<Favoris PhotoVinted={p=><img src={p.src} alt={p.alt} referrerPolicy="no-referrer"/>} uid={uid} owner={owner} ownerActuel={()=>window.owner} base="https://base.invalid" headers={()=>({Authorization:'Bearer fixture'})} nomCompte="Compte de démonstration"/>);window.afficher();`},bundle:true,write:false,format:'iife',logLevel:'silent'});
  const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});let n=0;
  const check=(ok,m)=>{assert.ok(ok,m);n++;};
  try{for(const largeur of [320,390,1512]){
