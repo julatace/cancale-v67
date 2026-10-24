@@ -11,7 +11,7 @@ function PhotoNotification({src, PhotoVinted}) {
 }
 
 
-export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension,recupererPage,PhotoVinted=null}) {
+export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCompte,executerFavori,favorisDisponible=false,favorisRaison='',verifierExtension,recupererPage,chargementAutomatique=false,PhotoVinted=null}) {
   const [etat,setEtat]=React.useState({}),[selection,setSelection]=React.useState([]),[message,setMessage]=React.useState(''),[retour,setRetour]=React.useState(''),[max,setMax]=React.useState(50);
   const [reduction,setReduction]=React.useState(''),[intervalle,setIntervalle]=React.useState('6'),[reglages,setReglages]=React.useState({});
   const [historique,setHistorique]=React.useState(null),[filtre,setFiltre]=React.useState('tous'),[recherche,setRecherche]=React.useState(''),[maintenant,setMaintenant]=React.useState(Date.now()),[importation,setImportation]=React.useState(false);
@@ -39,6 +39,8 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     catch(e){if(n===requete.current&&ownerActuel()===owner)setEtat({scope,erreur:e.message});}
     finally{if(n===requete.current)occupe.current=false;}
   };
+  const autoLu=React.useRef('');
+  React.useEffect(()=>{if(chargementAutomatique&&uid&&owner&&autoLu.current!==scope){autoLu.current=scope;charger();}},[chargementAutomatique,scope]);
   const lignes=data?.lignes||[],jobs=historique?.scope===scope?historique.vue.jobs:undefined;
   const statut=x=>contactFavori(x,jobs),bloque=x=>['envoye','ignore','incertain','verifie','reserve','attente'].includes(statut(x)?.etat);
   const filtrees=lignes.filter(x=>(filtre==='tous'||filtre==='envoyes'&&statut(x)?.etat==='envoye'||filtre==='contacter'&&!bloque(x))&&(!recherche.trim()||`${x.nom} ${x.body}`.toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr'))));
@@ -104,7 +106,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         {x.lien?<a href={x.lien} target="_blank" rel="noreferrer" aria-label="Ouvrir la notification sur Vinted"><span>Ouvrir sur Vinted</span><svg className="vrm-favoris-ouvrir-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>:<small>Lien indisponible</small>}
       </article>)}</div>
       {!visibles.length&&<p>Aucun favori ne correspond à ce filtre.</p>}{visibles.length<filtrees.length&&<button type="button" onClick={()=>setMax(x=>x+50)}>Afficher les suivants</button>}
-      {!!selection.length&&<div className="vrm-favoris-compose"><details className="vrm-favoris-parametres" open={!reglages.enregistres}><summary>{reglages.enregistres?'Réglages enregistrés · modifier':'Paramétrer ce compte'}</summary><label>Ton message<textarea maxLength={2000} rows={3} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Écris ton message personnalisé…"/></label>
+      {!!selection.length&&<div className="vrm-favoris-compose"><h4>Préparer le message · {selection.length} destinataire{selection.length>1?'s':''}</h4><details className="vrm-favoris-parametres" open={!reglages.enregistres}><summary>{reglages.enregistres?'Réglages enregistrés · modifier':'Paramétrer ce compte'}</summary><label>Ton message<textarea maxLength={2000} rows={3} value={message} onChange={e=>{setMessage(e.target.value);change();}} placeholder="Écris ton message personnalisé…"/></label>
         <div className="vrm-favoris-remise"><label>Réduction proposée (%)<input type="text" inputMode="numeric" maxLength={6} value={reduction} onChange={e=>{setReduction(e.target.value);change();}} placeholder="Facultative"/></label><div role="group" aria-label="Pourcentages de réduction">{[5,10,15,20].map(p=><button type="button" key={p} aria-pressed={apercu.pourcentage===p} onClick={()=>{setReduction(String(p));change();}}>−{p} %</button>)}{reduction&&<button type="button" onClick={()=>{setReduction('');change();}}>Sans réduction</button>}</div></div>
         <small>La remise est proposée dans le texte. Le prix de l’annonce reste inchangé et aucune offre de prix Vinted n’est créée.</small>
         {apercu.erreur&&<p role="alert">{apercu.erreur}</p>}
@@ -117,7 +119,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         <button type="button" disabled={!apercu.message||!!apercu.erreur} onClick={copier}>Copier le message</button></div>}
       </>}
     </>}
-    {uid&&owner&&executerFavori&&<AutomatisationFavoris key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/>}
+    {uid&&owner&&executerFavori&&<AutomatisationFavoris masquerSansSelection key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/>}
     {retour&&<p role="status">{retour}</p>}
   </section>;
 }
