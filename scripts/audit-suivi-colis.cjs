@@ -39,9 +39,9 @@ const MUTATIONS = {
   'retour-avant-arrivee': ['api/_lib/suivi-colis.js', "d == null || d >= arriveeMs)) reparti = true;", "d == null || true)) reparti = true;"],
   'chrono-mort': ['api/_lib/suivi-colis.js', 'tracking-no-cms/suivi-page', 'tracking-no-cdn/suivi-page'],
   'cp-devine': ['api/_lib/suivi-colis.js', "const cp = normaliserCodePostal(codePostal);", "const cp = normaliserCodePostal(codePostal) || '35260';"],
-  'cle-retire-commune': ['api/email-inbound.js', "  if (t.status === 'delivered') return `retire-${id}`;", ''],
+  'cle-retire-commune': ['api/email-inbound.js', "  if (t.status === 'delivered' && t.sens !== 'sortant') return `retire-${id}`;", ''],
   'notif-ailleurs-ignoree': ['api/email-inbound.js', 'if (!sortiAilleurs) try { await pushOnce({', 'try { await pushOnce({'],
-  'sujet-pas-range': ['api/email-inbound.js', "  if (!suivi) suivi = suiviDuSujet(mail.subject) || null;", ''],
+  'sujet-pas-range': ['api/email-inbound.js', "  if (!suivi) { suivi = suiviDuSujet(mail.subject) || null; suiviDuSujetSeul = !!suivi; }", ''],
   'rappel-sans-memo': ['api/ship-reminders.js', 'const nouveaux = liste.filter((x) => !envoyes[x.cle]);', 'const nouveaux = liste;'],
   'rappel-memo-passu': ['api/ship-reminders.js', "  const deja = await getRow('colis_retrait_dedup');\n  if (deja === undefined) return 'mémo illisible — rien envoyé';", "  const deja = await getRow('colis_retrait_dedup');"],
   'rappel-memo-non-ecrit': ['api/ship-reminders.js', "  if (!(await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';", "  await ecrireDedup('colis_retrait_dedup', { envoyes: memo, at: new Date(maintenant).toISOString() });"],
@@ -53,6 +53,19 @@ const MUTATIONS = {
   'achat-champs-morts': ['src/liensColis.js', "return [...new Set([t.suivi,...(Array.isArray(t.suivis)?t.suivis:[])]", "return [...new Set([achat?.tracking_code,achat?.shipment?.tracking_code,t.suivi,...(Array.isArray(t.suivis)?t.suivis:[])]"],
   'achat-autre-compte': ['src/liensColis.js', " if(t.uid&&uid&&String(t.uid)!==uid)return [];", ''],
   'index-par-transaction': ['src/liensColis.js', "return (uid&&index[uid+':'+tx])||index[tx]||null;", "return index[tx]||(uid&&index[uid+':'+tx])||null;"],
+  // ── revue du 23 oct. ──
+  'arrivee-a-venir-ignoree': ['api/_lib/etat-colis-email.js', "if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&", "if((FUTUR.test(t))&&"],
+  'sujet-preuve-arrivee': ['api/email-inbound.js', "if (track.status === 'available' && track.suiviDuSujetSeul && !track.code", "if (false && track.status === 'available' && track.suiviDuSujetSeul && !track.code"],
+  'cron-sans-relecture': ['api/_lib/suivi-colis.js', "  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => relireLigneMeta(l));", "  lignes = (Array.isArray(lignes) ? lignes : []).map((l) => ligneDeMeta(l));"],
+  'widget-sans-relecture': ['api/widget.js', "  const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);", "  const toutes = [...dispo0, ...partis0].filter(Boolean);"],
+  'cron-commande-ignoree': ['api/_lib/suivi-colis.js', "      if (f === undefined || f) continue;", ""],
+  'cron-relais-passu-envoie': ['api/ship-reminders.js', "  const relais = relaisRow === undefined ? null : objet(relaisRow);", "  const relais = objet(relaisRow);"],
+  'cron-commandes-ratees-envoient': ['api/ship-reminders.js', "    if (!Array.isArray(a) || !Array.isArray(e)) return 'lecture ratée — rien envoyé';\n    achats = a;", "    achats = Array.isArray(a) ? a : [];"],
+  'arrivee-heure-traitement': ['api/email-inbound.js', "const a = arriveLeAuRangement(prevLigne, subject, track.status, emailAt || now); return a ? { arriveLe: a } : {};", "const a = arriveLeAuRangement(prevLigne, subject, track.status, now); return a ? { arriveLe: a } : {};"],
+  'notif-arrivee-heure-traitement': ['api/email-inbound.js', "          const a = arriveLeAuRangement(prevLigne, subject, 'available', emailAt || now);", "          const a = arriveLeAuRangement(prevLigne, subject, 'available', now);"],
+  'retour-heure-traitement': ['api/_lib/suivi-colis.js', "    else e.retours.push(msDe(l.emailAt != null ? l.emailAt : l.ea) ?? msDe(l.receivedAt != null ? l.receivedAt : l.r));", "    else e.retours.push(msDe(l.receivedAt != null ? l.receivedAt : l.r));"],
+  'vente-retiree-cle-neuve': ['api/email-inbound.js', "  if (t.status === 'delivered' && t.sens !== 'sortant') return `retire-${id}`;", "  if (t.status === 'delivered') return `retire-${id}`;"],
+  'vente-bordereau-ignore': ['api/email-inbound.js', "          if ((Array.isArray(bordsK) && bordsK.length) || (Array.isArray(sortantsK) && sortantsK.length)) sensLigne = 'sortant';", ""],
 };
 const ARG_PROUVE = process.argv.find((x) => x.startsWith('--prouve'));
 if (ARG_PROUVE) {
@@ -415,6 +428,136 @@ function chargeApp(noms, injecte) {
     let c = {};
     try { const res = faireRes(); await w({ method: 'GET', headers: {}, query: {} }, res); c = res.corps || {}; } finally { Date.now = vraiNow; }
     dit(c.pickup === 1, 'widget : un « retiré » au n° du SUJET (autre clé) et un retiré NL (« info » relue) sortent du compte ; le colis toujours là reste', `pickup=${c.pickup} sortis=${c.pickupSortis}`);
+  });
+
+  // ══ 7. REVUE DU 23 OCTOBRE (n° 1, 2, 3, 4, 7) ══════════════════════════════
+  // Chaque défaut a été REPRODUIT par un relecteur sur la vraie route ; chaque
+  // contrôle ci-dessous est rouge sur 743585d (§6.1) et sous sa mutation.
+  const chrono = (sujet, corps, n, extra = {}) => ({ from: 'noreply@chronopost.fr', to: 'boite@banc.test', subject: sujet, text: corps, html: '', attachments: [], messageId: `<ch-${n}@banc>`, ...extra });
+  const vgo = (sujet, corps, n, extra = {}) => ({ from: 'noreply@vinted.fr', to: 'boite@banc.test', subject: sujet, text: corps, html: '', attachments: [], messageId: `<vg-${n}@banc>`, ...extra });
+  const lignesTrack = () => [...base.entries()].filter(([k]) => /\|email_track_/.test(k)).map(([k, d]) => ({ id: k.split('|')[1], ...d }));
+  await essaie('revue n° 1 — « Ton colis arrive aujourd\'hui ! #N » n\'est pas « à retirer »', async () => {
+    resetBase(); await oublis();
+    await recoit(vgo("Ton colis arrive aujourd'hui ! #1790000000000099", "Bonjour,\nBonne nouvelle : ton colis arrive aujourd'hui dans ta consigne Vinted Go.\nTu recevras ton code dès qu'il sera disponible.", 71));
+    const l1 = lignesTrack().find((l) => /1790000000000099$/.test(l.id));
+    dit(l1 && l1.status !== 'available' && l1.suivi === '1790000000000099' && !pushes.some((p) => /📍|point de retrait/.test(p.title || '')),
+      'le n° du sujet reste une IDENTITÉ (rangé) mais ne prouve pas l\'arrivée : la ligne n\'est pas « disponible », rien ne sonne « 📍 »', l1 ? `status=${l1.status} · push=${JSON.stringify(pushes.map((p) => p.title))}` : 'aucune ligne');
+    // L'annonce d'arrivée AVEC un lieu lu (le garde-fou du n° du sujet ne joue pas) : c'est la règle « arrive aujourd'hui » qui tranche.
+    resetBase(); await oublis();
+    await recoit(vgo("Ton colis arrive aujourd'hui ! #1790000000000098", "Bonjour,\nTon colis arrive aujourd'hui.\nPoint Relais\nBar Test\n5 Rue Exemple\n56000 Vannes", 72));
+    const l2 = lignesTrack().find((l) => /1790000000000098$/.test(l.id));
+    dit(l2 && l2.status === 'transit', '« arrive aujourd\'hui » (même avec un lieu) : l\'arrivée est ANNONCÉE ⇒ en route', l2 && `status=${l2.status}`);
+    // Le n° du SEUL sujet, un corps qui dit « disponible » mais ni code, ni QR, ni lieu : pas une preuve d'arrivée.
+    resetBase(); await oublis();
+    await recoit(vgo('Rappel : ton colis #1790000000000097', 'Bonjour,\nTon colis est disponible.', 73));
+    const l3 = lignesTrack().find((l) => /1790000000000097$/.test(l.id));
+    dit(l3 && l3.status === 'info' && !pushes.some((p) => /📍/.test(p.title || '')), 'n° lu dans le seul SUJET, sans code, ni QR, ni lieu ⇒ « info » (comme avant que ce n° soit lu)', l3 && `status=${l3.status}`);
+    // L'autre sens : le même n° du sujet AVEC un code ⇒ à retirer (la preuve est là).
+    resetBase(); await oublis();
+    await recoit(vgo('Libère de la place dans la consigne : récupère ton colis #1790000000000096', 'Bonjour,\nTon colis t\'attend.\nTon code de retrait est 482913', 74));
+    const l4 = lignesTrack().find((l) => /1790000000000096$/.test(l.id));
+    dit(l4 && l4.status === 'available', 'l\'autre sens : n° du sujet AVEC un code de retrait ⇒ disponible', l4 && `status=${l4.status}`);
+  });
+
+  await essaie('revue n° 2 — le cron, l\'app et le widget relisent la ligne de la MÊME façon', async () => {
+    const cron = (await importer('api/ship-reminders.js')).default;
+    const w = (await importer('api/widget.js')).default;
+    const T = Date.parse('2026-10-27T08:00:00Z');
+    resetBase(); await oublis();
+    base.set(`${A}|main`, { vrm_colis_collected: [], vrm_widget_token: '', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_sales_hidden: [], vinted_bords_hidden: {},
+      vrm_colis_retirer: { total: 0, aVerifier: 0, urgents: 0, finis: [], at: T - 6 * 86400000, colis: [], vus: [], vusTx: [] } });
+    // La forme MESURÉE des lignes Chronopost « Information sur votre colis » du 22-23 oct. (valeurs inventées).
+    const ligne = { type: 'suivi', carrier: 'chronopost', suivi: 'XW000000101FR', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: 'Information sur votre colis XW000000101FR',
+      receivedAt: '2026-10-22T09:58:23.030Z', code: null, code2: null, lieu: 'sera disponible dans les prochains jours dans votre Relais Pickup', limite: null, qrB64: null, qrUrl: null, consigne: false, account: '' };
+    base.set(`${A}|email_track_chronopost_XW000000101FR`, ligne);
+    const vraiNow = Date.now;
+    let wc = {};
+    try {
+      Date.now = () => T;
+      await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, faireRes());
+      // Le widget le lendemain de l'e-mail (dans la garde Chronopost : un colis
+      // vraiment arrivé y serait « à retirer ») — sinon le contrôle serait vacant.
+      Date.now = () => Date.parse('2026-10-23T12:00:00Z');
+      const res = faireRes(); await w({ method: 'GET', headers: {}, query: {} }, res); wc = res.corps || {};
+    } finally { Date.now = vraiNow; }
+    const retraitP = pushes.filter((p) => /^retrait-/.test(p.tag || ''));
+    const etat = await importer('api/_lib/etat-colis-email.js'), retrait = await importer('api/_lib/retrait-colis.js'), cr = await importer('api/_lib/code-retrait-email.js');
+    const app = chargeApp(['codeRetrait', 'reclassifyTrack'], { ...retrait, ...etat, ...cr, normaliserSuivi: etat.normaliserSuivi, relireLigneSuivi: S && S.relireLigneSuivi });
+    const rc = app.reclassifyTrack ? app.reclassifyTrack({ ...ligne }) : null;
+    dit(rc && rc.status === 'transit', 'app : « sera disponible dans les prochains jours », sans code ni QR ⇒ en transit', rc && rc.status);
+    dit(retraitP.length === 0, 'cron : AUCUN « Colis à vérifier — sans doute reparti… va le chercher » sur ce colis en route (le même verdict que l\'app)', JSON.stringify(retraitP.map((p) => p.title)));
+    dit(wc.pickup === 0, 'widget : ce colis arrivé APRÈS la photo de l\'app n\'est pas compté « à retirer » (le même verdict)', `pickup=${wc.pickup}`);
+  });
+
+  await essaie('revue n° 3 — « Dernier jour » : le cron lit lui-même la fin de l\'achat', async () => {
+    const cron = (await importer('api/ship-reminders.js')).default;
+    const T = Date.parse('2026-10-27T08:00:00Z');
+    const lancer3 = async ({ pub, statut = 'Commande finalisée', lien = 'code', pannesLire = [] } = {}) => {
+      resetBase(); await oublis();
+      base.set(`${A}|main`, { vrm_colis_collected: [], ...(pub ? { vrm_colis_retirer: pub } : {}) });
+      base.set(`${A}|email_track_mondialrelay_30000088`, { type: 'suivi', carrier: 'mondialrelay', suivi: '30000088', status: 'available', statusLabel: 'Arrivé au point de retrait', subject: 'Votre colis 30000088 est disponible 📦', receivedAt: '2026-10-22T08:00:00Z', arriveLe: '2026-10-22T08:00:00Z', code: '482913', lieu: 'Bar Test, 5 Rue Exemple, 56000 Vannes', limite: '2026-10-27' });
+      base.set(`${A}|panel_colis_relais`, lien === 'code' ? { '9900000001': { code: '482913', lieu: 'Bar Test', at: '2026-10-22T09:00:00Z' } } : {});
+      if (lien === 'suivi') base.set(`${A}|harvest_111_suivi_9900000001`, { v: 1, tx: '9900000001', suivi: '30000088', source: 'journey', capturedAt: '2026-10-25T08:00:00Z', etapes: [], dernier: null });
+      base.set(`${A}|harvest_111_orders_purchased`, { payload: { my_orders: [{ transaction_id: 9900000001, title: 'Nike', status: statut }] }, capturedAt: '2026-10-25T08:00:00Z' });
+      for (const p of pannesLire) pannes.add('lire:' + p);
+      const vraiNow = Date.now; Date.now = () => T;
+      try { await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, faireRes()); } finally { Date.now = vraiNow; }
+      return pushes.filter((p) => /^retrait-/.test(p.tag || '')).map((p) => p.title);
+    };
+    const a = await lancer3({ pub: null });
+    dit(a.length === 0, 'publication de l\'app ABSENTE, commande reliée par le CODE de retrait FINALISÉE ⇒ rien ne sonne', JSON.stringify(a));
+    const b = await lancer3({ pub: { finis: [], at: T - 4 * 86400000, total: 1 } });
+    dit(b.length === 0, 'publication vieille de 4 jours sans ce colis dans `finis` ⇒ rien (la commande dit finalisée)', JSON.stringify(b));
+    const c = await lancer3({ pub: null, lien: 'suivi' });
+    dit(c.length === 0, 'commande reliée par le N° DE SUIVI (ligne de suivi Vinted) finalisée ⇒ rien', JSON.stringify(c));
+    const d = await lancer3({ pub: null, statut: 'Colis déposé en point relais' });
+    dit(d.length === 1 && /Dernier jour/.test(d[0]), 'l\'autre sens : la commande reliée dit encore « au point relais » ⇒ « 📍 Dernier jour » part', JSON.stringify(d));
+    const e = await lancer3({ pub: null, pannesLire: ['id=eq.panel_colis_relais'] });
+    dit(e.length === 0, 'les codes lus dans les conversations illisibles ⇒ « pas su » ⇒ rien (jamais « pas fini »)', JSON.stringify(e));
+    const f = await lancer3({ pub: null, pannesLire: ['orders_purchased'] });
+    dit(f.length === 0, 'les commandes illisibles alors qu\'un colis est relié ⇒ rien', JSON.stringify(f));
+  });
+
+  await essaie('revue n° 4 — l\'ordre se juge sur la date de l\'e-mail, pas sur l\'heure du traitement', async () => {
+    resetBase(); await oublis();
+    const RealDate = Date; let t = RealDate.parse('2026-10-28T09:00:00Z');
+    global.Date = class extends RealDate { constructor(...a) { if (!a.length) super(t); else super(...a); } static now() { return t; } };
+    try {
+      await recoit({ from: 'shipping@relay.vinted.com', to: 'boite@banc.test', subject: "Ton colis 30000077 a été retourné à l'expéditeur", text: "Bonjour,\nTon colis 30000077 n'a pas été retiré à temps : il a été retourné à l'expéditeur.", html: '', attachments: [], messageId: '<r-77@banc>', sourceDate: '2026-10-27T08:00:00Z' });
+      t += 5000;
+      await recoit({ from: 'noreply@mondialrelay.fr', to: 'boite@banc.test', subject: 'Votre colis 30000077 est disponible 📦', text: "Bonjour,\nVotre colis 30000077 est disponible dans votre Point Relais.\nVotre code de retrait est 482913\nPoint Relais\nBar Test\n5 Rue Exemple\n56000 Vannes\nRETRAIT JUSQU'AU 30/10", html: '', attachments: [], messageId: '<d-77@banc>', sourceDate: '2026-10-20T08:00:00Z' });
+    } finally { global.Date = RealDate; }
+    const ls = lignesTrack();
+    const dispo = ls.find((l) => l.status === 'available');
+    const AR = await importer('api/_lib/arrivee-colis.js');
+    const ar = dispo ? AR.arriveeColisEmail(dispo) : null;
+    const sorti = dispo ? S.sortiParSuivi(dispo, S.finsDesLignes(ls), ar ? ar.ms : null) : null;
+    dit(sorti === 'reparti', 'un « reparti » TRAITÉ avant l\'e-mail d\'arrivée (rejeu du plus récent au plus ancien), mais ÉCRIT après elle ⇒ le colis est reparti', `arriveLe=${dispo && dispo.arriveLe} · sortiParSuivi=${sorti}`);
+    dit(!pushes.some((p) => /📍/.test(p.title || '')), 'et l\'arrivée traitée APRÈS ce retour ne sonne pas « 📍 »', JSON.stringify(pushes.map((p) => p.title)));
+    // Un retour ÉCRIT avant l'arrivée (un autre passage) mais traité après elle ne la fait pas sortir.
+    const fins = S.finsDesLignes([{ status: 'retour', suivi: '30000078', receivedAt: '2026-10-28T09:00:00Z', emailAt: '2026-10-18T08:00:00Z' }]);
+    dit(S.sortiParSuivis(['30000078'], fins, Date.parse('2026-10-22T08:00:00Z')) === null, 'un retour ÉCRIT avant l\'arrivée mais traité après elle ne compte pas (sa date d\'e-mail fait foi)');
+  });
+
+  await essaie('revue n° 7 — le « retiré » d\'un colis qu\'il a VENDU ne sonne pas « Colis livré » (Achats)', async () => {
+    resetBase(); await oublis();
+    base.set(`${A}|email_bord_99000123`, { type: 'bordereau', transaction: '99000123', suivi: 'XW123456789FR', receivedAt: '2026-10-20T08:00:00Z' });
+    await recoit(chrono('Confirmation du dépôt de votre colis', 'Bonjour,\nVotre colis XW123456789FR a bien été déposé.', 81));
+    await recoit(chrono('Votre colis a été retiré', 'Bonjour,\nVotre colis XW123456789FR a été retiré.', 82));
+    const livr = pushes.filter((p) => /livré|retiré/i.test(p.title || ''));
+    dit(!livr.some((p) => /\/\?tab=cat_achats/.test(p.url || '') || /^✅ Colis livré$/.test(p.title || '')), 'n° d\'un de SES bordereaux : pas de « ✅ Colis livré » qui ouvre Achats', JSON.stringify(pushes.map((p) => [p.title, p.tag, p.url])));
+    dit(pushes.length <= 1, 'pas de son en plus pour sa vente (la clé d\'avant)', JSON.stringify(pushes.map((p) => p.tag)));
+    const l = lignesTrack().find((x) => /XW123456789FR$/.test(x.id));
+    dit(l && l.sens === 'sortant', 'le sens « sortant » est RANGÉ sur la ligne (il ne l\'était jamais : 0 ligne sur 229)', l && `sens=${l.sens}`);
+    // Sans transit avant : s'il sonne, il dit ce que c'est.
+    resetBase(); await oublis();
+    base.set(`${A}|email_bord_99000124`, { type: 'bordereau', transaction: '99000124', suivi: 'XW123456780FR', receivedAt: '2026-10-20T08:00:00Z' });
+    await recoit(chrono('Votre colis a été retiré', 'Bonjour,\nVotre colis XW123456780FR a été retiré.', 83));
+    dit(pushes.every((p) => /vente/i.test(p.title || '') && /cat_ventes/.test(p.url || '')), 's\'il sonne, c\'est « Ta vente : colis retiré par l\'acheteur », vers Ventes', JSON.stringify(pushes.map((p) => [p.title, p.url])));
+    // L'autre sens : un ACHAT (aucun bordereau) retiré sonne toujours, une fois.
+    resetBase(); await oublis();
+    await recoit(chrono('Votre colis a été retiré', 'Bonjour,\nVotre colis XW123456781FR a été retiré.', 84));
+    dit(pushes.length === 1 && /✅/.test(pushes[0].title) && /cat_achats/.test(pushes[0].url || ''), 'l\'autre sens : un achat retiré sonne « ✅ », vers Achats', JSON.stringify(pushes.map((p) => [p.title, p.url])));
   });
 
   console.log(ko ? `\n❌ suivi des colis : ${ko} rouge(s)` : '\n✅ suivi des colis : tout est vert');

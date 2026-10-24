@@ -6,7 +6,7 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
-import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel} from '../api/_lib/suivi-colis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat} from '../api/_lib/suivi-colis.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import {qrMfa} from './qrMfa.js';
@@ -3335,35 +3335,15 @@ const TRACK_DELIVERED_RE = /livr[ée]|bien\s+re[çc]u|remis\s+(?:au\s+destinatai
 // et écrasait le statut), et le colis disparaissait de « à retirer » alors qu'il
 // était bien arrivé au point relais. On le rétablit ici depuis le SUJET.
 const TRACK_AVAILABLE_RE = /disponible|à\s*retirer|arriv[ée]\s+(?:dans|en|au)\s+point|pr[êe]t.*retrait|vous\s+attend/i;
-const reclassifyTrack = (d) => {
-  if(!d)return d;
-  // 22 oct. — le code de retrait « … suivant au commerçant : 123456 » d'une
-  // ligne DÉJÀ rangée (la route ne le lisait pas ; cette ligne ne sera jamais
-  // réécrite) : relu dans `extraitCode` avec la règle de la route (§11). Rien
-  // d'autre n'est deviné : sans la tournure exacte, le code reste vide.
-  if(!codeRetrait(d.code)&&d.extraitCode){const c=codeRetraitTournure(d.extraitCode);if(c)d={...d,code:c};}
-  // 23 oct. — même chose pour le LIEU : « POINT RELAIS® » faisait manquer
-  // l'en-tête, le nom et l'adresse restaient dans `extraitLieu` (« TABA'VAP |
-  // 29 Rue Hoche | 56000 Vannes | … »). Relu avec la règle de la route
-  // (api/_lib/retrait-colis.js, §11), seulement sous sa forme EXACTE.
-  if(!d.lieu&&d.extraitLieu){const l=lieuDepuisExtrait(d.extraitLieu);if(l)d={...d,lieu:l,lieuLuDansExtrait:true};}
-  // 23 oct. — et la DATE LIMITE, si une ligne gardée la porte (« RETRAIT
-  // JUSQU'AU 26/10 » : sans l'année, la route la manquait). Lue avec la même
-  // règle, l'année étant celle de l'e-mail gardé (`receivedAt`, celui dont
-  // viennent ces lignes). Sinon rien : « date limite inconnue », jamais inventée.
-  if(!d.limite&&(d.extraitCode||d.extraitLieu)){const lim=limiteRetraitDepuisTexte(`${d.extraitCode||''}\n${d.extraitLieu||''}`.replace(/\s*\|\s*/g,'\n'),d.receivedAt);if(lim)d={...d,limite:lim,limiteLueDansExtrait:true};}
-  // 23 oct. — « Information sur votre colis : il sera disponible dans les
-  // prochains jours dans votre Relais Pickup » était rangé « disponible », avec
-  // ce futur comme lieu (mesuré : 2 lignes Chronopost, une notification
-  // « à retirer » partie). Le texte gardé DIT que le colis n'est pas encore là :
-  // en route, sans lieu. Un code ou un QR, eux, prouveraient l'arrivée.
-  if(d.status==='available'&&d.lieu&&LIEU_AU_FUTUR.test(d.lieu)&&!codeRetrait(d.code)&&!d.qrB64&&!d.qrUrl)return {...d,status:'transit',statusLabel:'En transit',lieu:null};
-  const etat=etatColisDepuisTexte(d.subject||d.sujet||'',d.statusLabel||'');
-  if(etat==='retour'&&d.status!=='delivered')return {...d,status:'retour',statusLabel:'Reparti chez l’expéditeur'};
-  if(etat==='delivered')return {...d,status:'delivered',statusLabel:'Livré / retiré'};
-  if(etat==='available'&&d.status!=='delivered'&&normaliserSuivi(d.suivi))return {...d,status:'available',statusLabel:'Arrivé au point de retrait'};
-  return d;
-};
+// (revue du 23 oct., n° 2) LA RELECTURE D'UNE LIGNE VIT DANS LA RÈGLE PARTAGÉE
+// (api/_lib/suivi-colis.js, `relireLigneSuivi`) : le rappel du matin et le
+// widget relisent les MÊMES lignes de la même façon (§11). Elle disait « en
+// transit » ici et « à vérifier — va le chercher » au cron, sur le même colis.
+// Ce qu'elle fait : le code « … suivant au commerçant : 123456 », le lieu et la
+// date limite relus dans ce que la route a gardé ; une arrivée ANNONCÉE (lieu
+// au futur, « arrive aujourd'hui ») sans code ni QR ⇒ en route ; un retour ou un
+// retrait écrits dans le sujet ; un sujet « disponible » avec son n°.
+const reclassifyTrack = (d) => relireLigneSuivi(d);
 // ⚠️ LES EMAILS QUE L'APP N'A PAS SU LIRE (posé le 23 août 2026).
 // Le journal a montré un email arrivé à 06:36 avec expéditeur ET sujet vides,
 // classé « ignoré » — rien n'était gardé, donc impossible de savoir ce que
@@ -31553,18 +31533,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (finalisée, livrée, reçue) · `reparti` (non réclamée, remboursée, annulée) ·
   // null (rien de terminal). La transaction (TXN_ETATS) prime quand elle porte
   // un état terminal : 450 finalisée, ≥ 500 annulée, expédition « non réclamée ».
-  const finCommandeAchat = (o) => {
-    if (!o) return null;
-    const et = etatTxn(o.transaction_id);
-    if (et && /non\s+r[ée]clam/i.test(et.ss || '')) return 'reparti';
-    if (et && et.s >= 500 && et.s < 600) return 'reparti';
-    if (et && et.s === 450) return 'retire';
-    const st = String(o.status || '');
-    if (isAtRelayStatus(st)) return null;
-    if (/non\s+r[ée]clam|rembours|annul/i.test(st)) return 'reparti';
-    if (/finalis|termin|commande\s+livr|a\s+[ée]t[ée]\s+livr|re[çc]u\s+(?:sa|ta|la)\s+commande/i.test(st)) return 'retire';
-    return null;
-  };
+  // (revue du 23 oct., n° 3) La règle vit dans api/_lib/suivi-colis.js
+  // (`finDeCommandeAchat`) : le rappel du matin la lit aussi (§11).
+  const finCommandeAchat = (o) => (o ? finDeCommandeAchat({ statut: o.status, etat: etatTxn(o.transaction_id), auRelais: isAtRelayStatus(String(o.status || '')) }) : null);
   const pickupUnion = useMemo(() => {
     const maintenant = Date.now();
     // (23 oct.) LA fin d'un colis par son n° de suivi (retiré · reparti), toutes
@@ -31776,13 +31747,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const vusTx = [...new Set(vintedToPickup.map(o => String(o.transaction_id)))].slice(0, 300);
       // (23 oct.) + `finis` : les colis d'e-mail que l'app sait retirés ou
       // repartis (identité : n° de suivi) — le rappel du matin ne les annonce pas.
-      const finis = pickupUnion.finis || [];
+      // ⚠️ (revue du 23 oct., n° 3) Seulement quand ce qui RELIE un colis à sa
+      // commande est lu (les codes lus dans les conversations, `panel_colis_relais`,
+      // et les n° de suivi des achats) : avant, une liste vide passait pour
+      // « aucun fini ». Pas lu ⇒ `null` (« pas su ») — le cron juge alors lui-même.
+      const finisLus = colisRelaisLu && suivisVinted != null && Array.isArray(suivisManuels);
+      const finis = finisLus ? (pickupUnion.finis || []) : null;
       const v = { total: pickupUnion.total, prets: pickupUnion.prets, sansCode: pickupUnion.sansCode, aVerifier: pickupUnion.aVerifier.length, urgents: pickupUnion.urgents, colis, vus, vusTx, finis, at: Date.now() };
       const avant = load('vrm_colis_retirer', null);
       const memeChose = avant && avant.total === v.total && avant.prets === v.prets && avant.sansCode === v.sansCode
         && avant.aVerifier === v.aVerifier && avant.urgents === v.urgents && JSON.stringify(avant.colis || null) === JSON.stringify(colis)
         && JSON.stringify(avant.vus || null) === JSON.stringify(vus) && JSON.stringify(avant.vusTx || null) === JSON.stringify(vusTx)
-        && JSON.stringify(avant.finis || []) === JSON.stringify(finis);
+        && JSON.stringify(avant.finis === undefined ? null : avant.finis) === JSON.stringify(finis);
       if (!memeChose) {
         save('vrm_colis_retirer', v);
         // ⚠️ ET ON PRÉVIENT. Le centre de notifications lit cette ligne UNE
@@ -31815,7 +31791,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes)) save('vrm_codes_hors_ligne', { at: Date.now(), codes });
       }
     } catch (_) {}
-  }, [pickupUnion, tracking, buys.items]);
+  }, [pickupUnion, tracking, buys.items, colisRelaisLu, suivisVinted, suivisManuels]);
 
   // Même règle que `toShip` : un compte masqué ne fait pas disparaître un colis
   // à poster (seule une vente masquée à la main sort de la liste).

@@ -32,8 +32,10 @@ const MUTATIONS = {
   'annonce-sans-code-a-retirer': ['api/email-inbound.js', "  if (status === 'available' && !code && annonceArriveeFuture(all)) { status = 'transit'; label = 'En transit'; lieu = null; }", ''],
   'retour-cle-commune': ['api/email-inbound.js', "  if (t.status === 'retour') return `retour-${id}`;", ''],
   'retour-sans-statut': ['api/_lib/etat-colis-email.js', " if(phrases(texte).some(estUnRetour))return 'retour';", ''],
-  'app-limite-extrait': ['src/App.jsx', "if(!d.limite&&(d.extraitCode||d.extraitLieu)){", "if(false){"],
-  'app-annonce-a-retirer': ['src/App.jsx', "if(d.status==='available'&&d.lieu&&LIEU_AU_FUTUR.test(d.lieu)&&!codeRetrait(d.code)&&!d.qrB64&&!d.qrUrl)return", "if(false)return"],
+  // (revue du 23 oct., n° 2) La relecture des lignes vit dans la règle partagée
+  // (api/_lib/suivi-colis.js, `relireLigneSuivi`) : l'app, le cron et le widget.
+  'app-limite-extrait': ['api/_lib/suivi-colis.js', "if (!d.limite && (d.extraitCode || d.extraitLieu)) {", "if (false) {"],
+  'app-annonce-a-retirer': ['api/_lib/suivi-colis.js', "if (d.status === 'available' && d.lieu && LIEU_AU_FUTUR.test(d.lieu) && !preuve) return", "if (false) return"],
   // ── revue du 23 oct. ──
   'rappel-expire-present': ['api/_lib/etat-colis-email.js', "(?:est|a)\\s+(?:bien\\s+)?(?:depasse|expire|ecoule)", "(?:est\\s+|a\\s+)?(?:bien\\s+)?(?:depasse|expire|ecoule)"],
   'retour-sans-condition': ['api/_lib/etat-colis-email.js', "const estUnRetour=(ph)=>!CONDITION.test(ph)&&", "const estUnRetour=(ph)=>"],
@@ -243,9 +245,12 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
   await essaie('reclassifyTrack (lignes déjà rangées)', async () => {
     const EC = await importer('api/_lib/etat-colis-email.js');
     const CR = await importer('api/_lib/code-retrait-email.js');
+    // (revue du 23 oct., n° 2) La relecture vit dans la règle partagée : elle est
+    // donnée telle quelle (absente sur un arbre d'avant ⇒ l'ancienne règle de l'app).
+    let SC = {}; try { SC = await importer('api/_lib/suivi-colis.js'); } catch (_) { SC = {}; }
     const app = chargeApp(['codeRetrait', 'reclassifyTrack'], {
       codeRetraitTournure: CR.codeRetraitTournure, lieuDepuisExtrait: M.lieuDepuisExtrait, limiteRetraitDepuisTexte: M.limiteRetraitDepuisTexte,
-      LIEU_AU_FUTUR: M.LIEU_AU_FUTUR, etatColisDepuisTexte: EC.etatColisDepuisTexte, normaliserSuivi: EC.normaliserSuivi,
+      LIEU_AU_FUTUR: M.LIEU_AU_FUTUR, etatColisDepuisTexte: EC.etatColisDepuisTexte, normaliserSuivi: EC.normaliserSuivi, relireLigneSuivi: SC.relireLigneSuivi,
     });
     dit(typeof app.reclassifyTrack === 'function', 'la règle de relecture de l\'app se charge', app.__err_reclassifyTrack || app.__err_codeRetrait || '');
     // La forme RÉELLE du Mondial Relay du 21 octobre (lieu et date limite vides, l'extrait gardé).

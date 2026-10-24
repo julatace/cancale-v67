@@ -34,7 +34,7 @@ import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
-import { rappelsRetraitDuJour, texteRappelRetrait } from './_lib/suivi-colis.js';
+import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions } from './_lib/suivi-colis.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -283,21 +283,54 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   const deja = await getRow('colis_retrait_dedup');
   if (deja === undefined) return 'mémo illisible — rien envoyé';
   if (!(await pushCategorieActive('colis'))) return 'désactivé par le vendeur';
-  const sel = 'id,s:meta->>status,r:meta->>receivedAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,lab:meta->>statusLabel,lieu:meta->>lieu';
+  // (revue du 23 oct., n° 2) Les scalaires dont la règle partagée a besoin pour
+  // RELIRE une ligne comme l'app (code, QR, extraits gardés, date de l'e-mail).
   const [lignes, m, bords] = await Promise.all([
-    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(available,delivered,retour,info)&select=${sel}`)),
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(available,delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
     getRowProjete('main', MAIN_RETRAIT),
-    fetchPaginated(scoped('app_data?id=like.email_bord_*&select=suivi:data->>suivi')),
+    fetchPaginated(scoped('app_data?id=like.email_bord_*&select=suivi:meta->>suivi')),
   ]);
   if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords)) return 'lecture ratée — rien envoyé';
   const mm = objet(m);
   const pub = objet(mm.vrm_colis_retirer);
   const today = parisDate(0);
-  const liste = rappelsRetraitDuJour({
+  const entree = {
     lignes, collectes: Array.isArray(mm.vrm_colis_collected) ? mm.vrm_colis_collected : [],
     envoyes: bords.map((b) => b && b.suivi).filter(Boolean), finis: Array.isArray(pub.finis) ? pub.finis : [],
     maintenant, aujourdhui: today,
-  });
+  };
+  // (revue du 23 oct., n° 3) LA FIN D'UN ACHAT, LUE ICI — pas seulement dans la
+  // publication de l'app (`finis`) : absente (app pas ouverte depuis) ou plus
+  // ancienne qu'une capture des achats, « pas su » valait « pas fini », et
+  // « 📍 Dernier jour pour retirer » partait pour un colis déjà retiré. La
+  // commande d'un colis se trouve par IDENTITÉ (code de retrait, n° de suivi),
+  // sa fin par la règle de l'app (`finDeCommandeAchat`). Ces lectures ne partent
+  // que s'il y a un rappel à envoyer ; ratées ⇒ rien n'est envoyé.
+  const candidats = rappelsRetraitDuJour(entree);
+  if (!candidats.length) return { retrait: 'rien à dire', n: 0 };
+  const [relaisRow, suivisV, suivisM] = await Promise.all([
+    getRow('panel_colis_relais'),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi')),
+    fetchPaginated(scoped('app_data?id=like.colis_suivi_%25&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid')),
+  ]);
+  const liens = liensDesLignes(suivisV, suivisM);
+  const relais = relaisRow === undefined ? null : objet(relaisRow);
+  if (liens === null || relais === null) return 'lecture ratée — rien envoyé';
+  const txsPar = new Map();
+  for (const x of candidats) { const t = txDuColis({ suivi: x.suivi, code: x.code }, relais, liens); txsPar.set(x.suivi, t); }
+  const tousTx = [...new Set([...txsPar.values()].flatMap((t) => (t ? [...t] : [])))].filter((t) => /^\d{3,20}$/.test(t));
+  let achats = [], etats = new Map();
+  if (tousTx.length) {
+    const [a, e] = await Promise.all([
+      fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_purchased&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
+      fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${tousTx.join(',')})&select=tx:meta->>id,s:meta->>status,ss:meta->>ship_status_title`)),
+    ]);
+    if (!Array.isArray(a) || !Array.isArray(e)) return 'lecture ratée — rien envoyé';
+    achats = a;
+    for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
+  }
+  const liste = rappelsRetraitDuJour({ ...entree,
+    finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
   const envoyes = objet(deja && deja.envoyes);
   const nouveaux = liste.filter((x) => !envoyes[x.cle]);
   if (!nouveaux.length) return { retrait: 'rien à dire', n: 0 };

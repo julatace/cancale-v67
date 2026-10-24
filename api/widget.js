@@ -8,7 +8,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
-import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis } from './_lib/suivi-colis.js';
+import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META } from './_lib/suivi-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -318,13 +318,18 @@ const normSuivi = (v) => String(v || '').toUpperCase().replace(/[\s\u00a0-]+/g, 
 // AUSSI LU DANS LE SUJET (« … #1234567890123456 », api/_lib/suivi-colis.js, §11).
 // Les lignes « info » sont relues avec la règle d'aujourd'hui : « Uw pakket is
 // afgehaald door de ontvanger » était rangé « info » — c'est un retrait.
+// ⚠️ (revue du 23 oct., n° 2) Chaque ligne est RELUE avec la règle de l'app
+// (`relireLigneMeta`, api/_lib/suivi-colis.js) : « sera disponible dans les
+// prochains jours » ou « arrive aujourd'hui », sans code ni QR, est en route —
+// pas à retirer ; un sujet « disponible » d'une ligne « info » est à retirer.
 async function lireSuivisEmail() {
-  const sel = 'id,s:meta->>status,r:meta->>receivedAt,l:meta->>limite,a:meta->>arriveLe,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,lab:meta->>statusLabel';
-  const [dispo, partis] = await Promise.all([
-    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${sel}`)),
-    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour,info)&select=${sel}`)),
+  const [dispo0, partis0] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${SELECT_SUIVI_META}`)),
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
   ]);
-  return { dispo: Array.isArray(dispo) ? dispo : null, partis: Array.isArray(partis) ? partis.filter((x) => x && finDeLigne(x)) : null };
+  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null };
+  const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);
+  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)) };
 }
 const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant' });
 async function colisEmailDepuis(pub, retires, today, lu) {
