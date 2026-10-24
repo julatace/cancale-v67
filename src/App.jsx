@@ -138,20 +138,9 @@ const EXT_ATTENDUE = '5.218.0';
 //   · au doigt, un appui long (qui ouvre la sélection) suivi d'un doigt qui
 //     glisse en relâchant ;
 //   · une sélection encore active au moment de relâcher.
-// ⇒ La souris ne balaie que depuis un endroit SANS texte (`surDuTexte`) ; le
-//    doigt ne balaie que d'un geste rapide (`BALAYAGE_MAX_MS`), sans sélection.
+// ⇒ Aucun balayage à la souris : une sélection commencée dans une marge reste
+//    une sélection. Le doigt balaie d'un geste rapide, sans sélection.
 const BALAYAGE_MAX_MS = 600;
-function surDuTexte(x, y) {
-  try {
-    let noeud = null;
-    if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); noeud = r && r.startContainer; }
-    else if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); noeud = p && p.offsetNode; }
-    if (!noeud || noeud.nodeType !== 3 || !/\S/.test(noeud.nodeValue || '')) return false;
-    const rg = document.createRange(); rg.selectNodeContents(noeud);
-    for (const b of rg.getClientRects()) if (x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 2) return true;
-  } catch (_) {}
-  return false;
-}
 function selectionActive() {
   try { const s = window.getSelection(); return !!(s && !s.isCollapsed && String(s).trim()); } catch (_) { return false; }
 }
@@ -13222,7 +13211,7 @@ function etatExtensionFavoris(uid,mesure=null){
   if(__vmrPlusieurs)return {disponible:false,raison:textePlusieurs()};
   if(mesure&&(!e?.code||e.code!==e.version))return {disponible:false,raison:'Le code de l’extension ne correspond pas à sa version. Recharge-la dans Chrome.'};
   if(!mesure&&codePerime())return {disponible:false,raison:textePerime()};
-  if(!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
+  if(!mesure&&!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
   const version=e?.ok?String(e.version||''):vmrExtVersion();
   if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.218.`};
   if(e?.vrm?.connecte!==true||String(e.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
@@ -13242,7 +13231,10 @@ function FavorisConnectes(props){
     if(__vmrTour||__vmrPlusieurs)return {disponible:false,raison:__vmrPlusieurs?textePlusieurs():'La vérification des extensions est encore en cours.'};
     const id=__vmrPontUnique||__vmrEtat?.ext||__lier?.id||'';
     const mesurer=async()=>{
-      const direct=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);
+      let direct=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);
+      // A cold worker may time out or return an unknown auth state. Repeat only
+      // this read, never a send; all owner/version/account checks follow below.
+      if(!direct||direct.ok&&(!direct.vrm||direct.vrm.connecte==null))direct=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);
       if(direct?.ok&&direct.ext===id){transport.current={mode:'direct',id};directVu.current={etat:direct,at:Date.now()};__vmrExtReady=true;__vmrExtVersion=String(direct.version||'');if(direct.code===direct.version)__vmrPerimePont=null;return direct;}
       transport.current={mode:'pont',id};return vmrEtat(8000);
     };
@@ -37616,6 +37608,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const msgCompteActif = msgRelais ? String((msgRelaisVinted && msgRelaisVinted.uid) || '') : (compteConnecte && extSait('messagerie')==='ok' && !__vmrPlusieurs) ? String(compteConnecte) : '';
   const favorisUid = String(compteSel && compteSel!=='*' ? compteSel : msgCompteActif || '');
   const favorisCompte = accounts.find(a=>String(a.vinted_user_id)===favorisUid);
+  const [zoneMessages,setZoneMessages]=React.useState('conversations');
 
   const msgPeutAgir = msgRelais || (vmrExtPresent() && extSait('messagerie')==='ok' && !__vmrPlusieurs);
   const msgLectureSeule = (acc) => (msgRelais && !msgCompteActif) || (!!msgCompteActif && String((acc && acc.vinted_user_id) || '') !== msgCompteActif);
@@ -41263,9 +41256,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         <ScreenHead icon="chat" title="Messages" />
         <NoAcc/>
-        <FavorisConnectes key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
+          <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
+          <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>
+        </div>
+        <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
+        <FavorisConnectes chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         <DiagnosticFavoris key={'diag-favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()}/>
-        <div className="vrm-message-workspace"><div className="vrm-inbox-column">
+        </div>
+        <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
         {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
@@ -49967,8 +49966,8 @@ function AppCoeur() {
     if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
-  // Passer à l'onglet voisin. Partagé par le doigt, la souris et les flèches du
-  // clavier : une seule règle, sinon les trois finissent par diverger.
+  // Passer à l'onglet voisin au doigt ou avec les flèches du clavier.
+  // La souris conserve ses gestes de sélection, sans changer de plateforme.
   // ⚠️⚠️ (16 oct., Julien : « quand je publie sur eBay et que j'appuie sur
   //    n'importe quel bouton, des fois ça m'a publié sur Vestiaire Collective »).
   //    Mesuré : VRM n'a AUCUN code qui publie sur Vestiaire. C'était ce geste :
@@ -51379,54 +51378,7 @@ function AppCoeur() {
       slideTab(t.clientX-s.x, t.clientY-s.y, 70);
       }}
       onTouchCancel={()=>{ swipeStart.current=null; }}
-      // À LA SOURIS (ordinateur). Les événements tactiles ci-dessus ne sont
-      // JAMAIS émis par une souris : sur ordinateur, glisser ne faisait donc
-      // rien du tout. On écoute le pointeur, mais uniquement pour la souris —
-      // le tactile continue de passer par les gestes ci-dessus, qui marchent
-      // (un `pointerup` n'arrive pas toujours sur mobile : dès que la page se
-      // met à défiler, le navigateur envoie `pointercancel` à la place).
-      onPointerDown={e=>{
-      if(e.pointerType!=='mouse' || e.button!==0) return;
-      const t=e.target, tag=t&&t.tagName;
-      // Ne pas confondre avec une sélection de texte ou l'usage d'un champ.
-      if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable)) { swipeStart.current=null; return; }
-      let n=e.target, overlay=false;
-      while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
-      if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
-      // Appuyer sur un texte, c'est commencer à le sélectionner.
-      if(surDuTexte(e.clientX,e.clientY)){ swipeStart.current=null; return; }
-      swipeStart.current={x:e.clientX,y:e.clientY,souris:true,horiz:false};
-      }}
-      // À la souris : UNIQUEMENT le balayage HORIZONTAL entre onglets. Le
-      // défilement vertical reste celui du navigateur (molette + barre) —
-      // pas de « glisser-défiler » (Julien n'en veut pas). Dès que le geste part
-      // franchement de côté, on coupe la sélection de texte (sinon glisser
-      // surligne la page et la sélection restée en place casse les gestes
-      // suivants). Un geste vertical ou oblique sélectionne/défile normalement.
-      onPointerMove={e=>{
-      const s=swipeStart.current; if(!s||!s.souris) return;
-      if(s.horiz) return;
-      const dx=e.clientX-s.x, dy=e.clientY-s.y;
-      if(Math.abs(dx)>25 && Math.abs(dx)>Math.abs(dy)*1.5){
-      s.horiz=true;
-      try{ document.body.style.userSelect='none'; window.getSelection().removeAllRanges(); }catch(_){}
-      }
-      }}
-      onPointerUp={e=>{
-      const s=swipeStart.current;
-      if(!s||!s.souris||e.pointerType!=='mouse') return;
-      swipeStart.current=null;
-      try{ document.body.style.userSelect=''; }catch(_){}
-      // Un geste qui n'est jamais devenu horizontal, c'est une sélection/un clic.
-      if(!s.horiz) return;
-      // Seuil plus haut qu'au doigt : à la souris on bouge sans le vouloir.
-      slideTab(e.clientX-s.x, e.clientY-s.y, 110);
-      }}
-      // ⚠️ Seulement la SOURIS : au doigt, le navigateur envoie `pointercancel`
-      // dès qu'il prend la main sur le geste — remettre le départ à zéro ici
-      // tuait TOUT balayage au doigt sur Android (vu au banc, 17 oct.). Le doigt
-      // a ses propres événements (touchstart / touchend / touchcancel).
-      onPointerCancel={e=>{ if(e.pointerType!=='mouse') return; swipeStart.current=null; try{ document.body.style.userSelect=''; }catch(_){} }}>
+>
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>

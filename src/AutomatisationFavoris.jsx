@@ -1,6 +1,6 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat}){
+export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false}){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
   const courant=()=>vivant.current&&ownerActuel()===owner;
@@ -76,11 +76,12 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   const rangPhase=phase==='Enregistrement du résultat'?Object.keys(ETAPES_FAVORIS).length:Object.values(ETAPES_FAVORIS).indexOf(phase);
   const avancement=Math.min(p.total,p.termines+(p.encours&&rangPhase>=0?(rangPhase+1)/(Object.keys(ETAPES_FAVORIS).length+2):0));
   const raisons=[...new Set(p.jobs.filter(x=>['refuse','incertain'].includes(x.etat)).map(x=>RAISONS_FAVORIS[x.raison]).filter(Boolean))];
+  if(masquerSansSelection&&!selection.length&&!p.total&&!vue?.active&&!erreur)return null;
   return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
     <summary>Envoi automatique aux favoris</summary>
     <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
     <p>Garde cet écran ouvert et visible, avec l’extension 5.218 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
-    {!disponible&&<p>{raisonExtension||'L’extension n’est pas encore confirmée. Le bouton vérifie sa connexion avant de lancer.'}</p>}
+    {!disponible&&<p>{raisonExtension||'La connexion à l’extension sera vérifiée au lancement.'}</p>}
     {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">
       {!!p.total&&<><div className="vrm-favoris-progress-head" role="status"><strong>{p.termines} / {p.total} traités</strong><span>{p.envoyes} envoyé(s) · {p.ignores} ignoré(s)</span></div><progress aria-label="Traitement des favoris" aria-valuetext={`${p.termines} sur ${p.total} traités${phase?' · '+phase:''}`} value={avancement} max={p.total}/></>}

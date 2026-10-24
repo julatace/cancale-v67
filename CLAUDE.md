@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **24 octobre — sélection souris :** aucun balayage global à la souris :
+> sélectionner depuis une marge ne change plus de plateforme. Les favoris
+> privilégient une réponse Chrome fraîche sur un ancien battement de page ;
+> seul l’état peut être relu au réveil, jamais une commande d’envoi.
+> Voir `docs/passation/2026-10-24-selection-navigation-favoris.md`.
+
 > **24 octobre — favoris 5.218 :** archive privée cumulée avec révision atomique,
 > lecture paginée depuis une source native observée, dates relatives, filtres et
 > messages déjà envoyés confirmés. Chrome peut joindre directement l’extension
