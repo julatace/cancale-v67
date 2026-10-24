@@ -20,15 +20,18 @@ export function lienFavoriVinted(v,domain='www.vinted.fr') {
     return u.href;
   }catch{return null;}
 }
-export function formesLiensNotifications(payload) {
-  const formes=new Map(),segments=new Set(['inbox','member','items','conversations','new','offers','offer','create']);
-  const parametres=new Set(['conversation_id','conversation','item_id','receiver_id','recipient_id','user_id','transaction_id','id','type','offer_id','notification_id']);
+export function formesLiensNotifications(payload,uid=null) {
+  const formes=new Map(),segments=new Set(['inbox','member','items','conversations','conversation','messages','message','new','offers','offer','offer_request','offer_requests','suggested_price','suggested_prices','price_offer','price_offers','create']);
+  const parametres=new Set(['conversation_id','conversation','item_id','receiver_id','recipient_id','user_id','transaction_id','id','type','offer_id','notification_id','receiver','recipient','user','opposite_user_id','receiver_user_id','recipient_user_id','sender_id','seller_id','buyer_id','item','thread_id']);
   for(const n of (Array.isArray(payload?.notifications)?payload.notifications:[]).slice(0,100)){
     const lien=lienFavoriVinted(n?.link);if(!lien)continue;
     const u=new URL(lien),chemin='/'+u.pathname.split('/').filter(Boolean).map(s=>segments.has(s)?s:/^\d+$/.test(s)?'{identifiant}':'{segment}').join('/');
     const params=[...new Set([...u.searchParams.keys()].slice(0,30).map(k=>parametres.has(k)?k:'parametre_masque'))].sort();
     const mentionFavori=/favori|favourit/i.test(texte(n.body));
-    const forme={mentionFavori,chemin,parametres:params},cle=JSON.stringify(forme);
+    const user=typeof n.user_id==='string'&&/^\d{1,20}$/.test(n.user_id)?n.user_id:Number.isSafeInteger(n.user_id)&&n.user_id>0?String(n.user_id):null;
+    const userIdCorrespondAuCompte=user&&/^\d{1,20}$/.test(String(uid||''))?user===String(uid):null;
+    const parametresUserId=user?[...new Set([...u.searchParams.entries()].filter(([k,v])=>parametres.has(k)&&v===user).map(([k])=>k))].sort():[];
+    const forme={mentionFavori,chemin,parametres:params,userIdCorrespondAuCompte,parametresUserId},cle=JSON.stringify(forme);
     if(!formes.has(cle))formes.set(cle,{...forme,nombre:0});formes.get(cle).nombre++;
   }
   return {formes:[...formes.values()],echantillonLimite:Array.isArray(payload?.notifications)&&payload.notifications.length>100};
