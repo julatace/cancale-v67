@@ -65,6 +65,7 @@ const LIGNES = [
   { id: 'email_track_chronopost_XW476115185FR', data: TRACK },
   { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: ACHATS } } },
   { id: `harvest_${UID2}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: [] } } },
+  { id: `harvest_${UID}_notifications`, owner:'0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b', data:{uid:UID,type:'notifications',domain:'www.vinted.fr',payload:{notifications:[{id:'favori-banc-1',body:'Camille a ajouté ton article à ses favoris.',link:'/inbox/301',user_id:111,updated_at:new Date(MAINT).toISOString()}],pagination:{total_pages:2}}} },
   { id: `harvest_${UID}_inbox`, data: { capturedAt: cap, payload: { conversations: [
     conv(301, 'margaux_lp', 'Super. Vous feriez 45 € ?', true, 5), conv(303, 'kevin.b', 'Merci, bien reçu, nickel !', false, 26),
     conv(305, 'sneakers_addict_du_35', 'Vous pouvez m’envoyer une photo de la semelle de près ?', true, 50),
@@ -237,6 +238,15 @@ const capturer = async (pg, nom, vp) => {
         dit(l.deb <= 1, `${T} aucun débordement horizontal (liste)`, `${l.deb} px`);
         dit(l.nConvs === 5, `${T} les 5 conversations des deux comptes sont listées`, String(l.nConvs));
         if (tel) dit(!l.petits.length, `${T} aucune cible tactile < 44 px (liste)`, l.petits.slice(0, 8).join(' | '));
+        await pg.selectOption('#vrm-sel-compte', UID);
+        await pg.getByRole('button',{name:'Afficher les favoris',exact:true}).click();
+        await pg.locator('.vrm-favoris-rows article').first().waitFor();
+        dit(await pg.locator('.vrm-favoris-rows article').count()===1, `${T} la liste des favoris captés est raccordée au compte`);
+        await pg.locator('.vrm-favoris-rows input[type=checkbox]').check();
+        dit(await pg.getByRole('textbox',{name:'Ton message',exact:true}).count()===1, `${T} sélectionner un favori ouvre la préparation du message`);
+        await pg.locator('.vrm-favoris-liste').getByRole('button',{name:'Masquer',exact:true}).click();
+        dit(await pg.locator('.vrm-favoris-rows').count()===0, `${T} masquer la liste rend la place aux conversations`);
+        await pg.selectOption('#vrm-sel-compte', '*');
         await pg.click('[data-conv="301"]');
         await pg.waitForFunction(() => document.querySelector('.vrm-chat-panel [data-offre]'), null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(900);
