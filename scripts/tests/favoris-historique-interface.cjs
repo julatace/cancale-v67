@@ -21,6 +21,16 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check((await p.locator('time').innerText()).includes('7 h'),'native age displayed');
  await p.getByRole('button',{name:'Récupérer toutes les pages',exact:true}).click();await p.getByRole('status').filter({hasText:'Toutes les pages disponibles ont été récupérées.'}).waitFor();
  check(await p.locator('.vrm-favoris-rows article').count()===4,'all available pages merged without losing first page');
+
+ const boutonHaut=p.getByRole('button',{name:'Vérifier un favori',exact:true});
+ check(await boutonHaut.isVisible(),'la vérification porte un libellé visible même sur téléphone');
+ await boutonHaut.click();await p.waitForFunction(()=>typeof window.accuserOuverture==='function');
+ check(await p.evaluate(()=>window.ouvertures.length===1&&window.ouvertures[0]==='n2'&&window.envois===0),'le bouton vérifie uniquement le premier favori disponible sans message ni sélection nécessaire');
+ check(await p.getByRole('button',{name:'Vérification…',exact:true}).isDisabled(),'le bouton principal ne peut pas relancer une ouverture en cours');
+ await p.evaluate(()=>window.accuserOuverture({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}}));
+ const alerte=p.getByRole('alert').filter({hasText:'Vérification interrompue'});await alerte.waitFor();
+ check(await alerte.evaluate(e=>e.compareDocumentPosition(document.querySelector('.vrm-favoris-rows'))&Node.DOCUMENT_POSITION_FOLLOWING),'le refus apparaît avant la liste, sans devoir descendre jusqu’aux envois');
+ await p.evaluate(()=>{window.ouvertures=[];});
  const ouvrir=p.getByRole('button',{name:'Ouvrir ce favori pour vérifier sur Vinted · Camille 2',exact:true});await ouvrir.click();
  check(await ouvrir.isDisabled()&&await p.evaluate(()=>window.ouvertures.length===1),'une ouverture en cours ne peut pas partir deux fois');
  await p.evaluate(()=>window.accuserOuverture({ok:true,data:{ouvert:true,preuve:'confirmee'}}));await p.getByText('Lien enregistré',{exact:true}).waitFor();
@@ -45,7 +55,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check(!JSON.stringify(controle).includes('secret-prive')&&!JSON.stringify(controle).includes('987654321'),'les champs inconnus et valeurs hors limites ne sont pas copiés');
 
  await p.getByRole('searchbox',{name:'Rechercher un favori'}).fill('');
- await ouvrir.click();await p.evaluate(()=>window.accuserOuverture({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}}));
+ await p.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();await p.evaluate(()=>window.accuserOuverture({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}}));
  await p.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
  check(await p.getByRole('alert').filter({hasText:'Ouvre les notifications sur Vinted'}).count()===1,'un refus réel d’ouverture est affiché comme une erreur, pas un état discret');
  check(await p.getByText('Capture en attente',{exact:true}).count()===0,'une ouverture refusée ne reste pas affichée en attente');

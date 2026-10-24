@@ -1,5 +1,10 @@
 # VRM — dossier de passation
 
+> **24 octobre — vérification visible :** bouton texte « Vérifier un favori »
+> au-dessus de la liste, résultat et contrôle remontés avant celle-ci.
+> Aucun envoi ni nouvelle extension ; cause du refus client toujours inconnue.
+> Voir `docs/passation/2026-10-24-favoris-verification-visible.md`.
+
 > **24 octobre — refus ouverture favoris :** correctif côté site uniquement.
 > Le contrôle conserve la version mesurée et la catégorie de refus au lieu de
 > tout rendre « non confirmé » ; erreur visible et ancien contrôle effacé.
