@@ -45498,7 +45498,7 @@ function LeboncoinScreen() {
           {data.lbcJamaisLu && !data.postedCount && (
             <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
               Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> sur leboncoin.fr une fois, avec l'extension : je les lirai au passage.
-              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.
+              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand un article se vend sur Vinted.
             </div>
           )}
           {/* ⚠️ « Offre : Gratuit » s'affichait quand AUCUNE offre n'était connue
@@ -45531,7 +45531,7 @@ function LeboncoinScreen() {
             const pe = pauseEtat();
             return (
               <div data-lbc-pas-revues={data.pasRevues} style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-                {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours : je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quelle paire {data.pasRevues > 1 ? 'les' : 'la'} relier.{' '}
+                {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours : je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quel article {data.pasRevues > 1 ? 'les' : 'la'} relier.{' '}
                 {pe === 'absente'
                   ? <>Sur l'ordinateur où l'extension est installée, ouvre ta page profil Leboncoin (celle qui liste toutes tes annonces) : elle relira ta liste en entier.</>
                   : pe === 'retard'
@@ -45635,7 +45635,7 @@ function LeboncoinScreen() {
         {data.unlinked && data.unlinked.length > 0 && (
           <Card className="vrm-lbc-non-reliees">
             <Titre>{data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</Titre>
-            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Choisis la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quel article c'est. Choisis le bon article s'il est proposé, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
             {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions} cleRangement={u.id != null ? 'ad:' + u.id : ''}/>)}
             {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
@@ -45666,7 +45666,7 @@ function LeboncoinScreen() {
               fait ». On dit combien, et où c'est réglé. */}
           {data.vendues > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.vendues} paire{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendue{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'elles ne sont' : "elle n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
+              {data.vendues} article{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendu{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'ils ne sont' : "il n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
             </div>
           )}
           {/* ⚠️ Revue de la 5.167 : les annonces « à confirmer » (compte pas relu
@@ -45781,8 +45781,8 @@ function LeboncoinScreen() {
                     </div>
                   )}
                   {jm && <div className="vrm-apub-jumelle" data-apub-jumelle-texte="">{jm.posee
-                    ? <>Même photo que la <b>N°{jm.num}</b>, déjà sur Leboncoin : c'est la même paire, elle ne se publie pas deux fois.</>
-                    : <>Même photo que la <b>N°{jm.num}</b> : c'est sans doute la même paire sous deux N°. Publie la N°{jm.num} seulement.</>}</div>}
+                    ? <>Même photo que la <b>N°{jm.num}</b>, déjà sur Leboncoin : c'est le même article, il ne se publie pas deux fois.</>
+                    : <>Même photo que la <b>N°{jm.num}</b> : c'est sans doute le même article sous deux N°. Publie la N°{jm.num} seulement.</>}</div>}
                   <div className="vrm-apub-gestes">
                     {/* Le bouton dit les photos captées sur le total (11 octobre) —
                         une fois, là où on décide de publier (§7). */}
