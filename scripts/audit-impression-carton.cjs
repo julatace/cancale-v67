@@ -30,7 +30,9 @@ const code = [
     fiches = { a: { numero: '82', auto: true, numberedAt: PANNE, title: 'Vapor' }, b: { numero: '7', auto: true, numberedAt: '2026-10-10T08:00:00Z', title: 'Ancienne' } };
     demandes = []; reponse = false;
     dit((await f(['82'])) === false && demandes.length === 1, 'N°82 renuméroté pendant la panne : on DEMANDE, et « Annuler » n\'imprime pas', `${demandes.length} question(s)`);
-    dit(/82/.test(demandes[0] && demandes[0].title || '') && /mauvaise chaussure/.test(demandes[0] && demandes[0].desc || ''), 'la question nomme le numéro et le risque', JSON.stringify(demandes[0] && demandes[0].title));
+    // La RÈGLE, pas le mot : le risque « le mauvais part ». « chaussure » →
+    // « article » (prose de lancement) ; on tolère les deux, sinon cri au loup.
+    dit(/82/.test(demandes[0] && demandes[0].title || '') && /mauvais(?:e)? (?:article|chaussure)/.test(demandes[0] && demandes[0].desc || ''), 'la question nomme le numéro et le risque', JSON.stringify(demandes[0] && demandes[0].title));
     demandes = []; reponse = true;
     dit((await f(['82'])) === true, '« J\'ai vérifié, imprimer » laisse imprimer');
     demandes = [];
