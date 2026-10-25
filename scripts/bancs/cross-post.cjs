@@ -103,7 +103,7 @@ async function selecteurEbay(b, l, vp) {
   await pg.waitForTimeout(2500);
   try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); } catch (_) {}
   await pg.waitForTimeout(1500);
-  const btn = await pg.$('text=Vendre une paire sur eBay'); if (btn) await btn.click();
+  const btn = await pg.$('text=Vendre un article sur eBay'); if (btn) await btn.click();
   await pg.waitForFunction(() => document.querySelectorAll('[data-choix-paire]').length > 0, null, { timeout: 12000 }).catch(() => {});
   await pg.waitForTimeout(800);
   const v = await pg.evaluate(() => ({

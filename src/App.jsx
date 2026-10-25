@@ -16067,7 +16067,7 @@ function itemDeBrouillon(d) {
   const manquants = (cat.requis || []).filter((n) => !String(asp[n] || '').trim());
   if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
   const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
-  if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
+  if (!urls.length) return { err: 'Choisis un article — ses photos partent avec l\'annonce.' };
   if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
   // (19 oct., revue « argent ») « 1.250 » partait en 1,25 €, « 74 € » en NaN :
   // la MÊME lecture que toute saisie de montant (`montantSaisi`) — le serveur
@@ -16820,7 +16820,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // paire (marque/taille/état) ; l'IA a consigne de NE RIEN INVENTER (api/ai).
   const titreIA = async () => {
     const base = (pairSel ? pairSel.title : titre) || '';
-    if (!base.trim()) { setRes({ err: 'Choisis une paire (ou tape un titre) d\'abord.' }); return; }
+    if (!base.trim()) { setRes({ err: 'Choisis un article (ou tape un titre) d\'abord.' }); return; }
     setAiBusy(true); setAiWhy(''); setRes(null);
     try {
       const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
@@ -17035,20 +17035,20 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     const n = d.numero ? cleNum(d.numero) : '';
     if (!n) return null;
     const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(n) : null;
-    if (ou) return { k: 'vendue', t: `La paire N°${n} est déjà vendue sur ${ou} — rien ne sera publié.` };
-    if (!pairSel && d.pairId && vendusVinted && typeof vendusVinted.has === 'function' && vendusVinted.has(String(d.pairId))) return { k: 'vendue', t: `La paire N°${n} est vendue sur Vinted — rien ne sera publié.` };
-    if (!ventes || ventes.enCours) return { k: 'en-cours', t: `Je vérifie encore que la paire N°${n} n'est pas déjà vendue (Vinted, eBay, Leboncoin)…` };
-    if (Array.isArray(ventes.pasSu) && ventes.pasSu.length) return { k: 'pas-su', t: `Je n'ai pas pu vérifier ${ventes.pasSu.length === 1 ? ventes.pasSu[0] : ventes.pasSu.slice(0, -1).join(', ') + ' ni ' + ventes.pasSu[ventes.pasSu.length - 1]} : je ne publie pas une paire qui est peut-être déjà vendue. Rouvre l'écran dans un moment.` };
+    if (ou) return { k: 'vendue', t: `L'article N°${n} est déjà vendu sur ${ou} — rien ne sera publié.` };
+    if (!pairSel && d.pairId && vendusVinted && typeof vendusVinted.has === 'function' && vendusVinted.has(String(d.pairId))) return { k: 'vendue', t: `L'article N°${n} est vendu sur Vinted — rien ne sera publié.` };
+    if (!ventes || ventes.enCours) return { k: 'en-cours', t: `Je vérifie encore que l'article N°${n} n'est pas déjà vendu (Vinted, eBay, Leboncoin)…` };
+    if (Array.isArray(ventes.pasSu) && ventes.pasSu.length) return { k: 'pas-su', t: `Je n'ai pas pu vérifier ${ventes.pasSu.length === 1 ? ventes.pasSu[0] : ventes.pasSu.slice(0, -1).join(', ') + ' ni ' + ventes.pasSu[ventes.pasSu.length - 1]} : je ne publie pas un article qui est peut-être déjà vendu. Rouvre l'écran dans un moment.` };
     const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(n) : null;
     if (deja) {
       const t = deja.debut && Number.isFinite(Date.parse(deja.debut)) ? ` (${quandParisTexte(Date.parse(deja.debut))})` : '';
       return deja.etat === 'programmee'
-        ? { k: 'deja-programmee', t: `La paire N°${n} est déjà programmée sur eBay${t} — une paire, une annonce : rien ne sera publié. Si tu as annulé sa programmation sur eBay, « Relire chez eBay » plus bas, puis recommence.` }
-        : { k: 'deja-en-ligne', t: deja.via ? `Cette paire est déjà en vente sur eBay sous la N°${deja.via} (même photo que la N°${n}) — une paire, une annonce : rien ne sera publié.` : `La paire N°${n} est déjà en vente sur eBay — une paire, une annonce : rien ne sera publié.` };
+        ? { k: 'deja-programmee', t: `L'article N°${n} est déjà programmé sur eBay${t} — un article, une annonce : rien ne sera publié. Si tu as annulé sa programmation sur eBay, « Relire chez eBay » plus bas, puis recommence.` }
+        : { k: 'deja-en-ligne', t: deja.via ? `Cet article est déjà en vente sur eBay sous la N°${deja.via} (même photo que la N°${n}) — un article, une annonce : rien ne sera publié.` : `L'article N°${n} est déjà en vente sur eBay — un article, une annonce : rien ne sera publié.` };
     }
     if (!pairSel) {
-      if (enLigne && typeof enLigne.has === 'function') return { k: 'plus-en-vente', t: `La paire N°${n} n'est plus en vente sur Vinted — rien ne sera publié. Si tu l'as encore, remets-la en ligne sur Vinted, puis reviens.` };
-      return { k: 'pas-su', t: `Je n'ai pas pu vérifier que la paire N°${n} est encore en vente sur Vinted — rouvre l'écran dans un moment.` };
+      if (enLigne && typeof enLigne.has === 'function') return { k: 'plus-en-vente', t: `L'article N°${n} n'est plus en vente sur Vinted — rien ne sera publié. Si tu l'as encore, remets-le en ligne sur Vinted, puis reviens.` };
+      return { k: 'pas-su', t: `Je n'ai pas pu vérifier que l'article N°${n} est encore en vente sur Vinted — rouvre l'écran dans un moment.` };
     }
     return null;
   };
@@ -17065,12 +17065,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       let achatP;
       try { if (pairSel) achatP = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatP = undefined; }
       const lignes = [
-        `« ${titre || 'cette paire'} » sera mise en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus ${OFFRE_VEND_LA_PAIRE}.`,
+        `« ${titre || 'cet article'} » sera mis en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus ${OFFRE_VEND_LA_PAIRE}.`,
         offre.refuse != null && `Toute offre sous ${eurEbay(offre.refuse)} sera refusée par eBay.`,
-        !b.item.numero && 'Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. Choisis la paire d\'abord.',
+        !b.item.numero && 'Cette annonce n\'est reliée à aucun article : si eBay la vend, VRM ne saura pas quel article retirer de Vinted. Choisis l\'article d\'abord.',
         typeof achatP === 'number' && offre.accepte < achatP && `C'est sous ton prix d'achat (${eurEbay(achatP)}), avant frais eBay.`,
         offre.sousMoitie && `C'est ${Math.round(offre.accepte / prixP * 100)} % du prix de l'annonce — tu l'as confirmé.`,
-        b.item.numero && plusieursPub && `VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
+        b.item.numero && plusieursPub && `VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
       ].filter(Boolean);
       const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
       if (!ok) return;
@@ -17078,7 +17078,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
         title: `Publier sur ton compte eBay « ${nomComptePub} » ?`,
-        desc: `« ${titre || 'cette paire'} » sera mise en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`,
+        desc: `« ${titre || 'cet article'} » sera mis en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`,
         ok: 'Oui, publier', cancel: 'Annuler',
       });
       if (!ok) return;
@@ -17120,7 +17120,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
     <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      <Icon name="tag" size={17}/> Vendre une paire sur eBay
+      <Icon name="tag" size={17}/> Vendre un article sur eBay
     </button>
   );
   return (
@@ -17143,8 +17143,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
               sur Vinted → retire-la d'eBay » le jour où elle part ailleurs. */}
           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>{res.sku
-            ? <>Reliée à la paire par la référence <b style={{ color: C.text }}>{res.sku}</b> : si elle se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
-            : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
+            ? <>Reliée à l'article par la référence <b style={{ color: C.text }}>{res.sku}</b> : s'il se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
+            : <>Pas reliée à un article : relie-la depuis sa carte dans Annonces.</>}</div>
           {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} data-publie-offre-issue={res.offreIssue || ''} style={{ fontSize: 12.5, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
           {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
@@ -17183,15 +17183,15 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
           {/* 1 — LA PAIRE : on CHOISIT une paire (comme sur eBay on choisit son
               objet), ses photos partent toutes seules — plus aucun lien à coller. */}
-          <BlocEbay n="1" titre="La paire à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
+          <BlocEbay n="1" titre="L'article à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
             {(!pairSel || pickerOpen) ? (
               paires.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée n'est encore chargée sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes paires — avec leurs photos — apparaîtront ici.</div>
+                <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté n'est encore chargé sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes articles — avec leurs photos — apparaîtront ici.</div>
               ) : (<>
                 <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
-                  {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
-                  {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Une paire porte deux N° (même photo sur deux fiches) : elle n\'est proposée qu\'une fois.' : `${nJumellesMasquees} paires portent deux N° (même photo sur deux fiches) : chacune n'est proposée qu'une fois.`}</div>}
+                  {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucun article ne correspond.</div>}
+                  {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Un article porte deux N° (même photo sur deux fiches) : il n\'est proposé qu\'une fois.' : `${nJumellesMasquees} articles portent deux N° (même photo sur deux fiches) : chacun n'est proposé qu'une fois.`}</div>}
                   {listePaires.slice(0, 120).map(p => (
                     <button key={p.id} type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flexShrink: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
@@ -17200,7 +17200,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
                         <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
                           const jm = jumelles.get(String(p.id));
-                          return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même paire que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
+                          return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même article que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
                     </button>
                   ))}
@@ -17223,7 +17223,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cette paire n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens."}</div>
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cet article n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens."}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
@@ -17317,7 +17317,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <div><label style={lab}>Accepter les offres dès (€) — facultatif</label><input value={offreA} onChange={e => { setOffreA(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-accepte="1" style={inp} /></div>
                 <div><label style={lab}>Refuser les offres sous (€) — facultatif</label><input value={offreR} onChange={e => { setOffreR(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-refuse="1" style={inp} /></div>
               </div>
-              {offreA.trim() && vOffre && vOffre.ok && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>eBay acceptera seul toute offre de ce montant ou plus : la paire sera vendue à ce prix.</div>}
+              {offreA.trim() && vOffre && vOffre.ok && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>eBay acceptera seul toute offre de ce montant ou plus : l'article sera vendu à ce prix.</div>}
               {vOffre && !vOffre.ok && <div data-publier-offre-erreur="1" style={{ fontSize: 12, color: C.warn, marginTop: 6, lineHeight: 1.45 }}>{vOffre.err}</div>}
               {offreTropBas && (
                 <label data-publier-offre-sous-moitie="1" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.warn, marginTop: 8, lineHeight: 1.4, cursor: 'pointer' }}>
@@ -18048,13 +18048,13 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     // « n125 » (l'écriture de ses titres) vaut 125, comme sur Leboncoin.
     const c = cleNum(brut);
     const n = (numsConnus && numsConnus.has(c)) ? c : c.replace(/^N[°O]?(?=\d)/, '');
-    if (!NUM_OK.test(n)) { dire('Tape le numéro de la paire (125, ou B125).'); return; }
-    if (numsConnus && !numsConnus.has(n)) { dire(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
-    if (pris && pris.has(n) && pris.get(n) !== String(it.itemId)) { dire(`La paire N°${n} est déjà reliée à une autre annonce eBay : une paire, une annonce.`); return; }
+    if (!NUM_OK.test(n)) { dire('Tape le numéro de l\'article (125, ou B125).'); return; }
+    if (numsConnus && !numsConnus.has(n)) { dire(`Aucun article ne porte le N°${n} dans VRM.`); return; }
+    if (pris && pris.has(n) && pris.get(n) !== String(it.itemId)) { dire(`L'article N°${n} est déjà relié à une autre annonce eBay : un article, une annonce.`); return; }
     const tp = (titreDeNum && titreDeNum.get(n)) || '';
     const ok = await askConfirm({
-      title: `Relier cette annonce eBay à la paire N°${n} ?`,
-      desc: `eBay : « ${it.title || it.itemId} »\nVRM : ${tp ? `« ${tp} »` : `paire N°${n}`}${numero && numero !== n ? `\nAujourd'hui : reliée à la N°${numero}.` : ''}\n\nVRM écrit la référence VRM-${n} dans l'étiquette personnalisée (SKU) de l'annonce eBay. Tu pourras la changer.`,
+      title: `Relier cette annonce eBay à l'article N°${n} ?`,
+      desc: `eBay : « ${it.title || it.itemId} »\nVRM : ${tp ? `« ${tp} »` : `article N°${n}`}${numero && numero !== n ? `\nAujourd'hui : reliée à la N°${numero}.` : ''}\n\nVRM écrit la référence VRM-${n} dans l'étiquette personnalisée (SKU) de l'annonce eBay. Tu pourras la changer.`,
       ok: 'Oui, relier', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -18062,7 +18062,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sku', itemId: it.itemId, numero: n, ...corpsCompteEbay(it._compte) }) });
       const j = await r.json().catch(() => ({}));
-      if (j && j.ok) { try { const fs = fichesPourEbay(); const ids = Object.keys(fs).filter((k) => fs[k] && cleNum(fs[k].numero) === cleNum(n)); if (ids.length === 1) noterLienEbay(it.itemId, ids[0], n, 'main'); } catch (_) {} dire(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
+      if (j && j.ok) { try { const fs = fichesPourEbay(); const ids = Object.keys(fs).filter((k) => fs[k] && cleNum(fs[k].numero) === cleNum(n)); if (ids.length === 1) noterLienEbay(it.itemId, ids[0], n, 'main'); } catch (_) {} dire(`✓ Reliée à l'article N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
       else dire((j && j.error) || 'eBay a refusé la référence — rien n\'a changé.');
     } catch (_) { dire('Liaison impossible (réseau) — rien n\'a changé.'); }
     setGeste('');
@@ -18074,7 +18074,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     const prix = prixRemise != null ? eurE(prixRemise) : '';
     const ok = await askConfirm({
       title: `Envoyer une offre à −${remiseN} % ?`,
-      desc: `Les personnes qui suivent « ${it.title || it.itemId} » sur eBay${obs ? ` (${obs})` : ''} recevront une offre${prix ? ` à ${prix}` : ''}, valable 48 h. C'est eBay qui les choisit : VRM ne voit pas qui elles sont.\n\nSi l'une d'elles accepte, la paire est vendue à ce prix.`,
+      desc: `Les personnes qui suivent « ${it.title || it.itemId} » sur eBay${obs ? ` (${obs})` : ''} recevront une offre${prix ? ` à ${prix}` : ''}, valable 48 h. C'est eBay qui les choisit : VRM ne voit pas qui elles sont.\n\nSi l'une d'elles accepte, l'article est vendu à ce prix.`,
       ok: 'Oui, envoyer', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -18213,7 +18213,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       else if (refuseCle === null && refuseLu != null) lignes.push(`Le refus sous ${eurEbay(refuseLu)} sera retiré.`);
       if (et && et.etat !== 'pas-su' && et.offresActives === false) lignes.push('Les offres seront activées sur cette annonce : les acheteurs pourront t\'en faire.');
       else if (!et || et.etat === 'pas-su' || et.offresActives == null) lignes.push('Les offres seront activées si elles ne le sont pas déjà.');
-      if (!numero) lignes.push('Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. « Relier à une paire » d\'abord.');
+      if (!numero) lignes.push('Cette annonce n\'est reliée à aucun article : si eBay la vend, VRM ne saura pas quel article retirer de Vinted. « Relier à un article » d\'abord.');
       if (sousAchat) lignes.push(`C'est sous ton prix d'achat (${eurEbay(achat)}), avant frais eBay.`);
       if (tropBas) lignes.push(`C'est ${pctSaisi} % du prix de l'annonce — tu l'as confirmé.`);
       if (et && et.offresFaites > 0) lignes.push(texteOffresDejaFaites(1, 1));
@@ -18344,7 +18344,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           pour le reste (modifier, détails). Avant : deux ou trois boutons
           pleine hauteur empilés par carte. ── */}
       <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
-      {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à une paire</button>}
+      {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à un article</button>}
       {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
       {/* ── (9 octobre) LA RÈGLE D'OFFRE : une ligne, ou une porte. Trois
           états — « pas su » n'affiche AUCUN montant et ne dit pas « aucune ».
@@ -18388,7 +18388,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         <div data-regle-panneau={it.itemId} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
-            {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Une offre égale ou supérieure au montant ci-dessous est acceptée par eBay sans te demander : la paire est vendue à ce prix. En dessous, l'offre t'arrive sur eBay.
+            {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Une offre égale ou supérieure au montant ci-dessous est acceptée par eBay sans te demander : l'article est vendu à ce prix. En dessous, l'offre t'arrive sur eBay.
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
               ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, mais pas si les offres y sont activées. En enregistrant, VRM les active.`}</span>
               : (et.etat === 'pas-su' ? ' Règle actuelle : pas encore lue chez eBay — si elle existe, rien ne sera remplacé sans te le redemander.' : '')}
@@ -18421,10 +18421,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       )}
       {relierOuvert && (
         <div data-relier-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
-          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quelle paire est en vente dans cette annonce ? C'est toi qui choisis : VRM ne la devine pas d'après le titre.</div>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quel article est en vente dans cette annonce ? C'est toi qui choisis : VRM ne le devine pas d'après le titre.</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: choix.length ? 2 : 0 }}>
             <input value={numSaisi} onChange={(e) => setNumSaisi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(numSaisi); }} data-relier-num={it.itemId}
-              inputMode={clavierNum()} placeholder="N° de la paire" aria-label="N° de la paire" style={{ ...inpE, width: 140 }} />
+              inputMode={clavierNum()} placeholder="N° de l'article" aria-label="N° de l'article" style={{ ...inpE, width: 140 }} />
             <button type="button" data-relier-valider={it.itemId} disabled={!!geste || !numSaisi.trim()} onClick={() => relier(numSaisi)} style={{ ...btnE, opacity: (geste || !numSaisi.trim()) ? 0.5 : 1 }}>{geste === 'relier' ? 'Envoi…' : 'Relier'}</button>
           </div>
           {choix.map((p) => (
@@ -18441,7 +18441,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       )}
       {offreOuverte && eligible === true && (
         <div data-offre-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
-          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>eBay envoie l'offre aux personnes qui suivent l'annonce, valable 48 h. Si l'une accepte, la paire est vendue à ce prix.</div>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>eBay envoie l'offre aux personnes qui suivent l'annonce, valable 48 h. Si l'une accepte, l'article est vendu à ce prix.</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <label style={{ fontSize: 11.5, color: E.muted }}>Remise %<br /><input value={remise} onChange={(e) => setRemise(e.target.value)} inputMode="numeric" data-offre-remise={it.itemId} style={{ ...inpE, width: 76 }} /></label>
             <div style={{ fontSize: 12.5, color: E.muted, paddingBottom: 10 }}>soit <b data-offre-prix={prixRemise != null ? prixRemise.toFixed(2) : ''} style={{ color: E.text, fontSize: 15 }}>{prixRemise != null ? eurE(prixRemise) : '—'}</b>{isFinite(prixBase) && prixBase > 0 ? <> au lieu de {eurE(prixBase)}</> : null}</div>
@@ -18449,7 +18449,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {!remiseOk && <div style={{ fontSize: 11.5, color: E.warn, marginTop: 6 }}>Entre 5 et 50 %, un nombre entier.</div>}
           {/* (9 octobre) La règle d'offre ne joue pas sur une offre qu'il ENVOIE. */}
           {et && et.etat === 'connue' && prixRemise != null && prixRemise < et.accepte && (
-            <div data-offre-sous-regle={it.itemId} style={{ fontSize: 11.5, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>C'est sous ta règle d'offre ({eurEbay(et.accepte)}) : si l'une accepte, la paire part à {eurEbay(prixRemise)}.</div>
+            <div data-offre-sous-regle={it.itemId} style={{ fontSize: 11.5, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>C'est sous ta règle d'offre ({eurEbay(et.accepte)}) : si l'une accepte, l'article part à {eurEbay(prixRemise)}.</div>
           )}
           <textarea value={mot} onChange={(e) => setMot(e.target.value)} maxLength={2000} rows={2} placeholder="Message (facultatif)" data-offre-message={it.itemId}
             style={{ ...inpE, width: '100%', marginTop: 9, resize: 'vertical', lineHeight: 1.45 }} />
@@ -18701,7 +18701,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     // Une paire, une annonce — AUSSI à l'intérieur du lot : deux brouillons du
     // même N° partiraient avec deux identifiants d'envoi (le 488 d'eBay ne
     // protège pas). Le premier part, les suivants sont écartés et c'est dit.
-    if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon de la même paire est déjà dans ce lot' };
+    if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon du même article est déjà dans ce lot' };
     dansLeLot.add(sku);
     return { d, item: b.item, sku };
   }); }, [brouillons, skusEnLigne, progParSku, vendusPartout, dejaSurEbay]);
@@ -18791,7 +18791,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
       desc: `De ${quand(premiere)} à ${quand(derniere)} (heure de Paris, ± 15 min : c'est eBay qui arrondit).`
         + `\nFrais annoncés par eBay : ${eurEbay(lot.reduce((s, x) => s + x.v.fees, 0))}${progConnues.length ? ` (dont programmation ${eurEbay(totalProg)})` : ''}${progPayante ? ' — facturés à la création, non remboursés si tu annules.' : '.'}`
         + (progPasSu ? `\nFrais de programmation pas annoncés par eBay pour ${progPasSu} annonce${progPasSu > 1 ? 's' : ''}.` : '')
-        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si une paire se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`
+        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si un article se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`
         + texteOffres,
       ok: 'Oui, programmer', cancel: 'Annuler',
     });
@@ -19015,7 +19015,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
         {besoinCompris && pretes.length > 0 && (
           <label data-planif-risque="1" style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 12.5, color: E.text, lineHeight: 1.5, background: `${E.warn}14`, border: `1px solid ${E.warn}`, borderRadius: 10, padding: '10px 12px', marginBottom: 10, cursor: 'pointer' }}>
             <input type="checkbox" data-planif-compris="1" checked={compris} onChange={(e) => setCompris(e.target.checked)} style={{ width: 20, height: 20, flexShrink: 0, marginTop: 1, accentColor: E.accent }} />
-            <span>Avant ta première programmation : <b>l'annulation d'une annonce programmée par VRM n'est pas garantie</b> — il faudra peut-être l'annuler sur eBay. Et une paire <b>vendue ailleurs avant son heure</b> peut quand même partir sur eBay (VRM te le dira, mais ne peut pas promettre de l'arrêter). J'ai compris.</span>
+            <span>Avant ta première programmation : <b>l'annulation d'une annonce programmée par VRM n'est pas garantie</b> — il faudra peut-être l'annuler sur eBay. Et un article <b>vendu ailleurs avant son heure</b> peut quand même partir sur eBay (VRM te le dira, mais ne peut pas promettre de l'arrêter). J'ai compris.</span>
           </label>
         )}
         {envoi && !envoi.bilan && <div style={{ fontSize: 12.5, color: E.muted, marginBottom: 8 }}>Envoi à eBay : {envoi.en} sur {envoi.total}…</div>}
@@ -19401,7 +19401,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis : elles ont pu changer sur eBay. La remise en vente se fait sur eBay.`}</div>}
       {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours · la remise en vente se fait sur eBay.</div>}
       {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
-      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces paires sont vendues` : 'une de ces paires est vendue'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
+      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
       {rendues}
       {!voirTout && lignes.length > INACTIVES_PAGE && (
         <button type="button" data-inactives-plus="1" onClick={() => setVoirTout(true)}
@@ -19515,7 +19515,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
       const plusBas = cents(seuil) < cents(e.accepte);
       return { ...base, statut: 'remplace', cochable: true, defaut: !plusBas, plusBas, note: `remplace ${eurEbay(e.accepte)}${plusBas ? ' — plus bas' : ''}` };
     }
-    return { ...base, statut: 'nouvelle', cochable: true, defaut: !!numero, note: numero ? '' : 'sans paire reliée' };
+    return { ...base, statut: 'nouvelle', cochable: true, defaut: !!numero, note: numero ? '' : 'sans article relié' };
   });
   const coche = (l) => l.cochable && (choix.has(l.cle) ? choix.get(l.cle) : l.defaut);
   const selection = lignes.filter(coche);
@@ -19545,7 +19545,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
       o > 0 && `${o} où les offres seront activées si elles ne le sont pas déjà.`,
       sA > 0 && `${sA} sous ton prix d'achat (avant frais eBay).`,
       pA > 0 && `${pA} sans prix d'achat saisi.`,
-      r > 0 && `${r} sans paire reliée : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted.`,
+      r > 0 && `${r} sans article relié : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted.`,
       texteOffresDejaFaites(f, n),
       parCompte.size > 1 && `Sur tes comptes ${[...parCompte.entries()].map(([ref, c]) => `${nomRef(ref)} (${c})`).join(', ')}.`,
       'VRM les règle une par une et te dit le résultat de chacune.',
@@ -19824,7 +19824,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const basculerRetraitAuto = async () => {
     if (retraitAuto) { setRetraitAuto(false); save('vrm_ebay_retrait_auto', false); return; }
     const ok = await askConfirm({
-      title: 'Retirer d\'eBay, sans te demander, une paire vendue sur Vinted ?',
+      title: 'Retirer d\'eBay, sans te demander, un article vendu sur Vinted ?',
       desc: `Seulement quand tout est sûr : ${CONDITIONS_RETRAIT_AUTO}. Sinon, rien ne part : elle reste dans « à retirer », avec le bouton, et VRM te dit pourquoi. Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.`,
       ok: 'Allumer', cancel: 'Annuler',
     });
@@ -20108,7 +20108,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const id = String(it.itemId);
     if (dv.aRetirerEbay.some((d) => String(d.annonce && d.annonce.itemId) === id)) return { k: 'vendue', t: 'Vendue sur Vinted : retire-la d\'eBay plutôt que d\'y poser une règle d\'offre.' };
     const ou = ventesConnues.vendus.get(n);
-    if (ou) return { k: 'vendue', t: `Déjà vendue sur ${ou} : pas de règle d'offre sur une paire partie.` };
+    if (ou) return { k: 'vendue', t: `Déjà vendu sur ${ou} : pas de règle d'offre sur un article parti.` };
     if (surDeuxComptes.some((d) => d.numero === n)) return { k: 'deux-comptes', t: 'En vente sur deux de tes comptes eBay : retire l\'une des deux annonces d\'abord.' };
     if (ventesConnues.enCours || vendusVinted === undefined) return { k: 'en-cours' };
     if (ventesConnues.pasSu.length || vendusVinted === null) return { k: 'pas-su' };
@@ -20242,7 +20242,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const a = d.annonce;
     const ok = await askConfirm({
       title: `Retirer « ${a.title || a.itemId} » d'eBay ?`,
-      desc: `La paire N°${d.numero} est vendue sur Vinted. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
+      desc: `L'article N°${d.numero} est vendu sur Vinted. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
       ok: 'Oui, retirer d\'eBay', cancel: 'Annuler', danger: true,
     });
     if (!ok) return;
@@ -20285,7 +20285,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         enLigne={enLigne} vendusVinted={vendusVinted} ventes={ventesConnues}
         comptesPub={comptesPub} compteDefaut={compteDefautPub} onCompte={choisirComptePub} />
     : connected === false
-      ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre une paire en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
+      ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre un article en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
       : null; // en cours / pas su : on ne dit rien plutôt qu'une fausse invite
   // ── 3 bis. BROUILLONS · PLANIFICATEUR · PROGRAMMÉES (5 octobre) ────────────
   const brouillonsChoisis = planif && brouillons && typeof brouillons === 'object' ? planif.map((id) => brouillons[id]).filter(Boolean) : [];
@@ -20371,12 +20371,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const alertes = (<>
     {vueSeule && alertesAilleurs > 0 && (
       <div data-ebay-alertes-ailleurs={alertesAilleurs} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
-        ⚠️ {alertesAilleurs} paire{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay (vendue{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmée{alertesAilleurs > 1 ? 's' : ''}) — choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'la'} voir.
+        ⚠️ {alertesAilleurs} article{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay (vendu{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmé{alertesAilleurs > 1 ? 's' : ''}) — choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'le'} voir.
       </div>
     )}
     {deuxComptesVue.length > 0 && (
       <div data-ebay-deux-comptes={deuxComptesVue.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</Pourquoi></div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} article{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux personnes pourraient l'acheter, et tu n'en as qu'un. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</Pourquoi></div>
         {deuxComptesVue.map((d) => (
           <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
@@ -20391,7 +20391,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         ligne à l'heure dite si personne ne l'arrête. Identité par SKU (§5). */}
     {dvVue.aAnnulerEbay.length > 0 && (
       <div data-ebay-a-annuler={dvVue.aAnnulerEbay.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} paire{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendue{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmée{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} article{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendu{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmé{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
         <Pourquoi>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</Pourquoi>
         {dvVue.aAnnulerEbay.map((d) => {
           const id = String(d.annonce.itemId); const etat = annulations[id]; const t = Date.parse(d.annonce.debut || '');
@@ -20510,7 +20510,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const effets = [
     (relieesEbay || progReliees) && vendusVinted === null && 'je ne peux pas te dire si une paire en vente ou programmée ici est déjà partie sur Vinted',
     ventesKO.length > 0 && `je ne peux pas te dire quelles ventes en cours ${ventesKO.length > 1 ? 'de ces comptes' : 'de ce compte'} ne sont pas encore reliées à leur annonce`,
-    lbcPasSu && 'je ne peux pas te dire si une paire programmée ici est déjà vendue sur Leboncoin',
+    lbcPasSu && 'je ne peux pas te dire si un article programmé ici est déjà vendu sur Leboncoin',
     (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si une paire vendue ici est encore en vente sur Vinted',
   ].filter(Boolean);
   const ligneComptesIllisibles = illisiblesAnnonces.filter((c) => dansVue({ _compte: c.ref })).length > 0 && (
@@ -20834,7 +20834,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux paires : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à un article</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand l'article se vend sur Vinted. « Relier à un article » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux articles : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
       </div>
     )}
       {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
@@ -44581,12 +44581,12 @@ const comptesBloquesVinted = () => { try { const l = load('vinted_accounts_block
 // concluait que la fonction était cassée). En français, sans jargon (§2.7).
 // Les conditions, dites avec les MÊMES bornes que la règle (§5 : la phrase qui
 // explique vient de la même source) — pour la confirmation ET la ligne d'état.
-const CONDITIONS_RETRAIT_AUTO = `la vente Vinted est confirmée par ta liste de ventes relue depuis moins de ${LISTE_VENTES_FRAICHE_MS / 3600000} h (ni remboursée, ni annulée, jamais revenue chez toi, et pas sur un compte que Vinted a bloqué), l'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n'est porté que par une seule paire, et l'annonce eBay a été mise en ligne AVANT la vente`;
+const CONDITIONS_RETRAIT_AUTO = `la vente Vinted est confirmée par ta liste de ventes relue depuis moins de ${LISTE_VENTES_FRAICHE_MS / 3600000} h (ni remboursée, ni annulée, jamais revenue chez toi, et pas sur un compte que Vinted a bloqué), l'annonce eBay porte le N° de l'article (SKU VRM-n°), ce N° n'est porté que par un seul article, et l'annonce eBay a été mise en ligne AVANT la vente`;
 const RAISON_RETRAIT_AUTO = {
   'pas-su': 'je n\'ai pas pu tout vérifier (une annonce ou une vente Vinted pas lue)',
-  'sku': 'le N° de son annonce eBay ne correspond pas à la paire',
-  'numero-partage': 'ce N° est porté par plusieurs paires dans VRM',
-  'revenue-une-fois': 'cette paire est déjà revenue une fois (remboursée ou retournée)',
+  'sku': 'le N° de son annonce eBay ne correspond pas à l\'article',
+  'numero-partage': 'ce N° est porté par plusieurs articles dans VRM',
+  'revenue-une-fois': 'cet article est déjà revenu une fois (remboursé ou retourné)',
   'vente-non-confirmee': 'la vente n\'est pas encore confirmée par ta liste de ventes Vinted',
   'compte-bloque': 'la vente est sur un compte que Vinted a bloqué',
   'liste-perimee': 'ta liste de ventes de ce compte n\'a pas été relue depuis plus de 48 h',

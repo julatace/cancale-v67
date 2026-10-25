@@ -456,12 +456,12 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         await pg.click('[data-relier-valider="110000000002"]');
         await pg.waitForTimeout(300);
         let info = await pg.$eval('[data-ebay-info="110000000002"]', (x) => x.textContent).catch(() => '');
-        dit(/Aucune paire/.test(info) && !envois.some((x) => x.action === 'sku'), 'un N° que VRM ne connaît pas est refusé, rien n\'est envoyé', info);
+        dit(/Aucun article/.test(info) && !envois.some((x) => x.action === 'sku'), 'un N° que VRM ne connaît pas est refusé, rien n\'est envoyé', info);
         await pg.fill('[data-relier-num="110000000002"]', '23');
         await pg.click('[data-relier-valider="110000000002"]');
         await pg.waitForTimeout(300);
         info = await pg.$eval('[data-ebay-info="110000000002"]', (x) => x.textContent).catch(() => '');
-        dit(/déjà reliée/.test(info) && !envois.some((x) => x.action === 'sku'), 'un N° déjà porté par une autre annonce eBay est refusé (une paire, une annonce)', info);
+        dit(/déjà relié/.test(info) && !envois.some((x) => x.action === 'sku'), 'un N° déjà porté par une autre annonce eBay est refusé (un article, une annonce)', info);
         await pg.fill('[data-relier-num="110000000002"]', '21');
         await pg.click('[data-relier-valider="110000000002"]');
         await feuille(pg).getByRole('button', { name: 'Oui, relier' }).click({ timeout: 20000 });

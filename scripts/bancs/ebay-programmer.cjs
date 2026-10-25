@@ -512,7 +512,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         dit(/N°23 \(déjà vendue sur Leboncoin\)/.test(exclues), 'N°23, vendue sur Leboncoin (reliée par son annonce, réf VRM-23) : écartée');
         dit(/N°24 \(déjà vendue sur Vinted\)/.test(exclues), 'N°24, revendue sur Vinted sous une AUTRE annonce du même N° : écartée');
         dit(/N°26 \(déjà vendue sur Vinted\)/.test(exclues), 'N°26, vendue sur Vinted, brouillon SANS pairId : écartée');
-        dit(/N°25 \(un autre brouillon de la même paire/.test(exclues) && lignes.filter((x) => /^b-25/.test(x)).length === 1, 'deux brouillons de la N°25 (« 25 » et « 025 ») : UN dans le lot, l\'autre écarté avec sa raison', JSON.stringify(lignes));
+        dit(/N°25 \(un autre brouillon du même article/.test(exclues) && lignes.filter((x) => /^b-25/.test(x)).length === 1, 'deux brouillons de la N°25 (« 25 » et « 025 ») : UN dans le lot, l\'autre écarté avec sa raison', JSON.stringify(lignes));
         dit(/N°27 \(déjà en vente sur eBay\)/.test(exclues), 'N°27 en vente sur eBay sous « vrm-027 » : reconnue (forme canonique du SKU)');
         dit(/N°28 \(déjà programmée sur eBay/.test(exclues), 'N°28 programmée sur eBay sous « VRM 028 » : reconnue');
         dit(lignes.includes('b-21'), 'N°21 : une ancienne annonce vendue, mais la paire est REVENUE (une autre annonce en vente, pas vendue) ⇒ elle part', JSON.stringify(lignes));
@@ -624,7 +624,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         await pg.click('[data-brouillon-modifier="b-26"]');
         await pg.waitForFunction(() => { const e = document.querySelector('[data-publier-brouillon-id]'); return e && e.getAttribute('data-publier-brouillon-id') === 'b-26'; }, null, { timeout: 8000 });
         r = await essayerPublier();
-        dit(r.g.k === 'vendue' && /vendue sur Vinted/.test(r.g.t) && publies().length === 0, 'un brouillon rouvert d\'une paire VENDUE sur Vinted ne part pas', `${r.g.k} · ${r.g.t.trim().slice(0, 90)} · ${publies().length} publish`);
+        dit(r.g.k === 'vendue' && /vendu sur Vinted/.test(r.g.t) && publies().length === 0, 'un brouillon rouvert d\'un article VENDU sur Vinted ne part pas', `${r.g.k} · ${r.g.t.trim().slice(0, 90)} · ${publies().length} publish`);
         await pg.click('[data-brouillon-modifier="b-24"]');
         await pg.waitForFunction(() => { const e = document.querySelector('[data-publier-brouillon-id]'); return e && e.getAttribute('data-publier-brouillon-id') === 'b-24'; }, null, { timeout: 8000 });
         r = await essayerPublier();

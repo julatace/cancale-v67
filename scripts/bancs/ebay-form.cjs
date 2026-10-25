@@ -97,22 +97,22 @@ const envoisEbay = []; let avertir = false;
   const introuvables = [];
   for (const nom of ['Ventes', 'Annonces', 'Messages', 'Offres', 'Compte']) {
     try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) { introuvables.push(nom); }
-    parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre une paire sur eBay')).length,
+    parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }
   const total = Object.values(parOnglet).reduce((a, x) => a + x.vendre, 0);
   dit(!introuvables.length, 'le banc trouve chaque sous-onglet eBay', introuvables.join(', '));
-  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre une paire en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
+  dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
   dit(parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
   try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
-  const openBtn = await pg.$('text=Vendre une paire sur eBay');
-  dit(!!openBtn, 'le bouton d\'ouverture dit « Vendre une paire sur eBay »');
+  const openBtn = await pg.$('text=Vendre un article sur eBay');
+  dit(!!openBtn, 'le bouton d\'ouverture dit « Vendre un article sur eBay »');
   if (openBtn) await openBtn.click();
   await pg.waitForTimeout(400);
   let txt = await T();
-  dit(/La paire à vendre/i.test(txt), 'le formulaire s\'ouvre sur « La paire à vendre » (on choisit, on ne colle pas)');
+  dit(/L'article à vendre/i.test(txt), 'le formulaire s\'ouvre sur « L\'article à vendre » (on choisit, on ne colle pas)');
 
   // ⚠️ Plus AUCUN champ « colle le lien » : c'était la demande de Julien.
   const linkInput = await pg.$('input[placeholder*="Colle le lien"]');
