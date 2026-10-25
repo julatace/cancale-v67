@@ -1,5 +1,10 @@
 # VRM — dossier de passation
 
+> **25 octobre — favoris 5.224 :** contrôle réel 5.223 : `cloche_introuvable`.
+> Détecteur étendu aux noms accessibles et aux liens natifs de même origine ;
+> cas ignorés reproduits sur 5.223. Le DOM réel reste non observé, pas de promesse
+> de réparation du compte. Voir `docs/passation/2026-10-25-favoris-cloche-accessible.md`.
+
 > **25 octobre — favoris, rapport unifié :** l’assistance joint maintenant le
 > dernier contrôle d’ouverture à la structure de capture, avec version et codes
 > contrôlés. Ce changement corrige le diagnostic incomplet, pas un parcours réel

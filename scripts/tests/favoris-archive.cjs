@@ -99,7 +99,7 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  const avantManquant=f.rows.get('harvest_111_favoris_archive').data.creations.length;
  f.ctx.chrome.scripting.executeScript=async o=>o.func.name==='clocheFavorisNative'?[{result:{etat:o.args[0]?'activee':'disponible'}}]:[{result:{trouve:false}}];
  const manquant=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});
- check(!manquant.ok&&manquant.json.code==='favori_non_trouve'&&manquant.json.version==='5.223.0','cloche activée sans lien exact : refus spécifique et version conservée');
+ check(!manquant.ok&&manquant.json.code==='favori_non_trouve'&&manquant.json.version===JSON.parse(require('node:fs').readFileSync('vinted-sync-extension/manifest.json','utf8')).version,'cloche activée sans lien exact : refus spécifique et version conservée');
  check(f.rows.get('harvest_111_favoris_archive').data.creations.length===avantManquant,'un autre favori n’est jamais substitué à celui demandé');
  f.ctx.chrome.tabs.query=async()=>[];const absent=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(!absent.ok&&absent.json.code==='cloche_introuvable'&&onglets.length===0,'lien absent : refus explicite sans route directe de secours');
  console.log(controles+' contrôles archive et pagination réussis');
