@@ -97,7 +97,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.224.0';
+const EXT_ATTENDUE = '5.225.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -386,7 +386,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    messages aux favoris) PUBLIÉES par `main` n'ont pas `capterSuivisAchats`.
 //    À 5.214 ou 5.215, l'app promettait « l'extension relève le suivi » à une
 //    extension qui ne le fait pas (revue du 24 oct.).
-const EXT_CAPACITES = { favorisouvrir:'5.224.0', favorisliste:'5.218.0', suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -13224,7 +13224,7 @@ function etatExtensionFavoris(uid,mesure=null){
   if(!mesure&&codePerime())return {disponible:false,raison:textePerime()};
   if(!mesure&&!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
   const version=e?.ok?String(e.version||''):vmrExtVersion();
-  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.224.`};
+  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.225.`};
   if(e?.vrm?.connecte!==true||String(e.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
   const actif=String(e?.vinted?.uid||'');
   if(actif&&uid&&actif!==String(uid))return {disponible:false,raison:'Le navigateur est connecté à un autre compte Vinted. Connecte le compte sélectionné avant de lancer.'};
@@ -13262,8 +13262,8 @@ function FavorisConnectes(props){
     const version=String((transport.current?.mode==='direct'?directVu.current?.etat:__vmrEtat)?.code||'');
     const retour=(r,etape)=>lire==='ouvrir'?{...r,controleOuverture:{version,etape}}:r;
     if(!e.disponible)return retour({ok:false,code:'preparation-refusee',error:e.raison},'connexion');
-    if(lire==='ouvrir'&&cmpVersion(version,EXT_CAPACITES.favorisouvrir)<0)return retour({ok:false,error:'L’ouverture avec vérification nécessite l’extension 5.224. Mets à jour l’extension existante puis recharge-la.'},'version');
-    if(lire===true&&cmpVersion(version,'5.218.0')<0)return {ok:false,error:'La récupération complète nécessite une extension à jour. Installe la 5.224 puis recharge-la.'};
+    if(lire==='ouvrir'&&cmpVersion(version,EXT_CAPACITES.favorisouvrir)<0)return retour({ok:false,error:'L’ouverture avec vérification nécessite l’extension 5.225. Mets à jour l’extension existante puis recharge-la.'},'version');
+    if(lire===true&&cmpVersion(version,'5.218.0')<0)return {ok:false,error:'La récupération complète nécessite une extension à jour. Installe la 5.225 puis recharge-la.'};
     const endpoint=lire==='ouvrir'?'/vrm/favoris/ouvrir':lire?'/vrm/favoris/lire':'/vrm/favoris';
     const body=lire==='ouvrir'?{owner:props.owner,notificationId:t.id}:lire?t:{jeton:t.jeton};
     if(transport.current?.mode==='direct'){

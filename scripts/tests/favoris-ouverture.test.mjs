@@ -42,3 +42,11 @@ test('le rapport de capture contient aussi le résultat contrôlé de l’ouvert
  const malveillant={extension:'secret',code:'secret',raison:'secret',etape:'secret',preuve:'secret',url:'secret'};
  assert.ok(!JSON.stringify(rapportAssistanceFavoris(capture,malveillant,malveillant)).includes('secret'));
 });
+
+test('l’inspection DOM copiée contient seulement quatre compteurs bornés',async()=>{
+ const {rapportAssistanceFavoris}=await import('../../src/favorisOuverture.js');
+ const c=lire({ok:false,data:{version:'5.225.0',code:'favori_lien_ambigu',inspection:{exacts:2,visibles:2,memeArticle:3,liensFavoris:8,url:'secret',owner:'secret'}}});
+ assert.deepEqual(c.inspection,{liensFavoris:8,memeArticle:3,exacts:2,visibles:2});assert.equal(c.code,'favori_lien_ambigu');
+ const d=rapportAssistanceFavoris({},c,null);assert.deepEqual(d.verification.inspection,c.inspection);assert.ok(!JSON.stringify(d).includes('secret'));
+ const invalide=lire({data:{inspection:{exacts:-1,visibles:Infinity,memeArticle:1.5,liensFavoris:10001,url:'secret'}}});assert.deepEqual(invalide.inspection,{});
+});

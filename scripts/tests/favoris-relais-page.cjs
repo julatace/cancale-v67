@@ -21,7 +21,8 @@ const fs=require('node:fs'),assert=require('node:assert/strict');const {chromium
  assert.equal((await commande('cloche_sonder')).resultat.etat,'disponible');n++;
  const id='f'+'a'.repeat(32);assert.equal((await commande('cloche_ouvrir',{id})).resultat.etat,'activee');n++;
  await commande('cloche_ouvrir',{id});assert.equal(await p.evaluate(()=>cloches),1);n++;
- assert.equal((await commande('sonder')).resultat.trouve,true);n++;
+ const sondeVisible=await commande('sonder');assert.equal(sondeVisible.resultat.trouve,true);n++;
+ assert.deepEqual(sondeVisible.resultat.inspection,{liensFavoris:1,memeArticle:1,exacts:1,visibles:1});n++;
  const idOuverture='f'+'b'.repeat(32);assert.equal((await commande('ouvrir',{id:idOuverture})).resultat.trouve,true);n++;
  await commande('ouvrir',{id:idOuverture});assert.equal(await p.evaluate(()=>ouvertures),1);n++;
  await p.waitForFunction(()=>ouvertures===1);assert.equal(p.url(),'https://www.vinted.fr/inbox/900');n++;

@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **25 octobre — favoris 5.225 :** cloche ouverte, notification visible,
+> `favori_non_trouve` réel. Cas `display:contents` reproduit et corrigé ; sonde
+> de quatre compteurs anonymes pour distinguer les autres causes, aucune
+> relaxation du lien exact. DOM réel non observé.
+> Voir `docs/passation/2026-10-25-favoris-lien-visible.md`.
+
 > **25 octobre — favoris 5.224 :** contrôle réel 5.223 : `cloche_introuvable`.
 > Détecteur étendu aux noms accessibles et aux liens natifs de même origine ;
 > cas ignorés reproduits sur 5.223. Le DOM réel reste non observé, pas de promesse

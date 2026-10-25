@@ -153,10 +153,20 @@
 function suivreFavoriAffiche(cible,activer=false){
  const normaliser=v=>{try{const u=new URL(v,location.href);if(u.origin!==location.origin)return null;u.hash='';u.searchParams.sort();return u.href;}catch{return null;}};
  const attendu=normaliser(cible);if(!attendu)return {trouve:false};
- const liens=[...document.querySelectorAll('a[href]')].filter(a=>normaliser(a.href)===attendu&&a.getClientRects().length&&getComputedStyle(a).visibility!=='hidden'&&getComputedStyle(a).display!=='none');
- if(liens.length!==1)return {trouve:false};
- if(activer){liens[0].scrollIntoView({block:'center'});liens[0].click();}
- return {trouve:true};
+ const item=v=>{try{return /^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(new URL(v).pathname)?.[1]||'';}catch{return '';}};
+ const rectVisible=e=>[...e.getClientRects()].some(r=>r.width>0&&r.height>0);
+ const visible=a=>{
+  if(a.closest('[inert],[aria-hidden="true"]')||getComputedStyle(a).visibility==='hidden'||getComputedStyle(a).display==='none')return false;
+  // display:contents anchors have no own rectangle although their content is
+  // visible and clickable. Do not reject their native links for this reason.
+  return rectVisible(a)||(getComputedStyle(a).display==='contents'&&[...a.querySelectorAll('*')].some(e=>getComputedStyle(e).visibility!=='hidden'&&rectVisible(e)));
+ };
+ const tous=[...document.querySelectorAll('a[href]')].slice(0,10000).map(a=>({a,url:normaliser(a.href)}));
+ const exacts=tous.filter(x=>x.url===attendu),liens=exacts.filter(x=>visible(x.a));
+ const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===item(attendu)).length,exacts:exacts.length,visibles:liens.length};
+ if(liens.length!==1)return {trouve:false,inspection};
+ if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
+ return {trouve:true,inspection};
 }
 // Semantic native controls only. No guessed CSS class, router or API call.
 function clocheFavorisNative(activer=false,origine){
