@@ -411,7 +411,10 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/const arch = !numeroReprenable\(num\);/.test(A) && /↩️ revient → numéro neuf/.test(A) && /🔁 renvoi → numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
     // (21 octobre) Les retours se suivent dans Colis (« Retours en cours ») : la remise en
     // stock dit « retape-le » pour un N° qui se redonne, « numéro NEUF » pour un ancien.
-    dit(/estArchive: \(n\) => !numeroReprenable\(n\)/.test(A) && /desc: r\.archive \? `Elle portait l’ancien N°\$\{r\.num\} : un ancien numéro ne se redonne pas/.test(A) && /: `Elle garde son N°\$\{r\.num\} : retape-le/.test(A), '« retape son numéro » seulement pour un numéro qui se redonne (remise en stock)');
+    // On suit la RÈGLE, pas le genre : « paire »→« article » a mis « Elle portait »
+    // au masculin (« Il portait »). Les deux pronoms sont tolérés ; ce qui compte,
+    // c'est la distinction « ne se redonne pas / numéro NEUF » vs « retape-le ».
+    dit(/estArchive: \(n\) => !numeroReprenable\(n\)/.test(A) && /desc: r\.archive \? `(?:Il|Elle) portait l['’]ancien N°\$\{r\.num\} : un ancien numéro ne se redonne pas/.test(A) && /: `(?:Il|Elle) garde son N°\$\{r\.num\} : retape-le/.test(A), '« retape son numéro » seulement pour un numéro qui se redonne (remise en stock)');
     dit(/if \(num && !numeroReprenable\(num\) && republiee\(o\)\) continue;/.test(A), 'une paire revenue à l\'ancien N° sort de la liste quand elle est republiée (identité ou photo), pas par le numéro');
     { const ae = corps('async function appelEbay(corps) {', '\n}\n');
       dit(/const avecVersion = corps && \(corps\.action === 'publish' \|\| corps\.action === 'programmer'\);/.test(ae) && /avecVersion \? \{ \.\.\.corps, numerotation: versionNumerotation\(\) \}/.test(ae),

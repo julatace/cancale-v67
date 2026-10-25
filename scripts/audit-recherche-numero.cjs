@@ -168,7 +168,10 @@ async function audit(src, bavard) {
 
   // 8. Double et réattribution.
   dit(T('50').double === true, 'deux paires présentes sous le N°50 : double');
-  dit(T('60').double === true, 'une annonce en ligne + une vente annulée avant l\'envoi (autre paire) sous le N°60 : double');
+  // 25 oct. (décision de Julien, PR #701) : une vente ANNULÉE ne compte plus
+  // comme un conflit (conflitsDeNumeros l'exclut) — elle ne part jamais, donc pas
+  // « la mauvaise paire qui s'expédie ». La recherche par N° suit la même règle.
+  dit(T('60').double === false, 'une annonce en ligne + une vente ANNULÉE sous le N°60 : PAS un double (vente annulée exclue, décision du 25 oct., cohérent avec Colis)');
   dit(r41.double === false && r128.double === false, 'une annonce + sa case du Stock, ou une vente à poster seule : pas un double');
   const r51 = T('51'), r90 = T('90');
   dit(r51.reattribues.some((x) => x.sens === 'parti' && x.vers === '90'), 'N°51 : « remplacé, la paire porte maintenant le N°90 »');
