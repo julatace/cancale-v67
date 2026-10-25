@@ -17231,7 +17231,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               {photosEtat === 'cherche' && urls.length > 0 ? (
                 <div data-ebay-photos="cherche" style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Je récupère ses autres photos sur Vinted…</div>
               ) : photosEtat && photosEtat.raison ? (
-                <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis la paire.</div>
+                <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis l'article.</div>
               ) : pairSel.nPhotos != null && urls.length < pairSel.nPhotos ? (
                 <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>Seulement {urls.length} photo{urls.length > 1 ? 's' : ''} captée{urls.length > 1 ? 's' : ''} sur {pairSel.nPhotos}. Rouvre l'annonce sur Vinted (extension à jour) pour les avoir toutes — elles s'ajouteront ici automatiquement.</div>
               ) : (
@@ -18323,7 +18323,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
           <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
             {/* Le lien à la paire : la pastille distingue, pas une phrase par carte (§7). */}
-            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement une paire (numéro redonné depuis, ou porté par deux paires) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
+            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement un article (numéro redonné depuis, ou porté par deux articles) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
             {obs != null ? ` · ${obs} observateur${obs > 1 ? 's' : ''}` : ''}
             {nb ? ` · ${nb} photo${nb > 1 ? 's' : ''}` : ''}
             {j != null ? ` · en ligne depuis ${j} j` : ''}
@@ -45585,7 +45585,7 @@ function LeboncoinScreen() {
             {vendues.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
                   {pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression, elle se remet en ligne depuis « Mes annonces ».</span></> : null}
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
