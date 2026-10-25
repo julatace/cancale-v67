@@ -201,7 +201,10 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // n'a plus d'objet — la garantie est plus forte. Ce qui doit rester vrai,
   // c'est que le drapeau `vendue` est toujours calculé et affiché à Julien
   // avant qu'il ne tape (avertissement du bandeau ♻️).
-  /r\.vendue/.test(SRC) && /a été VENDUE sous le N°/.test(SRC)
+  // ⚠️ On suit la RÈGLE, pas l'orthographe : « paire »→« article » (prose de
+  // lancement) a mis l'avertissement au masculin (« a été VENDU »). Le « E »
+  // final est donc optionnel — sinon l'audit crie au loup sur un mot d'accord.
+  /r\.vendue/.test(SRC) && /a été VENDUE? sous le N°/.test(SRC)
     ? ok('une paire vendue est signalée avant toute reprise de son numéro')
     : nok('une paire vendue est signalée avant toute reprise de son numéro');
   // Saisie manuelle : un numéro déjà porté par une paire PRÉSENTE doit être refusé.
