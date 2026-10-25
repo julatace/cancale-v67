@@ -5909,21 +5909,21 @@ function etapeVente(o, { poste = () => false, expediee = null } = {}) {
   // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
   // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
   if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Vérifie qu'il arrive bien — Vinted règle souvent le remboursement tout seul." };
-  if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
+  if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : l'article doit te revenir avant le remboursement." };
   // `expediee` inconnu (la recherche n'a ni les bordereaux ni les emails) : le
   // texte de Vinted tranche — « Remboursement » ou non. Jamais deviné au-delà.
   // La transaction le dit annulée alors que la liste ne l'a pas encore vu
   // (« Bordereau envoyé au vendeur ») : c'est une vente annulée (17 oct.).
   const annuleeTxn = o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id);
-  if (annuleeTxn) return { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie. Son bordereau ne sert plus." };
+  if (annuleeTxn) return { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — l'article n'est jamais parti. Son bordereau ne sert plus." };
   // Litige : la liste montre le statut du colis de RETOUR (« déposé en point
   // relais ») — la transaction dit ce qui se passe vraiment (17 oct.).
   const et = o.transaction_id != null ? etatTxn(o.transaction_id) : null;
-  if (et && et.s === 440) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour (litige) : rien à expédier. La paire doit te revenir — marque-la reçue sur Vinted quand elle arrive." };
+  if (et && et.s === 440) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour (litige) : rien à expédier. L'article doit te revenir — marque-le reçu sur Vinted quand il arrive." };
   if (et && et.s === 430) return { label: 'Suspendue', color: C.warn, step: 0, aide: "Vinted vérifie cette transaction (litige ou contrôle) : rien à expédier tant que ce n'est pas réglé." };
   if (classifyOrderStatus(o.status) === 'cancelled') return (expediee ? expediee(o) : /rembours/i.test(s))
-    ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
-    : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
+    ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cet article a bien été EXPÉDIÉ, puis remboursé à l'acheteur — l'article et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
+    : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — l'article n'est jamais parti." };
   if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
   // ⚠️ COCHÉ « POSTÉ » À LA MAIN (`isShipDone`) : le colis a quitté
   // « À expédier » partout (Colis, Ma journée, la cloche, le filtre) et le
@@ -37526,7 +37526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { toast('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
     // Import direct (pas depuis une vente) : on demande le N° + le titre.
     if (ctx.standalone) {
-      const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la paire (laisse vide si aucun) :', value: '' }) || '').trim();
+      const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de l\'article (laisse vide si aucun) :', value: '' }) || '').trim();
       const title = (await askText({ desc: 'Titre / description (ex : Nike Air Max 90) :', value: '' }) || '').trim();
       ctx = { numero, title };
     }
@@ -37876,7 +37876,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${exact?'':'au moins '}${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
-            : 'Bordereau + paire au stock, coche par colis';
+            : 'Bordereau + article au stock, coche par colis';
           tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
@@ -37949,7 +37949,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
             title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
-            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon la mauvaise paire part`,
+            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon le mauvais article part`,
             tab:'cat_bord',prio:0.05});
         }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
@@ -38680,7 +38680,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
-                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
                       // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
                       //    se redonne jamais : l'app le refuse dans le champ N°. Dire
                       //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
@@ -38761,7 +38761,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {hidden ? (
                   <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
                 ) : st==='cancelled' ? (
-                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies l'article.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
                 ) : (
                   <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
                 )}
@@ -39185,7 +39185,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   ))}
                   <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.45}}>
-                    Prix moyen de revente moins prix moyen d'achat, avant frais de port, de protection et de boost — deux moyennes, pas la marge d'une paire précise. Un lot acheté compte comme un achat. C'est un repère pour acheter : il n'entre dans aucun total, rapport ni export.{r.tropPeu>0?` ${r.tropPeu} autre${r.tropPeu>1?'s':''} modèle${r.tropPeu>1?'s':''} : pas encore assez de ventes ou d'achats.`:''}
+                    Prix moyen de revente moins prix moyen d'achat, avant frais de port, de protection et de boost — deux moyennes, pas la marge d'un article précis. Un lot acheté compte comme un achat. C'est un repère pour acheter : il n'entre dans aucun total, rapport ni export.{r.tropPeu>0?` ${r.tropPeu} autre${r.tropPeu>1?'s':''} modèle${r.tropPeu>1?'s':''} : pas encore assez de ventes ou d'achats.`:''}
                   </div>
                 </div>
               );
