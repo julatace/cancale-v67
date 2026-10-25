@@ -317,7 +317,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
       const t = await r.pg.evaluate(() => document.body.innerText);
       const i = t.indexOf('N°7');
       const dialogue = i >= 0 ? t.slice(Math.max(0, i - 20), i + 260) : '';
-      dit(!/n.est plus en ligne/.test(dialogue) && !/Oui, la même paire revient/.test(t), 'taper le N° d’une paire « à confirmer » : jamais « elle n’est plus en ligne », jamais « la même paire revient »', dialogue.replace(/\n+/g, ' | '));
+      dit(!/n.est plus en ligne/.test(dialogue) && !/Oui, le même article revient/.test(t), 'taper le N° d’une paire « à confirmer » : jamais « elle n’est plus en ligne », jamais « le même article revient »', dialogue.replace(/\n+/g, ' | '));
       dit(/peut-être encore/.test(dialogue) && /Annuler/.test(t), 'le dialogue dit qu’une paire le porte PEUT-ÊTRE encore, avec Annuler / un numéro neuf', dialogue.replace(/\n+/g, ' | '));
       // Annuler : rien n'est écrit sur 8002 (ni fiche supprimée, ni prix d'achat déplacé).
       await r.pg.click('text=Annuler', { timeout: 4000 }).catch(() => {});

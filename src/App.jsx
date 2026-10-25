@@ -9016,7 +9016,7 @@ const ouvrirPdfOnglet = (url) => {
 // pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
 // le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
 // Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
-const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de la paire (Annonces → « numéros à vérifier »).";
+const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de l'article (Annonces → « numéros à vérifier »).";
 const confirmerNumerosAVerifier = async (numeros) => {
   try {
     const fiches = load('vinted_annonce_numeros', {}) || {};
@@ -9028,11 +9028,11 @@ const confirmerNumerosAVerifier = async (numeros) => {
     for (const f of Object.values(fiches)) { const k = f && cleNum(f.numero); if (k && cles.has(k)) (parCle[k] = parCle[k] || []).push(f); }
     const doubles = Object.keys(parCle).filter((k) => parCle[k].length > 1);
     if (doubles.length) {
-      const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'une paire').join(' · ')}`).join('\n');
+      const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'un article').join(' · ')}`).join('\n');
       const ok = await askConfirm({
         title: doubles.length > 1 ? `${doubles.length} numéros portés par deux paires` : `Le N°${doubles[0]} est porté par deux paires`,
-        desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner la mauvaise paire. Vérifie la photo et le titre avant d'imprimer.`,
-        ok: 'C\'est la bonne paire, imprimer', cancel: 'Annuler',
+        desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner le mauvais article. Vérifie la photo et le titre avant d'imprimer.`,
+        ok: 'C\'est le bon article, imprimer', cancel: 'Annuler',
       });
       if (!ok) return false;
     }
@@ -9040,17 +9040,17 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (pasEcrit.length) {
       const ok = await askConfirm({
         title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
-        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'une paire'}`).join('\n')}\n\nCette paire a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
+        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\nCet article a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
         ok: 'Oui, c\'est écrit', cancel: 'Annuler',
       });
       if (!ok) return false;
     }
     const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
     if (!doute.length) return true;
-    const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
+    const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'un article'}`).join('\n');
     return await askConfirm({
       title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés` : `Le N°${doute[0].numero} n'est pas encore vérifié`,
-      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde l'étiquette de la paire avant d'imprimer.`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner un autre article. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde l'étiquette de l'article avant d'imprimer.`,
       ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
     });
   } catch (_) { return true; }
@@ -9873,15 +9873,15 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           </div>
           <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
-            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 12.5 }}>Relier à une paire (facultatif)</summary>
+            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 12.5 }}>Relier à un article (facultatif)</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
               {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
                 <select value="" onChange={e => { const p = paires.find(x => String(x.id) === e.target.value); if (!p) return; setForm(d => ({ ...d, numero: p.num, title: d.title.trim() ? d.title : (p.title || '') })); }} style={inp}>
                   <option value="">— choisir —</option>
                   {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
                 </select>)}
-              {champ('N° de la paire', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
-              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de la paire : quand elle se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
+              {champ('N° de l\'article', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article : quand il se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
             </div>
           </details>
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
@@ -9949,7 +9949,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
         {edit ? (
           <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cette paire"
+              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cet article"
                 onKeyDown={e => { if (e.key === 'Escape') { setEdit(false); setTxt(''); setErr(''); } }}
                 style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
@@ -11585,12 +11585,12 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
       {rn.reattribues.map((r) => (
         <div key={'r' + r.id + r.sens} data-tout-reattribue={r.sens} style={{ marginTop: 8, fontSize: 13, color: C.text }}>
           {r.sens === 'parti'
-            ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'une paire'} » porte maintenant le <b>N°{r.vers}</b>. </>
+            ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'un article'} » porte maintenant le <b>N°{r.vers}</b>. </>
             : <>Ce numéro remplace le N°{r.de} (doublon réglé){r.ecrit ? '.' : ' — pas encore écrit sur le carton.'}</>}
           {r.sens === 'parti' && <button type="button" onClick={() => onChercher(r.vers)} style={lien}>Voir le N°{r.vers}</button>}
         </div>
       ))}
-      {rn.annonces.length > 0 && titreSec('La paire')}
+      {rn.annonces.length > 0 && titreSec('L\'article')}
       {rn.annonces.map((a) => ligne('a' + a.id, { 'data-tout-annonce': a.id, 'data-tout-annonce-etat': a.etat }, a.title || '(sans titre)', ETAT_ANN[a.etat] + (a.price ? ' · ' + prixCourt(String(a.price).replace(',', '.')) : ''), () => onNav('cat_annonces')))}
       {(vinted.length + lbc.length + ebay.length + rn.annoncesEbay.length) > 0 && titreSec('Ventes et autres plateformes')}
       {vinted.map((o) => ligne('v' + o._tx, { 'data-tout-vente': 'vinted', 'data-tout-tx': o._tx }, o.title || '(sans titre)', `Vente Vinted · ${etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label}${o.date ? ' · ' + jour(o.date) : ''}`, () => onNav('cat_ventes')))}
@@ -30076,7 +30076,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : la paire garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : l'article garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
         </div>
       </div>
       <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -30705,7 +30705,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const setBordLink = (b, numero) => {
     const k = bordKey(b); if (!k) return;
-    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) { toast('Cette paire est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.'); return; }
+    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) { toast('Cet article est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.'); return; }
     setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
   };
   // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
@@ -31395,7 +31395,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         </div>
         <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
-          title="Reçu d'achat PDF (avec le N° de la paire)" aria-label="Reçu d'achat"
+          title="Reçu d'achat PDF (avec le N° de l'article)" aria-label="Reçu d'achat"
           style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
       </div>
     );
@@ -32831,7 +32831,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (e && e.buyFromId) return;                          // déjà relié à un achat
     const rep = await askText({
       title: `Prix d'achat de la N°${numeroPose} ?`,
-      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cette paire'} ». Si tu l'as sous la main, note ce que tu l'as payée — sinon « Plus tard », tu le mettras quand tu veux.`,
+      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cet article'} ». Si tu l'as sous la main, note ce que tu l'as payé — sinon « Plus tard », tu le mettras quand tu veux.`,
       value: '', placeholder: 'ex : 25 ou 12,50', ok: 'Enregistrer', cancel: 'Plus tard',
     });
     if (rep == null) return;                               // « Plus tard » / fermé
@@ -32862,7 +32862,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // republiée a un numéro neuf (Julien, 10 octobre).
     if (!numeroReprenable(cle)) {
       updatePair(item, { numero: avant });
-      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur son étiquette.`);
+      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ton article republié garde un numéro neuf — écris celui-là sur son étiquette.`);
       return;
     }
     // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
@@ -32876,8 +32876,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!autres.length && takenCles.has(cle) && !(porteursNum[cle] || []).some(p => String(p.id) !== moi)) {
       const meme = await askConfirm({
         title: `Le N°${n} a déjà servi`,
-        desc: `Ce numéro a déjà été donné à une paire (il est peut-être écrit sur un carton).\n\nEst-ce bien la MÊME paire qui revient ? Sinon, prends un numéro neuf.`,
-        ok: 'Oui, la même paire', cancel: `Non — N°${nextNumero}`,
+        desc: `Ce numéro a déjà été donné à un article (il est peut-être écrit sur un carton).\n\nEst-ce bien le MÊME article qui revient ? Sinon, prends un numéro neuf.`,
+        ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
       updatePair(item, { numero: v, manuelAt }); recordUsed(v); await demanderPrixAchat(item, v); return;
@@ -32896,12 +32896,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ? `📦 peut-être encore en ligne « ${p.titre} » (son compte n'a pas été relu depuis ${p.lu ? depuisFr(p.lu).replace(/^il y a /, '') : 'longtemps'})`
           : `📦 en ligne « ${p.titre} »`)
         : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
-        : p.type === 'annulee' ? `↩️ vente annulée, la paire est restée « ${p.titre} »`
+        : p.type === 'annulee' ? `↩️ vente annulée, l'article est resté « ${p.titre} »`
         : `${p.titre}`).join('\n');
       const peutEtre = presents.every(p => p.aConfirmer);
       const prendre = await askConfirm({
         title: peutEtre ? `Le N°${n} est peut-être encore pris` : `Le N°${n} est déjà pris`,
-        desc: `${peutEtre ? 'Une paire le porte peut-être encore' : 'Une paire le porte encore'} :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
+        desc: `${peutEtre ? 'Un article le porte peut-être encore' : 'Un article le porte encore'} :\n${qui}\n\nDeux articles avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
@@ -32911,8 +32911,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const anc = numeros[autres[0]] || {};
     const meme = await askConfirm({
       title: `Le N°${n} a déjà servi`,
-      desc: `Il était sur « ${anc.title || 'une autre paire'} », qui n'est plus en ligne.\n\nEst-ce bien la MÊME paire qui te revient (litige, retour, annulation) ?\n\nSi oui, elle reprend son prix d'achat et ses infos. Si c'est une autre paire, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
-      ok: 'Oui, la même paire revient', cancel: `Non — N°${nextNumero}`,
+      desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
+      ok: 'Oui, le même article revient', cancel: `Non — N°${nextNumero}`,
     });
     if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
     setNumeros(prev => {
@@ -32927,7 +32927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u); return u;
     });
     recordUsed(n);
-    toast(`N°${n} repris — les infos de l'ancienne paire sont revenues avec lui`);
+    toast(`N°${n} repris — les infos de l'ancien article sont revenues avec lui`);
   };
 
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
@@ -33474,7 +33474,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
     <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux paires : VRM a donné un numéro neuf à l'une d'elles. Barre l'ancien sur son carton et écris le nouveau.</div>
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux articles : VRM a donné un numéro neuf à l'un d'eux. Barre l'ancien sur son carton et écris le nouveau.</div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}</span>
@@ -33487,7 +33487,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const autres = autresPorteurs(it);
     if (autres.length) {
       // On ne confirme pas un numéro qu'un autre carton présent porte déjà.
-      await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux paires au même numéro, c'est la mauvaise qui part.`);
+      await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux articles au même numéro, c'est le mauvais qui part.`);
       return;
     }
     marquerCartonVerifie(String(it.id), cleNum(f.numero)); toast(`N°${f.numero} confirmé pour « ${it.title} »`);
@@ -33508,7 +33508,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const prov = String(nextNumero);
       const ok = await askConfirm({
         title: `Le N°${n} est sur « ${autre.title} »`,
-        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON étiquette (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
+        desc: `Cet article a aussi été renuméroté pendant la panne : son N°${n} est sans doute faux.\n\nIl prend le N°${prov} en attendant que tu regardes SON étiquette (il reste dans la liste), et « ${it.title} » prend le N°${n}.`,
         ok: `Oui, le N°${n} est à « ${it.title} »`, cancel: 'Annuler',
       });
       if (!ok) return;
@@ -33664,11 +33664,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const n = String(num || '').trim(); if (!n) return;
     const cell = garageCellOf(garageGrid, n);
     const ok = await askConfirm(
-      `Déclarer la paire N°${n} PERDUE ?\n\n` +
+      `Déclarer l'article N°${n} PERDU ?\n\n` +
       `• Son numéro sera libéré (plus compté en stock).\n` +
       (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
       `• La vente reste dans ta compta comme perte.\n\n` +
-      `À ne faire que si la paire ne te revient pas.`
+      `À ne faire que si l'article ne te revient pas.`
     );
     if (!ok) return;
     setPairsLost(prev => { const u = { ...prev, [n]: { at: new Date().toISOString(), title: o && o.title || '', transaction: o && o.transaction_id != null ? String(o.transaction_id) : null } }; save('vinted_pairs_lost', u); return u; });
@@ -33697,11 +33697,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const id = String(it.id), f = numeros[id] || {}, n = String(f.numero || '').trim();
     if (!n) return;
     const autre = Object.keys(numeros).some((k) => k !== id && cleNum((numeros[k] || {}).numero) === cleNum(n));
-    const ok = await askConfirm({ title: `La paire N°${n} n'est plus chez toi ?`,
+    const ok = await askConfirm({ title: `L'article N°${n} n'est plus chez toi ?`,
       desc: `« ${String(it.title || f.title || '').slice(0, 60)} » — Vinted l'a masquée, et VRM la comptait encore sur ton étagère.\n\n`
         + `• Elle ne comptera plus comme présente. Son numéro reste pris : il ne sera jamais redonné.\n`
-        + (autre ? `• L'autre paire au N°${n} le garde : pas de numéro neuf pour elle.\n` : '')
-        + `\nÀ ne faire que si cette paire n'est plus sur ton étagère.`,
+        + (autre ? `• L'autre article au N°${n} le garde : pas de numéro neuf pour lui.\n` : '')
+        + `\nÀ ne faire que si cet article n'est plus sur ton étagère.`,
       ok: "Elle n'est plus là" });
     if (!ok) return;
     declarerPartie(id, n, f.title || it.title);
@@ -33870,16 +33870,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const r = remiseEnStock(ligne, { numeros, presentes: presentesAnnonceIds, cleNum, estArchive: (n) => !numeroReprenable(n) });
     if (!r.ok) {
       if (r.raison === 'pas-recu') toast('Note d’abord que le colis est arrivé chez toi (« Reçu chez moi »).');
-      else toast('Cette paire n’est reliée à aucun N° (ni par la vente, ni par son annonce) : rien à remettre en stock. Pose son N° à la main d’abord.');
+      else toast('Cet article n’est relié à aucun N° (ni par la vente, ni par son annonce) : rien à remettre en stock. Pose son N° à la main d’abord.');
       return;
     }
     let num = r.num;
     if (r.conflit) {
-      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Une autre paire présente porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
+      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Un autre article présent porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
       if (!ok) return;
       num = null;
     } else {
-      const ok = await askConfirm({ title: `Remettre en stock ${r.archive ? 'cette paire' : `la N°${r.num}`} ?`, desc: r.archive ? `Elle portait l’ancien N°${r.num} : un ancien numéro ne se redonne pas, elle prendra un numéro NEUF à sa republication — écris-le sur son étiquette.` : `Elle garde son N°${r.num} : retape-le dans le champ N° de la nouvelle annonce.\n\nRien d’autre ne change (ni la vente, ni ta compta).`, ok: 'Remettre en stock', cancel: 'Annuler' });
+      const ok = await askConfirm({ title: `Remettre en stock ${r.archive ? 'cet article' : `la N°${r.num}`} ?`, desc: r.archive ? `Il portait l'ancien N°${r.num} : un ancien numéro ne se redonne pas, il prendra un numéro NEUF à sa republication — écris-le sur son étiquette.` : `Elle garde son N°${r.num} : retape-le dans le champ N° de la nouvelle annonce.\n\nRien d’autre ne change (ni la vente, ni ta compta).`, ok: 'Remettre en stock', cancel: 'Annuler' });
       if (!ok) return;
     }
     const k = String(ligne.cle);
@@ -33988,8 +33988,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const applyReprise = async (r)=>{
     const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
     const q = r.vendue
-      ? `Cette paire t'est REVENUE (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nElle a été vendue sous le N°${oldNum}. Si tu l'as remise dans SA boîte, elle peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
-      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, reste brûlé : il ne sera donné à aucune autre paire.`;
+      ? `Cet article t'est REVENU (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nIl a été vendu sous le N°${oldNum}. Si tu l'as remis dans SA boîte, il peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
+      : `Cette annonce est bien ton article N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, reste brûlé : il ne sera donné à aucun autre article.`;
     if (!await askConfirm(q)) return;
     setNumeros(prev => {
       const u = { ...prev };
@@ -34197,7 +34197,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ua = [...used].sort(triPool);
     setUsedNumeros(ua); save('vinted_used_numeros', ua);
     setRenumOpen(false);
-    toast(`✓ ${moves.length} paire${moves.length > 1 ? 's' : ''} renumérotée${moves.length > 1 ? 's' : ''}`);
+    toast(`✓ ${moves.length} article${moves.length > 1 ? 's' : ''} renuméroté${moves.length > 1 ? 's' : ''}`);
   };
   // ── Assistant de repricing : quoi baisser, de combien, pourquoi ────────────
   // Règles : plus une paire dort, plus la baisse conseillée est forte ; une paire
