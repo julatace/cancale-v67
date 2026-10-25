@@ -1,5 +1,10 @@
 # VRM — dossier de passation
 
+> **25 octobre — VRM Capture 1.0.0 indépendant :** source
+> `vrm-capture-extension/`, bouton directement visible, sans connexion ni moteur
+> VRM. Archives dédiées Chrome et Orion, stockage et indicateur distincts.
+> Voir `docs/passation/2026-10-25-extension-capture-independante.md`.
+
 > **25 octobre — extension 5.226 :** parcours manuel opt-in, onglet Vinted
 > unique, rapport local filtré, arrêt conversation/3min/100étapes ; commandes
 > Enregistrer/Arrêter/Copier/Effacer dans la fenêtre de l’icône. Aucun message

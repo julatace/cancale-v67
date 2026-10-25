@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');const {faireFond}=require('../_fond-vm.cjs');
-(async()=>{const f=faireFond();let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};
+(async()=>{const f=faireFond(process.env.PARCOURS_BG?{src:require("node:path").resolve(process.env.PARCOURS_BG)}:{});let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};
  f.ctx.chrome.runtime.id='ext-test';f.ctx.chrome.runtime.getURL=p=>'chrome-extension://ext-test/'+p;
  f.ctx.chrome.tabs.query=async()=>[{id:7,url:'https://www.vinted.fr/'}];f.ctx.chrome.tabs.sendMessage=(id,msg,cb)=>cb({ok:true});
  const popup={id:'ext-test',url:'chrome-extension://ext-test/popup.html'};
@@ -24,9 +24,9 @@ const assert=require('node:assert/strict');const {faireFond}=require('../_fond-v
  ok(reprise.actif&&reprise.nonce!==state.nonce,'nouveau parcours distinct et reprise après navigation dans le même onglet');
  await Promise.all(Array.from({length:105},()=>cmd('evenement',{nonce:reprise.nonce,evenement:{type:'clic',balise:'a'}},page)));
  const borne=(await cmd('etat')).rapport;ok(!borne.actif&&borne.evenements.length===100&&borne.raison==='limite','événements concurrents sérialisés et rapport borné à cent');
- await cmd('effacer');await cmd('demarrer');f.store.vrmParcoursFavorisLocal.fin=Date.now()-1;
+ await cmd('effacer');await cmd('demarrer');f.store[process.env.PARCOURS_CLE||"vrmParcoursFavorisLocal"].fin=Date.now()-1;
  ok(!(await cmd('etat')).rapport.actif,'expiration de la capture après trois minutes');
- f.store.vrmParcoursFavorisLocal.debut=Date.now()-1800001;
+ f.store[process.env.PARCOURS_CLE||"vrmParcoursFavorisLocal"].debut=Date.now()-1800001;
  ok((await cmd('etat')).rapport===null,'rapport expiré supprimé à la consultation');
  await cmd('demarrer');await f.ctx.cloreParcoursOnglet(7);ok((await cmd('etat')).rapport.raison==='onglet_ferme','fermeture de l’onglet arrête le parcours');
  await cmd('effacer');

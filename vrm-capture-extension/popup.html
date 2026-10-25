@@ -1,0 +1,13 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VRM Capture</title><style>
+:root{font-family:system-ui,sans-serif;color:#193b43;background:#f5f7f6}*{box-sizing:border-box}body{width:350px;margin:0;padding:20px}header{display:flex;align-items:center;justify-content:space-between}h1{font-size:22px;margin:0}header span{font-size:11px;color:#5c747a}p{font-size:13px;line-height:1.5;color:#4d666c}button{width:100%;min-height:44px;border:1px solid #cedbd8;border-radius:9px;background:white;color:#193b43;font:600 14px system-ui;margin:5px 0;padding:11px;cursor:pointer}button:disabled{opacity:.5;cursor:default}#parcours-demarrer{background:#214b54;color:white;border-color:#214b54}#parcours-statut{border-left:3px solid #368c7b;padding:8px 10px;background:#e9f1ef;min-height:54px}label{display:block;font-size:12px;margin-top:12px}textarea{width:100%;font:11px ui-monospace,monospace;padding:10px;border:1px solid #cedbd8;border-radius:8px;resize:vertical;margin-top:6px}small{display:block;font-size:11px;line-height:1.5;color:#6b8085;margin-top:12px}.deux{display:flex;gap:8px}@media(max-width:360px){body{width:auto;min-width:280px;padding:14px}}
+</style></head><body><header><h1>VRM Capture</h1><span>1.0.0 · local</span></header><section id="parcours-favoris">
+<p>Enregistre tes gestes sur Vinted pour comprendre pourquoi un favori ne s’ouvre pas.</p>
+<button id="parcours-demarrer" type="button">Enregistrer le parcours</button>
+<button id="parcours-arreter" type="button" disabled>Arrêter et voir le rapport</button>
+<p id="parcours-statut" role="status" aria-live="polite">Ouvre Vinted dans l’onglet actif.</p>
+<p><strong>1.</strong> Démarre ici, puis ferme cette fenêtre.<br><strong>2.</strong> Ouvre la cloche et le favori toi-même.<br><strong>3.</strong> Reviens lire et copier le rapport.</p>
+<label for="parcours-rapport">Rapport à consulter avant partage</label><textarea id="parcours-rapport" readonly hidden rows="9" aria-label="Rapport du parcours Vinted"></textarea>
+<div class="deux"><button id="parcours-copier" type="button" disabled>Copier le rapport</button><button id="parcours-effacer" type="button" disabled>Effacer le rapport</button></div>
+<small>Aucun message envoyé. Aucun mot de passe, cookie, jeton, contenu de conversation ou valeur de lien enregistré. Rapport local : aucun envoi à VRM.</small>
+<small>Un onglet, trois minutes et 100 étapes maximum. Arrêt à l’ouverture d’une conversation. Expiration du rapport après 30 minutes à la prochaine consultation.</small>
+</section><script src="popup.js"></script></body></html>
