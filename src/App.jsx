@@ -12303,6 +12303,16 @@ function AuthScreen() {
   // Sans jeton anti-robot, les appels protégés ne partent pas : le bouton le DIT.
   const attendCaptcha = captchaActif() && mode !== 'newpw' && captcha.statut !== 'pret';
 
+  // Retour « en arrière » depuis Google/Discord : le navigateur restaure la page
+  // depuis son cache (bfcache) avec l'état React FIGÉ — `busy` reste à true et le
+  // bouton « Se connecter » reste bloqué sur « ... ». `pageshow`+`persisted` est
+  // le seul signal d'une restauration bfcache : on débloque le bouton.
+  React.useEffect(() => {
+    const onShow = (e) => { if (e && e.persisted) setBusy(false); };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
+
   const oauth = async (p) => {
     setErr(''); setBusy(true);
     const r = await oauthStart(p);
