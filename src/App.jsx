@@ -37994,7 +37994,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    (le bordereau de retour se fait sur CELUI-LÀ).
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
-            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
+            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
