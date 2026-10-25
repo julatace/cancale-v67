@@ -21330,7 +21330,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       </div>
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
-          Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
+          Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div data-stats-carte="hero" data-notion="finalise-vinted" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
@@ -21423,7 +21423,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
             légende disait. Un chiffre qu'on doit corriger avec sa légende est un
             chiffre faux : le titre dit maintenant ce qu'il compte. */}
-        <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
+        <StatCard icon="📦" label="Articles en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
         {/* ⚠️ « 0,00 € » N'EST PAS UN ZÉRO, C'EST UNE ABSENCE. Cette carte somme
             les PRIX D'ACHAT des annonces en ligne — or aucun n'est saisi, donc
             elle affichait un gros 0,00 € à côté d'un « 1581 € de valeur » sur
@@ -21776,9 +21776,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const moyenne=(totalAjouts/ajoutsParJour.length);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>📦 Paires ajoutées par jour</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>📦 Articles ajoutés par jour</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {totalAjouts} paire{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
+              {totalAjouts} article{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
             </div>
             <div style={{display:'flex',alignItems:'flex-end',gap:4,height:150,paddingTop:10,overflowX:'auto'}}>
               {ajoutsParJour.map((h,i)=>{
@@ -21921,9 +21921,9 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <ScreenHead icon="box" title={`Catalogue (${catalog.length})`}
-        desc="Les paires de l'ancienne application. Elles comptent toujours dans les statistiques."
+        desc="Les articles de l'ancienne application. Ils comptent toujours dans les statistiques."
         right={<Btn small onClick={()=>{
-          if(fullList.length===0){toast('Aucune paire à exporter');return;}
+          if(fullList.length===0){toast('Aucun article à exporter');return;}
           const headers=['N° Paire','Prix Achat (€)','Statut','Date ajout'];
           const rows=fullList.map(p=>[p.id||'',String(p.buyPrice||'').replace('.',','),p.status||'',p.addedAt||'']);
           const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -21953,7 +21953,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
       </div>
       {oldStockCount>0&&(
         <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:8,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
-          ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
+          ⚠️ {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -21964,7 +21964,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             ))}
           </tr></thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
+            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
             {list.map(p=>(
               <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:600,color:C.accent,fontSize:15,minWidth:60}}>
@@ -22027,7 +22027,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} paires</span>
+        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
     </div>
