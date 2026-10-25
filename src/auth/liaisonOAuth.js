@@ -5,7 +5,11 @@ export async function preparerLiaisonOAuth({provider,enabled,token,owner,base,cl
  const key='vrm_oauth_liaison';
  try{
   const url=new URL(base+'/auth/v1/user/identities/authorize');
-  url.search=new URLSearchParams({provider,redirect_to:origine+'/?tab=settings&vue=compte',code_challenge:challenge,code_challenge_method:'s256'}).toString();
+  // `skip_http_redirect=true` : sinon l'endpoint répond en 302 vers Google, le
+  // `fetch` suit la redirection et récupère du HTML → `r.json()` échoue, `j` est
+  // nul, `new URL('')` lève → « Impossible de préparer ». Avec ce paramètre,
+  // l'endpoint rend `{url}` en JSON (c'est ainsi que le SDK Supabase le lit).
+  url.search=new URLSearchParams({provider,redirect_to:origine+'/?tab=settings&vue=compte',code_challenge:challenge,code_challenge_method:'s256',skip_http_redirect:'true'}).toString();
   const r=await fetcher(url.href,{headers:{apikey:cle,Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
   const j=await r.json().catch(()=>null);
   if(!r.ok)return{ok:false,error:r.status===401?'Ta session a expiré. Reconnecte-toi avant de réessayer.':/already.*link|identity.*exists/i.test(j?.msg||j?.message||'')?'Ce compte est déjà relié à un autre compte VRM.':'La liaison n’est pas disponible pour le moment. Ton compte VRM reste inchangé.'};
