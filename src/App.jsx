@@ -13552,7 +13552,7 @@ function BoutonToutGenerer({ items }) {
 // l'instantané (`EXT_CAPACITES.preuves`) la croit encore vendue et refuserait
 // de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
 // UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
-const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sait pas qu'une vente remboursée fait revenir la paire) et refuserait de la publier : mets-la à jour (${EXT_ATTENDUE}).`;
+const texteCroitVendue = () => `Ton extension le croit encore vendu (elle ne sait pas qu'une vente remboursée fait revenir l'article) et refuserait de le publier : mets-la à jour (${EXT_ATTENDUE}).`;
 // ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
 //    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
 //    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
@@ -13794,7 +13794,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
                 </div>
               );
             })}
-            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — la paire est maintenant marquée <b>« sur Leboncoin »</b> dans VRM.</div>}
+            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — l'article est maintenant marqué <b>« sur Leboncoin »</b> dans VRM.</div>}
             {!fait && progres && progres.etape === 'champ-manquant' && (
               <div data-fiche-manque={(progres.manque || []).join('|')} style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
                 {(progres.manque && progres.manque.length) ? `${progres.manque.map((m) => `« ${m} »`).join(', ')} ${progres.manque.length > 1 ? 'restent' : 'reste'} à choisir` : 'Un champ obligatoire reste à choisir'} sur la page Leboncoin : fais-le, VRM continue tout seul.
@@ -13858,7 +13858,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         <textarea data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
           style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
         <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
-          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cette paire{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
+          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cet article{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
         </div>
 
         <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
@@ -13908,7 +13908,7 @@ function LbcCroitVendue({ n }) {
   if (!n || extSait('preuves') !== 'retard') return null;
   return (
     <div data-lbc-croit-vendue={n} style={{ fontSize: 12.5, color: C.text, background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
-      <b>{n} paire{n > 1 ? 's' : ''} revenue{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendues' : 'la croit encore vendue'} et refuserait de {n > 1 ? 'les' : 'la'} publier — mets-la à jour ({EXT_ATTENDUE}).
+      <b>{n} article{n > 1 ? 's' : ''} revenu{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendus' : 'le croit encore vendu'} et refuserait de {n > 1 ? 'les' : 'le'} publier — mets-la à jour ({EXT_ATTENDUE}).
     </div>
   );
 }
@@ -44814,7 +44814,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
     relierAnnonceLbc(id, n);
     setMsg('');
-    toast(`Annonce reliée à la paire N°${n}.`);
+    toast(`Annonce reliée à l'article N°${n}.`);
     onRelie && onRelie();
   };
   const aucune = () => { rangerSansJumelleLbc(cleRangement); toast('Compris — je ne te le redemande plus.'); onRelie && onRelie(); };
@@ -44828,8 +44828,8 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     // devenu « B233 » à la remise à zéro du 11 octobre : on le reconnaît, sans
     // jamais prendre la nouvelle paire du même chiffre quand elle existe.
     if (!numsConnus.includes(n) && /^\d+$/.test(n) && numsConnus.includes('B' + n)) n = 'B' + n;
-    if (!NUM_OK.test(n)) { setMsg('Tape le numéro de la paire (125, ou B125).'); return; }
-    if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
+    if (!NUM_OK.test(n)) { setMsg('Tape le numéro de l’article (125, ou B125).'); return; }
+    if (!numsConnus.includes(n)) { setMsg(`Aucun article ne porte le N°${n} dans VRM.`); return; }
     poser(n);
   };
   const sugg = (suggestions || []).filter((s) => s && s.numero);
@@ -44853,7 +44853,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
         {!vendue && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <input value={num} onChange={(e) => setNum(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(); }}
-              inputMode="numeric" placeholder="N°" aria-label="N° de la paire"
+              inputMode="numeric" placeholder="N°" aria-label="N° de l'article"
               style={{ width: 58, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 8px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
             <button type="button" onClick={relier} style={btn}>Relier</button>
           </div>
@@ -44863,21 +44863,21 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
           c'est son clic qui relie, jamais la ressemblance (§5). */}
       {sugg.length > 0 && (
         <div data-lbc-suggestions={id} style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 12, color: C.muted }}>{vendue ? 'Est-ce la même paire ?' : "C'est peut-être :"}</span>
+          <span style={{ fontSize: 12, color: C.muted }}>{vendue ? 'Est-ce le même article ?' : "C'est peut-être :"}</span>
           {sugg.map((s) => (
             <button key={s.numero} type="button" data-suggestion={s.numero} onClick={() => poser(s.numero)} title={s.titre || ''}
               style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, padding: '6px 10px 6px 6px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minHeight: 0 }}>
               {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}/> : null}
               <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
               <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
-              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accent }}>{vendue ? "C'est elle" : 'Relier'}</span>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accent }}>{vendue ? "C'est lui" : 'Relier'}</span>
             </button>
           ))}
         </div>
       )}
       {cleRangement && (
         <div style={{ marginTop: 8 }}>
-          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={{ ...btn, color: C.muted }}>{sugg.length ? 'Aucune de celles-là' : 'Pas de paire à relier'}</button>
+          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={{ ...btn, color: C.muted }}>{sugg.length ? 'Aucun de ceux-là' : 'Pas d’article à relier'}</button>
         </div>
       )}
     </div>
@@ -45418,7 +45418,7 @@ function LeboncoinScreen() {
       {data && data.doublons && data.doublons.length > 0 && (
         <Card style={{ borderColor: C.warn }}>
           <div data-lbc-doublons={data.doublons.length} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3 }}>
-            {data.doublons.length} paire{data.doublons.length > 1 ? 's' : ''} vendue{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
+            {data.doublons.length} article{data.doublons.length > 1 ? 's' : ''} vendu{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
           </div>
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 6 }}>
             Retire-{data.doublons.length > 1 ? 'les' : 'la'} de Vinted maintenant, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait pas à ta place : sur Vinted, c'est sans retour.
@@ -45440,8 +45440,8 @@ function LeboncoinScreen() {
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
                 {d.vintedUrl && <a href={d.vintedUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Ouvrir sur Vinted</a>}
                 {data.liensMain && String(data.liensMain[String(d.ad.id)] || '').trim() && (
-                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans paire » et tu pourras choisir la bonne.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
-                    style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.muted, cursor: 'pointer' }}>Pas la bonne paire</button>
+                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans article » et tu pourras choisir le bon.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
+                    style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.muted, cursor: 'pointer' }}>Pas le bon article</button>
                 )}
                 </div>
               </div>
@@ -45452,9 +45452,9 @@ function LeboncoinScreen() {
       {data && data.aRelierVentes && data.aRelierVentes.length > 0 && (
         <Card>
           <Titre data-lbc-ventes-a-relier={data.aRelierVentes.length}>
-            {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quelle paire ?
+            {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quel article ?
           </Titre>
-          <Sous>Une paire qui y ressemble est encore en vente sur Vinted. Si c'est la même, touche-la : je te dirai de la retirer de Vinted.</Sous>
+          <Sous>Un article qui y ressemble est encore en vente sur Vinted. Si c'est le même, touche-le : je te dirai de le retirer de Vinted.</Sous>
           {data.aRelierVentes.map(({ vente, ad, suggestions }) => (
             <LbcRelier key={String(vente.txId || ad.id)} ad={ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={suggestions} vendue
               cleRangement={'tx:' + (vente.txId || ad.id)}
@@ -45474,7 +45474,7 @@ function LeboncoinScreen() {
         const liste = rates.length === 1 ? rates[0] : rates.slice(0, -1).join(', ') + ' ni ' + rates[rates.length - 1];
         const effets = [
           data.preuveKO && 'la liste à publier peut contenir des paires déjà vendues sur Vinted',
-          data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted",
+          data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucun article vendu ici n'est encore en vente sur Vinted",
           data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
           data.echecLecture && 'la file à publier est incomplète',
         ].filter(Boolean);
@@ -51296,7 +51296,7 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
+      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
