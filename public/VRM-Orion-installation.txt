@@ -1,0 +1,55 @@
+VRM POUR ORION — IPHONE ET IPAD
+
+Version du moteur VRM : 5.222.0
+Paquet d’import WebExtension adapté à Orion, distinct du ZIP Chrome.
+Ni fiche de boutique ni application Safari signée par Apple.
+
+INSTALLATION
+
+1. Dans Orion, ouvrir le menu ••• puis Réglages.
+   Dans Extensions, autoriser l’installation des extensions Firefox.
+
+2. Télécharger le fichier avec Orion :
+   https://vrm.center/VRM-Orion.xpi
+   L’enregistrer dans Fichiers / Téléchargements.
+   Une copie ZIP du même contenu est aussi disponible :
+   https://vrm.center/VRM-Orion.zip
+
+3. Dans Orion : ••• > Extensions > + > installation depuis un fichier.
+   Choisir VRM-Orion.xpi dans Fichiers et accepter les permissions demandées.
+   Si le sélecteur ne propose pas ce format, utiliser la copie VRM-Orion.zip.
+   Installer UNE seule des deux copies : leur contenu est identique.
+
+4. Autoriser l’extension sur vrm.center et les plateformes utilisées.
+   Le mode Compatibilité d’Orion peut désactiver les extensions : le vérifier
+   sur ces sites si VRM ne s’affiche pas.
+
+5. Ouvrir https://vrm.center dans Orion et se connecter à son compte VRM.
+   Ouvrir ensuite Vinted ou Leboncoin dans CE MÊME Orion et se connecter.
+   Garder Orion au premier plan pendant la capture.
+
+VÉRIFICATION
+
+La présence d’un fichier installé ne prouve pas une synchronisation réussie.
+Vérifier que VRM affiche le bon compte connecté et les données effectivement
+reçues. Aucun message de test ni offre n’est nécessaire pour cette vérification.
+
+LIMITES À CONNAÎTRE
+
+Ce paquet a été contrôlé avec un validateur WebExtensions et des tests
+simulant les API et la liaison VRM. Il n’a pas été exécuté ici dans Orion
+sur un iPhone/iPad réel. La prise en charge des API d’extensions par Orion
+sur iOS est partielle, et iOS suspend les tâches en arrière-plan.
+
+Une API absente ne sera pas fabriquée et aucun compte ne sera deviné.
+Si Orion ne donne pas accès aux cookies de session protégés ou à l’injection
+nécessaire, la synchronisation ou certaines actions peuvent rester indisponibles.
+Un blocage de l’injection par le site ne peut pas être garanti résolu par ce paquet.
+
+SOURCE DES ÉTAPES D’INSTALLATION
+
+Documentation officielle Kagi, Orion iOS & iPadOS Web Extension Support :
+https://help.kagi.com/orion/browser-extensions/ios-ipados-extensions.html
+
+Source de cette documentation :
+https://github.com/kagisearch/kagi-docs/blob/main/docs/orion/browser-extensions/ios-ipados-extensions.md

@@ -18,6 +18,10 @@ export const LIENS_BOUTIQUES = {
   safari: '',    // https://apps.apple.com/app/<nom>/id<n> — l'app conteneur (Xcode, compte Apple)
 };
 
+// Fichier d’import dédié Orion ; ne constitue pas une fiche de boutique.
+export const LIEN_ORION_FICHIER = '/VRM-Orion.xpi';
+export const NOTICE_ORION = '/VRM-Orion-installation.txt';
+
 // ORION (Kagi) se présente exactement comme Safari. Kagi documente UN repère
 // pour le reconnaître : l'objet `window.KAGI` (aide d'Orion, page « technical »).
 // C'est un repère pour CHOISIR une phrase, jamais une capacité.
