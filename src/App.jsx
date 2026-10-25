@@ -39327,7 +39327,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
 
       {curSub==='achats' && (<div className="vrm-achats">
-        <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
+        <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>
         <RecusEmail recus={recusAchat} autres={nonRecusAchat} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
@@ -39345,7 +39345,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
         <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
-              C'est ça, un outil de réception : où en est chaque paire entre
+              C'est ça, un outil de réception : où en est chaque article entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
               un onglet vide se voit avant d'être ouvert. */}
           {(()=>{ const n={relais:0,route:0,recu:0};
@@ -39405,7 +39405,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unSeul = comptes.length===1;
           return (
             <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} article{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
               <div className="vrm-achats-bloc-p" style={{color:C.muted}}>L'étiquette de retour se génère sur Vinted — VRM ne l'envoie pas à ta place (compte en litige).</div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
@@ -39466,9 +39466,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // il est anormal (≥ 20 %) : c'est le seul chiffre à rattraper (§7).
             <div className="vrm-achats-kpis" style={{background:C.card,border:`1px solid ${C.border}`}}>
               {[
-                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} paire${vrais.length>1?'s':''}`, null],
-                ['Prix médian', fmtE0(med), 'par paire', null],
-                ['En route', fmtE0(somme(rte)), `${rte.length} paire${rte.length>1?'s':''}`, null],
+                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} article${vrais.length>1?'s':''}`, null],
+                ['Prix médian', fmtE0(med), 'par article', null],
+                ['En route', fmtE0(somme(rte)), `${rte.length} article${rte.length>1?'s':''}`, null],
                 ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.danger:null],
               ].map(([k,v,sub,col])=>(
                 <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
@@ -40289,7 +40289,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'}{tot>0 && <> — <span data-montant="" style={{whiteSpace:'nowrap'}}>{auMoins?'au moins ':''}{tot.toFixed(2).replace('.',',')} €</span> à vérifier</>}
               </div>
               <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
-                La paire ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.
+                L'article ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.
               </div>
               <div className="vrm-achats-bloc-liste">
                 {rendus.slice(0,8).map((r,ix)=>{
@@ -40387,7 +40387,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
                   {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.danger:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
-                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
+                  {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
@@ -40405,7 +40405,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ↩ Bordereau de retour sur Vinted
                     </a>
                     <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.4}}>
-                      Litige : la paire doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
+                      Litige : l'article doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
                     </div>
                   </div>
                 )}
@@ -41831,7 +41831,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux paires
             </div>
-            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux paires portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
+            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux articles portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
             {conflitsNum.slice(0,6).map(c=>{
               // Laquelle a reçu ce numéro par ERREUR ? Une annonce numérotée
               // automatiquement pendant la panne (`ficheAVerifier`), face à un
@@ -41943,7 +41943,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!ex.length) return (<>{lignePostes}
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
               Aucun colis à envoyer.<br/>
-              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
+              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, l'article apparaît ici — l'extension le capte sans que tu fasses rien.</span>
             </div></>
           );
           const sec = { flexShrink:0, borderRadius:10, padding:'0 14px', minHeight:44, boxSizing:'border-box', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit' };
@@ -42001,7 +42001,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    <Icon name="home" size={16}/>Où sont ces {nums.length} paire{nums.length>1?'s':''} dans le stock
+                    <Icon name="home" size={16}/>Où sont ces {nums.length} article{nums.length>1?'s':''} dans le stock
                   </button>
                 );
               })()}
@@ -42066,7 +42066,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           {num
                             ? <span className="vrm-colis-num" style={{fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px',flexShrink:0,fontVariantNumeric:'tabular-nums'}}>N°{num}</span>
-                            : <span className="vrm-colis-num" title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
+                            : <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:8,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
                         </div>
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
@@ -42088,7 +42088,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* ⚠️ LE CONFLIT DE NUMÉRO SE VOIT ICI, au moment où on
                             ferme le carton — pas seulement sur l'écran Annonces.
                             Julien : « si je me trompe entre deux colis, c'est deux
-                            ventes de perdues ». Un numéro porté par deux paires
+                            ventes de perdues ». Un numéro porté par deux articles
                             présentes est le seul défaut qui envoie la mauvaise
                             chaussure ; il doit crier là où se fait le geste. */}
                         {num && (()=>{
@@ -42100,7 +42100,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
-                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre paire dans Annonces.
+                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre article dans Annonces.
                               </span>
                             </div>
                           );
@@ -42166,9 +42166,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           celui de l'annonce, §24) : c'est toi qui le donnes, et il
                           est mémorisé sur la vente (`vinted_sale_overrides`). */}
                       {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
-                        const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
+                        const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cet article ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
-                      }} title="Poser le numéro de boîte de cette paire" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
+                      }} title="Poser le numéro de boîte de cet article" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
                       {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
                           fait, suivre) vivaient sur une deuxième rangée : sur un
                           colis sans PDF, la première n'avait plus qu'un bouton et
@@ -42634,7 +42634,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
               </div>
               {!lister ? (
-                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de la paire que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de l'article que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
               ) : (<>
                 {/* Prix conseillé */}
                 <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:10,padding:'13px 15px',marginBottom:14}}>
