@@ -26456,12 +26456,21 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // cartons), ou deux paires différentes hors garage (deux annonces, une
 // annonce et une autre vente…). Une vente et son annonce encore ouverte au
 // même titre restent la même paire (règle d'avant, inchangée).
+// ⚠️ 25 OCT — DÉCISION DE JULIEN : « ne montre plus en rouge un conflit venant
+// d'une vente ANNULÉE ». Une vente annulée ne part jamais : elle ne peut donc
+// pas être « la mauvaise paire qui s'expédie ». Elle garde son numéro dans
+// `porteursNum` (jamais réattribué, §5) mais ne compte PLUS comme un porteur
+// en conflit. Reste rouge un vrai conflit entre deux articles EN VENTE.
 function conflitsDeNumeros(porteurs) {
   const out = [];
   for (const n in (porteurs || {})) {
     const p = porteurs[n] || [];
     const cases = new Set(p.filter(x => x.type === 'garage').map(x => x.id));
-    const paires = p.filter(x => x.type !== 'garage');
+    // Une vente ANNULÉE ne part jamais : on ne la compte pas comme un porteur en
+    // conflit (25 oct., décision de Julien). Elle reste dans `porteursNum`, donc
+    // son numéro n'est jamais réattribué (§5) ; elle ne déclenche juste plus de
+    // rouge. Deux articles EN VENTE sous un même numéro restent un conflit.
+    const paires = p.filter(x => x.type !== 'garage' && x.type !== 'annulee');
     const ids = new Set(paires.map(x => x.type + ':' + x.id));
     let deux = cases.size > 1;
     if (!deux && paires.length > 1 && ids.size > 1) {
@@ -26484,8 +26493,11 @@ function conflitsDeNumeros(porteurs) {
 //     imprimé avec) ; toutes les annonces en ligne qui le portent changent ;
 //   · sinon, deux annonces en ligne ou plus : garde celle dont le numéro a été
 //     saisi À LA MAIN, puis celle numérotée la PREMIÈRE ; les autres changent ;
-//   · tout autre cas (deux cases du garage, une vente annulée encore là…) n'est
-//     PAS réglé tout seul : on ne devine pas (§5), le bloc rouge reste.
+//   · deux cases du garage, ou une vente annulée présente à côté d'un vrai
+//     conflit d'annonces : on ne devine pas (§5), ce conflit reste en rouge.
+// ⚠️ 25 OCT — Une vente ANNULÉE ne déclenche plus de rouge à elle seule
+//    (décision de Julien, voir conflitsDeNumeros) : seule avec une annonce, ce
+//    n'est plus un conflit, donc ça n'arrive jamais jusqu'ici.
 // Rend [{ id, ancien }] — les annonces à renuméroter. Fonction PURE.
 function doublonsAReattribuer(conflits, fiches) {
   const out = [];
