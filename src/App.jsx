@@ -31671,6 +31671,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const outilsTelephone = useEtroitReglages();
   const outilsOrdinateur = useOrdinateur();
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
+  // Astuce one-time : explique le numérotage auto (Julien, 25 oct. : « je ne sais
+  // pas pourquoi les numéros sont attribués comme ça »). Confort d'appareil, pas
+  // une donnée → localStorage ; refermée pour de bon au clic. §5 : n'explique
+  // que le comportement, ne touche à AUCUNE logique de numéro.
+  const [astuceNum, setAstuceNum] = useState(() => load('vrm_astuce_numeros', true) !== false);
   const [studioOpen, setStudioOpen] = useState(false); // « Studio photo » (cadre guide + détourage local)
   const [annToolsCote, setAnnToolsCote] = useState('droite'); // côté où s'ancre ce menu (mesuré au clic)
   // Encart « achats hors Vinted » (saisie occasionnelle) : replié par défaut.
@@ -40470,6 +40475,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" />
         <NoAcc/>
+        {astuceNum && listings.items?.length>0 && (
+          <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
+            <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
+            <div style={{flex:1,minWidth:0}}>VRM donne à chaque article un <b style={{color:C.text,fontWeight:600}}>numéro</b>, tout seul, dans l’ordre où tu l’as mis en ligne — pour le retrouver partout : sur ton étagère, sur Leboncoin, sur eBay. Tu peux le changer quand tu veux ; un numéro n’est jamais redonné à un autre article.</div>
+            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
+          </div>
+        )}
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
