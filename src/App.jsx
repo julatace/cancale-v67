@@ -1849,13 +1849,13 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
       <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger un article</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         {cellNom ? <>Case <b style={{color:C.text}}>{cellNom}</b> · </> : null}
-        {paires.length} paire{paires.length>1?'s':''} pas encore rangée{paires.length>1?'s':''}
+        {paires.length} article{paires.length>1?'s':''} pas encore rangé{paires.length>1?'s':''}
         {/* ⚠️ On ne fait pas semblant de savoir : quand l'écran Annonces n'a
             pas encore publié la liste des paires présentes, cette liste
             contient tout l'historique. On l'écrit, et on met les plus
             récentes en tête plutôt que de trier par numéro. */}
         {paires.length > 0 && !paires[0].sur && (
-          <><br/><span style={{color:C.warn}}>Les plus récentes en tête — ouvre une fois l'écran Annonces pour n'avoir que tes paires en stock.</span></>
+          <><br/><span style={{color:C.warn}}>Les plus récents en tête — ouvre une fois l'écran Annonces pour n'avoir que tes articles en stock.</span></>
         )}
       </div>
         </div>
@@ -1867,7 +1867,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
       {liste.length === 0 && (
         <div style={{fontSize:12.5,color:C.muted,padding:'14px 2px',lineHeight:1.5}}>
           {paires.length === 0
-            ? "Aucune paire en attente de rangement : tout ce que tu as en stock est déjà posé dans une case."
+            ? "Aucun article en attente de rangement : tout ce que tu as en stock est déjà posé dans une case."
             : "Rien ne correspond à cette recherche."}
         </div>
       )}
@@ -11109,7 +11109,7 @@ const PLUS_TABS=[
      restent dans le centre de notifications (job « Répondre à N messages »), qui
      ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
      simplement plus dans le menu. */
-  {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
+  {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangé chaque article'},
   /* La carte de la communauté (20 oct., migration 018) : opt-in, la ville seule, messages entre revendeurs. */
   {id:'communaute',   icon:'pin',     emoji:'📍',label:'Communauté',   desc:'La carte des revendeurs VRM, et leur messagerie'},
   /* ⚠️ « Masqués » RETIRÉ du menu le 1er oct. (demande de Julien : « dans les
@@ -23712,7 +23712,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const nv = await askText({ numeric: true, desc: 'Combien de niveaux (plateaux) sur cette étagère ?', value: String(t.rows) });
       if (nv == null) return;
       nivChoisi = Math.max(1, Math.min(10, parseInt(nv, 10) || t.rows));
-      const cs = await askText({ numeric: true, desc: 'Combien de cases par niveau (paires côte à côte) ?', value: String(t.cols) });
+      const cs = await askText({ numeric: true, desc: 'Combien de cases par niveau (articles côte à côte) ?', value: String(t.cols) });
       if (cs == null) return;
       casesChoisies = Math.max(1, Math.min(16, parseInt(cs, 10) || t.cols));
     }
@@ -24436,7 +24436,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       if (!bouge) { setPairePrete(x => x === p.numero ? null : p.numero); return; }
       const cible = document.elementFromPoint(ev.clientX, ev.clientY);
       if (cible && cible.closest && cible.closest('[data-stock3d] canvas') ? deposerSur(p.numero, ev.clientX, ev.clientY) : false) return;
-      toast('Lâche la paire sur une étagère, une table, un portant ou une pile dans la pièce.');
+      toast('Lâche l\'article sur une étagère, une table, un portant ou une pile dans la pièce.');
     };
     const annule = () => { window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule); if (f) f.style.display = 'none'; };
     window.addEventListener('pointermove', suivre, { passive: false }); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', annule);
@@ -24476,7 +24476,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div data-bande-a-ranger={aRanger.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
-              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} paire{aRanger.length > 1 ? 's' : ''} · touche-en une, ou glisse-la dans la pièce</span>
+              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
             </div>
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {aRanger.slice(0, 60).map(p => {
@@ -24510,10 +24510,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 650, color: C.text }}>
-              {chercheLoc.length} paire{chercheLoc.length > 1 ? 's' : ''} à aller chercher
+              {chercheLoc.length} article{chercheLoc.length > 1 ? 's' : ''} à aller chercher
               <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
             </span>
-            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les paires à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
+            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
           </div>
           {chercheLoc.map(x => (
             <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
@@ -25297,7 +25297,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
+      <ScreenHead icon="home" title="Stock" desc="Où sont rangés tes articles. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
