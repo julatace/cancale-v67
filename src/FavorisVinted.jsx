@@ -3,6 +3,7 @@ import {lireFavorisVinted,preparerMessageFavori,ageFavori,contactFavori} from '.
 import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris} from './reglagesFavoris.js';
 import {controleOuvertureFavori,echecVerificationFavori} from './favorisOuverture.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
+import DiagnosticFavoris from './DiagnosticFavoris.jsx';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
 // secours par l'extension, pictogramme), fourni par l'app. Sans lui, aucune
 // image : une photo Vinted affichée hors de la règle partirait cassée.
@@ -145,5 +146,6 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     </>}
     {uid&&owner&&executerFavori&&<AutomatisationFavoris revisionVerification={revisionVerification} onErreur={setControleEnvoi} masquerSansSelection key={scope} uid={uid} owner={owner} ownerActuel={ownerActuel} headers={headers} selection={selection} reglagesPrets={!!reglages.enregistres&&!reglages.sauvegarde} reglages={{message,pourcentage:reduction,intervalleMinutes:intervalle}} preparerReglages={preparerReglages} executer={executerFavori} disponible={favorisDisponible} raisonExtension={favorisRaison} verifierExtension={verifierExtension} onEtat={vue=>setHistorique({scope,vue})}/>}
 
+    <DiagnosticFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} controle={controle} controleEnvoi={controleEnvoi}/>
   </section>;
 }

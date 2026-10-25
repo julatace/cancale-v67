@@ -28,3 +28,17 @@ test('le refus de capture distingue le format natif et la sauvegarde',()=>{
  assert.equal(echecVerificationFavori({ok:true,data:{preuve:'confirmee'}}),'');
  assert.ok(!echecVerificationFavori({ok:true,data:{preuve:'non_confirmee',raison:'https://secret.invalid/token'}}).includes('secret'));
 });
+
+test('le rapport de capture contient aussi le résultat contrôlé de l’ouverture',async()=>{
+ const {rapportAssistanceFavoris,bilanOuvertureFavori}=await import('../../src/favorisOuverture.js');
+ const capture={diagnostic:'VRM-favoris-structure-v5',reception:'capture_disponible'};
+ const c=lire({ok:false,data:{code:'favori_non_trouve',version:'5.223.0'},controleOuverture:{etape:'commande'}});
+ const rapport=rapportAssistanceFavoris(capture,c,{code:'favoris_preuve_absente',diagnostic:{selection:3,secret:'prive',notifications:-1}});
+ assert.equal(rapport.verification.extension,'5.223.0');assert.equal(rapport.verification.code,'favori_non_trouve');
+ assert.deepEqual(rapport.lancement.diagnostic,{selection:3});assert.equal(rapport.diagnostic,capture.diagnostic);
+ assert.match(bilanOuvertureFavori(c),/n’a pas été retrouvé/);
+ assert.deepEqual(rapportAssistanceFavoris(capture,null,null).verification,{etat:'aucune_verification_dans_cette_vue'});
+ assert.match(bilanOuvertureFavori(null),/Aucune vérification/);
+ const malveillant={extension:'secret',code:'secret',raison:'secret',etape:'secret',preuve:'secret',url:'secret'};
+ assert.ok(!JSON.stringify(rapportAssistanceFavoris(capture,malveillant,malveillant)).includes('secret'));
+});

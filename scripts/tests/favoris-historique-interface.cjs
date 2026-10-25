@@ -65,6 +65,12 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  await p.getByRole('button',{name:'Copier le contrôle',exact:true}).click();const refus=await p.evaluate(()=>JSON.parse(window.controleCopie));
  check(refus.extension==='5.221.0'&&refus.code==='notifications_non_affichees'&&refus.etape==='commande'&&!refus.lancement,'la version mesurée et le refus sont copiés, sans recycler le lancement précédent');
 
+ await p.getByText('Assistance technique · favoris',{exact:true}).click();
+ await p.getByRole('button',{name:'Vérifier la capture des notifications',exact:true}).click();
+ await p.getByRole('button',{name:'Copier le diagnostic',exact:true}).click();
+ const assistance=await p.evaluate(()=>JSON.parse(window.controleCopie));
+ check(assistance.verification.extension==='5.221.0'&&assistance.verification.code==='notifications_non_affichees','le diagnostic détaillé reprend le contrôle de la vraie ouverture du composant parent');
+ check(!assistance.lancement,'le rapport ne recycle pas un refus de lancement effacé');
  check(await p.evaluate(()=>window.envois===0&&window.pages===2),'loading history never dispatches a message');
  check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal overflow');
  if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'historique-'+width+'.png'),fullPage:true});}await p.close();}}

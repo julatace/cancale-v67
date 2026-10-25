@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **25 octobre — favoris, rapport unifié :** l’assistance joint maintenant le
+> dernier contrôle d’ouverture à la structure de capture, avec version et codes
+> contrôlés. Ce changement corrige le diagnostic incomplet, pas un parcours réel
+> Vinted dont la cause reste non déterminée. Extension toujours 5.223.0.
+> Voir `docs/passation/2026-10-25-favoris-rapport-ouverture.md`.
+
 > **25 octobre — favoris 5.223 :** défaut reproduit sans scripting : le
 > parcours utilise désormais le relais adressé de la page, commandes fermées
 > sans envoi ni rejeu après clic incertain. Le contexte ne peut plus être
