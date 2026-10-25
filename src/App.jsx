@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.221.0';
+const EXT_ATTENDUE = '5.222.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -387,7 +387,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    messages aux favoris) PUBLIÉES par `main` n'ont pas `capterSuivisAchats`.
 //    À 5.214 ou 5.215, l'app promettait « l'extension relève le suivi » à une
 //    extension qui ne le fait pas (revue du 24 oct.).
-const EXT_CAPACITES = { favorisouvrir:'5.221.0', favorisliste:'5.218.0', suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.222.0', favorisliste:'5.218.0', suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -6226,6 +6226,18 @@ const normalizeConversationMessages = (conversation) => {
     const links = extractLinks(e);
     if (m.entity_type === 'message') {
       return { kind: 'message', mine:e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), body: e.body || '', photos:Array.isArray(e.photos)?e.photos:[], ts, links };
+    }
+    if(m.entity_type==='offer_request_message'){
+      const brutPrix=e.price&&typeof e.price==='object'?e.price.amount:e.price;
+      const montant=typeof brutPrix==='number'?brutPrix:typeof brutPrix==='string'&&/^\d+(?:[,.]\d{1,2})?$/.test(brutPrix.trim())?Number(brutPrix.replace(',','.')):null;
+      if(Number.isFinite(montant)&&montant>0){
+        const deviseBrute=e.price?.currency_code||e.price?.currency;
+        const devise=typeof deviseBrute==='string'&&/^[A-Z]{3}$/.test(deviseBrute)?deviseBrute:null;
+        const sens=e.user_id!=null&&oppId!=null?(String(e.user_id)===String(oppId)?'recue':'envoyee'):'inconnu';
+        const titre=typeof e.status_title==='string'?e.status_title.trim().slice(0,120):'';
+        const statut=titre&&!/^[a-z]+(?:_[a-z]+)+$/.test(titre)?titre:e.current===false?'Offre précédente':e.status===10?'En attente':'Statut non disponible';
+        return {kind:'offer',body:'',offre:{montant,devise,sens,statut},ts,links};
+      }
     }
     // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
     // codes de retrait compris.
@@ -13213,7 +13225,7 @@ function etatExtensionFavoris(uid,mesure=null){
   if(!mesure&&codePerime())return {disponible:false,raison:textePerime()};
   if(!mesure&&!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
   const version=e?.ok?String(e.version||''):vmrExtVersion();
-  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.221.`};
+  if(!/^\d+\.\d+\.\d+$/.test(version)||cmpVersion(version,EXT_CAPACITES.favoris)<0)return {disponible:false,raison:`Version détectée : ${version||'non confirmée'}. Installe puis recharge l’extension 5.222.`};
   if(e?.vrm?.connecte!==true||String(e.vrm.user_id||'')!==String(AUTH.user?.id||''))return {disponible:false,raison:'L’extension doit être connectée au même compte VRM que cette page. Ouvre l’extension et connecte-la à VRM avant de relancer.'};
   const actif=String(e?.vinted?.uid||'');
   if(actif&&uid&&actif!==String(uid))return {disponible:false,raison:'Le navigateur est connecté à un autre compte Vinted. Connecte le compte sélectionné avant de lancer.'};
@@ -13251,8 +13263,8 @@ function FavorisConnectes(props){
     const version=String((transport.current?.mode==='direct'?directVu.current?.etat:__vmrEtat)?.code||'');
     const retour=(r,etape)=>lire==='ouvrir'?{...r,controleOuverture:{version,etape}}:r;
     if(!e.disponible)return retour({ok:false,code:'preparation-refusee',error:e.raison},'connexion');
-    if(lire==='ouvrir'&&cmpVersion(version,EXT_CAPACITES.favorisouvrir)<0)return retour({ok:false,error:'L’ouverture avec vérification nécessite l’extension 5.221. Mets à jour l’extension existante puis recharge-la.'},'version');
-    if(lire===true&&cmpVersion(version,'5.218.0')<0)return {ok:false,error:'La récupération complète nécessite une extension à jour. Installe la 5.221 puis recharge-la.'};
+    if(lire==='ouvrir'&&cmpVersion(version,EXT_CAPACITES.favorisouvrir)<0)return retour({ok:false,error:'L’ouverture avec vérification nécessite l’extension 5.222. Mets à jour l’extension existante puis recharge-la.'},'version');
+    if(lire===true&&cmpVersion(version,'5.218.0')<0)return {ok:false,error:'La récupération complète nécessite une extension à jour. Installe la 5.222 puis recharge-la.'};
     const endpoint=lire==='ouvrir'?'/vrm/favoris/ouvrir':lire?'/vrm/favoris/lire':'/vrm/favoris';
     const body=lire==='ouvrir'?{owner:props.owner,notificationId:t.id}:lire?t:{jeton:t.jeton};
     if(transport.current?.mode==='direct'){
@@ -35443,7 +35455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current;
     setReplyText('');setReplyErr(null);setReplyBusy(false);setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
-    setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.description,photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
+    setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:res.conversation,messages:normalizeConversationMessages(res.conversation)}):o);
   };
@@ -37634,7 +37646,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {openConv.header?.photo?<PhotoVinted src={openConv.header.photo} alt="" style={{width:36,height:36,borderRadius:10,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
               <div className="vrm-chat-head-t">
                 <div className="vrm-chat-head-n" style={{color:C.text}}><span className="vrm-sensible">{openConv.header?.login||'Conversation'}</span></div>
-                <div className="vrm-chat-head-s" style={{color:C.muted}}>{[openConv.header?.title, accName(openConv.acc)].filter(Boolean).join(' · ')}</div>
+                <div className="vrm-chat-head-s" style={{color:C.muted}}>{[openConv.conversation?.transaction?.item_title||openConv.conversation?.transaction?.item?.title||openConv.header?.title, accName(openConv.acc)].filter(Boolean).join(' · ')}</div>
               </div>
               <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
@@ -37679,7 +37691,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
                 const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
                 return <React.Fragment key={i}>{sep}{(
-                m.kind==='event'
+                m.kind==='offer'
+                  ? <div className="vrm-chat-offer-event" data-offer-side={m.offre.sens}>
+                      <div><span>{m.offre.sens==='recue'?'Offre reçue':m.offre.sens==='envoyee'?'Offre envoyée':'Offre'}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
+                      <div><small>{m.offre.statut}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+                    </div>
+                  : m.kind==='event'
                   // Un évènement sans aucun texte lisible ne donne que son type
                   // technique (« offer_request_message ») : ce n'est pas un message
                   // pour lui. L'offre, elle, a sa carte sous le fil.
@@ -37735,20 +37752,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-chat-offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
                       {off && (
                         <div className="vrm-chat-offre-l">
-                          <span className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b></span>
+                          <span className="vrm-chat-offre-t" style={{color:C.text}}><small className="vrm-chat-offre-label">Offre reçue · à traiter</small><b data-montant="">{fmtE(off.prix)}</b></span>
                           <button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1}}>Accepter</button>
                           <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button>
                         </div>
                       )}
                       {tx && (
-                        <div className="vrm-chat-offre-l">
-                          <span className="vrm-chat-offre-k" style={{color:C.muted}}>{off?'Contre-offre':'Faire une offre'}</span>
-                          <input className="vrm-chat-prix" inputMode="decimal" disabled={ro} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                        <details className="vrm-chat-negociation" open={!off||!!prixOffre}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
+                          <span className="vrm-chat-offre-k" style={{color:C.muted}}>Ton prix</span>
+                          <input className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
                             style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
                           <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
-                        </div>
+                        </div></details>
                       )}
-                      {offreMsg && <div style={{fontSize:12,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
+                      {offreMsg && <div role={offreMsg.err?'alert':'status'} aria-live="polite" style={{fontSize:12,marginTop:6,color:offreMsg.err?C.danger:C.text}}>{offreMsg.err||('✓ '+offreMsg.ok)}</div>}
                     </div>
                   );
                 })()}
@@ -41296,7 +41313,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const choixExplicite = !!compteSel && compteSel!=='*' && String(compteSel)===selEff;
           const filtreMsg = choixExplicite ? selEff : (msgCompteActif ? '' : selEff);
           const prioMsg = !filtreMsg && msgCompteActif ? msgCompteActif : '';
-          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!filtreMsg || uidC(c)===filtreMsg) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
+          const liste=(convs.items||[]).filter(c=>!acctOffOf(c) && (!filtreMsg || uidC(c)===filtreMsg) && (!messageSearch.trim() || `${c.opposite_user?.login || ''} ${c.description || ''} ${c.item_title||c.item?.title||''}`.toLowerCase().includes(messageSearch.trim().toLowerCase())));
           // ⚠️⚠️ LE NOMBRE VIENT DE LA LISTE AFFICHÉE (§5, §11 — revue du
           //    8 octobre). Depuis que les autres comptes sont estompés au lieu
           //    d'être retirés, `liste` les contient tous ; or ce compte ne
@@ -41372,7 +41389,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
                   <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
-                  {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres <span>{nOffres}</span></button>}
+                  {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres reçues <span>{nOffres}</span></button>}
                 </div>
                 <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : liste.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
@@ -41477,7 +41494,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
         })()}
         </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Messages, offres et suivi de colis.</small></div>}</div></div>
-        <details className="vrm-quick-settings"><summary>Réponses rapides</summary>
+        {zoneMessages==='conversations'&&<details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
@@ -41500,7 +41517,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6}}>Ils apparaissent aussi dans chaque conversation : un clic remplit la réponse.</div>
         </div>
-        </details>
+        </details>}
       </>)}
 
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}

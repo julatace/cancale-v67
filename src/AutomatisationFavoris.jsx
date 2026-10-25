@@ -1,9 +1,14 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false,onErreur}){
+export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false,onErreur,revisionVerification=0}){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
   React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null);},[erreur,controleErreur]);
+  const revisionVue=React.useRef(revisionVerification);
+  React.useEffect(()=>{
+    if(revisionVue.current===revisionVerification)return;revisionVue.current=revisionVerification;
+    if(!vue?.active&&!busy.current&&!mutation.current&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(controleErreur?.code)){setErreur('');setControleErreur(null);}
+  },[revisionVerification]);
   const courant=()=>vivant.current&&ownerActuel()===owner;
   const adopter=j=>{if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(Array.isArray(j.vue?.jobs)&&onEtat)onEtat(j.vue);};
   const api=async(action,donnees={},h=headers())=>{
@@ -81,7 +86,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
     <summary>Envoi automatique aux favoris</summary>
     <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
-    <p>Garde cet écran ouvert et visible, avec l’extension 5.221 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
+    <p>Garde cet écran ouvert et visible, avec l’extension 5.222 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
     {!disponible&&<p>{raisonExtension||'La connexion à l’extension sera vérifiée au lancement.'}</p>}
     {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">

@@ -182,3 +182,16 @@
 @media(max-width:767px){.vrm-messages-sections{width:100%;}.vrm-messages-sections button{flex:1;padding:8px 10px;font-size:12px;}}
 .vrm-favoris-rows .vrm-favoris-ouvrir{grid-column:4;grid-row:1;}
 @media(max-width:767px){.vrm-favoris-rows .vrm-favoris-ouvrir{width:44px;padding:0;}.vrm-favoris-ouvrir>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}}
+
+/* Negotiations: history and the current action have distinct roles. */
+.vrm-chat-offer-event{align-self:stretch;border:1px solid var(--vrm-line);border-radius:10px;padding:9px 11px;background:var(--vrm-surface);color:var(--vrm-ink);margin:3px 0;}
+.vrm-chat-offer-event>div{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;}
+.vrm-chat-offer-event strong{font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.vrm-chat-offer-event span{font-size:12px;font-weight:600;}.vrm-chat-offer-event small,.vrm-chat-offer-event time{font-size:11px;color:var(--vrm-muted);}
+.vrm-chat-offer-event[data-offer-side="envoyee"]{border-inline-start:3px solid var(--vrm-accent,#244e54);}
+.vrm-chat-offre-label{display:block;font-size:11px;font-weight:500;color:var(--vrm-muted);margin-bottom:3px;}
+.vrm-chat-negociation{margin-top:9px;border-top:1px solid var(--vrm-line);padding-top:5px;}
+.vrm-chat-negociation>summary{cursor:pointer;min-height:36px;display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--vrm-ink);list-style:none;}
+.vrm-chat-negociation>summary::after{content:'+';margin-left:auto;font-size:16px;}.vrm-chat-negociation[open]>summary::after{content:'−';}
+.vrm-chat-negociation .vrm-chat-offre-l{padding:4px 0;}
+@media(max-width:767px){.vrm-chat-negociation>summary{min-height:44px;}.vrm-chat-offer-event{padding:8px 10px;}.vrm-chat-offer-event strong{font-size:15px;}}

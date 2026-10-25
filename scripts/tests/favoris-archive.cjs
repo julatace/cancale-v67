@@ -81,6 +81,26 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  f.ctx.chrome.tabs.get=async()=>({id:99,url:'https://www.vinted.fr/inbox/900'});
  for(const [m,st] of [['POST',200],['GET',403]])await f.ctx.capterLectureFavori('111','www.vinted.fr','900',fil,'/api/v2/conversations/900',99,'owner-A',m,st);
  check((await zone.get('vrmFavoriOnglet_99')).vrmFavoriOnglet_99.etat==='attente','une écriture ou un refus HTTP ne devient pas une preuve de lecture');
- f.ctx.chrome.tabs.query=async()=>[];const absent=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(!absent.ok&&absent.json.message.includes('notifications sur Vinted')&&onglets.length===0,'lien absent : refus explicite sans route directe de secours');
+ let focus=false,cloche=false,sondes=0,cliques=0;
+ f.ctx.chrome.tabs.update=async(id,o)=>{check(id===99&&o.active===true&&!o.url,'l’onglet Vinted est activé avant la cloche');focus=true;};
+ f.ctx.chrome.scripting.executeScript=async o=>{
+  if(o.func.name==='clocheFavorisNative'){
+   check(o.args[1]==='https://www.vinted.fr','la cloche est bornée à l’origine du lien natif');
+   if(o.args[0]){check(focus,'la cloche est rouverte seulement après activation de Vinted');cloche=true;cliques++;}
+   return [{result:{etat:o.args[0]?'activee':'disponible'}}];
+  }
+  if(!o.args[1])return [{result:{trouve:cloche&&++sondes>=2}}];
+  check(cloche,'le lien exact n’est activé qu’après apparition dans la cloche');
+  await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:101,opposite_user_id:201}),null,99);
+  return [{result:{trouve:true}}];
+ };
+ const ferme=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});
+ check(ferme.ok&&ferme.json.preuve==='confirmee'&&cliques===1,'une cloche fermée au retour dans VRM est rouverte une seule fois et produit un reçu réel');
+ const avantManquant=f.rows.get('harvest_111_favoris_archive').data.creations.length;
+ f.ctx.chrome.scripting.executeScript=async o=>o.func.name==='clocheFavorisNative'?[{result:{etat:o.args[0]?'activee':'disponible'}}]:[{result:{trouve:false}}];
+ const manquant=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});
+ check(!manquant.ok&&manquant.json.code==='favori_non_trouve'&&manquant.json.version==='5.222.0','cloche activée sans lien exact : refus spécifique et version conservée');
+ check(f.rows.get('harvest_111_favoris_archive').data.creations.length===avantManquant,'un autre favori n’est jamais substitué à celui demandé');
+ f.ctx.chrome.tabs.query=async()=>[];const absent=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(!absent.ok&&absent.json.code==='cloche_introuvable'&&onglets.length===0,'lien absent : refus explicite sans route directe de secours');
  console.log(controles+' contrôles archive et pagination réussis');
 })().catch(e=>{console.error(e);process.exitCode=1;});

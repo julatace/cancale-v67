@@ -17,3 +17,7 @@ test('seul un reçu positif permet la confirmation',()=>{
  assert.equal(lire({ok:false,data:{ouvert:true,preuve:'confirmee'}}).preuve,'ouverture_non_confirmee');
  assert.equal(lire({ok:false,error:'Aucune réponse dans ce profil Chrome.'}).code,'extension_sans_reponse');
 });
+
+test('le refus distingue la cloche introuvable du favori absent après ouverture',()=>{
+ for(const code of ['cloche_introuvable','cloche_indisponible','favori_non_trouve']){const d=lire({ok:false,data:{version:'5.222.0',code},controleOuverture:{etape:'commande'}});assert.equal(d.code,code);assert.equal(d.extension,'5.222.0');assert.equal(d.ouvert,false);}
+});

@@ -1,5 +1,13 @@
 # VRM — dossier de passation
 
+> **25 octobre — 5.222, cloche et messagerie :** le client confirme que la
+> cloche se referme en revenant dans VRM. Nouveau parcours : activer Vinted,
+> rouvrir une cloche native identifiable, attendre le lien exact, puis ouvrir
+> le fil. Pas de message de test. Historique des offres reçu/envoyé, contre-offre
+> repliée, titre d’article fiable, ancien refus retiré lors de la vérification.
+> Voir `docs/passation/2026-10-25-favoris-cloche-messages-offres.md`.
+> Sites concurrents inaccessibles (403) et DOM réel non vérifié ici.
+
 > **24 octobre — vérification visible :** bouton texte « Vérifier un favori »
 > au-dessus de la liste, résultat et contrôle remontés avant celle-ci.
 > Aucun envoi ni nouvelle extension ; cause du refus client toujours inconnue.

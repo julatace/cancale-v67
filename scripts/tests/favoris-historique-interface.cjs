@@ -55,7 +55,10 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check(!JSON.stringify(controle).includes('secret-prive')&&!JSON.stringify(controle).includes('987654321'),'les champs inconnus et valeurs hors limites ne sont pas copiés');
 
  await p.getByRole('searchbox',{name:'Rechercher un favori'}).fill('');
- await p.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();await p.evaluate(()=>window.accuserOuverture({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}}));
+ await p.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
+ await p.getByRole('alert').filter({hasText:'Le destinataire n’est pas confirmé.'}).waitFor({state:'hidden'});
+ check(await p.getByRole('alert').filter({hasText:'Le destinataire n’est pas confirmé.'}).count()===0,'une nouvelle vérification retire uniquement l’ancien refus de raccordement');
+ await p.evaluate(()=>window.accuserOuverture({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}}));
  await p.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
  check(await p.getByRole('alert').filter({hasText:'Ouvre les notifications sur Vinted'}).count()===1,'un refus réel d’ouverture est affiché comme une erreur, pas un état discret');
  check(await p.getByText('Capture en attente',{exact:true}).count()===0,'une ouverture refusée ne reste pas affichée en attente');

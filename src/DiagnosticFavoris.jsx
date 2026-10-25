@@ -20,13 +20,13 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
     catch { if (requete.current === numero) setEtat(x=>({...x,retour:'Copie indisponible : sélectionne le texte ci-dessous.'})); }
   };
   return <details className="vrm-favoris-diagnostic"><summary>Assistance technique · favoris</summary>
-    <p>Cette vérification sert à relier les notifications aux bonnes conversations, sans envoyer de message. Le statut des envois apparaît dans la file du compte.</p>
-    <p>Sur Vinted, ouvre la cloche puis un favori avec ce compte, comme tu le fais habituellement. Reviens ensuite ici, sans envoyer de message de test. Le diagnostic contient uniquement les noms et types des champs, sans pseudo, message, lien ou identifiant personnel.</p>
+    <p>Pour un blocage d’ouverture, utilise d’abord « Vérifier un favori » puis « Copier le contrôle » au-dessus de la liste. Ce diagnostic détaillé décrit les données captées ; il ne confirme pas un envoi.</p>
+    <p>Ce contrôle technique ne déclenche aucune action sur Vinted. Il contient uniquement les noms et types des champs, sans pseudo, message, lien ou identifiant personnel.</p>
     {!uid&&<p>Choisis le compte Vinted à vérifier dans le sélecteur de compte.</p>}
     <button type="button" disabled={!uid||!owner||etat.occupe} onClick={verifier}>{etat.occupe?'Vérification…':'Vérifier la capture des notifications'}</button>
     {etat.erreur&&<p role="alert">{etat.erreur}</p>}
     {etat.rapport&&<>
-      <p role="status">{etat.rapport.reception==='aucune_capture'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis réessaie.':'Capture reçue. Tu peux partager ce diagnostic pour terminer le raccordement.'}</p>
+      <p role="status">{etat.rapport.reception==='aucune_capture'?'Aucune capture reçue pour ce compte. Ouvre la cloche Vinted avec l’extension connectée, puis réessaie.':'Capture reçue. Sa structure est disponible ci-dessous pour l’assistance technique.'}</p>
       {etat.rapport.creation?.traces?.find(t=>t.api==='v2')?.rapprochement?.etat==='article_absent_de_la_capture'&&<p>La dernière conversation captée concerne un autre article que ceux de cette capture. Ce diagnostic ne confirme donc pas le destinataire des favoris sélectionnés.</p>}
       {etat.rapport.creation?.traces?.find(t=>t.api==='v2')?.rapprochement?.etat==='destinataire_non_confirme'&&<p>L’article correspond, mais le membre de la conversation ne correspond pas au champ utilisé par VRM. Copie le diagnostic ci-dessous pour corriger ce raccordement ; aucun message ne sera envoyé entre-temps.</p>}
       {etat.rapport.traces?.versionExtension&&<p>Version enregistrée dans les traces : {etat.rapport.traces.versionExtension}.</p>}
