@@ -86,7 +86,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
     <summary>Envoi automatique aux favoris</summary>
     <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
-    <p>Garde cet écran ouvert et visible, avec l’extension 5.223 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
+    <p>Garde cet écran ouvert et visible, avec l’extension 5.224 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
     {!disponible&&<p>{raisonExtension||'La connexion à l’extension sera vérifiée au lancement.'}</p>}
     {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">

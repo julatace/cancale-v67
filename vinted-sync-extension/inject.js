@@ -162,8 +162,22 @@ function suivreFavoriAffiche(cible,activer=false){
 function clocheFavorisNative(activer=false,origine){
  if(location.origin!==origine)return {etat:'origine'};
  const label=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
- const reconnu=v=>/^(?:(?:ouvrir|afficher|voir|open|show|view) (?:les |the )?)?notifications?(?: \([0-9]+\)| [0-9]+)?$/.test(label(v));
- const boutons=[...document.querySelectorAll('button,[role="button"]')].filter(b=>b.getClientRects().length&&getComputedStyle(b).visibility!=='hidden'&&getComputedStyle(b).display!=='none'&&(reconnu(b.getAttribute('aria-label'))||reconnu(b.getAttribute('title'))));
+ const reconnu=v=>/^(?:(?:mes|my|le mie|meine) |(?:(?:ouvrir|afficher|voir|open|show|view) (?:les |the )?))?(?:notifications?|notifiche|benachrichtigungen)(?:\s*[:·,–-]?\s*\(?[0-9]{1,5}\+?\)?(?: (?:non lues?|unread|non lette|ungelesen))?)?$/.test(label(v));
+ const nom=b=>{
+  // Follow accessible-name precedence. A labelled child must not override an
+  // explicit parent label (e.g. a destructive control containing an icon).
+  const ids=(b.getAttribute('aria-labelledby')||'').trim().split(/\s+/).filter(Boolean);
+  if(ids.length){const refs=ids.map(id=>document.getElementById(id));if(refs.some(x=>!x))return '';return refs.map(x=>x.textContent||'').join(' ');}
+  if(b.hasAttribute('aria-label'))return b.getAttribute('aria-label');
+  const texte=(b.innerText||'').trim();if(texte)return texte;
+  return b.getAttribute('title')||b.querySelector('svg title')?.textContent||'';
+ };
+ const boutons=[...document.querySelectorAll('button,[role="button"],a[href]')].filter(b=>{
+  if(!b.getClientRects().length||getComputedStyle(b).visibility==='hidden'||getComputedStyle(b).display==='none'||b.closest('[inert],[aria-hidden="true"]'))return false;
+  if(b.tagName==='A'){try{const u=new URL(b.href,location.href);if(u.origin!==origine||u.protocol!=='https:')return false;}catch{return false;}}
+  if(b.tagName==='BUTTON'&&b.form&&b.type==='submit')return false;
+  return reconnu(nom(b));
+ });
  if(boutons.length!==1)return {etat:boutons.length?'ambigue':'absente'};
  const b=boutons[0];if(b.disabled||b.getAttribute('aria-disabled')==='true')return {etat:'indisponible'};
  const ouverte=b.getAttribute('aria-expanded')==='true';
