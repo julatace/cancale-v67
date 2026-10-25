@@ -1,7 +1,7 @@
 import React from 'react';
 import {lireFavorisVinted,preparerMessageFavori,ageFavori,contactFavori} from './favorisVinted.js';
 import {lireReglagesFavoris,sauverReglagesFavoris,validerReglagesFavoris} from './reglagesFavoris.js';
-import {controleOuvertureFavori} from './favorisOuverture.js';
+import {controleOuvertureFavori,echecVerificationFavori} from './favorisOuverture.js';
 import AutomatisationFavoris from './AutomatisationFavoris.jsx';
 // La photo vient du CDN de Vinted : elle passe par `PhotoVinted` (sans référent,
 // secours par l'extension, pictogramme), fourni par l'app. Sans lui, aucune
@@ -82,7 +82,10 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       setControle(controleOuvertureFavori(r));
       if(!r?.ok)throw Error(r?.data?.message||r?.error||'L’ouverture n’a pas été confirmée.');
       setVerifications(v=>({...v,[x.id]:r.data?.preuve||'en_attente'}));
-      retourVinted.current=true;setRetour(r.data?.preuve==='confirmee'?'Le lien natif a été enregistré. Reviens ici pour actualiser la sélection. Aucun message envoyé.':'Vinted est ouvert. La capture n’est pas encore confirmée. Reviens ici après le chargement. Aucun message envoyé.');
+      const echec=echecVerificationFavori(r);
+      if(echec){retourVinted.current=false;setErreurOuverture(echec);setRetour('');}
+      else{retourVinted.current=true;setRetour(r.data?.preuve==='confirmee'?'Le lien natif a été enregistré. Reviens ici pour actualiser la sélection. Aucun message envoyé.':'Vinted est activé, mais la page n’a pas encore confirmé la liaison avec ce favori. Aucun message envoyé.');}
+
     }catch(e){if(ownerActuel()===owner&&n===requete.current){setErreurOuverture(e.message||'La vérification n’a pas abouti.');setVerifications(v=>({...v,[x.id]:'non_confirmee'}));setControle(c=>c||controleOuvertureFavori({ok:false,controleOuverture:{etape:'exception'}}));setRetour('');}}
     finally{if(ownerActuel()===owner&&n===requete.current){ouvrirEnCours.current=false;setOuverture('');if(retourVinted.current&&document.visibilityState==='visible'&&document.hasFocus())setTimeout(()=>{if(retourVinted.current&&!ouvrirEnCours.current&&ownerActuel()===owner&&n===requete.current){retourVinted.current=false;charger();}},600);}}
   };

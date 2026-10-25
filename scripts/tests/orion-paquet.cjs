@@ -26,7 +26,7 @@ const lire=p=>fs.readFileSync(p,'utf8');let n=0;const ok=(v,m)=>{assert.ok(v,m);
  const modifies=new Set(['manifest.json','popup.html','README.md']);
  for(const f of fs.readdirSync(path.join(racine,'vinted-sync-extension'))){if(modifies.has(f))continue;ok(fs.readFileSync(path.join(d,f)).equals(fs.readFileSync(path.join(racine,'vinted-sync-extension',f))),'shared runtime source unchanged: '+f);}
  const source=lire(path.join(d,'compat-orion.js')),store={a:7},appels=[];let auditeur;
- const chrome={runtime:{id:'orion-test',lastError:null,getURL:p=>'extension://vrm/'+p,onMessage:{addListener:f=>{auditeur=f;}}},storage:{local:{get(k,cb){appels.push('get');if(cb)cb({[k]:store[k]});},set(v,cb){Object.assign(store,v);cb?.();},remove(k,cb){delete store[k];cb?.();}}},browserAction:{setPopup(v,cb){appels.push(v.popup);cb?.();}},tabs:{query(q,cb){cb([{id:1}]);}}};
+ const chrome={scripting:{executeScript(){throw Error('MV3 permission missing');}},runtime:{id:'orion-test',lastError:null,getURL:p=>'extension://vrm/'+p,onMessage:{addListener:f=>{auditeur=f;}}},storage:{local:{get(k,cb){appels.push('get');if(cb)cb({[k]:store[k]});},set(v,cb){Object.assign(store,v);cb?.();},remove(k,cb){delete store[k];cb?.();}}},browserAction:{setPopup(v,cb){appels.push(v.popup);cb?.();}},tabs:{query(q,cb){cb([{id:1}]);}}};
  const ctx={chrome,console,Promise,Proxy,WeakMap,Set};vm.createContext(ctx);vm.runInContext(source,ctx);
  ok((await ctx.chrome.storage.local.get('a')).a===7,'callback-only storage supports awaited reads without browser global');
  await ctx.chrome.storage.local.set({b:8});ok(store.b===8,'awaited writes preserve payload');

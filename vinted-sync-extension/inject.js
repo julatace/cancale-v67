@@ -150,6 +150,41 @@
     if(url)dernierFavoriClique={url,at:Date.now()};
   },true);
 
+function suivreFavoriAffiche(cible,activer=false){
+ const normaliser=v=>{try{const u=new URL(v,location.href);if(u.origin!==location.origin)return null;u.hash='';u.searchParams.sort();return u.href;}catch{return null;}};
+ const attendu=normaliser(cible);if(!attendu)return {trouve:false};
+ const liens=[...document.querySelectorAll('a[href]')].filter(a=>normaliser(a.href)===attendu&&a.getClientRects().length&&getComputedStyle(a).visibility!=='hidden'&&getComputedStyle(a).display!=='none');
+ if(liens.length!==1)return {trouve:false};
+ if(activer){liens[0].scrollIntoView({block:'center'});liens[0].click();}
+ return {trouve:true};
+}
+// Semantic native controls only. No guessed CSS class, router or API call.
+function clocheFavorisNative(activer=false,origine){
+ if(location.origin!==origine)return {etat:'origine'};
+ const label=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+ const reconnu=v=>/^(?:(?:ouvrir|afficher|voir|open|show|view) (?:les |the )?)?notifications?(?: \([0-9]+\)| [0-9]+)?$/.test(label(v));
+ const boutons=[...document.querySelectorAll('button,[role="button"]')].filter(b=>b.getClientRects().length&&getComputedStyle(b).visibility!=='hidden'&&getComputedStyle(b).display!=='none'&&(reconnu(b.getAttribute('aria-label'))||reconnu(b.getAttribute('title'))));
+ if(boutons.length!==1)return {etat:boutons.length?'ambigue':'absente'};
+ const b=boutons[0];if(b.disabled||b.getAttribute('aria-disabled')==='true')return {etat:'indisponible'};
+ const ouverte=b.getAttribute('aria-expanded')==='true';
+ if(activer&&!ouverte)b.click();
+ return {etat:ouverte?'deja_ouverte':activer?'activee':'disponible'};
+}
+
+  // Navigation relay for browsers without scripting. No eval or network request.
+  const navFavorisReponses=new Map();
+  window.addEventListener('message',event=>{
+    const m=event.data;if(window.top!==window||event.source!==window||!m||m.__tag!=='CANCALE_VINTED_FAVORI_REQ'||!/^f[a-f0-9]{32}$/.test(String(m.id||'')))return;
+    if(!['sonder','ouvrir','cloche_sonder','cloche_ouvrir'].includes(m.action))return;
+    let u;try{u=new URL(m.cible);if(u.origin!==location.origin||!lienContexteFavori(u.href))return;}catch{return;}
+    const ancien=navFavorisReponses.get(m.id);
+    if(ancien){if(ancien.action===m.action&&ancien.cible===u.href)window.postMessage(ancien.reponse,location.origin);return;}
+    let resultat;
+    try{resultat=m.action.startsWith('cloche_')?clocheFavorisNative(m.action==='cloche_ouvrir',u.origin):suivreFavoriAffiche(u.href,m.action==='ouvrir');}catch{return;}
+    const reponse={__tag:'CANCALE_VINTED_FAVORI_REP',id:m.id,origine:location.origin,resultat};
+    navFavorisReponses.set(m.id,{action:m.action,cible:u.href,reponse});while(navFavorisReponses.size>64)navFavorisReponses.delete(navFavorisReponses.keys().next().value);
+    window.postMessage(reponse,location.origin);
+  });
   let lastCsrf = null; // dernier x-csrf-token vu (réutilisé pour la moisson active)
   let lastAnon = null; // dernier x-anon-id vu
   const sendCsrf = (headers) => {

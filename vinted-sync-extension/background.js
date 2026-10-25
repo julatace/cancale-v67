@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.222.0';
+const CODE_VERSION = '5.223.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1729,6 +1729,44 @@ function clocheFavorisNative(activer=false,origine){
  if(activer&&!ouverte)b.click();
  return {etat:ouverte?'deja_ouverte':activer?'activee':'disponible'};
 }
+// Closed navigation protocol: no arbitrary code and no message/offer endpoint.
+async function naviguerFavoriDansPage(tabId,action,cible){
+ const page=pageFavoriNative(cible);if(!page)throw Error('favoris_navigation_invalide');
+ const origine=new URL(page.url).origin;
+ const cloche=action==='cloche_sonder'||action==='cloche_ouvrir';
+ if(!['sonder','ouvrir','cloche_sonder','cloche_ouvrir'].includes(action))throw Error('favoris_navigation_invalide');
+ const lecture=action==='sonder'||action==='cloche_sonder';
+ const func=cloche?clocheFavorisNative:suivreFavoriAffiche,args=cloche?[action==='cloche_ouvrir',origine]:[page.url,action==='ouvrir'];
+ if(CAP.scripting&&!CAP_MAIN_REFUSE){
+  try{return await chrome.scripting.executeScript({target:{tabId},world:'MAIN',func,args});}
+  catch(e){
+   // Only a read may choose another channel. Never replay an ambiguous click.
+   if(!lecture||!/world|MAIN|unsupported|not supported|not implemented|is not a function|Unexpected property/i.test(String(e?.message||e)))throw e;
+   CAP_MAIN_REFUSE=true;
+  }
+ }
+ if(!CAP.tabsMsg)throw Error('favoris_relais_indisponible');
+ const t=await chrome.tabs.get(tabId);if(!t?.url||new URL(t.url).origin!==origine)throw Error('favoris_relais_origine');
+ const id='f'+Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+ return new Promise((resolve,reject)=>{
+  let fini=false;const finir=(r,err)=>{if(fini)return;fini=true;clearTimeout(timer);if(err)reject(Error(err));else resolve([{frameId:0,result:r}]);};
+  const timer=setTimeout(()=>finir(null,'favoris_relais_sans_reponse'),3500);
+  try{chrome.tabs.sendMessage(tabId,{vrm:'favoriPage',id,action,cible:page.url},r=>{
+   const err=chrome.runtime?.lastError;
+   if(err||!r)return finir(null,'favoris_relais_sans_reponse');
+   if(r.id!==id||r.origine!==origine)return finir(null,'favoris_relais_origine');
+   const v=r.resultat;
+   if(cloche){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return finir(null,'favoris_relais_invalide');finir({etat:v.etat});}
+   else {if(!v||typeof v.trouve!=='boolean')return finir(null,'favoris_relais_invalide');finir({trouve:v.trouve});}
+  });}catch{finir(null,'favoris_relais_indisponible');}
+ });
+}
+function refusRelaisFavori(e,refus){
+ const code=String(e?.message||'');
+ if(!/^favoris_relais_(indisponible|sans_reponse|origine|invalide)$/.test(code))return null;
+ const message=code==='favoris_relais_indisponible'?'Ce navigateur ne permet pas de transmettre la commande à l’onglet Vinted. Aucun message envoyé.':code==='favoris_relais_sans_reponse'?'La page Vinted n’a pas confirmé la commande. Recharge Vinted avant de réessayer. Aucun renvoi automatique.':'La réponse de l’onglet Vinted n’a pas été reconnue. Aucune autre page n’a été utilisée.';
+ return refus(message,code);
+}
 async function ouvrirFavoriNatif(uid,acc,body){
  const s=await authToken(),owner=s?.user_id;
  const refus=(message,code)=>({ok:false,status:409,json:{message,version:CODE_VERSION,...(code?{code}:{})}});
@@ -1744,27 +1782,28 @@ async function ouvrirFavoriNatif(uid,acc,body){
  let tab=null;
  try{
   const cible=new URL(liens[0].url);
-  const ouverts=await chrome.tabs.query({url:`${cible.origin}/*`});let avecCloche=null;
+  const ouverts=await chrome.tabs.query({url:`${cible.origin}/*`});let avecCloche=null,erreurRelais=null;
   for(const t of (ouverts||[]).slice().sort((a,b)=>Number(!!b.active)-Number(!!a.active)||(b.lastAccessed||0)-(a.lastAccessed||0))){
    if(!Number.isInteger(t.id)||t.id<0)continue;
    try{
-    const r=await chrome.scripting.executeScript({target:{tabId:t.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});
+    const r=await naviguerFavoriDansPage(t.id,'sonder',liens[0].url);
     if(r?.[0]?.result?.trouve===true){tab=t;break;}
-    if(!avecCloche){const cl=await chrome.scripting.executeScript({target:{tabId:t.id},world:'MAIN',func:clocheFavorisNative,args:[false,cible.origin]});if(['disponible','deja_ouverte'].includes(cl?.[0]?.result?.etat))avecCloche=t;}
-   }catch{}
+    if(!avecCloche){const cl=await naviguerFavoriDansPage(t.id,'cloche_sonder',liens[0].url);if(['disponible','deja_ouverte'].includes(cl?.[0]?.result?.etat))avecCloche=t;}
+   }catch(e){if(/^favoris_relais_/.test(String(e?.message||'')))erreurRelais=e;}
   }
   tab=tab||avecCloche;
+  if(!tab&&erreurRelais)return refusRelaisFavori(erreurRelais,refus);
   if(!tab)return refus('La cloche Vinted n’a pas été reconnue dans les onglets ouverts. Ouvre Vinted connecté sur ce compte, puis réessaie. Aucun message envoyé.','cloche_introuvable');
   await chrome.tabs.update(tab.id,{active:true});
   if(Number.isInteger(tab.windowId)&&chrome.windows?.update)try{await chrome.windows.update(tab.windowId,{focused:true});}catch{}
   if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
-  let present=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});
+  let present=await naviguerFavoriDansPage(tab.id,'sonder',liens[0].url);
   if(present?.[0]?.result?.trouve!==true){
-   const cl=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:clocheFavorisNative,args:[true,cible.origin]});
+   const cl=await naviguerFavoriDansPage(tab.id,'cloche_ouvrir',liens[0].url);
    if(!['activee','deja_ouverte'].includes(cl?.[0]?.result?.etat))return refus('La cloche Vinted ne peut pas être ouverte automatiquement dans cet onglet. Aucun message envoyé.','cloche_indisponible');
    for(let i=0;i<20;i++){
     if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))return refus('Le compte connecté a changé. Aucun message envoyé.');
-    present=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});
+    present=await naviguerFavoriDansPage(tab.id,'sonder',liens[0].url);
     if(present?.[0]?.result?.trouve===true)break;
     await new Promise(r=>setTimeout(r,200));
    }
@@ -1772,7 +1811,7 @@ async function ouvrirFavoriNatif(uid,acc,body){
   }
   await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now()}});
   if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
-  const activation=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,true]});
+  const activation=await naviguerFavoriDansPage(tab.id,'ouvrir',liens[0].url);
   if(activation?.[0]?.result?.trouve!==true)throw Error();
   for(let i=0;i<40;i++){
     if((await loadSession())?.user_id!==owner)return refus('La session VRM a changé pendant l’ouverture.');
@@ -1781,9 +1820,9 @@ async function ouvrirFavoriNatif(uid,acc,body){
     await new Promise(r=>setTimeout(r,250));
   }
   return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:'en_attente',raison:'capture_pas_recue'}};
- }catch{
+ }catch(e){
   if(tab?.id!=null)await stockageFavorisOnglets().remove(cleOngletFavori(tab.id)).catch(()=>{});
-  return refus('L’ouverture dans Vinted n’a pas abouti. Aucun message envoyé.');
+  return refusRelaisFavori(e,refus)||refus('L’ouverture dans Vinted n’a pas abouti. Aucun message envoyé.');
  }
 }
 try{chrome.tabs.onRemoved.addListener(id=>{stockageFavorisOnglets().remove(cleOngletFavori(id)).catch(()=>{});});}catch{}
@@ -2694,7 +2733,13 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
     const cle=cleOngletFavori(tabId),o=await stockageFavorisOnglets().get(cle),attente=o?.[cle];
     if(attente){
       if(attente.owner!==scope.user_id||String(attente.uid)!==String(uid)){await stockageFavorisOnglets().remove(cle);return;}
-      if(attente.etat==='attente'&&Date.now()-attente.at>=0&&Date.now()-attente.at<=60000){
+      let memeArticle=false,memeLien=contexteFavori==null;
+      try{const c=typeof body==='string'?JSON.parse(body):null;const item=Number.isSafeInteger(c?.item_id)&&c.item_id>0?String(c.item_id):typeof c?.item_id==='string'&&/^[1-9]\d{0,19}$/.test(c.item_id)?c.item_id:null;memeArticle=!!item&&pageFavoriNative(attente.contexteFavori)?.itemId===item;
+        if(contexteFavori!=null){const normaliser=v=>{const p=pageFavoriNative(v);if(!p)return null;const u=new URL(p.url);u.hostname=u.hostname.replace(/^www\./,'');u.searchParams.sort();return u.href;};const a=normaliser(contexteFavori);memeLien=!!a&&a===normaliser(attente.contexteFavori);}
+      }catch{}
+      // Unrelated native traffic must not steal this one-use selection, nor
+      // overwrite a different link observed from a trusted native click.
+      if(attente.etat==='attente'&&Date.now()-attente.at>=0&&Date.now()-attente.at<=60000&&memeArticle&&memeLien){
         contexteFavori=attente.contexteFavori;ouvertureLiee={cle,record:attente};await stockageFavorisOnglets().set({[cle]:{...attente,etat:'capture'}});
       }
     }

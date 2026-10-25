@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {controleOuvertureFavori as lire} from '../../src/favorisOuverture.js';
+import {controleOuvertureFavori as lire,echecVerificationFavori} from '../../src/favorisOuverture.js';
 test('un refus sans version dans le retour conserve la version mesurée',()=>{
  const d=lire({ok:false,error:'Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie.',controleOuverture:{version:'5.221.0',etape:'commande'}});
  assert.equal(d.extension,'5.221.0');assert.equal(d.code,'notifications_non_affichees');assert.equal(d.ouvert,false);assert.equal(d.etape,'commande');
@@ -20,4 +20,11 @@ test('seul un reçu positif permet la confirmation',()=>{
 
 test('le refus distingue la cloche introuvable du favori absent après ouverture',()=>{
  for(const code of ['cloche_introuvable','cloche_indisponible','favori_non_trouve']){const d=lire({ok:false,data:{version:'5.222.0',code},controleOuverture:{etape:'commande'}});assert.equal(d.code,code);assert.equal(d.extension,'5.222.0');assert.equal(d.ouvert,false);}
+});
+
+test('le refus de capture distingue le format natif et la sauvegarde',()=>{
+ assert.match(echecVerificationFavori({ok:true,data:{preuve:'non_confirmee',raison:'contexte_ou_format_incompatible'}}),/destinataire/);
+ assert.match(echecVerificationFavori({ok:true,data:{preuve:'non_confirmee',raison:'enregistrement_non_confirme'}}),/enregistré dans VRM/);
+ assert.equal(echecVerificationFavori({ok:true,data:{preuve:'confirmee'}}),'');
+ assert.ok(!echecVerificationFavori({ok:true,data:{preuve:'non_confirmee',raison:'https://secret.invalid/token'}}).includes('secret'));
 });
