@@ -41,6 +41,7 @@ const nums = (r) => Array.isArray(r) ? r.map(c => String(c.numero)) : ['ERREUR '
 const annonce = (id, titre) => ({ type: 'annonce', titre, id });
 const vente = (id, titre) => ({ type: 'vente', titre, id });
 const cas = (cell) => ({ type: 'garage', titre: `case ${cell}`, id: cell });
+const annulee = (id, titre) => ({ type: 'annulee', titre, id });
 
 console.log('Une paire = pas de rouge');
 let r = regle({ '41': [annonce('a1', 'Nike Air Max 90 taille 42'), cas('A-1')] });
@@ -51,6 +52,15 @@ r = regle({ '43': [annonce('a3', 'XT-6 40'), vente('t3', 'XT-6 40'), cas('A-3')]
 verifie(nums(r).length === 0, 'vente + son annonce encore ouverte (même titre) + sa case : une paire', JSON.stringify(nums(r)));
 r = regle({ '44': [cas('A-4')] });
 verifie(nums(r).length === 0, 'case seule : une paire', JSON.stringify(nums(r)));
+
+console.log('Vente ANNULÉE = plus jamais de rouge (25 oct., décision de Julien)');
+// §6.1 : sur le code d'avant, une vente annulée compte comme un porteur → rouge.
+r = regle({ '63': [annonce('a63', 'Blouse grain de malice'), annulee('t63', 'Lot 23 articles')] });
+verifie(nums(r).length === 0, 'annonce en ligne + vente ANNULÉE (titres différents) : pas de rouge', JSON.stringify(nums(r)));
+r = regle({ '64': [vente('t64', 'Nike 42'), annulee('t64b', 'Lot annulé')] });
+verifie(nums(r).length === 0, 'vente à poster + vente ANNULÉE : pas de rouge', JSON.stringify(nums(r)));
+r = regle({ '66': [annulee('x1', 'Lot A'), annulee('x2', 'Lot B')] });
+verifie(nums(r).length === 0, 'deux ventes annulées : pas de rouge (aucune ne part)', JSON.stringify(nums(r)));
 
 console.log('Deux paires = rouge (l\'autre sens)');
 r = regle({ '45': [annonce('a5', 'Nike 42'), annonce('a6', 'Adidas 38')] });
@@ -63,6 +73,8 @@ r = regle({ '48': [annonce('a9', 'Nike 42'), cas('A-1'), cas('C-3')] });
 verifie(nums(r).includes('48'), 'une annonce et deux cases', JSON.stringify(nums(r)));
 r = regle({ '49': [annonce('a10', 'Nike 42'), vente('t9', 'Samba 40')] });
 verifie(nums(r).includes('49'), 'une annonce et une AUTRE vente (titres différents)', JSON.stringify(nums(r)));
+r = regle({ '50': [annonce('a11', 'Nike 42'), annonce('a12', 'Adidas 38'), annulee('t50', 'Lot annulé')] });
+verifie(nums(r).includes('50'), 'deux annonces différentes + une vente annulée : rouge quand même (le vrai conflit reste)', JSON.stringify(nums(r)));
 
 console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
 process.exit(ko ? 1 : 0);
