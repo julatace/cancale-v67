@@ -1849,13 +1849,13 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
       <div className="vrm-display" style={{fontSize:19,fontWeight:700,color:C.text,marginBottom:2}}>Ranger un article</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         {cellNom ? <>Case <b style={{color:C.text}}>{cellNom}</b> · </> : null}
-        {paires.length} paire{paires.length>1?'s':''} pas encore rangée{paires.length>1?'s':''}
+        {paires.length} article{paires.length>1?'s':''} pas encore rangé{paires.length>1?'s':''}
         {/* ⚠️ On ne fait pas semblant de savoir : quand l'écran Annonces n'a
             pas encore publié la liste des paires présentes, cette liste
             contient tout l'historique. On l'écrit, et on met les plus
             récentes en tête plutôt que de trier par numéro. */}
         {paires.length > 0 && !paires[0].sur && (
-          <><br/><span style={{color:C.warn}}>Les plus récentes en tête — ouvre une fois l'écran Annonces pour n'avoir que tes paires en stock.</span></>
+          <><br/><span style={{color:C.warn}}>Les plus récents en tête — ouvre une fois l'écran Annonces pour n'avoir que tes articles en stock.</span></>
         )}
       </div>
         </div>
@@ -1867,7 +1867,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
       {liste.length === 0 && (
         <div style={{fontSize:12.5,color:C.muted,padding:'14px 2px',lineHeight:1.5}}>
           {paires.length === 0
-            ? "Aucune paire en attente de rangement : tout ce que tu as en stock est déjà posé dans une case."
+            ? "Aucun article en attente de rangement : tout ce que tu as en stock est déjà posé dans une case."
             : "Rien ne correspond à cette recherche."}
         </div>
       )}
@@ -5909,21 +5909,21 @@ function etapeVente(o, { poste = () => false, expediee = null } = {}) {
   // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
   // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
   if (/non\s+r[ée]clam/i.test(s)) return { label: 'Retournée', color: C.warn, step: 0, aide: "L'acheteur n'a pas retiré le colis : il te revient. Vérifie qu'il arrive bien — Vinted règle souvent le remboursement tout seul." };
-  if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : la paire doit te revenir avant le remboursement." };
+  if (/retour\s+initi|retour\s+en\s+cours|retour\s+demand/i.test(s)) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour : l'article doit te revenir avant le remboursement." };
   // `expediee` inconnu (la recherche n'a ni les bordereaux ni les emails) : le
   // texte de Vinted tranche — « Remboursement » ou non. Jamais deviné au-delà.
   // La transaction le dit annulée alors que la liste ne l'a pas encore vu
   // (« Bordereau envoyé au vendeur ») : c'est une vente annulée (17 oct.).
   const annuleeTxn = o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id);
-  if (annuleeTxn) return { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie. Son bordereau ne sert plus." };
+  if (annuleeTxn) return { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — l'article n'est jamais parti. Son bordereau ne sert plus." };
   // Litige : la liste montre le statut du colis de RETOUR (« déposé en point
   // relais ») — la transaction dit ce qui se passe vraiment (17 oct.).
   const et = o.transaction_id != null ? etatTxn(o.transaction_id) : null;
-  if (et && et.s === 440) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour (litige) : rien à expédier. La paire doit te revenir — marque-la reçue sur Vinted quand elle arrive." };
+  if (et && et.s === 440) return { label: 'Retour en cours', color: C.warn, step: 0, aide: "L'acheteur a ouvert un retour (litige) : rien à expédier. L'article doit te revenir — marque-le reçu sur Vinted quand il arrive." };
   if (et && et.s === 430) return { label: 'Suspendue', color: C.warn, step: 0, aide: "Vinted vérifie cette transaction (litige ou contrôle) : rien à expédier tant que ce n'est pas réglé." };
   if (classifyOrderStatus(o.status) === 'cancelled') return (expediee ? expediee(o) : /rembours/i.test(s))
-    ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cette paire a bien été EXPÉDIÉE, puis remboursée à l'acheteur — la chaussure et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
-    : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — la paire n'est jamais partie." };
+    ? { label: 'Remboursée', color: C.danger, step: 0, aide: "Cet article a bien été EXPÉDIÉ, puis remboursé à l'acheteur — l'article et l'argent sont partis. Ce n'est pas une commande annulée avant l'envoi." }
+    : { label: 'Annulée', color: C.danger, step: 0, aide: "Commande annulée avant l'envoi — l'article n'est jamais parti." };
   if (/finalis/i.test(s) || tus === 'completed') return { label: 'Vendue', color: INV_STATUS.online.color, step: 4 };
   // ⚠️ COCHÉ « POSTÉ » À LA MAIN (`isShipDone`) : le colis a quitté
   // « À expédier » partout (Colis, Ma journée, la cloche, le filtre) et le
@@ -9016,7 +9016,7 @@ const ouvrirPdfOnglet = (url) => {
 // pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
 // le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
 // Rend true si on peut tamponner (vérifié, pas concerné, ou il confirme).
-const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de la paire (Annonces → « numéros à vérifier »).";
+const NUM_A_VERIFIER_ANNULE = "Impression annulée : vérifie d'abord le numéro de l'article (Annonces → « numéros à vérifier »).";
 const confirmerNumerosAVerifier = async (numeros) => {
   try {
     const fiches = load('vinted_annonce_numeros', {}) || {};
@@ -9028,11 +9028,11 @@ const confirmerNumerosAVerifier = async (numeros) => {
     for (const f of Object.values(fiches)) { const k = f && cleNum(f.numero); if (k && cles.has(k)) (parCle[k] = parCle[k] || []).push(f); }
     const doubles = Object.keys(parCle).filter((k) => parCle[k].length > 1);
     if (doubles.length) {
-      const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'une paire').join(' · ')}`).join('\n');
+      const liste = doubles.slice(0, 3).map((k) => `N°${k} : ${parCle[k].slice(0, 3).map((f) => f.title || 'un article').join(' · ')}`).join('\n');
       const ok = await askConfirm({
         title: doubles.length > 1 ? `${doubles.length} numéros portés par deux paires` : `Le N°${doubles[0]} est porté par deux paires`,
-        desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner la mauvaise paire. Vérifie la photo et le titre avant d'imprimer.`,
-        ok: 'C\'est la bonne paire, imprimer', cancel: 'Annuler',
+        desc: `${liste}\n\nTamponné sur le bordereau, ce numéro peut désigner le mauvais article. Vérifie la photo et le titre avant d'imprimer.`,
+        ok: 'C\'est le bon article, imprimer', cancel: 'Annuler',
       });
       if (!ok) return false;
     }
@@ -9040,17 +9040,17 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (pasEcrit.length) {
       const ok = await askConfirm({
         title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
-        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'une paire'}`).join('\n')}\n\nCette paire a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
+        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\nCet article a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
         ok: 'Oui, c\'est écrit', cancel: 'Annuler',
       });
       if (!ok) return false;
     }
     const doute = Object.values(fiches).filter((f) => f && cles.has(cleNum(f.numero)) && ficheAVerifier(f));
     if (!doute.length) return true;
-    const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'une paire'}`).join('\n');
+    const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'un article'}`).join('\n');
     return await askConfirm({
       title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés` : `Le N°${doute[0].numero} n'est pas encore vérifié`,
-      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner une autre paire. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde l'étiquette de la paire avant d'imprimer.`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner un autre article. Tamponné sur le bordereau, c'est le mauvais article dans le colis.\n\nRegarde l'étiquette de l'article avant d'imprimer.`,
       ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
     });
   } catch (_) { return true; }
@@ -9873,15 +9873,15 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
             <input data-achat-hors-fichier ref={fichierRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: 'none' }} />
           </div>
           <details data-achat-hors-relier style={{ fontSize: 13, color: C.text }} open={!!(editId && form.numero) || undefined}>
-            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 12.5 }}>Relier à une paire (facultatif)</summary>
+            <summary style={{ cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', color: C.muted, fontSize: 12.5 }}>Relier à un article (facultatif)</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
               {Array.isArray(paires) && paires.length > 0 && champ('Une de tes annonces en ligne',
                 <select value="" onChange={e => { const p = paires.find(x => String(x.id) === e.target.value); if (!p) return; setForm(d => ({ ...d, numero: p.num, title: d.title.trim() ? d.title : (p.title || '') })); }} style={inp}>
                   <option value="">— choisir —</option>
                   {paires.map(p => <option key={p.id} value={String(p.id)}>N°{p.num} · {(p.title || '').slice(0, 40)}</option>)}
                 </select>)}
-              {champ('N° de la paire', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
-              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de la paire : quand elle se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
+              {champ('N° de l\'article', <input data-champ="numero" value={form.numero} onChange={e => setForm(d => ({ ...d, numero: e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 9) }))} inputMode={clavierNum()} placeholder={prochainNumero != null ? String(prochainNumero) : ''} style={inp} />)}
+              <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.45 }}>Avec un N°, ce prix devient le coût de l'article : quand il se vend, son bénéfice le reprend tout seul. Sans N°, l'achat compte quand même dans ce que tu as dépensé.</div>
             </div>
           </details>
           {erreur && <div role="alert" data-achat-hors-erreur style={{ fontSize: 12.5, color: C.warn, lineHeight: 1.4 }}>{erreur}</div>}
@@ -9949,7 +9949,7 @@ function CoutAchatVente({ onSaisir, onRelier }) {
         {edit ? (
           <form onSubmit={ev => { ev.preventDefault(); valider(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px', minWidth: 0 }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cette paire"
+              <input data-cout-vente-champ autoFocus value={txt} onChange={e => { setTxt(e.target.value); setErr(''); }} inputMode="decimal" enterKeyHint="done" placeholder="prix payé" aria-label="Prix d'achat de cet article"
                 onKeyDown={e => { if (e.key === 'Escape') { setEdit(false); setTxt(''); setErr(''); } }}
                 style={{ width: '100%', boxSizing: 'border-box', height: 44, border: `1px solid ${C.border}`, borderRadius: 10, padding: '0 28px 0 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
               <span aria-hidden="true" style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none' }}>€</span>
@@ -11109,7 +11109,7 @@ const PLUS_TABS=[
      restent dans le centre de notifications (job « Répondre à N messages »), qui
      ouvre l'écran Messages au clic — l'écran reste monté et joignable par là,
      simplement plus dans le menu. */
-  {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangée chaque paire'},
+  {id:'garage',       icon:'home',    emoji:'🏠',label:'Stock',        desc:'Où est rangé chaque article'},
   /* La carte de la communauté (20 oct., migration 018) : opt-in, la ville seule, messages entre revendeurs. */
   {id:'communaute',   icon:'pin',     emoji:'📍',label:'Communauté',   desc:'La carte des revendeurs VRM, et leur messagerie'},
   /* ⚠️ « Masqués » RETIRÉ du menu le 1er oct. (demande de Julien : « dans les
@@ -11585,12 +11585,12 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
       {rn.reattribues.map((r) => (
         <div key={'r' + r.id + r.sens} data-tout-reattribue={r.sens} style={{ marginTop: 8, fontSize: 13, color: C.text }}>
           {r.sens === 'parti'
-            ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'une paire'} » porte maintenant le <b>N°{r.vers}</b>. </>
+            ? <>Le N°{r.de} a été remplacé (doublon réglé) : « {r.title || 'un article'} » porte maintenant le <b>N°{r.vers}</b>. </>
             : <>Ce numéro remplace le N°{r.de} (doublon réglé){r.ecrit ? '.' : ' — pas encore écrit sur le carton.'}</>}
           {r.sens === 'parti' && <button type="button" onClick={() => onChercher(r.vers)} style={lien}>Voir le N°{r.vers}</button>}
         </div>
       ))}
-      {rn.annonces.length > 0 && titreSec('La paire')}
+      {rn.annonces.length > 0 && titreSec('L\'article')}
       {rn.annonces.map((a) => ligne('a' + a.id, { 'data-tout-annonce': a.id, 'data-tout-annonce-etat': a.etat }, a.title || '(sans titre)', ETAT_ANN[a.etat] + (a.price ? ' · ' + prixCourt(String(a.price).replace(',', '.')) : ''), () => onNav('cat_annonces')))}
       {(vinted.length + lbc.length + ebay.length + rn.annoncesEbay.length) > 0 && titreSec('Ventes et autres plateformes')}
       {vinted.map((o) => ligne('v' + o._tx, { 'data-tout-vente': 'vinted', 'data-tout-tx': o._tx }, o.title || '(sans titre)', `Vente Vinted · ${etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label}${o.date ? ' · ' + jour(o.date) : ''}`, () => onNav('cat_ventes')))}
@@ -13552,7 +13552,7 @@ function BoutonToutGenerer({ items }) {
 // l'instantané (`EXT_CAPACITES.preuves`) la croit encore vendue et refuserait
 // de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
 // UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
-const texteCroitVendue = () => `Ton extension la croit encore vendue (elle ne sait pas qu'une vente remboursée fait revenir la paire) et refuserait de la publier : mets-la à jour (${EXT_ATTENDUE}).`;
+const texteCroitVendue = () => `Ton extension le croit encore vendu (elle ne sait pas qu'une vente remboursée fait revenir l'article) et refuserait de le publier : mets-la à jour (${EXT_ATTENDUE}).`;
 // ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
 //    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
 //    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
@@ -13794,7 +13794,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
                 </div>
               );
             })}
-            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — la paire est maintenant marquée <b>« sur Leboncoin »</b> dans VRM.</div>}
+            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — l'article est maintenant marqué <b>« sur Leboncoin »</b> dans VRM.</div>}
             {!fait && progres && progres.etape === 'champ-manquant' && (
               <div data-fiche-manque={(progres.manque || []).join('|')} style={{ fontSize: 12.5, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
                 {(progres.manque && progres.manque.length) ? `${progres.manque.map((m) => `« ${m} »`).join(', ')} ${progres.manque.length > 1 ? 'restent' : 'reste'} à choisir` : 'Un champ obligatoire reste à choisir'} sur la page Leboncoin : fais-le, VRM continue tout seul.
@@ -13858,7 +13858,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         <textarea data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
           style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
         <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
-          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cette paire{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
+          La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cet article{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
         </div>
 
         <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
@@ -13908,7 +13908,7 @@ function LbcCroitVendue({ n }) {
   if (!n || extSait('preuves') !== 'retard') return null;
   return (
     <div data-lbc-croit-vendue={n} style={{ fontSize: 12.5, color: C.text, background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn}`, borderRadius: 10, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
-      <b>{n} paire{n > 1 ? 's' : ''} revenue{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendues' : 'la croit encore vendue'} et refuserait de {n > 1 ? 'les' : 'la'} publier — mets-la à jour ({EXT_ATTENDUE}).
+      <b>{n} article{n > 1 ? 's' : ''} revenu{n > 1 ? 's' : ''}</b> (vente remboursée ou annulée) : de nouveau à publier pour VRM, mais ton extension {n > 1 ? 'les croit encore vendus' : 'le croit encore vendu'} et refuserait de {n > 1 ? 'les' : 'le'} publier — mets-la à jour ({EXT_ATTENDUE}).
     </div>
   );
 }
@@ -16067,7 +16067,7 @@ function itemDeBrouillon(d) {
   const manquants = (cat.requis || []).filter((n) => !String(asp[n] || '').trim());
   if (manquants.length) return { err: 'À compléter : ' + manquants.join(', ') };
   const urls = (d.photos || []).map((s) => String(s || '').trim()).filter((s) => /^https?:\/\//.test(s));
-  if (!urls.length) return { err: 'Choisis une paire — ses photos partent avec l\'annonce.' };
+  if (!urls.length) return { err: 'Choisis un article — ses photos partent avec l\'annonce.' };
   if (!String(d.prix == null ? '' : d.prix).trim()) return { err: 'Mets un prix.' };
   // (19 oct., revue « argent ») « 1.250 » partait en 1,25 €, « 74 € » en NaN :
   // la MÊME lecture que toute saisie de montant (`montantSaisi`) — le serveur
@@ -16820,7 +16820,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // paire (marque/taille/état) ; l'IA a consigne de NE RIEN INVENTER (api/ai).
   const titreIA = async () => {
     const base = (pairSel ? pairSel.title : titre) || '';
-    if (!base.trim()) { setRes({ err: 'Choisis une paire (ou tape un titre) d\'abord.' }); return; }
+    if (!base.trim()) { setRes({ err: 'Choisis un article (ou tape un titre) d\'abord.' }); return; }
     setAiBusy(true); setAiWhy(''); setRes(null);
     try {
       const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
@@ -17035,20 +17035,20 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     const n = d.numero ? cleNum(d.numero) : '';
     if (!n) return null;
     const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(n) : null;
-    if (ou) return { k: 'vendue', t: `La paire N°${n} est déjà vendue sur ${ou} — rien ne sera publié.` };
-    if (!pairSel && d.pairId && vendusVinted && typeof vendusVinted.has === 'function' && vendusVinted.has(String(d.pairId))) return { k: 'vendue', t: `La paire N°${n} est vendue sur Vinted — rien ne sera publié.` };
-    if (!ventes || ventes.enCours) return { k: 'en-cours', t: `Je vérifie encore que la paire N°${n} n'est pas déjà vendue (Vinted, eBay, Leboncoin)…` };
-    if (Array.isArray(ventes.pasSu) && ventes.pasSu.length) return { k: 'pas-su', t: `Je n'ai pas pu vérifier ${ventes.pasSu.length === 1 ? ventes.pasSu[0] : ventes.pasSu.slice(0, -1).join(', ') + ' ni ' + ventes.pasSu[ventes.pasSu.length - 1]} : je ne publie pas une paire qui est peut-être déjà vendue. Rouvre l'écran dans un moment.` };
+    if (ou) return { k: 'vendue', t: `L'article N°${n} est déjà vendu sur ${ou} — rien ne sera publié.` };
+    if (!pairSel && d.pairId && vendusVinted && typeof vendusVinted.has === 'function' && vendusVinted.has(String(d.pairId))) return { k: 'vendue', t: `L'article N°${n} est vendu sur Vinted — rien ne sera publié.` };
+    if (!ventes || ventes.enCours) return { k: 'en-cours', t: `Je vérifie encore que l'article N°${n} n'est pas déjà vendu (Vinted, eBay, Leboncoin)…` };
+    if (Array.isArray(ventes.pasSu) && ventes.pasSu.length) return { k: 'pas-su', t: `Je n'ai pas pu vérifier ${ventes.pasSu.length === 1 ? ventes.pasSu[0] : ventes.pasSu.slice(0, -1).join(', ') + ' ni ' + ventes.pasSu[ventes.pasSu.length - 1]} : je ne publie pas un article qui est peut-être déjà vendu. Rouvre l'écran dans un moment.` };
     const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(n) : null;
     if (deja) {
       const t = deja.debut && Number.isFinite(Date.parse(deja.debut)) ? ` (${quandParisTexte(Date.parse(deja.debut))})` : '';
       return deja.etat === 'programmee'
-        ? { k: 'deja-programmee', t: `La paire N°${n} est déjà programmée sur eBay${t} — une paire, une annonce : rien ne sera publié. Si tu as annulé sa programmation sur eBay, « Relire chez eBay » plus bas, puis recommence.` }
-        : { k: 'deja-en-ligne', t: deja.via ? `Cette paire est déjà en vente sur eBay sous la N°${deja.via} (même photo que la N°${n}) — une paire, une annonce : rien ne sera publié.` : `La paire N°${n} est déjà en vente sur eBay — une paire, une annonce : rien ne sera publié.` };
+        ? { k: 'deja-programmee', t: `L'article N°${n} est déjà programmé sur eBay${t} — un article, une annonce : rien ne sera publié. Si tu as annulé sa programmation sur eBay, « Relire chez eBay » plus bas, puis recommence.` }
+        : { k: 'deja-en-ligne', t: deja.via ? `Cet article est déjà en vente sur eBay sous la N°${deja.via} (même photo que la N°${n}) — un article, une annonce : rien ne sera publié.` : `L'article N°${n} est déjà en vente sur eBay — un article, une annonce : rien ne sera publié.` };
     }
     if (!pairSel) {
-      if (enLigne && typeof enLigne.has === 'function') return { k: 'plus-en-vente', t: `La paire N°${n} n'est plus en vente sur Vinted — rien ne sera publié. Si tu l'as encore, remets-la en ligne sur Vinted, puis reviens.` };
-      return { k: 'pas-su', t: `Je n'ai pas pu vérifier que la paire N°${n} est encore en vente sur Vinted — rouvre l'écran dans un moment.` };
+      if (enLigne && typeof enLigne.has === 'function') return { k: 'plus-en-vente', t: `L'article N°${n} n'est plus en vente sur Vinted — rien ne sera publié. Si tu l'as encore, remets-le en ligne sur Vinted, puis reviens.` };
+      return { k: 'pas-su', t: `Je n'ai pas pu vérifier que l'article N°${n} est encore en vente sur Vinted — rouvre l'écran dans un moment.` };
     }
     return null;
   };
@@ -17065,12 +17065,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       let achatP;
       try { if (pairSel) achatP = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[pairSel.id], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatP = undefined; }
       const lignes = [
-        `« ${titre || 'cette paire'} » sera mise en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus ${OFFRE_VEND_LA_PAIRE}.`,
+        `« ${titre || 'cet article'} » sera mis en vente à ${eurEbay(prixP)}${plusieursPub ? ` sur le compte eBay « ${nomComptePub} »` : ''}. Toute offre de ${eurEbay(offre.accepte)} ou plus ${OFFRE_VEND_LA_PAIRE}.`,
         offre.refuse != null && `Toute offre sous ${eurEbay(offre.refuse)} sera refusée par eBay.`,
-        !b.item.numero && 'Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. Choisis la paire d\'abord.',
+        !b.item.numero && 'Cette annonce n\'est reliée à aucun article : si eBay la vend, VRM ne saura pas quel article retirer de Vinted. Choisis l\'article d\'abord.',
         typeof achatP === 'number' && offre.accepte < achatP && `C'est sous ton prix d'achat (${eurEbay(achatP)}), avant frais eBay.`,
         offre.sousMoitie && `C'est ${Math.round(offre.accepte / prixP * 100)} % du prix de l'annonce — tu l'as confirmé.`,
-        b.item.numero && plusieursPub && `VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
+        b.item.numero && plusieursPub && `VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
       ].filter(Boolean);
       const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
       if (!ok) return;
@@ -17078,7 +17078,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
         title: `Publier sur ton compte eBay « ${nomComptePub} » ?`,
-        desc: `« ${titre || 'cette paire'} » sera mise en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que la paire N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`,
+        desc: `« ${titre || 'cet article'} » sera mis en vente sur le compte eBay « ${nomComptePub} », tout de suite.${b.item.numero ? ` VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.` : ''}`,
         ok: 'Oui, publier', cancel: 'Annuler',
       });
       if (!ok) return;
@@ -17120,7 +17120,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
     <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      <Icon name="tag" size={17}/> Vendre une paire sur eBay
+      <Icon name="tag" size={17}/> Vendre un article sur eBay
     </button>
   );
   return (
@@ -17143,8 +17143,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
               sur Vinted → retire-la d'eBay » le jour où elle part ailleurs. */}
           <div data-publie-sku={res.sku || ''} style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>{res.sku
-            ? <>Reliée à la paire par la référence <b style={{ color: C.text }}>{res.sku}</b> : si elle se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
-            : <>Pas reliée à une paire : relie-la depuis sa carte dans Annonces.</>}</div>
+            ? <>Reliée à l'article par la référence <b style={{ color: C.text }}>{res.sku}</b> : s'il se vend sur Vinted, VRM te proposera de la retirer d'eBay.</>
+            : <>Pas reliée à un article : relie-la depuis sa carte dans Annonces.</>}</div>
           {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} data-publie-offre-issue={res.offreIssue || ''} style={{ fontSize: 12.5, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
           {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
           <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
@@ -17183,15 +17183,15 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
           {/* 1 — LA PAIRE : on CHOISIT une paire (comme sur eBay on choisit son
               objet), ses photos partent toutes seules — plus aucun lien à coller. */}
-          <BlocEbay n="1" titre="La paire à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
+          <BlocEbay n="1" titre="L'article à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
             {(!pairSel || pickerOpen) ? (
               paires.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée n'est encore chargée sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes paires — avec leurs photos — apparaîtront ici.</div>
+                <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté n'est encore chargé sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes articles — avec leurs photos — apparaîtront ici.</div>
               ) : (<>
                 <input value={pairQ} onChange={e => setPairQ(e.target.value)} placeholder="Chercher : n°, marque, pointure…" style={{ ...inp, marginBottom: 10 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
-                  {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucune paire ne correspond.</div>}
-                  {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Une paire porte deux N° (même photo sur deux fiches) : elle n\'est proposée qu\'une fois.' : `${nJumellesMasquees} paires portent deux N° (même photo sur deux fiches) : chacune n'est proposée qu'une fois.`}</div>}
+                  {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucun article ne correspond.</div>}
+                  {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Un article porte deux N° (même photo sur deux fiches) : il n\'est proposé qu\'une fois.' : `${nJumellesMasquees} articles portent deux N° (même photo sur deux fiches) : chacun n'est proposé qu'une fois.`}</div>}
                   {listePaires.slice(0, 120).map(p => (
                     <button key={p.id} type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flexShrink: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
@@ -17200,7 +17200,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                         <span style={{ display: 'block', fontSize: 12.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
                         <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
                           const jm = jumelles.get(String(p.id));
-                          return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même paire que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
+                          return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même article que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
                     </button>
                   ))}
@@ -17223,7 +17223,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cette paire n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens."}</div>
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cet article n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens."}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
@@ -17231,7 +17231,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               {photosEtat === 'cherche' && urls.length > 0 ? (
                 <div data-ebay-photos="cherche" style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Je récupère ses autres photos sur Vinted…</div>
               ) : photosEtat && photosEtat.raison ? (
-                <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis la paire.</div>
+                <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis l'article.</div>
               ) : pairSel.nPhotos != null && urls.length < pairSel.nPhotos ? (
                 <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 8, padding: '8px 10px' }}>Seulement {urls.length} photo{urls.length > 1 ? 's' : ''} captée{urls.length > 1 ? 's' : ''} sur {pairSel.nPhotos}. Rouvre l'annonce sur Vinted (extension à jour) pour les avoir toutes — elles s'ajouteront ici automatiquement.</div>
               ) : (
@@ -17317,7 +17317,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <div><label style={lab}>Accepter les offres dès (€) — facultatif</label><input value={offreA} onChange={e => { setOffreA(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-accepte="1" style={inp} /></div>
                 <div><label style={lab}>Refuser les offres sous (€) — facultatif</label><input value={offreR} onChange={e => { setOffreR(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-refuse="1" style={inp} /></div>
               </div>
-              {offreA.trim() && vOffre && vOffre.ok && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>eBay acceptera seul toute offre de ce montant ou plus : la paire sera vendue à ce prix.</div>}
+              {offreA.trim() && vOffre && vOffre.ok && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>eBay acceptera seul toute offre de ce montant ou plus : l'article sera vendu à ce prix.</div>}
               {vOffre && !vOffre.ok && <div data-publier-offre-erreur="1" style={{ fontSize: 12, color: C.warn, marginTop: 6, lineHeight: 1.45 }}>{vOffre.err}</div>}
               {offreTropBas && (
                 <label data-publier-offre-sous-moitie="1" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5, color: C.warn, marginTop: 8, lineHeight: 1.4, cursor: 'pointer' }}>
@@ -18048,13 +18048,13 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     // « n125 » (l'écriture de ses titres) vaut 125, comme sur Leboncoin.
     const c = cleNum(brut);
     const n = (numsConnus && numsConnus.has(c)) ? c : c.replace(/^N[°O]?(?=\d)/, '');
-    if (!NUM_OK.test(n)) { dire('Tape le numéro de la paire (125, ou B125).'); return; }
-    if (numsConnus && !numsConnus.has(n)) { dire(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
-    if (pris && pris.has(n) && pris.get(n) !== String(it.itemId)) { dire(`La paire N°${n} est déjà reliée à une autre annonce eBay : une paire, une annonce.`); return; }
+    if (!NUM_OK.test(n)) { dire('Tape le numéro de l\'article (125, ou B125).'); return; }
+    if (numsConnus && !numsConnus.has(n)) { dire(`Aucun article ne porte le N°${n} dans VRM.`); return; }
+    if (pris && pris.has(n) && pris.get(n) !== String(it.itemId)) { dire(`L'article N°${n} est déjà relié à une autre annonce eBay : un article, une annonce.`); return; }
     const tp = (titreDeNum && titreDeNum.get(n)) || '';
     const ok = await askConfirm({
-      title: `Relier cette annonce eBay à la paire N°${n} ?`,
-      desc: `eBay : « ${it.title || it.itemId} »\nVRM : ${tp ? `« ${tp} »` : `paire N°${n}`}${numero && numero !== n ? `\nAujourd'hui : reliée à la N°${numero}.` : ''}\n\nVRM écrit la référence VRM-${n} dans l'étiquette personnalisée (SKU) de l'annonce eBay. Tu pourras la changer.`,
+      title: `Relier cette annonce eBay à l'article N°${n} ?`,
+      desc: `eBay : « ${it.title || it.itemId} »\nVRM : ${tp ? `« ${tp} »` : `article N°${n}`}${numero && numero !== n ? `\nAujourd'hui : reliée à la N°${numero}.` : ''}\n\nVRM écrit la référence VRM-${n} dans l'étiquette personnalisée (SKU) de l'annonce eBay. Tu pourras la changer.`,
       ok: 'Oui, relier', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -18062,7 +18062,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     try {
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'sku', itemId: it.itemId, numero: n, ...corpsCompteEbay(it._compte) }) });
       const j = await r.json().catch(() => ({}));
-      if (j && j.ok) { try { const fs = fichesPourEbay(); const ids = Object.keys(fs).filter((k) => fs[k] && cleNum(fs[k].numero) === cleNum(n)); if (ids.length === 1) noterLienEbay(it.itemId, ids[0], n, 'main'); } catch (_) {} dire(`✓ Reliée à la paire N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
+      if (j && j.ok) { try { const fs = fichesPourEbay(); const ids = Object.keys(fs).filter((k) => fs[k] && cleNum(fs[k].numero) === cleNum(n)); if (ids.length === 1) noterLienEbay(it.itemId, ids[0], n, 'main'); } catch (_) {} dire(`✓ Reliée à l'article N°${n} (${j.sku}).`); setRelierOuvert(false); setNumSaisi(''); if (onSku) onSku(it.itemId, j.sku); }
       else dire((j && j.error) || 'eBay a refusé la référence — rien n\'a changé.');
     } catch (_) { dire('Liaison impossible (réseau) — rien n\'a changé.'); }
     setGeste('');
@@ -18074,7 +18074,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     const prix = prixRemise != null ? eurE(prixRemise) : '';
     const ok = await askConfirm({
       title: `Envoyer une offre à −${remiseN} % ?`,
-      desc: `Les personnes qui suivent « ${it.title || it.itemId} » sur eBay${obs ? ` (${obs})` : ''} recevront une offre${prix ? ` à ${prix}` : ''}, valable 48 h. C'est eBay qui les choisit : VRM ne voit pas qui elles sont.\n\nSi l'une d'elles accepte, la paire est vendue à ce prix.`,
+      desc: `Les personnes qui suivent « ${it.title || it.itemId} » sur eBay${obs ? ` (${obs})` : ''} recevront une offre${prix ? ` à ${prix}` : ''}, valable 48 h. C'est eBay qui les choisit : VRM ne voit pas qui elles sont.\n\nSi l'une d'elles accepte, l'article est vendu à ce prix.`,
       ok: 'Oui, envoyer', cancel: 'Annuler',
     });
     if (!ok) return;
@@ -18213,7 +18213,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       else if (refuseCle === null && refuseLu != null) lignes.push(`Le refus sous ${eurEbay(refuseLu)} sera retiré.`);
       if (et && et.etat !== 'pas-su' && et.offresActives === false) lignes.push('Les offres seront activées sur cette annonce : les acheteurs pourront t\'en faire.');
       else if (!et || et.etat === 'pas-su' || et.offresActives == null) lignes.push('Les offres seront activées si elles ne le sont pas déjà.');
-      if (!numero) lignes.push('Cette annonce n\'est reliée à aucune paire : si eBay la vend, VRM ne saura pas quelle paire retirer de Vinted. « Relier à une paire » d\'abord.');
+      if (!numero) lignes.push('Cette annonce n\'est reliée à aucun article : si eBay la vend, VRM ne saura pas quel article retirer de Vinted. « Relier à un article » d\'abord.');
       if (sousAchat) lignes.push(`C'est sous ton prix d'achat (${eurEbay(achat)}), avant frais eBay.`);
       if (tropBas) lignes.push(`C'est ${pctSaisi} % du prix de l'annonce — tu l'as confirmé.`);
       if (et && et.offresFaites > 0) lignes.push(texteOffresDejaFaites(1, 1));
@@ -18323,7 +18323,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           <div style={{ fontWeight: 600, fontSize: 13.5, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
           <div style={{ fontSize: 11.5, color: E.muted, marginTop: 2 }}>
             {/* Le lien à la paire : la pastille distingue, pas une phrase par carte (§7). */}
-            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement une paire (numéro redonné depuis, ou porté par deux paires) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
+            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement un article (numéro redonné depuis, ou porté par deux articles) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
             {obs != null ? ` · ${obs} observateur${obs > 1 ? 's' : ''}` : ''}
             {nb ? ` · ${nb} photo${nb > 1 ? 's' : ''}` : ''}
             {j != null ? ` · en ligne depuis ${j} j` : ''}
@@ -18344,7 +18344,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           pour le reste (modifier, détails). Avant : deux ou trois boutons
           pleine hauteur empilés par carte. ── */}
       <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
-      {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à une paire</button>}
+      {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à un article</button>}
       {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
       {/* ── (9 octobre) LA RÈGLE D'OFFRE : une ligne, ou une porte. Trois
           états — « pas su » n'affiche AUCUN montant et ne dit pas « aucune ».
@@ -18388,7 +18388,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         <div data-regle-panneau={it.itemId} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
-            {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Une offre égale ou supérieure au montant ci-dessous est acceptée par eBay sans te demander : la paire est vendue à ce prix. En dessous, l'offre t'arrive sur eBay.
+            {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Une offre égale ou supérieure au montant ci-dessous est acceptée par eBay sans te demander : l'article est vendu à ce prix. En dessous, l'offre t'arrive sur eBay.
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
               ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, mais pas si les offres y sont activées. En enregistrant, VRM les active.`}</span>
               : (et.etat === 'pas-su' ? ' Règle actuelle : pas encore lue chez eBay — si elle existe, rien ne sera remplacé sans te le redemander.' : '')}
@@ -18421,10 +18421,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       )}
       {relierOuvert && (
         <div data-relier-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
-          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quelle paire est en vente dans cette annonce ? C'est toi qui choisis : VRM ne la devine pas d'après le titre.</div>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quel article est en vente dans cette annonce ? C'est toi qui choisis : VRM ne le devine pas d'après le titre.</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: choix.length ? 2 : 0 }}>
             <input value={numSaisi} onChange={(e) => setNumSaisi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(numSaisi); }} data-relier-num={it.itemId}
-              inputMode={clavierNum()} placeholder="N° de la paire" aria-label="N° de la paire" style={{ ...inpE, width: 140 }} />
+              inputMode={clavierNum()} placeholder="N° de l'article" aria-label="N° de l'article" style={{ ...inpE, width: 140 }} />
             <button type="button" data-relier-valider={it.itemId} disabled={!!geste || !numSaisi.trim()} onClick={() => relier(numSaisi)} style={{ ...btnE, opacity: (geste || !numSaisi.trim()) ? 0.5 : 1 }}>{geste === 'relier' ? 'Envoi…' : 'Relier'}</button>
           </div>
           {choix.map((p) => (
@@ -18441,7 +18441,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       )}
       {offreOuverte && eligible === true && (
         <div data-offre-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
-          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>eBay envoie l'offre aux personnes qui suivent l'annonce, valable 48 h. Si l'une accepte, la paire est vendue à ce prix.</div>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>eBay envoie l'offre aux personnes qui suivent l'annonce, valable 48 h. Si l'une accepte, l'article est vendu à ce prix.</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <label style={{ fontSize: 11.5, color: E.muted }}>Remise %<br /><input value={remise} onChange={(e) => setRemise(e.target.value)} inputMode="numeric" data-offre-remise={it.itemId} style={{ ...inpE, width: 76 }} /></label>
             <div style={{ fontSize: 12.5, color: E.muted, paddingBottom: 10 }}>soit <b data-offre-prix={prixRemise != null ? prixRemise.toFixed(2) : ''} style={{ color: E.text, fontSize: 15 }}>{prixRemise != null ? eurE(prixRemise) : '—'}</b>{isFinite(prixBase) && prixBase > 0 ? <> au lieu de {eurE(prixBase)}</> : null}</div>
@@ -18449,7 +18449,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {!remiseOk && <div style={{ fontSize: 11.5, color: E.warn, marginTop: 6 }}>Entre 5 et 50 %, un nombre entier.</div>}
           {/* (9 octobre) La règle d'offre ne joue pas sur une offre qu'il ENVOIE. */}
           {et && et.etat === 'connue' && prixRemise != null && prixRemise < et.accepte && (
-            <div data-offre-sous-regle={it.itemId} style={{ fontSize: 11.5, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>C'est sous ta règle d'offre ({eurEbay(et.accepte)}) : si l'une accepte, la paire part à {eurEbay(prixRemise)}.</div>
+            <div data-offre-sous-regle={it.itemId} style={{ fontSize: 11.5, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>C'est sous ta règle d'offre ({eurEbay(et.accepte)}) : si l'une accepte, l'article part à {eurEbay(prixRemise)}.</div>
           )}
           <textarea value={mot} onChange={(e) => setMot(e.target.value)} maxLength={2000} rows={2} placeholder="Message (facultatif)" data-offre-message={it.itemId}
             style={{ ...inpE, width: '100%', marginTop: 9, resize: 'vertical', lineHeight: 1.45 }} />
@@ -18701,7 +18701,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     // Une paire, une annonce — AUSSI à l'intérieur du lot : deux brouillons du
     // même N° partiraient avec deux identifiants d'envoi (le 488 d'eBay ne
     // protège pas). Le premier part, les suivants sont écartés et c'est dit.
-    if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon de la même paire est déjà dans ce lot' };
+    if (dansLeLot.has(sku)) return { d, raison: 'un autre brouillon du même article est déjà dans ce lot' };
     dansLeLot.add(sku);
     return { d, item: b.item, sku };
   }); }, [brouillons, skusEnLigne, progParSku, vendusPartout, dejaSurEbay]);
@@ -18791,7 +18791,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
       desc: `De ${quand(premiere)} à ${quand(derniere)} (heure de Paris, ± 15 min : c'est eBay qui arrondit).`
         + `\nFrais annoncés par eBay : ${eurEbay(lot.reduce((s, x) => s + x.v.fees, 0))}${progConnues.length ? ` (dont programmation ${eurEbay(totalProg)})` : ''}${progPayante ? ' — facturés à la création, non remboursés si tu annules.' : '.'}`
         + (progPasSu ? `\nFrais de programmation pas annoncés par eBay pour ${progPasSu} annonce${progPasSu > 1 ? 's' : ''}.` : '')
-        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si une paire se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`
+        + `\nC'est eBay qui les mettra en ligne à ces heures, même si VRM est fermé. Si un article se vend ailleurs avant son heure, VRM te le dira — mais l'annulation peut devoir se faire sur eBay.`
         + texteOffres,
       ok: 'Oui, programmer', cancel: 'Annuler',
     });
@@ -19015,7 +19015,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
         {besoinCompris && pretes.length > 0 && (
           <label data-planif-risque="1" style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 12.5, color: E.text, lineHeight: 1.5, background: `${E.warn}14`, border: `1px solid ${E.warn}`, borderRadius: 10, padding: '10px 12px', marginBottom: 10, cursor: 'pointer' }}>
             <input type="checkbox" data-planif-compris="1" checked={compris} onChange={(e) => setCompris(e.target.checked)} style={{ width: 20, height: 20, flexShrink: 0, marginTop: 1, accentColor: E.accent }} />
-            <span>Avant ta première programmation : <b>l'annulation d'une annonce programmée par VRM n'est pas garantie</b> — il faudra peut-être l'annuler sur eBay. Et une paire <b>vendue ailleurs avant son heure</b> peut quand même partir sur eBay (VRM te le dira, mais ne peut pas promettre de l'arrêter). J'ai compris.</span>
+            <span>Avant ta première programmation : <b>l'annulation d'une annonce programmée par VRM n'est pas garantie</b> — il faudra peut-être l'annuler sur eBay. Et un article <b>vendu ailleurs avant son heure</b> peut quand même partir sur eBay (VRM te le dira, mais ne peut pas promettre de l'arrêter). J'ai compris.</span>
           </label>
         )}
         {envoi && !envoi.bilan && <div style={{ fontSize: 12.5, color: E.muted, marginBottom: 8 }}>Envoi à eBay : {envoi.en} sur {envoi.total}…</div>}
@@ -19401,7 +19401,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis : elles ont pu changer sur eBay. La remise en vente se fait sur eBay.`}</div>}
       {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours · la remise en vente se fait sur eBay.</div>}
       {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
-      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces paires sont vendues` : 'une de ces paires est vendue'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
+      {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
       {rendues}
       {!voirTout && lignes.length > INACTIVES_PAGE && (
         <button type="button" data-inactives-plus="1" onClick={() => setVoirTout(true)}
@@ -19515,7 +19515,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
       const plusBas = cents(seuil) < cents(e.accepte);
       return { ...base, statut: 'remplace', cochable: true, defaut: !plusBas, plusBas, note: `remplace ${eurEbay(e.accepte)}${plusBas ? ' — plus bas' : ''}` };
     }
-    return { ...base, statut: 'nouvelle', cochable: true, defaut: !!numero, note: numero ? '' : 'sans paire reliée' };
+    return { ...base, statut: 'nouvelle', cochable: true, defaut: !!numero, note: numero ? '' : 'sans article relié' };
   });
   const coche = (l) => l.cochable && (choix.has(l.cle) ? choix.get(l.cle) : l.defaut);
   const selection = lignes.filter(coche);
@@ -19545,7 +19545,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
       o > 0 && `${o} où les offres seront activées si elles ne le sont pas déjà.`,
       sA > 0 && `${sA} sous ton prix d'achat (avant frais eBay).`,
       pA > 0 && `${pA} sans prix d'achat saisi.`,
-      r > 0 && `${r} sans paire reliée : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted.`,
+      r > 0 && `${r} sans article relié : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted.`,
       texteOffresDejaFaites(f, n),
       parCompte.size > 1 && `Sur tes comptes ${[...parCompte.entries()].map(([ref, c]) => `${nomRef(ref)} (${c})`).join(', ')}.`,
       'VRM les règle une par une et te dit le résultat de chacune.',
@@ -19824,7 +19824,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const basculerRetraitAuto = async () => {
     if (retraitAuto) { setRetraitAuto(false); save('vrm_ebay_retrait_auto', false); return; }
     const ok = await askConfirm({
-      title: 'Retirer d\'eBay, sans te demander, une paire vendue sur Vinted ?',
+      title: 'Retirer d\'eBay, sans te demander, un article vendu sur Vinted ?',
       desc: `Seulement quand tout est sûr : ${CONDITIONS_RETRAIT_AUTO}. Sinon, rien ne part : elle reste dans « à retirer », avec le bouton, et VRM te dit pourquoi. Ça se fait quand VRM est ouvert. Une annonce eBay terminée ne revient pas : il faudrait la republier.`,
       ok: 'Allumer', cancel: 'Annuler',
     });
@@ -20108,7 +20108,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const id = String(it.itemId);
     if (dv.aRetirerEbay.some((d) => String(d.annonce && d.annonce.itemId) === id)) return { k: 'vendue', t: 'Vendue sur Vinted : retire-la d\'eBay plutôt que d\'y poser une règle d\'offre.' };
     const ou = ventesConnues.vendus.get(n);
-    if (ou) return { k: 'vendue', t: `Déjà vendue sur ${ou} : pas de règle d'offre sur une paire partie.` };
+    if (ou) return { k: 'vendue', t: `Déjà vendu sur ${ou} : pas de règle d'offre sur un article parti.` };
     if (surDeuxComptes.some((d) => d.numero === n)) return { k: 'deux-comptes', t: 'En vente sur deux de tes comptes eBay : retire l\'une des deux annonces d\'abord.' };
     if (ventesConnues.enCours || vendusVinted === undefined) return { k: 'en-cours' };
     if (ventesConnues.pasSu.length || vendusVinted === null) return { k: 'pas-su' };
@@ -20242,7 +20242,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const a = d.annonce;
     const ok = await askConfirm({
       title: `Retirer « ${a.title || a.itemId} » d'eBay ?`,
-      desc: `La paire N°${d.numero} est vendue sur Vinted. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
+      desc: `L'article N°${d.numero} est vendu sur Vinted. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
       ok: 'Oui, retirer d\'eBay', cancel: 'Annuler', danger: true,
     });
     if (!ok) return;
@@ -20285,7 +20285,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         enLigne={enLigne} vendusVinted={vendusVinted} ventes={ventesConnues}
         comptesPub={comptesPub} compteDefaut={compteDefautPub} onCompte={choisirComptePub} />
     : connected === false
-      ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre une paire en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
+      ? <div style={{ fontSize: 12.5, color: E.muted, lineHeight: 1.5, border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>Pour mettre un article en vente ici, relie d'abord ton compte eBay dans l'onglet <b style={{ color: E.text }}>« Compte eBay »</b>.</div>
       : null; // en cours / pas su : on ne dit rien plutôt qu'une fausse invite
   // ── 3 bis. BROUILLONS · PLANIFICATEUR · PROGRAMMÉES (5 octobre) ────────────
   const brouillonsChoisis = planif && brouillons && typeof brouillons === 'object' ? planif.map((id) => brouillons[id]).filter(Boolean) : [];
@@ -20371,12 +20371,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const alertes = (<>
     {vueSeule && alertesAilleurs > 0 && (
       <div data-ebay-alertes-ailleurs={alertesAilleurs} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5 }}>
-        ⚠️ {alertesAilleurs} paire{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay (vendue{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmée{alertesAilleurs > 1 ? 's' : ''}) — choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'la'} voir.
+        ⚠️ {alertesAilleurs} article{alertesAilleurs > 1 ? 's' : ''} à régler sur tes autres comptes eBay (vendu{alertesAilleurs > 1 ? 's' : ''} ailleurs, encore en vente ou programmé{alertesAilleurs > 1 ? 's' : ''}) — choisis « Tous les comptes » en haut pour {alertesAilleurs > 1 ? 'les' : 'le'} voir.
       </div>
     )}
     {deuxComptesVue.length > 0 && (
       <div data-ebay-deux-comptes={deuxComptesVue.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} paire{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux personnes pourraient l'acheter, et tu n'en as qu'une. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</Pourquoi></div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{deuxComptesVue.length} article{deuxComptesVue.length > 1 ? 's' : ''} en vente sur deux de tes comptes eBay en même temps <Pourquoi>Deux personnes pourraient l'acheter, et tu n'en as qu'un. Retire l'une des deux annonces — VRM ne choisit pas laquelle à ta place.</Pourquoi></div>
         {deuxComptesVue.map((d) => (
           <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
@@ -20391,7 +20391,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         ligne à l'heure dite si personne ne l'arrête. Identité par SKU (§5). */}
     {dvVue.aAnnulerEbay.length > 0 && (
       <div data-ebay-a-annuler={dvVue.aAnnulerEbay.length} style={bloc(E.warn)}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} paire{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendue{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmée{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aAnnulerEbay.length} article{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} vendu{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} {ouVenduesTexte(dvVue.aAnnulerEbay)} — programmé{dvVue.aAnnulerEbay.length > 1 ? 's' : ''} sur eBay, à annuler</div>
         <Pourquoi>Sinon eBay {dvVue.aAnnulerEbay.length > 1 ? 'les' : 'la'} mettra en vente à l'heure prévue, et quelqu'un pourra l'acheter une deuxième fois. L'annulation par VRM n'est pas garantie : si eBay refuse, fais-le dans le Seller Hub.</Pourquoi>
         {dvVue.aAnnulerEbay.map((d) => {
           const id = String(d.annonce.itemId); const etat = annulations[id]; const t = Date.parse(d.annonce.debut || '');
@@ -20510,7 +20510,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const effets = [
     (relieesEbay || progReliees) && vendusVinted === null && 'je ne peux pas te dire si une paire en vente ou programmée ici est déjà partie sur Vinted',
     ventesKO.length > 0 && `je ne peux pas te dire quelles ventes en cours ${ventesKO.length > 1 ? 'de ces comptes' : 'de ce compte'} ne sont pas encore reliées à leur annonce`,
-    lbcPasSu && 'je ne peux pas te dire si une paire programmée ici est déjà vendue sur Leboncoin',
+    lbcPasSu && 'je ne peux pas te dire si un article programmé ici est déjà vendu sur Leboncoin',
     (commandes === null || (skuCommandes && enLigne === null)) && 'je ne peux pas te dire si une paire vendue ici est encore en vente sur Vinted',
   ].filter(Boolean);
   const ligneComptesIllisibles = illisiblesAnnonces.filter((c) => dansVue({ _compte: c.ref })).length > 0 && (
@@ -20834,7 +20834,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à une paire</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand la paire se vend sur Vinted. « Relier à une paire » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux paires : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à un article</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand l'article se vend sur Vinted. « Relier à un article » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux articles : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
       </div>
     )}
       {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
@@ -20973,8 +20973,8 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
             {plat==='Vestiaire Collective'
               ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/></>
               : plat==='Leboncoin'
-              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à une paire — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
-              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes paires depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
+              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
+              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
           </div>
           {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
             <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
@@ -21330,7 +21330,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       </div>
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
-          Paires en stock = nb de numéros étiquetés au garage · Valeur du stock =
+          Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
           Σ prix d'achat des annonces en ligne · CA = ventes finalisées, tous comptes.
           Repli sur les valeurs locales (catalogue/garage) tant que le direct charge. */}
       <div data-stats-carte="hero" data-notion="finalise-vinted" className="vrm-stats-hero" style={{...sCarte,padding:'20px 20px 18px',marginTop:4}}>
@@ -21423,7 +21423,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             les numéros POSÉS AU GARAGE (le garage est vide), ce que seule la
             légende disait. Un chiffre qu'on doit corriger avec sa légende est un
             chiffre faux : le titre dit maintenant ce qu'il compte. */}
-        <StatCard icon="📦" label="Paires en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
+        <StatCard icon="📦" label="Articles en stock" value={liveStats&&liveStats.pairesStock!=null?liveStats.pairesStock:stockCount} color={C.text} sub="cases réellement remplies"/>
         {/* ⚠️ « 0,00 € » N'EST PAS UN ZÉRO, C'EST UNE ABSENCE. Cette carte somme
             les PRIX D'ACHAT des annonces en ligne — or aucun n'est saisi, donc
             elle affichait un gros 0,00 € à côté d'un « 1581 € de valeur » sur
@@ -21776,9 +21776,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const moyenne=(totalAjouts/ajoutsParJour.length);
         return (
           <Card>
-            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>📦 Paires ajoutées par jour</div>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>📦 Articles ajoutés par jour</div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
-              {totalAjouts} paire{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
+              {totalAjouts} article{totalAjouts>1?'s':''} sur {ajoutsParJour.length} jour{ajoutsParJour.length>1?'s':''} d'activité — moyenne {moyenne.toFixed(1)}/jour.
             </div>
             <div style={{display:'flex',alignItems:'flex-end',gap:4,height:150,paddingTop:10,overflowX:'auto'}}>
               {ajoutsParJour.map((h,i)=>{
@@ -21921,10 +21921,10 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <ScreenHead icon="box" title={`Catalogue (${catalog.length})`}
-        desc="Les paires de l'ancienne application. Elles comptent toujours dans les statistiques."
+        desc="Les articles de l'ancienne application. Ils comptent toujours dans les statistiques."
         right={<Btn small onClick={()=>{
-          if(fullList.length===0){toast('Aucune paire à exporter');return;}
-          const headers=['N° Paire','Prix Achat (€)','Statut','Date ajout'];
+          if(fullList.length===0){toast('Aucun article à exporter');return;}
+          const headers=['N° Article','Prix Achat (€)','Statut','Date ajout'];
           const rows=fullList.map(p=>[p.id||'',String(p.buyPrice||'').replace('.',','),p.status||'',p.addedAt||'']);
           const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
           const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
@@ -21953,7 +21953,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
       </div>
       {oldStockCount>0&&(
         <div style={{background:`${C.warn}22`,border:`1px solid ${C.warn}66`,borderRadius:8,padding:'8px 14px',fontSize:12,color:C.warn,fontWeight:500}}>
-          ⚠️ {oldStockCount} paire{oldStockCount>1?'s':''} en stock depuis + de 30 jours
+          ⚠️ {oldStockCount} article{oldStockCount>1?'s':''} en stock depuis + de 30 jours
         </div>
       )}
       <Card style={{padding:0,overflow:'hidden'}}>
@@ -21964,7 +21964,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             ))}
           </tr></thead>
           <tbody>
-            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucune paire</td></tr>}
+            {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
             {list.map(p=>(
               <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
                 <td style={{padding:'2px 12px',fontWeight:600,color:C.accent,fontSize:15,minWidth:60}}>
@@ -22027,7 +22027,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <Btn small onClick={()=>setShowAll(true)} color={C.warn} style={{color:'#fff',marginLeft:8}}>📋 Voir tout</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} paires</span>
+        <span style={{color:C.warn}}>📋 Affichage complet — {fullList.length} articles</span>
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>Revenir à la pagination</Btn>
       </div>}
     </div>
@@ -22184,7 +22184,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
           <Btn small onClick={()=>{
             if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
-            const headers=['ID','N° Paire','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
+            const headers=['ID','N° Article','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
             const rows=fullFiltered.map(s=>[
               s.id||'',s.productId||'',s.saleDate||'',s.receiveDate||'',
               String(s.buyPrice||'').replace('.',','),String(s.sellPrice||'').replace('.',','),
@@ -22548,7 +22548,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const inv=invoices.find(i=>i.id===id);
     const isAcc=inv&&accountedSet.has(String(inv.productId).trim());
     const msg=isAcc
-      ? `⚠️ La paire #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
+      ? `⚠️ L’article #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
       : 'Supprimer cette facture ?';
     if(!await askConfirm(msg)) return;
     const u=invoices.filter(i=>i.id!==id);
@@ -22572,7 +22572,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const exportExcel=()=>{
     if(fullList.length===0){toast('Aucune facture à exporter');return;}
     const multiEnt=Array.isArray(entreprises)&&entreprises.length>1;
-    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
+    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Article','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
     const rows=fullList.map(i=>{
       const e=entForInvoice(i,entreprises,activeEnt,invoiceSettings);
       return [
@@ -22622,7 +22622,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="N° de paire ou date de vente... puis Entrée"
+          placeholder="N° d’article ou date de vente... puis Entrée"
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
@@ -22692,7 +22692,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
           <thead>
             <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Paire</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
@@ -22784,7 +22784,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   
   const submit=()=>{
     setErr('');
-    if(!data.productId.trim()){setErr('Le numéro de paire est obligatoire');return;}
+    if(!data.productId.trim()){setErr('Le numéro d’article est obligatoire');return;}
     if(!data.sellPrice||+data.sellPrice<=0){setErr('Prix de vente invalide');return;}
     if(!data.itemName.trim()){setErr('La désignation est obligatoire');return;}
     onSave(data);
@@ -22802,7 +22802,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
         <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accent}}>{nextNumber}</b></div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="N° paire (étiquetage) *">
+          <Field label="N° article (étiquetage) *">
             <Input type="number" value={data.productId} onChange={e=>{
               const id=e.target.value;
               const p=catalog.find(p=>p.id===id);
@@ -23699,7 +23699,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       setSel(id); return;
     }
     if (type === 'autre') {
-      const n = (await askText({ desc: 'Nom de ton meuble (ex : Armoire, Bac à chaussures) :', value: '' }) || '').trim();
+      const n = (await askText({ desc: 'Nom de ton meuble (ex : Armoire, Étagère) :', value: '' }) || '').trim();
       if (n) name = n;
       const e = (await askText({ desc: 'Un emoji pour le représenter (facultatif) :', value: '🪑' }) || '').trim();
       if (e) emoji = e;
@@ -23712,7 +23712,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const nv = await askText({ numeric: true, desc: 'Combien de niveaux (plateaux) sur cette étagère ?', value: String(t.rows) });
       if (nv == null) return;
       nivChoisi = Math.max(1, Math.min(10, parseInt(nv, 10) || t.rows));
-      const cs = await askText({ numeric: true, desc: 'Combien de cases par niveau (paires côte à côte) ?', value: String(t.cols) });
+      const cs = await askText({ numeric: true, desc: 'Combien de cases par niveau (articles côte à côte) ?', value: String(t.cols) });
       if (cs == null) return;
       casesChoisies = Math.max(1, Math.min(16, parseInt(cs, 10) || t.cols));
     }
@@ -24436,7 +24436,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       if (!bouge) { setPairePrete(x => x === p.numero ? null : p.numero); return; }
       const cible = document.elementFromPoint(ev.clientX, ev.clientY);
       if (cible && cible.closest && cible.closest('[data-stock3d] canvas') ? deposerSur(p.numero, ev.clientX, ev.clientY) : false) return;
-      toast('Lâche la paire sur une étagère, une table, un portant ou une pile dans la pièce.');
+      toast('Lâche l\'article sur une étagère, une table, un portant ou une pile dans la pièce.');
     };
     const annule = () => { window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule); if (f) f.style.display = 'none'; };
     window.addEventListener('pointermove', suivre, { passive: false }); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', annule);
@@ -24476,7 +24476,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div data-bande-a-ranger={aRanger.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
-              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} paire{aRanger.length > 1 ? 's' : ''} · touche-en une, ou glisse-la dans la pièce</span>
+              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
             </div>
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {aRanger.slice(0, 60).map(p => {
@@ -24510,10 +24510,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 650, color: C.text }}>
-              {chercheLoc.length} paire{chercheLoc.length > 1 ? 's' : ''} à aller chercher
+              {chercheLoc.length} article{chercheLoc.length > 1 ? 's' : ''} à aller chercher
               <span style={{ fontWeight: 500, color: C.muted }}> · en couleur dans la pièce</span>
             </span>
-            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les paires à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
+            <button className="vrm-icon-control" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: 'transparent', color: C.muted, padding: '0 10px', minHeight: 32, cursor: 'pointer' }}><Icon name="close" size={14}/></button>
           </div>
           {chercheLoc.map(x => (
             <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
@@ -24693,7 +24693,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', marginBottom: 6 }}>
                 <div className="vrm-label" style={{ color: C.muted, marginBottom: 6 }}>
-                  {dedans.length} paire{dedans.length > 1 ? 's' : ''} dans ce meuble
+                  {dedans.length} article{dedans.length > 1 ? 's' : ''} dans ce meuble
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 6, maxHeight: 230, overflowY: 'auto' }}>
                   {dedans.map(p => (
@@ -24704,10 +24704,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                       <span style={{ flex: '1 1 90px', minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
                         <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
+                          {p.ambigu ? '⚠️ N° porté par plusieurs articles' : (p.title || '—')}
                         </span>
                       </span>
-                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du stock"
+                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
                         style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
                     </div>
                   ))}
@@ -24924,7 +24924,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   };
   const liberer = async (x) => {
     if (!sur) return;
-    if (!(await askConfirm({ title: `Libérer la case de la N°${x.numero} ?`, desc: `Elle n'est plus parmi tes paires en stock (vendue ou partie). Son numéro sort de « ${x.itemName} » — le numéro lui-même ne change pas.`, ok: 'Libérer la case', cancel: 'Annuler' }))) return;
+    if (!(await askConfirm({ title: `Libérer la case de la N°${x.numero} ?`, desc: `Il n'est plus parmi tes articles en stock (vendu ou parti). Son numéro sort de « ${x.itemName} » — le numéro lui-même ne change pas.`, ok: 'Libérer la case', cancel: 'Annuler' }))) return;
     const next = libererNumeroDuPlan(plan, x.itemId, x.numero);
     if (!next) { toast('Ce numéro n\'est plus dans cette case — rien n\'a été changé.'); return; }
     ecrire(next); toast(`Case libérée : N°${x.numero} sortie de ${x.itemName}.`);
@@ -24932,7 +24932,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
   const raisonPasSu = planLu === undefined ? 'Je relis le plan de ton stock…'
     : planLu === false ? "Le plan de ton stock n'a pas pu être relu (la base n'a pas répondu) : je ne propose rien tant que je ne l'ai pas — rouvre cet écran dans un instant."
-    : presents == null ? "Je ne sais pas encore quelles paires sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait une paire partie dans une case." : null;
+    : presents == null ? "Je ne sais pas encore quels articles sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait un article parti dans une case." : null;
   const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, borderRadius: 8, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text, fontSize: 12.5, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 });
   const carte = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow, padding: 14, minWidth: 0 };
   const titreBloc = (t, n) => <div className="vrm-label" style={{ color: C.muted, marginBottom: 10, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{t}</span>{n != null ? <span style={{ color: C.text }}>{n}</span> : null}</div>;
@@ -24992,7 +24992,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                           : <span style={{ width: 40, height: 40, borderRadius: 8, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="box" size={18} style={{ color: C.muted, opacity: .6 }} /></span>}
                         <span style={{ flex: '1 1 auto', minWidth: 0 }}>
                           <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.text }}>N°{p.numero}</span>
-                          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'paire présente'}</span>
+                          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'article présent'}</span>
                         </span>
                         <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                           {prochaine && <button type="button" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)} style={btn(true)}>Ranger ici</button>}
@@ -25007,7 +25007,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && aLiberer.length > 0 && (
             <div style={carte} data-rgt-liberer="">
               {titreBloc('À libérer', aLiberer.length)}
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand la place est vide.</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'un article qui n'est plus en stock (vendu ou parti). Libère-la quand la place est vide.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
                   <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
@@ -25297,7 +25297,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" desc="Où sont rangées tes paires. Cherche un numéro, il te dit le meuble et la case."/>
+      <ScreenHead icon="home" title="Stock" desc="Où sont rangés tes articles. Cherche un numéro, il te dit le meuble et la case."/>
 
       {/* Bascule : grille classique ↔ photo de ton vrai local */}
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
@@ -25316,7 +25316,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {garageView==='grid' && (<>
       {placing && (
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
-          <span>📦 Range la paire <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
+          <span>📦 Range l'article <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
           <button type="button" onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
         </div>
       )}
@@ -25348,7 +25348,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           {numberedNotStored.length>0&&(
             <Card style={{padding:12,background:`${C.warn}11`,borderColor:`${C.warn}44`}}>
               <div style={{fontSize:11,color:C.warn,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 À ranger ({numberedNotStored.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces paires ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces articles ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
                 {numberedNotStored.map(n=>(
                   <button key={n} type="button" onClick={()=>{ setLocalPlace(n); try{window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}catch(_){} }}
@@ -25360,7 +25360,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           {storedUnknown.length>0&&(
             <Card style={{padding:12,background:`${C.blue||C.accent}11`,borderColor:`${C.blue||C.accent}44`}}>
               <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au stock mais numéro inconnu ({storedUnknown.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans paire numérotée correspondante (ancien numéro, faute de frappe, ou vendue).</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans article numéroté correspondant (ancien numéro, faute de frappe, ou vendu).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
                 {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
               </div>
@@ -25421,7 +25421,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         🗄️ <b>Ton stock est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
       </div>}
       {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
-        {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des paires dans les cases vides.'}
+        {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des articles dans les cases vides.'}
         {blockMode&&'Clique sur une case vide pour la bloquer/débloquer (zone non utilisable). '}
         {colorMode&&(activeColor?'Clique sur une case pour la colorier. Re-clique pour effacer la couleur.':'Sélectionne une couleur, ou ✕ pour effacer la couleur d\'une case.')}
       </div>}
@@ -25568,7 +25568,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
           toast('❌ Fichier invalide : pas de données détectées');
           return;
         }
-        if(await askConfirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} paires\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
+        if(await askConfirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} articles\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
           onImport(data);
         }
       }catch(err){
@@ -25602,7 +25602,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
           <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📤 Exporter</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
-              <b>{catalog.length}</b> paires · <b>{sales.length}</b> ventes
+              <b>{catalog.length}</b> articles ·<b>{sales.length}</b> ventes
             </div>
             <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
           </div>
@@ -25767,7 +25767,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,fontSize:12.5,color:C.muted,lineHeight:1.5}}>
           Aucun numéro n'est encore posé dans le <b style={{color:C.text}}>Stock</b> : la comparaison
           avec cette liste ne dirait donc rien d'utile (elle signalerait les {stockVinted.length} numéros
-          d'un coup). Range tes paires dans le Stock, et les écarts apparaîtront ici.
+          d'un coup). Range tes articles dans le Stock, et les écarts apparaîtront ici.
         </div>
       )}
       {!garageVide && (enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
@@ -25795,7 +25795,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           {garagePasEnLigne.length>0&&(
             <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:8}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au stock mais pas en ligne ({garagePasEnLigne.length})</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le stock mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces articles sont dans le stock mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
                   <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:5,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -26456,12 +26456,21 @@ const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 // cartons), ou deux paires différentes hors garage (deux annonces, une
 // annonce et une autre vente…). Une vente et son annonce encore ouverte au
 // même titre restent la même paire (règle d'avant, inchangée).
+// ⚠️ 25 OCT — DÉCISION DE JULIEN : « ne montre plus en rouge un conflit venant
+// d'une vente ANNULÉE ». Une vente annulée ne part jamais : elle ne peut donc
+// pas être « la mauvaise paire qui s'expédie ». Elle garde son numéro dans
+// `porteursNum` (jamais réattribué, §5) mais ne compte PLUS comme un porteur
+// en conflit. Reste rouge un vrai conflit entre deux articles EN VENTE.
 function conflitsDeNumeros(porteurs) {
   const out = [];
   for (const n in (porteurs || {})) {
     const p = porteurs[n] || [];
     const cases = new Set(p.filter(x => x.type === 'garage').map(x => x.id));
-    const paires = p.filter(x => x.type !== 'garage');
+    // Une vente ANNULÉE ne part jamais : on ne la compte pas comme un porteur en
+    // conflit (25 oct., décision de Julien). Elle reste dans `porteursNum`, donc
+    // son numéro n'est jamais réattribué (§5) ; elle ne déclenche juste plus de
+    // rouge. Deux articles EN VENTE sous un même numéro restent un conflit.
+    const paires = p.filter(x => x.type !== 'garage' && x.type !== 'annulee');
     const ids = new Set(paires.map(x => x.type + ':' + x.id));
     let deux = cases.size > 1;
     if (!deux && paires.length > 1 && ids.size > 1) {
@@ -26484,8 +26493,11 @@ function conflitsDeNumeros(porteurs) {
 //     imprimé avec) ; toutes les annonces en ligne qui le portent changent ;
 //   · sinon, deux annonces en ligne ou plus : garde celle dont le numéro a été
 //     saisi À LA MAIN, puis celle numérotée la PREMIÈRE ; les autres changent ;
-//   · tout autre cas (deux cases du garage, une vente annulée encore là…) n'est
-//     PAS réglé tout seul : on ne devine pas (§5), le bloc rouge reste.
+//   · deux cases du garage, ou une vente annulée présente à côté d'un vrai
+//     conflit d'annonces : on ne devine pas (§5), ce conflit reste en rouge.
+// ⚠️ 25 OCT — Une vente ANNULÉE ne déclenche plus de rouge à elle seule
+//    (décision de Julien, voir conflitsDeNumeros) : seule avec une annonce, ce
+//    n'est plus un conflit, donc ça n'arrive jamais jusqu'ici.
 // Rend [{ id, ancien }] — les annonces à renuméroter. Fonction PURE.
 function doublonsAReattribuer(conflits, fiches) {
   const out = [];
@@ -29822,7 +29834,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 </div>
               )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                Ce résultat ne déduit pas le prix d'achat de tes paires : ton bénéfice brut et net, qui le déduit, est juste en dessous.
+                Ce résultat ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est juste en dessous.
               </div>
             </div>
           )}
@@ -30053,8 +30065,8 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
             {!remise && l.recu && l.etape === 'rembourse' && <span>reçue chez toi</span>}
             {!remise && l.livreeSelonVinted && !l.recu && <span>{l.plateforme === 'ebay' ? 'eBay' : 'Vinted'} dit livrée — confirme quand tu l'as</span>}
             {l.origine === 'non-reclamee' && <span>non réclamée par l'acheteur</span>}
-            {!l.num && <span data-retour-sans-num>paire pas reliée à un N°</span>}
-            {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par une autre paire</span>}
+            {!l.num && <span data-retour-sans-num>article pas relié à un N°</span>}
+            {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par un autre article</span>}
             {remise && l.remis && l.remis.archive && <span>ancien N° : numéro neuf à la republication</span>}
             {compte && <span>· {compte}</span>}
           </div>
@@ -30076,7 +30088,7 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
         <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="truck" size={18}/></span>
         <div style={{minWidth:0}}>
           <div style={{fontSize:13.5,fontWeight:700,color:C.text}}>Retours en cours{lignes.length ? ` · ${lignes.length}` : ''}</div>
-          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : la paire garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
+          <div style={{fontSize:11.5,color:C.muted,marginTop:3,lineHeight:1.45}}>Coche « Reçu chez moi » quand le colis est là, puis « Remise en stock » : l'article garde son N°. Rien ne change tout seul — la vente remboursée sort déjà de ton CA.{manques.length ? <span data-retours-pas-su> Je n'ai pas pu lire {manques.join(', ')} : un retour peut manquer.</span> : null}</div>
         </div>
       </div>
       <div style={{display:'grid',gap:6,marginTop:9}}>
@@ -30705,7 +30717,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const setBordLink = (b, numero) => {
     const k = bordKey(b); if (!k) return;
-    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) { toast('Cette paire est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.'); return; }
+    if (numero && !candidatsVenteSansAnnonce(numeros, onlineAnnonceIds, cleNum).some(e => cleNum(e.num) === cleNum(numero))) { toast('Cet article est encore en ligne ou ne fait plus partie des candidats. Aucun lien modifié.'); return; }
     setBordLinks(prev => { const u = { ...prev }; if (numero) u[k] = { numero: String(numero) }; else delete u[k]; save('vinted_bord_links', u); return u; });
   };
   // Entrée numérotée liée manuellement à ce bordereau (si l'utilisateur en a choisi une).
@@ -31395,7 +31407,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         </div>
         <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
-          title="Reçu d'achat PDF (avec le N° de la paire)" aria-label="Reçu d'achat"
+          title="Reçu d'achat PDF (avec le N° de l'article)" aria-label="Reçu d'achat"
           style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:C.bg,color:C.text,cursor:'pointer',fontSize:11,fontWeight:600,padding:'4px 8px',fontFamily:'inherit'}}><Icon name="doc" size={14}/> Reçu</button>
       </div>
     );
@@ -31671,6 +31683,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const outilsTelephone = useEtroitReglages();
   const outilsOrdinateur = useOrdinateur();
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
+  // Astuce one-time : explique le numérotage auto (Julien, 25 oct. : « je ne sais
+  // pas pourquoi les numéros sont attribués comme ça »). Confort d'appareil, pas
+  // une donnée → localStorage ; refermée pour de bon au clic. §5 : n'explique
+  // que le comportement, ne touche à AUCUNE logique de numéro.
+  const [astuceNum, setAstuceNum] = useState(() => load('vrm_astuce_numeros', true) !== false);
   const [studioOpen, setStudioOpen] = useState(false); // « Studio photo » (cadre guide + détourage local)
   const [annToolsCote, setAnnToolsCote] = useState('droite'); // côté où s'ancre ce menu (mesuré au clic)
   // Encart « achats hors Vinted » (saisie occasionnelle) : replié par défaut.
@@ -32826,7 +32843,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (e && e.buyFromId) return;                          // déjà relié à un achat
     const rep = await askText({
       title: `Prix d'achat de la N°${numeroPose} ?`,
-      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cette paire'} ». Si tu l'as sous la main, note ce que tu l'as payée — sinon « Plus tard », tu le mettras quand tu veux.`,
+      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cet article'} ». Si tu l'as sous la main, note ce que tu l'as payé — sinon « Plus tard », tu le mettras quand tu veux.`,
       value: '', placeholder: 'ex : 25 ou 12,50', ok: 'Enregistrer', cancel: 'Plus tard',
     });
     if (rep == null) return;                               // « Plus tard » / fermé
@@ -32857,7 +32874,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // republiée a un numéro neuf (Julien, 10 octobre).
     if (!numeroReprenable(cle)) {
       updatePair(item, { numero: avant });
-      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ta paire republiée garde un numéro neuf — écris celui-là sur son étiquette.`);
+      toast(`« ${cle} » est un ancien numéro : il ne se redonne pas. Ton article republié garde un numéro neuf — écris celui-là sur son étiquette.`);
       return;
     }
     // Ce qu'on écrit : tel quel pour des chiffres, la clé (majuscules) sinon.
@@ -32871,8 +32888,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!autres.length && takenCles.has(cle) && !(porteursNum[cle] || []).some(p => String(p.id) !== moi)) {
       const meme = await askConfirm({
         title: `Le N°${n} a déjà servi`,
-        desc: `Ce numéro a déjà été donné à une paire (il est peut-être écrit sur un carton).\n\nEst-ce bien la MÊME paire qui revient ? Sinon, prends un numéro neuf.`,
-        ok: 'Oui, la même paire', cancel: `Non — N°${nextNumero}`,
+        desc: `Ce numéro a déjà été donné à un article (il est peut-être écrit sur un carton).\n\nEst-ce bien le MÊME article qui revient ? Sinon, prends un numéro neuf.`,
+        ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
       updatePair(item, { numero: v, manuelAt }); recordUsed(v); await demanderPrixAchat(item, v); return;
@@ -32891,12 +32908,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ? `📦 peut-être encore en ligne « ${p.titre} » (son compte n'a pas été relu depuis ${p.lu ? depuisFr(p.lu).replace(/^il y a /, '') : 'longtemps'})`
           : `📦 en ligne « ${p.titre} »`)
         : p.type === 'vente' ? `📮 à expédier « ${p.titre} »`
-        : p.type === 'annulee' ? `↩️ vente annulée, la paire est restée « ${p.titre} »`
+        : p.type === 'annulee' ? `↩️ vente annulée, l'article est resté « ${p.titre} »`
         : `${p.titre}`).join('\n');
       const peutEtre = presents.every(p => p.aConfirmer);
       const prendre = await askConfirm({
         title: peutEtre ? `Le N°${n} est peut-être encore pris` : `Le N°${n} est déjà pris`,
-        desc: `${peutEtre ? 'Une paire le porte peut-être encore' : 'Une paire le porte encore'} :\n${qui}\n\nDeux paires avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
+        desc: `${peutEtre ? 'Un article le porte peut-être encore' : 'Un article le porte encore'} :\n${qui}\n\nDeux articles avec le même numéro, c'est le mauvais article au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
@@ -32906,8 +32923,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const anc = numeros[autres[0]] || {};
     const meme = await askConfirm({
       title: `Le N°${n} a déjà servi`,
-      desc: `Il était sur « ${anc.title || 'une autre paire'} », qui n'est plus en ligne.\n\nEst-ce bien la MÊME paire qui te revient (litige, retour, annulation) ?\n\nSi oui, elle reprend son prix d'achat et ses infos. Si c'est une autre paire, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
-      ok: 'Oui, la même paire revient', cancel: `Non — N°${nextNumero}`,
+      desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
+      ok: 'Oui, le même article revient', cancel: `Non — N°${nextNumero}`,
     });
     if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
     setNumeros(prev => {
@@ -32922,7 +32939,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u); return u;
     });
     recordUsed(n);
-    toast(`N°${n} repris — les infos de l'ancienne paire sont revenues avec lui`);
+    toast(`N°${n} repris — les infos de l'ancien article sont revenues avec lui`);
   };
 
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
@@ -33469,7 +33486,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
     <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B45309'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux paires : VRM a donné un numéro neuf à l'une d'elles. Barre l'ancien sur son carton et écris le nouveau.</div>
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux articles : VRM a donné un numéro neuf à l'un d'eux. Barre l'ancien sur son carton et écris le nouveau.</div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}</span>
@@ -33482,7 +33499,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const autres = autresPorteurs(it);
     if (autres.length) {
       // On ne confirme pas un numéro qu'un autre carton présent porte déjà.
-      await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux paires au même numéro, c'est la mauvaise qui part.`);
+      await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux articles au même numéro, c'est le mauvais qui part.`);
       return;
     }
     marquerCartonVerifie(String(it.id), cleNum(f.numero)); toast(`N°${f.numero} confirmé pour « ${it.title} »`);
@@ -33503,7 +33520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const prov = String(nextNumero);
       const ok = await askConfirm({
         title: `Le N°${n} est sur « ${autre.title} »`,
-        desc: `Cette paire a aussi été renumérotée pendant la panne : son N°${n} est sans doute faux.\n\nElle prend le N°${prov} en attendant que tu regardes SON étiquette (elle reste dans la liste), et « ${it.title} » prend le N°${n}.`,
+        desc: `Cet article a aussi été renuméroté pendant la panne : son N°${n} est sans doute faux.\n\nIl prend le N°${prov} en attendant que tu regardes SON étiquette (il reste dans la liste), et « ${it.title} » prend le N°${n}.`,
         ok: `Oui, le N°${n} est à « ${it.title} »`, cancel: 'Annuler',
       });
       if (!ok) return;
@@ -33659,11 +33676,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const n = String(num || '').trim(); if (!n) return;
     const cell = garageCellOf(garageGrid, n);
     const ok = await askConfirm(
-      `Déclarer la paire N°${n} PERDUE ?\n\n` +
+      `Déclarer l'article N°${n} PERDU ?\n\n` +
       `• Son numéro sera libéré (plus compté en stock).\n` +
       (cell ? `• Sa case au garage (${garageCellLabel(cell)}) sera vidée.\n` : '') +
       `• La vente reste dans ta compta comme perte.\n\n` +
-      `À ne faire que si la paire ne te revient pas.`
+      `À ne faire que si l'article ne te revient pas.`
     );
     if (!ok) return;
     setPairsLost(prev => { const u = { ...prev, [n]: { at: new Date().toISOString(), title: o && o.title || '', transaction: o && o.transaction_id != null ? String(o.transaction_id) : null } }; save('vinted_pairs_lost', u); return u; });
@@ -33692,11 +33709,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const id = String(it.id), f = numeros[id] || {}, n = String(f.numero || '').trim();
     if (!n) return;
     const autre = Object.keys(numeros).some((k) => k !== id && cleNum((numeros[k] || {}).numero) === cleNum(n));
-    const ok = await askConfirm({ title: `La paire N°${n} n'est plus chez toi ?`,
+    const ok = await askConfirm({ title: `L'article N°${n} n'est plus chez toi ?`,
       desc: `« ${String(it.title || f.title || '').slice(0, 60)} » — Vinted l'a masquée, et VRM la comptait encore sur ton étagère.\n\n`
         + `• Elle ne comptera plus comme présente. Son numéro reste pris : il ne sera jamais redonné.\n`
-        + (autre ? `• L'autre paire au N°${n} le garde : pas de numéro neuf pour elle.\n` : '')
-        + `\nÀ ne faire que si cette paire n'est plus sur ton étagère.`,
+        + (autre ? `• L'autre article au N°${n} le garde : pas de numéro neuf pour lui.\n` : '')
+        + `\nÀ ne faire que si cet article n'est plus sur ton étagère.`,
       ok: "Elle n'est plus là" });
     if (!ok) return;
     declarerPartie(id, n, f.title || it.title);
@@ -33865,16 +33882,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const r = remiseEnStock(ligne, { numeros, presentes: presentesAnnonceIds, cleNum, estArchive: (n) => !numeroReprenable(n) });
     if (!r.ok) {
       if (r.raison === 'pas-recu') toast('Note d’abord que le colis est arrivé chez toi (« Reçu chez moi »).');
-      else toast('Cette paire n’est reliée à aucun N° (ni par la vente, ni par son annonce) : rien à remettre en stock. Pose son N° à la main d’abord.');
+      else toast('Cet article n’est relié à aucun N° (ni par la vente, ni par son annonce) : rien à remettre en stock. Pose son N° à la main d’abord.');
       return;
     }
     let num = r.num;
     if (r.conflit) {
-      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Une autre paire présente porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
+      const ok = await askConfirm({ title: `Le N°${r.num} est déjà porté`, desc: `Un autre article présent porte aussi le N°${r.num}${r.conflit.titre ? ` (« ${r.conflit.titre} »)` : ''}.\n\nRegarde les deux cartons : VRM ne choisit pas à ta place. Tu peux remettre celle-ci en stock SANS numéro, et trancher ensuite dans le champ N°.`, ok: 'Remettre en stock sans N°', cancel: 'Annuler' });
       if (!ok) return;
       num = null;
     } else {
-      const ok = await askConfirm({ title: `Remettre en stock ${r.archive ? 'cette paire' : `la N°${r.num}`} ?`, desc: r.archive ? `Elle portait l’ancien N°${r.num} : un ancien numéro ne se redonne pas, elle prendra un numéro NEUF à sa republication — écris-le sur son étiquette.` : `Elle garde son N°${r.num} : retape-le dans le champ N° de la nouvelle annonce.\n\nRien d’autre ne change (ni la vente, ni ta compta).`, ok: 'Remettre en stock', cancel: 'Annuler' });
+      const ok = await askConfirm({ title: `Remettre en stock ${r.archive ? 'cet article' : `la N°${r.num}`} ?`, desc: r.archive ? `Il portait l'ancien N°${r.num} : un ancien numéro ne se redonne pas, il prendra un numéro NEUF à sa republication — écris-le sur son étiquette.` : `Elle garde son N°${r.num} : retape-le dans le champ N° de la nouvelle annonce.\n\nRien d’autre ne change (ni la vente, ni ta compta).`, ok: 'Remettre en stock', cancel: 'Annuler' });
       if (!ok) return;
     }
     const k = String(ligne.cle);
@@ -33983,8 +34000,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const applyReprise = async (r)=>{
     const oldNum = String(r.orphan.e.numero), autoNum2 = String(r.current.numero);
     const q = r.vendue
-      ? `Cette paire t'est REVENUE (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nElle a été vendue sous le N°${oldNum}. Si tu l'as remise dans SA boîte, elle peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
-      : `Cette annonce est bien ta paire N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, reste brûlé : il ne sera donné à aucune autre paire.`;
+      ? `Cet article t'est REVENU (litige, retour, annulation) ?\n\n« ${r.item.title} »\n\nIl a été vendu sous le N°${oldNum}. Si tu l'as remis dans SA boîte, il peut le reprendre — sinon garde le N°${autoNum2}, qui est neuf.`
+      : `Cette annonce est bien ton article N°${oldNum} ?\n\n« ${r.item.title} »\n\nElle reprendra le N°${oldNum} (celui écrit sur sa boîte).\nLe N°${autoNum2}, créé automatiquement, reste brûlé : il ne sera donné à aucun autre article.`;
     if (!await askConfirm(q)) return;
     setNumeros(prev => {
       const u = { ...prev };
@@ -34192,7 +34209,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ua = [...used].sort(triPool);
     setUsedNumeros(ua); save('vinted_used_numeros', ua);
     setRenumOpen(false);
-    toast(`✓ ${moves.length} paire${moves.length > 1 ? 's' : ''} renumérotée${moves.length > 1 ? 's' : ''}`);
+    toast(`✓ ${moves.length} article${moves.length > 1 ? 's' : ''} renuméroté${moves.length > 1 ? 's' : ''}`);
   };
   // ── Assistant de repricing : quoi baisser, de combien, pourquoi ────────────
   // Règles : plus une paire dort, plus la baisse conseillée est forte ; une paire
@@ -37521,7 +37538,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (f.type!=='application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) { toast('Choisis le bordereau PDF téléchargé depuis Vinted.'); return; }
     // Import direct (pas depuis une vente) : on demande le N° + le titre.
     if (ctx.standalone) {
-      const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de la paire (laisse vide si aucun) :', value: '' }) || '').trim();
+      const numero = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de l\'article (laisse vide si aucun) :', value: '' }) || '').trim();
       const title = (await askText({ desc: 'Titre / description (ex : Nike Air Max 90) :', value: '' }) || '').trim();
       ctx = { numero, title };
     }
@@ -37871,7 +37888,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${exact?'':'au moins '}${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
-            : 'Bordereau + paire au stock, coche par colis';
+            : 'Bordereau + article au stock, coche par colis';
           tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
@@ -37944,7 +37961,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
             title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
-            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon la mauvaise paire part`,
+            sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige-en un avant d'expédier, sinon le mauvais article part`,
             tab:'cat_bord',prio:0.05});
         }
         const pickupCount=pickupUnion.total; // UNION email + statut Vinted — EXACTEMENT le compte de l'onglet Achats
@@ -37989,7 +38006,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    (le bordereau de retour se fait sur CELUI-LÀ).
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
-            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} paire${ar.length>1?'s':''} (litige)`,
+            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
               sub:`Génère l'étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'cat_achats',prio:0.8}); } }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
@@ -38509,7 +38526,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
 
       {curSub==='ventes' && (<>
-        <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par paire, expédition, et tes documents comptables."/>
+        <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -38675,7 +38692,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && aExpedier(o) && (()=>{ const cell=garageCellOf(garageGrid,num); return cell ? <span onClick={()=>onLocate&&onLocate(num)} title="Voir la paire au stock" style={{color:C.blue||C.accent,fontWeight:600,cursor:'pointer'}}>{garageCellLabel(cell)}</span> : (garageUtilise ? <span style={{color:C.muted,fontWeight:500}} title="Cette paire n'est pas rangée au garage">pas au garage</span> : null); })()}
                     {st==='cancelled' && num && (()=>{
                       const out = saleOutcome(o);
-                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Paire déclarée perdue : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
+                      if (isPairLost(num)) return <span style={{color:C.danger,fontWeight:600,background:`${C.danger}18`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'1px 8px',flexShrink:0}} title="Article déclaré perdu : son numéro est libéré et sa case au garage vidée.">❌ N°{num} perdue</span>;
                       // ⚠️ (relecture du 11 octobre) Un numéro d'ARCHIVE (« B198 ») ne
                       //    se redonne jamais : l'app le refuse dans le champ N°. Dire
                       //    « garde le N°B198 » envoyait faire le geste qu'elle refuse.
@@ -38729,7 +38746,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     (30 sept. : une ligne de moins par vente). */}
                 {!hidden && (
                   <div style={{display:'flex',gap:6,alignItems:'center',flex:'1 1 200px',minWidth:0}}>
-                    <div title={num?undefined:"Paire pas encore identifiée automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
+                    <div title={num?undefined:"Article pas encore identifié automatiquement : pose son N° ici"} style={{display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 7px',background:C.bg,width:74,flexShrink:0}}>
                       <span style={{fontSize:11,color:C.muted,fontWeight:500}}>N°</span>
                       <ChampSaisie value={ov.numero ?? ''} onCommit={v=>setSaleOverride(o.transaction_id,{numero:v})} placeholder={baseNum||'?'} inputMode={clavierNum()} style={{width:'100%',minWidth:0,border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,outline:'none'}}/>
                     </div>
@@ -38742,13 +38759,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0,marginLeft:'auto'}}>
                 {num && aExpedier(o) && !hidden && inGarage(num) && (
-                  <button className="vrm-icon-control" type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir la paire N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={()=>onLocate&&onLocate(num)} title={`Voir l'article N°${num} au stock`} aria-label="Voir au stock" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:15,padding:'6px 8px'}}><Icon name="pin" size={15}/></button>
                 )}
                 {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) && (
-                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si la paire ne revient PAS, déclare-la perdue : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer la paire perdue" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Paire perdue ?</button>
+                  <button type="button" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:'transparent',color:C.danger,cursor:'pointer',fontSize:11,fontWeight:600,padding:'6px 9px',fontFamily:'inherit'}}>Article perdu ?</button>
                 )}
                 {num && isPairLost(num) && (
-                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : la paire N°${num} est finalement revenue.`} aria-label="Annuler paire perdue" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenue</button>
+                  <button type="button" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:11,fontWeight:500,padding:'6px 9px',fontFamily:'inherit'}}>↩︎ revenu</button>
                 )}
                 {isLotTitle(o.title) && (
                   <button className="vrm-icon-control" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
@@ -38756,7 +38773,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {hidden ? (
                   <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
                 ) : st==='cancelled' ? (
-                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies la paire.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
+                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies l'article.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
                 ) : (
                   <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
                 )}
@@ -38852,7 +38869,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 cases. Il n'en reste qu'une (Bénéfice), qui ouvre la saisie. */}
             {totals.nbCout>0 && <StatBox compact label="Coût d'achat" value={fmtE0(totals.cout)} sub={`${totals.nbCout}/${totals.bN} renseigné${totals.nbCout>1?'s':''}${totals.nbCout<totals.bN?' · compléter':''}`}
               onClick={totals.nbCout<totals.bN ? ()=>setFillBuyOpen(true) : null}
-              title="Compléter les prix d'achat, paire par paire"/>}
+              title="Compléter les prix d'achat, article par article"/>}
             {totals.frais>0 && <StatBox compact label="Boosts" value={fmtE0(totals.frais)} sub="mises en avant"/>}
             {/* ⚠️ HONNÊTETÉ DES CHIFFRES : sans AUCUN prix d'achat saisi, le
                 « bénéfice » vaut mécaniquement le CA (coût = 0) — c'est FAUX, et
@@ -38867,7 +38884,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 suit le même total partiel que l'ancienne carte (§5). */}
             {totals.nbCout===0
               ? <StatBox compact label="Bénéfice" value="—" color={C.muted} sub={null}
-                  onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, paire par paire"/>
+                  onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, article par article"/>
               : totals.benefBrut===totals.benefConnu && totals.benefConnu!=null
                 ? <StatBox compact label="Bénéfice" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                     subColor={totals.nbCout<totals.bN?C.warn:undefined}
@@ -39180,7 +39197,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   ))}
                   <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.45}}>
-                    Prix moyen de revente moins prix moyen d'achat, avant frais de port, de protection et de boost — deux moyennes, pas la marge d'une paire précise. Un lot acheté compte comme un achat. C'est un repère pour acheter : il n'entre dans aucun total, rapport ni export.{r.tropPeu>0?` ${r.tropPeu} autre${r.tropPeu>1?'s':''} modèle${r.tropPeu>1?'s':''} : pas encore assez de ventes ou d'achats.`:''}
+                    Prix moyen de revente moins prix moyen d'achat, avant frais de port, de protection et de boost — deux moyennes, pas la marge d'un article précis. Un lot acheté compte comme un achat. C'est un repère pour acheter : il n'entre dans aucun total, rapport ni export.{r.tropPeu>0?` ${r.tropPeu} autre${r.tropPeu>1?'s':''} modèle${r.tropPeu>1?'s':''} : pas encore assez de ventes ou d'achats.`:''}
                   </div>
                 </div>
               );
@@ -39322,7 +39339,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
 
       {curSub==='achats' && (<div className="vrm-achats">
-        <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque paire."/>
+        <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>
         <RecusEmail recus={recusAchat} autres={nonRecusAchat} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
@@ -39340,7 +39357,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
         <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
-              C'est ça, un outil de réception : où en est chaque paire entre
+              C'est ça, un outil de réception : où en est chaque article entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
               un onglet vide se voit avant d'être ouvert. */}
           {(()=>{ const n={relais:0,route:0,recu:0};
@@ -39400,7 +39417,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const unSeul = comptes.length===1;
           return (
             <div className="vrm-achats-bloc" data-a-renvoyer={l.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} paire{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
+              <div className="vrm-achats-bloc-t" style={{color:C.text}}><span style={{color:C.warn}}>↩</span> {l.length} article{l.length>1?'s':''} à renvoyer (litige){unSeul?<span style={{fontWeight:500,color:C.muted}}> · compte {comptes[0]}</span>:null}</div>
               <div className="vrm-achats-bloc-p" style={{color:C.muted}}>L'étiquette de retour se génère sur Vinted — VRM ne l'envoie pas à ta place (compte en litige).</div>
               {l.map(o=>{ const ph=orderPhoto(o); return (
                 <div key={o.transaction_id} style={{display:'flex',alignItems:'center',gap:10,marginTop:9,flexWrap:'wrap'}}>
@@ -39461,9 +39478,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // il est anormal (≥ 20 %) : c'est le seul chiffre à rattraper (§7).
             <div className="vrm-achats-kpis" style={{background:C.card,border:`1px solid ${C.border}`}}>
               {[
-                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} paire${vrais.length>1?'s':''}`, null],
-                ['Prix médian', fmtE0(med), 'par paire', null],
-                ['En route', fmtE0(somme(rte)), `${rte.length} paire${rte.length>1?'s':''}`, null],
+                ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} article${vrais.length>1?'s':''}`, null],
+                ['Prix médian', fmtE0(med), 'par article', null],
+                ['En route', fmtE0(somme(rte)), `${rte.length} article${rte.length>1?'s':''}`, null],
                 ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.danger:null],
               ].map(([k,v,sub,col])=>(
                 <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
@@ -40284,7 +40301,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'}{tot>0 && <> — <span data-montant="" style={{whiteSpace:'nowrap'}}>{auMoins?'au moins ':''}{tot.toFixed(2).replace('.',',')} €</span> à vérifier</>}
               </div>
               <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
-                La paire ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.
+                L'article ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.
               </div>
               <div className="vrm-achats-bloc-liste">
                 {rendus.slice(0,8).map((r,ix)=>{
@@ -40382,7 +40399,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
                   {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.danger:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
-                  {numA!=null && <span title="Numéro de la paire (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
+                  {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:'0 6px'}}>email</span>}
                 </div>
                 {/* ⚠️ LITIGE / RETOUR : il doit RENVOYER la paire, et générer le
@@ -40400,7 +40417,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ↩ Bordereau de retour sur Vinted
                     </a>
                     <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.4}}>
-                      Litige : la paire doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
+                      Litige : l'article doit repartir. L'étiquette se génère sur Vinted — VRM ne l'envoie pas à ta place.
                     </div>
                   </div>
                 )}
@@ -40470,6 +40487,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='annonces' && (<>
         <ScreenHead icon="tag" title="Annonces en ligne" />
         <NoAcc/>
+        {astuceNum && listings.items?.length>0 && (
+          <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
+            <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
+            <div style={{flex:1,minWidth:0}}>VRM donne à chaque article un <b style={{color:C.text,fontWeight:600}}>numéro</b>, tout seul, dans l’ordre où tu l’as mis en ligne — pour le retrouver partout : sur ton étagère, sur Leboncoin, sur eBay. Tu peux le changer quand tu veux ; un numéro n’est jamais redonné à un autre article.</div>
+            <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
+          </div>
+        )}
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
@@ -40509,7 +40533,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
                        va pas servir »). */
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -40548,7 +40572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             peuvent juste plus s'y vendre. */}
         {annBannies.n>0 && (
           <div style={{margin:'0 0 12px',fontSize:12,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:10,padding:'9px 12px',lineHeight:1.5}}>
-            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} par Vinted {annBannies.n>1?'ont été retirées':'a été retirée'} de « en ligne » : le compte est bloqué, {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Mais les paires restent là — tu peux {annBannies.n>1?'les':'la'} publier sur <b>Leboncoin</b> ou <b>eBay</b> (onglet de la plateforme → À publier).
+            <b>{annBannies.n} annonce{annBannies.n>1?'s':''}</b> de {annBannies.comptes.length>1?'comptes refusés':'ton compte '+annBannies.comptes[0]} par Vinted {annBannies.n>1?'ont été retirées':'a été retirée'} de « en ligne » : le compte est bloqué, {annBannies.n>1?'elles ne peuvent':'elle ne peut'} plus s'y vendre. Mais les articles restent là — tu peux {annBannies.n>1?'les':'la'} publier sur <b>Leboncoin</b> ou <b>eBay</b> (onglet de la plateforme → À publier).
           </div>
         )}
         {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
@@ -40593,10 +40617,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     <button type="button" onClick={async ()=>{
                       const libre = String(nextNumero);
-                      if (!await askConfirm({ title:`Donner le N°${libre} à cette paire ?`, desc:`« ${it.title} »\n\nElle quitte le N°${g.numero}, qui reste à l'autre paire. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
+                      if (!await askConfirm({ title:`Donner le N°${libre} à cet article ?`, desc:`« ${it.title} »\n\nIl quitte le N°${g.numero}, qui reste à l'autre article. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
-                      toast(`✓ Cette paire est maintenant le N°${libre}.`);
+                      toast(`✓ Cet article est maintenant le N°${libre}.`);
                     }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       → N°{nextNumero}
                     </button>
@@ -40681,7 +40705,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
             <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
-              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des paires ont reçu un nouveau numéro, parfois celui d'une autre paire. <b style={{ color: C.text }}>Seule l'étiquette de la paire dit le vrai.</b> Pour chaque paire : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
+              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des articles ont reçu un nouveau numéro, parfois celui d'un autre article. <b style={{ color: C.text }}>Seule l'étiquette de l'article dit le vrai.</b> Pour chaque article : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
@@ -40710,11 +40734,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               demande) : il n'y a plus rien à appliquer. */}
           {numeroReprises.length > 0 && (
             <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:10,padding:'10px 12px'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} paire{numeroReprises.length>1?'s':''} déjà connue{numeroReprises.length>1?'s':''} ?</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} article{numeroReprises.length>1?'s':''} déjà connu{numeroReprises.length>1?'s':''} ?</div>
               {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
                   seule : elle est partie, et si elle revient (litige, retour) elle
                   revient dans un autre carton. On le PROPOSE, il tranche. */}
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien la même paire et qu'elle est toujours dans SA boîte, remets son numéro d'origine.</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.45}}>Ces annonces ont reçu un numéro NEUF. Si c'est bien le même article et qu'il est toujours dans SA boîte, remets son numéro d'origine.</div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {numeroReprises.slice(0,8).map((r,i)=>(
                   <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 9px'}}>
@@ -40724,7 +40748,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
                       <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
-                      {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cette paire a été VENDUE sous le N°{r.orphan.e.numero} — ne le remets que si elle t'est revenue et qu'elle est dans sa boîte</div>}
+                      {r.vendue && <div style={{fontSize:10,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cet article a été VENDU sous le N°{r.orphan.e.numero} — ne le remets que s'il t'est revenu et qu'il est dans sa boîte</div>}
                     </div>
                     <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:8,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
                   </div>
@@ -40750,7 +40774,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
-            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
             <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
@@ -40786,7 +40810,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {retoursSuivis.etat==='lu' && retoursSuivis.lignes.length > 0 && (
             <button type="button" data-retours-renvoi={retoursSuivis.lignes.length} onClick={()=>onNav&&onNav('cat_bord')}
               style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:8,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'8px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} paire{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivies dans Colis</span>
+              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} article{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivis dans Colis</span>
               <span style={{fontSize:13,color:C.muted}}>›</span>
             </button>
           )}
@@ -40799,7 +40823,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div key={m.uid} style={{marginBottom:12,border:`1px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:10,padding:'11px 13px'}}>
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>🙈 {accNameOf(m.acc)} ne renvoie plus aucune annonce</div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
-              {m.nb} paire{m.nb>1?'s':''} numérotée{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
+              {m.nb} article{m.nb>1?'s':''} numéroté{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
             </div>
           </div>
         ))}
@@ -40829,7 +40853,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{d.numero} · {d.e.title||'—'}</div>
                       <div style={{fontSize:10.5,color:C.muted,marginTop:1}}>{inGarage(d.numero) ? 'rangée au stock' : 'pas au stock'}</div>
                     </div>
-                    <button type="button" title="La paire n'est plus à vendre : on libère son numéro pour une autre paire."
+                    <button type="button" title="L'article n'est plus à vendre : on libère son numéro pour un autre article."
                       onClick={()=>{ declarerPartie(d.id, d.numero, d.e.title||''); toast(`N°${d.numero} retirée du stock`); }}
                       style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:8,padding:'6px 10px',fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       Retirer
@@ -40838,7 +40862,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ))}
                 {disparues.length>40 && <div style={{fontSize:11,color:C.muted,paddingTop:6}}>… et {disparues.length-40} autres.</div>}
                 <div style={{fontSize:10.5,color:C.muted,marginTop:6,lineHeight:1.5}}>
-                  « Retirer » libère le numéro pour une autre paire. Si l'annonce revient (compte démasqué), elle retrouvera son numéro d'origine grâce à la reconnaissance par photo.
+                  « Retirer » libère le numéro pour un autre article. Si l'annonce revient (compte démasqué), elle retrouvera son numéro d'origine grâce à la reconnaissance par photo.
                 </div>
               </div>
             )}
@@ -40878,7 +40902,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
-              😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+              😴 {annStats.sleeping} article{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
               {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
             </div>
           )}
@@ -40895,7 +40919,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
-                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} paire{repriceList.length>1?'s':''} à baisser</span>
+                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} article{repriceList.length>1?'s':''} à baisser</span>
                   <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat</span>
                 </span>
                 <span style={{fontSize:13,color:C.muted}}>{showReprice?'▲':'▼'}</span>
@@ -40927,7 +40951,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(eb || surLbcAussi) && (
                         <div data-reprice-ailleurs={it.id} style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',padding:'0 12px 8px 62px',fontSize:11.5,color:C.muted,lineHeight:1.4}}>
                           {eb && eb.ambigu === 'ebay' && <span data-reprice-ebay-ambigu="ebay">eBay : deux annonces portent ce N° — je n'en baisse aucune, vérifie sur eBay.</span>}
-                          {eb && eb.ambigu === 'numero' && <span data-reprice-ebay-ambigu="numero">eBay : ce N° est porté par plusieurs paires dans VRM — l'annonce eBay est peut-être l'autre, je n'y touche pas.</span>}
+                          {eb && eb.ambigu === 'numero' && <span data-reprice-ebay-ambigu="numero">eBay : ce N° est porté par plusieurs articles dans VRM — l'annonce eBay est peut-être l'autre, je n'y touche pas.</span>}
                           {eb && !eb.ambigu && (eb.fait && eb.fait.etat === 'ok'
                             ? (eb.fait.memo
                               ? <span data-reprice-ebay="fait" data-reprice-ebay-memo="1">eBay : déjà baissé pour ce prix Vinted — <b style={{color:C.text}}>{eb.prixActuel} €</b> aujourd'hui ✓</span>
@@ -40953,7 +40977,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     );
                   })}
                   {ebayVivantes === null && <div style={{padding:'6px 12px',fontSize:11,color:C.muted}}>Tes annonces eBay n'ont pas pu être lues : je ne propose pas de baisse sur eBay pour l'instant.</div>}
-                  {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres paires à baisser…</div>}
+                  {repriceList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {repriceList.length-30} autres articles à baisser…</div>}
                 </div>
               )}
               {/* G22 — suivies, pas encore vendues → remise NATIVE (prévient tous les favoris) */}
@@ -40961,7 +40985,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div data-suivies style={{border:`1px solid ${C.border}`,borderRadius:10,background:C.card,overflow:'hidden',marginTop:10}}>
                   <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
                     <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>👀 Suivies, pas encore vendues — {suiviesList.length}</span>
-                    <span style={{display:'block',fontSize:11,color:C.muted,marginTop:3,lineHeight:1.45}}>Ces paires sont dans les favoris de plusieurs personnes mais ne se sont pas vendues. Une petite remise sur Vinted prévient d'un coup <b>toutes</b> les personnes qui l'ont mise en favori (la remise aux favoris de Vinted). VRM ne change jamais ton prix — c'est toi, sur Vinted.</span>
+                    <span style={{display:'block',fontSize:11,color:C.muted,marginTop:3,lineHeight:1.45}}>Ces articles sont dans les favoris de plusieurs personnes mais ne se sont pas vendus. Une petite remise sur Vinted prévient d'un coup <b>toutes</b> les personnes qui l'ont mis en favori (la remise aux favoris de Vinted). VRM ne change jamais ton prix — c'est toi, sur Vinted.</span>
                   </div>
                   {suiviesList.slice(0,30).map(({it,favs})=>{
                     const num = numeros[it.id]?.numero;
@@ -40978,7 +41002,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                     );
                   })}
-                  {suiviesList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {suiviesList.length-30} autres paires suivies…</div>}
+                  {suiviesList.length>30 && <div style={{padding:'8px 12px',fontSize:11,color:C.muted}}>+ {suiviesList.length-30} autres articles suivis…</div>}
                 </div>
               )}
             </div>
@@ -41140,7 +41164,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-ann-overview" style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
-                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
+                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:9,fontWeight:600,letterSpacing:'-0.2px',whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
                   <div className="vrm-ann-ledger-info" style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
@@ -41152,7 +41176,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </span>
                     </div>
                     <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
-                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cette paire : elle est vendue. Elle disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
                     {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
                     <div data-plateformes style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
                       <MarquePlateforme p="vinted"/>
@@ -41209,8 +41233,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {(()=>{ const actBtn={border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:8,padding:'7px 11px',minHeight:0,fontSize:11.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}; return (<>
                           <button type="button" onClick={()=>openPicker(item)} style={actBtn}>Relier un achat</button>
                           {num && <button type="button" onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={actBtn}>{atGarage?'Voir au stock':'Ranger au stock'}</button>}
-                          <button type="button" onClick={()=>setPassportFor({it,e,num})} style={actBtn}>Passeport de la paire</button>
-                          <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cette paire VENDUE et la retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={actBtn}>Marquer vendue</button>
+                          <button type="button" onClick={()=>setPassportFor({it,e,num})} style={actBtn}>Passeport de l'article</button>
+                          <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={actBtn}>Marquer vendue</button>
                           {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...actBtn,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,textDecoration:'none',display:'inline-block'}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                           </>); })()}
                         </div>
@@ -41224,7 +41248,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <button key={pl.cle} type="button"
                                 onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
                                 title={!num
-                                  ? `Mets un N° à cette paire d'abord : c'est la référence qui permet de la retrouver ensuite sur ${pl.nom}.`
+                                  ? `Mets un N° à cet article d'abord : c'est la référence qui permet de le retrouver ensuite sur ${pl.nom}.`
                                   : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
                                        : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
                                 style={{border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',
@@ -41817,9 +41841,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {conflitsNum.length > 0 && (
           <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:10,padding:'12px 14px',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
-              <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux paires
+              <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux articles
             </div>
-            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux paires portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
+            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux articles portent le même numéro : au moment d'expédier, c'est le mauvais article qui part. Corrige le numéro de l'un des deux avant d'envoyer.</div>
             {conflitsNum.slice(0,6).map(c=>{
               // Laquelle a reçu ce numéro par ERREUR ? Une annonce numérotée
               // automatiquement pendant la panne (`ficheAVerifier`), face à un
@@ -41896,7 +41920,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:12,marginTop:4,color:C.muted}}>
                       <span data-colis-ebay-urgence="" style={{color:urgCol,fontWeight:dl!=null&&dl<=1?600:400}}>{urgTxt}</span>
                       {cell && <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>}
-                      {!num && <span data-colis-ebay-sans-num="">· annonce pas reliée à une paire (pas de SKU VRM) — vérifie la paire avant d'emballer</span>}
+                      {!num && <span data-colis-ebay-sans-num="">· annonce pas reliée à un article (pas de SKU VRM) — vérifie l'article avant d'emballer</span>}
                       {plusieurs && <span>· {x.pseudo || x.compte}</span>}
                     </div>
                     {x.authentification && <div data-colis-ebay-auth="" style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>Part vers l'authentificateur d'eBay (garantie d'authenticité) : l'étiquette d'eBay l'y envoie, pas chez l'acheteur.</div>}
@@ -41931,7 +41955,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (!ex.length) return (<>{lignePostes}
             <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
               Aucun colis à envoyer.<br/>
-              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, la paire apparaît ici — l'extension le capte sans que tu fasses rien.</span>
+              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, l'article apparaît ici — l'extension le capte sans que tu fasses rien.</span>
             </div></>
           );
           const sec = { flexShrink:0, borderRadius:10, padding:'0 14px', minHeight:44, boxSizing:'border-box', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit' };
@@ -41989,7 +42013,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (
                   <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
                     style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:10,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    <Icon name="home" size={16}/>Où sont ces {nums.length} paire{nums.length>1?'s':''} dans le stock
+                    <Icon name="home" size={16}/>Où sont ces {nums.length} article{nums.length>1?'s':''} dans le stock
                   </button>
                 );
               })()}
@@ -42054,7 +42078,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                           {num
                             ? <span className="vrm-colis-num" style={{fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px',flexShrink:0,fontVariantNumeric:'tabular-nums'}}>N°{num}</span>
-                            : <span className="vrm-colis-num" title="Le numéro arrive dès que la paire est reliée à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
+                            : <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:11.5,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
                           {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:8,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
                         </div>
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
@@ -42076,7 +42100,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {/* ⚠️ LE CONFLIT DE NUMÉRO SE VOIT ICI, au moment où on
                             ferme le carton — pas seulement sur l'écran Annonces.
                             Julien : « si je me trompe entre deux colis, c'est deux
-                            ventes de perdues ». Un numéro porté par deux paires
+                            ventes de perdues ». Un numéro porté par deux articles
                             présentes est le seul défaut qui envoie la mauvaise
                             chaussure ; il doit crier là où se fait le geste. */}
                         {num && (()=>{
@@ -42085,10 +42109,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           const autres = c.porteurs.filter(x => normTitle(x.titre||'') !== normTitle(titre||''));
                           return (
                             <div style={{fontSize:11.5,fontWeight:600,marginTop:5,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}`,borderRadius:8,padding:'6px 9px',lineHeight:1.45}}>
-                              <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par une autre paire</span>
+                              <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par un autre article</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
-                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre paire dans Annonces.
+                                {' '}— vérifie la photo ci-contre avant de fermer le colis, et corrige le numéro de l'autre article dans Annonces.
                               </span>
                             </div>
                           );
@@ -42147,16 +42171,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <button type="button" onClick={()=>startBordereau(num, titre, acc, o && o.transaction_id)} title="J'ai déjà téléchargé le PDF : le tamponner avec le numéro"
                           className="vrm-colis-sec" style={{...sec,flex:'0 1 auto',border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>J'ai le PDF</button>
                       </>)}
-                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à une paire numérotée" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
+                      {!num && b && <button type="button" onClick={()=>{ setLinkPickFor(b); setLinkSearch(''); }} title="Relier ce bordereau à un article numéroté" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}><Icon name="link" size={14} style={{verticalAlign:'-2px',marginRight:5}}/>Relier</button>}
                       {/* Sans bordereau, il n'y avait AUCUN moyen de poser le numéro
                           sur cette vente — or c'est lui qu'on tamponne. Le numéro
                           n'est pas deviné (le titre de revente diffère souvent de
                           celui de l'annonce, §24) : c'est toi qui le donnes, et il
                           est mémorisé sur la vente (`vinted_sale_overrides`). */}
                       {!num && !b && o && o.transaction_id!=null && <button type="button" onClick={async ()=>{
-                        const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cette paire ? « ${titre} »`,value:''})||'').trim();
+                        const v=(await askText({numeric:clavierNum()==='numeric',desc:`Quel numéro porte cet article ? « ${titre} »`,value:''})||'').trim();
                         if(v) setSaleOverride(o.transaction_id,{numero:v});
-                      }} title="Poser le numéro de boîte de cette paire" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
+                      }} title="Poser le numéro de boîte de cet article" className="vrm-colis-sec" style={{...sec,border:`1px solid ${C.warn}88`,background:'transparent',color:C.warn}}>Poser le N°</button>}
                       {/* ⚠️ UNE SEULE RANGÉE D'ACTIONS. Les états (imprimé, colis
                           fait, suivre) vivaient sur une deuxième rangée : sur un
                           colis sans PDF, la première n'avait plus qu'un bouton et
@@ -42220,7 +42244,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Partis — Vinted suit le colis · {partis.length}
                 <span style={{fontWeight:500,color:C.muted}}> ({morceaux.join(' · ')})</span>
               </summary>
-              <div style={{fontSize:11.5,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Rien à faire ici : ces colis sont chez le transporteur ou chez l'acheteur. Ils quittent cette liste quand Vinted finalise la vente.{retours > 0 ? ' Un retour se vérifie : la paire doit te revenir.' : ''}</div>
+              <div style={{fontSize:11.5,color:C.muted,margin:'6px 0 8px',lineHeight:1.45}}>Rien à faire ici : ces colis sont chez le transporteur ou chez l'acheteur. Ils quittent cette liste quand Vinted finalise la vente.{retours > 0 ? ' Un retour se vérifie : l\'article doit te revenir.' : ''}</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(430px,100%), 1fr))',gap:6}}>
                 {partis.map(({ o, st, j }) => {
                   const ph = orderPhoto(o);
@@ -42321,7 +42345,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   .filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId))
                   .filter(p => !q || normTitle(p.title||'').includes(q));
                 if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.6}}>
-                  {q ? <>Aucun achat ne correspond à « {pickerQ} ».<br/><span style={{fontSize:12}}>Un achat déjà relié à une autre paire n'apparaît pas ici.</span></> : 'Aucun achat disponible.'}
+                  {q ? <>Aucun achat ne correspond à « {pickerQ} ».<br/><span style={{fontSize:12}}>Un achat déjà relié à un autre article n'apparaît pas ici.</span></> : 'Aucun achat disponible.'}
                 </div>;
                 // Les meilleurs candidats (même marque ET même taille) sont
                 // signalés : avec ~700 achats, sans repère on ne sait pas par où
@@ -42622,7 +42646,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
               </div>
               {!lister ? (
-                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de la paire que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
+                <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 16px',lineHeight:1.5}}>Tape le modèle de l'article que tu mets en vente.<br/><span style={{fontSize:12}}>Je te propose un prix basé sur tes propres ventes, et un titre + une description à copier-coller sur Vinted.</span></div>
               ) : (<>
                 {/* Prix conseillé */}
                 <div style={{border:`1.5px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:10,padding:'13px 15px',marginBottom:14}}>
@@ -42709,7 +42733,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                 })}
-                <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne dit pas le prix payé pour chaque paire du lot — seul le total est connu. Le N° s'affiche quand le titre correspond à une de tes paires.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>Vinted ne dit pas le prix payé pour chaque article du lot — seul le total est connu. Le N° s'affiche quand le titre correspond à un de tes articles.</div>
               </div>
             )}
           </div>
@@ -42748,7 +42772,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <StatBox label="Déjà vendues" value={checker.nb} sub={checker.lastDate?`dernière : ${checker.lastDate.toLocaleDateString('fr-FR')}`:undefined}/>
                       <StatBox label="Prix de vente moyen" value={fmtE(checker.avgSell)} color={C.accent}/>
                       {checker.joursMoy!=null && <StatBox label="Temps de vente" value={`${checker.joursMoy.toFixed(0)} j`}/>}
-                      {checker.benefMoy!=null && <StatBox label="Bénéf. moyen/paire" value={fmtE(checker.benefMoy)} color={checker.benefMoy>=0?INV_STATUS.online.color:C.danger} sub={`sur ${checker.benefNb} connue${checker.benefNb>1?'s':''}`}/>}
+                      {checker.benefMoy!=null && <StatBox label="Bénéf. moyen/article" value={fmtE(checker.benefMoy)} color={checker.benefMoy>=0?INV_STATUS.online.color:C.danger} sub={`sur ${checker.benefNb} connue${checker.benefNb>1?'s':''}`}/>}
                       {checker.online>0 && <StatBox label="Déjà en ligne" value={checker.online} color={C.warn} sub="chez toi"/>}
                     </div>
                     {checker.estBenef!=null && (
@@ -42782,7 +42806,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             </div>
                             <div style={{textAlign:'right',flexShrink:0}}>
                               <div style={{fontSize:15,fontWeight:700,color:r.benefMoy==null?C.muted:(r.benefMoy>=0?INV_STATUS.online.color:C.danger)}}>{r.benefMoy==null?'—':`${r.benefMoy>=0?'+':''}${r.benefMoy.toFixed(0)} €`}</div>
-                              <div style={{fontSize:9,color:C.muted}}>{r.benefMoy==null?'achat inconnu':'bénéf./paire'}</div>
+                              <div style={{fontSize:9,color:C.muted}}>{r.benefMoy==null?'achat inconnu':'bénéf./article'}</div>
                             </div>
                           </div>
                         );})}
@@ -42791,7 +42815,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 };
                 return (<>
-                  <Section title="Par marque" rows={sourcing.brands} hint="Trié par nb de ventes. Le bénéfice/paire aide à prioriser les rachats."/>
+                  <Section title="Par marque" rows={sourcing.brands} hint="Trié par nb de ventes. Le bénéfice/article aide à prioriser les rachats."/>
                   <Section title="Par taille" rows={sourcing.sizes} hint="Taille estimée depuis le titre — approximatif. « ? » = pointure non détectée."/>
                   <div style={{fontSize:11,color:C.muted,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:10}}>Le bénéfice n'est calculé que pour les ventes dont le prix d'achat est renseigné (bouton 🔗 dans Annonces). Les marques reconnues viennent d'une liste interne.</div>
                 </>);
@@ -42869,9 +42893,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter</div>
                   <div style={{fontSize:11,color:C.muted,marginTop:2}}>
-                    {fillBuyRows.length} paire{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe à la suivante
+                    {fillBuyRows.length} article{fillBuyRows.length>1?'s':''} sans coût · tape le prix, <b>Entrée</b> passe au suivant
                     {fillBuyAchats.loading && <> · <span style={{color:C.accent}}>recherche de tes achats…</span></>}
-                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} paire{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
+                    {!fillBuyAchats.loading && Object.keys(fillBuySugg).length>0 && <> · <b style={{color:C.accent}}>{Object.keys(fillBuySugg).length} article{Object.keys(fillBuySugg).length>1?'s':''} avec une piste</b> — tape « C'est ça » ou vérifie</>}
                   </div>
                 </div>
                 <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
@@ -42884,7 +42908,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
               {fillBuyRows.length===0 && (
-                <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Toutes tes paires ont un prix d'achat.</div>
+                <div style={{textAlign:'center',padding:'28px 12px',color:C.muted,fontSize:13}}>🎉 Tous tes articles ont un prix d'achat.</div>
               )}
               {/* ⚠️ IL Y AVAIT UN PLAFOND À 300, POUR 320 PAIRES : vingt paires
                   n'étaient atteignables NULLE PART, alors que l'en-tête les
@@ -42954,7 +42978,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>✨ Rédiger une annonce (IA)</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis une paire — l'IA propose un titre et une description. <b>Tu copies, tu publies</b> ; rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article — l'IA propose un titre et une description. <b>Tu copies, tu publies</b> ; rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</div>
               </div>
               <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -42962,7 +42986,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {(()=>{ const items=Object.entries(numeros)
                   .filter(([id,e])=>e&&e.numero&&String(e.title||'').trim())
                   .sort((a,b)=>Number(b[1].numero||0)-Number(a[1].numero||0));
-                if(!items.length) return <div style={{textAlign:'center',padding:'26px 12px',color:C.muted,fontSize:13}}>Aucune paire numérotée à rédiger.</div>;
+                if(!items.length) return <div style={{textAlign:'center',padding:'26px 12px',color:C.muted,fontSize:13}}>Aucun article numéroté à rédiger.</div>;
                 return items.map(([id,e])=>{ const k=String(e.numero||id); const actif=repubAi.key===k;
                   return (
                   <div key={id} style={{background:C.card,border:`1px solid ${actif?C.accent+'55':C.border}`,borderRadius:10,padding:'8px 10px',marginBottom:6}}>
@@ -43304,7 +43328,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:600,color:C.text}}>Relier à une paire numérotée</div>
+                  <div style={{fontSize:15,fontWeight:600,color:C.text}}>Relier à un article numéroté</div>
                   <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{linkPickFor.modele||linkPickFor.article||'Bordereau'}{linkPickFor.taille?` · T${linkPickFor.taille}`:''}</div>
                 </div>
                 <button type="button" onClick={()=>setLinkPickFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
@@ -43313,7 +43337,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:8,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire hors ligne{q?' pour cette recherche':' disponible'}. Les paires encore en ligne ne sont pas proposées pour cette vente.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'}. Les articles encore en ligne ne sont pas proposés pour cette vente.</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
@@ -43365,7 +43389,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {s.pts.map(p=>(<g key={p.i}><circle cx={xs(p.i)} cy={ys(p.avg)} r="3.5" fill={C.accent}/><text x={xs(p.i)} y={ys(p.avg)-7} textAnchor="middle" fontSize="8.5" fontWeight="800" fill={C.text}>{Math.round(p.avg)}</text></g>))}
                 </svg>
               )}
-              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des paires <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleures paires).</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleurs articles).</div>
             </div>
           </div>
         </div>
@@ -43391,8 +43415,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{textAlign:'center'}}>
             <div style={{marginBottom:6,color:C.muted,opacity:.5,display:'flex',justifyContent:'center'}}><Icon name="image" size={44}/></div>
             <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,display:'block'}}/>
-            <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>paires vendues</div>
-            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque paire, une petite victoire. 💪</div>
+            <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>articles vendus</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque article, une petite victoire. 💪</div>
           </div>
         )});
         cards.push({ bg:'linear-gradient(160deg,#0a8f5b 0%,#3ad07f 100%)', body:(
@@ -43408,7 +43432,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:48,marginBottom:6}}>⭐</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
             <div style={{fontSize:52,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
-            <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> paires vendues</div>
+            <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> articles vendus</div>
           </div>
         )});
         if(w.bestMonth) cards.push({ bg:'linear-gradient(160deg,#c2179c 0%,#7a3cff 100%)', body:(
@@ -43421,7 +43445,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )});
         if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Paire de l'année</div>
+            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Article de l'année</div>
             <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
@@ -43448,7 +43472,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:52,marginBottom:10}}>🚀</div>
             <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
-              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>paires vendues</div></div>
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
               {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
               {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
@@ -43609,7 +43633,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
               <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Renuméroter à la suite</div>
               <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.45}}>
-                Tes numéros vont de 1 à <b style={{color:C.text}}>{maxBefore||'—'}</b> pour <b style={{color:C.text}}>{nTotal}</b> paire{nTotal>1?'s':''} en ligne.
+                Tes numéros vont de 1 à <b style={{color:C.text}}>{maxBefore||'—'}</b> pour <b style={{color:C.text}}>{nTotal}</b> article{nTotal>1?'s':''} en ligne.
                 {moves.length>0 ? <> Après, ils iront de 1 à <b style={{color:C.accent}}>{maxAfter}</b>, sans trou.</> : <> Ils sont déjà à la suite.</>}
               </div>
             </div>
@@ -43618,7 +43642,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',gap:8}}>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'11px 13px'}}>
                     <div style={{fontSize:22,fontWeight:600,color:C.accent,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>paire{moves.length>1?'s':''} à renuméroter</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>article{moves.length>1?'s':''} à renuméroter</div>
                   </div>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'11px 13px'}}>
                     <div style={{fontSize:22,fontWeight:600,color:C.text,lineHeight:1,letterSpacing:'-0.02em'}}>{nLocked}</div>
@@ -43626,7 +43650,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{fontSize:11,color:C.muted,marginTop:9,lineHeight:1.45}}>
-                  ⚠️ Si tu as déjà <b style={{color:C.text}}>écrit ces numéros sur tes boîtes</b>, il faudra les réécrire. Les paires rangées au garage et celles d'une vente en cours ne bougent pas.
+                  ⚠️ Si tu as déjà <b style={{color:C.text}}>écrit ces numéros sur tes boîtes</b>, il faudra les réécrire. Les articles rangés au garage et ceux d'une vente en cours ne bougent pas.
                 </div>
               </div>
             )}
@@ -43649,7 +43673,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
               <button type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-              {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} paire{moves.length>1?'s':''}</button>}
+              {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} article{moves.length>1?'s':''}</button>}
             </div>
           </div>
         </div>
@@ -43697,7 +43721,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return null;
         };
         const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer'
-          : t === 'annulee' ? 'vente annulée — la paire est restée' : 'au garage';
+          : t === 'annulee' ? 'vente annulée — l\'article est resté' : 'au garage';
         return (
           <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
             <FermeAuRetour fermer={()=>setInventOpen(false)}/>
@@ -43707,12 +43731,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button className="vrm-icon-control" type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
               </div>
               <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
-                <b style={{color:C.text}}>{lignes.length} paire{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, la paire n'est pas là où l'app la croit.
+                <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, l'article n'est pas là où l'app le croit.
               </div>
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
-                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux paires</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux paires portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux articles</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux articles portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,overflow:'hidden'}}>
@@ -43727,7 +43751,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </span>
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'block',fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
-                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux paires !':''}</span>
+                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux articles !':''}</span>
                       </span>
                     </div>
                   );
@@ -43735,7 +43759,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button type="button" onClick={()=>{
                 const txt = lignes.map(l=>`N°${l.num}\t${(l.p.map(x=>x.titre).filter(Boolean)[0]||'').replace(/\t/g,' ')}\t${l.p.map(x=>ou(x.type)).join(' + ')}`).join('\n');
-                try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} paires\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
+                try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} articles\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
               }} style={{width:'100%',marginTop:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier la liste (pour l'imprimer)</button>
             </div>
           </div>
@@ -43781,13 +43805,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
               {nothing && <div style={{fontSize:13,color:INV_STATUS.online.color,fontWeight:600,textAlign:'center',padding:'24px 0'}}>✓ Tout est cohérent, rien à signaler !</div>}
-              <Section icon="👻" color={C.danger} title="Paires perdues" desc="Numérotées mais ni en ligne, ni vendues, ni au garage → probablement égarées." items={ghosts} render={Row}/>
+              <Section icon="👻" color={C.danger} title="Articles perdus" desc="Numérotés mais ni en ligne, ni vendus, ni au garage → probablement égarés." items={ghosts} render={Row}/>
               <Section icon="📦" color={C.warn} title="Vendues mais encore au garage" desc="À sortir du garage : elles sont vendues mais toujours rangées." items={soldStored} render={Row}/>
               <Section icon="🏠" color={C.blue||C.accent} title="En ligne, pas encore rangées" desc="En vente mais introuvables au garage → range-les pour les retrouver vite." items={notStored} render={Row}/>
               {unknownAtGarage.length>0 && (
                 <div style={{marginBottom:4}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.muted}}>❓ Au garage, numéro inconnu ({unknownAtGarage.length})</div>
-                  <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucune paire numérotée ne correspond (ancien numéro / faute de frappe).</div>
+                  <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucun article numéroté ne correspond (ancien numéro / faute de frappe).</div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 9px'}}>N°{t}</span>)}</div>
                 </div>
               )}
@@ -43809,7 +43833,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les paires choisies → marge juste sur chacune.</div></div>
+                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les articles choisis → marge juste sur chacun.</div></div>
                 <button type="button" onClick={()=>setLotOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
               </div>
               <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
@@ -43822,7 +43846,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button key={id} type="button" onClick={()=>setLotMode(id)} style={{border:`1px solid ${lotMode===id?C.accent:C.border}`,background:lotMode===id?C.accent:'transparent',color:lotMode===id?'#fff':C.text,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer'}}>{lb}</button>
                 ))}
               </div>
-              <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} paire{nSel>1?'s':''} sélectionnée{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
+              <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} article{nSel>1?'s':''} sélectionné{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
               <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Chercher une annonce (N°, titre, marque)…" style={{marginTop:8,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
@@ -43840,7 +43864,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })}
             </div>
             <div style={{flexShrink:0,padding:'12px 16px',borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center'}}>
-              <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les paires.'}</div>
+              <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les articles.'}</div>
               <button type="button" disabled={!(nSel>0&&total>0)} onClick={applyLot} style={{border:'none',borderRadius:10,padding:'11px 18px',background:(nSel>0&&total>0)?C.accent:C.border,color:'#fff',fontSize:15,fontWeight:600,cursor:(nSel>0&&total>0)?'pointer':'default',fontFamily:'inherit'}}>Appliquer</button>
             </div>
           </div>
@@ -43875,7 +43899,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const { it, e, num } = passportFor;
         const steps = buildPassport(it, e, num);
         const photo = (it && it.photo) || (e && e.photo) || null;
-        const title = (it && (it.title||it.brand)) || (e && e.title) || 'Paire';
+        const title = (it && (it.title||it.brand)) || (e && e.title) || 'Article';
         return (
         <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPassportFor(null)}/>
@@ -43891,7 +43915,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setPassportFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'16px 18px'}}>
-              {steps.length===0 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Pas encore d'historique pour cette paire.</div> : (
+              {steps.length===0 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Pas encore d'historique pour cet article.</div> : (
                 <div style={{position:'relative',paddingLeft:8}}>
                   {steps.map((s,i)=>(
                     <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',position:'relative',paddingBottom:i<steps.length-1?16:0}}>
@@ -44569,12 +44593,12 @@ const comptesBloquesVinted = () => { try { const l = load('vinted_accounts_block
 // concluait que la fonction était cassée). En français, sans jargon (§2.7).
 // Les conditions, dites avec les MÊMES bornes que la règle (§5 : la phrase qui
 // explique vient de la même source) — pour la confirmation ET la ligne d'état.
-const CONDITIONS_RETRAIT_AUTO = `la vente Vinted est confirmée par ta liste de ventes relue depuis moins de ${LISTE_VENTES_FRAICHE_MS / 3600000} h (ni remboursée, ni annulée, jamais revenue chez toi, et pas sur un compte que Vinted a bloqué), l'annonce eBay porte le N° de la paire (SKU VRM-n°), ce N° n'est porté que par une seule paire, et l'annonce eBay a été mise en ligne AVANT la vente`;
+const CONDITIONS_RETRAIT_AUTO = `la vente Vinted est confirmée par ta liste de ventes relue depuis moins de ${LISTE_VENTES_FRAICHE_MS / 3600000} h (ni remboursée, ni annulée, jamais revenue chez toi, et pas sur un compte que Vinted a bloqué), l'annonce eBay porte le N° de l'article (SKU VRM-n°), ce N° n'est porté que par un seul article, et l'annonce eBay a été mise en ligne AVANT la vente`;
 const RAISON_RETRAIT_AUTO = {
   'pas-su': 'je n\'ai pas pu tout vérifier (une annonce ou une vente Vinted pas lue)',
-  'sku': 'le N° de son annonce eBay ne correspond pas à la paire',
-  'numero-partage': 'ce N° est porté par plusieurs paires dans VRM',
-  'revenue-une-fois': 'cette paire est déjà revenue une fois (remboursée ou retournée)',
+  'sku': 'le N° de son annonce eBay ne correspond pas à l\'article',
+  'numero-partage': 'ce N° est porté par plusieurs articles dans VRM',
+  'revenue-une-fois': 'cet article est déjà revenu une fois (remboursé ou retourné)',
   'vente-non-confirmee': 'la vente n\'est pas encore confirmée par ta liste de ventes Vinted',
   'compte-bloque': 'la vente est sur un compte que Vinted a bloqué',
   'liste-perimee': 'ta liste de ventes de ce compte n\'a pas été relue depuis plus de 48 h',
@@ -44802,7 +44826,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     if (!id) { setMsg("Cette annonce n'a pas d'identifiant Leboncoin : impossible de la relier."); return; }
     relierAnnonceLbc(id, n);
     setMsg('');
-    toast(`Annonce reliée à la paire N°${n}.`);
+    toast(`Annonce reliée à l'article N°${n}.`);
     onRelie && onRelie();
   };
   const aucune = () => { rangerSansJumelleLbc(cleRangement); toast('Compris — je ne te le redemande plus.'); onRelie && onRelie(); };
@@ -44816,8 +44840,8 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     // devenu « B233 » à la remise à zéro du 11 octobre : on le reconnaît, sans
     // jamais prendre la nouvelle paire du même chiffre quand elle existe.
     if (!numsConnus.includes(n) && /^\d+$/.test(n) && numsConnus.includes('B' + n)) n = 'B' + n;
-    if (!NUM_OK.test(n)) { setMsg('Tape le numéro de la paire (125, ou B125).'); return; }
-    if (!numsConnus.includes(n)) { setMsg(`Aucune paire ne porte le N°${n} dans VRM.`); return; }
+    if (!NUM_OK.test(n)) { setMsg('Tape le numéro de l’article (125, ou B125).'); return; }
+    if (!numsConnus.includes(n)) { setMsg(`Aucun article ne porte le N°${n} dans VRM.`); return; }
     poser(n);
   };
   const sugg = (suggestions || []).filter((s) => s && s.numero);
@@ -44841,7 +44865,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
         {!vendue && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <input value={num} onChange={(e) => setNum(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(); }}
-              inputMode="numeric" placeholder="N°" aria-label="N° de la paire"
+              inputMode="numeric" placeholder="N°" aria-label="N° de l'article"
               style={{ width: 58, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 8px', background: C.bg, color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit' }}/>
             <button type="button" onClick={relier} style={btn}>Relier</button>
           </div>
@@ -44851,21 +44875,21 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
           c'est son clic qui relie, jamais la ressemblance (§5). */}
       {sugg.length > 0 && (
         <div data-lbc-suggestions={id} style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 12, color: C.muted }}>{vendue ? 'Est-ce la même paire ?' : "C'est peut-être :"}</span>
+          <span style={{ fontSize: 12, color: C.muted }}>{vendue ? 'Est-ce le même article ?' : "C'est peut-être :"}</span>
           {sugg.map((s) => (
             <button key={s.numero} type="button" data-suggestion={s.numero} onClick={() => poser(s.numero)} title={s.titre || ''}
               style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.text, padding: '6px 10px 6px 6px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minHeight: 0 }}>
               {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}/> : null}
               <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
               <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
-              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accent }}>{vendue ? "C'est elle" : 'Relier'}</span>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accent }}>{vendue ? "C'est lui" : 'Relier'}</span>
             </button>
           ))}
         </div>
       )}
       {cleRangement && (
         <div style={{ marginTop: 8 }}>
-          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={{ ...btn, color: C.muted }}>{sugg.length ? 'Aucune de celles-là' : 'Pas de paire à relier'}</button>
+          <button type="button" data-lbc-aucune={cleRangement} onClick={aucune} style={{ ...btn, color: C.muted }}>{sugg.length ? 'Aucun de ceux-là' : 'Pas d’article à relier'}</button>
         </div>
       )}
     </div>
@@ -45406,7 +45430,7 @@ function LeboncoinScreen() {
       {data && data.doublons && data.doublons.length > 0 && (
         <Card style={{ borderColor: C.warn }}>
           <div data-lbc-doublons={data.doublons.length} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3 }}>
-            {data.doublons.length} paire{data.doublons.length > 1 ? 's' : ''} vendue{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
+            {data.doublons.length} article{data.doublons.length > 1 ? 's' : ''} vendu{data.doublons.length > 1 ? 's' : ''} sur Leboncoin — encore sur Vinted
           </div>
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginBottom: 6 }}>
             Retire-{data.doublons.length > 1 ? 'les' : 'la'} de Vinted maintenant, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait pas à ta place : sur Vinted, c'est sans retour.
@@ -45428,8 +45452,8 @@ function LeboncoinScreen() {
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
                 {d.vintedUrl && <a href={d.vintedUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.text, textDecoration: 'none' }}>Ouvrir sur Vinted</a>}
                 {data.liensMain && String(data.liensMain[String(d.ad.id)] || '').trim() && (
-                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans paire » et tu pourras choisir la bonne.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
-                    style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.muted, cursor: 'pointer' }}>Pas la bonne paire</button>
+                  <button type="button" data-lbc-delier={String(d.ad.id)} onClick={() => { if (window.confirm(`Ce n'est pas la N°${d.numero} ? Je retire ce lien : la vente redevient « sans article » et tu pourras choisir le bon.`)) { delierAnnonceLbc(d.ad.id); reload(); } }}
+                    style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, color: C.muted, cursor: 'pointer' }}>Pas le bon article</button>
                 )}
                 </div>
               </div>
@@ -45440,9 +45464,9 @@ function LeboncoinScreen() {
       {data && data.aRelierVentes && data.aRelierVentes.length > 0 && (
         <Card>
           <Titre data-lbc-ventes-a-relier={data.aRelierVentes.length}>
-            {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quelle paire ?
+            {data.aRelierVentes.length} vente{data.aRelierVentes.length > 1 ? 's' : ''} Leboncoin : quel article ?
           </Titre>
-          <Sous>Une paire qui y ressemble est encore en vente sur Vinted. Si c'est la même, touche-la : je te dirai de la retirer de Vinted.</Sous>
+          <Sous>Un article qui y ressemble est encore en vente sur Vinted. Si c'est le même, touche-le : je te dirai de le retirer de Vinted.</Sous>
           {data.aRelierVentes.map(({ vente, ad, suggestions }) => (
             <LbcRelier key={String(vente.txId || ad.id)} ad={ad} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={suggestions} vendue
               cleRangement={'tx:' + (vente.txId || ad.id)}
@@ -45462,7 +45486,7 @@ function LeboncoinScreen() {
         const liste = rates.length === 1 ? rates[0] : rates.slice(0, -1).join(', ') + ' ni ' + rates[rates.length - 1];
         const effets = [
           data.preuveKO && 'la liste à publier peut contenir des paires déjà vendues sur Vinted',
-          data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucune paire vendue ici n'est encore en vente sur Vinted",
+          data.ventesLbcKO && "je n'ai pas pu vérifier qu'aucun article vendu ici n'est encore en vente sur Vinted",
           data.lbcKO && 'je ne peux pas te dire lesquelles retirer de Leboncoin',
           data.echecLecture && 'la file à publier est incomplète',
         ].filter(Boolean);
@@ -45486,7 +45510,7 @@ function LeboncoinScreen() {
           {data.lbcJamaisLu && !data.postedCount && (
             <div style={{ fontSize: 11.5, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
               Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> sur leboncoin.fr une fois, avec l'extension : je les lirai au passage.
-              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand une paire se vend sur Vinted.
+              <br/>Tant que c'est le cas, je ne peux pas te dire <b>lesquelles retirer</b> quand un article se vend sur Vinted.
             </div>
           )}
           {/* ⚠️ « Offre : Gratuit » s'affichait quand AUCUNE offre n'était connue
@@ -45519,7 +45543,7 @@ function LeboncoinScreen() {
             const pe = pauseEtat();
             return (
               <div data-lbc-pas-revues={data.pasRevues} style={{ fontSize: 11.5, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-                {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours : je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quelle paire {data.pasRevues > 1 ? 'les' : 'la'} relier.{' '}
+                {data.pasRevues} annonce{data.pasRevues > 1 ? 's' : ''} Leboncoin pas revue{data.pasRevues > 1 ? 's' : ''} depuis plus de {data.pasRevuesJours > LBC_REVUE_JOURS ? data.pasRevuesJours : LBC_REVUE_JOURS} jours : je ne sais pas si elle{data.pasRevues > 1 ? 's y sont' : ' y est'} encore, je ne te demande donc pas à quel article {data.pasRevues > 1 ? 'les' : 'la'} relier.{' '}
                 {pe === 'absente'
                   ? <>Sur l'ordinateur où l'extension est installée, ouvre ta page profil Leboncoin (celle qui liste toutes tes annonces) : elle relira ta liste en entier.</>
                   : pe === 'retard'
@@ -45573,7 +45597,7 @@ function LeboncoinScreen() {
             {vendues.length > 0 && (
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre la même paire deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de la paire ne change pas.
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
                   {pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression, elle se remet en ligne depuis « Mes annonces ».</span></> : null}
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
@@ -45623,7 +45647,7 @@ function LeboncoinScreen() {
         {data.unlinked && data.unlinked.length > 0 && (
           <Card className="vrm-lbc-non-reliees">
             <Titre>{data.unlinked.length} annonce{data.unlinked.length > 1 ? 's' : ''} Leboncoin non reliée{data.unlinked.length > 1 ? 's' : ''}</Titre>
-            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quelle paire c'est. Choisis la bonne paire si elle est proposée, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>VRM ne sait pas quel article c'est. Choisis le bon article s'il est proposé, ou tape son <b>N°</b> et « Relier » : elle sera suivie comme les autres (vendue sur Vinted → à retirer d'ici, et l'inverse).</div>
             {data.unlinked.slice(0, 40).map((u) => <LbcRelier key={String(u.id || u.url || u.subject)} ad={u} numsConnus={data.numsConnus || []} onRelie={reload} suggestions={u.suggestions} cleRangement={u.id != null ? 'ad:' + u.id : ''}/>)}
             {data.unlinked.length > 40 && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6 }}>… et {data.unlinked.length - 40} autre{data.unlinked.length - 40 > 1 ? 's' : ''}.</div>}
           </Card>
@@ -45654,7 +45678,7 @@ function LeboncoinScreen() {
               fait ». On dit combien, et où c'est réglé. */}
           {data.vendues > 0 && (
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>
-              {data.vendues} paire{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendue{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'elles ne sont' : "elle n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
+              {data.vendues} article{data.vendues > 1 ? 's' : ''} {data.vendues > 1 ? 'sont' : 'est'} <b>déjà vendu{data.vendues > 1 ? 's' : ''} sur Vinted</b> — {data.vendues > 1 ? 'ils ne sont' : "il n'est"} pas dans cette file. (Vinted laisse parfois l'annonce ouverte après la vente ; c'est la transaction qui fait foi.)
             </div>
           )}
           {/* ⚠️ Revue de la 5.167 : les annonces « à confirmer » (compte pas relu
@@ -45769,8 +45793,8 @@ function LeboncoinScreen() {
                     </div>
                   )}
                   {jm && <div className="vrm-apub-jumelle" data-apub-jumelle-texte="">{jm.posee
-                    ? <>Même photo que la <b>N°{jm.num}</b>, déjà sur Leboncoin : c'est la même paire, elle ne se publie pas deux fois.</>
-                    : <>Même photo que la <b>N°{jm.num}</b> : c'est sans doute la même paire sous deux N°. Publie la N°{jm.num} seulement.</>}</div>}
+                    ? <>Même photo que la <b>N°{jm.num}</b>, déjà sur Leboncoin : c'est le même article, il ne se publie pas deux fois.</>
+                    : <>Même photo que la <b>N°{jm.num}</b> : c'est sans doute le même article sous deux N°. Publie la N°{jm.num} seulement.</>}</div>}
                   <div className="vrm-apub-gestes">
                     {/* Le bouton dit les photos captées sur le total (11 octobre) —
                         une fois, là où on décide de publier (§7). */}
@@ -51284,7 +51308,7 @@ function AppCoeur() {
       }
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
-      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} paire${lbcDoubles>1?'s':''} vendue${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
+      if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si

@@ -142,7 +142,7 @@ const projette = (row, sel) => {
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'double-vente-' + vp.width + '.png'), fullPage: true });
       dit(v1.doublons.length === 1 && v1.doublons[0].num === '12', 'vendue sur Leboncoin, encore sur Vinted ⇒ alerte pour la N°12, et elle seule', JSON.stringify(v1.doublons.map((d) => d.num)));
       dit(v1.doublons[0] && /vinted\.fr\/items\/5001$/.test(v1.doublons[0].href), 'l’alerte mène à L’annonce Vinted de cette paire', v1.doublons[0] && v1.doublons[0].href);
-      dit(v1.aRelier === 1, 'la vente non reliée demande « quelle paire ? »', String(v1.aRelier));
+      dit(v1.aRelier === 1, 'la vente non reliée demande « quel article ? »', String(v1.aRelier));
       dit(v1.relier.length > 0 && v1.deborde.length === 0, 'aucun bouton ni champ rogné par le bord de l’écran (N°, Relier, Actualiser…)', v1.deborde.join(', ') || (v1.relier.length ? '' : 'aucune ligne'));
       dit(v1.sugg.includes('14') && v1.sugg.includes('15'), 'et PROPOSE les deux paires identiques — sans en choisir une', JSON.stringify(v1.sugg));
       dit(v1.relier.includes('lbc3'), 'son annonce jamais reliée (compte prouvé par une vente) est listée', JSON.stringify(v1.relier));
@@ -165,10 +165,10 @@ const projette = (row, sel) => {
       // de bord a été refondu en « Statistiques » et n'affiche plus les actions :
       // l'alerte vit sur l'écran qu'il ouvre le matin — et c'est là qu'on la juge.
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForFunction(() => /vendues? sur Leboncoin, encore en vente sur Vinted/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+      await pg.waitForFunction(() => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
       const txt = await pg.evaluate(() => document.body.innerText);
-      const m = /(\d+) paires? vendues? sur Leboncoin, encore en vente sur Vinted/.exec(txt);
-      dit(m && m[1] === '2', 'Ma journée annonce les mêmes 2 paires', m ? m[0] : 'absent');
+      const m = /(\d+) articles? vendus? sur Leboncoin, encore en vente sur Vinted/.exec(txt);
+      dit(m && m[1] === '2', 'Ma journée annonce les mêmes 2 articles', m ? m[0] : 'absent');
       dit(!/vendues? sur Vinted\)/.test(txt), 'et ne dit « vendue sur Vinted » d’aucune paire non prouvée vendue');
       // (16 oct.) « Je me suis trompé, j'ai mal relié une paire » : le lien se
       // défait, et ça tient au rechargement (le nuage ne le rend pas).
@@ -178,14 +178,14 @@ const projette = (row, sel) => {
         pg.once('dialog', (d) => d.accept());
         await pg.click('[data-doublon="15"] [data-lbc-delier="lbc2"]');
         await pg.waitForTimeout(2500);
-      } catch (e) { dit(false, '« Pas la bonne paire » se clique sur la ligne de la N°15', String(e.message).slice(0, 100)); }
+      } catch (e) { dit(false, '« Pas le bon article » se clique sur la ligne de la N°15', String(e.message).slice(0, 100)); }
       const liens2 = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_lbc_liens') || 'null'); } catch (_) { return null; } });
       dit(liens2 && liens2.lbc2 === '' && liens2.lbc1 === '12', 'le lien de lbc2 est défait (les autres restent)', JSON.stringify(liens2));
       await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-lbc-doublons], [data-lbc-ventes-a-relier]', { timeout: 15000 }).catch(() => {});
       await pg.waitForTimeout(1500);
       const v3 = await lire();
-      dit(v3.doublons.map((d) => d.num).join() === '12' && v3.aRelier === 1, 'après rechargement : plus d’alerte pour la N°15, la vente redemande « quelle paire ? »', JSON.stringify(v3.doublons.map((d) => d.num)) + ' · ' + v3.aRelier);
+      dit(v3.doublons.map((d) => d.num).join() === '12' && v3.aRelier === 1, 'après rechargement : plus d’alerte pour la N°15, la vente redemande « quel article ? »', JSON.stringify(v3.doublons.map((d) => d.num)) + ' · ' + v3.aRelier);
       const nLiens = await pg.evaluate(() => (document.querySelector('[data-lbc-liens]') || {}).getAttribute ? document.querySelector('[data-lbc-liens]').getAttribute('data-lbc-liens') : null);
       dit(nLiens === '1', 'la liste « Paires que tu as reliées » ne garde que le lien restant (N°12)', String(nLiens));
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));

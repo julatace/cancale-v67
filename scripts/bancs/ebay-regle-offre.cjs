@@ -641,13 +641,13 @@ async function finPage(pg, errs, quoi) {
         const l = await lignesApercu(pg);
         const att = { [A.A1]: ['inchange', '72.00', null], [A.A2]: ['nouvelle', '81.00', true], [A.A3]: ['a-relire', '', null], [A.A4]: ['a-relire', '', null], [A.A5]: ['exclue', null, null], [A.A6]: ['remplace', '90.00', false], [A.A7]: ['nouvelle', '45.00', false], [A.B1]: ['nouvelle', '90.00', true], [A.B2]: ['exclue', '', null], [A.B3]: ['a-relire', '', null] };
         const ecarts = Object.entries(att).filter(([id, [s, seuil, coche]]) => !l[id] || l[id].s !== s || (seuil != null && l[id].seuil !== seuil) || l[id].coche !== coche);
-        dit(!ecarts.length && l[A.A2].achat && l[A.A6].achat, `[9] ${T} 90 % : chaque ligne a SON statut, SON seuil (au centime supérieur) et sa case (plus bas et sans paire reliée : décochées) ; sous le prix d'achat signalé`, ecarts.length ? JSON.stringify(ecarts.map(([id]) => [id, l[id]])) : '');
+        dit(!ecarts.length && l[A.A2].achat && l[A.A6].achat, `[9] ${T} 90 % : chaque ligne a SON statut, SON seuil (au centime supérieur) et sa case (plus bas et sans article relié : décochées) ; sous le prix d'achat signalé`, ecarts.length ? JSON.stringify(ecarts.map(([id]) => [id, l[id]])) : '');
         dit(/Appliquer à 2 annonces/.test(await pg.$eval('[data-regles-appliquer]', (e) => e.innerText)), `[9] ${T} « Appliquer à 2 annonces »`);
         await pg.click(`[data-regles-ligne="${A.A6}"] [data-regles-choix]`); await pg.click(`[data-regles-ligne="${A.A7}"] [data-regles-choix]`); await pg.waitForTimeout(200);
         dit(/Appliquer à 4 annonces/.test(await pg.$eval('[data-regles-appliquer]', (e) => e.innerText)), `[9] ${T} A6 et A7 cochées : « Appliquer à 4 annonces »`);
         await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
         const tf = await feuille(pg).innerText();
-        dit(/1 remplace une règle existante \(dont 1 plus basse\)/.test(tf) && /2 sous ton prix d'achat/.test(tf) && /1 sans prix d'achat saisi/.test(tf) && /1 sans paire reliée/.test(tf) && /paire_perso/.test(tf) && /paire_pro/.test(tf), `[9] ${T} la feuille compte ce qui compte (remplace, plus basse, sous l'achat, sans prix d'achat, sans paire) et nomme les deux comptes`, tf.replace(/\s+/g, ' ').slice(0, 220));
+        dit(/1 remplace une règle existante \(dont 1 plus basse\)/.test(tf) && /2 sous ton prix d'achat/.test(tf) && /1 sans prix d'achat saisi/.test(tf) && /1 sans article relié/.test(tf) && /paire_perso/.test(tf) && /paire_pro/.test(tf), `[9] ${T} la feuille compte ce qui compte (remplace, plus basse, sous l'achat, sans prix d'achat, sans article) et nomme les deux comptes`, tf.replace(/\s+/g, ' ').slice(0, 220));
         await feuille(pg).getByRole('button', { name: 'Annuler' }).click(); await pg.waitForTimeout(400);
         dit(regleoffres().length === 0, `[9] ${T} Annuler n'envoie RIEN`);
         await pg.click('[data-regles-appliquer]'); await feuille(pg).waitFor({ timeout: 5000 });
