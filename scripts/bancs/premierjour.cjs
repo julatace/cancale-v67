@@ -73,7 +73,7 @@ const ecouter = () => new Promise((res, rej) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null, ua = null, orion = false } = {}) {
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null, ua = null, orion = false, dateFixe = '' } = {}) {
   // ⚠️ Un téléphone n'est pas « un écran étroit » : ce qui compte est l'ENTRÉE.
   //    `isMobile + hasTouch` fait déclarer à Chromium `pointer: coarse` et
   //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
@@ -82,6 +82,14 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     ? Object.assign({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua ? { userAgent: ua } : {})
     : Object.assign({ viewport: { width: 1512, height: 950 } }, ua ? { userAgent: ua } : {}));
   const pg = await ctx.newPage();
+  // ⚠️ Une horloge pinée, uniquement là où on en a besoin : le rappel d'échéance
+  //    URSSAF du calendrier (dans les 7 jours avant le 30/04·31/07·31/10·31/01,
+  //    ou les 3 premiers jours d'un mois) est une VRAIE « chose à faire ». Rendu
+  //    un 25 octobre, il faisait disparaître la fête « Tout est à jour » du
+  //    scénario inverse — le banc devenait rouge une semaine par trimestre, pour
+  //    la mauvaise raison. `setFixedTime` fige `new Date()` sans geler les
+  //    minuteurs (même usage que ebay-programmer/vendu-recu).
+  if (dateFixe) await pg.clock.setFixedTime(new Date(dateFixe));
   if(orion)await pg.addInitScript(()=>{window.KAGI={};});
   await pg.addInitScript(([s, pr, sans]) => {
     try {
@@ -240,7 +248,12 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // ── 3. L'AUTRE SENS : une boutique branchée et à jour se fête encore ──────
   // Sans ça, « ne rien fêter du tout » passerait tous les contrôles ci-dessus.
   console.log('\n── Un compte lié et rien à faire : la fête revient');
-  const calme = await rendre(nav, { comptes: [COMPTE_BANC] });
+  // Un 15 novembre : hors fenêtre d'échéance URSSAF (prochaine le 31/01) et
+  // après le 3 du mois → aucune « chose à faire » de calendrier. Avec zéro
+  // donnée, la seule chose qui puisse rester est la fête : si une fausse
+  // consigne opérationnelle (colis, messages) apparaissait, elle ajouterait un
+  // job et ferait tomber ce contrôle — le garde-fou reste entier.
+  const calme = await rendre(nav, { comptes: [COMPTE_BANC], dateFixe: '2026-11-15T12:00:00' });
   dit(/Tout est à jour/i.test(calme.txt), 'la fête est rendue quand elle est vraie',
     calme.txt.slice(0, 120).replace(/\n/g, ' · '));
   dit(!/aucun compte Vinted n['’]est encore relié/i.test(calme.txt),
