@@ -73,7 +73,7 @@ const ecouter = () => new Promise((res, rej) => {
 //   comptes : [] (neuf) ou [COMPTE_BANC]
 //   baseKO  : la base ne répond pas (522 + HTML, la VRAIE forme de la panne)
 //   prenom  : ce que le réglage synchronisé contient
-async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null, ua = null } = {}) {
+async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lecturePublique = false, sansSession = false, pont = null, tab = 'journee', telephone = false, version = '5.63.0', clic = null, ua = null, orion = false } = {}) {
   // ⚠️ Un téléphone n'est pas « un écran étroit » : ce qui compte est l'ENTRÉE.
   //    `isMobile + hasTouch` fait déclarer à Chromium `pointer: coarse` et
   //    `hover: none` — exactement ce que l'app mesure (vérifié : coarse true /
@@ -82,6 +82,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     ? Object.assign({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ua ? { userAgent: ua } : {})
     : Object.assign({ viewport: { width: 1512, height: 950 } }, ua ? { userAgent: ua } : {}));
   const pg = await ctx.newPage();
+  if(orion)await pg.addInitScript(()=>{window.KAGI={};});
   await pg.addInitScript(([s, pr, sans]) => {
     try {
       if (!sans) localStorage.setItem('vrm_session', JSON.stringify(s));
@@ -188,8 +189,19 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
 
 (async () => {
   const srv = await ecouter();
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH||'/usr/bin/chromium',
     args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  if(process.env.ORION_ONLY){
+    const r=await rendre(nav,{telephone:true,orion:true,ua:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'});
+    dit(r.gestes.includes('orion-fichier'),'Orion iPhone : le téléchargement local est proposé sans inventer une boutique',JSON.stringify(r.gestes));
+    dit(r.liens.some(h=>/VRM-Orion\.xpi/.test(h||'')),'Orion iPhone : lien vers le paquet adapté');
+    dit(!r.liens.some(h=>/VRM-extension\.zip/.test(h||'')),'Orion iPhone : aucun ZIP Chrome proposé à la place');
+    dit(!/ton appareil n’en accepte pas/.test(r.carte),'Orion iPhone : aucune affirmation contraire à la disponibilité du paquet');
+    dit(r.liens.some(h=>/VRM-Orion-installation/.test(h||'')),'Orion iPhone : notice accessible');
+    dit(r.mobile.debord<=1,'Orion iPhone : aucun débordement horizontal',String(r.mobile.debord));
+    await nav.close();srvBase.close();console.log(`${ok} réussis, ${ko} échecs — rendu Orion simulé`);process.exit(ko?1:0);
+  }
+
 
   // ── 1. LE PRÉNOM ──────────────────────────────────────────────────────────
   // La règle : le bonjour DÉPEND du réglage. On ne cherche pas le mot

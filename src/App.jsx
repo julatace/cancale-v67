@@ -51,7 +51,7 @@ import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLu
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
-import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, phraseNavigateur } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
@@ -14323,13 +14323,13 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
           : <>Sur Android, seul <b style={{color:C.text}}>Firefox</b> l’accepte, et la version Firefox de l’extension n’est pas encore en ligne.</>}
       </p>}
       {mobile === 'firefox-android' && <p style={{margin:'0 0 10px'}} data-premiers-mobile="firefox-android-pas-encore">Firefox pour Android accepte l’extension, mais sa version Firefox n’est pas encore en ligne dans la boutique de Firefox.</p>}
-      <p style={{margin:0}}>
+      {mobile!=='ios-orion'&&<p style={{margin:0}}>
         {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'
           ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: </>
           : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. </>}
         ouvre <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
-      </p>
-      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Tu es dans <b style={{color:C.text}}>Orion</b>&nbsp;: il installe l’extension depuis la boutique de Firefox{orion ? <> (bouton ci-dessous) — puis reviens ici, l’écran avance tout seul</> : <>, où elle n’est pas encore en ligne</>}. VRM n’y a pas encore été essayé sur un vrai iPhone&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
+      </p>}
+      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Le paquet pour <b style={{color:C.text}}>Orion sur iPhone et iPad</b> est disponible ci-dessous. Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accent}}>Voir les étapes</a>. Le fonctionnement sur ton appareil reste à vérifier.</p>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
     </>
   ) : boutique.lien ? (
@@ -14382,7 +14382,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   // débloque est de la METTRE À JOUR (le zip), et — si elle range chez un autre —
   // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
   const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
-  const bouton = (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
+  const bouton = (!fait.ext && mobile==='ios-orion')
+    ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Télécharger pour Orion</a>
+    : (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
     ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer depuis la boutique</a>
     : (!fait.ext && orion && (boutique.nav === 'safari' || boutique.nav === 'orion') && !(sansSouris && estAndroid()))
     ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" style={{textDecoration:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px 18px',fontSize:14,fontWeight:600}}>Installer dans Orion</a>

@@ -93,10 +93,15 @@ L'extension **le dit elle-même** : l'état du pont porte `nav: { remplace: […
 indispo: […] }` (absent sur Chrome) ; le panneau « Actions possibles / Lecture
 seule » de l'app l'écrit en **une** phrase (`phraseNavigateur`).
 
-**Quel paquet pour Orion ?** Le paquet **Firefox** (`background.scripts`) : c'est
-la forme qu'Orion choisit quand il a le choix, et la seule dont rien ne dit
-qu'elle soit « Not compatible » sur iOS. L'app propose donc la boutique Firefox
-d'abord (`boutiqueOrion`). ⚠️ Non essayé sur un vrai iPhone.
+**Quel paquet pour Orion sur iPhone/iPad ?** Un paquet dédié est désormais
+livré : `public/VRM-Orion.xpi` et sa copie identique `VRM-Orion.zip`.
+Le manifeste classique utilise une page de fond non persistante, un adaptateur
+d’API et un chargeur des capteurs dans la page. La notice est dans
+`public/VRM-Orion-installation.txt`. Il s’importe depuis le bouton + des
+Extensions d’Orion. Ce n’est pas une fiche de boutique publiée, et son
+fonctionnement dans Orion/iOS réel reste à confirmer. Voir
+`docs/passation/2026-10-25-orion-iphone-ipad.md` pour les validations exactes.
+La boutique Firefox reste une autre voie lorsqu’une fiche sera publiée.
 
 ### Marche à suivre Orion, pas à pas (une fois la fiche Firefox publiée)
 1. Sur l'iPhone : App Store → **Orion Browser by Kagi** (gratuit) → Obtenir.
@@ -113,9 +118,11 @@ d'abord (`boutiqueOrion`). ⚠️ Non essayé sur un vrai iPhone.
 6. Si l'écran n'avance pas : Orion → ••• → Extensions → VRM → la console du
    fond (aide Kagi, « Troubleshooting Extension Issues ») et l'envoyer.
 
-Sans fiche publiée, Orion propose aussi « installer depuis un fichier » (le
-bouton **+** de ses Extensions, aide Kagi) — **format accepté non vérifié** ;
-à essayer avec `VRM-firefox.zip`, sans compter dessus.
+Sans fiche publiée, utiliser le paquet Orion dédié et sa notice ci-dessus.
+Kagi documente l’installation depuis un fichier ; les suffixes acceptés par
+chaque version du sélecteur et l’exécution réelle doivent être vérifiés sur
+l’appareil. Les deux copies XPI/ZIP ont le même contenu, ne pas les installer
+toutes les deux.
 
 ## 3. Le kit de publication addons.mozilla.org (Firefox ordinateur, Android, Orion)
 

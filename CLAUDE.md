@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **25 octobre — Orion iPhone/iPad :** paquet d’import dédié MV2, fond non
+> persistant, compat API et chargeur de page. XPI + ZIP identiques et notice
+> dans public/. Aucun changement du moteur Chrome 5.222.
+> Tests et validateur verts, mais installation Orion/iOS réelle non exécutée.
+> Voir `docs/passation/2026-10-25-orion-iphone-ipad.md`.
+
 > **25 octobre — 5.222, cloche et messagerie :** le client confirme que la
 > cloche se referme en revenant dans VRM. Nouveau parcours : activer Vinted,
 > rouvrir une cloche native identifiable, attendre le lien exact, puis ouvrir

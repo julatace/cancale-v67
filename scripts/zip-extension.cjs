@@ -8,7 +8,10 @@
 //    sert Microsoft Edge Add-ons et Opera Add-ons (moteur Chromium) ;
 //  · le paquet Firefox (`--firefox <chemin>`, addons.mozilla.org — ordinateur
 //    ET Firefox pour Android) : manifeste adapté par `manifesteFirefox`, plus
-//    `compat-firefox.js` en tête de chaque script. Mêmes fichiers de code,
+//    `compat-firefox.js` en tête de chaque script.
+//  · Orion iPhone/iPad (`--orion <chemin.xpi>`) : WebExtension MV2 à la racine,
+//    page de fond non persistante, adaptateur d’API et injection de page différée.
+// Mêmes fichiers de code,
 //    octet pour octet (`audit-extension-navigateurs.cjs` le vérifie).
 // Les deux portent exactement les mêmes fichiers (`audit-extension-zip.cjs`
 // vérifie le premier octet pour octet contre la source).
@@ -26,6 +29,9 @@ const iFx = args.indexOf('--firefox');
 const firefox = iFx >= 0 ? path.resolve(args[iFx + 1] || '') : '';
 const iSa = args.indexOf('--safari');
 const safari = iSa >= 0 ? path.resolve(args[iSa + 1] || '') : '';
+const iOrion=args.indexOf('--orion');
+const orionPublic=path.join(racine,'public','VRM-Orion.xpi');
+const orion=iOrion>=0?path.resolve(args[iOrion+1]||''):orionPublic;
 const COMPAT = 'compat-firefox.js';
 
 // ── LE MANIFESTE FIREFOX (Firefox 128+, ordinateur et Android) ─────────────
@@ -91,6 +97,23 @@ function manifesteSafari(m) {
   }
   return f;
 }
+// Orion iOS: legacy WebExtension import, no Chrome service worker or MAIN
+// declaration. Preserve the shared runtime; use its page relay and own API shim.
+function manifesteOrion(m){
+ const f=JSON.parse(JSON.stringify(m));
+ f.manifest_version=2;
+ f.background={scripts:['compat-orion.js',m.background.service_worker],persistent:false};
+ f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads'].includes(p)),...(m.host_permissions||[])])];
+ delete f.host_permissions;delete f.externally_connectable;
+ f.browser_action=f.action;delete f.action;
+ f.browser_specific_settings={gecko:{id:'vrm@vrm.center',data_collection_permissions:{required:['authenticationInfo','personalCommunications','websiteContent','websiteActivity','browsingActivity']}}};
+ f.web_accessible_resources=[...new Set((m.web_accessible_resources||[]).flatMap(x=>x.resources||[]))];
+ f.content_scripts=(m.content_scripts||[]).filter(c=>!(c.world==='MAIN'&&(c.js||[]).includes('inject.js'))).map(c=>{
+  const n={...c};delete n.world;n.js=['compat-orion.js',...(n.js||[])];return n;
+ });
+ f.content_scripts.unshift({matches:['https://*.vinted.fr/*','https://*.vinted.com/*','https://*.vinted.it/*','https://*.vinted.de/*','https://*.leboncoin.fr/*','https://*.vestiairecollective.com/*'],js:['compat-orion.js','orion-main.js'],run_at:'document_start',all_frames:false});
+ return f;
+}
 // La fenêtre de l'icône charge ses scripts elle-même : la compatibilité d'abord.
 function compatDansPopup(dossier) {
   const ph = path.join(dossier, 'popup.html');
@@ -142,4 +165,19 @@ try {
     execFileSync('zip', ['-qrX', safari, 'VRM-safari'], { cwd: tmp });
     console.log('✓', safari, '(Safari Mac et iPhone : dossier à convertir avec Xcode)');
   }
+  if(orion){
+    const o=path.join(tmp,'orion');fs.cpSync(dossier,o,{recursive:true});fs.rmSync(path.join(o,'README.md'),{force:true});
+    for(const nom of ['compat-orion.js','orion-main.js'])fs.copyFileSync(path.join(__dirname,'extension-orion',nom),path.join(o,nom));
+    const m=JSON.parse(fs.readFileSync(path.join(o,'manifest.json'),'utf8'));
+    fs.writeFileSync(path.join(o,'manifest.json'),JSON.stringify(manifesteOrion(m),null,2)+'\n');
+    const ph=path.join(o,'popup.html');fs.writeFileSync(ph,fs.readFileSync(ph,'utf8').replace(/<script\b/i,'<script src="compat-orion.js"></script>\n<script'));
+    fs.rmSync(orion,{force:true});execFileSync('zip',['-qrX',orion,...fs.readdirSync(o)],{cwd:o});
+    if(orion===orionPublic){
+      fs.copyFileSync(orion,path.join(racine,'public','VRM-Orion.zip'));
+      const notice=path.join(racine,'public','VRM-Orion-installation.txt');
+      if(fs.existsSync(notice))fs.writeFileSync(notice,fs.readFileSync(notice,'utf8').replace(/^Version du moteur VRM : .*$/m,'Version du moteur VRM : '+m.version));
+    }
+    console.log('✓',orion,'(Orion iPhone/iPad : archive WebExtension, manifest.json à la racine ; appareil réel à vérifier)');
+  }
+
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

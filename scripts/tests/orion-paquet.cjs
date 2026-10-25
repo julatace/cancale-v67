@@ -1,0 +1,58 @@
+// Package, runtime and bridge checks with synthetic browser APIs only.
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {execFileSync}=require('node:child_process');
+const racine=path.resolve(__dirname,'../..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'vrm-orion-test-'));
+const lire=p=>fs.readFileSync(p,'utf8');let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};
+(async()=>{try{
+ const zip=path.join(tmp,'Orion.xpi');execFileSync('node',[path.join(racine,'scripts/zip-extension.cjs'),'--orion',zip],{stdio:'pipe'});
+ const d=path.join(tmp,'extension');fs.mkdirSync(d);execFileSync('unzip',['-q',zip,'-d',d]);
+ const publicXpi=path.join(racine,'public/VRM-Orion.xpi'),publicZip=path.join(racine,'public/VRM-Orion.zip');
+ ok(fs.readFileSync(publicXpi).equals(fs.readFileSync(publicZip)),'XPI and ZIP downloads contain the same package');
+ const distrib=path.join(tmp,'distrib');fs.mkdirSync(distrib);execFileSync('unzip',['-q',publicXpi,'-d',distrib]);
+ ok(JSON.stringify(fs.readdirSync(distrib).sort())===JSON.stringify(fs.readdirSync(d).sort()),'published package file set matches the current generator');
+ for(const nom of fs.readdirSync(d))ok(fs.readFileSync(path.join(d,nom)).equals(fs.readFileSync(path.join(distrib,nom))),'distributed content matches the current source: '+nom);
+ ok(fs.existsSync(path.join(racine,'public/VRM-Orion-installation.txt')),'the installation guide exists');
+ const m=JSON.parse(lire(path.join(d,'manifest.json'))),base=JSON.parse(lire(path.join(racine,'vinted-sync-extension/manifest.json')));
+ ok(m.manifest_version===2&&m.version===base.version,'legacy import with the same core version');
+ ok(m.background.persistent===false&&m.background.scripts.join(',')==='compat-orion.js,background.js'&&!m.background.service_worker,'nonpersistent background, no Chrome worker');
+ ok(!m.action&&m.browser_action.default_popup==='popup.html','legacy toolbar action');
+ ok(!m.host_permissions&&m.permissions.includes('https://vrm.center/*')&&!m.permissions.includes('scripting')&&!m.permissions.includes('downloads'),'legacy host permissions, no MV3-only scripting dependency');
+ ok(!m.externally_connectable&&!JSON.stringify(m).includes('strict_min_version'),'page bridge, no Firefox minimum-version restriction');
+ ok(m.web_accessible_resources.every(x=>typeof x==='string'),'legacy web resources');
+ for(const c of m.content_scripts){ok(!c.world&&c.js[0]==='compat-orion.js','compat before isolated content');for(const f of c.js)ok(fs.existsSync(path.join(d,f)),'declared content file exists');}
+ ok(!m.content_scripts.some(c=>c.js.includes('inject.js')),'Vinted native hook never runs as an isolated content script');
+ ok(m.content_scripts.some(c=>c.js.includes('orion-main.js')&&c.run_at==='document_start'),'deferred page loader is declared');
+ const ph=lire(path.join(d,'popup.html'));ok(ph.indexOf('compat-orion.js')<ph.indexOf('popup.js'),'popup compatibility before code');
+ const modifies=new Set(['manifest.json','popup.html','README.md']);
+ for(const f of fs.readdirSync(path.join(racine,'vinted-sync-extension'))){if(modifies.has(f))continue;ok(fs.readFileSync(path.join(d,f)).equals(fs.readFileSync(path.join(racine,'vinted-sync-extension',f))),'shared runtime source unchanged: '+f);}
+ const source=lire(path.join(d,'compat-orion.js')),store={a:7},appels=[];let auditeur;
+ const chrome={runtime:{id:'orion-test',lastError:null,getURL:p=>'extension://vrm/'+p,onMessage:{addListener:f=>{auditeur=f;}}},storage:{local:{get(k,cb){appels.push('get');if(cb)cb({[k]:store[k]});},set(v,cb){Object.assign(store,v);cb?.();},remove(k,cb){delete store[k];cb?.();}}},browserAction:{setPopup(v,cb){appels.push(v.popup);cb?.();}},tabs:{query(q,cb){cb([{id:1}]);}}};
+ const ctx={chrome,console,Promise,Proxy,WeakMap,Set};vm.createContext(ctx);vm.runInContext(source,ctx);
+ ok((await ctx.chrome.storage.local.get('a')).a===7,'callback-only storage supports awaited reads without browser global');
+ await ctx.chrome.storage.local.set({b:8});ok(store.b===8,'awaited writes preserve payload');
+ let rappel;ctx.chrome.storage.local.get('a',v=>{rappel=v;});ok(rappel.a===7,'native callback caller preserved');
+ ok((await ctx.chrome.tabs.query({}))[0].id===1,'callback-only tab calls adapted');
+ const f=()=>{};ctx.chrome.runtime.onMessage.addListener(f);ok(auditeur===f,'native message listener unchanged');
+ ok(ctx.chrome.runtime.getURL('a.js')==='extension://vrm/a.js','synchronous URL unchanged');
+ ctx.chrome.action.setPopup({popup:'popup.html'});ok(appels.includes('popup.html'),'browserAction exposed to core action users');
+ ok(!ctx.chrome.cookies&&!ctx.chrome.scripting,'unsupported APIs are not fabricated');
+ chrome.runtime.lastError={message:'denied'};await assert.rejects(ctx.chrome.storage.local.get('a'),/denied/);n++;chrome.runtime.lastError=null;
+ const promiseChrome={runtime:{id:'promise'},storage:{local:{get:async()=>({a:9})}}};const cp={chrome:promiseChrome,console,Promise,Proxy,WeakMap,Set};vm.createContext(cp);vm.runInContext(source,cp);ok((await cp.chrome.storage.local.get('a')).a===9,'promise-native read preserved');
+ const cb={browser:promiseChrome,console,Promise,Proxy,WeakMap,Set};vm.createContext(cb);vm.runInContext(source,cb);ok((await cb.chrome.storage.local.get('a')).a===9,'browser-only namespace exposed to shared code');
+ const {faireFond}=require('../_fond-vm.cjs');
+ const fcore=faireFond({src:path.join(d,'background.js'),store:{__sansSession:true},retirer:['alarms','downloads','windows','runtime.onMessageExternal','scripting'],firefox:{compat:'delete globalThis.browser;\n'+source}});
+ const uid='11111111-2222-4333-8444-555555555555',app={origin:'https://vrm.center',url:'https://vrm.center/',tab:{id:3,url:'https://vrm.center/'}};
+ const q=await fcore.envoyer({from:'vmr-bridge',action:'adresse',msg:{type:'liaison',pour:uid}},app);
+ ok(q?.ok&&q.besoin===true&&/^[a-f0-9]{32}$/.test(q.nonce),'real packaged worker responds with a scoped bridge nonce');
+ const refuse=await fcore.envoyer({from:'vmr-bridge',action:'adresse',msg:{type:'liaison',pour:uid}},{origin:'https://vrm.center.evil.invalid',url:'https://vrm.center.evil.invalid/'});
+ ok(refuse?.ok===false&&refuse.code==='origine','a foreign page cannot link the packaged worker');
+ const token='x.'+Buffer.from(JSON.stringify({sub:uid,email:'fixture@example.test'})).toString('base64url')+'.y';
+ const nonceFaux=await fcore.envoyer({from:'vmr-bridge',action:'adresse',msg:{type:'session',nonce:'f'.repeat(32),session:{access_token:token,refresh_token:'fixture',user_id:uid}}},app);
+ ok(nonceFaux?.ok===false&&nonceFaux.code==='nonce','invalid nonce still refused');
+ const q2=await fcore.envoyer({from:'vmr-bridge',action:'adresse',msg:{type:'liaison',pour:uid}},app);
+ const adopte=await fcore.envoyer({from:'vmr-bridge',action:'adresse',msg:{type:'session',nonce:q2.nonce,session:{access_token:token,refresh_token:'fixture',user_id:uid}}},app);
+ ok(adopte?.ok&&fcore.store.vrmSession?.user_id===uid,'the real worker adopts only the addressed authenticated owner');
+ const rejoue=await fcore.envoyer({from:'vmr-bridge',action:'adresse',msg:{type:'session',nonce:q2.nonce,session:{access_token:token,refresh_token:'fixture',user_id:uid}}},app);
+ ok(rejoue?.ok===false,'the same bridge nonce cannot be replayed');
+ console.log(n+' contrôles du paquet Orion et des API réussis (aucun Orion/iOS réel exécuté)');
+}finally{fs.rmSync(tmp,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});
