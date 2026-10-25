@@ -11,7 +11,7 @@ Documentation officielle Kagi via le dépôt kagisearch/kagi-docs : docs/orion/b
 - public/VRM-Orion.xpi : archive WebExtension, manifest.json à la racine.
 - public/VRM-Orion.zip : copie identique, autre suffixe pour le sélecteur Orion.
 - public/VRM-Orion-installation.txt : étapes iPhone/iPad, permissions par site, vérification du bon compte et limites réelles.
-- scripts/zip-extension.cjs --orion <fichier> : construction reproductible depuis vinted-sync-extension.
+- scripts/zip-extension.cjs : les fichiers Orion publics et la version de la notice sont régénérés avec le paquet Chrome. --orion <fichier> exporte vers un autre chemin. Les mises à jour du moteur ne doivent donc pas laisser un paquet Orion ancien.
 
 Le moteur partagé reste 5.222.0 : aucun changement de logique métier ni nouvelle promesse pour les favoris. Le paquet Chrome reste identique. Le manifeste Orion est MV2 avec background.scripts non persistant, browser_action et permissions d'hôtes au format classique. Le service worker, externally_connectable et la contrainte Firefox strict_min_version sont retirés. Le pont de page adressé reste la voie de liaison, avec contrôles d'origine, owner et nonce identiques.
 

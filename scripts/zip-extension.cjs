@@ -30,7 +30,8 @@ const firefox = iFx >= 0 ? path.resolve(args[iFx + 1] || '') : '';
 const iSa = args.indexOf('--safari');
 const safari = iSa >= 0 ? path.resolve(args[iSa + 1] || '') : '';
 const iOrion=args.indexOf('--orion');
-const orion=iOrion>=0?path.resolve(args[iOrion+1]||''):'';
+const orionPublic=path.join(racine,'public','VRM-Orion.xpi');
+const orion=iOrion>=0?path.resolve(args[iOrion+1]||''):orionPublic;
 const COMPAT = 'compat-firefox.js';
 
 // ── LE MANIFESTE FIREFOX (Firefox 128+, ordinateur et Android) ─────────────
@@ -171,6 +172,11 @@ try {
     fs.writeFileSync(path.join(o,'manifest.json'),JSON.stringify(manifesteOrion(m),null,2)+'\n');
     const ph=path.join(o,'popup.html');fs.writeFileSync(ph,fs.readFileSync(ph,'utf8').replace(/<script\b/i,'<script src="compat-orion.js"></script>\n<script'));
     fs.rmSync(orion,{force:true});execFileSync('zip',['-qrX',orion,...fs.readdirSync(o)],{cwd:o});
+    if(orion===orionPublic){
+      fs.copyFileSync(orion,path.join(racine,'public','VRM-Orion.zip'));
+      const notice=path.join(racine,'public','VRM-Orion-installation.txt');
+      if(fs.existsSync(notice))fs.writeFileSync(notice,fs.readFileSync(notice,'utf8').replace(/^Version du moteur VRM : .*$/m,'Version du moteur VRM : '+m.version));
+    }
     console.log('✓',orion,'(Orion iPhone/iPad : archive WebExtension, manifest.json à la racine ; appareil réel à vérifier)');
   }
 
