@@ -20973,8 +20973,8 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
             {plat==='Vestiaire Collective'
               ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/></>
               : plat==='Leboncoin'
-              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à une paire — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
-              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes paires depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
+              ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
+              : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
           </div>
           {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
             <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
@@ -24693,7 +24693,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', marginBottom: 6 }}>
                 <div className="vrm-label" style={{ color: C.muted, marginBottom: 6 }}>
-                  {dedans.length} paire{dedans.length > 1 ? 's' : ''} dans ce meuble
+                  {dedans.length} article{dedans.length > 1 ? 's' : ''} dans ce meuble
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 6, maxHeight: 230, overflowY: 'auto' }}>
                   {dedans.map(p => (
@@ -24704,10 +24704,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                       <span style={{ flex: '1 1 90px', minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
                         <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {p.ambigu ? '⚠️ N° porté par plusieurs paires' : (p.title || '—')}
+                          {p.ambigu ? '⚠️ N° porté par plusieurs articles' : (p.title || '—')}
                         </span>
                       </span>
-                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cette paire du stock"
+                      <button type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
                         style={{ flexShrink: 0, border: `1px solid ${C.border}`, borderRadius: 9, background: 'transparent', color: C.muted, fontSize: 11.5, fontWeight: 600, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit' }}>Sortir</button>
                     </div>
                   ))}
@@ -24924,7 +24924,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   };
   const liberer = async (x) => {
     if (!sur) return;
-    if (!(await askConfirm({ title: `Libérer la case de la N°${x.numero} ?`, desc: `Elle n'est plus parmi tes paires en stock (vendue ou partie). Son numéro sort de « ${x.itemName} » — le numéro lui-même ne change pas.`, ok: 'Libérer la case', cancel: 'Annuler' }))) return;
+    if (!(await askConfirm({ title: `Libérer la case de la N°${x.numero} ?`, desc: `Il n'est plus parmi tes articles en stock (vendu ou parti). Son numéro sort de « ${x.itemName} » — le numéro lui-même ne change pas.`, ok: 'Libérer la case', cancel: 'Annuler' }))) return;
     const next = libererNumeroDuPlan(plan, x.itemId, x.numero);
     if (!next) { toast('Ce numéro n\'est plus dans cette case — rien n\'a été changé.'); return; }
     ecrire(next); toast(`Case libérée : N°${x.numero} sortie de ${x.itemName}.`);
@@ -24932,7 +24932,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
   const raisonPasSu = planLu === undefined ? 'Je relis le plan de ton stock…'
     : planLu === false ? "Le plan de ton stock n'a pas pu être relu (la base n'a pas répondu) : je ne propose rien tant que je ne l'ai pas — rouvre cet écran dans un instant."
-    : presents == null ? "Je ne sais pas encore quelles paires sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait une paire partie dans une case." : null;
+    : presents == null ? "Je ne sais pas encore quels articles sont chez toi : ouvre une fois l'écran Annonces sur cet appareil, puis reviens ici. D'ici là je ne propose rien — ranger d'après une liste devinée mettrait un article parti dans une case." : null;
   const btn = (primaire) => ({ border: primaire ? 'none' : `1px solid ${C.border}`, borderRadius: 8, background: primaire ? C.accent : 'transparent', color: primaire ? (C.onAccent || '#fff') : C.text, fontSize: 12.5, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', minHeight: 36 });
   const carte = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, boxShadow: C.shadow, padding: 14, minWidth: 0 };
   const titreBloc = (t, n) => <div className="vrm-label" style={{ color: C.muted, marginBottom: 10, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>{t}</span>{n != null ? <span style={{ color: C.text }}>{n}</span> : null}</div>;
@@ -24992,7 +24992,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                           : <span style={{ width: 40, height: 40, borderRadius: 8, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="box" size={18} style={{ color: C.muted, opacity: .6 }} /></span>}
                         <span style={{ flex: '1 1 auto', minWidth: 0 }}>
                           <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.text }}>N°{p.numero}</span>
-                          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'paire présente'}</span>
+                          <span style={{ display: 'block', fontSize: 11.5, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'article présent'}</span>
                         </span>
                         <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                           {prochaine && <button type="button" data-ranger-ici={p.numero} onClick={() => ranger(p.numero, prochaine.itemId, prochaine.key)} style={btn(true)}>Ranger ici</button>}
@@ -25007,7 +25007,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && aLiberer.length > 0 && (
             <div style={carte} data-rgt-liberer="">
               {titreBloc('À libérer', aLiberer.length)}
-              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'une paire qui n'est plus en stock (vendue ou partie). Libère-la quand la place est vide.</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>Ces cases portent le N° d'un article qui n'est plus en stock (vendu ou parti). Libère-la quand la place est vide.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(voirLiberer ? aLiberer : aLiberer.slice(0, 5)).map(x => (
                   <div key={x.itemId + x.key + x.numero} data-a-liberer={x.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: C.text }}>
@@ -25316,7 +25316,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {garageView==='grid' && (<>
       {placing && (
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 14px',borderRadius:10,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,position:'sticky',top:8,zIndex:20,boxShadow:'0 3px 12px rgba(0,0,0,0.18)'}}>
-          <span>📦 Range la paire <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
+          <span>📦 Range l'article <b>N°{placing}</b> — touche une boîte pour l'y mettre.</span>
           <button type="button" onClick={clearPlacing} style={{background:'transparent',border:`1px solid ${C.onAccent}`,borderRadius:8,color:C.onAccent,cursor:'pointer',fontSize:11,fontWeight:500,padding:'4px 11px',flexShrink:0}}>Annuler</button>
         </div>
       )}
@@ -25348,7 +25348,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           {numberedNotStored.length>0&&(
             <Card style={{padding:12,background:`${C.warn}11`,borderColor:`${C.warn}44`}}>
               <div style={{fontSize:11,color:C.warn,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>📦 À ranger ({numberedNotStored.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces paires ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Ces articles ont un numéro mais ne sont dans aucune boîte. <b>Touche-en une</b>, puis touche la boîte où tu la ranges.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
                 {numberedNotStored.map(n=>(
                   <button key={n} type="button" onClick={()=>{ setLocalPlace(n); try{window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});}catch(_){} }}
@@ -25360,7 +25360,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           {storedUnknown.length>0&&(
             <Card style={{padding:12,background:`${C.blue||C.accent}11`,borderColor:`${C.blue||C.accent}44`}}>
               <div style={{fontSize:11,color:C.blue||C.accent,fontWeight:500,marginBottom:6,textTransform:'uppercase',letterSpacing:1}}>❓ Au stock mais numéro inconnu ({storedUnknown.length})</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans paire numérotée correspondante (ancien numéro, faute de frappe, ou vendue).</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:6}}>Numéros présents au stock sans article numéroté correspondant (ancien numéro, faute de frappe, ou vendu).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:11}}>
                 {storedUnknown.map(n=>(<span key={n} onClick={()=>{setSearchInput(n);setGarageSearch(n);}} style={{background:C.bg,padding:'4px 10px',borderRadius:5,cursor:'pointer',color:C.text,border:`1px solid ${(C.blue||C.accent)}66`,fontWeight:500}}>#{n}</span>))}
               </div>
@@ -25421,7 +25421,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
         🗄️ <b>Ton stock est vide.</b> Clique une case pour y poser un numéro de boîte, ou va sur une annonce et utilise « Ranger » pour la placer d'un tap.
       </div>}
       {(blockMode||colorMode||addMode)&&<div style={{fontSize:11,color:C.muted}}>
-        {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des paires dans les cases vides.'}
+        {addMode&&'Toutes les cases sont visibles. Tu peux ajouter des articles dans les cases vides.'}
         {blockMode&&'Clique sur une case vide pour la bloquer/débloquer (zone non utilisable). '}
         {colorMode&&(activeColor?'Clique sur une case pour la colorier. Re-clique pour effacer la couleur.':'Sélectionne une couleur, ou ✕ pour effacer la couleur d\'une case.')}
       </div>}
@@ -25568,7 +25568,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
           toast('❌ Fichier invalide : pas de données détectées');
           return;
         }
-        if(await askConfirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} paires\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
+        if(await askConfirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} articles\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
           onImport(data);
         }
       }catch(err){
@@ -25602,7 +25602,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
           <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:8,padding:14}}>
             <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📤 Exporter</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
-              <b>{catalog.length}</b> paires · <b>{sales.length}</b> ventes
+              <b>{catalog.length}</b> articles ·<b>{sales.length}</b> ventes
             </div>
             <Btn small onClick={exportData} color={C.accent}>💾 Télécharger sauvegarde</Btn>
           </div>
@@ -25767,7 +25767,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         <div style={{marginBottom:16,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,fontSize:12.5,color:C.muted,lineHeight:1.5}}>
           Aucun numéro n'est encore posé dans le <b style={{color:C.text}}>Stock</b> : la comparaison
           avec cette liste ne dirait donc rien d'utile (elle signalerait les {stockVinted.length} numéros
-          d'un coup). Range tes paires dans le Stock, et les écarts apparaîtront ici.
+          d'un coup). Range tes articles dans le Stock, et les écarts apparaîtront ici.
         </div>
       )}
       {!garageVide && (enLignePasGarage.length>0||garagePasEnLigne.length>0)&&(
@@ -25795,7 +25795,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           {garagePasEnLigne.length>0&&(
             <div style={{padding:10,background:'rgba(0,119,130,0.08)',borderRadius:8}}>
               <div style={{fontSize:13,fontWeight:500,marginBottom:4}}>Au stock mais pas en ligne ({garagePasEnLigne.length})</div>
-              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces paires sont dans le stock mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces articles sont dans le stock mais pas dans ton stock Vinted (peut-être à mettre en ligne).</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {garagePasEnLigne.map(n=>(
                   <span key={n} style={{background:C.accent,color:C.onAccent,borderRadius:5,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
@@ -43316,7 +43316,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:600,color:C.text}}>Relier à une paire numérotée</div>
+                  <div style={{fontSize:15,fontWeight:600,color:C.text}}>Relier à un article numéroté</div>
                   <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{linkPickFor.modele||linkPickFor.article||'Bordereau'}{linkPickFor.taille?` · T${linkPickFor.taille}`:''}</div>
                 </div>
                 <button type="button" onClick={()=>setLinkPickFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
@@ -43325,7 +43325,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
               {already && <button type="button" onClick={()=>{ setBordLink(linkPickFor, null); setLinkPickFor(null); }} style={{border:`1px solid ${C.danger}66`,background:'transparent',color:C.danger,borderRadius:8,padding:'10px 12px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit',textAlign:'left'}}>✕ Retirer le lien actuel (N°{already.numero})</button>}
-              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucune paire hors ligne{q?' pour cette recherche':' disponible'}. Les paires encore en ligne ne sont pas proposées pour cette vente.</div>}
+              {list.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 12px'}}>Aucun article hors ligne{q?' pour cette recherche':' disponible'}. Les articles encore en ligne ne sont pas proposés pour cette vente.</div>}
               {list.map(e=>(
                 <button key={e.num} type="button" onClick={()=>{ setBordLink(linkPickFor, e.num); setLinkPickFor(null); }}
                   style={{display:'flex',gap:10,alignItems:'center',border:`1px solid ${already&&String(already.numero)===String(e.num)?C.accent:C.border}`,background:C.card,borderRadius:8,padding:'8px 10px',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
@@ -43377,7 +43377,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {s.pts.map(p=>(<g key={p.i}><circle cx={xs(p.i)} cy={ys(p.avg)} r="3.5" fill={C.accent}/><text x={xs(p.i)} y={ys(p.avg)-7} textAnchor="middle" fontSize="8.5" fontWeight="800" fill={C.text}>{Math.round(p.avg)}</text></g>))}
                 </svg>
               )}
-              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des paires <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleures paires).</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:8,lineHeight:1.5,padding:'0 4px'}}>Chaque point = prix de vente moyen des articles <b>{effBrand==='__ALL__'?'toutes marques':effBrand}</b> vendues ce mois-là. Une pente qui monte = tu vends plus cher (marché porteur ou meilleurs articles).</div>
             </div>
           </div>
         </div>
@@ -43403,8 +43403,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{textAlign:'center'}}>
             <div style={{marginBottom:6,color:C.muted,opacity:.5,display:'flex',justifyContent:'center'}}><Icon name="image" size={44}/></div>
             <CountUp value={w.nb} style={{fontSize:96,fontWeight:800,color:'#fff',letterSpacing:-3,lineHeight:1,display:'block'}}/>
-            <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>paires vendues</div>
-            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque paire, une petite victoire. 💪</div>
+            <div style={{fontSize:20,color:'#fff',fontWeight:600,marginTop:6}}>articles vendus</div>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.85)',marginTop:10}}>Chaque article, une petite victoire. 💪</div>
           </div>
         )});
         cards.push({ bg:'linear-gradient(160deg,#0a8f5b 0%,#3ad07f 100%)', body:(
@@ -43420,7 +43420,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:48,marginBottom:6}}>⭐</div>
             <div style={{fontSize:14,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
             <div style={{fontSize:52,fontWeight:800,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
-            <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> paires vendues</div>
+            <div style={{fontSize:16,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> articles vendus</div>
           </div>
         )});
         if(w.bestMonth) cards.push({ bg:'linear-gradient(160deg,#c2179c 0%,#7a3cff 100%)', body:(
@@ -43433,7 +43433,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         )});
         if(w.bestPair) cards.push({ bg:'linear-gradient(160deg,#b8860b 0%,#ffbf3d 100%)', body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Paire de l'année</div>
+            <div style={{fontSize:14,color:'rgba(0,0,0,0.55)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>👑 Article de l'année</div>
             <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(0,0,0,0.15)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 10px 30px rgba(0,0,0,0.3)'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:44}}>👑</span>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:22,fontWeight:800,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
@@ -43460,7 +43460,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:52,marginBottom:10}}>🚀</div>
             <div style={{fontSize:26,fontWeight:800,color:'#fff',letterSpacing:-0.5}}>{w.mode==='month'?'Quel mois, Julien !':'Quelle année, Julien !'}</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,margin:'18px 6px 0'}}>
-              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>paires vendues</div></div>
+              <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{w.nb}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>articles vendus</div></div>
               <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:24,fontWeight:800,color:'#fff'}}>{eur0(w.ca)}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>de CA</div></div>
               {w.topBrand && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.topBrand[0]}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>marque star</div></div>}
               {w.bestMonth && <div style={{background:'rgba(255,255,255,0.15)',borderRadius:10,padding:'12px 8px'}}><div style={{fontSize:18,fontWeight:800,color:'#fff'}}>{w.bestMonth.nom}</div><div style={{fontSize:11,color:'rgba(255,255,255,0.85)'}}>mois record</div></div>}
@@ -43621,7 +43621,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{width:36,height:4,borderRadius:8,background:C.border,margin:'0 auto 14px'}}/>
               <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Renuméroter à la suite</div>
               <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.45}}>
-                Tes numéros vont de 1 à <b style={{color:C.text}}>{maxBefore||'—'}</b> pour <b style={{color:C.text}}>{nTotal}</b> paire{nTotal>1?'s':''} en ligne.
+                Tes numéros vont de 1 à <b style={{color:C.text}}>{maxBefore||'—'}</b> pour <b style={{color:C.text}}>{nTotal}</b> article{nTotal>1?'s':''} en ligne.
                 {moves.length>0 ? <> Après, ils iront de 1 à <b style={{color:C.accent}}>{maxAfter}</b>, sans trou.</> : <> Ils sont déjà à la suite.</>}
               </div>
             </div>
@@ -43630,7 +43630,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',gap:8}}>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'11px 13px'}}>
                     <div style={{fontSize:22,fontWeight:600,color:C.accent,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>paire{moves.length>1?'s':''} à renuméroter</div>
+                    <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>article{moves.length>1?'s':''} à renuméroter</div>
                   </div>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:'11px 13px'}}>
                     <div style={{fontSize:22,fontWeight:600,color:C.text,lineHeight:1,letterSpacing:'-0.02em'}}>{nLocked}</div>
@@ -43638,7 +43638,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                 </div>
                 <div style={{fontSize:11,color:C.muted,marginTop:9,lineHeight:1.45}}>
-                  ⚠️ Si tu as déjà <b style={{color:C.text}}>écrit ces numéros sur tes boîtes</b>, il faudra les réécrire. Les paires rangées au garage et celles d'une vente en cours ne bougent pas.
+                  ⚠️ Si tu as déjà <b style={{color:C.text}}>écrit ces numéros sur tes boîtes</b>, il faudra les réécrire. Les articles rangés au garage et ceux d'une vente en cours ne bougent pas.
                 </div>
               </div>
             )}
@@ -43661,7 +43661,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
               <button type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-              {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} paire{moves.length>1?'s':''}</button>}
+              {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:10,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} article{moves.length>1?'s':''}</button>}
             </div>
           </div>
         </div>
@@ -43709,7 +43709,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return null;
         };
         const ou = (t) => t === 'annonce' ? 'en ligne' : t === 'vente' ? 'à envoyer'
-          : t === 'annulee' ? 'vente annulée — la paire est restée' : 'au garage';
+          : t === 'annulee' ? 'vente annulée — l\'article est resté' : 'au garage';
         return (
           <div onClick={()=>setInventOpen(false)} data-noswipe style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:120,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
             <FermeAuRetour fermer={()=>setInventOpen(false)}/>
@@ -43719,12 +43719,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button className="vrm-icon-control" type="button" onClick={()=>setInventOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer',display:'flex'}}><Icon name="close" size={18}/></button>
               </div>
               <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>
-                <b style={{color:C.text}}>{lignes.length} paire{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, la paire n'est pas là où l'app la croit.
+                <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, l'article n'est pas là où l'app le croit.
               </div>
               {conflits.size>0 && (
                 <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:10,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
-                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux paires</span>
-                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux paires portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux articles</span>
+                  <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux articles portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
               )}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,overflow:'hidden'}}>
@@ -43739,7 +43739,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </span>
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'block',fontSize:12.5,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
-                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux paires !':''}</span>
+                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux articles !':''}</span>
                       </span>
                     </div>
                   );
@@ -43747,7 +43747,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button type="button" onClick={()=>{
                 const txt = lignes.map(l=>`N°${l.num}\t${(l.p.map(x=>x.titre).filter(Boolean)[0]||'').replace(/\t/g,' ')}\t${l.p.map(x=>ou(x.type)).join(' + ')}`).join('\n');
-                try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} paires\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
+                try { navigator.clipboard.writeText(`Inventaire physique — ${lignes.length} articles\n\n${txt}`); toast('Liste copiée'); } catch(_) { toast('Copie impossible'); }
               }} style={{width:'100%',marginTop:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:10,padding:'11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier la liste (pour l'imprimer)</button>
             </div>
           </div>
@@ -43793,13 +43793,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
               {nothing && <div style={{fontSize:13,color:INV_STATUS.online.color,fontWeight:600,textAlign:'center',padding:'24px 0'}}>✓ Tout est cohérent, rien à signaler !</div>}
-              <Section icon="👻" color={C.danger} title="Paires perdues" desc="Numérotées mais ni en ligne, ni vendues, ni au garage → probablement égarées." items={ghosts} render={Row}/>
+              <Section icon="👻" color={C.danger} title="Articles perdus" desc="Numérotés mais ni en ligne, ni vendus, ni au garage → probablement égarés." items={ghosts} render={Row}/>
               <Section icon="📦" color={C.warn} title="Vendues mais encore au garage" desc="À sortir du garage : elles sont vendues mais toujours rangées." items={soldStored} render={Row}/>
               <Section icon="🏠" color={C.blue||C.accent} title="En ligne, pas encore rangées" desc="En vente mais introuvables au garage → range-les pour les retrouver vite." items={notStored} render={Row}/>
               {unknownAtGarage.length>0 && (
                 <div style={{marginBottom:4}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.muted}}>❓ Au garage, numéro inconnu ({unknownAtGarage.length})</div>
-                  <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucune paire numérotée ne correspond (ancien numéro / faute de frappe).</div>
+                  <div style={{fontSize:11,color:C.muted,margin:'2px 0 6px'}}>Rangés au garage mais aucun article numéroté ne correspond (ancien numéro / faute de frappe).</div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{unknownAtGarage.slice(0,80).map(t=><span key={t} style={{fontSize:12,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 9px'}}>N°{t}</span>)}</div>
                 </div>
               )}
@@ -43821,7 +43821,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'88vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les paires choisies → marge juste sur chacune.</div></div>
+                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:C.text}}>🧮 Répartir un lot</div><div style={{fontSize:12,color:C.muted}}>Prix d'un achat groupé ventilé sur les articles choisis → marge juste sur chacun.</div></div>
                 <button type="button" onClick={()=>setLotOpen(false)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
               </div>
               <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
@@ -43834,7 +43834,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button key={id} type="button" onClick={()=>setLotMode(id)} style={{border:`1px solid ${lotMode===id?C.accent:C.border}`,background:lotMode===id?C.accent:'transparent',color:lotMode===id?'#fff':C.text,borderRadius:8,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer'}}>{lb}</button>
                 ))}
               </div>
-              <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} paire{nSel>1?'s':''} sélectionnée{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
+              <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} article{nSel>1?'s':''} sélectionné{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
               <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Chercher une annonce (N°, titre, marque)…" style={{marginTop:8,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
@@ -43852,7 +43852,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })}
             </div>
             <div style={{flexShrink:0,padding:'12px 16px',borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center'}}>
-              <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les paires.'}</div>
+              <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les articles.'}</div>
               <button type="button" disabled={!(nSel>0&&total>0)} onClick={applyLot} style={{border:'none',borderRadius:10,padding:'11px 18px',background:(nSel>0&&total>0)?C.accent:C.border,color:'#fff',fontSize:15,fontWeight:600,cursor:(nSel>0&&total>0)?'pointer':'default',fontFamily:'inherit'}}>Appliquer</button>
             </div>
           </div>
@@ -43887,7 +43887,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const { it, e, num } = passportFor;
         const steps = buildPassport(it, e, num);
         const photo = (it && it.photo) || (e && e.photo) || null;
-        const title = (it && (it.title||it.brand)) || (e && e.title) || 'Paire';
+        const title = (it && (it.title||it.brand)) || (e && e.title) || 'Article';
         return (
         <div onClick={()=>setPassportFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1350,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPassportFor(null)}/>
@@ -43903,7 +43903,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setPassportFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'16px 18px'}}>
-              {steps.length===0 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Pas encore d'historique pour cette paire.</div> : (
+              {steps.length===0 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Pas encore d'historique pour cet article.</div> : (
                 <div style={{position:'relative',paddingLeft:8}}>
                   {steps.map((s,i)=>(
                     <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',position:'relative',paddingBottom:i<steps.length-1?16:0}}>
