@@ -40521,7 +40521,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'🔎', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} paire${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    {k:'fillbuy', icon:'💶', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
                     /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
                        va pas servir »). */
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -40762,7 +40762,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
-            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} paire(s) ont TOUTES leurs photos + une description captées — prêtes pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
             <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
@@ -40798,7 +40798,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {retoursSuivis.etat==='lu' && retoursSuivis.lignes.length > 0 && (
             <button type="button" data-retours-renvoi={retoursSuivis.lignes.length} onClick={()=>onNav&&onNav('cat_bord')}
               style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:8,marginBottom:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'8px 12px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} paire{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivies dans Colis</span>
+              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{retoursSuivis.lignes.length} article{retoursSuivis.lignes.length>1?'s':''} qui te revien{retoursSuivis.lignes.length>1?'nent':'t'} — suivis dans Colis</span>
               <span style={{fontSize:13,color:C.muted}}>›</span>
             </button>
           )}
@@ -40811,7 +40811,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div key={m.uid} style={{marginBottom:12,border:`1px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:10,padding:'11px 13px'}}>
             <div style={{fontSize:13,fontWeight:600,color:C.text}}>🙈 {accNameOf(m.acc)} ne renvoie plus aucune annonce</div>
             <div style={{fontSize:11.5,color:C.muted,marginTop:4,lineHeight:1.5}}>
-              {m.nb} paire{m.nb>1?'s':''} numérotée{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
+              {m.nb} article{m.nb>1?'s':''} numéroté{m.nb>1?'s':''} sur ce compte, et zéro annonce en ligne. C'est ce qui arrive quand <b>Vinted masque un compte</b> quelques jours. Tes numéros et tes prix d'achat sont conservés — ils reviendront tels quels. Rien à faire, sauf si le compte est fermé pour de bon : dans ce cas masque-le (puce du compte plus bas) ou déconnecte-le dans Paramètres.
             </div>
           </div>
         ))}
@@ -40890,7 +40890,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:8,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
-              😴 {annStats.sleeping} paire{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+              😴 {annStats.sleeping} article{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
               {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
             </div>
           )}
@@ -40907,7 +40907,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setShowReprice(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'11px 13px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                 <span style={{fontSize:20}}>🏷️</span>
                 <span style={{flex:1,minWidth:0}}>
-                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} paire{repriceList.length>1?'s':''} à baisser</span>
+                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>Repricing — {repriceList.length} article{repriceList.length>1?'s':''} à baisser</span>
                   <span style={{display:'block',fontSize:11,color:C.muted,fontWeight:500}}>Très vues sans acheteur ou qui dorment · jamais sous ton prix d'achat</span>
                 </span>
                 <span style={{fontSize:13,color:C.muted}}>{showReprice?'▲':'▼'}</span>
@@ -41152,7 +41152,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-ann-overview" style={{display:'flex',gap:10,padding:10}}>
                   <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{flexShrink:0,width:88,height:118,borderRadius:8,overflow:'hidden',background:C.bg,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
-                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:10,fontWeight:600,color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
+                    {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:4,right:4,bottom:4,textAlign:'center',fontSize:9,fontWeight:600,letterSpacing:'-0.2px',whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 0'}}>Boostée</span>}
                   </a>
                   <div className="vrm-ann-ledger-info" style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
