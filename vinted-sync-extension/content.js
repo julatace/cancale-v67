@@ -136,6 +136,9 @@
     const m=event.data;if(event.source!==window||m?.__tag!=='CANCALE_VINTED_FAVORI_REP')return;
     const f=attentesFavoris.get(m.id);if(f){attentesFavoris.delete(m.id);f(m);}
   });
+  function inspectionFavoriSure(v){
+ const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
+}
   function traiterFavoriPage(m,sender,sendResponse){
     if(m?.vrm!=='favoriPage'||window.top!==window)return false;
     if(sender?.id&&sender.id!==chrome.runtime.id)return false;
@@ -147,7 +150,7 @@
       clearTimeout(timer);if(r.origine!==location.origin)return sendResponse(null);
       const v=r.resultat;
       if(m.action.startsWith('cloche_')){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{etat:v.etat}});}
-      else {if(!v||typeof v.trouve!=='boolean')return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{trouve:v.trouve}});}
+      else {if(!v||typeof v.trouve!=='boolean')return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{trouve:v.trouve,...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})}});}
     });
     try{window.postMessage({__tag:'CANCALE_VINTED_FAVORI_REQ',id:m.id,action:m.action,cible:m.cible},location.origin);}catch{clearTimeout(timer);attentesFavoris.delete(m.id);sendResponse(null);}
     return true;

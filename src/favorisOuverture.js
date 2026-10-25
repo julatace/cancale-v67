@@ -1,3 +1,6 @@
+export function inspectionFavoriSure(v){
+ const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
+}
 // Only controlled categories are copied. Never include raw errors, account IDs,
 // links, tokens or notification contents in a shared diagnostic.
 export function controleOuvertureFavori(r){
@@ -16,11 +19,11 @@ export function controleOuvertureFavori(r){
   ['verification_en_cours',/vérification des extensions est encore en cours/],
   ['ouverture_refusee',/L’ouverture dans Vinted n’a pas abouti/],
  ];
- const codes=['cloche_introuvable','cloche_indisponible','favori_non_trouve','favoris_relais_indisponible','favoris_relais_sans_reponse','favoris_relais_origine','favoris_relais_invalide'];
+ const codes=['cloche_introuvable','cloche_indisponible','favori_non_trouve','favori_lien_ambigu','favoris_relais_indisponible','favoris_relais_sans_reponse','favoris_relais_origine','favoris_relais_invalide'];
  const code=codes.includes(r?.data?.code)?r.data.code:motifs.find(([,re])=>re.test(texte))?.[0]||(['vinted-pause','vinted-absent','vinted-autre','origine'].includes(r?.code)?r.code:r?.ok?'':'refus_non_classe');
  return {diagnostic:'VRM-favoris-controle-v1',extension:/^\d+\.\d+\.\d+$/.test(version||'')?version:'non_confirmee',ouvert:r?.ok===true&&r?.data?.ouvert===true,preuve,
   raison:['contexte_ou_format_incompatible','enregistrement_non_confirme','capture_pas_recue'].includes(r?.data?.raison)?r.data.raison:'',
-  etape:['connexion','version','commande','transport','exception'].includes(meta.etape)?meta.etape:'retour_extension',code};
+  etape:['connexion','version','commande','transport','exception'].includes(meta.etape)?meta.etape:'retour_extension',code,...(r?.data?.inspection?{inspection:inspectionFavoriSure(r.data.inspection)}:{})};
 }
 
 export function echecVerificationFavori(r){
@@ -38,8 +41,9 @@ export function rapportAssistanceFavoris(rapport,controle,lancement){
   ouvert:controle.ouvert===true,
   preuve:['confirmee','non_confirmee','en_attente','ouverture_non_confirmee'].includes(controle.preuve)?controle.preuve:'ouverture_non_confirmee',
   etape:['connexion','version','commande','transport','exception','retour_extension'].includes(controle.etape)?controle.etape:'non_confirmee',
-  code:['cloche_introuvable','cloche_indisponible','favori_non_trouve','favoris_relais_indisponible','favoris_relais_sans_reponse','favoris_relais_origine','favoris_relais_invalide','notifications_non_affichees','extension_a_actualiser','compte_vrm_different','compte_vinted_different','compte_vinted_absent','capture_indisponible','lien_incompatible','extension_sans_reponse','verification_en_cours','ouverture_refusee','vinted-pause','vinted-absent','vinted-autre','origine','refus_non_classe'].includes(controle.code)?controle.code:'',
-  raison:['contexte_ou_format_incompatible','enregistrement_non_confirme','capture_pas_recue'].includes(controle.raison)?controle.raison:''
+  code:['cloche_introuvable','cloche_indisponible','favori_non_trouve','favori_lien_ambigu','favoris_relais_indisponible','favoris_relais_sans_reponse','favoris_relais_origine','favoris_relais_invalide','notifications_non_affichees','extension_a_actualiser','compte_vrm_different','compte_vinted_different','compte_vinted_absent','capture_indisponible','lien_incompatible','extension_sans_reponse','verification_en_cours','ouverture_refusee','vinted-pause','vinted-absent','vinted-autre','origine','refus_non_classe'].includes(controle.code)?controle.code:'',
+  raison:['contexte_ou_format_incompatible','enregistrement_non_confirme','capture_pas_recue'].includes(controle.raison)?controle.raison:'',
+  ...(controle.inspection?{inspection:inspectionFavoriSure(controle.inspection)}:{})
  }:{etat:'aucune_verification_dans_cette_vue'};
  const sortie={...rapport,verification};
  if(lancement){
@@ -54,6 +58,7 @@ export function bilanOuvertureFavori(controle){
  const version=/^\d+\.\d+\.\d+$/.test(controle.extension||'')?'Extension '+controle.extension+' · ':'';
  if(controle.preuve==='confirmee')return version+'Lien avec le destinataire enregistré. Cette vérification n’envoie aucun message.';
  if(controle.code==='cloche_introuvable'||controle.code==='cloche_indisponible')return version+'Blocage : la cloche Vinted n’a pas pu être reconnue ou activée.';
+ if(controle.code==='favori_lien_ambigu')return version+'Blocage : plusieurs liens visibles correspondent au favori. Aucun clic ambigu effectué.';
  if(controle.code==='favori_non_trouve'||controle.code==='notifications_non_affichees')return version+'Blocage : le favori n’a pas été retrouvé dans la liste affichée sur Vinted.';
  if(/^favoris_relais_/.test(controle.code||'')||controle.code==='extension_sans_reponse')return version+'Blocage : la commande à la page Vinted n’a pas été confirmée.';
  if(controle.raison==='enregistrement_non_confirme')return version+'Blocage : l’enregistrement du lien dans VRM n’est pas confirmé.';

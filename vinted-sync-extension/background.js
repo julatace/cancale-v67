@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.224.0';
+const CODE_VERSION = '5.225.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1712,10 +1712,20 @@ function pageFavoriNative(v,domain='www.vinted.fr'){
 function suivreFavoriAffiche(cible,activer=false){
  const normaliser=v=>{try{const u=new URL(v,location.href);if(u.origin!==location.origin)return null;u.hash='';u.searchParams.sort();return u.href;}catch{return null;}};
  const attendu=normaliser(cible);if(!attendu)return {trouve:false};
- const liens=[...document.querySelectorAll('a[href]')].filter(a=>normaliser(a.href)===attendu&&a.getClientRects().length&&getComputedStyle(a).visibility!=='hidden'&&getComputedStyle(a).display!=='none');
- if(liens.length!==1)return {trouve:false};
- if(activer){liens[0].scrollIntoView({block:'center'});liens[0].click();}
- return {trouve:true};
+ const item=v=>{try{return /^\/items\/([1-9]\d{0,19})\/[a-z_-]{1,40}\/new\/?$/.exec(new URL(v).pathname)?.[1]||'';}catch{return '';}};
+ const rectVisible=e=>[...e.getClientRects()].some(r=>r.width>0&&r.height>0);
+ const visible=a=>{
+  if(a.closest('[inert],[aria-hidden="true"]')||getComputedStyle(a).visibility==='hidden'||getComputedStyle(a).display==='none')return false;
+  // display:contents anchors have no own rectangle although their content is
+  // visible and clickable. Do not reject their native links for this reason.
+  return rectVisible(a)||(getComputedStyle(a).display==='contents'&&[...a.querySelectorAll('*')].some(e=>getComputedStyle(e).visibility!=='hidden'&&rectVisible(e)));
+ };
+ const tous=[...document.querySelectorAll('a[href]')].slice(0,10000).map(a=>({a,url:normaliser(a.href)}));
+ const exacts=tous.filter(x=>x.url===attendu),liens=exacts.filter(x=>visible(x.a));
+ const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===item(attendu)).length,exacts:exacts.length,visibles:liens.length};
+ if(liens.length!==1)return {trouve:false,inspection};
+ if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
+ return {trouve:true,inspection};
 }
 // Semantic native controls only. No guessed CSS class, router or API call.
 function clocheFavorisNative(activer=false,origine){
@@ -1771,9 +1781,12 @@ async function naviguerFavoriDansPage(tabId,action,cible){
    if(r.id!==id||r.origine!==origine)return finir(null,'favoris_relais_origine');
    const v=r.resultat;
    if(cloche){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return finir(null,'favoris_relais_invalide');finir({etat:v.etat});}
-   else {if(!v||typeof v.trouve!=='boolean')return finir(null,'favoris_relais_invalide');finir({trouve:v.trouve});}
+   else {if(!v||typeof v.trouve!=='boolean')return finir(null,'favoris_relais_invalide');finir({trouve:v.trouve,...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})});}
   });}catch{finir(null,'favoris_relais_indisponible');}
  });
+}
+function inspectionFavoriSure(v){
+ const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
 }
 function refusRelaisFavori(e,refus){
  const code=String(e?.message||'');
@@ -1783,7 +1796,7 @@ function refusRelaisFavori(e,refus){
 }
 async function ouvrirFavoriNatif(uid,acc,body){
  const s=await authToken(),owner=s?.user_id;
- const refus=(message,code)=>({ok:false,status:409,json:{message,version:CODE_VERSION,...(code?{code}:{})}});
+ const refus=(message,code,inspection)=>({ok:false,status:409,json:{message,version:CODE_VERSION,...(code?{code}:{}),...(inspection?{inspection:inspectionFavoriSure(inspection)}:{})}});
  if(!owner||body?.owner!==owner||typeof body?.notificationId!=='string'||!body.notificationId||body.notificationId.length>160)return refus('Le compte VRM de l’ouverture n’est pas confirmé.');
  const a=await archiveNotifications(uid,{lecture:true,ownerAttendu:owner});if(!a)return refus('L’historique ne peut pas être lu. Aucun onglet ouvert.');
  if(a.data&&(a.data.archiveVersion!==1||String(a.data.uid)!==String(uid)||!Array.isArray(a.data.payload?.notifications)))return refus('L’historique ne confirme pas ce compte.');
@@ -1821,7 +1834,10 @@ async function ouvrirFavoriNatif(uid,acc,body){
     if(present?.[0]?.result?.trouve===true)break;
     await new Promise(r=>setTimeout(r,200));
    }
-   if(present?.[0]?.result?.trouve!==true)return refus('Après l’activation de la cloche, ce favori n’a pas été retrouvé dans sa liste. Aucun autre destinataire n’a été choisi et aucun message n’a été envoyé.','favori_non_trouve');
+   if(present?.[0]?.result?.trouve!==true){
+    const inspection=present?.[0]?.result?.inspection;
+    return refus(inspection?.visibles>1?'Plusieurs liens visibles correspondent exactement à ce favori. La vérification est arrêtée sans choisir à ta place. Aucun message envoyé.':'La notification peut être affichée, mais son lien exact n’a pas été reconnu. Aucun autre destinataire n’a été choisi et aucun message envoyé.',inspection?.visibles>1?'favori_lien_ambigu':'favori_non_trouve',inspection);
+   }
   }
   await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now()}});
   if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
