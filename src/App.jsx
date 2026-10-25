@@ -9050,7 +9050,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     const liste = doute.slice(0, 4).map((f) => `N°${f.numero} · ${f.title || 'un article'}`).join('\n');
     return await askConfirm({
       title: doute.length > 1 ? `${doute.length} numéros pas encore vérifiés` : `Le N°${doute[0].numero} n'est pas encore vérifié`,
-      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner un autre article. Tamponné sur le bordereau, c'est la mauvaise chaussure dans le colis.\n\nRegarde l'étiquette de l'article avant d'imprimer.`,
+      desc: `${liste}\n\nCe numéro a été redonné pendant la panne de synchronisation (11-18 octobre) : il peut désigner un autre article. Tamponné sur le bordereau, c'est le mauvais article dans le colis.\n\nRegarde l'étiquette de l'article avant d'imprimer.`,
       ok: 'J\'ai vérifié, imprimer', cancel: 'Annuler',
     });
   } catch (_) { return true; }
@@ -23699,7 +23699,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       setSel(id); return;
     }
     if (type === 'autre') {
-      const n = (await askText({ desc: 'Nom de ton meuble (ex : Armoire, Bac à chaussures) :', value: '' }) || '').trim();
+      const n = (await askText({ desc: 'Nom de ton meuble (ex : Armoire, Étagère) :', value: '' }) || '').trim();
       if (n) name = n;
       const e = (await askText({ desc: 'Un emoji pour le représenter (facultatif) :', value: '🪑' }) || '').trim();
       if (e) emoji = e;
@@ -32913,7 +32913,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const peutEtre = presents.every(p => p.aConfirmer);
       const prendre = await askConfirm({
         title: peutEtre ? `Le N°${n} est peut-être encore pris` : `Le N°${n} est déjà pris`,
-        desc: `${peutEtre ? 'Un article le porte peut-être encore' : 'Un article le porte encore'} :\n${qui}\n\nDeux articles avec le même numéro, c'est la mauvaise chaussure au moment d'expédier.`,
+        desc: `${peutEtre ? 'Un article le porte peut-être encore' : 'Un article le porte encore'} :\n${qui}\n\nDeux articles avec le même numéro, c'est le mauvais article au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
@@ -41843,7 +41843,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:7,fontSize:14,fontWeight:700,color:C.danger}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux articles
             </div>
-            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux articles portent le même numéro : au moment d'expédier, c'est la mauvaise chaussure qui part. Corrige le numéro de l'une des deux avant d'envoyer.</div>
+            <div style={{fontSize:11.5,color:C.text,marginTop:3,lineHeight:1.45}}>Deux articles portent le même numéro : au moment d'expédier, c'est le mauvais article qui part. Corrige le numéro de l'un des deux avant d'envoyer.</div>
             {conflitsNum.slice(0,6).map(c=>{
               // Laquelle a reçu ce numéro par ERREUR ? Une annonce numérotée
               // automatiquement pendant la panne (`ficheAVerifier`), face à un
