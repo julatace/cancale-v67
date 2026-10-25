@@ -16,7 +16,8 @@ export function controleOuvertureFavori(r){
   ['verification_en_cours',/vérification des extensions est encore en cours/],
   ['ouverture_refusee',/L’ouverture dans Vinted n’a pas abouti/],
  ];
- const code=motifs.find(([,re])=>re.test(texte))?.[0]||(['vinted-pause','vinted-absent','vinted-autre','origine'].includes(r?.code)?r.code:r?.ok?'':'refus_non_classe');
+ const codes=['cloche_introuvable','cloche_indisponible','favori_non_trouve'];
+ const code=codes.includes(r?.data?.code)?r.data.code:motifs.find(([,re])=>re.test(texte))?.[0]||(['vinted-pause','vinted-absent','vinted-autre','origine'].includes(r?.code)?r.code:r?.ok?'':'refus_non_classe');
  return {diagnostic:'VRM-favoris-controle-v1',extension:/^\d+\.\d+\.\d+$/.test(version||'')?version:'non_confirmee',ouvert:r?.ok===true&&r?.data?.ouvert===true,preuve,
   raison:['contexte_ou_format_incompatible','enregistrement_non_confirme','capture_pas_recue'].includes(r?.data?.raison)?r.data.raison:'',
   etape:['connexion','version','commande','transport','exception'].includes(meta.etape)?meta.etape:'retour_extension',code};

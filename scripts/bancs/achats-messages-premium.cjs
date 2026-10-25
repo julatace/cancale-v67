@@ -47,13 +47,16 @@ const TRACK = { status: 'available', statusLabel: 'Arrivé au point de retrait',
 
 const conv = (id, login, desc, unread, h, acc) => ({ id, unread, updated_at: ilYa(0, h), description: desc, opposite_user: { id: 5000 + id, login }, item_photos: id % 2 ? [ph()] : [] });
 const msg = (uid, body, h) => ({ entity_type: 'message', entity: { user_id: uid, body, created_at_ts: ilYa(0, h) }, created_at_ts: ilYa(0, h) });
-const FIL = { id: 301, opposite_user: { id: 5301, login: 'margaux_lp' }, transaction: { id: 9901, item_id: 4301 }, description: 'Nike Air Max 90 blanche taille 43', allow_reply: true,
+const FIL = { id: 301, opposite_user: { id: 5301, login: 'margaux_lp' }, transaction: { id: 9901, item_id: 4301,item_title:'Nike Air Max 90 blanche taille 43' }, description: 'Nike Air Max 90 blanche taille 43', allow_reply: true,
   messages: [
     msg(5301, 'Bonjour ! Elle est toujours disponible ? Est-ce que la semelle est en bon état ?', 30),
     msg(Number(UID), 'Bonjour, oui toujours dispo 🙂 La semelle est en très bon état, portée 3 ou 4 fois.', 29),
     msg(5301, 'Super. Vous feriez 45 € ?', 5),
-    { entity_type: 'offer_request_message', entity: { user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0' }, transaction_id: 9901, offer_request_id: 77 } },
+    { entity_type:'offer_request_message',created_at_ts:ilYa(0,6),entity:{user_id:Number(UID),current:false,status:20,status_title:'Offre précédente',price:{amount:'50.00',currency_code:'EUR'}} },
+    { entity_type: 'offer_request_message',created_at_ts:ilYa(0,4.5), entity: { user_id: 5301, current: true, status: 10, status_title: '', price: { amount: '45.0',currency_code:'EUR' }, transaction_id: 9901, offer_request_id: 77 } },
   ] };
+// Native message identities are stable across stored and refreshed copies.
+FIL.messages=FIL.messages.map((m,i)=>({...m,id:i+1,entity:{...m.entity,id:i+1}}));
 const ACCOUNTS = [
   { id: 1, vinted_user_id: UID, login: 'julatace35260', domain: 'www.vinted.fr', updated_at: ilYa(0) },
   { id: 2, vinted_user_id: UID2, login: 'tomj606', domain: 'www.vinted.fr', updated_at: ilYa(0) },
@@ -107,7 +110,7 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
   let version = '5.216.0';
-  window.majExtensionFavoris=()=>{version='5.221.0';post({__vmr:'ready',version});};
+  window.majExtensionFavoris=()=>{version='5.222.0';post({__vmr:'ready',version});};
   const post = (m) => window.postMessage({id:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',...m}, '*');
   Object.defineProperty(window.chrome,'runtime',{configurable:true,value:{sendMessage:(id,m,cb)=>{
     if(id!=='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')return cb(null);
@@ -267,7 +270,7 @@ const capturer = async (pg, nom, vp) => {
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('alert').filter({hasText:'5.221'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.222'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>window.controleOuverture=t}}));
           await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
@@ -304,7 +307,15 @@ const capturer = async (pg, nom, vp) => {
         await pg.screenshot({ path: path.join(SHOTS, `messages-fil-${vp.width}.png`) });
         dit(!f.tombe && !errs.length, `${T} le fil s’affiche sans erreur`, errs.join(' | ').slice(0, 160));
         dit(f.deb <= 1, `${T} aucun débordement horizontal (fil)`, `${f.deb} px`);
+        dit((await pg.locator('.vrm-chat-head-s').innerText()).includes('Nike Air Max 90 blanche taille 43'),`${T} l’en-tête montre l’article réel, pas le dernier message`);
         dit(!!f.offre, `${T} l’offre de l’acheteuse est montrée dans le fil`, String(f.offre));
+        dit(await pg.locator('.vrm-chat-offer-event[data-offer-side="recue"]').count()===1&&await pg.locator('.vrm-chat-offer-event[data-offer-side="envoyee"]').count()===1,`${T} historique : offres reçues et envoyées clairement distinguées`);
+        if(!tel){
+        dit(await pg.locator('.vrm-chat-negociation').getAttribute('open')===null,`${T} la contre-offre est repliée pour laisser la place aux messages`);
+        await pg.getByText('Proposer un autre prix',{exact:true}).click();
+        dit(await pg.getByRole('textbox',{name:"Prix de l'offre",exact:true}).isVisible(),`${T} proposer un autre prix ouvre le champ sans envoyer`);
+
+        }else dit(await pg.locator('.vrm-chat-prix').count()===0,`${T} sans extension : aucun formulaire de contre-offre inutilisable`);
         dit(!f.coupes.length, `${T} aucun montant coupé dans le fil`, f.coupes.join(' | '));
         if (tel) dit(!f.petits.length, `${T} aucune cible tactile < 44 px (fil)`, f.petits.slice(0, 8).join(' | '));
         await ctx.close();

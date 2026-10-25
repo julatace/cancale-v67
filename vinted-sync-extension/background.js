@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.221.0';
+const CODE_VERSION = '5.222.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1717,9 +1717,21 @@ function suivreFavoriAffiche(cible,activer=false){
  if(activer){liens[0].scrollIntoView({block:'center'});liens[0].click();}
  return {trouve:true};
 }
+// Semantic native controls only. No guessed CSS class, router or API call.
+function clocheFavorisNative(activer=false,origine){
+ if(location.origin!==origine)return {etat:'origine'};
+ const label=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+ const reconnu=v=>/^(?:(?:ouvrir|afficher|voir|open|show|view) (?:les |the )?)?notifications?(?: \([0-9]+\)| [0-9]+)?$/.test(label(v));
+ const boutons=[...document.querySelectorAll('button,[role="button"]')].filter(b=>b.getClientRects().length&&getComputedStyle(b).visibility!=='hidden'&&getComputedStyle(b).display!=='none'&&(reconnu(b.getAttribute('aria-label'))||reconnu(b.getAttribute('title'))));
+ if(boutons.length!==1)return {etat:boutons.length?'ambigue':'absente'};
+ const b=boutons[0];if(b.disabled||b.getAttribute('aria-disabled')==='true')return {etat:'indisponible'};
+ const ouverte=b.getAttribute('aria-expanded')==='true';
+ if(activer&&!ouverte)b.click();
+ return {etat:ouverte?'deja_ouverte':activer?'activee':'disponible'};
+}
 async function ouvrirFavoriNatif(uid,acc,body){
  const s=await authToken(),owner=s?.user_id;
- const refus=message=>({ok:false,status:409,json:{message}});
+ const refus=(message,code)=>({ok:false,status:409,json:{message,version:CODE_VERSION,...(code?{code}:{})}});
  if(!owner||body?.owner!==owner||typeof body?.notificationId!=='string'||!body.notificationId||body.notificationId.length>160)return refus('Le compte VRM de l’ouverture n’est pas confirmé.');
  const a=await archiveNotifications(uid,{lecture:true,ownerAttendu:owner});if(!a)return refus('L’historique ne peut pas être lu. Aucun onglet ouvert.');
  if(a.data&&(a.data.archiveVersion!==1||String(a.data.uid)!==String(uid)||!Array.isArray(a.data.payload?.notifications)))return refus('L’historique ne confirme pas ce compte.');
@@ -1732,15 +1744,34 @@ async function ouvrirFavoriNatif(uid,acc,body){
  let tab=null;
  try{
   const cible=new URL(liens[0].url);
-  const ouverts=await chrome.tabs.query({url:`${cible.origin}/*`});
-  for(const t of ouverts||[]){
+  const ouverts=await chrome.tabs.query({url:`${cible.origin}/*`});let avecCloche=null;
+  for(const t of (ouverts||[]).slice().sort((a,b)=>Number(!!b.active)-Number(!!a.active)||(b.lastAccessed||0)-(a.lastAccessed||0))){
    if(!Number.isInteger(t.id)||t.id<0)continue;
-   try{const r=await chrome.scripting.executeScript({target:{tabId:t.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});if(r?.[0]?.result?.trouve===true){tab=t;break;}}catch{}
+   try{
+    const r=await chrome.scripting.executeScript({target:{tabId:t.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});
+    if(r?.[0]?.result?.trouve===true){tab=t;break;}
+    if(!avecCloche){const cl=await chrome.scripting.executeScript({target:{tabId:t.id},world:'MAIN',func:clocheFavorisNative,args:[false,cible.origin]});if(['disponible','deja_ouverte'].includes(cl?.[0]?.result?.etat))avecCloche=t;}
+   }catch{}
   }
-  if(!tab)return refus('Ouvre les notifications sur Vinted dans ce profil Chrome, puis réessaie. Le favori doit être affiché dans la liste Vinted ; son lien ne peut pas être chargé directement. Aucun message envoyé.');
+  tab=tab||avecCloche;
+  if(!tab)return refus('La cloche Vinted n’a pas été reconnue dans les onglets ouverts. Ouvre Vinted connecté sur ce compte, puis réessaie. Aucun message envoyé.','cloche_introuvable');
+  await chrome.tabs.update(tab.id,{active:true});
+  if(Number.isInteger(tab.windowId)&&chrome.windows?.update)try{await chrome.windows.update(tab.windowId,{focused:true});}catch{}
+  if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
+  let present=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});
+  if(present?.[0]?.result?.trouve!==true){
+   const cl=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:clocheFavorisNative,args:[true,cible.origin]});
+   if(!['activee','deja_ouverte'].includes(cl?.[0]?.result?.etat))return refus('La cloche Vinted ne peut pas être ouverte automatiquement dans cet onglet. Aucun message envoyé.','cloche_indisponible');
+   for(let i=0;i<20;i++){
+    if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))return refus('Le compte connecté a changé. Aucun message envoyé.');
+    present=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,false]});
+    if(present?.[0]?.result?.trouve===true)break;
+    await new Promise(r=>setTimeout(r,200));
+   }
+   if(present?.[0]?.result?.trouve!==true)return refus('Après l’activation de la cloche, ce favori n’a pas été retrouvé dans sa liste. Aucun autre destinataire n’a été choisi et aucun message n’a été envoyé.','favori_non_trouve');
+  }
   await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now()}});
   if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
-  await chrome.tabs.update(tab.id,{active:true});
   const activation=await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:suivreFavoriAffiche,args:[liens[0].url,true]});
   if(activation?.[0]?.result?.trouve!==true)throw Error();
   for(let i=0;i<40;i++){

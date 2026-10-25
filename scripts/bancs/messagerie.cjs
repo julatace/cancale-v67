@@ -33,7 +33,7 @@
 //      même quand l'offre n'est pas le dernier message ; pas de pastille pour
 //      une offre acceptée, refusée ou expirée (statut 10 mais « Expirée »), ni
 //      quand la lecture des offres échoue (pas su) ; le filtre « Offres ».
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -214,7 +214,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH||'/usr/bin/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const tel of [false, true]) {
       console.log(`── extension à jour (5.135) · ${tel ? '390 px' : '1512 px'}`);
       const r = await rendre(b, { version: '5.135.0', tel });
@@ -283,6 +283,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const acc = r.execs.find((x) => x.method === 'PUT');
       dit(acc && acc.endpoint === '/api/v2/transactions/9001/offer_requests/77/accept' && acc.uid === '111', 'puis envoie EXACTEMENT l’acceptation de CETTE offre, au nom de SON compte', JSON.stringify(acc));
       // 3. faire une offre
+      await r.pg.getByText('Proposer un autre prix',{exact:true}).click();
       await r.pg.fill('input[aria-label="Prix de l\'offre"]', '50');
       await r.pg.getByRole('button', { name: 'Envoyer l\'offre' }).click();
       await r.pg.waitForTimeout(900);
