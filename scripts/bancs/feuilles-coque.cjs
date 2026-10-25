@@ -350,7 +350,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     { nom: 'Annonces · Audit du stock', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Audit du stock') },
     { nom: "Annonces · Compléter les prix d'achat", tab: 'plat_vinted', section: 'Annonces', etapes: outil("Compléter les prix d'achat") },
     { nom: 'Annonces · Studio photo', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Studio photo') },
-    { nom: 'Annonces · Passeport de la paire', tab: 'plat_vinted', section: 'Annonces', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer l’annonce")', 700); await clic(pg, 'button:has-text("Passeport de la paire")'); } },
+    { nom: 'Annonces · Passeport de l’article', tab: 'plat_vinted', section: 'Annonces', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer l’annonce")', 700); await clic(pg, 'button:has-text("Passeport de l’article")'); } },
     { nom: 'Ventes · Rapport comptable', tab: 'plat_vinted', section: 'Ventes', etapes: outilVentes('Rapport comptable') },
     { nom: 'Ventes · Registre annuel', tab: 'plat_vinted', section: 'Ventes', etapes: outilVentes('Registre annuel') },
     { nom: 'Ventes · Paires du lot', tab: 'plat_vinted', section: 'Ventes', cible: 'Paires du lot', etapes: ouvrirLotDuTiroir },
