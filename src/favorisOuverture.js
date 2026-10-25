@@ -29,3 +29,34 @@ export function echecVerificationFavori(r){
  if(r.data.raison==='enregistrement_non_confirme')return 'Le lien observé sur Vinted n’a pas pu être enregistré dans VRM. La vérification est arrêtée. Aucun message envoyé.';
  return 'La liaison entre ce favori et sa conversation n’a pas été confirmée. Aucun message envoyé.';
 }
+
+// The technical report and the opening result belong to the same React account
+// scope. Keep only controlled categories; never copy arbitrary extension data.
+export function rapportAssistanceFavoris(rapport,controle,lancement){
+ const verification=controle?{
+  extension:/^\d+\.\d+\.\d+$/.test(controle.extension||'')?controle.extension:'non_confirmee',
+  ouvert:controle.ouvert===true,
+  preuve:['confirmee','non_confirmee','en_attente','ouverture_non_confirmee'].includes(controle.preuve)?controle.preuve:'ouverture_non_confirmee',
+  etape:['connexion','version','commande','transport','exception','retour_extension'].includes(controle.etape)?controle.etape:'non_confirmee',
+  code:['cloche_introuvable','cloche_indisponible','favori_non_trouve','favoris_relais_indisponible','favoris_relais_sans_reponse','favoris_relais_origine','favoris_relais_invalide','notifications_non_affichees','extension_a_actualiser','compte_vrm_different','compte_vinted_different','compte_vinted_absent','capture_indisponible','lien_incompatible','extension_sans_reponse','verification_en_cours','ouverture_refusee','vinted-pause','vinted-absent','vinted-autre','origine','refus_non_classe'].includes(controle.code)?controle.code:'',
+  raison:['contexte_ou_format_incompatible','enregistrement_non_confirme','capture_pas_recue'].includes(controle.raison)?controle.raison:''
+ }:{etat:'aucune_verification_dans_cette_vue'};
+ const sortie={...rapport,verification};
+ if(lancement){
+  const diagnostic={};for(const k of ['notifications','tracesNatives','pairesNatives','formesUserId','liensExacts','parametresConfirmes','selection'])if(Number.isSafeInteger(lancement.diagnostic?.[k])&&lancement.diagnostic[k]>=0&&lancement.diagnostic[k]<=10000)diagnostic[k]=lancement.diagnostic[k];
+  sortie.lancement={code:['favoris_preuve_absente','favoris_identite_non_unique'].includes(lancement.code)?lancement.code:'non_precise',diagnostic};
+ }
+ return sortie;
+}
+
+export function bilanOuvertureFavori(controle){
+ if(!controle)return 'Aucune vérification d’ouverture dans cette vue. La capture des notifications ne prouve pas que leur destinataire est confirmé.';
+ const version=/^\d+\.\d+\.\d+$/.test(controle.extension||'')?'Extension '+controle.extension+' · ':'';
+ if(controle.preuve==='confirmee')return version+'Lien avec le destinataire enregistré. Cette vérification n’envoie aucun message.';
+ if(controle.code==='cloche_introuvable'||controle.code==='cloche_indisponible')return version+'Blocage : la cloche Vinted n’a pas pu être reconnue ou activée.';
+ if(controle.code==='favori_non_trouve'||controle.code==='notifications_non_affichees')return version+'Blocage : le favori n’a pas été retrouvé dans la liste affichée sur Vinted.';
+ if(/^favoris_relais_/.test(controle.code||'')||controle.code==='extension_sans_reponse')return version+'Blocage : la commande à la page Vinted n’a pas été confirmée.';
+ if(controle.raison==='enregistrement_non_confirme')return version+'Blocage : l’enregistrement du lien dans VRM n’est pas confirmé.';
+ if(controle.ouvert)return version+'Vinted a été activé ; le lien avec le destinataire reste non confirmé.';
+ return version+'L’ouverture du favori n’est pas confirmée. Aucun message envoyé.';
+}

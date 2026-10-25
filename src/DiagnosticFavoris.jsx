@@ -1,7 +1,8 @@
 import React from 'react';
 import {lireDiagnosticFavoris} from './diagnosticFavoris.js';
+import {rapportAssistanceFavoris,bilanOuvertureFavori} from './favorisOuverture.js';
 
-export default function DiagnosticFavoris({uid, owner, ownerActuel, base, headers}) {
+export default function DiagnosticFavoris({uid, owner, ownerActuel, base, headers, controle=null, controleEnvoi=null}) {
   const [etat, setEtat] = React.useState({});
   const requete = React.useRef(0);
   React.useEffect(() => { requete.current++; setEtat({}); return () => { requete.current++; }; }, [uid, owner]);
@@ -13,15 +14,18 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
       if (requete.current === numero && ownerActuel() === owner) setEtat({rapport});
     } catch (e) { if (requete.current === numero && ownerActuel() === owner) setEtat({erreur:e.message}); }
   };
+  const rapport=etat.rapport?rapportAssistanceFavoris(etat.rapport,controle,controleEnvoi):null;
+  const bilan=bilanOuvertureFavori(controle);
   const copier = async () => {
     const numero = requete.current;
     if (ownerActuel() !== owner) return;
-    try { await navigator.clipboard.writeText(JSON.stringify(etat.rapport,null,2)); if (requete.current === numero) setEtat(x=>({...x,retour:'Diagnostic copié.'})); }
+    try { await navigator.clipboard.writeText(JSON.stringify(rapport,null,2)); if (requete.current === numero) setEtat(x=>({...x,retour:'Diagnostic copié.'})); }
     catch { if (requete.current === numero) setEtat(x=>({...x,retour:'Copie indisponible : sélectionne le texte ci-dessous.'})); }
   };
   return <details className="vrm-favoris-diagnostic"><summary>Assistance technique · favoris</summary>
-    <p>Pour un blocage d’ouverture, utilise d’abord « Vérifier un favori » puis « Copier le contrôle » au-dessus de la liste. Ce diagnostic détaillé décrit les données captées ; il ne confirme pas un envoi.</p>
-    <p>Ce contrôle technique ne déclenche aucune action sur Vinted. Il contient uniquement les noms et types des champs, sans pseudo, message, lien ou identifiant personnel.</p>
+    <p role="status">{bilan}</p>
+    <p>Le rapport ci-dessous réunit la dernière vérification sur Vinted et la structure des données captées. Après « Vérifier un favori », copie ce rapport pour transmettre aussi le résultat de l’ouverture.</p>
+    <p>Ce contrôle technique ne déclenche aucune action sur Vinted. Il contient les noms et types des champs ainsi que des statuts techniques, sans pseudo, message, lien ou identifiant personnel.</p>
     {!uid&&<p>Choisis le compte Vinted à vérifier dans le sélecteur de compte.</p>}
     <button type="button" disabled={!uid||!owner||etat.occupe} onClick={verifier}>{etat.occupe?'Vérification…':'Vérifier la capture des notifications'}</button>
     {etat.erreur&&<p role="alert">{etat.erreur}</p>}
@@ -33,7 +37,7 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
       {etat.rapport.traces?.observations?.some(x=>x.statut===401||x.statut===403)&&<p>Une lecture des notifications a été refusée par Vinted. Vérifie que le bon compte est accessible sur Vinted avant de réessayer.</p>}
       {etat.rapport.traces?.observations?.some(x=>x.statut===429)&&<p>Vinted demande de ralentir. Attends avant de relancer la lecture.</p>}
       <button type="button" onClick={copier}>Copier le diagnostic</button>
-      <pre tabIndex="0" aria-label="Diagnostic technique des favoris">{JSON.stringify(etat.rapport,null,2)}</pre>
+      <pre tabIndex="0" aria-label="Diagnostic technique des favoris">{JSON.stringify(rapport,null,2)}</pre>
     </>}
     {etat.retour&&<p role="status">{etat.retour}</p>}
   </details>;
