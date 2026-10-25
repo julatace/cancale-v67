@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **25 octobre — extension 5.226 :** parcours manuel opt-in, onglet Vinted
+> unique, rapport local filtré, arrêt conversation/3min/100étapes ; commandes
+> Enregistrer/Arrêter/Copier/Effacer dans la fenêtre de l’icône. Aucun message
+> ni upload de rapport. Ne pas prétendre le favori réparé : outil d’observation.
+> Voir `docs/passation/2026-10-25-favoris-parcours-local.md`.
+
 > **25 octobre — favoris 5.225 :** cloche ouverte, notification visible,
 > `favori_non_trouve` réel. Cas `display:contents` reproduit et corrigé ; sonde
 > de quatre compteurs anonymes pour distinguer les autres causes, aucune
