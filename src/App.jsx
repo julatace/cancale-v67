@@ -21924,7 +21924,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         desc="Les articles de l'ancienne application. Ils comptent toujours dans les statistiques."
         right={<Btn small onClick={()=>{
           if(fullList.length===0){toast('Aucun article à exporter');return;}
-          const headers=['N° Paire','Prix Achat (€)','Statut','Date ajout'];
+          const headers=['N° Article','Prix Achat (€)','Statut','Date ajout'];
           const rows=fullList.map(p=>[p.id||'',String(p.buyPrice||'').replace('.',','),p.status||'',p.addedAt||'']);
           const csv='\ufeff'+[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
           const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
@@ -22184,7 +22184,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
           <Btn small onClick={()=>{
             if(fullFiltered.length===0){toast('Aucune vente à exporter');return;}
-            const headers=['ID','N° Paire','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
+            const headers=['ID','N° Article','Date vente','Date réception','Prix achat (€)','Prix vente (€)','Bénéfice (€)','Multi'];
             const rows=fullFiltered.map(s=>[
               s.id||'',s.productId||'',s.saleDate||'',s.receiveDate||'',
               String(s.buyPrice||'').replace('.',','),String(s.sellPrice||'').replace('.',','),
@@ -22548,7 +22548,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const inv=invoices.find(i=>i.id===id);
     const isAcc=inv&&accountedSet.has(String(inv.productId).trim());
     const msg=isAcc
-      ? `⚠️ La paire #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
+      ? `⚠️ L’article #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
       : 'Supprimer cette facture ?';
     if(!await askConfirm(msg)) return;
     const u=invoices.filter(i=>i.id!==id);
@@ -22572,7 +22572,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const exportExcel=()=>{
     if(fullList.length===0){toast('Aucune facture à exporter');return;}
     const multiEnt=Array.isArray(entreprises)&&entreprises.length>1;
-    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Paire','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
+    const headers=['N° Facture',...(multiEnt?['Entreprise','SIRET']:[]),'Date vente','N° Article','Désignation','Prix vente','Acheteur','Email','Adresse','N° Vinted','Statut'];
     const rows=fullList.map(i=>{
       const e=entForInvoice(i,entreprises,activeEnt,invoiceSettings);
       return [
@@ -22622,7 +22622,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           value={searchInput}
           onChange={e=>setSearchInput(e.target.value)}
           onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder="N° de paire ou date de vente... puis Entrée"
+          placeholder="N° d’article ou date de vente... puis Entrée"
           style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
             color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
         />
@@ -22692,7 +22692,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
           <thead>
             <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Paire</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.warn,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Article</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>N° Facture</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Date vente</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:500,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>Désignation</th>
@@ -22784,7 +22784,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   
   const submit=()=>{
     setErr('');
-    if(!data.productId.trim()){setErr('Le numéro de paire est obligatoire');return;}
+    if(!data.productId.trim()){setErr('Le numéro d’article est obligatoire');return;}
     if(!data.sellPrice||+data.sellPrice<=0){setErr('Prix de vente invalide');return;}
     if(!data.itemName.trim()){setErr('La désignation est obligatoire');return;}
     onSave(data);
@@ -22802,7 +22802,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
         <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accent}}>{nextNumber}</b></div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <Field label="N° paire (étiquetage) *">
+          <Field label="N° article (étiquetage) *">
             <Input type="number" value={data.productId} onChange={e=>{
               const id=e.target.value;
               const p=catalog.find(p=>p.id===id);
@@ -29822,7 +29822,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 </div>
               )}
               <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                Ce résultat ne déduit pas le prix d'achat de tes paires : ton bénéfice brut et net, qui le déduit, est juste en dessous.
+                Ce résultat ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est juste en dessous.
               </div>
             </div>
           )}
@@ -30053,8 +30053,8 @@ function RetoursEnCoursBloc({ res, nomCompte, plusieursComptes, onRecu, onRemett
             {!remise && l.recu && l.etape === 'rembourse' && <span>reçue chez toi</span>}
             {!remise && l.livreeSelonVinted && !l.recu && <span>{l.plateforme === 'ebay' ? 'eBay' : 'Vinted'} dit livrée — confirme quand tu l'as</span>}
             {l.origine === 'non-reclamee' && <span>non réclamée par l'acheteur</span>}
-            {!l.num && <span data-retour-sans-num>paire pas reliée à un N°</span>}
-            {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par une autre paire</span>}
+            {!l.num && <span data-retour-sans-num>article pas relié à un N°</span>}
+            {remise && l.remis && l.remis.num === null && l.num && <span>sans N° — le N°{l.num} est porté par un autre article</span>}
             {remise && l.remis && l.remis.archive && <span>ancien N° : numéro neuf à la republication</span>}
             {compte && <span>· {compte}</span>}
           </div>
