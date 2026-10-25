@@ -1,5 +1,12 @@
 # VRM — dossier de passation
 
+> **25 octobre — favoris 5.223 :** défaut reproduit sans scripting : le
+> parcours utilise désormais le relais adressé de la page, commandes fermées
+> sans envoi ni rejeu après clic incertain. Le contexte ne peut plus être
+> consommé par une requête d’un autre article ou écraser un autre clic natif.
+> Paquets Chrome/Orion synchronisés ; session réelle toujours non validée.
+> Voir `docs/passation/2026-10-25-favoris-relais-navigation.md`.
+
 > **25 octobre — Orion iPhone/iPad :** paquet d’import dédié MV2, fond non
 > persistant, compat API et chargeur de page. XPI + ZIP identiques et notice
 > dans public/. Aucun changement du moteur Chrome 5.222.

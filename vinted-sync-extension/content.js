@@ -123,11 +123,35 @@
   });
   try {
     chrome.runtime.onMessage.addListener((m, sender, sendResponse) => {
+      if(m?.vrm==='favoriPage')return traiterFavoriPage(m,sender,sendResponse);
       if (!m || m.vrm !== 'fetchPage') return false;
       demanderPage(m).then(sendResponse, () => sendResponse(null));
       return true;
     });
   } catch (_) {}
+
+  // Tab-addressed navigation only. Do not broadcast a click through storage.
+  const attentesFavoris=new Map();
+  window.addEventListener('message',event=>{
+    const m=event.data;if(event.source!==window||m?.__tag!=='CANCALE_VINTED_FAVORI_REP')return;
+    const f=attentesFavoris.get(m.id);if(f){attentesFavoris.delete(m.id);f(m);}
+  });
+  function traiterFavoriPage(m,sender,sendResponse){
+    if(m?.vrm!=='favoriPage'||window.top!==window)return false;
+    if(sender?.id&&sender.id!==chrome.runtime.id)return false;
+    if(!/^f[a-f0-9]{32}$/.test(String(m.id||''))||!['sonder','ouvrir','cloche_sonder','cloche_ouvrir'].includes(m.action))return false;
+    try{const u=new URL(m.cible);if(u.origin!==location.origin||u.protocol!=='https:'||!/^\/items\/[1-9]\d{0,19}\/[a-z_-]{1,40}\/new\/?$/.test(u.pathname)||! /^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname)||u.href.length>2000||u.username||u.password)return false;}catch{return false;}
+    if(attentesFavoris.has(m.id)||attentesFavoris.size)return false;
+    const timer=setTimeout(()=>{attentesFavoris.delete(m.id);sendResponse(null);},3000);
+    attentesFavoris.set(m.id,r=>{
+      clearTimeout(timer);if(r.origine!==location.origin)return sendResponse(null);
+      const v=r.resultat;
+      if(m.action.startsWith('cloche_')){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{etat:v.etat}});}
+      else {if(!v||typeof v.trouve!=='boolean')return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{trouve:v.trouve}});}
+    });
+    try{window.postMessage({__tag:'CANCALE_VINTED_FAVORI_REQ',id:m.id,action:m.action,cible:m.cible},location.origin);}catch{clearTimeout(timer);attentesFavoris.delete(m.id);sendResponse(null);}
+    return true;
+  }
   // La boîte aux lettres (navigateur sans `tabs.sendMessage`) : une demande
   // posée par le fond dans `chrome.storage.local`, prise par UN onglet Vinted.
   try {

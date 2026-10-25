@@ -66,7 +66,7 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  check(!(await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'inconnue'})).ok&&onglets.length===nombre,'notification inconnue : aucun onglet');
  const refuse=await f.ctx.executerPourApp({uid:'111',method:'POST',endpoint:'/vrm/favoris/ouvrir',body:{owner:'owner-A',notificationId:'n0'}},{origin:'https://evil.invalid'});check(!refuse.ok&&onglets.length===nombre,'l’opération interne reste fermée aux autres sites');
  navigation=async()=>{await f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:999,opposite_user_id:201}),null,99);};
- ouvert=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(ouvert.ok&&ouvert.json.preuve==='non_confirmee'&&ouvert.json.raison==='contexte_ou_format_incompatible','un autre article ne produit pas un faux reçu positif');
+ ouvert=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(ouvert.ok&&ouvert.json.preuve==='en_attente'&&ouvert.json.raison==='capture_pas_recue','un autre article ne consomme pas le contexte et ne produit pas un faux reçu positif');
  f.ctx.compteNonCapte=async()=>false;f.ctx.conversationFusionnee=async(id,p)=>p;f.ctx.sbGet=async()=>[];
  f.ctx.chrome.tabs.get=async()=>({id:99,url:'https://www.vinted.fr/inbox/900'});
  const fil={conversation:{id:900,transaction:{item_id:101},opposite_user:{id:201},messages:[{entity_type:'message',entity:{body:'message de démonstration'}}]}};
@@ -99,7 +99,7 @@ const notif=i=>({id:'n'+i,body:'Camille a ajouté ton article à ses favoris.',u
  const avantManquant=f.rows.get('harvest_111_favoris_archive').data.creations.length;
  f.ctx.chrome.scripting.executeScript=async o=>o.func.name==='clocheFavorisNative'?[{result:{etat:o.args[0]?'activee':'disponible'}}]:[{result:{trouve:false}}];
  const manquant=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});
- check(!manquant.ok&&manquant.json.code==='favori_non_trouve'&&manquant.json.version==='5.222.0','cloche activée sans lien exact : refus spécifique et version conservée');
+ check(!manquant.ok&&manquant.json.code==='favori_non_trouve'&&manquant.json.version==='5.223.0','cloche activée sans lien exact : refus spécifique et version conservée');
  check(f.rows.get('harvest_111_favoris_archive').data.creations.length===avantManquant,'un autre favori n’est jamais substitué à celui demandé');
  f.ctx.chrome.tabs.query=async()=>[];const absent=await f.ctx.ouvrirFavoriNatif('111',acc,{owner:'owner-A',notificationId:'n0'});check(!absent.ok&&absent.json.code==='cloche_introuvable'&&onglets.length===0,'lien absent : refus explicite sans route directe de secours');
  console.log(controles+' contrôles archive et pagination réussis');

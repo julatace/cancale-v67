@@ -24,6 +24,9 @@
   if(!o||typeof o!=='object')return o;
   if(cache.has(o))return cache.get(o);
   const p=new Proxy(o,{get(obj,k){
+   // This MV2 distribution does not request MV3 scripting permission.
+   // Use the existing page relay even if Orion exposes that namespace.
+   if(chemin===''&&k==='scripting')return undefined;
    if(chemin===''&&k==='action'&&!obj.action&&obj.browserAction)return envelopper(obj.browserAction,'action');
    const v=obj[k],nom=chemin?chemin+'.'+String(k):String(k);
    if(typeof v==='function')return function(...args){
