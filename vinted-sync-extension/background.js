@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.228.0';
+const CODE_VERSION = '5.229.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1862,6 +1862,43 @@ async function confirmerNavigationNative(tabId,uid,owner,domain,contexte,natif){
   const r=await lire();if(r?.etat==='attente'&&r.contexteFavori===contexte)await stockageFavorisOnglets().set({[cle]:{...r,etat:'erreur',raison:'navigation_non_confirmee'}});
  }finally{try{chrome.tabs.onUpdated.removeListener(ecoute);}catch{}}
 }
+// A trusted click by the seller on the bell's native row (receiver_id/item_id)
+// is also a proof, under the same identity rules as « Vérifier sur Vinted » :
+// one stored favorite whose article and single numeric parameter equal them,
+// then the tab must show that route. Counters only, no identifier stored.
+async function noterClicFavoriNatif(domain,url,tabId){
+ if(!Number.isInteger(tabId)||tabId<0||typeof url!=='string'||url.length>2000)return;
+ let u;try{u=new URL(url);}catch{return;}
+ if(u.protocol!=='https:'||u.username||u.password||!/^(?:www\.)?vinted\.(fr|com|it|de)$/.test(u.hostname))return;
+ const ks=[...u.searchParams.keys()].sort().join(','),num=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:'';
+ if(ks!=='item_id,receiver_id'||u.searchParams.getAll('item_id').length!==1||u.searchParams.getAll('receiver_id').length!==1)return;
+ const natif=natifFavoriSur({chemin:u.pathname.replace(/\/$/,'')||'/',itemId:num(u.searchParams.get('item_id')),receiverId:num(u.searchParams.get('receiver_id'))});
+ if(!natif||(!/^\/(?:inbox|conversations?|messages?)(?:\/[a-z_-]{1,40}){0,2}$/.test(natif.chemin)&&!new RegExp('^/items/'+natif.itemId+'/[a-z_-]{1,40}(?:/new)?$').test(natif.chemin)))return;
+ noterDiag('favori_clic_natif').catch(()=>{});
+ const s=await authToken(),owner=s?.user_id;if(!owner){noterDiag('favori_clic_sans_session').catch(()=>{});return;}
+ const uid=await compteConnecte(domain);if(!uid||await compteNonCapte(uid))return;
+ const a=await archiveNotifications(uid,{lecture:true,ownerAttendu:owner});
+ const raw=await sbGet(`app_data?id=eq.harvest_${uid}_notifications&owner=eq.${owner}&select=owner,data`);
+ if(!a||!Array.isArray(raw)){noterDiag('favori_clic_lecture_ratee').catch(()=>{});return;}
+ const ds=[a.data,...raw.filter(r=>r.owner===owner).map(r=>r.data)].filter(d=>d&&String(d.uid)===String(uid)&&Array.isArray(d.payload?.notifications));
+ const memeArticle=[],concordants=[];
+ for(const d of ds)for(const n of d.payload.notifications.slice(0,10000)){
+  if(typeof n?.id!=='string'||!/favori|favourit/i.test(String(n.body||'')))continue;
+  const p=pageFavoriNative(n.link,d.domain);if(!p||p.itemId!==natif.itemId)continue;
+  memeArticle.push(p.url);if(natifConcorde(natif,p))concordants.push({id:n.id,url:p.url});
+ }
+ const urls=[...new Set(concordants.map(x=>x.url))],ids=[...new Set(concordants.map(x=>x.id))];
+ const borne=v=>v>3?'plus':String(v);
+ noterDiag('favori_clic_meme_article_'+borne(new Set(memeArticle).size)).catch(()=>{});
+ noterDiag('favori_clic_concorde_'+borne(urls.length)).catch(()=>{});
+ if(urls.length!==1||ids.length!==1)return;
+ const cle=cleOngletFavori(tabId),avant=(await stockageFavorisOnglets().get(cle))?.[cle];
+ if(avant&&avant.etat==='attente'&&Date.now()-avant.at<60000)return; // VRM's own verification is running
+ await stockageFavorisOnglets().set({[cle]:{uid:String(uid),owner,contexteFavori:urls[0],notificationId:ids[0],etat:'attente',at:Date.now(),natif,manuel:true}});
+ await confirmerNavigationNative(tabId,uid,owner,domain,urls[0],natif);
+ const fin=(await stockageFavorisOnglets().get(cle))?.[cle];
+ noterDiag('favori_clic_'+(fin?.etat==='confirmee'?'confirme':'refuse_'+String(fin?.raison||fin?.etat||'inconnu').replace(/[^a-z_]/gi,'').slice(0,30))).catch(()=>{});
+}
 async function ouvrirFavoriNatif(uid,acc,body){
  const s=await authToken(),owner=s?.user_id;
  const refus=(message,code,inspection)=>({ok:false,status:409,json:{message,version:CODE_VERSION,...(code?{code}:{}),...(inspection?{inspection:inspectionFavoriSure(inspection)}:{})}});
@@ -2749,6 +2786,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeLabel(domain, msg.url, msg.b64);
   } else if (msg.kind === 'receipt' && msg.b64) {
     storeReceipt(domain, msg.url, msg.b64);
+  } else if (msg.kind === 'favoriNatifClic' && msg.url) {
+    if(!(sender?.frameId>0))noterClicFavoriNatif(domain,msg.url,sender?.tab?.id).catch(()=>{});
   } else if (msg.kind === 'writereq' && msg.url) {
     storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
     return true;

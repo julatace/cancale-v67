@@ -7,6 +7,8 @@
 > enregistré. L’onglet doit ensuite montrer cette route, sinon rien n’est rangé.
 > Serveur : une preuve `NAV` confirme CE favori ; il en faut deux de destinataires
 > distincts pour les autres. Parcours réel non vérifié, aucun message envoyé.
+> 5.229 : le clic du vendeur lui-même dans la cloche produit aussi la preuve (mêmes
+> contrôles) ; compteurs `favori_clic_*` dans `panel_diag_capture`.
 > Voir `docs/passation/2026-10-26-favoris-lien-natif.md`.
 
 > **25 octobre — VRM Capture 1.0.0 indépendant :** source

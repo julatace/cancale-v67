@@ -88,6 +88,26 @@ async function worker(){
  ok(r.json?.preuve!=='confirmee'&&!t.lectures.length,'compte changé pendant l’ouverture : rien n’est rangé');
  t=fond('conversation_autre');r=await t.f.ctx.ouvrirFavoriNatif('111',acc,body);
  ok(r.json?.preuve!=='confirmee'&&!t.creations.length&&!t.lectures.length,'une requête native vers un autre destinataire bloque la confirmation');
+
+ // Le clic du vendeur lui-même dans la cloche (5.229) : même règle d'identité.
+ const manuel=async(url,notifs,urlOnglet)=>{
+  const t=fond('ok');t.f.ctx.archiveNotifications=async(uid,o)=>{if(o.lecture)return {owner:'owner-test',data:{archiveVersion:1,uid:'111',type:'notifications',domain:'www.vinted.fr',payload:{notifications:notifs}}};if(o.lectureLiee){t.lectures.push(o.lectureLiee);return {owner:'owner-test',data:{}};}return null;};
+  t.f.ctx.chrome.tabs.get=async()=>({id:7,url:urlOnglet});
+  await t.f.ctx.noterClicFavoriNatif('www.vinted.fr',url,7);return t;
+ };
+ const N1={id:'n1',body:'Camille a ajouté ton article en favori',link:STOCKE};
+ t=await manuel('https://www.vinted.fr'+NATIF,[N1],'https://www.vinted.fr'+NATIF);
+ ok(t.lectures.length===1&&t.lectures[0].method==='NAV'&&t.lectures[0].recipientId==='201','clic manuel dans la cloche : la preuve est rangée');
+ t=await manuel('https://www.vinted.fr/inbox/want_it?receiver_id=999&item_id=101',[N1],'https://www.vinted.fr/inbox/want_it?receiver_id=999&item_id=101');
+ ok(!t.lectures.length,'clic manuel vers un autre destinataire : rien n’est rangé');
+ t=await manuel('https://www.vinted.fr'+NATIF,[N1,{...N1,id:'n9',link:STOCKE+'&x=1'}],'https://www.vinted.fr'+NATIF);
+ ok(t.lectures.length===1,'une notification à deux paramètres n’entre pas en concurrence');
+ t=await manuel('https://www.vinted.fr'+NATIF,[N1,{...N1,id:'n2'}],'https://www.vinted.fr'+NATIF);
+ ok(!t.lectures.length,'deux notifications concordantes : aucun choix');
+ t=await manuel('https://www.vinted.fr'+NATIF,[N1],'https://www.vinted.fr/notifications');
+ ok(!t.lectures.length,'clic manuel sans arrivée sur la page : rien n’est rangé');
+ t=await manuel('https://evil.invalid'+NATIF,[N1],'https://www.vinted.fr'+NATIF);
+ ok(!t.lectures.length,'clic manuel hors Vinted : ignoré');
 }
 
 async function serveur(){

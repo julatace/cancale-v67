@@ -61,7 +61,7 @@ export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations
  // it can address favorites that have never been opened natively.
  parametres=parametres.filter(p=>new Set(parametres.filter(q=>q.forme===p.forme&&q.cle===p.cle).map(q=>q.recipientId)).size>=2);
  const erreurRaccordement=(message,code)=>{const e=new RefusFavoris(message);e.code=code;e.diagnostic={notifications:candidats.length,tracesNatives:natifs.length,pairesNatives:paires.size,formesUserId:formes.size,liensExacts:exacts.size,parametresConfirmes:new Set(parametres.map(p=>p.forme+':'+p.cle)).size,selection:selection.length};return e;};
- if(!formes.size&&!exacts.size&&!parametres.length){throw erreurRaccordement('Le lien du favori n’est pas confirmé. Utilise « Vérifier sur Vinted » sur sa ligne, puis vérifie que « Lien enregistré » apparaît avant de relancer. Aucun message envoyé.','favoris_preuve_absente');}
+ if(!formes.size&&!exacts.size&&!parametres.length){throw erreurRaccordement('Le lien du favori n’est pas confirmé. Avec l’extension 5.229 ou plus récente, ouvre ce favori depuis la cloche de Vinted (connecté sur ce compte), attends que sa page de message s’affiche, puis relance. Aucun message envoyé.','favoris_preuve_absente');}
  return selection.map(notificationId=>{
   const ns=parId.get(notificationId)||[],n=ns[0]?.n,l=ns[0]?.l;
   if(ns.length!==1||!l)throw new RefusFavoris('Un favori sélectionné n’a pas de destinataire confirmé. Aucun envoi lancé.');
