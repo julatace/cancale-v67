@@ -100,12 +100,13 @@ const unBouton = (pg) => pg.evaluate(() => {
       await ctx.close();
     }
     {
-      // L'autre sens : le balayage existe toujours entre Vinted et Leboncoin.
+      // 24 oct. (décision) : AUCUN balayage global à la souris. Un glisser franc
+      // sur une zone vide reste donc sur Vinted ; l'autre sens est vérifié au
+      // doigt plus bas (le balayage n'existe plus qu'au toucher).
       const { ctx, pg } = await page(nav, false, 'plat_vinted');
-      await pg.evaluate(() => { const s = document.createElement('div'); s.id = 'zone-vide'; s.style.cssText = 'height:200px'; (document.querySelector('main') || document.body).appendChild(s); });
       await glisserSouris(pg, 900, 880, -300);
       const e = await ecran(pg);
-      dit(/leboncoin/i.test(e), 'l’autre sens : balayer sur une zone vide passe toujours de Vinted à Leboncoin', `→ ${e}`);
+      dit(/vinted/i.test(e), 'souris : glisser sur une zone vide ne change plus de plateforme (décision du 24 oct.)', `→ ${e}`);
       await ctx.close();
     }
     console.log('── téléphone (doigt)');
@@ -120,6 +121,14 @@ const unBouton = (pg) => pg.evaluate(() => {
       await glisserDoigt(pg, 200, 780, 200);
       const e2 = await ecran(pg);
       dit(!/vestiaire/i.test(e2), 'un balayage depuis eBay ne mène jamais à Vestiaire', `→ ${e2}`);
+      await ctx.close();
+    }
+    {
+      // L'autre sens : au DOIGT, le balayage existe toujours entre Vinted et Leboncoin.
+      const { ctx, pg } = await page(nav, true, 'plat_vinted');
+      await glisserDoigt(pg, 300, 700, -220);
+      const e = await ecran(pg);
+      dit(/leboncoin/i.test(e), 'l’autre sens : au doigt, balayer sur une zone vide passe toujours de Vinted à Leboncoin', `→ ${e}`);
       await ctx.close();
     }
     // (17 oct., Julien : « quand je sélectionne Bon après-midi Shopcancale et

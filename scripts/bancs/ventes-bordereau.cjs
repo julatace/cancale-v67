@@ -164,9 +164,20 @@ async function ouvrirVente(pg, tx) {
       await ouvrirVente(pg, '9001'); 
       try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
       await pg.waitForTimeout(2500);
+      // 26 oct. : « sur ordi les bordereaux sont bègues et ne s'ouvrent pas ». L'onglet
+      // vide réservé au clic cachait la confirmation et se refermait tout seul.
+      // Le PDF s'ouvre DANS VRM : aucune fenêtre, un cadre sur le PDF, « Imprimer ».
       const urls = onglets.map((p) => p.url());
-      dit(onglets.length === 1 && /^blob:/.test(urls[0] || ''), 'un clic OUVRE le bordereau dans un onglet (pas un fichier téléchargé)', JSON.stringify(urls));
+      const vis = await pg.evaluate(() => { const v = document.querySelector('[data-visionneuse-pdf]'); const f = document.querySelector('[data-visionneuse-cadre]'); return { etat: v && v.getAttribute('data-visionneuse-pdf'), src: f && f.getAttribute('src'), imp: !!document.querySelector('[data-visionneuse-imprimer]') }; });
+      dit(onglets.length === 0, 'aucune fenêtre ni onglet ouvert (rien qui clignote)', JSON.stringify(urls));
+      dit(vis.etat === 'pret' && /^blob:/.test(vis.src || '') && vis.imp, 'le bordereau s\'ouvre DANS VRM, avec « Imprimer »', JSON.stringify(vis));
+      if (vis.src) {
+        const debut = await pg.evaluate(async (u) => { const t = new Uint8Array(await (await fetch(u)).arrayBuffer()); return String.fromCharCode(...t.slice(0, 5)); }, vis.src);
+        dit(debut === '%PDF-', 'le cadre montre un vrai PDF', debut);
+      }
       dit(telecharges.length === 0, 'aucun téléchargement', JSON.stringify(telecharges));
+      try { await pg.locator('[data-visionneuse-fermer]').click({ timeout: 3000 }); } catch (_) {}
+      dit(!(await pg.locator('[data-visionneuse-pdf]').count()), 'Fermer referme la visionneuse');
       dit(pdfDemandes.slice(avant).includes('email_bord_test1'), 'un clic demande le PDF de CE bordereau, et de lui seul', JSON.stringify(pdfDemandes.slice(avant)));
       dit(tamponOctets === 0, 'et ne rapatrie AUCUN octet de la copie tamponnée par le serveur (personne ne la lit)', `${tamponOctets} octets base64`);
       const txt = await pg.evaluate(() => document.body.innerText);

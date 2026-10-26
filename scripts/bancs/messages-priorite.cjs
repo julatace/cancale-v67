@@ -144,7 +144,7 @@ const lireListe = (pg) => pg.evaluate(() => {
   };
 });
 const lireFil = (pg) => pg.evaluate(() => {
-  const btn = (name) => { const b = [...document.querySelectorAll('.vrm-chat-panel button')].find((x) => x.innerText.trim() === name); return b ? b.disabled : 'absent'; };
+  const btn = (name) => { const b = [...document.querySelectorAll('.vrm-chat-panel button')].find((x) => (x.innerText || x.textContent).trim() === name || x.textContent.trim() === name); return b ? b.disabled : 'absent'; };
   const ta = document.querySelector('textarea[aria-label="Réponse à la conversation"]');
   const prix = document.querySelector('input[aria-label="Prix de l\'offre"]');
   const off = document.querySelector('[data-offre]');

@@ -97,7 +97,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.230.0';
+const EXT_ATTENDUE = '5.231.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -9085,34 +9085,63 @@ const estIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.pl
 // l'utilisateur a expiré). On RÉSERVE donc l'onglet au moment même du clic —
 // tout bouton marqué `data-imprime` — et on y charge le PDF quand il est prêt.
 // Rien n'est arrivé en 25 s (PDF illisible, erreur) ⇒ l'onglet vide se referme.
-let ONGLET_PDF = null;
-const libererOngletPdf = () => { try { if (ONGLET_PDF && ONGLET_PDF.w && !ONGLET_PDF.w.closed) ONGLET_PDF.w.close(); } catch (_) {} ONGLET_PDF = null; };
-const reserverOngletPdf = () => {
-  try {
-    if (estIOS()) return;
-    libererOngletPdf();
-    const w = window.open('', '_blank');
-    if (!w) return;
-    try { w.document.title = 'Bordereau…'; w.document.body.style.cssText = 'font:15px system-ui,sans-serif;color:#555;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'; w.document.body.textContent = 'Préparation du bordereau…'; } catch (_) {}
-    const at = Date.now();
-    ONGLET_PDF = { w, at };
-    setTimeout(() => { if (ONGLET_PDF && ONGLET_PDF.at === at) libererOngletPdf(); }, 25000);
-  } catch (_) {}
-};
+// ⚠️⚠️ 26 OCTOBRE — « SUR ORDI LES BORDEREAUX SONT BÈGUES ET NE S'OUVRENT PAS ».
+// L'onglet réservé au clic s'ouvrait VIDE (« Préparation du bordereau… ») et
+// prenait le premier plan ; or le tamponnage demande parfois une confirmation
+// (N° pas encore vérifié, N° porté par deux paires) — elle s'affichait dans
+// l'onglet de VRM, CACHÉE derrière l'onglet vide, et au bout de 25 s l'onglet
+// se refermait tout seul : un onglet qui clignote, et aucun bordereau. Le PDF
+// s'ouvre maintenant DANS VRM (`VisionneusePdf`) : aucune fenêtre à réserver,
+// aucun bloqueur de fenêtres, la confirmation passe au-dessus (z 20000), et
+// « Imprimer » / « Ouvrir dans un onglet » sont de vrais clics.
+let _visionneuse = null; const _ecoutesVisionneuse = new Set();
+const _poserVisionneuse = (v) => { _visionneuse = v; for (const f of _ecoutesVisionneuse) { try { f(v); } catch (_) {} } };
+// Au clic : la visionneuse s'ouvre tout de suite, « préparation… ».
+const reserverOngletPdf = () => { try { if (estIOS()) return; const at = Date.now(); _poserVisionneuse({ prep: true, at }); setTimeout(() => { if (_visionneuse && _visionneuse.prep && _visionneuse.at === at) _poserVisionneuse(null); }, 25000); } catch (_) {} };
+const libererOngletPdf = () => { if (_visionneuse && _visionneuse.prep) _poserVisionneuse(null); };
 if (typeof document !== 'undefined') {
   document.addEventListener('click', (e) => {
     try { const b = e.target && e.target.closest && e.target.closest('[data-imprime]'); if (b && !b.disabled) reserverOngletPdf(); } catch (_) {}
   }, true);
 }
-const ouvrirPdfOnglet = (url) => {
+const ouvrirPdfOnglet = (url, nom) => {
   try {
     if (estIOS()) return false;            // iPhone : le bouton de la modale fait le geste
-    const r = ONGLET_PDF; ONGLET_PDF = null;
-    if (r && r.w && !r.w.closed) { r.w.location.href = url; return true; }
-    const w = window.open(url, '_blank');
-    return !!w;
+    _poserVisionneuse({ url, nom: nom || 'bordereau.pdf', at: Date.now() });
+    return true;
   } catch (_) { return false; }
 };
+function VisionneusePdf() {
+  const [v, setV] = React.useState(_visionneuse);
+  React.useEffect(() => { _ecoutesVisionneuse.add(setV); setV(_visionneuse); return () => { _ecoutesVisionneuse.delete(setV); }; }, []);
+  const cadre = React.useRef(null);
+  React.useEffect(() => {
+    if (!v) return;
+    const k = (e) => { if (e.key === 'Escape') _poserVisionneuse(null); };
+    document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
+  }, [v]);
+  if (!v || typeof document === 'undefined') return null;
+  const fermer = () => _poserVisionneuse(null);
+  const imprimer = () => { try { const w = cadre.current && cadre.current.contentWindow; w.focus(); w.print(); } catch (_) { try { window.open(v.url, '_blank'); } catch (_) {} } };
+  const btn = { minHeight:44, padding:'0 16px', borderRadius:8, border:`1px solid ${C.border}`, background:'transparent', color:C.text, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'inline-flex', alignItems:'center' };
+  return createPortal(
+    <div data-visionneuse-pdf={v.prep ? 'prep' : 'pret'} role="dialog" aria-modal="true" aria-label="Bordereau" onClick={fermer}
+      style={{ position:'fixed', inset:0, zIndex:9500, background:'rgba(8,12,18,.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <FermeAuRetour fermer={fermer}/>
+      <div onClick={(e) => e.stopPropagation()} style={{ width:'min(980px,100%)', height:'min(92vh,100%)', background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:12, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderBottom:`1px solid ${C.border}`, flexWrap:'wrap' }}>
+          <div style={{ fontWeight:700, fontSize:15, flex:'1 1 auto', minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v.prep ? 'Préparation du bordereau…' : 'Bordereau'}</div>
+          {!v.prep && <button type="button" data-visionneuse-imprimer="" onClick={imprimer} style={{ ...btn, border:'none', background:C.accent, color:C.onAccent || '#fff' }}>🖨 Imprimer</button>}
+          {!v.prep && <a data-visionneuse-onglet="" href={v.url} target="_blank" rel="noopener" style={btn}>Ouvrir dans un onglet</a>}
+          {!v.prep && <a data-visionneuse-telecharger="" href={v.url} download={v.nom} style={btn}>Télécharger</a>}
+          <button type="button" data-visionneuse-fermer="" onClick={fermer} aria-label="Fermer" style={btn}>Fermer</button>
+        </div>
+        {v.prep
+          ? <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:C.muted, fontSize:15 }}>Préparation du bordereau…</div>
+          : <iframe ref={cadre} data-visionneuse-cadre="" title="Bordereau" src={v.url} style={{ flex:1, width:'100%', border:0, background:'#fff' }}/>}
+      </div>
+    </div>, document.body);
+}
 // ⚠️ UN NUMÉRO PAS ENCORE VÉRIFIÉ SUR SON CARTON (18 octobre) : renuméroté
 // pendant la panne de synchro, il peut désigner une AUTRE paire — tamponné sur
 // le bordereau, c'est la mauvaise chaussure dans le colis. On demande avant.
@@ -9156,7 +9185,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     });
   } catch (_) { return true; }
 };
-const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
+const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, pos, opts = {}) => {
   if (numero && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   if (numero && !(await confirmerNumerosAVerifier([numero]))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
@@ -9173,15 +9202,17 @@ const annotateAndDownloadBordereau = async (numero, title, pdfArrayBuffer, pos, 
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
   const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
-  const ouvert = ouvrirPdfOnglet(url);
+  const ouvert = ouvrirPdfOnglet(url, filename);
   return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
            entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [] };
 };
+// Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
+const annotateAndDownloadBordereau = async (...a) => { try { return await annotateAndDownloadBordereauBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
 // Regroupe plusieurs bordereaux en UN seul PDF (chaque bordereau tamponné à la
 // suite, une page par bordereau) pour tout imprimer d'un coup. `items` =
 // [{ numero, title, pdfBuf }]. `resolvePos(w,h)` donne la position mémorisée du
 // tampon pour chaque format → le N° tombe au MÊME endroit sur tous.
-const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
+const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   if ((items || []).some((it) => it && it.numero) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
   if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);
   const PL = await import('pdf-lib');
@@ -9215,9 +9246,11 @@ const mergeAndDownloadBordereaux = async (items, resolvePos, opts = {}) => {
   const url = URL.createObjectURL(blob);
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
-  const printed = ouvrirPdfOnglet(url);
+  const printed = ouvrirPdfOnglet(url, filename);
   return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers };
 };
+// Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
+const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
 
 // Génère un JUSTIFICATIF D'ACHAT (PDF) à partir des données de la commande —
 // utile pour le registre d'achats d'un pro (surtout en régime de la marge, où
@@ -50080,9 +50113,9 @@ export default function App() {
   const coeur = <AppCoeur key={(authState.user && authState.user.id) || 'local'}/>;
   // L'équipe AVANT l'abonnement : un aide ne paie pas (c'est l'abonnement du
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
-  return (MULTI_USER && authState.user)
+  return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur;
+    : coeur}<VisionneusePdf/></>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────

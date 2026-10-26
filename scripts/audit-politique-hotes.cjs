@@ -60,6 +60,7 @@ const COUPLES = {
   'src/fondCarte.js|www.openstreetmap.org': ['lien', 'lien de l’attribution de la carte'],
   'src/App.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
   'src/communaute/Communaute.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
+  'src/App.jsx|app.photoroom.com': ['lien', LIEN],
   'src/App.jsx|supabase.com': ['lien', LIEN],
   'src/App.jsx|vercel.com': ['lien', LIEN],
   'src/App.jsx|www.autoentrepreneur.urssaf.fr': ['lien', LIEN],
