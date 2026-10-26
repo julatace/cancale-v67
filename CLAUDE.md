@@ -1,5 +1,13 @@
 # VRM — dossier de passation
 
+> **26 octobre — annonces d'un compte bloqué, bancs :** Comptes liés → un compte →
+> « Supprimer ce compte » → « Retirer ses annonces pour de bon » (`vrm_annonces_retirees`,
+> synchronisé) : ses annonces sortent d'Annonces, des totaux et des files Leboncoin/eBay ;
+> ses ventes restent. « Les remettre » annule. Banc `annonces-retirees.cjs`. Navigateur des
+> bancs : `/opt/pw-browsers/chromium` (lien stable). Rouges À L'IDENTIQUE sur main :
+> stats-compta, retours-stock, glisser-onglet, revendeurs, messages-priorite, session,
+> extension-leboncoin-installee.
+
 > **26 octobre — favoris 5.228 :** le rapport du parcours manuel montre que la cloche
 > affiche le favori avec un lien `receiver_id`/`item_id`, pas le lien enregistré
 > (`/items/{article}/want_it/new?offering_id=…`). Ce lien est suivi seulement par

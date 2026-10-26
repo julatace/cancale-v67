@@ -159,7 +159,7 @@ const jugerSegment = async (pg, label, ecran) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const TEL = { width: 390, height: 844 }, PC = { width: 1512, height: 950 };
 
     console.log('\n── Colis, 390 px');
@@ -296,7 +296,12 @@ const jugerSegment = async (pg, label, ecran) => {
       await pg.waitForFunction(() => document.querySelectorAll('.vrm-sale-row').length > 0, null, { timeout: 15000 });
       await pg.waitForTimeout(1200);
       const fond = await pg.evaluate(() => { const bt = [...document.querySelectorAll('.vrm-rangee > button[aria-pressed="true"]')][0]; return bt ? getComputedStyle(bt).backgroundColor : null; });
-      dit(fond != null && (lum(fond) ?? 1) < 0.5, 'sombre : le filtre actif n’est pas une pastille blanche', fond);
+      // « Jamais blanc plein » (§7). Depuis la palette retenue du 23 oct., l'actif
+      // sombre est une pastille d'ACCENT pastel (#B7D6C8) : voulu. Est fautif un
+      // blanc NEUTRE (clair ET sans teinte), pas une couleur d'accent.
+      const rgbF = (/rgba?\((\d+), (\d+), (\d+)/.exec(fond || '') || []).slice(1).map(Number);
+      const teinte = rgbF.length === 3 ? Math.max(...rgbF) - Math.min(...rgbF) : 0;
+      dit(fond != null && ((lum(fond) ?? 1) < 0.5 || teinte >= 20), 'sombre : le filtre actif n’est pas une pastille blanche (sombre, ou couleur d’accent)', fond);
       await ctx.close();
     });
   } catch (e) { dit(false, 'le banc tourne', String(e && e.message || e).slice(0, 200)); }

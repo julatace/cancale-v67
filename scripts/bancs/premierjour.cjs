@@ -197,7 +197,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
 
 (async () => {
   const srv = await ecouter();
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH||'/usr/bin/chromium',
+  const nav = await chromium.launch({ executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),
     args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   if(process.env.ORION_ONLY){
     const r=await rendre(nav,{telephone:true,orion:true,ua:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'});

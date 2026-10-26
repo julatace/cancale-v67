@@ -115,7 +115,7 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; try { await pg.scree
 async function main() {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const T = vp.width < 600 ? '📱' : '🖥️';
       const tap = async (pg, sel) => { if (vp.width < 600) await pg.locator(sel).first().tap(); else await pg.locator(sel).first().click(); };

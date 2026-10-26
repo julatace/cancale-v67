@@ -118,7 +118,7 @@ async function selecteurEbay(b, l, vp) {
   await new Promise((ok) => srv.listen(PORT, ok));
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     console.log('── E1. eBay : la N°80 est déjà en vente, la N°81 est la même paire (photo exacte)');
     await essaie('E1', async () => {
       const r = await selecteurEbay(b, lignes({ ebaySku80: true }), { width: 1512, height: 950 });

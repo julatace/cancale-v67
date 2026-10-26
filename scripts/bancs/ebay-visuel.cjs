@@ -231,7 +231,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
   let b;
   try {
     await new Promise((res) => srv.listen(PORT, res));
-    b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const taille of ['390c', '1512c']) {
       const T = taille.startsWith('390') ? '390' : '1512', tel = T === '390';
       // ── Annonces ──

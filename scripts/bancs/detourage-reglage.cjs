@@ -75,7 +75,7 @@ async function rendre(nav, largeur) {
 
 (async () => {
   try { await ecouter(); } catch (e) { console.log('❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const l of [390, 1512]) {
       const x = await rendre(nav, l);

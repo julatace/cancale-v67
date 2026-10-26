@@ -143,7 +143,7 @@ function prepareRelais(purch){
 }
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   let purch=purchFx, main=mainFx;
   // ── Passe 1 : Achats ouvert en premier, puis on coche UN colis ici ─────────
   let p1=await rendre(b,{main,purch,delaiMain:1500});

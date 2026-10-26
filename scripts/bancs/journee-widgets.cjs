@@ -286,7 +286,7 @@ if (require.main === module) (async () => {
     const avant = process.env.BANC_DIST && !process.env.BANC_DIST_AVANT ? null : distAvant();
     srv = await serveur(DIST, PORT);
     if (avant) srvAv = await serveur(avant, PORT + 1);
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
     for (const T of TAILLES) {
       console.log(`\n══ ${T.nom}`);

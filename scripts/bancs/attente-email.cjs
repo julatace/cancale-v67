@@ -191,7 +191,7 @@ async function scenarios(nav, taille) {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.error('dist/ absent — lance `npm run build` d’abord'); process.exit(2); }
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est pris — relance avec BANC_PORT=…`) : e)); srv.listen(PORT, res); })
     .catch((e) => { console.error(e.message); process.exit(2); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const t of [390, 1512]) {
       try { await scenarios(nav, t); } catch (e) { dit(false, `scénarios ${t} px`, e.message); }

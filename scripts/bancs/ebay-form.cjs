@@ -34,7 +34,7 @@ let ko = 0; const dit = (c,m,d)=>{ if(!c)ko++; console.log((c?'✅ ':'❌ ')+m+(
 // Ce qui part vers /api/ebay (le corps exact), et l'avertissement servi à la demande.
 const envoisEbay = []; let avertir = false;
 (async()=>{
-  const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium', args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server'] });
   const pg = await b.newPage({ viewport:{ width:390, height:1500 } });
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await pg.addInitScript(([nums]) => { try{ localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(nums)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(['401','402'])); }catch(_){}}, [NUMS]);

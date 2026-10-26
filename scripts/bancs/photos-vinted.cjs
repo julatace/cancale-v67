@@ -414,7 +414,7 @@ const pageTexte = (pg) => pg.evaluate(() => document.body.innerText);
   await new Promise((ok) => srv.listen(PORT, ok));
   await new Promise((ok) => cdn.listen(PORT_CDN, '127.0.0.1', ok));
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
       args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', `--host-resolver-rules=MAP images1.vinted.net 127.0.0.1:${PORT_CDN}`] });
 
     // ── 0. Le banc mesure-t-il ce qu'il croit mesurer ? ───────────────────────

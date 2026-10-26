@@ -93,8 +93,15 @@ function poser(pw) {
   const surContexte = (ctx) => { try { ctx.addInitScript(script()); tracer(ctx); } catch (_) {} return ctx; };
   // Un banc écrit sur une autre machine vise parfois /usr/bin/chromium : absent,
   // on prend le Chromium installé ici (même moteur, rien d'autre ne change).
-  const fs = require('fs'); const ICI = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-  const chemin = (o) => { if (o && o.executablePath && !fs.existsSync(o.executablePath) && fs.existsSync(ICI)) return Object.assign({}, o, { executablePath: ICI }); return o; };
+  const fs = require('fs');
+  // (26 oct.) Le Chromium installé change de version d'un conteneur à l'autre
+  // (1194 puis 1243, sous chrome-linux64) : on prend celui qui EXISTE, jamais un chemin figé.
+  const ICI = (() => {
+    const cands = ['/opt/pw-browsers/chromium'];
+    try { for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => /^chromium-\d+$/.test(n)).sort((a, b) => +b.split('-')[1] - +a.split('-')[1])) { cands.push('/opt/pw-browsers/' + d + '/chrome-linux64/chrome', '/opt/pw-browsers/' + d + '/chrome-linux/chrome'); } } catch (_) {}
+    return cands.find((x) => { try { return fs.statSync(x).isFile(); } catch (_) { return false; } }) || '';
+  })();
+  const chemin = (o) => { if (o && o.executablePath && !fs.existsSync(o.executablePath) && ICI) return Object.assign({}, o, { executablePath: ICI }); return o; };
   const launch0 = c.launch.bind(c); const launch = (o, ...r) => launch0(chemin(o), ...r);
   c.launch = async (...a) => {
     const b = await launch(...a);

@@ -6,7 +6,7 @@ const audit=fs.readFileSync(path.join(root,'scripts/audit-lbc-session.cjs'),'utf
 const ads={ads:[{list_id:701,subject:'Article privé',price:[25],images:{urls:['https://img.leboncoin.fr/701.jpg']}}],recommendations:[{list_id:999,subject:'Tiers',price:[99]}]};
 const transaction={purchase_id:778899,is_seller:true,item:{id:701,title:'Article privé',prices:{final:2500,total:2928}},step:{status:'done',label:'Terminée'}};
 const identite={account:{account_id:'compte-35',type:'private'},member:{account_id:'compte-35',nickname:{value:'Mon compte'}}};
-(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});try{for(const mode of ['html-annonces','html-annonces-id-long','html-vente','grosse-reponse','ecriture-refusee','format-inconnu','page-publique'].filter(m=>!process.env.CAS_LBC||process.env.CAS_LBC===m)){
+(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});try{for(const mode of ['html-annonces','html-annonces-id-long','html-vente','grosse-reponse','ecriture-refusee','format-inconnu','page-publique'].filter(m=>!process.env.CAS_LBC||process.env.CAS_LBC===m)){
  const compte=mode==='html-annonces-id-long'?'a'.repeat(64):'compte-35';
  const chemin=mode.startsWith('html-annonces')?'/compte/part/mes-annonces':mode==='html-vente'?'/compte/part/transaction/778899':mode==='page-publique'?'/ad/chaussures/701':'/compte/part/mes-transactions';
  const documentUrl='https://www.leboncoin.fr'+chemin;

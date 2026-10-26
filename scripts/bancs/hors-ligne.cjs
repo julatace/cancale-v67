@@ -123,7 +123,7 @@ const photoDe = (pg, uid) => pg.evaluate((u) => { try { return JSON.parse(localS
 
 async function main() {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est pris — relance ce banc seul`) : e)); srv.listen(PORT, res); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const T = vp.width < 600 ? '📱 390' : '🖥️ 1512';

@@ -112,7 +112,7 @@ const section = async (pg, s) => { await pg.click(`button[data-section="${s}"]`)
 const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   for (const W of [390, 1512]) {
     console.log(`── ${W} px`);
     const { ctx, pg } = await page(b, base(), W);

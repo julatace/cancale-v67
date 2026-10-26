@@ -58,7 +58,7 @@ const RETIRES = ['collectif', 'cat_detail', 'outils'];
 (async () => {
   let ko = 0; const trouv = [];
   const dit = (c, m, d) => { if (!c) { ko++; trouv.push(m + (d ? ' — ' + d : '')); } console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   for (const mode of MODES) {
     for (const [W, H, tag, tactile] of [[390, 844, '390', true], [1512, 950, '1512', false]]) {
       const ctx = await b.newContext({ viewport: { width: W, height: H }, isMobile: tactile, hasTouch: tactile });

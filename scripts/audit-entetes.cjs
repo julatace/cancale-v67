@@ -82,7 +82,7 @@ verifie('une règle réservée à iOS pose la police des champs', !!bloc && /fon
 (async () => {
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (_) {}
-  const exe = [process.env.CHROMIUM_PATH || '/usr/bin/chromium','/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
+  const exe = [process.env.CHROMIUM_PATH || '/usr/bin/chromium','/opt/pw-browsers/chromium', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
   if (!chromium || !exe || !bloc) {
     verifie('mesure dans un navigateur', false, !bloc ? 'règle introuvable' : 'navigateur du banc introuvable');
   } else {

@@ -73,7 +73,7 @@ async function brancher(p){
    shipped:{txId:11,isSeller:true,title:'Colis en route',parcelStatus:'in_transit',label:{voucherUrl:'https://example.test/old.pdf'}},
    finished:{txId:12,isSeller:true,title:'Colis finalisé',stepStatus:'done',stepLabel:'Terminé',label:{voucherUrl:'https://example.test/final.pdf'}}};
   await new Promise(ok=>server.listen(0,'127.0.0.1',ok));const base='http://127.0.0.1:'+server.address().port;
-  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  b=await chromium.launch({executablePath:process.env.BANC_CHROMIUM||'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   const ctx=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();await brancher(p);
   const errors=[];p.on('pageerror',e=>errors.push(e.message));let writes=[],commandeWrites=[],modeMessageCommande='refuse',modeReponse='refuse',lectureMessageFausse=false,messageCommandePret,libererMessageCommande;
   await p.route('**/api/ebay',async r=>{const body=r.request().method()==='POST'?r.request().postDataJSON():{};const a=body.action;let j={ok:true,connected:true,ready:true,canConsent:true};

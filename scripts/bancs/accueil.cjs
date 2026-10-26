@@ -354,7 +354,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
   //    durait 8. C'est la MACHINE qu'on mesurait, pas la page. Composée par le
   //    processeur, la même page tourne à 60 images/s (médiane 17 ms) — ce que
   //    voit un vrai visiteur. Rien d'autre ne change (couleurs, polices, tailles).
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
   try {
     if (veut('rendu')) {
       console.log('\n── UN VISITEUR SANS SESSION : LE PREMIER ÉCRAN, LA CARTE, LA BARRE');
