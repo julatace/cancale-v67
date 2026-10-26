@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.229.0';
+const CODE_VERSION = '5.230.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -11398,6 +11398,61 @@ async function storeLbcListingsUneFois(url, listings,owner) {
 // d'avant) ou `lbc-account:{id}` (la source privée, depuis le 22 octobre). Une
 // seule identité : on compare sans le préfixe.
 const idCompteLbc = (x) => String(x || '').replace(/^lbc-account:/i, '');
+// (26 octobre) Julien : « quand les annonces sont désactivées sur Leboncoin, je
+// veux que ce soit mis à jour ». Un statut qui dit désactivée / expirée /
+// supprimée / archivée devient `inactive` (la règle `<lbc-en-vente-regle>`,
+// commune à l'app, à l'extension et au serveur, sort déjà `inacti` de « en
+// vente » — on ne la touche pas). Le statut d'origine reste dans `statutLbc`.
+function statutLbcNormal(st) {
+  const t = String(st || '').trim();
+  if (!t) return '';
+  return /disab|d[ée]sactiv|expir|delet|supprim|archiv|deactiv/i.test(t) ? 'inactive' : t;
+}
+// La liste des annonces DÉSACTIVÉES / expirées de « Mes annonces »
+// (`pintad/v1/public/expired`, vue par son navigateur — sa forme exacte n'a
+// jamais été lue : on prend tout `list_id` / `ad_id` / `id` qu'elle porte et
+// on note sa forme). On ne marque QUE des annonces déjà rangées, d'un de SES
+// comptes, par identifiant (§5) ; rien n'est créé, rien n'est effacé. Une
+// capture plus récente qui la remontre ACTIVE la remet en vente (le statut est
+// réécrit par `storeLbcListings`).
+async function noterDesactiveesLbc(ids, miens) {
+  const vus = new Set((ids || []).map(String));
+  if (!vus.size) return { ok: true, n: 0 };
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) { noterDiag('lbc_desactivees_lecture_ratee'); return { ok: false, code: 'lecture' }; }
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      const nowIso = new Date().toISOString();
+      let n = 0;
+      for (const id of vus) {
+        const ad = items[id];
+        if (!ad || typeof ad !== 'object') continue;
+        const cpt = idCompteLbc(ad.account || ad.lbcUser);
+        if (!cpt || !miens.has(cpt)) continue;
+        if (ad.status === 'inactive' && ad.desactiveeAt) continue;
+        items[id] = Object.assign({}, ad, { statutLbc: ad.status || '', status: 'inactive', desactiveeAt: nowIso, seenAt: nowIso });
+        n++;
+      }
+      noterDiag(n ? 'lbc_desactivees' : 'lbc_desactivees_rien');
+      if (!n) return { ok: true, n: 0 };
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
+      if (ok !== false) { try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {} }
+      return { ok: ok !== false, n };
+    } catch (_) { return { ok: false, code: 'erreur' }; }
+  });
+}
+const LBC_URL_DESACTIVEES = /\/pintad\/v\d+\/public\/expired\b/i;
+function idsAnnoncesLbc(node, out, prof) {
+  out = out || []; if (!node || (prof || 0) > 8 || out.length > 500) return out;
+  if (Array.isArray(node)) { for (const v of node) idsAnnoncesLbc(v, out, (prof || 0) + 1); return out; }
+  if (typeof node !== 'object') return out;
+  const id = node.list_id != null ? node.list_id : node.ad_id != null ? node.ad_id : node.listId != null ? node.listId : null;
+  if (id != null && /^\d{5,14}$/.test(String(id))) out.push(String(id));
+  for (const v of Object.values(node)) if (v && typeof v === 'object') idsAnnoncesLbc(v, out, (prof || 0) + 1);
+  return out;
+}
 async function noterListeLbcComplete(owner, ids, total) {
   owner = idCompteLbc(owner);
   return enChaineLbcListings(async () => {
@@ -12534,6 +12589,13 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
   const sessListe = await sessionDeListe(sessionPage);
   if (sessListe) miens.add(sessListe.id);
   if(listeMoi&&String(sessionPage||'').startsWith('lbc-account:')&&!sessListe)return {ok:false,etat:'compte-non-confirme'};
+  if (LBC_URL_DESACTIVEES.test(String(url || ''))) {
+    try { noterDiag('lbc_desactivees_vu'); } catch (_) {}
+    const ids = idsAnnoncesLbc(data);
+    const mi = new Set([...miens].map(idCompteLbc).filter(Boolean));
+    const r = await noterDesactiveesLbc(ids, mi);
+    return { ok: !!(r && r.ok), etat: 'desactivees', n: (r && r.n) || 0 };
+  }
   if(listeMoi&&sessListe?.prive){try{const u=new URL(url);for(const[k,v]of u.searchParams)if(/^(user_id|store_id|account_id|owner_id)$/i.test(k)&&!(k==='account_id'&&v===sessListe.id.slice('lbc-account:'.length)))return;}catch(_){return;}}
   // Le compte connecté (id + nom + pro/particulier), s'il transparaît ici.
   const acct = detectLbcAccount(data, url);
@@ -12569,7 +12631,7 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
         url: info.URL || '',
         images: photosAnnonceLbc(info),
         category: info.Category || info.CategoryId || '',
-        status: ad.Status || '',
+        status: statutLbcNormal(ad.Status || ''),
         createdAt: ad.CreatedAt || ad.PostedAt || null,
         // Diagnostic fourni par Leboncoin : utile pour savoir quelle annonce
         // ne sort pas (visibilité faible, peu de clics…).
@@ -12625,7 +12687,7 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
           url: node.url || '',
           images: photosAnnonceLbc(node),
           category: node.category_name || node.category_id || '',
-          status: node.status || node.ad_status || '',
+          status: statutLbcNormal(node.status || node.ad_status || ''),
           // ⚠️ Le propriétaire de CETTE annonce (une réponse générique mêle ses
           //    annonces et le flux « découverte » d'autrui) : on prend l'owner
           //    porté par l'annonce ELLE-MÊME, jamais le compte de session (qui,
