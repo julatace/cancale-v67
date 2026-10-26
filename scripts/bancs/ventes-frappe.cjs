@@ -176,7 +176,7 @@ const lire = (pg) => pg.evaluate(() => {
 });
 
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     console.log(`\n── Ventes · 390 px tactile · processeur ×${CPU} · « ${MOT} »`);
     // A. La page, puis les frappes.

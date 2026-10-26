@@ -5,7 +5,7 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{const root=path.resolve(process.env.SOURCE_EXTENSION||'vinted-sync-extension'),manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8')),src=fs.readFileSync(path.join(root,'inject.js'),'utf8');
  assert.ok(manifest.content_scripts.some(s=>s.js.includes('inject.js')&&s.world==='MAIN'&&s.run_at==='document_start'),'the manifest must install the hook in MAIN before native scripts');let n=1;
- const b=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,proxy:{server:'http://127.0.0.1:1'},args:['--no-sandbox']});
+ const b=await chromium.launch({executablePath:(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),headless:true,proxy:{server:'http://127.0.0.1:1'},args:['--no-sandbox']});
  try{for(const main of [false,true]){const c=await b.newContext();let requetes=0;
  await c.route('https://**/*',r=>{const u=new URL(r.request().url());if(u.hostname!=='www.vinted.fr')return r.abort();
   if(u.pathname==='/api/v2/conversations'){requetes++;return r.fulfill({status:200,contentType:'application/json',body:'{"code":0,"conversation":{"id":900}}'});}

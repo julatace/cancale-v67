@@ -4,7 +4,7 @@ const {chromium}=require('playwright');
 (async()=>{
  const source=fs.readFileSync('vinted-sync-extension/background.js','utf8');
  const fonction=source.slice(source.indexOf('function suivreFavoriAffiche('),source.indexOf('async function ouvrirFavoriNatif('));
- const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),headless:true,args:['--no-sandbox']});
  try{
  const page=await browser.newPage();let documents=0;
  await page.route('**/*',r=>{documents++;return r.fulfill({contentType:'text/html',body:`<button aria-label="Notifications" aria-expanded="false" id="cloche">Notifications</button><section hidden id="liste"><a id="favori" href="/items/101/conversation/new?native_target=201">Camille a ajouté un favori</a></section><script>window.clics=0;window.cloches=0;document.querySelector('button').onclick=()=>{window.cloches++;document.getElementById('liste').hidden=false;document.querySelector('button').setAttribute('aria-expanded','true');};document.querySelector('a').onclick=e=>{e.preventDefault();window.clics++;history.pushState({},'', '/inbox/900');};</script>`});});

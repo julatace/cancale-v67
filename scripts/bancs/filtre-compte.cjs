@@ -171,7 +171,7 @@ const messagerie = (pg) => pg.evaluate(() => {
   let b;
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     console.log('── 1. Chrome ouvert sur compte_a (111), rien choisi — Ventes');
     await essaie('1', async () => {

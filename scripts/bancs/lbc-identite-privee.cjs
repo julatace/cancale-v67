@@ -4,7 +4,7 @@ const racine=path.resolve(__dirname,'../..'),src=fs.readFileSync(path.join(racin
 const audit=fs.readFileSync(path.join(racine,'scripts/audit-lbc-session.cjs'),'utf8');
 const fixture=audit.slice(audit.indexOf('function faire('),audit.indexOf('const LIES ='));
 const faire=new Function('vm','SRC',fixture+';return faire;')(vm,src);
-(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});try{
+(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});try{
  const env=faire(),ecrire=env.ctx.supabaseUpsert;
  const httpRefuse=process.env.BANC_HTTP_REFUSE==='1';
  const refuser=process.env.BANC_REFUSER_IDENTITE==='1',envoyer=env.envoyer;if(refuser)env.envoyer=m=>m.action==='lbcSessionPrivee'?Promise.resolve({ok:false}):envoyer(m);env.ctx.supabaseUpsert=async(...args)=>{await new Promise(r=>setTimeout(r,150));return ecrire(...args);};

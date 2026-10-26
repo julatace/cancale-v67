@@ -29,7 +29,7 @@ const srv = http.createServer((q, r) => {
 (async () => {
   try { await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }); }
   catch (e) { console.log(`❌ port ${PORT} pris — relance ce banc seul`); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   try {
     const pg = await nav.newPage({ viewport: { width: 1512, height: 950 } });
     const errs = []; pg.on('pageerror', (e) => errs.push(String(e).slice(0, 140)));

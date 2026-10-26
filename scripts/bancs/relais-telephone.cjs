@@ -150,7 +150,7 @@ const cliquer = (pg, tx) => pg.evaluate((tx) => { const b = document.querySelect
   let b;
   await new Promise((r) => srv.listen(PORT, r));
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const VIVANT = { ageMin: 0.2, vUid: '111', vLogin: 'compte_a' };
 
     console.log('── 1. Relais vivant (téléphone) : les boutons sont actifs');

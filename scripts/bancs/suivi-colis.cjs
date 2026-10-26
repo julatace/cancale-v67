@@ -206,7 +206,7 @@ const lire = (pg) => pg.evaluate(() => {
 });
 
 async function navigateur() {
-  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const tailles = [['390 clair', { width: 390, height: 844 }, false], ['1512', { width: 1512, height: 950 }, false], ['390 sombre', { width: 390, height: 844 }, true]];
   try {
     for (const [nom, vp, sombre] of tailles) {

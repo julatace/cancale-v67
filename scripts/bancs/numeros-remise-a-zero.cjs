@@ -146,7 +146,7 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
 
 (async () => {
   try { await ecouter(); } catch (e) { console.log('  ❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const contexte = async () => {
     const ctx = await nav.newContext({ viewport: { width: 1512, height: 950 } });
     await ctx.addInitScript((s) => { try { if (!localStorage.getItem('vrm_session')) localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);

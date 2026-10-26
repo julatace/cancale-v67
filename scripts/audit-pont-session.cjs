@@ -555,7 +555,7 @@ const quiRepond = (r, t) => (t.vivante(r) ? String(t.vivante(r)) : 'vide/erreur'
   else {
     let nav = null;
     try {
-      nav = await pw.chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+      nav = await pw.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
     } catch (e) { dit(false, 'f · le navigateur du banc ne démarre pas', e && e.message); }
     if (nav) {
       await essaie('f · orphelin à côté du vivant', async () => {

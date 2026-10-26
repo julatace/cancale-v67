@@ -376,7 +376,7 @@ async function scenarios(nav, taille) {
 
 (async () => {
   try { await ecouter(); } catch (e) { console.log('  ❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     // TAILLES=1512 : une seule taille (preuves par mutation, machine partagée).
     for (const t of String(process.env.TAILLES || '390,1512').split(',').map(Number)) {

@@ -13,7 +13,7 @@ const racine=path.resolve(__dirname,'../..');
  window.afficher=(uid='123',owner='vendeur-test',controle=null)=>root.render(<Diagnostic controle={controle} uid={uid} owner={owner} ownerActuel={()=>window.owner} base="https://base.invalid" headers={()=>({Authorization:'Bearer session-fictive'})}/>);
  Object.defineProperty(navigator,'clipboard',{value:{writeText:async x=>window.copie=x},configurable:true});
  window.afficher();`},bundle:true,write:false,format:'iife',logLevel:'silent'});
- const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+ const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});
  let controles=0;const check=(condition,message)=>{assert.ok(condition,message);controles++;};
  try{for(const largeur of [320,390,1512]){
   const p=await b.newPage({viewport:{width:largeur,height:900}});

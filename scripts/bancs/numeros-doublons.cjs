@@ -110,7 +110,7 @@ const SERVIS = ['1', '2', '3', '51', '52'];
 
 (async () => {
   try { await ecouter(); } catch (e) { console.log('  ❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const taille of [1512, 390]) {
       console.log(`\n── A. Deux annonces au même numéro (${taille} px)`);

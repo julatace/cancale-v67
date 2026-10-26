@@ -44,7 +44,7 @@ const srv = http.createServer(servir);
 srv.on('error', (e) => { console.log('KO  le banc n\'a pas pu démarrer — ' + e.message); process.exit(1); });
 srv.listen(0, '127.0.0.1', async () => {
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     const ctx = await b.newContext();
     const pg = await ctx.newPage();

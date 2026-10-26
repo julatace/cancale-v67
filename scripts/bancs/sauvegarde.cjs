@@ -140,7 +140,7 @@ async function restaurer(nav, opts, contenu) {
 (async () => {
   try { await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est déjà pris — relance ce banc seul.`) : e)); srv.listen(PORT, res); }); }
   catch (e) { console.log('❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     console.log('── LE FICHIER');
     const ok = await exporter(nav, {});

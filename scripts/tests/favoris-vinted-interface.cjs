@@ -21,7 +21,7 @@ const racine=path.resolve(__dirname,'../..');
  };
  Object.defineProperty(navigator,'clipboard',{value:{writeText:async x=>window.copie=x},configurable:true});
  window.afficher=(uid='123',owner='owner-test')=>root.render(<Favoris PhotoVinted={p=><img src={p.src} alt={p.alt} referrerPolicy="no-referrer"/>} uid={uid} owner={owner} ownerActuel={()=>window.owner} base="https://base.invalid" headers={()=>({Authorization:'Bearer fixture'})} nomCompte="Compte de démonstration"/>);window.afficher();`},bundle:true,write:false,format:'iife',logLevel:'silent'});
- const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});let n=0;
+ const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let n=0;
  const check=(ok,m)=>{assert.ok(ok,m);n++;};
  try{for(const largeur of [320,390,1512]){
   const p=await b.newPage({viewport:{width:largeur,height:950}});

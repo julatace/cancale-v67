@@ -6,7 +6,7 @@ const os=require('node:os');
  try{
  execFileSync('unzip',['-q',path.resolve('public/VRM-Orion.xpi'),'-d',dir]);
  const boot=fs.readFileSync(path.join(dir,'orion-main.js'),'utf8');
- b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+ b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});
  for(const bloque of [false,true]){
  const c=await b.newContext(),p=await c.newPage();let api=0,assets=0;const messages=[];
  p.on('console',m=>messages.push(m.text()));p.on('pageerror',e=>messages.push(e.message));

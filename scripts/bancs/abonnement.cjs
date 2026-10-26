@@ -173,7 +173,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
 
 (async () => {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e)); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     console.log('\n── La carte suit ce que le serveur sait');
     const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire',

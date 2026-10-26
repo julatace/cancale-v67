@@ -44,7 +44,7 @@ catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwri
 const { metaVersData } = require('./_meta.cjs');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 9201;
-const CHROME = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const CHROME = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 
 const auj = new Date();
 const jour = (n) => new Date(auj.getTime() - n * 86400000).toISOString();

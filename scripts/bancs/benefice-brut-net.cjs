@@ -90,7 +90,7 @@ const lireStrip = async (b, avecAchats) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     // ── A. avec prix d'achat + un boost → brut ≠ net ──────────────────────────
     console.log('── A. des prix d’achat (un boost) → brut et net distincts');

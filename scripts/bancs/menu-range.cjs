@@ -68,7 +68,7 @@ const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'A
 (async () => {
   try { await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }); }
   catch (e) { console.log(`❌ port ${PORT} pris — relance ce banc seul`); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   try {
     console.log('── ordinateur : le rail');
     {

@@ -336,7 +336,7 @@ async function finPage(pg, errs, quoi) {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const bloc = (n) => !BLOCS || BLOCS.has(n);
     for (const vp of TAILLES) {
       const T = `${vp.width} px`;

@@ -97,7 +97,7 @@ async function partieRendu() {
     r.end(fs.readFileSync(p));
   });
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est déjà pris — relance ce banc seul.`) : e)); srv.listen(PORT, res); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const rendre = async (lignes) => {
     const ctx = await nav.newContext({ viewport: { width: 1512, height: 1100 } });
     const pg = await ctx.newPage();

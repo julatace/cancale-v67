@@ -192,7 +192,7 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   const reels = vrais();
   const pdfs = reels || await synthetiques();
   console.log(`ℹ︎  ${reels ? `${Object.keys(pdfs).length} vrais bordereaux (copie locale)` : 'bordereaux fabriqués (pas de copie locale)'}`);
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const largeur of [1512, 390]) {
       console.log(`\n── ${largeur} px`);

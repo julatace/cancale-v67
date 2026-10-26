@@ -103,7 +103,7 @@ async function contexte(b, W, H, tactile, sombre) {
 (async () => {
   let ko = 0;
   const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   // Un bloc qui lève devient un contrôle ROUGE, jamais un banc mort.
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle n\'a pas pu se dérouler', e.message.slice(0, 140)); } };
   const aller = async (pg, tab, attente = 4500) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(attente); };

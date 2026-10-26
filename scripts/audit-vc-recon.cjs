@@ -29,7 +29,7 @@ const COMMANDE = JSON.stringify({ order: { id: 987654321, status: 'shipped', buy
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
     const pg = await b.newPage();
     await pg.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>' }));
     await pg.route('https://fr.vestiairecollective.com/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: COMMANDE }));

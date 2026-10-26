@@ -35,18 +35,24 @@ const FICHES = {
   5040: { numero: '40', title: 'Adidas Spezial noir taille 35,5', numberedAt: '2026-10-12T10:00:00Z' },
   5041: { numero: '41', title: 'Adidas Spezial noir taille 35,5', numberedAt: '2026-10-13T10:00:00Z' },
   5050: { numero: '50', title: 'Nike Dunk Low taille 40', numberedAt: '2026-10-12T10:00:00Z' },
+  // Un VRAI conflit (25 oct.) : deux annonces différentes en ligne sous le N°60, et
+  // une vente annulée sous le même N° — l'app ne devine rien (vente annulée en jeu),
+  // le rouge reste.
+  5060: { numero: '60', title: 'New Balance 550 taille 42', numberedAt: '2026-10-12T10:00:00Z' },
+  5061: { numero: '60', title: 'Puma Suede taille 39', numberedAt: '2026-10-13T10:00:00Z' },
 };
 const item = (id, title) => ({ id: Number(id), title, price: { amount: '60.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, created_at_ts: Math.floor(Date.parse('2026-10-12T10:00:00Z') / 1000) });
-const LISTINGS = [item(5128, FICHES[5128].title), item(51280, FICHES[51280].title), item(5012, FICHES[5012].title), item(5041, FICHES[5041].title), item(5050, FICHES[5050].title)];
+const LISTINGS = [item(5128, FICHES[5128].title), item(51280, FICHES[51280].title), item(5012, FICHES[5012].title), item(5041, FICHES[5041].title), item(5050, FICHES[5050].title), item(5060, FICHES[5060].title), item(5061, FICHES[5061].title)];
 const vente = (tx, title, status, h) => ({ transaction_id: tx, title, status, price: { amount: '60.0', currency_code: 'EUR' }, date: IL_Y_A(h) });
 const VENTES = [
   vente(9040, FICHES[5040].title, 'Commande finalisée', 120),
   vente(9041, FICHES[5041].title, 'Bordereau envoyé au vendeur', 20),
   vente(9128, FICHES[5128].title, 'Bordereau envoyé au vendeur', 10),
-  // Une AUTRE paire, vente annulée avant l'envoi, corrigée sous le N°50 : elle est
-  // encore sur l'étagère — deux paires présentes sous le N°50 (l'app ne règle
-  // pas ce doublon toute seule : une vente annulée est en jeu).
+  // Une AUTRE paire, vente annulée avant l'envoi, corrigée sous le N°50. Décision de
+  // Julien du 25 oct. (#701) : une vente annulée ne part jamais, elle ne fait PLUS
+  // le rouge — le N°50 n'est pas un double.
   vente(9050, 'Asics Gel Lyte taille 43', 'Commande annulée', 30),
+  vente(9060, 'Vans Old Skool taille 44', 'Commande annulée', 30),
 ];
 const txn = (tx, it, s) => ({ id: `harvest_111_txn_${tx}`, data: { capturedAt: IL_Y_A(1), payload: { transaction: { id: tx, item_id: it, status: s, status_title: 'x' } } } });
 const PLAN = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 8, h: 6, wallH: 3 }, items: [
@@ -54,8 +60,8 @@ const PLAN = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 8, h: 6, wallH: 3 
 ] }], active: 'r1' };
 const MAIN = {
   vinted_annonce_numeros: FICHES,
-  vinted_used_numeros: [12, 40, 41, 50, 128, 200, 1280, 'B128'],
-  vinted_sale_overrides: { 9050: { numero: '50' } },
+  vinted_used_numeros: [12, 40, 41, 50, 60, 128, 200, 1280, 'B128'],
+  vinted_sale_overrides: { 9050: { numero: '50' }, 9060: { numero: '60' } },
   vinted_bords_printed: { 9041: { at: IL_Y_A(5) } },
   vinted_ship_done: {},
   vrm_numerotation: { version: 2, archive: 'B', coupure: '2026-10-09T00:00:00Z', appliqueLe: '2026-10-11T14:58:07Z' },
@@ -168,7 +174,7 @@ async function chercher(pg, q) {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px`);
       const { ctx, pg, errs } = await rendre(b, vp);
@@ -199,8 +205,10 @@ async function chercher(pg, q) {
         dit(rb && rb.num === 'B128' && rb.annonces.join() === '5999:plus-en-ligne' && rb.ventes.length === 0, 'C : « B128 » = l’ancienne paire seule', rb && (rb.num + ' ' + rb.annonces.join() + ' ' + rb.ventes.join()));
       });
       await essaie('D', async () => {
-        const r = await chercher(pg, '50');
-        dit(r && r.doubles === 1, 'D : deux paires présentes sous le N°50 ⇒ le rouge, une fois', r && String(r.doubles));
+        const r0 = await chercher(pg, '50');
+        dit(r0 && r0.doubles === 0, 'D : une annonce + une vente ANNULÉE sous le N°50 ⇒ pas de rouge (25 oct.)', r0 && String(r0.doubles));
+        const r = await chercher(pg, '60');
+        dit(r && r.doubles === 1, 'D : deux annonces présentes sous le N°60 ⇒ le rouge, une fois', r && String(r.doubles));
         const m = r && /rgb\((\d+), (\d+), (\d+)/.exec(r.rouge || '');
         dit(!!m && Number(m[1]) > 150 && Number(m[2]) < 110 && Number(m[3]) < 110, 'D : le bloc double est en rouge (couleur de danger)', r && r.rouge);
       });

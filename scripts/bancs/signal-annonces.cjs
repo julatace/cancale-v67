@@ -131,7 +131,7 @@ const SUPP = (ids) => ({ id: 'harvest_111_supprimees', data: { uid: '111', ids: 
   let b;
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     for (const [onglet, sansVentes] of [['cat_annonces', false], ['dashboard', false], ['cat_annonces', true]]) {
       const nom = `${onglet}${sansVentes ? ' (ventes et boîte absentes aussi)' : ''}`;

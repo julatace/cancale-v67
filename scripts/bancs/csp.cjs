@@ -65,7 +65,7 @@ const DIST = path.join(__dirname, '..', '..', 'dist');
 const RACINE = path.join(__dirname, '..', '..');
 const PORT = Number(process.env.BANC_PORT || 4993);
 const ORIGINE = `http://localhost:${PORT}`;
-const EXE = ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find((p) => fs.existsSync(p));
+const EXE = ['/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p));
 
 // ── Mutations / bascule ─────────────────────────────────────────────────────
 const MUT = process.env.BANC_CSP_MUTATION || '';
