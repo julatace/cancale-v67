@@ -85,6 +85,11 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');return h&&t?Math.abs(top(h)-top(t)):null;})(),
     limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];return {deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
     fraiche:vis(document.querySelector('[data-fraicheur-ventes]')),
+    titreEcran:(()=>{const b=document.querySelector('.vrm-mobile-titre,[data-titre-barre]');const t=[...document.querySelectorAll('.vrm-main h2')].filter(h=>vis(h)&&/^(Statistiques|Comptabilité|Colis)$/.test(h.textContent.trim()));return t.map(h=>h.textContent.trim());})(),
+    courbeDoublons:(()=>{const c=document.querySelector('[data-stats-courbe]');return c?c.querySelectorAll('[data-chart-caption],[data-chart-compare]').length:null;})(),
+    lignesZero:[...document.querySelectorAll('[data-ca-ligne]')].filter(tr=>[...tr.querySelectorAll('td')].slice(1).every(td=>/^0,00/.test(td.textContent.trim()))).length,
+    nLignesCa:document.querySelectorAll('[data-ca-ligne]').length,
+    pictoSeuls:[...document.querySelectorAll('[data-compta-section] .vrm-pourquoi > summary')].filter(x=>x.textContent.trim().length<3).length,
     v0:top(ventes[0]),a0:top(cartes[0]),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,nA:cartes.length,
     deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1};});
 if(sub==='ventes'){
@@ -106,7 +111,15 @@ if(sub==='ventes'){
   dit(m.chev===false,`[${W}] « Reçu » et « Chiffre d'affaires » ne se chevauchent pas dans la carte Vendu`,String(m.chev));
   dit(m.dateCap!=='capitalize',`[${W}] la date s'écrit « lundi 26 octobre », pas « Lundi 26 Octobre »`,String(m.dateCap));
   if(W>=768)dit(m.tete!=null&&m.tete<=12,`[${W}] bonjour et « N choses à faire » sur la même ligne`,String(m.tete));
+} else if(v==='dashboard'){
+  dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Statistiques'),`[${W}] « Statistiques » : une fois sur téléphone (la barre du haut), présent sur ordinateur`,JSON.stringify(m.titreEcran));
+  dit(m.courbeDoublons===0,`[${W}] « Vendu · 12 mois » ne réécrit pas ses mois arrondis autrement`,String(m.courbeDoublons));
+} else if(v==='compta'){
+  dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Comptabilité'),`[${W}] « Comptabilité » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
+  dit(m.nLignesCa>=1&&m.lignesZero===0,`[${W}] le tableau par période ne s'allonge pas de mois sans aucune vente`,`${m.lignesZero} / ${m.nLignesCa}`);
+  dit(m.pictoSeuls===0,`[${W}] pas de ⓘ seul sous les cartes de Compta`,String(m.pictoSeuls));
 } else if(v==='cat_bord'){
+  dit(W<600?m.titreEcran.length===0:m.titreEcran.includes('Colis'),`[${W}] « Colis » : une fois sur téléphone, présent sur ordinateur`,JSON.stringify(m.titreEcran));
   dit(m.limites.length>=3,`[${W}] les cartes de Colis portent leur date limite`,String(m.limites.length));
   dit(m.limites.every(x=>!x.deborde),`[${W}] la date limite ne déborde pas de sa carte`,JSON.stringify(m.limites.filter(x=>x.deborde)));
   dit(m.limites.every(x=>!x.rouge),`[${W}] un retard est ambre, pas rouge (§7)`,JSON.stringify(m.limites.filter(x=>x.rouge)));

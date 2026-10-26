@@ -122,3 +122,13 @@
 .vrm-app-shell .vrm-colis-imprimante { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
 .vrm-app-shell .vrm-colis-imprimante > .vrm-colis-imprimante-aide { margin-top: 0 !important; }
 .vrm-app-shell .vrm-colis-fraicheur:empty { display: none; }
+
+/* ── Toute l'app (26 octobre) : un titre d'écran identique à celui de la barre du
+   haut ne se répète pas sur téléphone (« Colis » écrit deux fois à 60 px). Les
+   actions de sa ligne restent ; une ligne sans action disparaît. */
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre { display: none; }
+  .vrm-app-shell .vrm-screen-head-doublon:not(:has(.vrm-tete-row > :nth-child(2))) { display: none; }
+}
+/* « À quoi ça sert ? » écrit à côté du ⓘ, plus un pictogramme seul sous la carte. */
+.vrm-app-shell .vrm-pourquoi-ecrit > summary { font-size: 12.5px; color: var(--vrm-muted, #6b7a80); cursor: pointer; width: auto; min-width: 0; }

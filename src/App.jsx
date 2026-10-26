@@ -11759,6 +11759,10 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
     </div>
   );
 }
+// (26 oct.) Le titre de la barre du haut (téléphone), posé par la coque à chaque
+// rendu : un grand titre d'écran IDENTIQUE se tait sur téléphone (§7, un mot écrit
+// deux fois à 60 px d'écart). Un titre différent (sous-écran de Réglages…) reste.
+let TITRE_BARRE = '';
 function ScreenHead({ icon, title, desc, right }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
@@ -11776,7 +11780,7 @@ function ScreenHead({ icon, title, desc, right }) {
     /* (16 oct.) GRAND TITRE : l'échelle typographique de l'app est posée une
        fois (index.html, `--vrm-t-*`) ; taille, graisse et marges vivent dans
        `.vrm-screen-head` (styles-coque.css). Plus de filet sous le titre. */
-    <div className="vrm-screen-head">
+    <div className={"vrm-screen-head" + (title && title === TITRE_BARRE ? " vrm-screen-head-doublon" : "")}>
       {/* ⚠️ LA RANGÉE DU TITRE RÉSERVE LA PLACE DE L'ÎLE D'ACTIONS. Depuis
           qu'elle flotte en haut à droite (fixe), les boutons qu'un écran pose
           sur sa propre ligne de titre passaient DESSOUS : sur Factures,
@@ -14920,8 +14924,8 @@ function EntetePlateforme({nom,plateforme}) {
 // au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.
 // Ce qui dit un RISQUE propre à la donnée (une règle d'offre, une raison qui
 // distingue une ligne) reste visible — seul le texte fixe se replie.
-function Pourquoi({ children, label = 'Pourquoi ?' }) {
-  return <details className="vrm-pourquoi" data-pourquoi><summary aria-label={label} title={label}>ⓘ</summary><div>{children}</div></details>;
+function Pourquoi({ children, label = 'Pourquoi ?', ecrit = false }) {
+  return <details className={'vrm-pourquoi' + (ecrit ? ' vrm-pourquoi-ecrit' : '')} data-pourquoi>{ecrit ? <summary>ⓘ {label}</summary> : <summary aria-label={label} title={label}>ⓘ</summary>}<div>{children}</div></details>;
 }
 // (17 oct.) LES VENTES, MÊME QUAND IL N'Y EN A PAS ENCORE — Julien : « même s'il
 // n'y a pas de ventes tu peux faire comme Vinted : ventes en cours, finalisées,
@@ -21785,10 +21789,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <div>
-        <h2 style={{margin:0,color:C.text,fontSize:28,fontWeight:600,letterSpacing:-0.5}}>Statistiques</h2>
-        <div style={{fontSize:13,color:C.muted,marginTop:2}}>Tes ventes, ton évolution, tes résultats</div>
-      </div>
+      <ScreenHead icon="chart" title="Statistiques"/>
 
       {/* Stats principales — priorité aux valeurs Vinted en direct (liveStats) :
           Articles en stock = nb de numéros étiquetés au garage · Valeur du stock =
@@ -21929,7 +21930,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div style={{fontSize:11,color:C.muted,marginTop:4}}>Toutes plateformes · ventes en cours comprises</div>
             <div className="vrm-display" style={{...sHero,fontSize:28,letterSpacing:-0.8,marginTop:6}}>{fmt(tot)}</div>
             <DayWeekNote label="Comprendre ce graphique"><div style={{...sNote,marginTop:6}}>Toutes plateformes, ventes en cours comprises, au jour de la vente — ce n'est pas le finalisé, c'est pourquoi ce total peut dépasser celui du dessus.</div></DayWeekNote>
-            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende/></div>
+            <div style={{marginTop:14}}><CourbeMois mois={mois.map((m,i)=>({...m,enCours:i===mois.length-1}))} attr="data-courbe-vendu" presentation="ligne" legende={false}/></div>
             <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.muted}}>
                 <span aria-hidden="true" style={{width:10,height:10,borderRadius:999,background:C.accent,flexShrink:0}}/>
@@ -28449,7 +28450,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
                 </tr>
               </thead>
               <tbody>
-                {lignes.slice(1).map((r) => (
+                {(() => { const L = lignes.slice(1); let n = L.length; while (n > 0 && COLS.every(([k]) => L[n - 1][k] && L[n - 1][k].n === 0)) n--; return L.slice(0, n); })().map((r) => (
                   <tr key={r.cle} data-ca-ligne={r.libelle} style={{ borderTop: `1px solid ${C.border}` }}>
                     <td style={{ padding: '9px 16px', color: C.text, whiteSpace: 'nowrap' }}>{r.libelle}</td>
                     {COLS.map(([k]) => <td key={k} style={{ padding: '9px 16px 9px 8px', textAlign: 'right', color: r[k] == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{montant(r[k])}</td>)}
@@ -29526,7 +29527,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
-      {note && <div className="vrm-set-pied" style={{ color: C.muted }}><Pourquoi label="À quoi ça sert ?">{note}</Pourquoi></div>}
+      {note && <div className="vrm-set-pied" style={{ color: C.muted }}><Pourquoi label="À quoi ça sert ?" ecrit>{note}</Pourquoi></div>}
     </section>
   );
 }
@@ -50810,7 +50811,7 @@ function AppCoeur() {
     main.addEventListener('scroll', surDefilement, { passive: true });
     return () => { main.removeEventListener('scroll', surDefilement); if (raf) cancelAnimationFrame(raf); };
   }, [tab]);
-  const titreCourant = titreEcran(tab);
+  const titreCourant = titreEcran(tab); TITRE_BARRE = titreCourant;
   // Repercute dans le state React les tokens rafraichis automatiquement par le
   // proxy (via persistRefreshedTokens). Sans ca, seuls l'objet compte en memoire
   // et Supabase seraient a jour, mais pas le state -> le prochain rendu
