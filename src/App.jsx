@@ -18442,7 +18442,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
       {/* (26 octobre) Julien : « sur eBay je veux pouvoir supprimer les annonces ».
           Le geste était caché dans la carte dépliée : il est sur la carte. */}
-      <button type="button" data-ebay-supprimer={it.itemId} disabled={saving || supprimee} onClick={terminer} style={btnE}>{supprimee ? 'Supprimée d’eBay' : 'Supprimer d’eBay'}</button>
+      <button type="button" data-ebay-supprimer={it.itemId} disabled={saving || supprimee} onClick={terminer} style={{ ...btnE, border: 'none', background: 'transparent', padding: '8px 4px', minHeight: 44, color: E.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>{supprimee ? 'Supprimée d’eBay' : 'Supprimer d’eBay'}</button>
       {msg && !open && <span data-ebay-supprimer-msg={it.itemId} style={{ fontSize: 12, color: E.muted }}>{msg}</span>}
       {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à un article</button>}
       {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
@@ -29220,7 +29220,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
-      {note && <div className="vrm-set-pied" style={{ color: C.muted }}>{note}</div>}
+      {note && <div className="vrm-set-pied" style={{ color: C.muted }}><Pourquoi label="À quoi ça sert ?">{note}</Pourquoi></div>}
     </section>
   );
 }
@@ -30039,12 +30039,22 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Tes charges, tes abonnements et ton chiffre d'affaires par période — chaque euro compte dans ton résultat." />
+      <ScreenHead icon="euro" title="Comptabilité" desc="Ton résultat, ta déclaration URSSAF, tes charges et tes factures." />
+      {/* (26 octobre) Julien : « la compta, c'est horrible ». La page fait plus de
+          6 000 px au téléphone : un sommaire en tête mène à chaque partie, et la
+          déclaration URSSAF remonte juste sous le bénéfice. Aucune règle de
+          calcul ne change ; les explications longues passent derrière « Pourquoi ? ». */}
+      <nav aria-label="Parties de la comptabilité" data-compta-sommaire="" className="vrm-rangee vrm-compta-sommaire" style={{ display: 'flex', gap: 8, margin: '-4px 0 0' }}>
+        {[['compta-resultat', 'Résultat'], ['compta-benefice', 'Bénéfice'], ['compta-urssaf', 'URSSAF'], ['compta-charges', 'Charges'], ['compta-ca', 'Chiffre d\'affaires'], ['compta-factures', 'Factures']].map(([id, l]) => (
+          <button key={id} type="button" data-compta-aller={id} onClick={() => { const e = document.getElementById(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+            style={{ flex: '0 0 auto', minHeight: 40, padding: '0 14px', borderRadius: 999, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{l}</button>
+        ))}
+      </nav>
 
       {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
-      <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
+      <Card id="compta-resultat" className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden', scrollMarginTop: 72 }}>
         <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)} data-compta-ca-etat={etatCa} data-compta-ca-at={caAt ? new Date(caAt).toISOString() : ''}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>Résultat {annee} · CA déclaré − charges</div>
           {recettesAnnee == null ? (
@@ -30075,24 +30085,28 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   {/* (17 oct., revue) La carte URSSAF, juste en dessous sur le même écran,
                       écrit déjà « N ventes sans date de versement (X €) » avec le
                       geste : ici on y renvoie, sans redire les mêmes nombres (§7). */}
-                  {couvertureCa.aDater && <div>Des ventes finalisées n'ont pas encore de date de versement : elles ne sont dans aucun mois pour l'instant (le détail est dans « Ta déclaration URSSAF »).</div>}
+                  {couvertureCa.aDater && <div>Des ventes finalisées attendent leur date de versement (détail dans « URSSAF »).</div>}
                 </div>
               )}
-              <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                Ce résultat ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est juste en dessous.
-              </div>
+              <div style={{ marginTop: 10 }}><Pourquoi label="Ce que ce résultat compte">Le CA déclaré de l'année (toutes plateformes) moins tes charges. Il ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est juste en dessous.</Pourquoi></div>
             </div>
           )}
         </div>
       </Card>
 
+      <div id="compta-benefice" style={{ scrollMarginTop: 72 }}>
       <BeneficeCompta compta={data} onNav={onNav}
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { setOuvert('dep'); setVersDepense((n) => n + 1); }} />
+      </div>
+
+      <div id="compta-urssaf" style={{ scrollMarginTop: 72 }}>
+      <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
+      </div>
 
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
           libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
-      <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+      <section id="compta-charges" className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0, scrollMarginTop: 72 }}>
         <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted }}>Tes charges</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           {[
@@ -30114,9 +30128,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </div>
       </section>
 
-      <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
 
+      <div id="compta-ca" style={{ scrollMarginTop: 72 }}>
       <CaParPeriodeCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+      </div>
 
       <RecapComptableMensuel />
 
@@ -30243,7 +30258,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </div>
 
       {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
-      <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+      <section id="compta-factures" className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0, scrollMarginTop: 72 }}>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           <button type="button" className="vrm-set-ligne" onClick={() => onNav && onNav('invoices')}>
             <IconeReglage name="receipt" />
