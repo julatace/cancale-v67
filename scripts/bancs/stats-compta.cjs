@@ -151,11 +151,13 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
       console.log(`\n── Statistiques, ${vp.width}`);
       await essaie(`stats ${vp.width}`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, vp, 'dashboard');
+        // 26 oct. : le détail de « Ce qui se vend » est replié (Tailles, modèles et délais) : on l'ouvre comme lui.
+        await pg.evaluate(() => { const d = [...document.querySelectorAll('.vrm-stats-analyses details')][0]; if (d && !d.open) d.querySelector('summary').click(); });
         await pg.waitForSelector('[data-stats-carte="repartitions"][data-repart-etat="lu"]', { timeout: 15000 }).catch(() => {});
         await pg.waitForFunction(() => { const e = document.querySelector('[data-repart-delai-n]'); return e && e.getAttribute('data-repart-delai-n') !== ''; }, null, { timeout: 8000 }).catch(() => {});
         const lu = await pg.evaluate(() => {
           const pts = (sel) => [...document.querySelectorAll(`${sel} g[data-mois]`)].map((g) => ({ m: g.getAttribute('data-mois'), v: Number(g.getAttribute('data-valeur')) }));
-          const r = document.querySelector('[data-stats-carte="repartitions"]');
+          const r = document.querySelector('[data-stats-carte="repartitions"][data-repart-etat]');
           return {
             tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
             deb: document.documentElement.scrollWidth - window.innerWidth,
@@ -200,6 +202,9 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
       console.log(`\n── Statistiques, pays illisible, ${vp.width}`);
       await essaie(`stats ko ${vp.width}`, async () => {
         const { ctx, pg } = await ouvrir(b, vp, 'dashboard', { txnKO: true });
+        await pg.waitForSelector('.vrm-stats-analyses details', { timeout: 15000 });
+        // 26 oct. : le détail de « Ce qui se vend » est replié (Tailles, modèles et délais) : on l'ouvre comme lui.
+        await pg.evaluate(() => { const d = [...document.querySelectorAll('.vrm-stats-analyses details')][0]; if (d && !d.open) d.querySelector('summary').click(); });
         await pg.waitForSelector('[data-repart-mode="pays"]', { timeout: 15000 });
         await pg.click('[data-repart-mode="pays"]'); await pg.waitForTimeout(600);
         const t = await pg.evaluate(() => (document.querySelector('[data-repart-liste="pays"]') || {}).innerText || '');
