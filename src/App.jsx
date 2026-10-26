@@ -38,7 +38,8 @@ import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
-import {colisEbay, lienCommandeEbay} from '../api/_lib/ebay-a-expedier.js';
+import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
+import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe} from '../api/_lib/retrait-colis.js';
@@ -16344,9 +16345,10 @@ const corpsCompteEbay = (ref) => (ref && ref !== 'principal' && CLE_COMPTE_EBAY.
 // identité n'est pas apprise. La MÊME règle que la route (`comptesActifs`, §11).
 function comptesEbayActifs(reg) {
   const l = (reg && Array.isArray(reg.comptes) ? reg.comptes : []).filter((e) => e && typeof e === 'object')
-    .map((e) => ({ cle: CLE_COMPTE_EBAY.test(String(e.cle || '')) ? String(e.cle) : '', pseudo: String(e.pseudo || '').slice(0, 64), principal: e.principal === true, deconnecteLe: Number(e.deconnecteLe) || null, ajouteLe: Number(e.ajouteLe) || null, type: (e.type === 'pro' || e.type === 'particulier') ? e.type : '' }))
+    .map((e) => ({ cle: CLE_COMPTE_EBAY.test(String(e.cle || '')) ? String(e.cle) : '', pseudo: String(e.pseudo || '').slice(0, 64), principal: e.principal === true, deconnecteLe: Number(e.deconnecteLe) || null, ajouteLe: Number(e.ajouteLe) || null, type: (e.type === 'pro' || e.type === 'particulier') ? e.type : '', ...(typeof e.site === 'string' ? { site: e.site } : {}) }))
     .filter((e) => e.principal || e.cle);
   const out = l.filter((e) => !e.deconnecteLe).map((e) => ({ ...e, suffixe: suffixeCompteEbay(e), ref: refCompteEbay(e) }));
+  for (const e of out) { const m = marcheEbayDuCompte(e); if (m) _marchesParRef.set(e.ref, m); }
   if (!l.some((e) => e.principal)) out.unshift({ cle: '', pseudo: '', principal: true, implicite: true, deconnecteLe: null, ajouteLe: null, suffixe: '', ref: 'principal' });
   return out;
 }
@@ -16355,6 +16357,17 @@ const nomCompteEbay = (c) => (c && c.pseudo) ? c.pseudo : 'compte principal';
 // (17 oct.) Pro ou particulier, tel qu'eBay le dit (GetUser, rangé par la route).
 // Pas su ⇒ rien (jamais « particulier » par défaut).
 const typeCompteEbayTexte = (c) => (c && c.type === 'pro') ? 'Pro' : (c && c.type === 'particulier') ? 'Particulier' : '';
+// (26 oct.) Le SITE eBay d'un compte (eBay.fr, .co.uk, .com…) — la même table
+// que la route (`ebay-marches-table.js`, §11). Dit seulement quand ce n'est pas
+// eBay.fr : un vendeur français n'a rien de nouveau à lire.
+const siteCompteEbayTexte = (c) => { const m = marcheEbayDuCompte(c); return !m ? 'site eBay non géré' : (m.site === 'FR' ? '' : m.nom); };
+// Le marché d'un compte désigné par sa RÉF (`_compte` des lignes), lu dans le
+// dernier registre connu ; inconnu ⇒ eBay.fr (le comportement d'avant).
+const _marchesParRef = new Map();
+const marcheEbayDeRef = (ref) => _marchesParRef.get(ref || 'principal') || MARCHE_EBAY_DEFAUT;
+const lienCommandeEbay = (orderId, ref) => lienCommandeMarche(marcheEbayDeRef(ref), orderId);
+const lienItemEbay = (itemId, ref) => lienAnnonceMarche(marcheEbayDeRef(ref), itemId);
+const symboleEbayDeRef = (ref) => marcheEbayDeRef(ref).devise === 'EUR' ? '€' : marcheEbayDeRef(ref).devise;
 // Le registre, lu une fois par ouverture (et relu après une connexion ou une
 // déconnexion : `vrm:ebay-comptes`). TROIS états : `undefined` en cours ·
 // `null` pas su (la base n'a pas répondu) · la liste des comptes actifs.
@@ -17512,7 +17525,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 confirme qu'il est accepté avant toute publication. */}
             <BlocEbay n="4" titre="Prix & livraison">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
-                <div><label style={lab}>Prix (€)</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
+                <div><label style={lab} data-ebay-prix-devise={symboleEbayDeRef(comptePub)}>Prix ({symboleEbayDeRef(comptePub)})</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               </div>
               {/* (9 octobre) LA RÈGLE D'OFFRE, facultative : c'est eBay qui
@@ -17964,7 +17977,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 return (
                   <div key={ref} data-ebay-compte-ligne={ref} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
                     <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}{typeCompteEbayTexte(c) ? <span data-ebay-compte-type={c.type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(c)}</span> : null}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}{typeCompteEbayTexte(c) ? <span data-ebay-compte-type={c.type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(c)}</span> : null}{siteCompteEbayTexte(c) ? <span data-ebay-compte-site={c.site || ''} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{siteCompteEbayTexte(c)}</span> : null}</div>
                       <div style={{ fontSize: 11, color: c.relie === false ? C.warn : C.muted }}>{c.relie === true ? 'relié' : c.relie === false ? 'plus relié — reconnecte-le avec « Connecter un autre compte eBay »' : 'état pas lu'}</div>
                       {etat && etat !== '…' && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{etat}</div>}
                     </div>
@@ -18004,7 +18017,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 </div>
               );
               if (solde && solde.ok && (solde.dispo != null || solde.retenu != null || solde.enAttente != null)) {
-                const item = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: col || C.text }}>{v == null ? '—' : eur(v)}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
+                const item = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 19, fontWeight: 700, color: col || C.text }}>{v == null ? '—' : (solde.devise && solde.devise !== 'EUR' ? prixEbayTexte(v, solde.devise) : eur(v))}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
                 const enRoute = (solde.enAttente != null || solde.retenu != null) ? (Number(solde.enAttente || 0) + Number(solde.retenu || 0)) : null;
                 return (
                   <div key={cpt.ref} data-ebay-solde={cpt.ref} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '12px 14px', marginBottom: 10 }}>
@@ -18512,7 +18525,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
   const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?prixEbayTexte(n,c):'';};
   const j = (() => { const t = Date.parse(it.depuis || ''); return isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 86400000)); })();
-  const url = it.url || (it.itemId ? `https://www.ebay.fr/itm/${it.itemId}` : null);
+  const url = it.url || (it.itemId ? lienItemEbay(it.itemId, it._compte) : null);
   const d = it.detail || {};
   const specs = (d.specifics && typeof d.specifics === 'object') ? Object.entries(d.specifics).filter(([, v]) => v != null && String(v).trim()) : [];
   const nb = Array.isArray(d.photos) ? d.photos.length : null;
@@ -20601,7 +20614,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           <div key={d.numero} data-ebay-deux-comptes-paire={d.numero} style={{ padding: '8px 0', borderTop: `1px solid ${E.border}` }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text }}>N°{d.numero} · {d.annonces[0].title || d.annonces[0].itemId}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 5 }}>
-              {d.annonces.map((a) => <a key={a._compte + a.itemId} href={a.url || `https://www.ebay.fr/itm/${a.itemId}`} target="_blank" rel="noreferrer" data-ebay-deux-comptes-annonce={a._compte} style={lienE}>{nomCompteEbay((comptesEbay || []).find((c) => c.ref === a._compte) || { pseudo: a._pseudo })} ↗</a>)}
+              {d.annonces.map((a) => <a key={a._compte + a.itemId} href={a.url || lienItemEbay(a.itemId, a._compte)} target="_blank" rel="noreferrer" data-ebay-deux-comptes-annonce={a._compte} style={lienE}>{nomCompteEbay((comptesEbay || []).find((c) => c.ref === a._compte) || { pseudo: a._pseudo })} ↗</a>)}
             </div>
           </div>
         ))}
@@ -20946,7 +20959,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const offresInconnuesRegle = pasSuRegle.filter((it) => etatVue(it).raison === 'offres-inconnues');
   const nPasLueRegle = relisablesRegle.length;
   const nIllisibleRegle = causesRegle.get('illisible') || 0, nDeviseRegle = causesRegle.get('devise') || 0, nAbsenteRegle = causesRegle.get('pas-sur-ce-compte') || 0;
-  const lienEbayDe = (it) => it.url || `https://www.ebay.fr/itm/${it.itemId}`;
+  const lienEbayDe = (it) => it.url || lienItemEbay(it.itemId, it._compte);
   // « Réessayer » : relit ce que VRM a rangé (notre base) — jamais eBay.
   const relireBase = async () => {
     if (relitRegles || !comptesEbay) return;
@@ -34787,7 +34800,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); const prix = parseFloat(String((x && x.price) || '').replace(',', '.'));
           if (!c || !x.itemId || !(prix > 0)) continue;
           if (m.has(c)) { m.set(c, { ambigu: 'ebay' }); continue; }
-          m.set(c, { itemId: String(x.itemId), prix, titre: String(x.title || ''), url: x.url || `https://www.ebay.fr/itm/${x.itemId}`, compte: x._compte || 'principal' });
+          m.set(c, { itemId: String(x.itemId), prix, titre: String(x.title || ''), url: x.url || lienItemEbay(x.itemId, x._compte), compte: x._compte || 'principal' });
         }
         if (!stop) setEbayVivantes(m);
       } catch (_) { if (!stop) setEbayVivantes(null); }
@@ -42063,7 +42076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>Ni annulée, ni partie : regarde-la dans eBay avant de poster ou non.</div>
             {colisEb.aVerifier.map(x => {
               const num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
-              return <div key={x.compte+':'+x.orderId} data-ebay-a-verifier-cmd={x.orderId} data-numero={num} style={{fontSize:12,color:C.text,marginTop:6}}>{num?<b>N°{num} · </b>:null}{x.titre || `Commande ${x.orderId}`} <span style={{color:C.muted}}>· {x.etat}</span> · <a href={lienCommandeEbay(x.orderId)} target="_blank" rel="noopener noreferrer" style={{color:C.text}}>Ouvrir dans eBay ↗</a></div>;
+              return <div key={x.compte+':'+x.orderId} data-ebay-a-verifier-cmd={x.orderId} data-numero={num} style={{fontSize:12,color:C.text,marginTop:6}}>{num?<b>N°{num} · </b>:null}{x.titre || `Commande ${x.orderId}`} <span style={{color:C.muted}}>· {x.etat}</span> · <a href={lienCommandeEbay(x.orderId, x.compte)} target="_blank" rel="noopener noreferrer" style={{color:C.text}}>Ouvrir dans eBay ↗</a></div>;
             })}
           </div>
         )}
@@ -42406,7 +42419,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <LigneDestinationEbay d={x.destination}/>
                     {x.authentification && <div data-colis-ebay-auth="" style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>Part vers l'authentificateur d'eBay (garantie d'authenticité) : l'étiquette d'eBay l'y envoie, pas chez l'acheteur.</div>}
                     <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-                      <a data-lien-etiquette-ebay="" href={lienCommandeEbay(x.orderId)} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,boxSizing:'border-box',fontSize:13,fontWeight:600,color:C.text,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,padding:'0 14px'}}>Étiquette sur eBay ↗</a>
+                      <a data-lien-etiquette-ebay="" href={lienCommandeEbay(x.orderId, x.compte)} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,boxSizing:'border-box',fontSize:13,fontWeight:600,color:C.text,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,padding:'0 14px'}}>Étiquette sur eBay ↗</a>
                       <button type="button" data-gerer-ebay={x.orderId} onClick={()=>{ DEMANDE_EBAY_CIBLE.compte = x.compte; DEMANDE_EBAY_CIBLE.id = x.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); }}
                         style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'0 14px',minHeight:44,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Suivi et message à l'acheteur</button>
                     </div>
@@ -52569,7 +52582,7 @@ function AppCoeur() {
           {Array.isArray(comptesEbay) && comptesEbay.length >= 2 && (
             <ListeComptes id="vrm-sel-compte-ebay" skin={EBAY_SKIN} valeur={ebayVueEff} onChange={setEbayVue}
               attrs={{ 'data-ebay-vue': ebayVueEff }}
-              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') }))} />
+              options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
           )}
           {platSub==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {platSub==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessages key={ref} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}

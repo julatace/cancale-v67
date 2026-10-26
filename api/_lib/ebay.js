@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { sbCle } from './cle.js';
+import { MARCHES, siteDeEbay } from './ebay-marches.js';
 // Base cloisonnée : sans propriétaire ni cible (owner,id), l'écriture est refusée.
 // La base sait-elle séparer les vendeurs ? (trois états, voir session.js)
 import { baseCloisonnee } from './session.js';
@@ -171,7 +172,11 @@ async function identiteEbay(token) {
     const seller = (/<SellerInfo>([\s\S]*?)<\/SellerInfo>/.exec(user) || [])[1] || '';
     const bt = ((/<SellerBusinessType>([\s\S]*?)<\/SellerBusinessType>/.exec(seller) || [])[1] || '').trim().toLowerCase();
     const type = bt === 'commercial' ? 'pro' : bt === 'private' ? 'particulier' : '';
-    return { cle: cleCompteDe(eias), pseudo, type };
+    // (26 octobre) LE MARCHÉ — `User.Site` (eBay.fr, .co.uk, .com…). Absent ⇒ ''
+    // (pas su : le compte reste sur eBay.fr) ; un site que VRM ne gère pas ⇒ '?'.
+    const siteBrut = ((/<Site>([\s\S]*?)<\/Site>/.exec(user) || [])[1] || '').trim();
+    const site = siteBrut ? (siteDeEbay(siteBrut) || '?') : '';
+    return { cle: cleCompteDe(eias), pseudo, type, site };
   } catch (_) { return null; }
 }
 
@@ -196,6 +201,9 @@ function normaliserRegistre(d) {
     // Pro / particulier lu chez eBay (GetUser). '' = demandé, eBay ne l'a pas
     // dit ; absent (undefined) = jamais demandé.
     ...(e.type === 'pro' || e.type === 'particulier' || e.type === '' ? { type: e.type, typeLuLe: Number(e.typeLuLe) || null } : {}),
+    // Le marché (26 octobre) : un code de `MARCHES`, '?' (site non géré) ou ''
+    // (pas dit par eBay) ; absent = jamais demandé (⇒ eBay.fr).
+    ...(e.site === '' || e.site === '?' || Object.prototype.hasOwnProperty.call(MARCHES, e.site) ? { site: e.site } : {}),
   })).filter((e) => e.principal || e.cle);
   return { comptes, absent: d === null };
 }
@@ -315,10 +323,10 @@ async function rangerConnexion(code, owner, opts = {}) {
   }
   const meme = entrees.find((x) => x.cle && x.cle === id.cle);
   if (meme) {
-    const entree = { ...meme, pseudo: id.pseudo || meme.pseudo, vuLe: maintenant, deconnecteLe: null, type: id.type, typeLuLe: maintenant };
+    const entree = { ...meme, pseudo: id.pseudo || meme.pseudo, vuLe: maintenant, deconnecteLe: null, type: id.type, typeLuLe: maintenant, site: id.site };
     return ranger(suffixeCompte(meme), (l) => poser(l, entree), entree, false);
   }
-  const nouvelle = (principal) => ({ cle: id.cle, pseudo: id.pseudo, principal, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null, type: id.type, typeLuLe: maintenant });
+  const nouvelle = (principal) => ({ cle: id.cle, pseudo: id.pseudo, principal, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null, type: id.type, typeLuLe: maintenant, site: id.site });
   if (refP && !princ) {
     // Le principal est relié mais son identité n'a jamais été apprise :
     // l'apprendre AVANT de décider (sinon on ne sait pas si c'est le même).
@@ -327,7 +335,7 @@ async function rangerConnexion(code, owner, opts = {}) {
     if (idP && idP.cle === id.cle) return ranger('', (l) => poser(l, nouvelle(true)), nouvelle(true), false);
     if (idP) {
       if (autres.some((x) => x.cle === idP.cle)) return REFUS_PRINCIPAL;
-      const p = { cle: idP.cle, pseudo: idP.pseudo, principal: true, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null, type: idP.type, typeLuLe: maintenant };
+      const p = { cle: idP.cle, pseudo: idP.pseudo, principal: true, ajouteLe: maintenant, vuLe: maintenant, deconnecteLe: null, type: idP.type, typeLuLe: maintenant, site: idP.site };
       const n = nouvelle(false);
       return ranger(suffixeCompte(n), (l) => poser(poser(l, p), n), n, true);
     }
@@ -355,7 +363,7 @@ async function apprendrePrincipal(owner, token) {
   if (!id || reg.comptes.some((x) => x.cle === id.cle)) return null;
   const t = Date.now();
   return modifierComptes(owner, (l) => l.some((x) => x.principal || x.cle === id.cle) ? null
-    : [{ cle: id.cle, pseudo: id.pseudo, principal: true, ajouteLe: t, vuLe: t, deconnecteLe: null, type: id.type, typeLuLe: t }, ...l]);
+    : [{ cle: id.cle, pseudo: id.pseudo, principal: true, ajouteLe: t, vuLe: t, deconnecteLe: null, type: id.type, typeLuLe: t, site: id.site }, ...l]);
 }
 
 // (17 octobre) Pro ou particulier pour les comptes déjà reliés AVANT que VRM le
@@ -367,7 +375,7 @@ const TYPE_RELECTURE_MS = 7 * 24 * 3600 * 1000;
 async function apprendreTypes(owner, reg) {
   if (!reg || !Array.isArray(reg.comptes)) return null;
   const t0 = Date.now();
-  const aLire = comptesActifs(reg).filter((c) => c.type === undefined || (c.type === '' && !(c.typeLuLe && t0 - c.typeLuLe < TYPE_RELECTURE_MS)));
+  const aLire = comptesActifs(reg).filter((c) => c.type === undefined || c.site === undefined || (c.type === '' && !(c.typeLuLe && t0 - c.typeLuLe < TYPE_RELECTURE_MS)));
   if (!aLire.length) return null;
   const lus = [];
   for (const c of aLire.slice(0, 3)) {
@@ -376,12 +384,12 @@ async function apprendreTypes(owner, reg) {
     const id = await identiteEbay(at.token);
     // L'identité doit être CELLE du compte (la clé) — sinon on ne range rien.
     if (!id || (c.cle && id.cle !== c.cle)) continue;
-    lus.push({ ref: c.principal ? '' : c.cle, principal: !!c.principal, type: id.type });
+    lus.push({ ref: c.principal ? '' : c.cle, principal: !!c.principal, type: id.type, site: id.site });
   }
   if (!lus.length) return null;
   const w = await modifierComptes(owner, (l) => {
     let change = false;
-    const out = l.map((e) => { const x = lus.find((y) => (y.principal && e.principal) || (!y.principal && e.cle === y.ref)); if (!x) return e; change = true; return { ...e, type: x.type, typeLuLe: Date.now() }; });
+    const out = l.map((e) => { const x = lus.find((y) => (y.principal && e.principal) || (!y.principal && e.cle === y.ref)); if (!x) return e; change = true; return { ...e, type: x.type, typeLuLe: Date.now(), ...(x.site !== undefined ? { site: x.site } : {}) }; });
     return change ? out : null;
   });
   return w === true;
@@ -393,7 +401,17 @@ async function apprendreTypes(owner, reg) {
 // désigne rien, et rien ne part chez eBay.
 async function resoudreCompte(brut, owner) {
   const v = String(brut == null ? '' : brut).trim().toLowerCase();
-  if (!v) return { ok: true, compte: { ...PRINCIPAL } };
+  if (!v) {
+    // (26 octobre) Le principal a lui aussi un MARCHÉ (eBay.fr, .co.uk, .com) :
+    // il est lu dans le registre. Registre illisible ⇒ `siteInconnu` (les
+    // actions qui créent une annonce refusent plutôt que de publier en France
+    // à la place) ; base pas cloisonnée ⇒ une seule boutique, eBay.fr.
+    if (!(await baseCloisonnee())) return { ok: true, compte: { ...PRINCIPAL } };
+    const regP = await lireComptes(owner);
+    if (regP === undefined) return { ok: true, compte: { ...PRINCIPAL, siteInconnu: true } };
+    const p = (regP.comptes || []).find((e) => e.principal);
+    return { ok: true, compte: { ...PRINCIPAL, ...(p && p.site !== undefined ? { site: p.site } : {}) } };
+  }
   if (!CLE_COMPTE.test(v)) return { ok: false, status: 400, body: { ok: false, reason: 'compte', error: 'Compte eBay mal désigné — rien n\'a été envoyé à eBay.' } };
   if (!(await baseCloisonnee())) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée — rien n\'a été envoyé à eBay.' } };
   const reg = await lireComptes(owner);
@@ -401,7 +419,7 @@ async function resoudreCompte(brut, owner) {
   const e = reg.comptes.find((x) => x.cle === v);
   if (!e) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Ce compte eBay n\'est pas relié à ton compte VRM — rien n\'a été envoyé à eBay.' } };
   if (e.deconnecteLe) return { ok: false, status: 409, body: { ok: false, reason: 'compte-deconnecte', error: `Le compte eBay « ${e.pseudo || 'sans nom'} » est déconnecté — reconnecte-le d'abord. Rien n'a été envoyé à eBay.` } };
-  return { ok: true, compte: { cle: e.cle, pseudo: e.pseudo, principal: e.principal, suffixe: suffixeCompte(e) } };
+  return { ok: true, compte: { cle: e.cle, pseudo: e.pseudo, principal: e.principal, suffixe: suffixeCompte(e), ...(e.site !== undefined ? { site: e.site } : {}) } };
 }
 
 // Déconnecter UN compte : ses jetons sont vidés, il est marqué déconnecté dans

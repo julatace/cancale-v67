@@ -49,7 +49,7 @@ const remettre = (unSeul) => {
     { id: 'vinted_item_details', data: DETAILS },
     { id: 'ebay_comptes', data: { comptes: unSeul ? [{ cle: K1, pseudo: 'paire_perso', principal: true }] : [
       { cle: K1, pseudo: 'paire_perso', principal: true, ajouteLe: 1 },
-      { cle: K2, pseudo: 'paire_pro', principal: false, ajouteLe: 2 },
+      { cle: K2, pseudo: 'paire_pro', principal: false, ajouteLe: 2, site: 'GB' },   // (26 oct.) inscrit sur eBay.co.uk
       { cle: K3, pseudo: 'paire_trois', principal: false, ajouteLe: 3 },
     ] } },
     { id: 'ebay_listings', data: { items: [ann('120000000030', 30, '130.0'), ann('120000000031', 31, '99.0')], capturedAt: Date.now() } },
@@ -172,7 +172,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-ebay-vente]', { timeout: 10000 }).catch(() => {});
         await pg.waitForTimeout(700);
         const opts = await pg.$$eval('#vrm-sel-compte-ebay option', (l) => l.map((o) => [o.value, o.textContent]));
-        dit(opts.length === 4 && opts[0][0] === '*' && opts.some(([v, t]) => v === 'principal' && t === 'paire_perso') && opts.some(([v, t]) => v === K2 && t === 'paire_pro') && opts.some(([v, t]) => v === K3 && t === 'paire_trois'),
+        dit(opts.length === 4 && opts[0][0] === '*' && opts.some(([v, t]) => v === 'principal' && t === 'paire_perso') && opts.some(([v, t]) => v === K2 && t === 'paire_pro · eBay.co.uk') && opts.some(([v, t]) => v === K3 && t === 'paire_trois'),
           'le sélecteur propose « Tous les comptes » + une entrée par compte eBay, nommée par son pseudo', JSON.stringify(opts));
         const v = await ventes(pg); const r = await resume(pg);
         dit(v.length === 3 && new Set(v.map((x) => x.c)).size === 3 && v.some((x) => x.id === '22-0002' && x.c === K2 && /paire_pro/.test(x.t)),
@@ -216,6 +216,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 4000 }).catch(() => pg.getByRole('button', { name: 'Trouver la catégorie eBay' }).click({ timeout: 5000 }));
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '125');
+        const dev = await pg.$eval('[data-ebay-prix-devise]', (e) => e.getAttribute('data-ebay-prix-devise') + '|' + e.textContent).catch(() => '');
+        dit(/^GBP\|Prix \(GBP\)$/.test(dev), '(26 oct.) le compte 2 est inscrit sur eBay.co.uk : le prix se tape en livres (« Prix (GBP) »), jamais en €', dev);
         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
         const g = await pg.$eval('[data-publier-garde]', (e) => e.getAttribute('data-publier-garde')).catch(() => null);
         const dis = await pg.$eval('button:has-text("Publier sur eBay")', (e) => e.disabled).catch(() => null);

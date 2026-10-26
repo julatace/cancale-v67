@@ -42,6 +42,7 @@ const jetonDe = (ctx) => accessToken(ctx.owner, ctx.compte.suffixe);
 const ligneDe = (base, ctx) => base + (ctx.compte.suffixe || '');
 const nomCompte = (c) => (c && c.pseudo) ? `« ${c.pseudo} »` : (c && c.principal ? 'principal' : '');
 import { numeroExterne } from './_lib/numerotation.js';
+import { avecMarche, marcheCourant, marcheDuCompte, MARCHE_DEFAUT, lienAnnonce } from './_lib/ebay-marches.js';
 
 // ── LECTURE des données eBay du vendeur (centraliser dans VRM) ───────────────
 // Julien : « capte absolument tout d'eBay ». C'est une LECTURE (comme la moisson
@@ -153,7 +154,7 @@ async function tradingCall(token, callName, inner) {
   try {
     const r = await fetch(`${EBAY_API}/ws/api.dll`, {
       method: 'POST',
-      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': '71', 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
+      headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': marcheCourant().siteId, 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
       body,
     });
     const xml = await r.text();
@@ -496,7 +497,7 @@ async function handleRegleOffre(b, ctx) {
   if (!pre.ok) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'Je n\'ai pas pu relire l\'annonce chez eBay (prix, état) — rien n\'a été envoyé.' } };
   if (!/^(FixedPriceItem|StoresFixedPrice)$/.test(pre.annonce.type)) return { status: 409, body: { ok: false, reason: 'format', error: 'Ce n\'est pas une annonce à prix fixe : eBay n\'y propose pas d\'offres.' } };
   if (pre.annonce.statut && pre.annonce.statut !== 'Active') return { status: 409, body: { ok: false, reason: 'plus-en-vente', error: 'Elle n\'est plus en vente sur eBay — rien n\'a été envoyé.' } };
-  if (pre.annonce.devise !== 'EUR') return { status: 409, body: { ok: false, reason: 'devise', error: 'Annonce dans une autre devise que l\'euro : VRM ne pose pas de règle dessus.' } };
+  if (pre.annonce.devise !== marcheCourant().devise) return { status: 409, body: { ok: false, reason: 'devise', error: `Annonce dans une autre devise que celle de ton compte ${marcheCourant().nom} (${pre.annonce.devise || 'devise inconnue'}) : VRM ne pose pas de règle dessus.` } };
   const P = pre.lecture;
   const rangerPre = () => rangerReglesOffre(ctx, { [itemId]: { ...P, par: 'regle' } });
   // Le prix que Julien a VU n'est plus celui d'eBay : rien ne part.
@@ -539,8 +540,8 @@ async function handleRegleOffre(b, ctx) {
     const yRefus = refuse != null ? refuse : (refuse === undefined && P.refuse != null ? P.refuse : null);
     inner = `<Item><ItemID>${itemId}</ItemID>`
       + (P.offresActives !== true ? '<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>' : '')
-      + `<ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">${montantXml(accepte)}</BestOfferAutoAcceptPrice>`
-      + (yRefus != null ? `<MinimumBestOfferPrice currencyID="EUR">${montantXml(yRefus)}</MinimumBestOfferPrice>` : '')
+      + `<ListingDetails><BestOfferAutoAcceptPrice currencyID="${marcheCourant().devise}">${montantXml(accepte)}</BestOfferAutoAcceptPrice>`
+      + (yRefus != null ? `<MinimumBestOfferPrice currencyID="${marcheCourant().devise}">${montantXml(yRefus)}</MinimumBestOfferPrice>` : '')
       + '</ListingDetails></Item>'
       + (refuse === null && P.refuse != null ? '<DeletedField>Item.ListingDetails.MinimumBestOfferPrice</DeletedField>' : '');
   } else {
@@ -637,7 +638,7 @@ async function handleRevise(b, ctx) {
   if (prixChange) {
     const pre = await lireRegleOffre(at.token, itemId);
     if (!pre.ok || !pre.annonce) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas rendu l\'annonce pour vérifier son prix actuel — rien n\'a été changé.' } };
-    if (pre.annonce.devise !== 'EUR') return { status: 409, body: { ok: false, reason: 'devise', error: `Cette annonce n'est pas en euros (${pre.annonce.devise || 'devise inconnue'}) : VRM ne change pas son prix. Fais-le sur eBay.` } };
+    if (pre.annonce.devise !== marcheCourant().devise) return { status: 409, body: { ok: false, reason: 'devise', error: `Cette annonce n'est pas dans la devise de ton compte ${marcheCourant().nom} (${pre.annonce.devise || 'devise inconnue'}) : VRM ne change pas son prix. Fais-le sur eBay.` } };
     if (cents(pre.annonce.prix) !== cents(vu)) return { status: 409, body: { ok: false, reason: 'prix-change', prixActuel: pre.annonce.prix, error: `Le prix a changé sur eBay (${eur(pre.annonce.prix)} au lieu de ${eur(vu)}) — rien n'a été changé. Recharge l'annonce.` } };
   }
   let avant = undefined, aRegle = false;
@@ -712,8 +713,8 @@ function itemXml(it) {
     `<Quantity>${parseInt(it.quantity || 1, 10)}</Quantity>` +
     '<ListingType>FixedPriceItem</ListingType><ListingDuration>GTC</ListingDuration>' +
     (it.scheduleTime ? `<ScheduleTime>${esc(it.scheduleTime)}</ScheduleTime>` : '') +
-    '<Currency>EUR</Currency><Country>FR</Country>' +
-    `<Location>${esc(it.location || 'France')}</Location>` +
+    `<Currency>${marcheCourant().devise}</Currency><Country>${marcheCourant().pays}</Country>` +
+    `<Location>${esc(it.location || marcheCourant().lieu)}</Location>` +
     `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` +
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
@@ -741,8 +742,8 @@ function itemXml(it) {
     // Sans règle : RIEN n'est émis, le XML est celui d'avant au caractère près.
     (it.regleOffre
       ? '<BestOfferDetails><BestOfferEnabled>true</BestOfferEnabled></BestOfferDetails>'
-        + `<ListingDetails><BestOfferAutoAcceptPrice currencyID="EUR">${montantXml(it.regleOffre.accepte)}</BestOfferAutoAcceptPrice>`
-        + (it.regleOffre.refuse != null ? `<MinimumBestOfferPrice currencyID="EUR">${montantXml(it.regleOffre.refuse)}</MinimumBestOfferPrice>` : '')
+        + `<ListingDetails><BestOfferAutoAcceptPrice currencyID="${marcheCourant().devise}">${montantXml(it.regleOffre.accepte)}</BestOfferAutoAcceptPrice>`
+        + (it.regleOffre.refuse != null ? `<MinimumBestOfferPrice currencyID="${marcheCourant().devise}">${montantXml(it.regleOffre.refuse)}</MinimumBestOfferPrice>` : '')
         + '</ListingDetails>'
       : '') +
     (it.uuid ? `<UUID>${esc(it.uuid)}</UUID>` : '') +
@@ -787,7 +788,7 @@ function fraisParNom(xml) {
     insertion: un(/^InsertionFee$/i),
     programmation: un(/^Schedul/i),
     remises: remises.length ? deux(remises.reduce((s, p) => s + p.remise, 0)) : null,
-    devise: (parNom.find((p) => /^ListingFee$/i.test(p.nom)) || parNom[0] || {}).devise || 'EUR',
+    devise: (parNom.find((p) => /^ListingFee$/i.test(p.nom)) || parNom[0] || {}).devise || marcheCourant().devise,
     // Tous les frais NON NULS, par nom — ce que l'écran détaille. (Le total
     // `ListingFee` n'y est pas : c'est la somme de ces lignes, pas une de plus.)
     lignes: parNom.filter((p) => !/^ListingFee$/i.test(p.nom) && p.montant != null && p.montant !== 0),
@@ -901,7 +902,9 @@ async function dejaChezEbay(ctx, tokenCourant, sku, verbe, mk) {
   const meme=x=>!!voulu && numeroExterne(numDeSku(x.sku),x.itemId,'ebayAnnonces',null,mk)===voulu;
   for (const { compte, token } of v.liste) {
     const ou = plusieurs && nomCompte(compte) ? ` (compte eBay ${nomCompte(compte)})` : '';
-    const L = await listeVendeur(token);
+    // Chaque compte relu sur SON marché (eBay.co.uk, .com…) : `compte` vient du
+    // registre, il porte son site.
+    const L = await avecMarche(marcheDuCompte(compte) || MARCHE_DEFAUT, () => listeVendeur(token));
     if (!L.ok) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: plusieurs ? `Je n'ai pas pu relire tes annonces du compte eBay ${nomCompte(compte) || 'principal'} pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` : PAS_SU_LISTE } };
     if (!L.complet) return { status: 503, body: { ok: false, reason: 'pas-su', compte: compte.pseudo || '', error: `Tu as plus de 1 000 annonces sur eBay${ou} : je n'ai pas pu toutes les relire pour vérifier que cette paire n'y est pas déjà — rien n'a été envoyé.` } };
     const prog = L.programmees.find(meme);
@@ -968,7 +971,7 @@ async function handlePublish(b, ctx) {
     const range = await rangerReglesOffre(ctx, { [String(r.itemId)]: post.ok && memeRegle(post.lecture,demande,null)!==false?{...post.lecture,par:'publication'}:{lu:false,raison:'apres-ecriture',lueA:Date.now(),par:'publication',observee:post.ok?post.lecture:null} });
     offre = { envoyee: demande, verifie: post.ok ? memeRegle(post.lecture, demande, null) : null, lecture: post.ok ? post.lecture : null, range: range === true };
   }
-  return { status: 200, body: { ok: true, itemId: r.itemId, url: `https://www.ebay.fr/itm/${r.itemId}`, sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements, ...(offre ? { offre } : {}) } };
+  return { status: 200, body: { ok: true, itemId: r.itemId, url: lienAnnonce(marcheCourant(), r.itemId), sku: it.sku || null, compte: ctx.compte.pseudo || '', avertissements: r.avertissements, ...(offre ? { offre } : {}) } };
 }
 
 // ── L'HEURE DE PROGRAMMATION, VALIDÉE PAR LE SERVEUR ─────────────────────────
@@ -1143,7 +1146,7 @@ async function sortirDesRegles(itemId, ctx) {
 function resultatProgramme(itemId, it, quand, debut, fin, plus) {
   const td = Date.parse(debut || ''), tq = Date.parse(quand || '');
   const enLigneMaintenant = !!quand && Number.isFinite(td) && Number.isFinite(tq) && td < tq - 5 * 60 * 1000;
-  return { ok: true, itemId, sku: it.sku, demande: quand || null, debut: debut || null, fin: fin || null, enLigneMaintenant, url: `https://www.ebay.fr/itm/${itemId}`, ...plus };
+  return { ok: true, itemId, sku: it.sku, demande: quand || null, debut: debut || null, fin: fin || null, enLigneMaintenant, url: lienAnnonce(marcheCourant(), itemId), ...plus };
 }
 // ── « UUID DÉJÀ UTILISÉ » (488) : eBay dit que cet envoi a DÉJÀ créé une
 // annonce. On ne le croit pas sur parole : l'ItemID d'origine est lu (dans les
@@ -1170,7 +1173,7 @@ async function confirmerDoublon(token, a, it, quand) {
 // ratée garde la dernière capture (« rien lu » ne vaut pas « rien »). La
 // réponse rend aussi les identités EN LIGNE (ItemID + SKU) : c'est ce qui dit
 // qu'une programmée est bien partie à l'heure.
-const resumeProgrammee = (x) => ({ itemId: x.itemId, sku: x.sku, title: x.title, price: x.price, debut: x.depuis || null, fin: x.fin || null, photo: x.photo, url: x.url || (x.itemId ? `https://www.ebay.fr/itm/${x.itemId}` : '') });
+const resumeProgrammee = (x) => ({ itemId: x.itemId, sku: x.sku, title: x.title, price: x.price, debut: x.depuis || null, fin: x.fin || null, photo: x.photo, url: x.url || (x.itemId ? lienAnnonce(marcheCourant(), x.itemId) : '') });
 // (23 octobre) Une annonce INACTIVE rangée : les seuls scalaires que l'écran lit
 // (§4.4) — ni `detail`, ni `vues` brut, ni adresse de photo hors d'eBay
 // (`i.ebayimg.com` seulement, la règle des achats). L'adresse de la page se
@@ -1311,7 +1314,7 @@ async function handleLimites(ctx) {
     ok: true,
     quantite: sl.quantity != null && Number.isFinite(q) ? q : null,
     montant: sl.amount && sl.amount.value != null && Number.isFinite(m) ? m : null,
-    devise: (sl.amount && sl.amount.currency) || 'EUR',
+    devise: (sl.amount && sl.amount.currency) || marcheCourant().devise,
     inscrit: typeof r.data.sellerRegistrationCompleted === 'boolean' ? r.data.sellerRegistrationCompleted : null,
   } };
 }
@@ -1351,7 +1354,8 @@ async function handleSku(b, ctx) {
 // native touche tout le monde en un clic, pas un envoi en série). Droit
 // `sell.inventory`, déjà accordé.
 const NEGO = `${EBAY_API}/sell/negotiation/v1`;
-const MARCHE_FR = { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR' };
+// (26 oct.) Le marché du compte de la requête (eBay.fr, .co.uk, .com…).
+const enteteMarche = () => ({ 'X-EBAY-C-MARKETPLACE-ID': marcheCourant().marketplace });
 // Les annonces pour lesquelles eBay ACCEPTE une offre (au moins un observateur
 // éligible). Trois états, jamais deux : `{ok:true, ids, complet}` lu ·
 // `{ok:false}` pas su. ⚠️ eBay répond 204 (sans corps) quand AUCUNE annonce
@@ -1359,7 +1363,7 @@ const MARCHE_FR = { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_FR' };
 async function eligiblesOffre(token) {
   const ids = []; let url = `${NEGO}/find_eligible_items?limit=200`;
   for (let p = 0; p < 5 && url; p++) {
-    const r = await ebayJson(url, token, MARCHE_FR);
+    const r = await ebayJson(url, token, enteteMarche());
     if (r.status === 204) return { ok: true, ids, complet: true };
     if (r.status === 403) return { ok: false, status: 200, reason: 'scope', error: 'Reconnecte-toi à eBay pour envoyer des offres (l\'accès n\'a pas été autorisé).' };
     if (r.status === 0) return { ok: false, status: 503, error: 'eBay injoignable' };
@@ -1406,7 +1410,7 @@ async function handleOffre(b, ctx) {
   try {
     r = await fetch(`${NEGO}/send_offer_to_interested_buyers`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${at.token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Language': 'fr-FR', ...MARCHE_FR },
+      headers: { Authorization: `Bearer ${at.token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Content-Language': marcheCourant().langue, ...enteteMarche() },
       body: JSON.stringify(corps),
     });
   } catch (_) {
@@ -1525,7 +1529,7 @@ async function handleFinances(ctx) {
   if (!r.ok || !r.data) return { status: r.status >= 400 ? r.status : 502, body: { ok: false, error: 'eBay n\'a pas renvoyé le solde.' } };
   const amt = (o) => (o && o.value != null && isFinite(Number(o.value))) ? Number(o.value) : null;
   const d = r.data;
-  const out = { ok: true, dispo: amt(d.availableFunds), enAttente: amt(d.processingFunds), retenu: amt(d.fundsOnHold), total: amt(d.totalFunds), devise: (d.totalFunds && d.totalFunds.currency) || (d.availableFunds && d.availableFunds.currency) || 'EUR', capturedAt: Date.now() };
+  const out = { ok: true, dispo: amt(d.availableFunds), enAttente: amt(d.processingFunds), retenu: amt(d.fundsOnHold), total: amt(d.totalFunds), devise: (d.totalFunds && d.totalFunds.currency) || (d.availableFunds && d.availableFunds.currency) || marcheCourant().devise, capturedAt: Date.now() };
   await storeData(ligneDe('ebay_finances', ctx), out, ctx.owner);
   return { status: 200, body: out };
 }
@@ -1537,7 +1541,7 @@ async function handlePubInfo(b, ctx) {
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
   const token = at.token;
-  const MKT = 'EBAY_FR';
+  const MKT = marcheCourant().marketplace;
   const H = { 'Accept-Language': 'fr-FR', 'Content-Language': 'fr-FR' };
   const title = String(b.title || 'Nike Air Max baskets').slice(0, 80);
   // 1) Arbre de catégories FR + suggestion de catégorie pour un titre.
@@ -1895,7 +1899,7 @@ const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,api
 // (17 octobre) Après la vente : retours, annulations, promotion, achats.
 // Une annulation ACCEPTÉE marque la commande rangée « CANCELED » (comparer-et-
 // échanger) : elle sort aussitôt des colis à faire, sans attendre la synchro.
-const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOrigin:EBAY_API,
+const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace,
   lireAnnonces:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),titre:String(x.title||''),prix:x.price??null})).filter(x=>x.itemId):[];},
   marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
 });
@@ -1970,7 +1974,7 @@ async function handleApp(req, res) {
       for (const c of comptesActifs(reg)) {
         const relie = c.suffixe ? await hasRefresh(owner, c.suffixe) : has;
         if (c.implicite && !relie) continue;
-        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null, type: c.type || '' });
+        comptes.push({ cle: c.principal ? (c.cle || '') : c.cle, pseudo: c.pseudo || '', principal: !!c.principal, relie, ajouteLe: c.ajouteLe || null, type: c.type || '', ...(() => { const m = marcheDuCompte(c); return { site: m ? m.site : '?', siteLu: c.site !== undefined && c.site !== '', marche: m ? { nom: m.nom, devise: m.devise, domaine: m.domaine, pays: m.pays } : null }; })() });
       }
       res.status(200).json({ ok: true, connected: comptes.some((c) => c.relie === true), comptes });
       return;
@@ -2051,10 +2055,23 @@ async function handleApp(req, res) {
     const rc = await resoudreCompte(b.compte, owner);
     if (!rc.ok) { res.status(rc.status).json(rc.body); return; }
     const ctx={owner,compte:rc.compte};
+    // (26 octobre) Le MARCHÉ du compte (eBay.fr, .co.uk, .com…) : toute la
+    // requête lui parle — SiteID, marketplace, devise, pays de l'annonce. Créer
+    // une annonce sur un compte dont le marché n'est pas connu (registre
+    // illisible) ou pas géré par VRM est REFUSÉ : jamais publié en France à la
+    // place.
+    const marche=marcheDuCompte(rc.compte);
+    const creeAnnonce=new Set(['publish','pubverify','pubinfo','programmer']);
+    if(creeAnnonce.has(action)&&(!marche||rc.compte.siteInconnu)){
+      res.status(!marche?409:503).json({ok:false,reason:!marche?'marche-non-gere':'marche-pas-su',error:!marche
+        ?'Ce compte eBay est inscrit sur un site eBay que VRM ne gère pas encore (VRM gère eBay.fr, eBay.co.uk, eBay.com, eBay.de, eBay.it, eBay.es) — rien n\'a été envoyé.'
+        :'Je n\'ai pas pu relire sur quel site eBay ton compte est inscrit — rien n\'a été envoyé. Réessaie dans un moment.'});
+      return;
+    }
     const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
-    const r = commerciales.has(action) && b.confirme===true
-      ? await executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
-      : await ACTIONS[action](ctx);
+    const r = await avecMarche(marche||MARCHE_DEFAUT, () => commerciales.has(action) && b.confirme===true
+      ? executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
+      : ACTIONS[action](ctx));
     res.status(r.status).json(r.body);
   } catch (e) {
     res.status(502).json({ ok: false, error: 'eBay injoignable', detail: String((e && e.message) || '').slice(0, 200) });

@@ -118,6 +118,7 @@ const remettreEbay = () => { ebay = { 'at-J': { actives: ANNONCES_J(), programme
 // GetUser rend le compte APPELANT : son pseudo et son identifiant stable
 // (EIASToken). Julien a DEUX comptes eBay (particulier `at-J`, pro `at-A2`) ;
 // B a le sien. Données INVENTÉES.
+const SITES_GETUSER = {};   // (26 oct.) jeton → <Site> rendu par GetUser
 const IDENTITES = { 'at-J': ['julien_part', 'EIAS-JULIEN-PART-000000001'], 'at-A2': ['julien_pro', 'EIAS-JULIEN-PRO-000000002'], 'at-A3': ['julien_trois', 'EIAS-JULIEN-TROIS-00000003'], 'at-B': ['vendeur_b', 'EIAS-VENDEUR-B-0000000004'] };
 remettreEbay();
 let prochainId = 110000000777;
@@ -205,7 +206,7 @@ global.fetch = async (url, opts = {}) => {
     const appel = h['X-EBAY-API-CALL-NAME'] || '';
     const jeton = h['X-EBAY-API-IAF-TOKEN'] || String(h.Authorization || '').replace(/^Bearer\s+/, '') || '';
     const corps = String(opts.body || '');
-    journal.push({ ou: 'ebay', m, u: u.replace(/\?.*$/, ''), appel, corps, jeton, marche: h['X-EBAY-C-MARKETPLACE-ID'] || '', seq: ++seq });
+    journal.push({ ou: 'ebay', m, u: u.replace(/\?.*$/, ''), appel, corps, jeton, marche: h['X-EBAY-C-MARKETPLACE-ID'] || '', site: h['X-EBAY-API-SITEID'] || '', url: u, seq: ++seq });
     if (u.includes('/identity/v1/oauth2/token')) {
       // Le jeton d'accès dépend du refresh_token : c'est ce qui montre QUEL
       // compte eBay sert chaque appel.
@@ -229,7 +230,7 @@ global.fetch = async (url, opts = {}) => {
       if (appel === 'GetUser') {
         const idn = IDENTITES[jeton];
         if (mode.getuser === 'ko' || !idn) return xml(mode.getuser === 'ko' ? XML_REFUS : XML_OK(''));
-        return xml(XML_OK(`<User><UserID>${idn[0]}</UserID><EIASToken>${idn[1]}</EIASToken><Status>Confirmed</Status></User>`));
+        return xml(XML_OK(`<User><UserID>${idn[0]}</UserID><EIASToken>${idn[1]}</EIASToken><Status>Confirmed</Status>${SITES_GETUSER[jeton] ? `<Site>${SITES_GETUSER[jeton]}</Site>` : ''}</User>`));
       }
       if (appel === 'GetMyeBaySelling') {
         if (mode.liste === 'ko' || (mode.listeKoPour && mode.listeKoPour === jeton)) return xml(XML_REFUS);
@@ -2655,6 +2656,64 @@ const RA = {};
     const o = await app(JWT_J, { action: 'relire' });
     dit(ecrit(o.journal, 'ebay_listings') === null && ecrit(o.journal, 'ebay_inactives') === null && !(o.corps && o.corps.lu && o.corps.lu.inactives),
       '[INA-coherence] la relecture n\'a pas pu réécrire les annonces en ligne ⇒ elle ne range pas non plus les inactives (sinon la MÊME annonce serait « en ligne » dans l\'ancienne liste ET « inactive » dans la nouvelle)', JSON.stringify(o.corps && o.corps.lu));
+  });
+
+  // ── 10 ter. LES MARCHÉS eBAY (26 octobre) : eBay.fr, .co.uk, .com ─────────
+  //    Julien : « lance eBay UK et US ». Chaque compte parle à SON site, dans SA
+  //    devise ; un site inconnu ou illisible ne publie jamais en France.
+  await essaie('[MKT] compte UK : publication sur eBay.co.uk en GBP', async () => {
+    remettre(); remettreBase();
+    SITES_GETUSER['at-J'] = 'France'; SITES_GETUSER['at-A2'] = 'UK';
+    try {
+      await app(JWT_J, { action: 'status' });
+      await connecter(JWT_J, 'code-A2', true);
+      const reg = registre(J) || [];
+      const a2 = reg.find((x) => x.cle === CLE_A2), a1 = reg.find((x) => x.principal);
+      dit(a2 && a2.site === 'GB' && a1 && a1.site === 'FR', '[MKT] le registre retient le site lu chez eBay (UK ⇒ GB, France ⇒ FR)', JSON.stringify(reg.map((x) => [x.pseudo, x.site])));
+      const st = await app(JWT_J, { action: 'status' });
+      const c2 = (st.corps.comptes || []).find((x) => x.cle === CLE_A2) || {};
+      dit(c2.site === 'GB' && c2.marche && c2.marche.devise === 'GBP' && c2.marche.domaine === 'www.ebay.co.uk', '[MKT] « status » dit à l\'app le marché de chaque compte (devise, domaine)', JSON.stringify(c2.marche));
+      const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '401' } });
+      const add = chezEbay(o.journal).find((x) => x.appel === 'AddFixedPriceItem');
+      dit(o.code === 200 && add && add.site === '3' && /<Currency>GBP<\/Currency>/.test(add.corps) && /<Country>GB<\/Country>/.test(add.corps) && !/EUR/.test(add.corps),
+        '[MKT] l\'annonce part sur eBay.co.uk (SiteID 3), en livres, pays GB — jamais en euros', add ? `site=${add.site}` : `HTTP ${o.code}`);
+      dit(o.corps && /ebay\.co\.uk\/itm\//.test(o.corps.url || ''), '[MKT] le lien rendu est celui d\'eBay.co.uk', o.corps && o.corps.url);
+      const p = await app(JWT_J, { action: 'publish', item: { ...item, numero: '402' } });
+      const addP = chezEbay(p.journal).find((x) => x.appel === 'AddFixedPriceItem');
+      dit(p.code === 200 && addP && addP.site === '71' && /<Currency>EUR<\/Currency>/.test(addP.corps), '[MKT] le compte français, lui, reste sur eBay.fr en euros', addP ? `site=${addP.site}` : `HTTP ${p.code}`);
+      const pi = await app(JWT_J, { action: 'pubinfo', compte: CLE_A2, title: 'Nike Dunk' });
+      const tx = chezEbay(pi.journal).find((x) => /taxonomy/.test(x.u));
+      dit(!!tx && /marketplace_id=EBAY_GB/.test(tx.url || ''), '[MKT] les catégories sont demandées au marché EBAY_GB', tx ? tx.u : 'aucun appel');
+    } finally { delete SITES_GETUSER['at-J']; delete SITES_GETUSER['at-A2']; }
+  });
+  await essaie('[MKT] site non géré : rien ne part', async () => {
+    remettre(); remettreBase();
+    SITES_GETUSER['at-A2'] = 'Australia';
+    try {
+      await app(JWT_J, { action: 'status' });
+      await connecter(JWT_J, 'code-A2', true);
+      const a2 = (registre(J) || []).find((x) => x.cle === CLE_A2);
+      const o = await app(JWT_J, { action: 'publish', compte: CLE_A2, item: { ...item, numero: '403' } });
+      dit(a2 && a2.site === '?' && o.code === 409 && o.corps.reason === 'marche-non-gere' && chezEbay(o.journal).length === 0,
+        '[MKT] un compte inscrit sur un site que VRM ne gère pas ⇒ 409, rien publié (jamais en France à la place)', `site=${a2 && a2.site} HTTP ${o.code}`);
+    } finally { delete SITES_GETUSER['at-A2']; }
+  });
+  await essaie('[MKT] registre illisible : le principal ne publie pas à l\'aveugle', async () => {
+    remettre(); remettreBase();
+    await app(JWT_J, { action: 'status' });
+    mode.comptesKo = true;
+    const o = await app(JWT_J, { action: 'publish', item: { ...item, numero: '404' } });
+    mode.comptesKo = false;
+    dit(o.code === 503 && o.corps.reason === 'marche-pas-su' && chezEbay(o.journal).length === 0, '[MKT] registre illisible ⇒ 503 « marché pas su », rien publié', `HTTP ${o.code}`);
+  });
+  await essaie('[MKT] compte relié avant le 26 octobre (site jamais lu) : eBay.fr comme avant', async () => {
+    remettre(); remettreBase();
+    await app(JWT_J, { action: 'status' });
+    const l = lignes.find((x) => x.owner === J && x.id === 'ebay_comptes');
+    if (l) l.data.comptes = l.data.comptes.map(({ site, ...e }) => e);
+    const o = await app(JWT_J, { action: 'offreinfo' });
+    const e = chezEbay(o.journal).find((x) => /find_eligible_items/.test(x.u)) || {};
+    dit(e.marche === 'EBAY_FR', '[MKT] sans site connu, le compte reste sur EBAY_FR (le comportement d\'avant)', e.marche);
   });
 
   // ── 11. BASE PAS ENCORE CLOISONNÉE : rejouée dans un processus neuf ─────────

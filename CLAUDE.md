@@ -13697,3 +13697,34 @@ dans le Seller Hub (programme de livraison internationale), pas par l'API.
 - **Pas fait, à trancher** : vendeurs eBay.co.uk/.com (site, devise et règles
   d'argent en EUR seulement) ; options internationales à la publication pour un
   compte NON géré (`ShipToLocations`, `InternationalShippingServiceOption`).
+
+### eBay.co.uk, eBay.com (et .de, .it, .es) : chaque compte sur SON site (26 octobre)
+Julien : « lance eBay UK et US ». Tout l'eBay de VRM était figé sur eBay.fr
+(SiteID 71, `EBAY_FR`, EUR, `Country FR`, liens ebay.fr).
+- **Une table** `api/_lib/ebay-marches-table.js` (pure, lue par l'app ET la
+  route, §11) : FR 71/EBAY_FR/EUR · GB 3/EBAY_GB/GBP · US 0/EBAY_US/USD · DE 77 ·
+  IT 101 · ES 186. `api/_lib/ebay-marches.js` (serveur) y ajoute le marché de la
+  REQUÊTE (AsyncLocalStorage, jamais une variable de module).
+- **Le site d'un compte est lu chez eBay** (GetUser → `User.Site`, `identiteEbay`)
+  et rangé dans le registre `ebay_comptes` (`site` : code, `'?'` site non géré,
+  `''` pas dit, absent = jamais lu ⇒ eBay.fr, le comportement d'avant).
+  `apprendreTypes` relit aussi les comptes sans site.
+- **La route** (`handleApp`) fait tourner chaque action dans le marché du compte :
+  SiteID de Trading, `X-EBAY-C-MARKETPLACE-ID`, catégories (`marketplace_id`),
+  devise et pays de l'annonce (`itemXml`), seuils d'offre, liens rendus, après-vente.
+  L'anti double vente relit chaque compte sur SON marché. **Créer une annonce**
+  (publish, pubverify, pubinfo, programmer) est REFUSÉ pour un site non géré
+  (409 `marche-non-gere`) ou un registre illisible (503 `marche-pas-su`) : jamais
+  publié en France à la place. `status` rend `site`, `siteLu`, `marche`.
+- **L'app** : badge « eBay.co.uk » à côté du compte (rien pour eBay.fr, §7),
+  sélecteur « paire_pro · eBay.co.uk », « Prix (GBP) » dans le formulaire, liens
+  commande et annonce sur le bon domaine, solde dans sa devise.
+- ⚠️ **L'argent reste en euros** : le CA déclaré, le bénéfice et les totaux ne
+  convertissent pas (une commande en GBP/USD est ÉCARTÉE et dite, `montantRecuEbay`)
+  — l'URSSAF est française. Un vendeur UK verra « — » sur le CA eBay en euros.
+- Preuves : `audit-ebay-route.cjs` §10 ter « [MKT] » (511 contrôles ; 7 rouges sur
+  l'avant ; SiteID figé à 71 ⇒ 2 rouges) ; banc `ebay-comptes.cjs` (« Prix (GBP) »,
+  badge dans le sélecteur).
+- **Non mesuré** : la valeur réelle de `User.Site` (doc SiteCodeType) ; aucun
+  compte UK ou US relié ; les règles de chaque site (catégories, états, livraison
+  gérée) viennent d'eBay au moment de publier ; l'interface reste en français.
