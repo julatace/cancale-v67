@@ -202,7 +202,7 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       await aller(pg,'dashboard','[data-dash-stat="caMois"]',3000);
       const dashMois=await pg.evaluate(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e?Number(e.getAttribute('data-dash-cents')):null; });
       await aller(pg,'journee','[data-vendu-mois]',2500);
-      const j=await pg.evaluate(()=>({ v:(document.querySelector('[data-vendu-mois]')||{getAttribute:()=>null}).getAttribute('data-vendu-mois'), r:(document.querySelector('[data-recu-mois]')||{getAttribute:()=>null}).getAttribute('data-recu-mois') }));
+      const j=await pg.evaluate(()=>({ v:(document.querySelector('[data-vendu-mois]')||{getAttribute:()=>null}).getAttribute('data-vendu-mois'), r:(document.querySelector('[data-recu-mois]')||{getAttribute:()=>null}).getAttribute('data-recu-mois'), an:(document.querySelector('[data-ca-annee]')||{getAttribute:()=>null}).getAttribute('data-ca-annee') }));
       await aller(pg,'compta','[data-ca-cur]',3000);
       const c=await pg.evaluate(()=>{ const o={}; for(const e of document.querySelectorAll('[data-ca-cur]')) o[e.getAttribute('data-ca-cur')]=e.getAttribute('data-ca-eur'); const r=document.querySelector('[data-compta-resultat]'); o.decl=r?r.getAttribute('data-compta-ca'):null; o.periode=(document.querySelector('[data-ca-periode]')||{getAttribute:()=>null}).getAttribute('data-ca-periode'); return o; });
       console.log(`   rendu : Ma journée vendu ${j.v} reçu ${j.r} · Statistiques vendu ${dashMois} · Compta (${c.periode}) vendu ${c.vendu} reçu ${c.recu} · CA déclaré ${c.decl}`);
@@ -211,6 +211,7 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       const an=String(maintenant.getFullYear());
       const declAttendu=pub?Math.round(pub.mois.filter(m=>String(m.ym).slice(0,4)===an).reduce((s,m)=>s+(Number(m.ca)||0),0)*100)/100:null;
       dit(declAttendu!=null && Math.abs(Number(c.decl)-declAttendu)<0.005,'CA déclaré de l’année (Comptabilité) = somme des mois publiés',`${c.decl} · attendu ${declAttendu}`);
+      dit(j.an!=null && j.an!=='' && Math.abs(Number(j.an)-Math.round(Number(c.decl)*100))<=1,'(26 oct.) Ma journée « Chiffre d’affaires de l’année » = CA déclaré de Comptabilité',`${j.an} · ${c.decl}`);
       dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
       await ctx.close();
     });

@@ -38381,6 +38381,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // le mois de déclaration, qui peut être un autre (revue du 6 octobre).
         const recuMois = declarables ? recuDuMois(declarables.lignes, ymIci) : null;
         const moisNom = new Date().toLocaleDateString('fr-FR',{month:'long'});
+        // (26 octobre) Julien : « le chiffre d'affaires total ». Celui de l'ANNÉE,
+        // toutes plateformes, sur les MÊMES lignes et le même mois que le CA déclaré
+        // de Compta (`declarables`, `l.ym`) — jamais un second calcul (§11).
+        const anIci = String(new Date().getFullYear());
+        const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) : null;
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
         // Ce qui a été versé ce mois-ci mais DÉCLARÉ dans un autre mois : c'est
         // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
@@ -38537,6 +38542,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
+            </div>
+            <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
+              <div style={{minWidth:0}}>
+                <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
+                <div className="vrm-day-note" style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : `le CA déclaré, comme dans Compta · toutes plateformes${recuSans || adVinted>0 ? ' · au moins' : ''}`}</div>
+              </div>
+              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${(recuSans || adVinted>0) ? '≥ ' : ''}${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
             <BeneficeJournee onNav={onNav} place="integre"/>
           </div>
