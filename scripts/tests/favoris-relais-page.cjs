@@ -1,6 +1,6 @@
 // Real MAIN + isolated JS worlds, synthetic Vinted UI only. No account login.
 const fs=require('node:fs'),assert=require('node:assert/strict');const {chromium}=require('playwright');
-(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});let n=0;
+(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let n=0;
  try{
  const source=fs.readFileSync('vinted-sync-extension/background.js','utf8');const dom=source.slice(source.indexOf('function suivreFavoriAffiche('),source.indexOf('// Closed navigation protocol:'));assert.ok(fs.readFileSync('vinted-sync-extension/inject.js','utf8').includes(dom));n++;
  const c=await b.newContext(),p=await c.newPage();let creations=0;

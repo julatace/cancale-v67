@@ -93,7 +93,7 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
 
 
 const SUIVI={ok:true,emails:[],adresses:[],collecteur:{}};
-(async()=>{await new Promise(r=>srv.listen(PORT,r));const nav=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+(async()=>{await new Promise(r=>srv.listen(PORT,r));const nav=await chromium.launch({executablePath:(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});
 try{for(const viewport of [{width:390,height:844},{width:1512,height:950}]){for(const etat of [false,'panne',true])await essaie('protection '+etat+' '+viewport.width,async()=>{
 const {ctx,pg,lecturesPrivees,erreurs}=await ouvrir(nav,{liste:[],viewport,confidentialite:etat});
 if(etat===true){dit(await pg.locator('[data-confidentialite]').count()===0,'contrôle validé : l’espace peut s’ouvrir');dit(await pg.locator('[data-reception-emails]').isVisible(),'écran utilisateur disponible après contrôle');}else{const garde=pg.locator('[data-confidentialite]');dit(await garde.getAttribute('data-confidentialite')===(etat===false?'protection':'indisponible'),'refus et panne distingués');dit(lecturesPrivees.length===0,'aucune lecture de boutique avant la validation',lecturesPrivees.join(' '));dit(await pg.locator('[data-reception-emails]').count()===0,'le cœur de l’application n’est pas monté');}

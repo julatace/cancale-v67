@@ -214,7 +214,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH||'/usr/bin/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const tel of [false, true]) {
       console.log(`── extension à jour (5.135) · ${tel ? '390 px' : '1512 px'}`);
       const r = await rendre(b, { version: '5.135.0', tel });

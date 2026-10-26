@@ -94,7 +94,7 @@ const SUIVI={ok:true,limite:100,plus:false,collecteur:{dernierSucces:new Date().
 SUIVI.adresses=[{adresse:'un@example.test',declaree:true,comptes:[{id:'1',nom:'vendeur-un'}]},{adresse:'deux@example.test',declaree:true,comptes:[{id:'2',nom:'vendeur-deux'}]}];
 SUIVI.emails.forEach((e,i)=>{e.adresses=[i?'deux@example.test':'un@example.test'];e.compte={id:i?'2':'1',nom:i?'vendeur-deux':'vendeur-un',bloque:!!i};});
 (async()=>{
- await new Promise(r=>srv.listen(PORT,r));const nav=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+ await new Promise(r=>srv.listen(PORT,r));const nav=await chromium.launch({executablePath:(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});
  try{for(const viewport of [{width:320,height:720},{width:390,height:844},{width:1512,height:950}]){
   await essaie('réception '+viewport.width,async()=>{
    const {ctx,pg,erreurs,panne,retablir,etat}=await ouvrir(nav,{liste:EMAILS,viewport,registre:{'vendeuse@exemple.test':{owner:SESSION.user.id},'un@example.test':{owner:SESSION.user.id},'deux@example.test':{owner:SESSION.user.id}}});

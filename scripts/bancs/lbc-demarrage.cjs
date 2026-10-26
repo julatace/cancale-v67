@@ -2,7 +2,7 @@
 const fs=require('fs'),path=require('path'),assert=require('assert/strict');
 const{chromium}=require('playwright');const root=path.resolve(__dirname,'../..');
 const inject=fs.readFileSync(process.env.LBC_INJECT||path.join(root,'vinted-sync-extension/lbc-inject.js'),'utf8'),relay=fs.readFileSync(path.join(root,'vinted-sync-extension/lbc-relay.js'),'utf8');
-(async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});try{for(const ordre of ['capteur-avant','relais-avant']){
+(async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});try{for(const ordre of ['capteur-avant','relais-avant']){
  const p=await browser.newPage();await p.route('https://www.leboncoin.fr/**',r=>r.fulfill({contentType:'text/html',body:'<html><body></body></html>'}));await p.goto('https://www.leboncoin.fr/');
  await p.evaluate(()=>{window.relayes=[];window.chrome={runtime:{sendMessage:(m,cb)=>{window.relayes.push(m);cb?.({ok:true});}}};window.fetch=async()=>new Response(JSON.stringify({unread:3}),{headers:{'content-type':'application/json'}});});
  const charge=()=>p.evaluate(async()=>{await fetch('https://api.leboncoin.fr/messaging/proxy/api/hal/aaaa1111-0000-4000-8000-000000000001/counter');await new Promise(r=>setTimeout(r,40));});

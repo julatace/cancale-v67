@@ -3,7 +3,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');const {chromium
 (async()=>{
  const src=fs.readFileSync(process.env.SOURCE_FAVORIS_BG||'vinted-sync-extension/background.js','utf8');
  const fn=src.slice(src.indexOf('function suivreFavoriAffiche('),src.indexOf('// Semantic native controls only.'));
- const b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});let n=0;
+ const b=await chromium.launch({executablePath:(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let n=0;
  try{const p=await b.newPage();await p.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:'<main></main>'}));await p.goto('https://www.vinted.fr/');await p.addScriptTag({content:fn});
  const url='/items/101/conversation/new?native_target=201';
  const cas=async(html)=>{await p.evaluate(html=>{document.querySelector('main').innerHTML=html;window.clics=0;document.querySelector('main').onclick=e=>{e.preventDefault();window.clics++;};},html);return p.evaluate(url=>suivreFavoriAffiche(location.origin+url,true),url);};
