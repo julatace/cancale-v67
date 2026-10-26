@@ -37,6 +37,8 @@ const MAIN = {
     '5004': { numero: '15', title: 'Adidas Samba noir taille 39', mp: { lbc: true } },
   },
   vrm_lbc_liens: { lbc1: '12' },
+  // Prix d'achat SAISI de la N°12 (par numéro) → bénéfice de la vente reliée.
+  vinted_buyprice_by_num: { '12': '30' },
 };
 const MON = 'acc9';
 const ITEMS = {
@@ -161,6 +163,24 @@ const projette = (row, sel) => {
       dit(!v1.relier.includes('lbc4'), 'l’annonce d’un inconnu ne l’est pas');
       dit(!v1.relier.includes('lbc1') && v1.relier.filter((x) => x === 'lbc2').length === 1,
         'une annonce vendue n’est pas présentée comme « en ligne non reliée » (elle n’est que dans « quelle paire ? »)', JSON.stringify(v1.relier));
+      // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay) : N° + bénéfice sur la carte,
+      //    par identité seulement. t1 est reliée (lien → N°12, achat 30 €) → 55 € ;
+      //    t2 n'est reliée à rien → ni N° ni bénéfice inventé (§5).
+      await pg.click('[data-section="ventes"]').catch(() => {});
+      await pg.waitForSelector('.vrm-sale-row', { timeout: 8000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      // Le N° est sur la carte compacte (titre) ; le bénéfice vit dans le tiroir
+      // de détail (portail), comme pour une vente Vinted — même composant partagé.
+      const ven = await pg.evaluate(() => ({
+        titres: [...document.querySelectorAll('.vrm-ledger-sale-title')].map((e) => e.textContent.trim()),
+        benefs: [...document.querySelectorAll('[data-lbc-benef]')].map((e) => e.getAttribute('data-lbc-benef')),
+      }));
+      dit(ven.titres.some((t) => /Nike Air Max/.test(t) && /N°12/.test(t)), 'vente Leboncoin reliée : le N° de la paire est sur la carte', JSON.stringify(ven.titres));
+      dit(ven.benefs.length === 1 && ven.benefs[0] === '55.00', 'son bénéfice (85 € − 30 € d’achat saisi) = 55,00 €, et la vente NON reliée n’en a aucun', JSON.stringify(ven.benefs));
+      dit(ven.titres.some((t) => /Adidas Samba/.test(t) && !/N°/.test(t)), 'vente NON reliée : aucun N° inventé', JSON.stringify(ven.titres));
+      await pg.click('[data-section="annonces"]').catch(() => {});
+      await pg.waitForSelector('[data-lbc-doublons], [data-lbc-ventes-a-relier]', { timeout: 8000 }).catch(() => {});
+      await pg.waitForTimeout(300);
       try {
         await pg.click('[data-lbc-suggestions="lbc2"] [data-suggestion="15"]');
         await pg.waitForTimeout(2500);

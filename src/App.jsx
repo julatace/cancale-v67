@@ -15568,9 +15568,13 @@ const lbcExpediee = o => {
 const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
-function CarteLbc({ o }) {
-  return <LigneVente photo={photoArticle(o)} titre={o.title} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
-    meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}</>}/>;
+function CarteLbc({ o, num = '', benef = null }) {
+  // N° (identité stricte) en tête du titre, bénéfice en meta — parité Vinted/eBay.
+  // Les deux ne s'affichent QUE connus (§5) : un N° ambigu ou un prix d'achat
+  // manquant ⇒ rien, jamais 0.
+  const titre = num ? `N°${num} · ${o.title || ''}` : o.title;
+  return <LigneVente photo={photoArticle(o)} titre={titre} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
+    meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · bénéfice {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
 // celle d'un achat Vinted (`etapeAchat`) : Annulé · Reçu · En transit · Payé.
@@ -15658,10 +15662,29 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   const ventes=lbcVentes.ventes || [];
   const visibles=ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
     && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o))));
+  // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay, 26 oct.) ──────────────────────
+  // N° et bénéfice par IDENTITÉ seulement (§5) : `numeroLbcIdentite` (lien posé
+  // à la main > référence VRM de l'annonce, '' si ambigu), puis le prix d'achat
+  // SAISI de cette paire (`vinted_buyprice_by_num`, via `prixAchatDe` — la MÊME
+  // source que Vinted/eBay, §11). Prix d'achat inconnu ⇒ pas de bénéfice (jamais
+  // 0 : un total partiel présenté comme complet est pire qu'un absent).
+  const liens = React.useMemo(() => load('vrm_lbc_liens', {}) || {}, [lbcVentes]);
+  const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [lbcVentes]);
+  // La carte des annonces LBC donne la réf VRM ; en l'attendant, `null` ⇒ le
+  // lien posé à la main suffit déjà (c'est l'identité la plus forte).
+  const [itemsLbc, setItemsLbc] = useState(null);
+  useEffect(() => { let m = false; lbcAnnoncesSession().then((it) => { if (!m) setItemsLbc(it || null); }).catch(() => {}); return () => { m = true; }; }, []);
+  const infoVente = (o) => {
+    const num = numeroLbcIdentite(o, itemsLbc, liens);
+    const prix = o.price != null ? Number(o.price) / 100 : null;
+    const achat = num ? prixAchatDe({ numero: num }, buyByNum) : null;
+    const benef = (prix != null && achat != null && !lbcAnnulee(o)) ? prix - achat : null;
+    return { num, benef };
+  };
   return <div>
     <ScreenHead icon="cash" title="Ventes"/>
     <FiltresVentes plateforme="leboncoin" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o}/>)}</div>
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o} {...infoVente(o)}/>)}</div>
     {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
     {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
   </div>;
