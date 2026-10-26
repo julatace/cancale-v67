@@ -114,3 +114,32 @@ n'est ajoutée.
 4. Relancer la sélection.
 
 Si le refus continue, copier le contrôle : les compteurs `natifs*` diront pourquoi.
+
+## 5.229 — le clic du vendeur dans la cloche sert aussi de preuve
+
+Mesuré après l'essai du vendeur. La 5.228 était bien installée (12:47), mais
+l'archive des favoris n'avait reçu **aucune** preuve. Ses clics faits à la main
+dans la cloche (rapport VRM Capture) n'en produisaient pas : seul « Vérifier sur
+Vinted » le faisait.
+
+Désormais, `inject.js` signale un clic de confiance sur un lien
+`receiver_id`/`item_id`. Le fond (`noterClicFavoriNatif`) applique alors les
+mêmes contrôles :
+
+- une seule notification enregistrée concordante, même article et même
+  destinataire ;
+- l'onglet doit montrer cette route, comptes revérifiés ;
+- la preuve `NAV` est rangée.
+
+Compteurs anonymes dans `panel_diag_capture` :
+
+- `favori_clic_natif` ;
+- `favori_clic_meme_article_{0..3|plus}` ;
+- `favori_clic_concorde_{0..3|plus}` ;
+- `favori_clic_confirme` ou `favori_clic_refuse_*`.
+
+**Lecture** : si `meme_article` est supérieur à 0 et `concorde` vaut 0,
+`offering_id` n'est pas le `receiver_id`. L'équivalence est alors fausse et rien
+ne sera rangé.
+
+Tests : 6 contrôles de plus dans `favoris-lien-natif.cjs`, 40 en tout.
