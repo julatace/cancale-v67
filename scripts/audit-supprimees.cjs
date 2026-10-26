@@ -163,8 +163,13 @@ function lecteurAnnoncesApp(ligne, ids) {
   const masquees = mq ? mq[1] : '';
   const dressingEnLigne = morceau(/const dressingEnLigne = async[\s\S]*?\n\};/, 'dressingEnLigne');
   const brut = morceau(/const fetchHarvestBrut = async[\s\S]*?\n\};/, 'fetchHarvestBrut');
+  // 26 oct. : `dressingEnLigne` ferme les annonces d'un compte « retiré pour de bon »
+  // (`annoncesRetirees`, `resRetire`). Sans ces aides le lecteur levait et l'écran
+  // rendait [] (§6.3). Absentes d'un code d'avant le 26 oct. : rien à charger.
+  const rt = /const ANNONCES_RETIREES = [\s\S]*?\nconst resRetire = [\s\S]*?\}\);\n/.exec(F.app);
+  const retirees = rt ? rt[0] : '';
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
-    busyStart() {}, busyEnd() {}, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [], lecturesPubliquesKO: () => false,   // (5.167 revue : `dressingEnLigne` dit si les lectures publiques ont pu être lues)
+    busyStart() {}, busyEnd() {}, load: (k, d) => d, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [], lecturesPubliquesKO: () => false,   // (5.167 revue : `dressingEnLigne` dit si les lectures publiques ont pu être lues)
    
     fetch: async (url) => {
       const u = decodeURIComponent(String(url));
@@ -172,7 +177,7 @@ function lecteurAnnoncesApp(ligne, ids) {
       return { ok: true, json: async () => projette([ligne], u) };
     } };
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${masquees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 
