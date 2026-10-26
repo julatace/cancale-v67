@@ -35,7 +35,9 @@ const server = http.createServer((q,r)=>{
 let n=0;
 const check=(v,label)=>{assert.ok(v,label);console.log('OK '+label);n++;};
 async function brancher(p){
-  await p.addInitScript(()=>{localStorage.setItem('vrm_acces_direct','1');localStorage.setItem('vrm_zoom','0.65');});
+  // Le rappel URSSAF ne s'affiche qu'en fin de mois (échéance proche) : la vue globale dépendait de la DATE du lancement.
+  // Le banc note les mois passés « déclarés » pour mesurer la même Ma journée quel que soit le jour (26 oct.).
+  await p.addInitScript(()=>{localStorage.setItem('vrm_acces_direct','1');localStorage.setItem('vrm_zoom','0.65');const d=new Date(),reg={};for(let i=0;i<15;i++){const m=new Date(d.getFullYear(),d.getMonth()-i,1);reg[m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')]={ids:[],n:0,ca:0,regle:'versement',at:Date.now()};}localStorage.setItem('vrm_urssaf_declare',JSON.stringify(reg));});
   await p.route('**/*',async r=>{
     const url = new URL(r.request().url());
     if(url.pathname.includes('/rest/v1/')){

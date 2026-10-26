@@ -550,15 +550,15 @@ let TLS = null;
     const app = sessionApp(F);
     const dir = copier(V164, 'perime-' + Date.now());
     const udd = path.join(TMP, 'profil-G-' + Date.now());
-    let ctx = await lancer(udd, []);
-    const br = ctx.browser();
-    const bcdp = br ? await br.newBrowserCDPSession() : await ctx.newCDPSession(await ctx.newPage());
-    const r = await bcdp.send('Extensions.loadUnpacked', { path: dir }).catch((e) => ({ err: e.message }));
-    if (!r || !r.id) { dit(false, 'G : installation non empaquetée (CDP)', JSON.stringify(r)); await ctx.close(); return; }
+    // 26 oct. (Chrome 153) : une extension installée par CDP n'est plus rechargée au
+    // redémarrage ; « Charger l'extension non empaquetée » se joue par --load-extension,
+    // qui garde l'ANCIEN service worker sous le manifeste neuf (mesuré : 5.164 sous 5.231).
+    let ctx = await lancer(udd, [dir]);
+    const r = { id: extId(dir) };
     await attendre(2500);
     await ctx.close();
     remplacer(dir, EXT_SRC);                                          // le zip dézippé PAR-DESSUS, sans ⟳
-    ctx = await lancer(udd, []);
+    ctx = await lancer(udd, [dir]);
     try {
       const postes = []; await espionnerPage(ctx, postes); await poserSessionApp(ctx, app.s);
       await attendre(2500);
@@ -593,15 +593,15 @@ let TLS = null;
     const app = sessionApp(F);
     const dir = copier(V164, 'perime-P-' + Date.now());
     const udd = path.join(TMP, 'profil-P-' + Date.now());
-    let ctx = await lancer(udd, []);
-    const br = ctx.browser();
-    const bcdp = br ? await br.newBrowserCDPSession() : await ctx.newCDPSession(await ctx.newPage());
-    const r = await bcdp.send('Extensions.loadUnpacked', { path: dir }).catch((e) => ({ err: e.message }));
-    if (!r || !r.id) { dit(false, 'P : installation non empaquetée (CDP)', JSON.stringify(r)); await ctx.close(); return; }
+    // 26 oct. (Chrome 153) : une extension installée par CDP n'est plus rechargée au
+    // redémarrage ; « Charger l'extension non empaquetée » se joue par --load-extension,
+    // qui garde l'ANCIEN service worker sous le manifeste neuf (mesuré : 5.164 sous 5.231).
+    let ctx = await lancer(udd, [dir]);
+    const r = { id: extId(dir) };
     await attendre(2500);
     await ctx.close();
     remplacer(dir, EXT_SRC);
-    ctx = await lancer(udd, []);
+    ctx = await lancer(udd, [dir]);
     try {
       await poserSessionApp(ctx, app.s);
       await attendre(2000);
