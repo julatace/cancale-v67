@@ -109,12 +109,14 @@ export function annulerCommandeRangee(d,orderId,at=new Date().toISOString()){
   const orders=d.orders.map(o=>{if(o && (o.orderId===orderId || o.legacyOrderId===orderId)){vu=true;return {...o,cancelStatus:{...(o.cancelStatus || {}),cancelState:'CANCELED'},_annuleeParVrm:at};}return o;});
   return vu?{...d,orders}:undefined;
 }
-export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(...a)=>fetch(...a),marketplace='EBAY_FR',lireAnnonces,marquerCommandeAnnulee}){
+export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(...a)=>fetch(...a),marketplace:marche='EBAY_FR',lireAnnonces,marquerCommandeAnnulee}){
+  // (26 oct.) Le marché peut être une FONCTION : celui du compte de la requête.
+  const mk=()=>typeof marche==='function'?marche():marche;
   const jeton=async ctx=>{const r=await accessToken(ctx);return r.ok && r.token?r:echec(r.error || 'Compte eBay indisponible.',r.status || 502,r.reason);};
   // Une requête JSON. `post` : un 5xx ou une coupure ⇒ `incertain:true`.
   async function json(url,token,{method='GET',body,iaf=false}={}){
     try{
-      const r=await fetcher(url,{method,headers:{Authorization:(iaf?'IAF ':'Bearer ')+token,Accept:'application/json','Content-Type':'application/json','X-EBAY-C-MARKETPLACE-ID':marketplace},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+      const r=await fetcher(url,{method,headers:{Authorization:(iaf?'IAF ':'Bearer ')+token,Accept:'application/json','Content-Type':'application/json','X-EBAY-C-MARKETPLACE-ID':mk()},...(body!==undefined?{body:JSON.stringify(body)}:{})});
       const txt=await r.text().catch(()=>'');let data=null;try{data=txt?JSON.parse(txt):null;}catch(_){}
       return {status:r.status,ok:r.status>=200 && r.status<300,data,headers:r.headers};
     }catch(_){return {status:0,ok:false,data:null,coupure:true};}
@@ -202,7 +204,7 @@ export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(
   async function lirePromotion(token){
     const c=await json(`${MK}/ad_campaign?campaign_status=RUNNING&limit=100`,token);
     if(!c.ok)return {ko:lectureRatee(c,'tes campagnes de promotion')};
-    const campagnes=campagnesEbay(c.data,marketplace);if(!campagnes)return {ko:echec('Réponse eBay illisible pour la promotion.',502,'illisible')};
+    const campagnes=campagnesEbay(c.data,mk());if(!campagnes)return {ko:echec('Réponse eBay illisible pour la promotion.',502,'illisible')};
     const ads=[];
     for(const cp of campagnes){
       const r=await json(`${MK}/ad_campaign/${encodeURIComponent(cp.id)}/ad?limit=500`,token);
@@ -228,7 +230,7 @@ export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(
     if(p.ads.some(x=>x.listingId===String(b.listingId)))return echec('Cette annonce est déjà promue — change son taux plutôt.',409,'deja');
     let camp=p.campagnes[0]?.id;
     if(!camp){
-      const c=await json(`${MK}/ad_campaign`,a.token,{method:'POST',body:{campaignName:'VRM',startDate:new Date(Date.now()+60000).toISOString(),marketplaceId:marketplace,fundingStrategy:{fundingModel:'COST_PER_SALE',bidPercentage:taux}}});
+      const c=await json(`${MK}/ad_campaign`,a.token,{method:'POST',body:{campaignName:'VRM',startDate:new Date(Date.now()+60000).toISOString(),marketplaceId:mk(),fundingStrategy:{fundingModel:'COST_PER_SALE',bidPercentage:taux}}});
       if(!c.ok)return ecritureRatee(c,'la campagne de promotion a été créée','eBay a refusé de créer la campagne de promotion.');
       camp=String((c.headers && c.headers.get && c.headers.get('location') || '').split('/').pop() || '');
       if(!camp)return incertain('la campagne de promotion a été créée');
