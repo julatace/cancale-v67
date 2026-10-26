@@ -110,7 +110,7 @@ const photoSvg = (k) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" hei
 // Le pont de l'extension (ordinateur seulement) : Chrome connecté sur le compte 111.
 const PONT = ({ fils }) => {
   let version = '5.216.0';
-  window.majExtensionFavoris=()=>{version='5.223.0';post({__vmr:'ready',version});};
+  window.majExtensionFavoris=()=>{version='5.226.0';post({__vmr:'ready',version});};
   const post = (m) => window.postMessage({id:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',...m}, '*');
   Object.defineProperty(window.chrome,'runtime',{configurable:true,value:{sendMessage:(id,m,cb)=>{
     if(id!=='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')return cb(null);
@@ -270,7 +270,7 @@ const capturer = async (pg, nom, vp) => {
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
-          await pg.getByRole('alert').filter({hasText:'5.223'}).waitFor();
+          await pg.getByRole('alert').filter({hasText:'5.226'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>window.controleOuverture=t}}));
           await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
