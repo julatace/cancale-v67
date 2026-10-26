@@ -51498,10 +51498,13 @@ function AppCoeur() {
       //    PROUVÉES ; le doute, lui, se règle sur l'écran Leboncoin.
       let lbcRemovePids=[];
       let lbcRemoveCount=0;
+      let postedIds=[];              // tous les ids publiés sur LBC (pour le croisement eBay→LBC)
+      let lbcRemoveEbayCount=0;      // vendues sur eBay, encore en ligne ici (§11, même base que le compte Vinted)
+      let sortisN=new Set();         // N° dont l'annonce LBC est SORTIE (plus en ligne) — partagé par les deux comptes « à retirer »
       let postedDepuis='';
       try{
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
-        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
       // La MÊME règle que l'écran Leboncoin (`doublesVenteLbc`, §11). Les ventes
@@ -51543,6 +51546,7 @@ function AppCoeur() {
             let preuve=null;
             if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
             const {prouves:sortis}=numerosLbcSortis(items, load('vrm_lbc_liens',{})||{}, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve);
+            sortisN=sortis;
             lbcRemoveCount=lbcRemovePids.filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return !(k && sortis.has(k)); }).length;
           }
         }catch(_){}
@@ -51588,6 +51592,20 @@ function AppCoeur() {
         if(ventesE.lbcSansPaire>0 && (progE||[]).length){ const items=await lbcAnnoncesSession(); ventesE=verdict(items||null); }
         const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:enLigneE, vendusVinted:vendusE, programmees:progE||[], ventes:ventesE});
         ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerAilleurs=(dvE.aRetirerEbayAilleurs||[]).length; ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length; ebayAAnnulerOu=ouVenduesTexte(dvE.aAnnulerEbay);
+        // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire PUBLIÉE sur LBC et
+        //    VENDUE sur eBay, encore en ligne ici — le pendant du compte « vendue
+        //    sur Vinted » juste au-dessus, avec le MÊME verdict que l'écran eBay
+        //    (`ventesE.vendus`, §11). Hors de celles déjà comptées « sur Vinted »
+        //    (une paire, une ligne). « pas su » (verdict sans Map) ⇒ 0, jamais inventé.
+        if(ventesE && ventesE.vendus && typeof ventesE.vendus.get==='function'){
+          const soldEbayN=new Set([...ventesE.vendus].filter(([,v])=>v==='eBay').map(([k])=>k));
+          if(soldEbayN.size){
+            const vintedRemN=new Set(lbcRemovePids.map(pid=>cleNum((nums[pid]||{}).numero)).filter(Boolean));
+            // Même refinement que le compte Vinted (§11) : une annonce LBC SORTIE
+            // n'est plus « à retirer » ; une déjà comptée « sur Vinted » non plus.
+            lbcRemoveEbayCount=postedIds.filter(pid=>/^\d+$/.test(String(pid))).filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return k && soldEbayN.has(k) && !vintedRemN.has(k) && !sortisN.has(k); }).length;
+          }
+        }
         // Retrait automatique (proposition 8) : allumé par lui, nuage là AU
         // DÉPART du passage, passage pas annulé, toutes ses annonces Vinted
         // lues — puis la règle la plus stricte (`retraitsEbayAutoPermis`), jugée
@@ -51653,6 +51671,7 @@ function AppCoeur() {
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
+      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
