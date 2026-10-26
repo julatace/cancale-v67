@@ -32,10 +32,10 @@ const fs = require('fs'), http = require('http'), path = require('path');
 // depuis /tmp/avN, et un chemin en dur y servirait le build COURANT — le banc
 // mesurerait le correctif en croyant mesurer le code d'avant.
 const DIST = path.join(__dirname, '..', '..', 'dist'), SC = __dirname;
-const FX = (f) => JSON.parse(fs.readFileSync(path.join(SC, 'fx', f + '.json'), 'utf8'));
-const main = FX('main'), accounts = FX('accounts');
-const rows = [...FX('sold'), ...FX('purch'), ...dressingsDuJour(FX('listings')), ...FX('inbox'),
-  ...FX('track'), ...FX('bord'), ...FX('label'), ...FX('billing')];
+// fx/ absent (toute session hors la sienne) : socle synthétique, mêmes contrôles.
+const { FXok, main, accounts, LISTV } = require('./_fx-secours.cjs').fxSecours(SC);
+const rows = [...FXok('sold'), ...FXok('purch'), ...dressingsDuJour(FXok('listings')), ...LISTV(), ...FXok('inbox'),
+  ...FXok('track'), ...FXok('bord'), ...FXok('label'), ...FXok('billing')];
 
 // Les quatre lignes de réglages, telles qu'elles existent chez lui (formes
 // mesurées le 15 septembre ; contenus synthétiques).
