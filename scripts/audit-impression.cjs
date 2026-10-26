@@ -192,8 +192,8 @@ const airePage = (p) => { const s = p.getSize(); return s.width * s.height; };
   const poser = (APP.match(/const poserBordereau = async[\s\S]*?\n\};/) || [])[0] || '';
   dit(/zoneEtiquette\(PL, first\)/.test(poser) && /if \(thermique && z\.ok\)/.test(poser),
     'la découpe ne part que d’une zone MESURÉE (`poserBordereau`)');
-  const fusion = (APP.match(/const mergeAndDownloadBordereaux = async[\s\S]*?\n\};/) || [])[0] || '';
-  const unique = (APP.match(/const annotateAndDownloadBordereau = async[\s\S]*?\n\};/) || [])[0] || '';
+  const fusion = (APP.match(/const mergeAndDownloadBordereaux(?:Brut)? = async[\s\S]*?\n\};/) || [])[0] || '';
+  const unique = (APP.match(/const annotateAndDownloadBordereau(?:Brut)? = async[\s\S]*?\n\};/) || [])[0] || '';
   const avecFacture = (APP.match(/const printBordAndInvoice = async[\s\S]*?\n  \};/) || [])[0] || '';
   dit(/poserBordereau\(/.test(fusion) && /poserBordereau\(/.test(unique) && /poserBordereau\(/.test(avecFacture),
     'les trois chemins d’impression (lot, un bordereau, bordereau + facture) passent par LA même règle');

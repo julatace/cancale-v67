@@ -102,7 +102,8 @@ async function preparer(b, vp, { ventesOk = true } = {}) {
     const u = decodeURIComponent(metaVersData(req.url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (req.method() !== 'GET') { try { ecrits.push(req.postData() || ''); } catch (_) {} return j([]); }
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+    // Base CLOISONNÉE comme la production : sinon l'app n'envoie rien au nuage (cloudPush exige CLOISONNE).
+    if (/select=owner/.test(u)) return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     if (!ventesOk && /orders_sold|orders_%|orders_\*/.test(u)) return route.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"panne"}' });
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
