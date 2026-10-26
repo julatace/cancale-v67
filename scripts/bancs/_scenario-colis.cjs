@@ -114,11 +114,46 @@ function annonce({ id, titre, prix, taille, marque }) {
 // « il y a 1 min » → la règle « en ligne ≤ 24 h » passe).
 const ligneListings = (uid, items) => ({ id: `harvest_${uid}_listings`, data: { capturedAt: iso(NOW), payload: { items, pagination: null } } });
 
+// ── SCÉNARIO « PRIX D'ACHAT » (serie, prixachat) ────────────────────────────
+// 60 paires numérotées SANS prix d'achat + leurs achats, pour exercer le moteur
+// de suggestion (§5.23, `scoreAchatPrep`). Marque+4, taille+4, titre exact+6 :
+// 18 achats au titre IDENTIQUE → score ≥12 → « C'est ça » ; 42 achats « {marque}
+// baskets {taille} » (même marque+taille, pas de modèle/couleur, moins cher) →
+// score 6 → « à vérifier ». Marque×taille uniques sur les 60 → aucune collision
+// (une taille qui diffère = −10 → jamais candidat). Ce n'est PAS une fiction du
+// jugement : les achats ressemblent VRAIMENT aux paires, le barème fait son
+// travail — c'est ce que l'agent SKIP attendait comme fixtures ciblées.
+function achatsScenario() {
+  const BRANDS = ['Nike', 'Adidas', 'Puma', 'New Balance', 'Asics', 'Reebok'];
+  const MODELS = ['Air Force', 'Gazelle', 'Suede', '550', 'Gel Lyte', 'Club C'];
+  const COLORS = ['rouge', 'bleu', 'noir', 'blanc', 'gris'];
+  const paires = [], achats = [], soldOrders = [], num = {};
+  for (let i = 0; i < 60; i++) {
+    const brand = BRANDS[i % 6], model = MODELS[i % 6], size = 36 + Math.floor(i / 6), color = COLORS[i % 5];
+    const id = 'pa' + i, titre = `${brand} ${model} ${color} ${size}`;
+    paires.push(annonce({ id, titre, prix: 60 + (i % 10), taille: size, marque: brand }));
+    // ⚠️ L'entrée `vinted_annonce_numeros` PORTE le titre et le prix : c'est elle
+    // que le barème lit (`refAchat({title:e.title, price:e.price})`), pas
+    // l'annonce. Sans eux, la référence est vide → aucune suggestion.
+    num[id] = { numero: String(i + 1), title: titre, price: 60 + (i % 10) };
+    if (i % 10 < 3) achats.push(ordre({ tx: 'ac' + i, titre, prix: 50, statut: STATUT_FINAL, dateMs: NOW - 30 * 86400e3 }));      // fort : titre identique → « C'est ça »
+    else achats.push(ordre({ tx: 'ac' + i, titre: `${brand} baskets ${size}`, prix: 40, statut: STATUT_FINAL, dateMs: NOW - 30 * 86400e3 })); // faible : marque+taille → « à vérifier »
+    // Les 20 premières sont AUSSI vendues (identité item_id → la paire), pour que
+    // l'écran Ventes ait du contenu et sa case « Bénéfice/Coût d'achat ».
+    if (i < 20) { const o = ordre({ tx: 've' + i, titre, prix: 60 + (i % 10), statut: STATUT_FINAL, dateMs: NOW - 10 * 86400e3 }); o.item_id = id; soldOrders.push(o); }
+  }
+  return {
+    accounts: comptes(), main: ligneMain({ vinted_annonce_numeros: num }),
+    listings: [ligneListings(UID[0], paires)], purch: [lignePurch(UID[0], achats)],
+    sold: [ligneSold(UID[0], soldOrders)],
+  };
+}
+
 // fx/ présent ? (sur SA machine on lit la vraie base, ces builders dorment.)
 const present = (SC) => fs.existsSync(path.join(SC, 'fx', 'accounts.json'));
 
 module.exports = {
   present, comptes, ligneMain, ordre, lignePurch, ligneSold,
-  bordereau, labelLatest, trackColis, panelRelais, panelComptesEtat, annonce, ligneListings, uuid, UID,
+  bordereau, labelLatest, trackColis, panelRelais, panelComptesEtat, annonce, ligneListings, achatsScenario, uuid, UID,
   STATUT_RELAIS, STATUT_AEXP, STATUT_FINAL, STATUT_NONRECL, iso, NOW,
 };
