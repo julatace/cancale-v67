@@ -3886,6 +3886,9 @@ function FactureSousVente({ factures, compte }) {
           </select>
         </label>
         {!drafts.length && <span style={{fontSize:11,color:C.muted}}>Aucun brouillon à envoyer pour ce compte. Les reçus restent disponibles dans Factures.</span>}
+        {inv && <span data-facture-retour={inv.retourNom ? 'oui' : 'non'} style={{fontSize:11,color:inv.retourNom?C.muted:C.warn,lineHeight:1.4}}>{inv.retourNom
+          ? 'Les 2 documents Vinted Pro partent ensemble : la facture + le formulaire de retour en pièce jointe.'
+          : 'Vinted Pro demande 2 documents : seule la facture part (le formulaire de retour n’a pas été reçu avec l’email de vente — joins-le toi-même à l’acheteur).'}</span>}
         {inv && <button type="button" disabled={busy} onClick={async()=>{
           if(!await askConfirm(`Mettre la facture ${inv.number} (${inv.prix} €) en file d'envoi à ${inv.buyerEmail} ?`))return;
           setBusy(true);const ok=await setProInvoiceStatus(inv,'queued');setBusy(false);
@@ -14362,6 +14365,75 @@ function EtatActions({ onNav, ordi, sombre }) {
 // écrans n'ouvrent pas la même conversation (« Bienvenue » sur le tableau de
 // bord, « ta journée est vide » sur l'accueil) — mais les ÉTAPES, elles, sont
 // les mêmes, et c'est tout ce qui compte.
+// ── MINI-TUTO ILLUSTRÉ DE L'ÉTAPE COURANTE (26 octobre, demande de Julien) ────
+// L'onboarding était 100 % texte. Une petite illustration DÉMONTRE le geste de
+// l'étape en cours (installer · connecter · passer sur Vinted) — tier « première
+// fois / explication », le seul où le motion est justifié (skill `animate`, §7 :
+// sobriété). transform/opacity SEULEMENT, la courbe de sortie du projet
+// (0.23,1,0.32,1), et tout sous `prefers-reduced-motion` : l'état final reste
+// lisible, animation OFF. `aria-hidden` : purement décoratif — c'est le titre et
+// le texte au-dessus qui portent le sens (et que `premierjour.cjs` lit).
+const TUTO_CLES = ['install', 'lien', 'vinted'];
+function TutoIllustration({ n }) {
+  const cle = TUTO_CLES[Math.min(Math.max(n, 1), 3) - 1];
+  const vert = INV_STATUS.online.color;
+  return (
+    <div className="vrm-tuto" data-tuto={cle} aria-hidden="true" style={{ margin: '2px 0 16px' }}>
+      <style>{`
+.vrm-tuto{display:flex;justify-content:center}
+.vrm-tuto svg{width:100%;max-width:300px;height:auto;animation:vrmTutoIn .5s cubic-bezier(.23,1,.32,1) both}
+@keyframes vrmTutoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes vrmTutoDrop{0%{opacity:0;transform:translateY(-15px)}60%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes vrmTutoPulse{0%{opacity:.5;transform:scale(.7)}70%,100%{opacity:0;transform:scale(1.9)}}
+@keyframes vrmTutoDraw{from{stroke-dashoffset:var(--l)}to{stroke-dashoffset:0}}
+@keyframes vrmTutoPop{0%{opacity:0;transform:scale(.2)}70%{transform:scale(1.15)}100%{opacity:1;transform:scale(1)}}
+@keyframes vrmTutoFlux{0%{opacity:0;transform:translateX(0)}15%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateX(70px)}}
+.vt-drop{animation:vrmTutoDrop 1s cubic-bezier(.23,1,.32,1) .3s both;transform-box:fill-box;transform-origin:center}
+.vt-pulse{animation:vrmTutoPulse 2.4s ease-out 1.1s infinite;transform-box:fill-box;transform-origin:center}
+.vt-draw{stroke-dasharray:var(--l);animation:vrmTutoDraw .8s cubic-bezier(.23,1,.32,1) .5s both}
+.vt-pop{animation:vrmTutoPop .5s cubic-bezier(.23,1,.32,1) 1.35s both;transform-box:fill-box;transform-origin:center}
+.vt-flux{animation:vrmTutoFlux 2.8s ease-in-out infinite;transform-box:fill-box}
+.vt-flux.b{animation-delay:.95s}.vt-flux.c{animation-delay:1.9s}
+@media (prefers-reduced-motion:reduce){.vrm-tuto svg,.vrm-tuto .vt-drop,.vrm-tuto .vt-pulse,.vrm-tuto .vt-draw,.vrm-tuto .vt-pop,.vrm-tuto .vt-flux{animation:none!important}}
+      `}</style>
+      {cle === 'install' && (
+        <svg viewBox="0 0 300 108" role="img">
+          <rect x="18" y="16" width="264" height="80" rx="11" fill={C.bg} stroke={C.border} strokeWidth="2"/>
+          <rect x="18" y="16" width="264" height="22" rx="11" fill={C.card}/>
+          <circle cx="33" cy="27" r="3" fill={C.muted}/><circle cx="44" cy="27" r="3" fill={C.muted}/><circle cx="55" cy="27" r="3" fill={C.muted}/>
+          <rect x="72" y="21" width="150" height="12" rx="6" fill={C.bg} stroke={C.border}/>
+          <circle className="vt-pulse" cx="251" cy="27" r="12" fill="none" stroke={C.accent} strokeWidth="2"/>
+          <g className="vt-drop"><rect x="241" y="17" width="20" height="20" rx="5" fill={C.accent}/><path d="M245 22l6 10 6-10" fill="none" stroke={C.onAccent||'#fff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></g>
+          <rect x="34" y="50" width="120" height="7" rx="3.5" fill={C.border}/>
+          <rect x="34" y="64" width="150" height="7" rx="3.5" fill={C.border}/>
+          <rect x="34" y="78" width="90" height="7" rx="3.5" fill={C.border}/>
+        </svg>
+      )}
+      {cle === 'lien' && (
+        <svg viewBox="0 0 300 108" role="img">
+          <rect x="20" y="36" width="78" height="40" rx="9" fill={C.card} stroke={C.border} strokeWidth="2"/>
+          <path d="M34 50l18 12 18-12" fill="none" stroke={C.muted} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+          <rect x="34" y="48" width="36" height="20" rx="3" fill="none" stroke={C.muted} strokeWidth="2.4"/>
+          <rect x="202" y="36" width="78" height="40" rx="9" fill={C.accent}/>
+          <path d="M224 48l8 16 8-16" fill="none" stroke={C.onAccent||'#fff'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          <path className="vt-draw" style={{ ['--l']: 104 }} d="M98 56h104" fill="none" stroke={C.accent} strokeWidth="3" strokeLinecap="round" strokeDasharray="7 7"/>
+          <g className="vt-pop"><circle cx="150" cy="56" r="15" fill={vert}/><path d="M143 56l5 5 9-10" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></g>
+        </svg>
+      )}
+      {cle === 'vinted' && (
+        <svg viewBox="0 0 300 108" role="img">
+          <rect x="20" y="26" width="74" height="60" rx="10" fill={C.card} stroke={C.border} strokeWidth="2"/>
+          <path d="M40 42l10 26 10-26" fill="none" stroke={C.accent} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+          <rect x="206" y="26" width="74" height="60" rx="10" fill={C.bg} stroke={C.accent} strokeWidth="2"/>
+          <path d="M224 56l6 6 12-14" fill="none" stroke={C.accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          <rect className="vt-flux" x="112" y="50" width="22" height="16" rx="4" fill={C.accent}/>
+          <rect className="vt-flux b" x="112" y="50" width="22" height="16" rx="4" fill={C.accent} opacity="0.75"/>
+          <rect className="vt-flux c" x="112" y="50" width="22" height="16" rx="4" fill={C.accent} opacity="0.55"/>
+        </svg>
+      )}
+    </div>
+  );
+}
 function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const { extAuth, etape, relire } = useEtapePont();
   const sansSouris = useSansSouris();
@@ -14564,6 +14636,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
           <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<n?(INV_STATUS.online.color):(k+1)===n?C.accent:C.border}}/>
         ))}
       </div>
+      {/* Mini-tuto illustré de l'étape courante — sur le parcours normal (3 étapes),
+          pas sur un état-problème où un autre message doit dominer. */}
+      {['absente','demande','pasconnectee','connectee'].includes(etape) && <TutoIllustration n={n}/>}
       <div style={{fontSize:18,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{titre}</div>
       <div style={{fontSize:13.5,color:C.muted,marginTop:7,lineHeight:1.6}}>{corps}</div>
 

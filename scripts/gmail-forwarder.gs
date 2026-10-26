@@ -206,10 +206,20 @@ function sendQueuedInvoices() {
           opts.inlineImages = { logoFacture: Utilities.newBlob(Utilities.base64Decode(b64), mime, 'logo') };
         } catch (e) {}
       }
+      // 2e document Vinted Pro : le formulaire de retour, joint à la facture.
+      var avecRetour = false;
+      if (d.retourB64) {
+        try {
+          opts.attachments = [Utilities.newBlob(Utilities.base64Decode(d.retourB64), 'application/pdf', d.retourNom || ('Formulaire-retour-commande-' + d.number + '.pdf'))];
+          avecRetour = true;
+        } catch (e) {}
+      }
       GmailApp.sendEmail(
         d.buyerEmail,
         'Votre facture ' + d.number + (cfg.nom ? ' – ' + cfg.nom : ''),
-        'Bonjour,\n\nVeuillez trouver votre facture ' + d.number + ' pour votre achat Vinted.\n\nMerci pour votre achat !',
+        'Bonjour,\n\nVeuillez trouver votre facture ' + d.number + ' pour votre achat Vinted'
+          + (avecRetour ? ', ainsi que le formulaire de retour en pièce jointe' : '')
+          + '.\n\nMerci pour votre achat !',
         opts
       );
       // Marque la facture comme envoyée (sinon elle repartirait au passage

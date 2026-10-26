@@ -123,6 +123,8 @@ const VENTE = {
   text: 'acheteur_banc a acheté\nNike Air Max banc\n50,00 €\nEn tant que membre Vinted Pro, tu dois envoyer à l\'acheteur 2 documents supplémentaires :\nCoordonnées de l\'acheteur\nAdresse : Jean Banc, 1 rue du Banc 35000 Rennes\nAdresse e-mail : acheteur@banc.test\n',
   html: '', attachments: [],
 };
+// Les octets du 2e document Vinted Pro (formulaire de retour), joints à l'email.
+const RETOUR_B64 = Buffer.from('%PDF-1.4\nFormulaire de retour de commande (banc)\n%%EOF').toString('base64');
 // La forme de l'email d'un compte PRO, telle que Julien l'a transmise (16 oct.),
 // avec des données INVENTÉES. Transféré depuis sa boîte, en-tête compris.
 const VENTE_PRO = (tx, pseudo = 'acheteuse_banc') => ({
@@ -135,7 +137,7 @@ const VENTE_PRO = (tx, pseudo = 'acheteuse_banc') => ({
     + '• Un formulaire de retour de commande.\n• Une facture. Veille à inclure une facture dans le colis avec l\'article.\n\n'
     + 'Coordonnées de l\'acheteur\nAdresse :\nMarie Banc, 12 rue Inventée, Lisbonne, 1000-001, PT, Portugal\nAdresse e-mail :\nmarie.banc@exemple.test\n\n'
     + 'N\'hésite pas à contacter ' + pseudo + ' afin de lui faire savoir quand tu as envoyé l\'article.\n\nL\'équipe Vinted\n',
-  html: '', attachments: [{ filename: `Formulaire-retour-commande-${tx}.pdf`, contentType: 'application/pdf', content: '' }],
+  html: '', attachments: [{ filename: `Formulaire-retour-commande-${tx}.pdf`, contentType: 'application/pdf', content: RETOUR_B64 }],
 });
 // Un compte PARTICULIER : la même vente, sans mention Pro ni coordonnées.
 const VENTE_PART = {
@@ -210,6 +212,20 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       dit(x.buyerName === 'Marie Banc' && /Lisbonne/.test(x.buyerAddress || '') && x.buyerEmail === 'marie.banc@exemple.test',
         'le nom, l\'adresse et l\'email de l\'acheteur viennent du bloc « Coordonnées de l\'acheteur »', `${x.buyerName} · ${x.buyerAddress} · ${x.buyerEmail}`);
       dit(x.prix === '30.00' && /Asics Metaspeed banc/.test(x.designation || ''), 'le prix et l\'article sont ceux de la vente (pas l\'en-tête du transfert)', `${x.prix} · ${x.designation}`);
+      // ── Le 2e document Vinted Pro : le formulaire de retour (26 octobre) ──
+      dit(/Formulaire-retour-commande-23999999001/.test(x.retourNom || ''), 'le formulaire de retour est reconnu (nom de la pièce jointe)', `retourNom=${x.retourNom}`);
+      dit(x.retourB64 === RETOUR_B64, 'ses OCTETS sont gardés (pour les joindre à la facture envoyée à l\'acheteur)', x.retourB64 ? `${x.retourB64.length} car.` : 'vide');
+      // mode=factures (queued) doit transporter le formulaire au script d'envoi.
+      base.set(`${A}|email_invoice_tx23999999001`, { ...base.get(`${A}|email_invoice_tx23999999001`), status: 'queued' });
+      const rf = faireRes();
+      await inbound.default({ method: 'GET', query: { mode: 'factures' }, headers: { 'x-vrm-email-key': 'cle-banc-routes' } }, rf);
+      const fq = (rf.corps && rf.corps.factures || []).find((f) => /23999999001/.test(f.id));
+      dit(fq && fq.retourB64 === RETOUR_B64 && /Formulaire-retour-commande/.test(fq.retourNom || ''), 'mode=factures porte le formulaire (octets + nom) vers l\'envoi', fq ? `b64=${(fq.retourB64||'').length} · ${fq.retourNom}` : 'facture absente de la file');
+      // facture-envoyee : les octets sont PURGÉS (hygiène d'égress), le nom reste.
+      const re = faireRes();
+      await inbound.default({ method: 'POST', query: { mode: 'facture-envoyee' }, headers: { 'x-vrm-email-key': 'cle-banc-routes' }, body: JSON.stringify({ id: 'email_invoice_tx23999999001' }) }, re);
+      const apres = base.get(`${A}|email_invoice_tx23999999001`) || {};
+      dit(apres.status === 'sent' && !apres.retourB64 && /Formulaire-retour-commande/.test(apres.retourNom || ''), 'facture envoyée : octets du formulaire purgés, le nom reste (« formulaire joint »)', `status=${apres.status} · b64=${apres.retourB64 ? apres.retourB64.length : 0} · nom=${apres.retourNom}`);
       await recoit(VENTE_PRO('23999999002'));
       dit(factures().length === 2, 'une AUTRE vente au même pseudo, prix et titre (autre transaction) a SA facture', `${factures().length} facture(s)`);
       await recoit(VENTE_PRO('23999999001'));

@@ -13740,3 +13740,67 @@ Julien : « lance eBay UK et US ». Tout l'eBay de VRM était figé sur eBay.fr
 - **Non mesuré** : la valeur réelle de `User.Site` (doc SiteCodeType) ; aucun
   compte UK ou US relié ; les règles de chaque site (catégories, états, livraison
   gérée) viennent d'eBay au moment de publier ; l'interface reste en français.
+
+### Retrait « pour de bon » par catégorie : annonces + messages (26 octobre, PR #735)
+Julien : « le retrait définitif par catégorie, ça peut être que les annonces par
+exemple et pas les ventes ; et la possibilité dans les paramètres de les
+réactiver ». Le « pour de bon » (survit à une recapture) existait pour les
+**annonces seules** (`vrm_annonces_retirees`, filtre à la lecture) ; il devient
+un CHOIX par catégorie dans la fenêtre « Supprimer des données… ».
+- **Annonces + Messages uniquement.** Mesuré avant de coder : les messages ne
+  nourrissent AUCUN chiffre, les cacher pour de bon ne fausse rien ; les **ventes**
+  (compta/URSSAF/CA) et les **achats** (repère de prix d'achat par modèle) si — on
+  ne les propose donc PAS. C'est le « pas les ventes » demandé.
+- `vrm_messages_retires` = { [uid]: { at, login } } (SYNC_KEYS, posée sur son
+  clic, rattrapée par `onCloudReady`), miroir exact de `vrm_annonces_retirees`.
+  `messagesRetires()` rend un Set d'uid ; illisible ⇒ Set vide, rien n'est caché
+  (« pas su » ne cache rien).
+- Filtre aux **trois portes** de lecture des conversations (comme les deux
+  d'annonces) : `loadConvs` (la liste ET tous ses compteurs — nonLus,
+  nonLusAilleurs, la tuile « Messages » du tableau de bord ligne ~38180 — et
+  « boîte pas lue » : un compte retiré n'y apparaît pas non plus), plus
+  `fetchResumesConversations` et `fetchOffresConversations` (skip par uid du `id`).
+  Le chemin CACHÉ de `loadConvs` filtre aussi (sinon il resservait l'ancienne liste).
+- Réactivation « dans les paramètres » : puce « Messages retirés · Les remettre »
+  sur la carte du compte (Réglages → Comptes liés), comme pour les annonces. La
+  modale offre un bloc « Pour de bon » à deux boutons (Annonces `data-retirer-annonces`,
+  Messages `data-retirer-messages`), chacun bascule retirer/remettre.
+- Preuves : banc `annonces-retirees.cjs` étendu (conversations inventées via
+  `harvest_{uid}_inbox` → `data.payload.conversations`). §6.1 : **3 rouges** sur le
+  code d'avant (la conversation du compte retiré restait sur Messages, le compteur
+  voyait 2, `[data-retirer-messages]` n'existait pas), 0 après. Audits
+  tdz/variables/coherence/chiffres/bancs verts, banc messagerie vert.
+- ⚠️ **Le cas qui coûte, évité** : `fetchHarvestBrut` rend `data.payload` pour
+  l'inbox (pas `data`) — ma première fixture n'avait pas le niveau `payload`, le
+  banc ne voyait aucune conversation. Un banc qui ne sert pas la bonne forme
+  mesure une fiction (§6.3).
+
+### Suppression ciblée : bordereaux et relevés séparés des ventes (26 octobre, PR #738)
+Julien : « sépare les bordereaux et relevés des ventes ». La case « Ventes » de la
+fenêtre « Supprimer des données… » emportait aussi les bordereaux (PDF) et les
+relevés de versement — trois notions sous une case.
+- `familiesDeCompte` : `label*` → `scopes.bordereaux`, `releve_*` → `scopes.releves` ;
+  « Ventes » ne garde que `orders_sold$|txn_|billing$` (la compta se calcule sur
+  eux, pas sur les bordereaux/relevés). Deux cases de plus dans la modale, prises
+  dans « Tout supprimer » et dans `rienCoche`/`tout`.
+- La **garde de préfixe EXACT** (le `_` joker de PostgREST `like` — le compte 35
+  n'efface jamais le 352) et le reste du périmètre ne bougent pas.
+- Preuves : `audit-suppr-compte.cjs` (exécute la VRAIE `familiesDeCompte`) étendu.
+  §6.1 : **5 rouges** sur le code d'avant (Ventes prenait encore `label`/`releve`,
+  les scopes `bordereaux`/`releves` n'existaient pas), 0 après. Build + banc de
+  rendu verts.
+
+### Vérification du `main` déployé (26 octobre, après #735/#738/#737/#739)
+Plusieurs sessions mergent en parallèle (eBay multi-sites #737, fiabilité messages
+#739). Contrôle de non-régression sur `main` (`526d61b`) : `npm run build` vert ;
+**163 audits verts** (le seul non-vert au premier passage était `audit-renum-b` en
+TIMEOUT sous charge séquentielle — relancé seul : 126 verts, 0 rouge) ; bancs de
+rendu à données inventées `messagerie` et `ebay-comptes` verts. ⚠️ `verif_visuel`
+(et les autres bancs `fx/`) n'est PAS exécutable dans ce conteneur : les fixtures
+ne montent jamais dans le dépôt public — ce n'est pas une régression.
+Prod : `vrm.center/api/sante` 200 (`serviceKey:true · owner:true`), build servi
+daté du dernier merge — `main` en ligne et sain. ⚠️ vrm.center était joignable
+DEPUIS ce conteneur cette fois (curl 200), alors que §8 le disait bloqué : la
+connexion Vercel de la session, elle, ne voyait pas l'équipe du projet (404 sur
+`list_deployments`/`web_fetch_vercel_url`) — vérifier d'abord par `curl` l'endpoint
+public `/api/sante`, sans supposer l'un ou l'autre.

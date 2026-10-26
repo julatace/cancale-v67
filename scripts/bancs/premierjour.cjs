@@ -191,8 +191,10 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   // Le bonjour est la ligne de titre, pas la page entière : un contrôle posé
   // sur toute la page attraperait n'importe quel prénom écrit ailleurs.
   const bonjour = (/^(?:Bonjour|Bon après-midi|Bonsoir).*$/m.exec(txt) || [''])[0].trim();
+  // Mini-tuto illustré : la clé de l'illustration rendue (install|lien|vinted), ou null.
+  const tuto = await pg.evaluate(() => { const el = document.querySelector('[data-tuto]'); return el ? el.getAttribute('data-tuto') : null; });
   await ctx.close();
-  return { txt, liens, bonjour, erreurs, etat, voie, gestes, carte, posts, clique, mobile };
+  return { txt, liens, bonjour, erreurs, etat, voie, gestes, carte, posts, clique, mobile, tuto };
 }
 
 (async () => {
@@ -236,6 +238,9 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   dit(/même email/i.test(neuf.txt), 'se connecter à l’extension avec le même email est dit — c’est ce qui sépare les vendeurs');
   const zip = neuf.liens.find((h) => /VRM-extension\.zip/.test(h || ''));
   dit(!!zip, 'un lien de téléchargement de l’extension est offert');
+  // Mini-tuto illustré (26 oct.) : aucune extension ici ⇒ étape 1, l'illustration
+  // « install » est rendue (et décorative — elle n'ajoute aucun texte à la carte).
+  dit(neuf.tuto === 'install', 'un mini-tuto illustré de l’étape courante (installer) est rendu', String(neuf.tuto));
   // ⚠️ Un bouton qui mène à un 404 est le défaut du pipeline Factures : on
   //    vérifie que le fichier EXISTE vraiment là où le lien pointe.
   dit(!!zip && fs.existsSync(path.join(DIST, zip.replace(/^\//, ''))),
