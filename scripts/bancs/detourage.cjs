@@ -23,7 +23,7 @@ let etat;
 let oublier = () => {};
 function base(over = {}) {
   oublier();
-  etat = Object.assign({ cache: new Map(), compteur: new Map(), plafond: null, compteurKO: false, photoroom: [], reponsePR: 200, acces: true, cacheKO: false, abo: {}, aboKO: false, coupure: false }, over);
+  etat = Object.assign({ cache: new Map(), compteur: new Map(), plafond: null, compteurKO: false, photoroom: [], reponsePR: 200, acces: true, cacheKO: false, abo: {}, aboKO: false, coupure: false, clesUser: {}, clesUserKO: false }, over);
   global.fetch = async (url, opts = {}) => {
     const u = String(url); const m = (opts.method || 'GET').toUpperCase();
     const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json' } });
@@ -33,6 +33,12 @@ function base(over = {}) {
       return id ? J({ id, email: id === PROPRIO ? 'p@test' : 'a@test' }) : J({ msg: 'no' }, 401);
     }
     if (/rpc\/vrm_acces_pour/.test(u)) return J(etat.acces);
+    if (/app_data\?id=eq\.vrm_photoroom_cle/.test(u)) {
+      if (etat.clesUserKO) return new Response('<html>522</html>', { status: 522 });
+      const o = decodeURIComponent((u.match(/owner=eq\.([^&]+)/) || [])[1] || '');
+      const c = etat.clesUser[o];
+      return J(c ? [{ cle: c }] : []);
+    }
     if (/\/rest\/v1\/abonnements/.test(u)) {
       if (etat.aboKO) return new Response('<html>522</html>', { status: 522 });
       const o = decodeURIComponent((u.match(/owner=eq\.([^&]+)/) || [])[1] || '');
@@ -115,6 +121,34 @@ async function appeler({ methode = 'POST', qui = PROPRIO, corps = {}, query = {}
     r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
     dit(r.code === 503 && etat.photoroom.length === 0, '« tous » + abonnement illisible : 503, on ne dépense pas à l’aveugle', String(r.code));
     delete process.env.PHOTOROOM_POUR;
+
+    // ── SA PROPRE CLÉ PHOTOROOM (26 octobre) ─────────────────────────────
+    // Julien : « chaque personne puisse mettre sa clé API ». Un vendeur qui a
+    // rangé SA clé (`vrm_photoroom_cle`) détoure avec ELLE — sans verrou
+    // propriétaire (PHOTOROOM_POUR non ouvert), sans plafond serveur (son compte
+    // Photoroom facture). C'est le cas qui PROUVE la nouveauté : sur le code
+    // d'avant, AUTRE sans « tous » recevait 403.
+    const moisKey = new Date().toISOString().slice(0, 7);
+    base({ clesUser: { [AUTRE]: 'pr_cle_a_LUI' } });
+    r = await appeler({ methode: 'GET', qui: AUTRE, query: { usage: '1' } });
+    dit(r.code === 200 && r.corps.clePropre === true && r.corps.ready === true, 'GET ?usage : avec SA clé, prêt, sans plafond (clePropre)', JSON.stringify(r.corps));
+    base({ clesUser: { [AUTRE]: 'pr_cle_a_LUI' } });
+    r = await appeler({ qui: AUTRE, corps: { sha: h1 } });
+    dit(r.code === 200 && r.corps.hit === false && etat.photoroom.length === 0, 'sonde : avec SA clé, pas de plafond serveur, aucun octet envoyé', JSON.stringify(r.corps));
+    base({ clesUser: { [AUTRE]: 'pr_cle_a_LUI' } });
+    r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 200 && etat.photoroom.length === 1 && (etat.photoroom[0].headers || {})['x-api-key'] === 'pr_cle_a_LUI',
+      'un AUTRE vendeur détoure avec SA clé (PHOTOROOM_POUR fermé) — l’appel porte SA clé, pas celle de Julien', JSON.stringify({ k: (etat.photoroom[0] || {}).headers && etat.photoroom[0].headers['x-api-key'], code: r.code }));
+    dit(etat.compteur.get(AUTRE + ':' + moisKey) == null && r.corps.clePropre === true, 'avec SA clé : AUCUN plafond serveur décompté (son compte Photoroom facture)', `compteur=${etat.compteur.get(AUTRE + ':' + moisKey)}`);
+    // Sa clé passe DEVANT celle du serveur (même esprit que /api/ai).
+    base({ clesUser: { [PROPRIO]: 'pr_cle_du_proprio' } });
+    r = await appeler({ qui: PROPRIO, corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 200 && (etat.photoroom[0].headers || {})['x-api-key'] === 'pr_cle_du_proprio', 'la clé du vendeur passe devant la clé du serveur', JSON.stringify((etat.photoroom[0] || {}).headers && etat.photoroom[0].headers['x-api-key']));
+    // Clé du vendeur illisible ⇒ on retombe sur la clé serveur (le verrou
+    // propriétaire protège alors Julien) : le PROPRIO passe, pas un AUTRE.
+    base({ clesUserKO: true });
+    r = await appeler({ qui: AUTRE, corps: { sha: h1, b64: p1.toString('base64') } });
+    dit(r.code === 403 && etat.photoroom.length === 0, 'lecture de la clé vendeur ratée : on retombe sur la clé serveur (AUTRE reste bloqué, Julien protégé)', String(r.code));
 
     // ── L'argent : ce qui ne se repaie pas, ce qui ne se rend pas ─────────
     base({ cacheKO: true });

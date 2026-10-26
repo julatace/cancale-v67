@@ -105,6 +105,28 @@ async function rendre(owner, mois) {
     });
   } catch (_) { /* au pire le compteur garde une unité de trop : on sous-dépense */ }
 }
+
+// ── LA CLÉ PHOTOROOM DU VENDEUR (26 octobre) ────────────────────────────────
+// Julien : « chaque personne puisse mettre sa clé API ». Le MÊME principe que
+// l'IA (`api/ai.js`) : la clé du vendeur d'abord, celle du serveur en secours.
+// Mais le détourage est appelé par l'EXTENSION, qui n'envoie qu'une session —
+// la clé ne peut donc pas voyager à chaque appel. Le vendeur la range dans SA
+// ligne (`vrm_photoroom_cle`, RLS : lui seul et la clé de service la lisent),
+// et le serveur la relit par la session. Avec SA clé, c'est SON compte
+// Photoroom qui paie : on saute alors le verrou « propriétaire » et le plafond
+// (qui ne protègent que la clé de Julien). On ne range jamais la clé ailleurs,
+// jamais dans une sauvegarde (le filet de `telechargerSauvegarde` l'exclut).
+// Rend la clé (chaîne) ou '' — une lecture ratée ('') retombe sur la clé
+// serveur, où le verrou propriétaire protège Julien.
+async function lireCleVendeur(owner) {
+  if (!service() || !owner) return '';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_photoroom_cle&owner=eq.${encodeURIComponent(owner)}&select=cle:data->>cle`, { headers: sbCle(service()) });
+    if (!r.ok) return '';
+    const j = await r.json();
+    return (Array.isArray(j) && j[0] && typeof j[0].cle === 'string') ? j[0].cle.trim() : '';
+  } catch (_) { return ''; }
+}
 // Combien ce vendeur a détouré ce mois-ci. undefined = pas su (jamais « 0 »).
 async function lireUsage(owner, mois) {
   if (!service()) return undefined;
@@ -151,20 +173,32 @@ export async function handleDetourage(req, res) {
     if (!q.usage) { res.status(200).json({ ok: true, ready: !!cle }); return; }
     const u = await utilisateurDe(req);
     if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
+    const cleUser = await lireCleVendeur(u.id);
+    // Avec SA clé : prête, sans plafond serveur ni verrou propriétaire — c'est
+    // son compte Photoroom qui facture, VRM ne compte rien.
+    if (cleUser) { res.status(200).json({ ok: true, ready: true, clePropre: true, autorise: true }); return; }
     const mois = moisCourant();
     const n = await lireUsage(u.id, mois);
     if (n === undefined) { res.status(503).json({ ok: false, reason: 'compteur', ready: !!cle }); return; }
-    res.status(200).json({ ok: true, ready: !!cle, mois, n, plafond: plafondMois(), autorise: await autorise(u.id) });
+    res.status(200).json({ ok: true, ready: !!cle, clePropre: false, mois, n, plafond: plafondMois(), autorise: await autorise(u.id) });
     return;
   }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }
   const u = await utilisateurDe(req);
   if (!u) { res.status(401).json({ ok: false, reason: 'session' }); return; }
   if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement' }); return; }
-  const droit = await autorise(u.id);
-  if (droit === null) { res.status(503).json({ ok: false, reason: 'acces' }); return; }
-  if (!droit) { res.status(403).json({ ok: false, reason: 'reserve' }); return; }
-  if (!cle) { res.status(503).json({ ok: false, reason: 'no-key' }); return; }
+  // La clé du vendeur d'abord (SON compte Photoroom paie) ; la clé serveur en
+  // secours. Avec SA clé : ni verrou propriétaire, ni plafond — ils ne protègent
+  // que la clé de Julien.
+  const cleUser = await lireCleVendeur(u.id);
+  const propre = !!cleUser;
+  const cleEff = cleUser || cle;
+  if (!propre) {
+    const droit = await autorise(u.id);
+    if (droit === null) { res.status(503).json({ ok: false, reason: 'acces' }); return; }
+    if (!droit) { res.status(403).json({ ok: false, reason: 'reserve' }); return; }
+  }
+  if (!cleEff) { res.status(503).json({ ok: false, reason: 'no-key' }); return; }
   const b = req.body || {};
   const sha = String(b.sha || '').toLowerCase();
   if (!SHA.test(sha)) { res.status(400).json({ ok: false, reason: 'sha' }); return; }
@@ -179,6 +213,7 @@ export async function handleDetourage(req, res) {
   //    et pas du tout si le plafond du mois est déjà atteint (sinon chaque
   //    publication renverrait ses photos pour s'entendre dire 429).
   if (b.b64 == null) {
+    if (propre) { res.status(200).json({ ok: true, hit: false }); return; }   // sa clé : pas de plafond serveur
     const n = await lireUsage(u.id, moisCourant());
     if (n === undefined) { res.status(503).json({ ok: false, reason: 'compteur' }); return; }
     if (n >= plafondMois()) { res.status(429).json({ ok: false, reason: 'plafond', plafond: plafondMois() }); return; }
@@ -202,18 +237,20 @@ export async function handleDetourage(req, res) {
   if (!p) {
     p = (async () => {
       const mois = moisCourant();
-      const n = await reserver(u.id, mois, plafondMois());
-      if (n === undefined) return { status: 503, corps: { ok: false, reason: 'compteur' } };
-      if (n === null) return { status: 429, corps: { ok: false, reason: 'plafond', plafond: plafondMois() } };
-      const r = await appelerPhotoroom(cle, b64);
+      // Plafond serveur UNIQUEMENT pour la clé de Julien. Avec SA clé, c'est son
+      // compte Photoroom qui facture : aucune réservation, aucun « rendre ».
+      const n = propre ? 0 : await reserver(u.id, mois, plafondMois());
+      if (!propre && n === undefined) return { status: 503, corps: { ok: false, reason: 'compteur' } };
+      if (!propre && n === null) return { status: 429, corps: { ok: false, reason: 'plafond', plafond: plafondMois() } };
+      const r = await appelerPhotoroom(cleEff, b64);
       if (!r.ok) {
-        if (r.certain) await rendre(u.id, mois);        // un REFUS ne se paie pas sur le plafond
+        if (!propre && r.certain) await rendre(u.id, mois);        // un REFUS ne se paie pas sur le plafond
         const s = r.status;
         const status = (s === 402 || s === 403 || s === 429) ? s : (s >= 500 ? 502 : 502);
         return { status, corps: { ok: false, reason: 'photoroom', status: s } };
       }
       await ecrireCache(u.id, sha, r.buf);              // au mieux : un cache raté se paiera une fois de plus
-      return { status: 200, corps: { ok: true, hit: false, b64: r.buf.toString('base64'), type: 'image/jpeg', bytes: r.buf.length, n } };
+      return { status: 200, corps: { ok: true, hit: false, b64: r.buf.toString('base64'), type: 'image/jpeg', bytes: r.buf.length, ...(propre ? { clePropre: true } : { n }) } };
     })().finally(() => enVol.delete(cleVol));
     enVol.set(cleVol, p);
   }
