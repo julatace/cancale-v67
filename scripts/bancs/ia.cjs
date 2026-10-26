@@ -34,8 +34,16 @@ const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=path.join(__dirname,'..','..','dist'), SC=__dirname;
-const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'); const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox')];
+const { fxSecours } = require('./_fx-secours.cjs'); // fx/ absent → données synthétiques (les contrôles jugent la STRUCTURE de l'écran, pas le contenu de fx)
+const { FXok, present, main, accounts } = fxSecours(SC);
+// Secours : une annonce en ligne par compte, DATÉE (capturedAt) pour passer la
+// règle « en ligne ≤ 24 h » via dressingsDuJour — sinon l'écran Annonces se vide
+// (0 carte) et les deux contrôles-garde anti-vacuité sortent rouges.
+const NOW=new Date().toISOString();
+const listingsSecours = present ? [] : accounts.map((a,i)=>({ id:`harvest_${a.vinted_user_id}_listings`, data:{ capturedAt: NOW, payload:{ items:[
+  { id:`syn_${a.vinted_user_id}_1`, title:'Paire test '+(i+1), brand_title:'Nike', size_title:'42', price:{amount:'40',currency_code:'EUR'}, is_closed:false, is_hidden:false, is_draft:false, photo:{url:''}, url:'https://www.vinted.fr/items/'+(100+i) }
+], pagination:null } } }));
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour([...FXok('listings'),...listingsSecours]),...FXok('inbox')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
