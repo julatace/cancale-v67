@@ -143,12 +143,18 @@ const projette = (row, sel) => {
           const r = e.getBoundingClientRect();
           return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1;
         }).map((e) => (e.getAttribute('aria-label') || e.textContent.trim().slice(0, 14) || e.tagName)),
+        // L'agent qui conseille (parité eBay) : la liste rangée des priorités.
+        conseils: [...document.querySelectorAll('[data-lbc-conseil]')].map((e) => e.getAttribute('data-lbc-conseil')),
       }));
       const v1 = await lire();
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'double-vente-' + vp.width + '.png'), fullPage: true });
       dit(v1.doublons.length === 1 && v1.doublons[0].num === '12', 'vendue sur Leboncoin, encore sur Vinted ⇒ alerte pour la N°12, et elle seule', JSON.stringify(v1.doublons.map((d) => d.num)));
       dit(v1.doublons[0] && /vinted\.fr\/items\/5001$/.test(v1.doublons[0].href), 'l’alerte mène à L’annonce Vinted de cette paire', v1.doublons[0] && v1.doublons[0].href);
       dit(v1.aRelier === 1, 'la vente non reliée demande « quel article ? »', String(v1.aRelier));
+      // « À faire sur Leboncoin » (parité eBay) : rangé, l'urgent d'abord.
+      dit(v1.conseils.length > 0, '« À faire sur Leboncoin » liste les priorités', JSON.stringify(v1.conseils));
+      dit(['retirer', 'doublons'].includes(v1.conseils[0]), 'la première priorité est urgente (à retirer d’une plateforme)', v1.conseils[0] || '(aucune)');
+      dit(v1.conseils.includes('doublons') && v1.conseils.includes('relier-ventes'), 'elle porte la double vente ET la vente à relier de cet écran', JSON.stringify(v1.conseils));
       dit(v1.relier.length > 0 && v1.deborde.length === 0, 'aucun bouton ni champ rogné par le bord de l’écran (N°, Relier, Actualiser…)', v1.deborde.join(', ') || (v1.relier.length ? '' : 'aucune ligne'));
       dit(v1.sugg.includes('14') && v1.sugg.includes('15'), 'et PROPOSE les deux paires identiques — sans en choisir une', JSON.stringify(v1.sugg));
       dit(v1.relier.includes('lbc3'), 'son annonce jamais reliée (compte prouvé par une vente) est listée', JSON.stringify(v1.relier));
