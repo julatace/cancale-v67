@@ -23785,7 +23785,11 @@ function CountUpEuro({ value }) {
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [cible]);
-  return <>{Math.round(v).toLocaleString('fr-FR')} €</>;
+  // Le montant et sa devise ne se séparent JAMAIS. Le héros porte
+  // overflow-wrap:anywhere (pour qu'un montant énorme ne déborde pas la carte),
+  // qui cassait « 299 » / « € » même à travers l'espace insécable : un nowrap
+  // sur le nombre le protège, avec l'espace fine insécable (typographie FR).
+  return <span style={{whiteSpace:'nowrap'}}>{Math.round(v).toLocaleString('fr-FR') + ' €'}</span>;
 }
 
 
@@ -39082,7 +39086,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 n'a pu être lu, le chiffre est « — » ; si une partie seulement,
                 c'est « au moins », et les comptes manquants sont nommés. */}
             {(() => { const actifs = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length; const toutKO = actifs>0 && nomsVentesKO.length>=actifs && moisN===0; const partiel = !toutKO && nomsVentesKO.length>0; return (<>
-            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <>{partiel && <span style={{fontSize:'0.4em',fontWeight:600,color:C.muted,marginRight:6}}>au moins</span>}<CountUpEuro value={moisEur}/></>}</div>
+            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <>{partiel && <span style={{display:'block',fontSize:'0.32em',fontWeight:600,color:C.muted,marginBottom:2,letterSpacing:0}}>au moins</span>}<CountUpEuro value={moisEur}/></>}</div>
             {(toutKO || partiel) && <div data-vendu-manque="" style={{fontSize:12,color:C.muted,marginTop:4}}>{toutKO ? 'Tes ventes n\'ont pas pu être lues pour l\'instant — ce n\'est pas zéro.' : `sans ${nomsVentesKO.length>2 ? nomsVentesKO.length+' comptes' : nomsVentesKO.join(', ')} (ventes pas lues)`}</div>}
             </>); })()}
             <div className="vrm-day-meta" style={{color:C.muted}}>
