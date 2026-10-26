@@ -45,6 +45,45 @@ export function limiteEnvoiEbay(o) {
   return ts.length ? Math.min(...ts) : null;
 }
 
+// ── OÙ PART CE COLIS (26 octobre) ──────────────────────────────────────────
+// Julien : « une marketplace mondiale… les frais de port, la douane, les envois
+// internationaux ». eBay.fr vend dans toute l'Europe et au-delà. Une commande
+// internationale n'arrive pas toujours au même endroit :
+//   · par un PROGRAMME d'eBay (Livraison internationale / Global Shipping) :
+//     `ebaySupportedFulfillment: true` ⇒ le vendeur poste vers l'adresse
+//     d'expédition donnée par eBay (un centre en FRANCE) ; eBay fait la douane,
+//     l'acheteur a payé droits et taxes ; `finalDestinationAddress` = le pays
+//     final. ⚠️ Le même drapeau vaut pour la garantie d'authenticité
+//     (authentificateur, en France) : ce n'est PAS un envoi international.
+//   · en DIRECT : `shippingStep.shipTo` est l'acheteur à l'étranger. Hors Union
+//     européenne (Royaume-Uni, Suisse, États-Unis…), une déclaration en douane
+//     (CN22/CN23) doit accompagner le colis ; dans l'UE, aucune.
+// Lu dans la doc de l'API Fulfillment (FulfillmentStartInstruction).
+// ⚠️ NON MESURÉ sur une vraie commande (aucune vente eBay chez lui au 26 oct.).
+// Rien n'est deviné : pays illisible ⇒ `pays: null`, on ne dit pas « France ».
+// Jamais le nom ni l'adresse de l'acheteur : le CODE pays seulement.
+export const PAYS_UE = new Set(['AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK']);
+const codePays = (a) => { const c = String((a && (a.countryCode || (a.contactAddress && a.contactAddress.countryCode))) || '').trim().toUpperCase(); return /^[A-Z]{2}$/.test(c) ? c : null; };
+export function destinationEbay(o, paysVendeur = 'FR') {
+  const fs = (Array.isArray(o && o.fulfillmentStartInstructions) ? o.fulfillmentStartInstructions : []).filter((f) => f && typeof f === 'object');
+  const f = fs.find((x) => x.ebaySupportedFulfillment === true) || fs.find((x) => String(x.fulfillmentInstructionsType || '').toUpperCase() === 'SHIP_TO') || fs[0] || null;
+  if (!f) return { pays: null, programme: null, international: null, horsUE: null, douane: null };
+  const auth = (Array.isArray(o && o.lineItems) ? o.lineItems : []).some((l) => !!(l && l.program && l.program.authenticityVerification));
+  const step = f.shippingStep || {};
+  const paysEnvoi = codePays(step.shipTo);
+  if (f.ebaySupportedFulfillment === true) {
+    if (auth) return { pays: paysEnvoi, programme: 'authentification', international: false, horsUE: false, douane: false };
+    const pays = codePays(f.finalDestinationAddress);
+    const inter = pays ? pays !== paysVendeur : null;
+    // eBay fait la douane : le vendeur n'a rien à remplir (`douane:false`).
+    return { pays, paysEnvoi, programme: 'international', international: inter, horsUE: pays ? !PAYS_UE.has(pays) : null, douane: false };
+  }
+  const pays = paysEnvoi;
+  if (!pays) return { pays: null, programme: null, international: null, horsUE: null, douane: null };
+  const inter = pays !== paysVendeur, horsUE = !PAYS_UE.has(pays);
+  return { pays, programme: null, international: inter, horsUE, douane: inter && horsUE };
+}
+
 const ANNULATION_CLOSE = ['', 'NONE_REQUESTED', 'CANCEL_REJECTED', 'CANCELED'];
 const expediee = (o) => ['FULFILLED', 'SHIPPED'].includes(String((o && o.orderFulfillmentStatus) || '').toUpperCase());
 
@@ -70,6 +109,7 @@ export function colisEbay(orders, maintenant = Date.now()) {
       creationDate: o.creationDate || null, articles: li.length,
       limite, jours: joursAvant(limite, maintenant),
       authentification: li.some((l) => !!(l && l.program && l.program.authenticityVerification)),
+      destination: destinationEbay(o),
       ordre: o,                                       // la commande rangée (l'app y lit le N° par le SKU)
     };
     const cancel = String((o.cancelStatus && o.cancelStatus.cancelState) || '').toUpperCase();
@@ -104,7 +144,8 @@ export function resumeColisEbay(c) {
   if (!c) return null;
   let overdue = 0, today = 0, tomorrow = 0;
   for (const x of c.aPoster) { if (x.jours == null) continue; if (x.jours < 0) overdue++; else if (x.jours === 0) today++; else if (x.jours === 1) tomorrow++; }
-  return { total: c.aPoster.length, overdue, today, tomorrow, nePasPoster: c.nePasPoster.length, aVerifier: (c.aVerifier || []).length };
+  const international = c.aPoster.filter((x) => x.destination && x.destination.international === true).length;
+  return { total: c.aPoster.length, overdue, today, tomorrow, nePasPoster: c.nePasPoster.length, aVerifier: (c.aVerifier || []).length, international };
 }
 
 // La page de la commande dans le Seller Hub d'eBay.fr (c'est là que s'achète

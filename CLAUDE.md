@@ -13671,3 +13671,29 @@ Chacun REPRODUIT d'abord (vrai `background.js` dans `_fond-vm`, vrai `inject.js`
 - Preuves : `audit-suivi-vinted.cjs` **127 contrôles** (sections H à K neuves), **46 rouges** sur 1957c54 (le code relu, après la fusion et le numéro, §6.1 : l'audit copié dans l'arbre d'avant) ; **31 mutations sur 31** rouges (`--mutation ?` les liste), dont `cas` 3, `relais` 3, `cle-instant` 1, `futur` 2, `futur-route` 1, `chaine-suivi` 1, `chaine-notifs` 2, `chaine-formes` 1, `borne-24h` 1, `base-sans-date` 1, `escrow-remplace` 6, `budget` 3, `forme-inconnue` 1, `arrive` 1, `remis-a` 6, `code-machine` 2, `est-le` 2, `personne` 2. `audit-budget-lectures.cjs` section 7 (le suivi sous la réserve) : 8 rouges sur 1957c54 ; « suivi remis dans les prioritaires » 8 rouges, « classe suivi lue comme les photos » 2. ⚠️ Sur la base 743585d (5.213) le suivi n'existe pas : ses rouges ne prouvent rien.
 - ⚠️ **Non mesuré** : la forme réelle des trois réponses (bloquées d'ici ; `panel_formes_suivi` la dira) ; le PATCH conditionnel sur `data->>rev` contre SA PostgREST (la grammaire de `modifierDonnee`, déjà en production) ; le délai réel entre une étape chez le transporteur et son affichage par Vinted.
 - **Gestes de Julien** : installer la **5.216** (remplacer le dossier, puis ⟳ dans chaque Chrome), ouvrir une fois « Suivre le colis » d'un achat en route ; pour être prévenu, Réglages → Notifications → « Suivi du colis ».
+
+### eBay à l'international : où part chaque colis, et la douane (26 octobre)
+Julien : « marketplace mondiale… frais de port, douane, envois internationaux ».
+**Mesuré (lecture seule)** : 0 commande eBay en base ; aucun e-mail de vente ou
+de message Leboncoin/Vestiaire (seulement de la pub, « nouvel appareil »,
+« suppression de vos annonces ») — sans l'extension, il n'y a RIEN à capter
+par e-mail pour ces deux sites. Tout l'eBay de VRM est réglé sur eBay.fr
+(SiteID 71, EUR, `Country FR`) et la publication part en livraison GÉRÉE par
+eBay (son compte refuse tout `<ShippingDetails>`) : l'international se règle
+dans le Seller Hub (programme de livraison internationale), pas par l'API.
+- **`destinationEbay(o)`** (`api/_lib/ebay-a-expedier.js`, lu par `colisEbay`,
+  §11) : programme d'eBay (`ebaySupportedFulfillment`) ⇒ on poste au centre en
+  France, eBay fait la douane, pays final = `finalDestinationAddress` ; la
+  garantie d'authenticité porte le MÊME drapeau et n'est pas internationale ;
+  envoi direct hors UE ⇒ déclaration CN22 (CN23 > 425 €). Pays illisible ⇒
+  `null`, jamais « France ». Le code pays seulement, jamais nom ni adresse.
+  `resumeColisEbay` rend `international`.
+- **Colis** : une ligne `LigneDestinationEbay` (`data-colis-ebay-dest` =
+  programme · douane · ue) sous chaque vente eBay concernée ; rien pour la France.
+- Preuves : `audit-ebay-destination.cjs` 14 contrôles (rouge sur l'avant ;
+  mutations « authentification ignorée » 2, « douane jamais due » 3) ; banc
+  `ebay-colis.cjs` + vente vers le Royaume-Uni (390 et 1512).
+- **Non mesuré** : une vraie commande internationale (doc de l'API Fulfillment).
+- **Pas fait, à trancher** : vendeurs eBay.co.uk/.com (site, devise et règles
+  d'argent en EUR seulement) ; options internationales à la publication pour un
+  compte NON géré (`ShipToLocations`, `InternationalShippingServiceOption`).
