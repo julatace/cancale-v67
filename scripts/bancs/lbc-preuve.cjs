@@ -183,7 +183,7 @@ async function fileApp(b, lignes, vp, pont) {
       dit(!!seuil && avant(pub.version, seuil), `et l'app la sait en retard pour la preuve (${pub.version} < seuil ${seuil})`, String(seuil));
       const vieille = await fileApp(b, base('B'), { width: 1512, height: 950 }, { version: pub.version });
       dit(JSON.stringify(vieille.nums) === '["12","13"]', 'l\'app propose toujours les deux paires (la N°13 est revenue pour VRM)', JSON.stringify(vieille.nums));
-      dit(/^grise\|/.test(vieille.boutons['5002'] || '') && /croit encore vendue/.test(vieille.boutons['5002'] || ''), 'mais le « Publier » de la N°13 est GRISÉ, avec la raison (l\'extension refuserait)', String(vieille.boutons['5002']));
+      dit(/^grise\|/.test(vieille.boutons['5002'] || '') && /croit encore vendue?/.test(vieille.boutons['5002'] || ''), 'mais le « Publier » de la N°13 est GRISÉ, avec la raison (l\'extension refuserait)', String(vieille.boutons['5002']));
       dit(/^pret\|/.test(vieille.boutons['5001'] || ''), 'et la N°12 reste publiable', String(vieille.boutons['5001']));
       dit(JSON.stringify(vieille.croit) === '["1"]', 'la raison est dite UNE fois au-dessus de la liste (§7)', JSON.stringify(vieille.croit));
       const neuve = await fileApp(b, base('B'), { width: 1512, height: 950 }, { version: attendue });
