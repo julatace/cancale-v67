@@ -243,3 +243,42 @@ export const localiserNumeros = (plan, nums, cle, ouEst) => {
   }
   return out;
 };
+
+// ── L'ASSISTANT « CRÉER MA PIÈCE » (26 oct.) ────────────────────────────────
+// Julien : « on n'a pas d'agent qui aide pour créer la pièce ». Trois réponses
+// (la taille de la pièce, le meuble, combien d'articles) donnent une PROPOSITION
+// qu'il voit avant de la poser. Une règle fixe, sans IA, sans rien de payant :
+//  · une porte au milieu du mur de devant, et 1 m libre devant elle ;
+//  · des rangées de meubles le dos au mur du fond, puis au mur de devant
+//    (tournés vers la pièce), puis au milieu, chaque rangée avec 1 m d'allée
+//    devant elle ;
+//  · un meuble ne se pose que là où il tient sans rien traverser (`rectDans`,
+//    `chevauche` — les mêmes règles que le glisser), aligné, à 10 cm d'écart.
+// Ce qui ne tient pas est DIT (`manque`) : on ne pose jamais en travers.
+// Rend { meubles: [{ cx, cy, rot }], porte: { cx, cy, rot }, capacite, manque }.
+export const ALLEE = 1.0;
+export const proposerPiece = ({ w, h, mw, md, cap, besoin, max = 40 }) => {
+  const W = Math.max(1.5, Math.min(40, Number(w) || 0)), H = Math.max(1.5, Math.min(40, Number(h) || 0));
+  const poly = rectPoly(W, H);
+  const capM = Math.max(1, Math.floor(Number(cap) || 1));
+  const voulu = Math.max(1, Math.min(max, Math.ceil(Math.max(1, Number(besoin) || 0) / capM)));
+  const porte = { cx: r2(W / 2), cy: r2(H - 0.18), rot: Math.PI };
+  const obstacles = [{ cx: W / 2, cy: H - 0.18, w: 1.0, h: 0.36 }, { cx: W / 2, cy: H - 0.35 - ALLEE / 2, w: 1.2, h: ALLEE }];
+  const meubles = [];
+  const rangee = (cy, rot) => {
+    const pas = mw + 0.1;
+    for (let cx = 0.1 + mw / 2; cx + mw / 2 <= W - 0.1 + 1e-6 && meubles.length < voulu; cx += pas) {
+      const r = { cx: r2(cx), cy: r2(cy), w: mw, h: md };
+      if (!rectDans(r.cx, r.cy, mw, md, poly) || obstacles.some((o) => chevauche(r, o))) continue;
+      meubles.push({ cx: r.cx, cy: r.cy, rot }); obstacles.push(r);
+    }
+  };
+  // Le fond, puis le mur de devant (si une allée tient entre les deux).
+  rangee(0.05 + md / 2, 0);
+  if (H - 2 * (md + 0.05) >= ALLEE) rangee(H - 0.05 - md / 2, Math.PI);
+  // Puis le milieu : une rangée tous les (profondeur + allée), sans mordre sur
+  // l'allée de la rangée du mur de devant.
+  for (let cy = 0.05 + md / 2 + md + ALLEE; cy + md / 2 <= H - 0.05 - md - ALLEE + 1e-6 && meubles.length < voulu; cy += md + ALLEE) rangee(cy, 0);
+  const capacite = meubles.length * capM;
+  return { meubles, porte, capacite, manque: Math.max(0, (Number(besoin) || 0) - capacite), voulu };
+};

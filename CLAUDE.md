@@ -1,5 +1,20 @@
 # VRM — dossier de passation
 
+> **26 octobre — Stock : un assistant, et tout au pavé numérique :** Julien : « le stock 3D n'est
+> pas pratique, ne fait pas gagner de temps ; pas d'agent pour créer la pièce et gérer le
+> rangement » et « la plupart utilisent un ordi avec un pavé numérique ». Assistant À RÈGLES
+> (aucune IA, rien de payant), qui PROPOSE et attend un « oui », ne touche jamais un numéro :
+> « Créer ma pièce en 3 questions » (taille, meuble, nombre d'articles → `proposerPiece`,
+> src/stockRegles.js : rangées le dos aux murs, allée de 1 m, porte et passage libres ; ce qui
+> ne tient pas est dit ; pièce déjà meublée ⇒ une NOUVELLE pièce) ; « Tout ranger » (Ma pièce et
+> Liste des cases : `proposerToutRanger`, dans l'ordre des N°, la place la plus basse d'abord,
+> les N° qui se suivent ensemble). Au clavier (ordinateur) : un chiffre tapé n'importe où sur
+> le Stock ouvre la saisie, N° + Entrée ⇒ déjà rangé : montré ; à ranger : posé à la prochaine
+> place libre ; hors stock : jamais rangé ; Échap le ressort. Verr Num éteint compris (le pavé
+> envoie « Clear » : on lit `e.code` `Numpad5`). La carte « pièce vide » passe AU-DESSUS de la
+> 3D (sur téléphone elle était hors écran) ; feuilles en portail. Banc `stock-assistant.cjs`,
+> audit `audit-stock-plan.cjs` (+ 3 mutations).
+
 > **26 octobre — Statistiques, Compta, et le grand titre sur téléphone :** un titre d'écran
 > IDENTIQUE à celui de la barre du haut se tait sur téléphone (`ScreenHead` →
 > `vrm-screen-head-doublon`, comparé à `TITRE_BARRE` posé par la coque ; un titre différent,

@@ -19,6 +19,9 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const SRC = path.join(__dirname, '..', 'src', 'stockRegles.js');
 
 const MUTATIONS = {
+  piece_sans_obstacles: (s) => s.replace("if (!rectDans(r.cx, r.cy, mw, md, poly) || obstacles.some((o) => chevauche(r, o))) continue;", "if (!rectDans(r.cx, r.cy, mw, md, poly)) continue;"),
+  piece_sans_porte: (s) => s.replace("const obstacles = [{ cx: W / 2, cy: H - 0.18, w: 1.0, h: 0.36 }, { cx: W / 2, cy: H - 0.35 - ALLEE / 2, w: 1.2, h: ALLEE }];", "const obstacles = [];"),
+  piece_trop: (s) => s.replace("&& meubles.length < voulu; cx += pas", "; cx += pas"),
   coins_seuls: (s) => s.replace("if (poly.some(([x, y]) => x > x0 && x < x1 && y > y0 && y < y1)) return false;", '').replace(/for \(let i = 0; i < poly\.length; i\+\+\) \{\n    const a = poly\[i\], b = poly\[\(i \+ 1\) % poly\.length\];\n    for \(let k = 0; k < 4; k\+\+\) if \(segCoupe\(a, b, coins\[k\], coins\[\(k \+ 1\) % 4\]\)\) return false;\n  \}/, ''),
   sans_obstacles: (s) => s.replace("const libre = (x, y) => rectDans(x, y, w, h, poly) && !obstacles.some((o) => chevauche({ cx: x, cy: y, w, h }, o));", "const libre = (x, y) => rectDans(x, y, w, h, poly);").replace('for (const s of obstacles) {', 'for (const s of []) {'),
   pas_de_descente: (s) => s.replace("const reste = pile.slice(0, i).concat(pile.slice(i + 1));", "const reste = pile.slice(0, i);"),
@@ -121,6 +124,25 @@ async function audit(src, bavard) {
     dit(R.estPoseSur({ x: 2.5, y: 2.25, w: 0.5, h: 0.5, lift: 0.75 }, table), 'une pile posée sur la table est reconnue (elle la suivra)');
     dit(!R.estPoseSur({ x: 2.5, y: 2.25, w: 0.5, h: 0.5, lift: 0 }, table), 'une pile au sol n’est pas « posée sur »');
     dit(!R.estPoseSur({ x: 6, y: 6, w: 0.5, h: 0.5, lift: 0.75 }, table), 'une pile posée sur un AUTRE meuble n’est pas sur celle-ci');
+  });
+  essaie('créer ma pièce', () => {
+    if (typeof R.proposerPiece !== 'function') { dit(false, 'proposerPiece existe'); return; }
+    const chev = (a, b) => ((a.w + b.w) / 2 - Math.abs(a.cx - b.cx)) > 0.003 && ((a.h + b.h) / 2 - Math.abs(a.cy - b.cy)) > 0.003;
+    for (const [w, h, besoin] of [[4, 3, 64], [8, 6, 200], [12, 5, 400], [2, 2, 10]]) {
+      const P = R.proposerPiece({ w, h, mw: 1.2, md: 0.5, cap: 10, besoin });
+      const fps = P.meubles.map((m) => ({ cx: m.cx, cy: m.cy, w: 1.2, h: 0.5 })).concat([{ cx: P.porte.cx, cy: P.porte.cy, w: 1, h: 0.36 }]);
+      let croise = 0; for (let i = 0; i < fps.length; i++) for (let j = i + 1; j < fps.length; j++) if (chev(fps[i], fps[j])) croise++;
+      const dehors = fps.filter((f) => !R.rectDans(f.cx, f.cy, f.w, f.h, R.rectPoly(w, h))).length;
+      dit(croise === 0 && dehors === 0, `pièce ${w}×${h} : aucun meuble ne traverse un autre ni la porte, aucun ne sort`, `${croise} croisement(s), ${dehors} dehors`);
+      dit(P.capacite === P.meubles.length * 10 && P.manque === Math.max(0, besoin - P.capacite), `pièce ${w}×${h} : places et manque comptés juste`, `${P.meubles.length} meubles, ${P.capacite} places, manque ${P.manque}`);
+      dit(P.meubles.length <= Math.ceil(besoin / 10), `pièce ${w}×${h} : pas plus de meubles que nécessaire`);
+      const passage = { cx: P.porte.cx, cy: h - 0.35 - 0.5, w: 1.2, h: 1.0 }; const devant = P.meubles.filter((m) => chev({ cx: m.cx, cy: m.cy, w: 1.2, h: 0.5 }, passage));
+      dit(devant.length === 0, `pièce ${w}×${h} : l'entrée devant la porte reste libre`);
+    }
+    const P = R.proposerPiece({ w: 4, h: 3, mw: 1.2, md: 0.5, cap: 20, besoin: 12 });
+    dit(P.meubles.length === 1 && P.manque === 0, '12 articles, 20 places par meuble : un seul meuble, rien ne manque');
+    const G = R.proposerPiece({ w: 2, h: 2, mw: 1.2, md: 0.5, cap: 10, besoin: 100 });
+    dit(G.manque > 0, 'une pièce trop petite DIT ce qui manque (jamais un meuble en travers)', `manque ${G.manque}`);
   });
   return ko;
 }
