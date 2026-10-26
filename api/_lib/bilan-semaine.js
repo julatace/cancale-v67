@@ -2,18 +2,25 @@
 // « Un bilan de la semaine en notification » : ventes et montant vendus, argent
 // reçu, colis à expédier, paires qui dorment.
 //
-// ⚠️ QUAND : LE LUNDI MATIN, PAS LE DIMANCHE SOIR — et c'est un choix assumé.
-//    Le cron du matin (`api/ship-reminders.js`, vercel.json) tourne une fois
-//    par jour à 05:00 UTC depuis le 22 octobre (avant : 08:00), et le plan
-//    Hobby de Vercel ne garantit que l'heure (± 59 min) : 7 h à Paris l'été,
-//    6 h l'hiver. Un « bilan du dimanche soir » envoyé dimanche matin serait un bilan d'une semaine pas
-//    finie présenté comme complet (§5). Le lundi matin, la semaine du lundi au
-//    dimanche est TERMINÉE : le bilan dit des chiffres arrêtés. Ajouter un
-//    second cron pour le dimanche soir est possible si le plan l'accepte — un
-//    cron de trop refusé au déploiement bloquerait TOUS les déploiements
-//    (le défaut #250 des 13 fonctions) : c'est à Julien de trancher, pas ici.
-//    Rattrapage : si la base ne répondait pas le lundi, mardi et mercredi
-//    réessaient (le mémo garantit UN bilan par semaine, jamais deux).
+// ⚠️ QUAND : LE DIMANCHE SOIR (demande de Julien, 26 octobre), avec le lundi
+//    matin en RATTRAPAGE — et un seul bilan par semaine.
+//    · Le dimanche soir : le cron du SOIR (`/api/rappel-soir` → `?moment=soir`,
+//      18:00 UTC, soit 19 h à Paris l'hiver / 20 h l'été) appelle le bilan avec
+//      `semaineCourante` (semaine EN COURS, bornée à maintenant). On N'AJOUTE PAS
+//      de cron : le plan Hobby n'en garantit que l'heure et un cron de trop
+//      refusé au déploiement bloquerait TOUT (le défaut #250) — on réutilise un
+//      cron du soir qui existe déjà.
+//    · Le lundi matin (cron de 05:00 UTC) : `semainePassee` (semaine terminée).
+//    La clé de dédoublonnage est le LUNDI de la semaine — identique des deux
+//    côtés — donc si le dimanche soir a envoyé, le lundi voit « déjà envoyé » et
+//    se tait ; si le dimanche a échoué (base muette), le lundi (puis mardi,
+//    mercredi) rattrape. Jamais deux bilans pour la même semaine.
+// ⚠️ UNE SEMAINE EN COURS N'EST PAS COMPLÈTE (§5) : le dimanche soir, `fin` vaut
+//    MAINTENANT (aucune vente future comptée) et la fraîcheur se juge sur
+//    « capté aujourd'hui » (`seuilCapture`), sinon chaque compte paraîtrait « pas
+//    lu ». Les quelques heures après l'envoi (dimanche 20 h → minuit) ne sont
+//    dans aucun bilan hebdo : c'est le prix d'un résumé envoyé le dimanche soir,
+//    assumé — la compta, elle, reste complète et séparée.
 //
 // ⚠️ LES RÈGLES NE SONT PAS ICI. « Vendu » = `ventesFaites`, « reçu » =
 //    `ventesDeclarables` daté au versement — le miroir EXACT de l'app
@@ -66,6 +73,21 @@ export function semainePassee(maintenant = Date.now()) {
   return { lundi, dimanche: plusJours(lundiCourant, -1), debut: minuitParis(lundi), fin: minuitParis(lundiCourant), jour };
 }
 
+// La semaine EN COURS (lundi 00:00 → MAINTENANT), pour le bilan du DIMANCHE SOIR
+// (26 octobre, demande de Julien). `lundi` ici vaut le lundi de CETTE semaine —
+// c'est EXACTEMENT ce que `semainePassee().lundi` rendra le lendemain (lundi) :
+// la clé de dédoublonnage est donc la MÊME, et le bilan du lundi matin devient
+// un simple rattrapage (il ne renvoie pas ce que le dimanche soir a déjà
+// envoyé). `fin` = maintenant : on ne compte pas de ventes futures, et le
+// contrôle de fraîcheur (`seuilCapture`) juge à part « capté aujourd'hui ».
+export function semaineCourante(maintenant = Date.now()) {
+  const auj = dateParis(maintenant);
+  const [y, m, d] = auj.split('-').map(Number);
+  const jour = ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7) + 1;
+  const lundiCourant = plusJours(auj, -(jour - 1));
+  return { lundi: lundiCourant, dimanche: auj, debut: minuitParis(lundiCourant), fin: maintenant, seuilCapture: minuitParis(auj), jour };
+}
+
 // tx → date du versement (statut 450, `status_updated_at`) — la MÊME condition
 // que `fetchVersementsVinted` dans l'app (l'audit compare les deux textes).
 export function versementsDeLignes(rows) {
@@ -87,7 +109,11 @@ const dansSemaine = (ts, debut, fin) => ts >= debut && ts < fin;
 //   lbc [], ebay [], versements {}            — comme l'écran Ventes
 //   colis (nombre, ventes eBay comprises), colisAuMoins (eBay illisible), dorment ({ n, total, datesKnown, at })
 export function calculerBilan(e) {
+  // `seuilCapture` : au-delà duquel une capture couvre la fenêtre. Le lundi matin
+  // c'est `fin` (fin de semaine) ; le dimanche soir c'est le début du jour (une
+  // capture d'aujourd'hui suffit — sinon chaque compte paraîtrait « pas lu »).
   const { debut, fin, maintenant = Date.now() } = e;
+  const seuilCapture = e.seuilCapture != null ? e.seuilCapture : fin;
   const out = { vendu: { etat: 'pas-su', n: 0, eur: 0, manque: [] }, recu: { etat: 'pas-su', eur: 0, manque: [] }, colis: { etat: 'pas-su', n: null }, dorment: { etat: 'pas-su', n: null, auMoins: false } };
   const vintedLisible = Array.isArray(e.comptes) && e.commandes != null && e.masquesTx != null && e.masquesComptes != null && e.panneau != null;
   // Rien de lisible du tout : aucun nombre (le bilan ne part pas).
@@ -106,7 +132,7 @@ export function calculerBilan(e) {
       if (!ligne) { manque.push(`${nom} (jamais lu)`); continue; }
       const cap = Date.parse(ligne.cap || '');
       if (!cap) manque.push(`${nom} (date de lecture inconnue)`);
-      else if (cap < fin) manque.push(`${nom} (lu ${jourCourt(cap)})`);
+      else if (cap < seuilCapture) manque.push(`${nom} (lu ${jourCourt(cap)})`);
       for (const o of (Array.isArray(ligne.orders) ? ligne.orders : [])) {
         const id = String(o && (o.transaction_id != null ? o.transaction_id : o.id));
         if (vusTx.has(id)) continue; vusTx.add(id);

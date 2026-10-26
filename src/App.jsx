@@ -733,6 +733,32 @@ async function sauverBordereauxAuto(owner, active) {
   if (rows.length !== 1 || rows[0]?.data?.active !== active) throw Error('Enregistrement non confirmé');
 }
 
+// ── CLÉ API PHOTOROOM DU VENDEUR (26 octobre) ───────────────────────────────
+// Julien : « chaque personne puisse mettre sa clé API ». Sa ligne à lui (RLS :
+// lui seul et la clé de service la lisent) ; le serveur de détourage la relit
+// par la session et l'utilise à SA place (son compte Photoroom paie). Jamais
+// synchronisée dans `main`, jamais dans une sauvegarde (filet d'exclusion).
+// Rend la clé enregistrée ('' si aucune) ; lève sur lecture impossible.
+async function lireClePhotoroom(owner) {
+  if (!owner || owner !== AUTH.user?.id) throw Error('Session indisponible');
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_photoroom_cle&owner=eq.${encodeURIComponent(owner)}&select=cle:data->>cle`, { headers: sbAuth() });
+  if (!r.ok) throw Error('Lecture impossible');
+  const rows = await r.json();
+  return (rows.length === 1 && typeof rows[0]?.cle === 'string') ? rows[0].cle : '';
+}
+// cle='' efface la clé (le vendeur retombe sur la clé du serveur, si Julien l'ouvre).
+async function sauverClePhotoroom(owner, cle) {
+  if (!owner || owner !== AUTH.user?.id || !CLOISONNE) throw Error('Session indisponible');
+  const propre = String(cle || '').trim();
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+    method: 'POST', headers: sbAuth({'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=representation'}),
+    body: JSON.stringify({id:'vrm_photoroom_cle',owner,data:{cle:propre, at:new Date().toISOString()},updated_at:new Date().toISOString()})
+  });
+  if (!r.ok) throw Error('Enregistrement impossible');
+  const rows = await r.json();
+  if (rows.length !== 1 || String(rows[0]?.data?.cle || '') !== propre) throw Error('Enregistrement non confirmé');
+}
+
 const STUDIO_BASE = { url: SUPABASE_URL, auth: (e) => sbAuth(e), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT };
 
 // ⚠️ Vérification anti-robot (src/captcha.js) : sur les routes que GoTrue
@@ -21063,6 +21089,48 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
 // (colonne meta, §4.4 : jamais la ligne entière).
 // Trois états, jamais deux : `undefined` en cours · `null` pas su · objet lu
 // (`{}` = jamais relevé).
+// ── CLÉ API PHOTOROOM, PAR VENDEUR (26 octobre) ─────────────────────────────
+// Julien : « chaque personne puisse mettre sa clé API » (+ « le détourage QUE
+// dans Vestiaire Collective », 17 oct.) : le champ vit donc ICI, dans l'onglet
+// Vestiaire, jamais dans les Paramètres (le banc detourage-reglage l'y interdit).
+// La clé va dans SA ligne `vrm_photoroom_cle` (RLS) ; le serveur de détourage la
+// relit par la session et détoure avec SON compte Photoroom. Jamais affichée en
+// clair une fois enregistrée (on ne montre que « enregistrée »).
+function PhotoroomCle() {
+  const owner = AUTH.user?.id;
+  const [cle, setCle] = useState(undefined);   // undefined=on lit · ''=aucune · string=enregistrée · null=pas pu lire
+  const [val, setVal] = useState('');
+  const [etat, setEtat] = useState('');        // '' | 'saving' | 'ok' | 'err'
+  const [msg, setMsg] = useState('');
+  useEffect(() => { let stop = false; (async () => {
+    if (!owner) { if (!stop) setCle(null); return; }
+    try { const c = await lireClePhotoroom(owner); if (!stop) setCle(c); } catch (_) { if (!stop) setCle(null); }
+  })(); return () => { stop = true; }; }, [owner]);
+  if (!MULTI_USER || !owner || cle === undefined) return null;
+  const poser = async (nouvelle) => {
+    setEtat('saving'); setMsg('');
+    try { await sauverClePhotoroom(owner, nouvelle); setCle(nouvelle.trim()); setVal(''); setEtat('ok'); setMsg(nouvelle.trim() ? '✓ Ta clé Photoroom est enregistrée.' : '✓ Clé retirée.'); }
+    catch (_) { setEtat('err'); setMsg(CLOISONNE ? "La clé n'a pas pu être enregistrée — réessaie dans un moment." : 'Disponible une fois ton espace vendeur activé.'); }
+  };
+  const inp = { padding:'8px 10px', borderRadius:8, border:`1px solid ${C.border}`, background:C.bg, color:C.text, fontSize:14, fontFamily:'inherit', flex:'1 1 180px', minWidth:0 };
+  const btn = (bg) => ({ border:'none', background:bg, color:'#fff', borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' });
+  return (
+    <div data-photoroom-cle={cle ? 'posee' : cle === null ? 'pas-su' : 'vide'} style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}` }}>
+      <div style={{ fontSize:12.5, fontWeight:700, color:C.text }}>Détourage des photos (fond blanc)</div>
+      <div style={{ fontSize:11.5, color:C.muted, lineHeight:1.5, margin:'3px 0 8px' }}>
+        Vestiaire Collective attend des photos sur fond net. VRM les détoure avec <b>Photoroom</b>, avec <b>ta</b> clé API (c'est ton compte Photoroom qui la facture — VRM ne s'en sert pas à ta place). {cle ? 'Ta clé est enregistrée.' : cle === null ? "Je n'ai pas pu lire si une clé est enregistrée — réessaie dans un moment." : "Colle ta clé Photoroom pour activer le détourage."}
+      </div>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+        <input data-photoroom-champ value={val} onChange={(e) => { setEtat(''); setVal(e.target.value); }} type="password" autoComplete="off" spellCheck={false}
+          placeholder={cle ? '•••••••••• (enregistrée) — colle une nouvelle clé pour remplacer' : 'Clé API Photoroom'} aria-label="Clé API Photoroom" style={inp} />
+        <button type="button" data-photoroom-enregistrer disabled={etat === 'saving' || !val.trim()} onClick={() => poser(val)} style={{ ...btn(C.accent), opacity:(etat === 'saving' || !val.trim()) ? 0.6 : 1 }}>{etat === 'saving' ? 'Enregistrement…' : 'Enregistrer'}</button>
+        {cle ? <button type="button" data-photoroom-effacer disabled={etat === 'saving'} onClick={() => poser('')} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Retirer</button> : null}
+      </div>
+      {msg ? <div data-photoroom-msg={etat} style={{ fontSize:11.5, color: etat === 'err' ? C.warn : C.muted, marginTop:6 }}>{msg} <a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700 }}>Où trouver ma clé ↗</a></div>
+        : <div style={{ fontSize:11.5, color:C.muted, marginTop:6 }}><a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700 }}>Où trouver ma clé Photoroom ↗</a></div>}
+    </div>
+  );
+}
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
   useEffect(() => { let stop = false; (async () => {
@@ -21184,7 +21252,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
-              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/></>
+              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/><PhotoroomCle/></>
               : plat==='Leboncoin'
               ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
               : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
@@ -45594,6 +45662,31 @@ function LeboncoinScreen() {
         if (!r.lbc && r.numero !== '?' && vuesLbc.has(cleNum(r.numero))) removals.splice(i, 1);
       }
     }
+    // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire VENDUE SUR eBAY et
+    //    encore en ligne ici doit en sortir, sinon elle se vend deux fois.
+    //    `commandesEbayTous` rend null si un compte eBay est illisible ⇒ « pas
+    //    su », on ne retire RIEN (rien lu ne vaut pas rien). Identité par le SKU
+    //    VRM-{n°} (§5), jamais le titre. Une paire déjà « à retirer » (vendue
+    //    sur Vinted) n'est pas doublée — une paire, une ligne.
+    try {
+      const cmdsEbay = await commandesEbayTous();   // null si un compte eBay illisible ⇒ pas su
+      if (Array.isArray(cmdsEbay)) {
+        const soldEbay = new Set();
+        for (const o of cmdsEbay) { if (!commandeEbayEngagee(o)) continue; for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) { const k = cleNum(numLigneEbay(o, li)); if (k) soldEbay.add(k); } }
+        if (soldEbay.size) {
+          const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
+          for (const ad of liveAds) {
+            const k = adKeys(ad).filter((x) => keysKnown.has(x)).find((x) => soldEbay.has(x));
+            if (!k) continue;
+            const ex = parN.get(k);
+            if (ex && ex.etat === 'vendue') continue;   // déjà « à retirer » (vendue ailleurs, prouvée) — une paire, une ligne
+            if (ex) { const i = removals.indexOf(ex); if (i >= 0) removals.splice(i, 1); }   // un simple doute devient une vente eBay PROUVÉE
+            const entry = { numero: k, title: ad.subject || '', lbc: true, ou: 'eBay', url: ad.url || '', etat: 'vendue', id: ad.id != null ? String(ad.id) : '', prix: ad.price != null && isFinite(Number(ad.price)) ? Number(ad.price) : null };
+            removals.push(entry); parN.set(k, entry);
+          }
+        }
+      }
+    } catch (_) { /* une lecture eBay qui tombe ne casse jamais l'écran Leboncoin */ }
     removals.sort((a, b) => triNum(a.numero, b.numero));
     // ── L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ────────
     // Les paires que Vinted propose encore à la vente (`onlineIds`), et celles que
@@ -45718,9 +45811,11 @@ function LeboncoinScreen() {
   //    exactement la régression que le bloc détaillé (« VENDUE SE PROUVE »)
   //    existe pour empêcher. Aligné sur eBay (`dvVue.aRetirerEbay`) et la
   //    cloche (`lbcRemoveCount`), qui ne comptent que le prouvé.
-  const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue').length : 0;
+  const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
+  const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
     nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${nRetirerLbc} paire${plurLbc(nRetirerLbc)} vendue${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    nRetirerLbcEbay && { k: 'retirer-ebay', urg: true, sel: '[data-lbc-retirer-ebay]', txt: `${nRetirerLbcEbay} paire${plurLbc(nRetirerLbcEbay)} vendue${plurLbc(nRetirerLbcEbay)} sur eBay, encore en ligne ici — à retirer de Leboncoin` },
     data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
     data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
     data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
@@ -45890,7 +45985,8 @@ function LeboncoinScreen() {
             encore. Trois états, et seul le prouvé est rouge — §5 « mieux vaut un
             blanc qu'un faux », et on dit « à vérifier », jamais « vendu ». */}
         {data.removals.length > 0 && (() => {
-          const vendues = data.removals.filter(r => r.etat === 'vendue');
+          const vendues = data.removals.filter(r => r.etat === 'vendue' && r.ou !== 'eBay');
+          const venduesEbay = data.removals.filter(r => r.etat === 'vendue' && r.ou === 'eBay');
           const pause = data.removals.filter(r => r.etat === 'pause');
           const doute = data.removals.filter(r => r.etat !== 'vendue' && r.etat !== 'pause');
           const pe = pauseEtat();
@@ -45929,6 +46025,16 @@ function LeboncoinScreen() {
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
                 {carteDoute === 'vendues' ? phraseDoute : null}
+              </Card>
+            )}
+            {venduesEbay.length > 0 && (
+              <Card style={{ borderColor: C.warn }}>
+                <Titre>{venduesEbay.length} vendue{venduesEbay.length > 1 ? 's' : ''} sur eBay — à retirer de Leboncoin</Titre>
+                <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
+                  {venduesEbay.some((r) => r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
+                  {venduesEbay.some((r) => r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
+                </div>
+                {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
             )}
             {doute.length > 0 && (
@@ -51491,10 +51597,13 @@ function AppCoeur() {
       //    PROUVÉES ; le doute, lui, se règle sur l'écran Leboncoin.
       let lbcRemovePids=[];
       let lbcRemoveCount=0;
+      let postedIds=[];              // tous les ids publiés sur LBC (pour le croisement eBay→LBC)
+      let lbcRemoveEbayCount=0;      // vendues sur eBay, encore en ligne ici (§11, même base que le compte Vinted)
+      let sortisN=new Set();         // N° dont l'annonce LBC est SORTIE (plus en ligne) — partagé par les deux comptes « à retirer »
       let postedDepuis='';
       try{
         const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`,{headers:sbAuth()});
-        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
+        if(r.ok){ const rows=await r.json(); const posted=(rows&&rows[0]&&rows[0].data&&rows[0].data.ids)||[]; postedIds=posted; postedDepuis=(Array.isArray(rows)&&rows[0]&&rows[0].data&&rows[0].data.updatedAt)||''; lbcRemovePids=posted.filter(x=>/^\d+$/.test(String(x))&&soldIdsN.has(String(x))).map(String); lbcRemoveCount=lbcRemovePids.length; }
       }catch(_){}
       // ── ET L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ──
       // La MÊME règle que l'écran Leboncoin (`doublesVenteLbc`, §11). Les ventes
@@ -51536,6 +51645,7 @@ function AppCoeur() {
             let preuve=null;
             if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
             const {prouves:sortis}=numerosLbcSortis(items, load('vrm_lbc_liens',{})||{}, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve);
+            sortisN=sortis;
             lbcRemoveCount=lbcRemovePids.filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return !(k && sortis.has(k)); }).length;
           }
         }catch(_){}
@@ -51581,6 +51691,20 @@ function AppCoeur() {
         if(ventesE.lbcSansPaire>0 && (progE||[]).length){ const items=await lbcAnnoncesSession(); ventesE=verdict(items||null); }
         const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:enLigneE, vendusVinted:vendusE, programmees:progE||[], ventes:ventesE});
         ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerAilleurs=(dvE.aRetirerEbayAilleurs||[]).length; ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length; ebayAAnnulerOu=ouVenduesTexte(dvE.aAnnulerEbay);
+        // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire PUBLIÉE sur LBC et
+        //    VENDUE sur eBay, encore en ligne ici — le pendant du compte « vendue
+        //    sur Vinted » juste au-dessus, avec le MÊME verdict que l'écran eBay
+        //    (`ventesE.vendus`, §11). Hors de celles déjà comptées « sur Vinted »
+        //    (une paire, une ligne). « pas su » (verdict sans Map) ⇒ 0, jamais inventé.
+        if(ventesE && ventesE.vendus && typeof ventesE.vendus.get==='function'){
+          const soldEbayN=new Set([...ventesE.vendus].filter(([,v])=>v==='eBay').map(([k])=>k));
+          if(soldEbayN.size){
+            const vintedRemN=new Set(lbcRemovePids.map(pid=>cleNum((nums[pid]||{}).numero)).filter(Boolean));
+            // Même refinement que le compte Vinted (§11) : une annonce LBC SORTIE
+            // n'est plus « à retirer » ; une déjà comptée « sur Vinted » non plus.
+            lbcRemoveEbayCount=postedIds.filter(pid=>/^\d+$/.test(String(pid))).filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return k && soldEbayN.has(k) && !vintedRemN.has(k) && !sortisN.has(k); }).length;
+          }
+        }
         // Retrait automatique (proposition 8) : allumé par lui, nuage là AU
         // DÉPART du passage, passage pas annulé, toutes ses annonces Vinted
         // lues — puis la règle la plus stricte (`retraitsEbayAutoPermis`), jugée
@@ -51646,6 +51770,7 @@ function AppCoeur() {
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
       if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
+      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
@@ -52075,7 +52200,7 @@ function AppCoeur() {
             };
             // `ebay_tokens*` (les jetons eBay, de chacun de ses comptes) et `push_subs` (les clés de ses téléphones)
             // ne quittent pas la base.
-            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs'];
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle'];
             const [lignes, legeres, comptes] = await Promise.all([
               toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),
@@ -52088,7 +52213,7 @@ function AppCoeur() {
             const data={ _cancale_backup:3, exportDate:new Date().toISOString(), keys,
               donnees:{ lignes:(lignes||[]).map(l=>({ id:l.id, data:sansSecrets(l.data) })), resumes:legeres||[], comptes:comptes||[] },
               complet: manques.length===0, manques,
-              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton email)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted et eBay, clé du widget, clés de tes téléphones (jamais dans un fichier)'] };
+              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton email)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted et eBay, clé du widget, clé Photoroom, clés de tes téléphones (jamais dans un fichier)'] };
             const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
             const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
             a.download=`vrm-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;

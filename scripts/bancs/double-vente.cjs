@@ -34,6 +34,9 @@ const LISTINGS = { capturedAt: auj.toISOString(), payload: { items: [
   annonce(5010, 'Reebok Club C taille 41', 60, { is_closed: true }),
   annonce(5011, 'Asics Gel taille 43', 55, { is_hidden: true }),
   annonce(5012, 'New Balance 550 taille 42', 90, { is_closed: true }),
+  // (26 oct.) N°60 : EN LIGNE sur Vinted, VENDUE SUR eBAY, encore en ligne sur
+  // Leboncoin (lbc6) ⇒ croisement eBay → Leboncoin « à retirer de Leboncoin ».
+  annonce(5060, 'Reebok Nano X taille 44', 65),
 ] } };
 const MAIN = {
   vinted_annonce_numeros: {
@@ -44,6 +47,7 @@ const MAIN = {
     '5010': { numero: '20', title: 'Reebok Club C taille 41' },
     '5011': { numero: '21', title: 'Asics Gel taille 43' },
     '5012': { numero: '22', title: 'New Balance 550 taille 42' },
+    '5060': { numero: '60', title: 'Reebok Nano X taille 44' },
     // DEUX fiches portent le N°40 (prix d'achat ≠) → coût AMBIGU : la carte
     // Ventes ne doit PAS montrer de bénéfice (le total de la compta ne le fait
     // pas non plus — ficheUniqueDuNumero).
@@ -62,6 +66,9 @@ const ITEMS = {
   lbc3: { id: 'lbc3', subject: 'Salomon XT-6 blanc T40', price: 105, account: MON, platform: 'leboncoin', status: 'active', images: ['https://img.test/lbc3.jpg'] },
   lbc4: { id: 'lbc4', subject: 'Chalet 8 personnes', price: 900, account: 'inconnu', platform: 'leboncoin', status: 'active', images: [] },
   lbc5: { id: 'lbc5', subject: 'Puma Suede T41', price: 50, account: MON, platform: 'leboncoin', status: 'active', ref: '40', images: ['https://img.test/lbc5.jpg'] },
+  // (26 oct.) Reliée à la N°60 par sa référence : vendue sur eBay (ebay_orders,
+  // SKU VRM-60), encore en ligne ici ⇒ « à retirer de Leboncoin ».
+  lbc6: { id: 'lbc6', subject: 'Reebok Nano X taille 44', price: 65, account: MON, platform: 'leboncoin', status: 'active', ref: '60', images: ['https://img.test/lbc6.jpg'] },
 };
 const VENTES = {
   t1: { txId: 't1', itemId: 'lbc1', isSeller: true, stepStatus: 'action', stepLabel: 'Colis à envoyer', price: 8500, title: 'Nike Air Max 1 olive T42', at: auj.toISOString() },
@@ -76,8 +83,11 @@ const rows = [
   { id: 'lbc_ventes', data: { ventes: VENTES } },
   // Trois paires postées sur Leboncoin (removals) ; 5010 a une transaction
   // finalisée ⇒ vente PROUVÉE (vendue), 5011 masquée (pause), 5012 fermée (doute).
-  { id: 'vinted_lbc_posted', data: { ids: ['5010', '5011', '5012'] } },
+  { id: 'vinted_lbc_posted', data: { ids: ['5010', '5011', '5012', '5060'] } },
   { id: 'harvest_111_txn_990010', data: { capturedAt: auj.toISOString(), payload: { transaction: { id: '990010', item_id: '5010', status: 450, status_title: 'Vendu', status_updated_at: auj.toISOString() } } } },
+  // (26 oct.) Une commande eBay PAYÉE dont le SKU VRM-60 désigne la N°60, encore
+  // en ligne sur Leboncoin (lbc6) : croisement eBay → Leboncoin.
+  { id: 'ebay_orders', data: { orders: [ { orderId: 'EB-60', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', lineItems: [{ sku: 'VRM-60', title: 'Reebok Nano X taille 44', legacyItemId: '220000000060' }], pricingSummary: { total: { value: '65.00', currency: 'EUR' } } } ], capturedAt: auj.toISOString() } },
 ];
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -170,6 +180,8 @@ const projette = (row, sel) => {
         // L'agent qui conseille (parité eBay) : la liste rangée des priorités.
         conseils: [...document.querySelectorAll('[data-lbc-conseil]')].map((e) => e.getAttribute('data-lbc-conseil')),
         retirerTxt: (document.querySelector('[data-lbc-conseil="retirer"]') || { textContent: '' }).textContent.trim(),
+        retirerEbay: Number((document.querySelector('[data-lbc-retirer-ebay]') || { getAttribute: () => 0 }).getAttribute('data-lbc-retirer-ebay')),
+        retirerEbayN: [...document.querySelectorAll('[data-lbc-retirer="lbc6"]')].map((e) => e.getAttribute('data-lbc-retirer')),
       }));
       const v1 = await lire();
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'double-vente-' + vp.width + '.png'), fullPage: true });
@@ -190,6 +202,13 @@ const projette = (row, sel) => {
       dit(!v1.relier.includes('lbc4'), 'l’annonce d’un inconnu ne l’est pas');
       dit(!v1.relier.includes('lbc1') && v1.relier.filter((x) => x === 'lbc2').length === 1,
         'une annonce vendue n’est pas présentée comme « en ligne non reliée » (elle n’est que dans « quelle paire ? »)', JSON.stringify(v1.relier));
+      // ── CROISEMENT eBay → LEBONCOIN (26 oct.) ─────────────────────────────────
+      // La N°60, vendue sur eBay (ebay_orders, SKU VRM-60) et encore en ligne sur
+      // Leboncoin (lbc6, N°60 toujours en vente sur Vinted donc hors du contrôle
+      // Vinted), a sa propre carte « à retirer de Leboncoin ».
+      dit(v1.retirerEbay === 1 && v1.retirerEbayN.length === 1,
+        'vendue sur eBay, encore en ligne sur Leboncoin ⇒ « à retirer de Leboncoin » (N°60, sa propre carte), et elle seule', `carte=${v1.retirerEbay} ligne=${JSON.stringify(v1.retirerEbayN)}`);
+      dit(v1.conseils.includes('retirer-ebay'), '« À faire sur Leboncoin » le liste aussi (croisement eBay→Leboncoin)', JSON.stringify(v1.conseils));
       // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay) : N° + bénéfice sur la carte,
       //    par identité seulement. t1 est reliée (lien → N°12, achat 30 €) → 55 € ;
       //    t2 n'est reliée à rien → ni N° ni bénéfice inventé (§5).
@@ -229,6 +248,10 @@ const projette = (row, sel) => {
       const m = /(\d+) articles? vendus? sur Leboncoin, encore en vente sur Vinted/.exec(txt);
       dit(m && m[1] === '2', 'Ma journée annonce les mêmes 2 articles', m ? m[0] : 'absent');
       dit(!/vendues? sur Vinted\)/.test(txt), 'et ne dit « vendue sur Vinted » d’aucune paire non prouvée vendue');
+      // (26 oct.) CLOCHE eBay→Leboncoin : la N°60, publiée sur LBC (posted) et
+      // vendue sur eBay, encore en ligne ici ⇒ une ligne « à retirer de Leboncoin
+      // (vendue sur eBay) » — le pendant de la ligne Vinted, visible dès l'accueil.
+      dit(/1 à retirer de Leboncoin \(vendue sur eBay\)/.test(txt), 'Ma journée : « 1 à retirer de Leboncoin (vendue sur eBay) » (croisement eBay→LBC, cloche)', (txt.match(/\d+ à retirer de Leboncoin \([^)]*\)/g) || []).join(' | ') || 'absent');
       // (16 oct.) « Je me suis trompé, j'ai mal relié une paire » : le lien se
       // défait, et ça tient au rechargement (le nuage ne le rend pas).
       try {
