@@ -161,7 +161,7 @@ const telecharge = async (pg, clic, ms = 8000) => {
       console.log(`── ${vp.width} px · A/B : profil complet, régime micro`);
       {
         const { ctx, pg, errs } = await ouvrir(vp, { profil: PROFIL_OK, regime: 'micro' });
-        const r0 = await attendre(pg, (r) => r.carte && r.total != null && r.etat === 'ok' && r.nuage === '1' && r.btn);
+        const r0 = await attendre(pg, (r) => r.carte && r.total != null && r.etat === 'ok' && r.nuage === '1' && r.btn && !/encore en lecture/.test(r.recapTxt), 20000);
         dit(r0.carte, 'la carte « Facturation électronique » est dans Comptabilité');
         dit(r0.etat === 'ok', 'profil complet + micro ⇒ facturation possible', r0.etat + ' · ' + r0.raison);
         dit(r0.total === ATTENDU.total && Number(r0.n) === ATTENDU.n, 'récap du mois à l’écran = 80 + 40 + 60 = 180 € (3 ventes, datées au versement)', `${r0.total} · ${r0.n}`);
