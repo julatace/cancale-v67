@@ -1,5 +1,17 @@
 # VRM — dossier de passation
 
+> **26 octobre — Statistiques, Compta, et le grand titre sur téléphone :** un titre d'écran
+> IDENTIQUE à celui de la barre du haut se tait sur téléphone (`ScreenHead` →
+> `vrm-screen-head-doublon`, comparé à `TITRE_BARRE` posé par la coque ; un titre différent,
+> ou l'ordinateur, le garde). Statistiques passe par `ScreenHead` (sa phrase « Tes ventes, ton
+> évolution… » est partie). « Vendu · 12 mois » : la légende du graphique (`legende`) redisait
+> les mois écrits juste dessous, arrondis autrement — retirée. Compta : « ⓘ À quoi ça sert ? »
+> écrit (`Pourquoi ecrit`), plus un ⓘ seul sous chaque carte ; le tableau par période ne
+> s'allonge plus de mois anciens sans aucune vente (`n === 0` partout). Banc
+> `annonces-ventes-brouillon.cjs` (vues `dashboard`, `compta`, `cat_bord`) : 9 rouges sur main,
+> vert après. Même règle sur Paramètres (`vrm-set-tete`) et Organisation (`ops-entete-doublon`,
+> vendeur seul) : 2 rouges sur main, vert après.
+
 > **26 octobre — Colis et Ma journée, même traitement :** Ma journée au téléphone : dans la
 > carte « Vendu », « Reçu en … » et « Chiffre d'affaires {année} » se CHEVAUCHAIENT (la règle
 > de `styles-mobile-studio.css` rangeait UN bloc dans une colonne à droite ; le second s'y
