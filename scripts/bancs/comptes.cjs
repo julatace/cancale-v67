@@ -33,9 +33,28 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : TROIS comptes liés avec des annonces en ligne (3 · 1 · 2). Le
+// banc masque ensuite le moins frais (il le vieillit en mémoire) et vérifie que
+// le masque le sort des actifs sans le dire « en panne » ; puis qu'un compte
+// exclu DANS LE NUAGE (celui qui a le moins d'annonces en ligne, 1) compte pareil
+// sur Annonces et le tableau de bord dès le premier écran. Trois comptes pour
+// que « masqué = actifs − 1 » et « exclu à part » soient réellement mesurés.
+const ACC3 = present ? null : (() => {
+  const acc = [...sc.comptes(), { vinted_user_id: '820003', login: 'boutique_est', domain: 'www.vinted.fr', updated_at: sc.iso(sc.NOW), created_at: sc.iso(sc.NOW - 600 * 3600e3) }];
+  const list = [
+    sc.ligneListings('820001', [sc.annonce({ id: 'n1', titre: 'Nike Air Force 1', prix: 50 }), sc.annonce({ id: 'n2', titre: 'Nike Blazer', prix: 52 }), sc.annonce({ id: 'n3', titre: 'Nike Cortez', prix: 54 })]),
+    sc.ligneListings('820002', [sc.annonce({ id: 's1', titre: 'Adidas Gazelle', prix: 45 })]),
+    sc.ligneListings('820003', [sc.annonce({ id: 'e1', titre: 'Puma Suede', prix: 40 }), sc.annonce({ id: 'e2', titre: 'Puma Palermo', prix: 42 })]),
+  ];
+  return { acc, list };
+})();
+const main=present?FX('main'):sc.ligneMain(), accounts=present?FX('accounts'):ACC3.acc, txn=present?FX('txn'):[];
+const etatSc = present ? [] : [sc.panelComptesEtat(['820001','820002','820003'])]; // actif/banni, lu par acctHealth
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(present?FX('listings'):ACC3.list),...FXok('inbox'),...FXok('track'),...FXok('bord'),...FXok('label'),...FXok('billing'),...etatSc];
 function projette(row,select){
   if(!select||select==='*') return row;
   const out={};

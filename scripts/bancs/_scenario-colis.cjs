@@ -95,12 +95,30 @@ function trackColis({ n, code, qr, ageJ = 30 }) {
 }
 // La ligne DÉDIÉE des codes lus en conversation, indexée par transaction_id.
 const panelRelais = (map) => ({ id: 'panel_colis_relais', data: map || {} });
+// L'état actif/banni que l'extension (5.181) lit dans le profil Vinted
+// (`panel_comptes_etat.comptes[uid] = {etat, at}`). Sans lui, un compte reste
+// « État non vérifié » et ne compte ni actif ni banni.
+const panelComptesEtat = (uids, etat = 'actif') => ({ id: 'panel_comptes_etat',
+  data: { comptes: Object.fromEntries((uids || []).map((u) => [String(u), { etat, at: iso(NOW - 3600e3) }])) } });
+
+// Une annonce EN LIGNE du dressing (forme `payload.items` de Vinted).
+function annonce({ id, titre, prix, taille, marque }) {
+  return {
+    id: String(id), title: titre || 'Nike Air Force 1', brand_title: marque || 'Nike',
+    size_title: taille == null ? '42' : String(taille),
+    price: { amount: Number(prix == null ? 45 : prix).toFixed(2), currency_code: 'EUR' },
+    is_closed: false, is_hidden: false, is_draft: false, photo: { url: '' },
+  };
+}
+// La ligne `harvest_{uid}_listings`, DATÉE à l'instant (dressingsDuJour la lit
+// « il y a 1 min » → la règle « en ligne ≤ 24 h » passe).
+const ligneListings = (uid, items) => ({ id: `harvest_${uid}_listings`, data: { capturedAt: iso(NOW), payload: { items, pagination: null } } });
 
 // fx/ présent ? (sur SA machine on lit la vraie base, ces builders dorment.)
 const present = (SC) => fs.existsSync(path.join(SC, 'fx', 'accounts.json'));
 
 module.exports = {
   present, comptes, ligneMain, ordre, lignePurch, ligneSold,
-  bordereau, labelLatest, trackColis, panelRelais, uuid, UID,
+  bordereau, labelLatest, trackColis, panelRelais, panelComptesEtat, annonce, ligneListings, uuid, UID,
   STATUT_RELAIS, STATUT_AEXP, STATUT_FINAL, STATUT_NONRECL, iso, NOW,
 };
