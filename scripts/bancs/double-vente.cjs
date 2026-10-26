@@ -83,7 +83,7 @@ const rows = [
   { id: 'lbc_ventes', data: { ventes: VENTES } },
   // Trois paires postées sur Leboncoin (removals) ; 5010 a une transaction
   // finalisée ⇒ vente PROUVÉE (vendue), 5011 masquée (pause), 5012 fermée (doute).
-  { id: 'vinted_lbc_posted', data: { ids: ['5010', '5011', '5012'] } },
+  { id: 'vinted_lbc_posted', data: { ids: ['5010', '5011', '5012', '5060'] } },
   { id: 'harvest_111_txn_990010', data: { capturedAt: auj.toISOString(), payload: { transaction: { id: '990010', item_id: '5010', status: 450, status_title: 'Vendu', status_updated_at: auj.toISOString() } } } },
   // (26 oct.) Une commande eBay PAYÉE dont le SKU VRM-60 désigne la N°60, encore
   // en ligne sur Leboncoin (lbc6) : croisement eBay → Leboncoin.
@@ -248,6 +248,10 @@ const projette = (row, sel) => {
       const m = /(\d+) articles? vendus? sur Leboncoin, encore en vente sur Vinted/.exec(txt);
       dit(m && m[1] === '2', 'Ma journée annonce les mêmes 2 articles', m ? m[0] : 'absent');
       dit(!/vendues? sur Vinted\)/.test(txt), 'et ne dit « vendue sur Vinted » d’aucune paire non prouvée vendue');
+      // (26 oct.) CLOCHE eBay→Leboncoin : la N°60, publiée sur LBC (posted) et
+      // vendue sur eBay, encore en ligne ici ⇒ une ligne « à retirer de Leboncoin
+      // (vendue sur eBay) » — le pendant de la ligne Vinted, visible dès l'accueil.
+      dit(/1 à retirer de Leboncoin \(vendue sur eBay\)/.test(txt), 'Ma journée : « 1 à retirer de Leboncoin (vendue sur eBay) » (croisement eBay→LBC, cloche)', (txt.match(/\d+ à retirer de Leboncoin \([^)]*\)/g) || []).join(' | ') || 'absent');
       // (16 oct.) « Je me suis trompé, j'ai mal relié une paire » : le lien se
       // défait, et ça tient au rechargement (le nuage ne le rend pas).
       try {
