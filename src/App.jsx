@@ -3829,9 +3829,9 @@ const fetchEmailSales = async () => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;                    // « rien lu » ≠ « rien » : null, comme fetchEmailBordereaux/Tracking/Billing
     return (await res.json()).map(r => r.data).filter(Boolean);
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 };
 // Reconstitue des VENTES à partir des emails « X a acheté ton article ».
 // Pourquoi : les emails arrivent 24/7, même quand l'extension n'a rien
@@ -33290,6 +33290,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // maintenant la même exclusion. Se recalcule seul à chaque passage ici.
   useEffect(() => {
     if (!listings.items) return;
+    // ⚠️ « RIEN LU » ≠ « RIEN » (revue du 26 oct.). `emailSoldIds` est RECONSTRUIT
+    //    à partir des emails de vente ET des bordereaux ; si une de ces deux
+    //    sources n'a PAS pu être lue (`null`), la reconstruction est incomplète
+    //    et RÉTRÉCIRAIT la liste persistée — on réécrirait `vinted_annonces_email_sold`
+    //    (clé SYNCHRONISÉE → poussée au nuage, tous appareils) amputée, et une
+    //    paire déjà vendue redeviendrait « en ligne » → reproposée ailleurs →
+    //    DOUBLE VENTE. On ne réécrit QUE quand les deux sources sont lues.
+    if (emailSales === null || emailBords === null) return;
     const arr = [...emailSoldIds];
     const prev = load('vinted_annonces_email_sold', []) || [];
     if (arr.length !== prev.length || arr.some(x => !prev.includes(x))) save('vinted_annonces_email_sold', arr);

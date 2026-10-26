@@ -95,6 +95,7 @@ const projette = (row, sel) => {
       const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      let failSale = false;   // (26 oct.) simule un échec de lecture des emails de vente
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
@@ -102,6 +103,7 @@ const projette = (row, sel) => {
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
         if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        if (failSale && /id=like\.email_sale/.test(u)) return route.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
         const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
         const eq = /id=eq\.([^&]*)/.exec(u);
@@ -260,6 +262,21 @@ const projette = (row, sel) => {
         }
 
       } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }
+      // ── « RIEN LU » ≠ « RIEN » : un échec de lecture des emails de vente ne doit
+      //    PAS effacer `vinted_annonces_email_sold` (clé synchronisée). Sinon une
+      //    paire déjà vendue redevient « en ligne » → reproposée ailleurs → DOUBLE
+      //    VENTE. On pré-remplit la mémoire avec une paire EN LIGNE (9101) qui n'a
+      //    ni email de vente ni bordereau : sur le code d'avant, l'écriture la
+      //    retire ; après le correctif, l'échec de lecture ⇒ on ne touche à rien.
+      try {
+        await pg.evaluate(() => { try { localStorage.setItem('vinted_annonces_email_sold', JSON.stringify(['9101'])); } catch (_) {} });
+        failSale = true;
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForTimeout(3500);
+        const garde = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonces_email_sold') || '[]'); } catch (_) { return []; } });
+        failSale = false;
+        dit(garde.includes('9101'), 'un échec de lecture des emails de vente n’efface PAS vinted_annonces_email_sold (pas de double vente)', JSON.stringify(garde));
+      } catch (e) { dit(false, 'scénario « lecture email de vente ratée »', String(e.message).slice(0, 120)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }
