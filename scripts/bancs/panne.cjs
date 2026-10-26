@@ -33,9 +33,10 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
-const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
+const { fxSecours } = require('./_fx-secours.cjs');   // #3 : tourne sans fx/ (secours synthétique, aucun assert sur le contenu de fx)
+const { FXok, main, accounts, LISTV } = fxSecours(SC);
+const txn=FXok('txn');
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(FXok('listings')),...LISTV(),...FXok('inbox'),...FXok('track'),...FXok('bord'),...FXok('label'),...FXok('billing')];
 function projette(row,select){
   if(!select||select==='*') return row;
   const out={};

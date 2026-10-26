@@ -11,9 +11,9 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
-const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')]; const txn=FX('txn');
+const { fxSecours } = require('./_fx-secours.cjs');   // #3 : tourne sans fx/ (secours synthétique, aucun assert sur le contenu de fx)
+const { FXok, main, accounts, LISTV } = fxSecours(SC);
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(FXok('listings')),...LISTV(),...FXok('inbox'),...FXok('track'),...FXok('bord'),...FXok('label'),...FXok('billing')]; const txn=FXok('txn');
 // ── LA PROJECTION `select=` DE POSTGREST, honnêtement appliquée ─────────────
 // ⚠️ SANS ÇA, CE BANC MESURE UNE FICTION. Il rendait la ligne BRUTE
 // (`{id,data}`) pour une requête qui demande une projection
