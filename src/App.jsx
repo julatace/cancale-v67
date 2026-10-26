@@ -20828,9 +20828,41 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const itemsAffiches = itemsVue.filter((it) => passeFiltreAnn(it) && passeQAnn(it));
   const annVus = itemsAffiches.slice(0, annMax);
   const chipsAnn = [['toutes', 'Toutes', itemsVue.length], ['relier', 'À relier', setRelierAnn.size], ['dorment', 'Qui dorment', nDortAnn], ['retirer', 'À retirer', setRetirerAnn.size]].filter(([k, , n]) => k === 'toutes' || n > 0);
+  // ── L'AGENT QUI CONSEILLE (26 oct., Julien : « un agent qui conseille ») :
+  // « À faire sur eBay » — une liste RANGÉE du plus urgent au moins, calculée
+  // sur les signaux déjà là (dvVue, à relier, qui dorment). Chaque ligne saute
+  // au bloc détaillé OU applique le filtre. C'est un sommaire d'actions ; les
+  // blocs détaillés restent dessous pour agir. Les libellés n'emploient jamais
+  // « pas reliée »/« reliée à aucune » (le banc règle-offre compte ces mots).
+  const nEligCons = elig ? itemsVue.filter((a) => elig.has(String(a.itemId))).length : 0;
+  const plurCons = (n) => (n > 1 ? 's' : '');
+  const conseils = [
+    dvVue.aRetirerEbay.length && { k: 'retirer', urg: true, sel: '[data-ebay-a-retirer]', cta: 'Voir', txt: `${dvVue.aRetirerEbay.length} paire${plurCons(dvVue.aRetirerEbay.length)} vendue${plurCons(dvVue.aRetirerEbay.length)} sur Vinted, encore en vente ici — à retirer d'eBay` },
+    dvVue.aAnnulerEbay.length && { k: 'annuler', urg: true, sel: '[data-ebay-a-annuler]', cta: 'Voir', txt: `${dvVue.aAnnulerEbay.length} programmée${plurCons(dvVue.aAnnulerEbay.length)} sur eBay, déjà vendue${plurCons(dvVue.aAnnulerEbay.length)} ailleurs — à annuler` },
+    dvVue.aRetirerVinted.length && { k: 'retirer-vinted', urg: true, sel: '[data-ebay-retirer-vinted]', cta: 'Voir', txt: `${dvVue.aRetirerVinted.length} vendue${plurCons(dvVue.aRetirerVinted.length)} sur eBay, encore sur Vinted — à retirer là-bas` },
+    setRelierAnn.size && { k: 'relier', filtre: 'relier', cta: 'Filtrer', txt: `${setRelierAnn.size} annonce${plurCons(setRelierAnn.size)} à relier à un article — sans ce lien, VRM ne peut pas la retirer quand elle se vend` },
+    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${nDortAnn} paire${plurCons(nDortAnn)} en ligne depuis plus de 30 jours — baisse le prix${nEligCons ? ' ou fais une offre aux observateurs' : ''}` },
+  ].filter(Boolean);
+  const allerConseil = (c) => () => {
+    if (c.filtre) { setFiltreAnn(c.filtre); setAnnMax(60); }
+    try { const el = document.querySelector(c.sel || '.vrm-ebay-outils'); if (el) el.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'center' }); } catch (_) {}
+  };
   return wrap(<>
     {head(itemsVue.length)}
     <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique} — ` : (melangeAnnonces ? `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay — ` : 'Tes annonces en ligne sur eBay — ')}touche une annonce pour la modifier</div>
+    {conseils.length > 0 && (
+      <div data-ebay-conseils={conseils.length} style={{ ...bloc(), marginBottom: 12 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: E.text }}>À faire sur eBay</div>
+        <div style={{ fontSize: 11, color: E.muted, margin: '1px 0 6px' }}>Tes priorités du moment, de la plus urgente à la moins.</div>
+        {conseils.slice(0, 4).map((c, i) => (
+          <div key={c.k} data-ebay-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
+            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? E.warn : E.accentSoft, flexShrink: 0 }} />
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: E.text, lineHeight: 1.4 }}>{c.txt}</span>
+            <button type="button" data-ebay-conseil-go={c.k} onClick={allerConseil(c)} style={{ ...lienE, padding: '4px 11px', fontSize: 12, flexShrink: 0 }}>{c.cta}</button>
+          </div>
+        ))}
+      </div>
+    )}
     {publier}
     {alertes}
     {ligneComptesIllisibles}
