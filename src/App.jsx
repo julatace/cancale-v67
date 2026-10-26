@@ -2452,14 +2452,16 @@ const purgerComptesSupprimes = async () => {
 // ⚠️ GARDE DESTRUCTIVE : le `_` de PostgREST `like` est un joker 1-caractère, donc
 //    `harvest_35_*` matcherait `harvest_352_*`. On relit la liste et on filtre
 //    sur le préfixe EXACT en JS avant d'effacer quoi que ce soit.
-// `scopes` : { annonces, ventes, achats, messages, compte } (booléens).
+// `scopes` : { annonces, ventes, bordereaux, releves, achats, messages, compte } (booléens).
 const familiesDeCompte = (uid, id, scopes) => {
   const hp = `harvest_${uid}_`, cp = `coffre_${uid}_`;
   if (id.startsWith(cp)) return scopes.annonces;          // le coffre = annonces archivées
   if (!id.startsWith(hp)) return false;                   // garde EXACTE (pas de 35→352)
   const r = id.slice(hp.length);
   if (/^(listings$|enligne$|item_)/.test(r)) return scopes.annonces;   // `enligne` : la relecture publique (5.170)
-  if (/^(orders_sold$|txn_|label|releve_|billing$)/.test(r)) return scopes.ventes;
+  if (/^label/.test(r)) return scopes.bordereaux;          // les bordereaux captés (PDF) — séparés des ventes (26 oct.)
+  if (/^releve_/.test(r)) return scopes.releves;           // les relevés de versement — séparés des ventes
+  if (/^(orders_sold$|txn_|billing$)/.test(r)) return scopes.ventes;
   if (/^(orders_purchased$)/.test(r)) return scopes.achats;
   if (/^(conv_)/.test(r)) return scopes.messages;
   // Le reste (seen_urls, diag, offer_statuts…) ne part qu'avec « tout le compte ».
@@ -26525,10 +26527,10 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   // calcule sur les ventes : la modale le dit, pas de fausse case qui
   // dupliquerait « ventes ». Le blocage définitif reste une option à part.
   const [delCible, setDelCible] = useState(null);     // le compte visé, ou null
-  const [delScopes, setDelScopes] = useState({ annonces: true, ventes: true, achats: true, messages: true, compte: true });
+  const [delScopes, setDelScopes] = useState({ annonces: true, ventes: true, bordereaux: true, releves: true, achats: true, messages: true, compte: true });
   const [delBusy, setDelBusy] = useState(false);
-  const ouvrirSuppression = (acc) => { setDelScopes({ annonces: true, ventes: true, achats: true, messages: true, compte: true }); setDelCible(acc); };
-  const rienCoche = !delScopes.annonces && !delScopes.ventes && !delScopes.achats && !delScopes.messages && !delScopes.compte;
+  const ouvrirSuppression = (acc) => { setDelScopes({ annonces: true, ventes: true, bordereaux: true, releves: true, achats: true, messages: true, compte: true }); setDelCible(acc); };
+  const rienCoche = !delScopes.annonces && !delScopes.ventes && !delScopes.bordereaux && !delScopes.releves && !delScopes.achats && !delScopes.messages && !delScopes.compte;
   const confirmerSuppression = async () => {
     const acc = delCible; if (!acc || rienCoche) return;
     setDelBusy(true);
@@ -26801,7 +26803,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
             </span>
           </label>
         );
-        const tout = delScopes.annonces && delScopes.ventes && delScopes.achats && delScopes.messages && delScopes.compte;
+        const tout = delScopes.annonces && delScopes.ventes && delScopes.bordereaux && delScopes.releves && delScopes.achats && delScopes.messages && delScopes.compte;
         return (
         <div onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
           <FermeAuRetour fermer={()=>!delBusy&&setDelCible(null)}/>
@@ -26817,11 +26819,13 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
             <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
               {/* Tout sélectionner / désélectionner */}
               <label style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',borderRadius:10,cursor:'pointer',marginBottom:10,background:C.card,border:`1px solid ${C.border}`}}>
-                <input type="checkbox" checked={tout} onChange={e=>{ const v=e.target.checked; setDelScopes({annonces:v,ventes:v,achats:v,messages:v,compte:v}); }} style={{width:17,height:17,accentColor:C.accent}}/>
+                <input type="checkbox" checked={tout} onChange={e=>{ const v=e.target.checked; setDelScopes({annonces:v,ventes:v,bordereaux:v,releves:v,achats:v,messages:v,compte:v}); }} style={{width:17,height:17,accentColor:C.accent}}/>
                 <span style={{fontSize:13,fontWeight:700,color:C.text}}>Tout supprimer</span>
               </label>
               <Case k="annonces" titre="Annonces" sous="Le dressing capté, les photos et descriptions, le coffre."/>
-              <Case k="ventes" titre="Ventes" sous="Les ventes, transactions, bordereaux, relevés et porte-monnaie. La compta (CA, URSSAF) se recalcule dessus : la retirer la met à jour."/>
+              <Case k="ventes" titre="Ventes" sous="Les ventes, transactions et porte-monnaie. La compta (CA, URSSAF) se recalcule dessus : la retirer la met à jour."/>
+              <Case k="bordereaux" titre="Bordereaux" sous="Les étiquettes d'envoi (PDF) captées sur ce compte. Les ventes et la compta ne bougent pas."/>
+              <Case k="releves" titre="Relevés" sous="Les relevés de versement captés sur ce compte. Les ventes et la compta ne bougent pas."/>
               <Case k="achats" titre="Achats" sous="Les commandes achetées sur ce compte."/>
               <Case k="messages" titre="Messages" sous="Les conversations captées de ce compte."/>
               <Case k="compte" titre="Le compte et ses jetons" sous="Retire le compte de la liste. Tu le récupères en reconnectant l'extension dessus sur Vinted."/>
