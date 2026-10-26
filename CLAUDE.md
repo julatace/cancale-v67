@@ -1,5 +1,11 @@
 # VRM — dossier de passation
 
+> **26 octobre — Achats et Messages, même traitement :** dans l'espace Vinted, plus de
+> second titre « Achats » / « Messages » sous l'onglet déjà sélectionné, et la carte
+> « Reçus d'achat par email » passe SOUS la liste (une archive, pas le geste du jour ;
+> à « · 0 » elle poussait les colis vers le bas). Banc `annonces-ventes-brouillon.cjs`
+> (vues achats et messages) : 8 rouges sur le build d'avant, vert après.
+
 > **26 octobre — Annonces et Ventes « trop brouillon » (avis d'un ami de Julien) :** dans
 > l'espace Vinted, plus de second titre (« Ventes », « Vos ventes », « Annonces en ligne »), ni
 > « Annonces de N comptes » sous le sélecteur (sauf connexion refusée) ; « À faire aujourd'hui »

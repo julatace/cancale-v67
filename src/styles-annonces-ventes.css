@@ -90,3 +90,6 @@
 
 /* « Retirer mon argent » se tait sans argent à retirer : son emplacement aussi. */
 .vrm-app-shell .vrm-retirer-hote:empty { display: none; }
+
+/* Achats : les reçus par email descendent sous la liste (26 octobre). */
+.vrm-app-shell .vrm-main .vrm-achats-recus-bas { margin-top: 18px; }

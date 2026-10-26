@@ -39926,8 +39926,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
 
       {curSub==='achats' && (<div className="vrm-achats">
-        <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>
-        <RecusEmail recus={recusAchat} autres={nonRecusAchat} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/>
+        {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
+        {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>}
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -41068,6 +41068,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
           </button>
         )}
+        {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
+            sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
+        <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} onOuvrir={r=>r.pdfB64?openReceipt(r):setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>
       </div>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
@@ -41902,7 +41905,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Messages (séparés par compte via le sélecteur) ── */}
       {curSub==='messages' && (<>
-        <ScreenHead icon="chat" title="Messages" />
+        {!dansPlateforme && <ScreenHead icon="chat" title="Messages" />}
         <NoAcc/>
         <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
           <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
