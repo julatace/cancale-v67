@@ -63,7 +63,8 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
   for(const largeur of [320,360,390,430]){
     const ctx=await b.newContext({viewport:{width:largeur,height:844},isMobile:true,hasTouch:true});const p=await ctx.newPage();const erreurs=[];p.on('pageerror',e=>erreurs.push(e.message));await brancher(p);
     for(const tab of ['journee','cat_ventes','cat_annonces','plat_vinted','plat_leboncoin','plat_ebay','compta','settings']){
-      await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();
+      // L'en-tête se lit juste après : on l'attend aussi (la mesure tombait parfois avant lui, une course du banc).
+      await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();await p.locator('header').first().waitFor({state:'attached'}).catch(()=>{});
       check(!(await p.locator('main').innerText()).includes("Cet écran n'a pas pu s'afficher"),largeur+' '+tab+' écran rendu');
       const geometrie=await p.evaluate(()=>{
         const h=document.querySelector('header'),nav=document.querySelector('.vrm-mobile-nav') || [...document.querySelectorAll('nav')].at(-1),main=document.querySelector('main');
@@ -126,8 +127,10 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
   check(await rail.getByRole('button',{name:'Comptabilité',exact:true}).isVisible(),'ordinateur: comptabilité (factures comprises) accessible depuis le rail');
   await rail.getByRole('button',{name:'Vinted',exact:true}).click();
   await p.getByRole('button',{name:'Annonces',exact:true}).first().click();
-  await p.getByRole('heading',{name:'Annonces en ligne'}).waitFor();
-  check(await p.getByRole('heading',{name:'Annonces en ligne'}).isVisible(),'ordinateur: annonces accessibles depuis le rail');
+  // (26 oct.) Dans l'espace Vinted, l'onglet « Annonces » est le titre : plus de second titre
+  // « Annonces en ligne ». On juge la section elle-même : l'onglet « Annonces » est le courant.
+  await p.waitForTimeout(800);
+  check(await p.locator('.vrm-market-space [aria-current]').filter({hasText:/^Annonces$/}).count()>0,'ordinateur: annonces accessibles depuis le rail');
   if(process.env.BANC_CAPTURES){await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'ventes-desktop.png')});}
   console.log(n+' contrôles mobiles/ordinateur réussis.');
  }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}

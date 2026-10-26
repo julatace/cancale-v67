@@ -175,8 +175,9 @@ async function brancher(p){
       // qu'un doigt atteint (`elementFromPoint`), pas la présence dans le DOM.
       const barreV=p.locator('.vrm-sales-workbar');
       const dansBarre=await barreV.evaluate(b=>({ba:!!b.querySelector(':scope > div > button[role=switch]'),vues:!!b.querySelector(':scope > .vrm-vues')}));
-      if(width<768) check(!dansBarre.ba && !dansBarre.vues,'téléphone : « Bordereaux auto » et « Mes vues » sortis de la barre '+width);
-      else check(dansBarre.ba && dansBarre.vues,'ordinateur : « Bordereaux auto » et « Mes vues » restent dans la barre '+width);
+      // (26 oct., « trop brouillon ») Sortis de la barre à TOUTES les tailles : sur ordinateur ils faisaient
+      //   deux lignes de réglages avant la première vente.
+      check(!dansBarre.ba && !dansBarre.vues,'« Bordereaux auto » et « Mes vues » sortis de la barre '+width);
       const bOutils=barreV.getByRole('button',{name:/Outils/});
       await bOutils.scrollIntoViewIfNeeded();
       const outilsVisible=await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return !!x&&e.contains(x);});
@@ -185,7 +186,7 @@ async function brancher(p){
       // Le menu se reconnaît à son CONTENU (« Rapport comptable »), pas à un attribut posé par le correctif.
       const atteint=await p.evaluate(()=>{const t=e=>{if(!e)return false;const b=e.getBoundingClientRect();if(!b.width||!b.height)return false;const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return !!x&&e.contains(x);};const r=[...document.querySelectorAll('.vrm-main button')].find(b=>/Rapport comptable/.test(b.innerText));if(!r)return null;const m=r.parentElement;return {rapport:t(r),ba:t(m.querySelector('button[role=switch]')),vues:t(m.querySelector('.vrm-vues summary'))};}).catch(()=>null);
       check(!!atteint && atteint.rapport,'le menu « ⋯ Outils » s’ouvre et se touche '+width+' '+JSON.stringify(atteint));
-      if(width<768) check(!!atteint && atteint.ba && atteint.vues,'téléphone : « Bordereaux auto » et « Mes vues » touchables dans « ⋯ Outils » '+width);
+      check(!!atteint && atteint.ba && atteint.vues,'« Bordereaux auto » et « Mes vues » touchables dans « ⋯ Outils » '+width);
       // Refermer comme un doigt : ce qui est sous le bouton (le voile du menu) reçoit le clic. Sur le
       // code d'avant le voile restait ouvert sur un menu invisible et bloquait tout l'écran.
       await bOutils.evaluate(e=>{const b=e.getBoundingClientRect();const x=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);if(x&&!e.contains(x))x.click();}).catch(()=>{});await p.waitForTimeout(200);

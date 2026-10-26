@@ -14959,6 +14959,9 @@ function RetirerArgent({ liveStats }) {
   const liste = liveStats && Array.isArray(liveStats.walletParCompte) ? liveStats.walletParCompte.filter((x) => x.dispo != null) : null;
   if (!liste) return null;
   const total = liste.reduce((a, x) => a + (x.dispo || 0), 0);
+  // (26 oct., « trop brouillon ») Rien à retirer ⇒ rien à montrer : le résumé du
+  // haut dit déjà « Disponible 0 € ». Une carte qui ne mène à aucun geste est du bruit.
+  if (!(total > 0)) return null;
   return (
     <div data-retirer-argent={liste.length} data-portefeuille-vide={total === 0 ? "true" : undefined} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '10px 14px' }}>
       <button type="button" aria-expanded={ouvert} onClick={() => setOuvert((v) => !v)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: '2px 0', minHeight: 44, cursor: 'pointer', color: C.text, fontFamily: 'inherit', textAlign: 'left' }}>
@@ -15420,7 +15423,11 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
   </div>;
 }
 
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, etat, etatNoeud = null, montant, children, initialOuvert = false, ...props }) {
+// (26 oct., « trop brouillon ») La ligne repliée dit aussi QUAND et SUR QUEL
+// COMPTE (`sous`, une seconde ligne discrète), et l'état qui demande un geste
+// (`ton="action"` : à expédier) se distingue des autres — sans autre couleur
+// que l'ambre des choses à faire (§7).
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, initialOuvert = false, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -15440,8 +15447,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, etat, etatNoeud =
   return <div {...props} data-ligne-ouverte={ouvert}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={28} portrait/>}</span>
-      <span className="vrm-ledger-sale-title" title={titre}>{titre || '(sans titre)'}</span>
-      <span className="vrm-ledger-sale-state" title={etat}>{etatNoeud || etat}</span>
+      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
+      <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
       <span aria-hidden="true">{ouvert?'−':'⋯'}</span>
     </button>
@@ -26906,6 +26913,14 @@ const INV_STATUS = {
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.
 const normTitle = (t) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// La taille est-elle DÉJÀ écrite dans le titre ? (« taille 42 », « T40,5 ») —
+// la carte d'annonce ne la redit pas (26 oct., « trop brouillon »).
+const tailleDansTitre = (titre, taille) => {
+  const t = normTitle(titre).replace(/,/g, '.'), z = normTitle(String(taille || '')).replace(/,/g, '.');
+  if (!z) return false;
+  const e = z.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^0-9.])' + e + '([^0-9]|$)').test(t);
+};
 // <conflits-numeros-regle>
 // Deux paires PRÉSENTES sous un même numéro (§5, le seul rouge de l'app).
 // ⚠️ Une case du garage n'est pas une PAIRE, c'est un EMPLACEMENT : une
@@ -30806,7 +30821,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false }) {
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
@@ -32150,13 +32165,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [tipsOpen, setTipsOpen] = useState(() => !!load('vinted_tips_open', false));
   useEffect(() => { save('vinted_tips_open', tipsOpen); }, [tipsOpen]);
   const [toolsOpen, setToolsOpen] = useState(false); // menu « ⋯ Outils » (Ventes)
-  // (22 oct.) Barre d'outils des Ventes : la largeur décide où vivent les choses.
-  // Téléphone (< 768 px) : « Bordereaux auto » et « Mes vues » passent dans
-  // « ⋯ Outils » (la barre faisait 273 px de haut, mesuré, avant la 1re vente).
+  // (22 oct.) Barre d'outils des Ventes : « Bordereaux auto » et « Mes vues »
+  // vivent dans « ⋯ Outils » — d'abord sur téléphone (la barre faisait 273 px
+  // de haut, mesuré, avant la 1re vente), puis le 26 oct. à toutes les tailles
+  // (« trop brouillon » : deux lignes de réglages avant la première vente).
   // Sous 1 024 px, la rangée des filtres défile au doigt : le menu ne peut plus
   // s'ouvrir DANS la rangée (elle le coupait — invisible et intouchable,
   // mesuré au banc) ; il s'ouvre sous la barre entière.
-  const outilsTelephone = useEtroitReglages();
   const outilsOrdinateur = useOrdinateur();
   const [annToolsOpen, setAnnToolsOpen] = useState(false); // menu « ⋯ Outils » (Annonces)
   // Astuce one-time : explique le numérotage auto (Julien, 25 oct. : « je ne sais
@@ -38051,7 +38066,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     <>
       <div onClick={()=>setToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
       <div data-outils-ventes={sousBarre?'sous-barre':'bouton'} style={{position:'absolute',zIndex:71,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2,...(sousBarre?{left:8,right:8,top:'calc(100% - 4px)'}:{right:0,top:'calc(100% + 6px)',minWidth:220})}}>
-        {outilsTelephone && (
+        {(
           <div className="vrm-outils-reglages" style={{padding:'4px 6px 8px',borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
             <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);setToolsOpen(false);}}/>
@@ -39023,15 +39038,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       )}
 
       {curSub==='ventes' && (<>
-        <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>
+        {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
             tous les jours vient en premier, les encadrés d'information ensuite. */}
-        <div className="vrm-mobile-sales-intro"><div><span className="vrm-mobile-eyebrow">VINTED · VENTES</span><h2>Vos ventes</h2></div><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>
+        {/* (26 oct.) Dans l'espace Vinted, le nombre de résultats seul sur sa ligne
+            ne servait qu'à repousser la liste : il ne reste que sur l'écran seul. */}
+        {!dansPlateforme && <div className="vrm-mobile-sales-intro"><span className="vrm-mobile-resultats" role="status">{Array.isArray(sales.items) && !sales.loading && !baseKO ? `${ventesAffichees.length} résultat${ventesAffichees.length !== 1 ? 's' : ''}` : sales.loading ? 'Chargement…' : 'Non disponible'}</span></div>}
         <div className="vrm-workbar vrm-sales-workbar" style={{position:'relative'}}>
-        {!outilsTelephone && <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>}
-        {!outilsTelephone && <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);}}/>}
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
             <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
@@ -39172,7 +39187,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} etat={venteStage(o).label} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -40982,12 +40997,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
       {curSub==='annonces' && (<>
-        <ScreenHead icon="tag" title="Annonces en ligne" />
+        {/* (26 oct., « trop brouillon ») Dans l'espace Vinted, l'onglet « Annonces »
+            dit déjà où l'on est : pas de second titre. */}
+        {!dansPlateforme && <ScreenHead icon="tag" title="Annonces en ligne" />}
         <NoAcc/>
         {astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
             <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
-            <div style={{flex:1,minWidth:0}}>VRM donne à chaque article un <b style={{color:C.text,fontWeight:600}}>numéro</b>, tout seul, dans l’ordre où tu l’as mis en ligne — pour le retrouver partout : sur ton étagère, sur Leboncoin, sur eBay. Tu peux le changer quand tu veux ; un numéro n’est jamais redonné à un autre article.</div>
+            <div style={{flex:1,minWidth:0}}>Chaque article reçoit un <b style={{color:C.text,fontWeight:600}}>numéro</b> dans l’ordre de mise en ligne, pour le retrouver sur ton étagère, Leboncoin et eBay. Il se change d’un clic et n’est jamais redonné.</div>
             <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
@@ -41158,6 +41175,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (uids.length < 2 && !uids.some(u=>hiddenAccts.has(u))) return null; // un seul compte : rien à dire
           const nOff = uids.filter(u => acctOff(u)).length;
           const refuses = uids.filter(u => blockedAccts.has(u) && !acctOff(u));
+          // (26 oct.) Dans l'espace Vinted, le sélecteur « Compte » est juste au-dessus :
+          // la ligne ne reste que si elle demande un geste (connexion refusée).
+          if (dansPlateforme && refuses.length === 0) return null;
           const accByUid = {}; accounts.forEach(a=>{ accByUid[String(a.vinted_user_id)] = a; });
           const nom = (u) => { const a = accByUid[u]; return a ? accNameOf(a) : `#${u}`; };
           return (
@@ -41672,29 +41692,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
                     </div>
-                    <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[it.size,it.condition].filter(Boolean).join(' · ')}</div>
-                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {/* (26 oct., « trop brouillon ») Une ligne : l'état (et la taille
+                        seulement si le titre ne la dit pas déjà), puis où elle est en
+                        ligne. Les logos avaient leur propre ligne, pour un seul logo. */}
+                    <div data-etat-ligne style={{fontSize:11,color:C.muted,display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                    <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',minWidth:0}}>{[it.size && !tailleDansTitre(it.title, it.size) ? `taille ${it.size}` : '', it.condition].filter(Boolean).join(' · ')}</span>
                     {/* La présence AILLEURS, prouvée seulement (Vinted : l'en-tête le dit une fois). */}
-                    <div data-plateformes style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
+                    <span data-plateformes style={{display:'inline-flex',alignItems:'center',gap:4,flexShrink:0}}>
                       <MarquePlateforme p="vinted"/>
                       {ailleurs && <MarquePlateforme p="leboncoin"/>}
                       {num && ebayNums.has(cleNum(num)) && <MarquePlateforme p="ebay"/>}
                       {/* Revue du 16 octobre : le logo Leboncoin le dit déjà — le texte
                           qui le redisait ne reste que pour un lecteur d'écran. */}
                       {ailleurs && <span data-aussi-sur className="vrm-sr">aussi sur Leboncoin</span>}
+                    </span>
                     </div>
-                    {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
+                    {soldBord && <div title="Un bordereau d'envoi a été reçu pour cet article : il est vendu. Il disparaîtra des annonces à la prochaine mise à jour Vinted." style={{fontSize:11,fontWeight:600,color:C.warn}}>Vendue — bordereau reçu</div>}
+                    {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7).
+                        (26 oct.) Vues, favoris, âge et compte sur la MÊME ligne : « achat — »
+                        restait seul sur la sienne. */}
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
                       <span><span style={lab}>achat </span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
                         titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/></span>
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
-                    </div>
-                    <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted,marginTop:'auto'}}>
+                      <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>
                       {it.views!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="eye" size={12}/>{it.views}</span>}
                       {it.favourites!=null && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Icon name="heart" size={12}/>{it.favourites}</span>}
                       {age!=null && <span title={`En ligne depuis ${age} jours`} style={{color:sleeps?C.warn:C.muted,fontWeight:sleeps?600:400}}>{age} j{sleeps?' · dort':''}</span>}
                       {!annUnCompte && <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:120}}>{accNameOf(it._acc)}</span>}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -52499,12 +52526,11 @@ function AppCoeur() {
               aucun compteur dupliqué ici qui pourrait diverger). */}
           {!baseKO && !premierJour && (
             <div style={{ padding: '10px 16px 0' }}>
-              <button type="button" data-vinted-majournee="" onClick={() => setTab('journee')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <span aria-hidden="true" style={{ fontSize: 18, flexShrink: 0 }}>🗓️</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13.5, fontWeight: 800, color: C.text }}>À faire aujourd'hui</span>
-                  <span style={{ display: 'block', fontSize: 11, color: C.muted, lineHeight: 1.4 }}>Ma journée rassemble tes colis à poster et à retirer, messages et offres — sur tous tes comptes.</span>
-                </span>
+              {/* (26 oct., « trop brouillon ») Une ligne, pas une carte de deux lignes :
+                  l'explication est dans Ma journée elle-même. */}
+              <button type="button" data-vinted-majournee="" title="Ma journée : colis à poster et à retirer, messages et offres, sur tous tes comptes" onClick={() => setTab('journee')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <Icon name="check" size={16} style={{ color: C.muted, flexShrink: 0 }}/>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: C.text }}>À faire aujourd'hui</span>
                 <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, flexShrink: 0 }}>›</span>
               </button>
             </div>
@@ -52518,8 +52544,8 @@ function AppCoeur() {
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
           {(platSub==='ventes'||platSub==='annonces'||platSub==='achats'||platSub==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={platSub==='messages'}/>}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
-          {platSub==='ventes' && !baseKO && <div style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
-          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte}/>
+          {platSub==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
+          <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
           <div style={{padding:'0 16px'}}><DiagnosticLeboncoin lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
