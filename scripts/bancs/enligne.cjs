@@ -188,7 +188,7 @@ const lireAnnonces = (pg) => pg.evaluate((PAIRE) => {
   const veut = (k) => !process.env.SECTIONS || process.env.SECTIONS.split(',').includes(String(k));
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); } };
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     for (const tel of [false, true]) {
       const t = tel ? '390 px' : '1512 px';

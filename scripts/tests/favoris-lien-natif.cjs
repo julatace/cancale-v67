@@ -15,7 +15,7 @@ const NATIF='/inbox/want_it?receiver_id=201&item_id=101';
 async function dom(){
  const src=fs.readFileSync(SRC,'utf8');
  const fn=src.slice(src.indexOf('function suivreFavoriAffiche('),src.indexOf('// Semantic native controls only.'));
- const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--no-sandbox']});
+ const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/opt/pw-browsers/chromium',args:['--no-sandbox']});
  try{
   const p=await b.newPage();await p.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:'<main></main>'}));
   await p.goto('https://www.vinted.fr/');await p.addScriptTag({content:fn});

@@ -159,7 +159,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
 
 (async () => {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e)); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const viewport of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) {
       console.log(`\n── Réglages, ${viewport.width} px : la liste vient de la route`);

@@ -98,7 +98,7 @@ const PORT_VV=Number(process.env.BANC_PORT)||4322; srv.listen(PORT_VV);
 const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   for(const [W,H,tag] of [[390,844,'390 px'],[1512,950,'1512 px']]){
     const pg=await b.newPage({viewport:{width:W,height:H}});
     const errs=[];

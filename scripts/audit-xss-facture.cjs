@@ -82,7 +82,7 @@ function extraire(src, noms, jsx) {
       f.CSP_DOCUMENT || '', f.ouvrirDocumentImprimable || '', f.generatePDF || ''].join('\n');
     if (MUTATION === 'sanscsp') code = code.replace(/const CSP_DOCUMENT = `[^`]*`;/, 'const CSP_DOCUMENT = "";');
     const { chromium } = require(path.join(NM, 'playwright'));
-    const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium-1194/chrome-linux/chrome') ? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' : undefined, args: ['--no-sandbox'] });
+    const nav = await chromium.launch({ executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined, args: ['--no-sandbox'] });
     try {
       const page = await (await nav.newContext()).newPage();
       await page.route('http://vrm.test/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><body>app</body></html>' }));

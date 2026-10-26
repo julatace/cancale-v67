@@ -138,7 +138,7 @@ async function interrupteurs(pg, T) {
 
 (async () => {
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
   try {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {

@@ -41,7 +41,7 @@ const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path
 const PORT=Number(process.env.BANC_PORT||process.env.PORT)||4411; srv.listen(PORT);
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
   for(const [W,H,tag] of [[390,844,'iPhone'],[1512,950,'ordinateur']]){
   const pg=await b.newPage({viewport:{width:W,height:H}});
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});

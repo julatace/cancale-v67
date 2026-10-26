@@ -341,7 +341,7 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
     console.log('── extension ABSENTE (autre navigateur)');
     { const r = await rendre(b, { mode: 'absente' }); const v = await r.lire();

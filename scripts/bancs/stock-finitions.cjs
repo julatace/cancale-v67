@@ -25,7 +25,7 @@ const fs = require('fs'), http = require('http'), path = require('path'), os = r
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7111;
 const CAPT = process.env.CAPTURES || os.tmpdir();
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const CHROME = '/opt/pw-browsers/chromium';
 
 const L = [[0, 0], [8, 0], [8, 3], [4.5, 3], [4.5, 6], [0, 6]];
 const PLAN_L = { rooms: [{ id: 'r1', name: 'Atelier en L', room: { w: 8, h: 6, wallH: 3, poly: L }, items: [

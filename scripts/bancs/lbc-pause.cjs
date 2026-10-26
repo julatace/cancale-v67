@@ -166,7 +166,7 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px · extension à jour (elle sait mettre en pause)`);
       const { ctx, pg, errs } = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' });

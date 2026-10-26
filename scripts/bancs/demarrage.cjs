@@ -105,7 +105,7 @@ async function ouvrir(ctx, { sondeKO = false, ventesKO = false, nVentes = 300 } 
 
 (async () => {
   try { await ecouter(); } catch (e) { console.log('  ❌ ' + e.message); process.exit(1); }
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     // ── 1. La sonde de démarrage échoue (502), la session est bonne ─────────
     console.log('\n── La sonde de démarrage échoue : l\'app ne doit pas se croire vide');

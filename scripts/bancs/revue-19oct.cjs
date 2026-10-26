@@ -103,7 +103,7 @@ async function contexte(b, W, H, tactile, sombre) {
 (async () => {
   let ko = 0;
   const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
 
   if (process.env.EXPLORE) {
     const D = process.env.EXPLORE; fs.mkdirSync(D, { recursive: true });

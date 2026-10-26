@@ -97,7 +97,7 @@ function poser(pw) {
   // (26 oct.) Le Chromium installé change de version d'un conteneur à l'autre
   // (1194 puis 1243, sous chrome-linux64) : on prend celui qui EXISTE, jamais un chemin figé.
   const ICI = (() => {
-    const cands = ['/opt/pw-browsers/chromium/chrome-linux64/chrome', '/opt/pw-browsers/chromium/chrome-linux/chrome'];
+    const cands = ['/opt/pw-browsers/chromium'];
     try { for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => /^chromium-\d+$/.test(n)).sort((a, b) => +b.split('-')[1] - +a.split('-')[1])) { cands.push('/opt/pw-browsers/' + d + '/chrome-linux64/chrome', '/opt/pw-browsers/' + d + '/chrome-linux/chrome'); } } catch (_) {}
     return cands.find((x) => { try { return fs.statSync(x).isFile(); } catch (_) { return false; } }) || '';
   })();

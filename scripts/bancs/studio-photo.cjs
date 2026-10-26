@@ -142,7 +142,7 @@ const estPayant = (r) => PAYANT_HOTE.test(r.url) || /\/api\/detourage|\/api\/ai\
   try { ort = dossierOrt(); } catch (e) { console.log('KO  moteur onnxruntime-web introuvable (BANC_ORT_DIR ?) — ' + e.message); srv.close(); process.exit(1); }
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
       args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px — caméra accordée`);

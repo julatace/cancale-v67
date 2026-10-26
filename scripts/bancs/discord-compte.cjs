@@ -170,7 +170,7 @@ const attr = (pg, sel, a) => pg.evaluate(([s, x]) => { const e = document.queryS
   try { compte = (await import('file://' + path.join(RACINE, 'api', 'compte.js'))).default; }
   catch (e) { console.log('❌ api/compte.js ne se charge pas : ' + e.message); process.exit(1); }
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   let discordMod;
   try { discordMod = await import('file://' + path.join(RACINE, 'api', '_lib', 'discord.js')); } catch (_) {}
   process.env.DISCORD_CLIENT_ID = '1562176038098702467';

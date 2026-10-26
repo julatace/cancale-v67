@@ -69,7 +69,7 @@ const initChrome = (d) => {
 (async () => {
   const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); r.end(PAGE((/[?&]cas=([A-Z])/.exec(q.url) || [])[1])); });
   await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }).catch((e) => { console.log('❌ port ' + PORT + ' pris (' + e.code + ') — relance avec BANC_PORT=…'); process.exit(1); });
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const ctx = await b.newContext({ viewport: { width: 1200, height: 900 } });
   const lancer = async (cas, opts = {}) => {
     const pg = await ctx.newPage();

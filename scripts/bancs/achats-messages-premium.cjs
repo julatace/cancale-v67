@@ -216,7 +216,7 @@ const capturer = async (pg, nom, vp) => {
   let b;
   try {
     fs.mkdirSync(SHOTS, { recursive: true });
-    b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const tel = vp.width < 600, T = vp.width + ' px';
       for (const [onglet, nomOnglet] of [['attente', 'a-retirer'], ['all', 'tous']]) {

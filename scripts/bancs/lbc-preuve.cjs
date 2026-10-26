@@ -154,7 +154,7 @@ async function fileApp(b, lignes, vp, pont) {
   await new Promise((ok) => srv.listen(PORT, ok));
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const ATTENDU = { A: ['12'], B: ['12', '13'], C: ['12', '13'] };
     const NOMS = { A: 'bordereau seul (vente vivante) ⇒ la N°13 est vendue', B: 'transaction figée « payée » + vente remboursée ⇒ la N°13 est revenue', C: 'rien de vendu' };
     for (const cas of ['A', 'B', 'C']) {

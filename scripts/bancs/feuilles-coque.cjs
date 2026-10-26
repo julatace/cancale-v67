@@ -304,7 +304,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
   let ko = 0;
   const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
   await fabriquerPdf();
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   const aller = async (pg, tab, attente = 4500) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(attente); };
   const section = async (pg, nom) => { await pg.locator('.vrm-seg-btn', { hasText: nom }).first().click({ timeout: 5000 }); await pg.waitForTimeout(2500); };
   const PARTIES = (process.env.PARTIES || 'feuilles,confirmation,messages,entete,clavier').split(',');

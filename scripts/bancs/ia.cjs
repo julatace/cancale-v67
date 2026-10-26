@@ -103,7 +103,7 @@ async function cliqueToutRediger(pg){
 }
 
 (async()=>{
-  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']}).catch(e=>{console.log('launch KO',e.message);process.exit(2);});
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']}).catch(e=>{console.log('launch KO',e.message);process.exit(2);});
   const pg=await b.newPage({viewport:{width:1512,height:950}});
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   await prepare(pg);

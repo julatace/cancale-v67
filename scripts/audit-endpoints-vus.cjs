@@ -40,7 +40,7 @@ const dit = (bon, quoi, det) => {
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`❌ ${quoi} — a levé : ${e && e.message}`); return null; } };
 
 (async () => {
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const ctx = await nav.newContext();
   const pg = await ctx.newPage();
   // ⚠️ §6.6 : le fourre-tout D'ABORD, les routes précises ENSUITE — Playwright

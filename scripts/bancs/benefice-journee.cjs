@@ -139,7 +139,7 @@ const touche=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.scrollI
 (async()=>{
   let b;
   try{
-    b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+    b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
     for(const T of TAILLES){
       console.log(`\n══ ${T.nom} px${T.hasTouch?' (tactile)':''}`);
 

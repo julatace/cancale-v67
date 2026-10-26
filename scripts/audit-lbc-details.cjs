@@ -35,7 +35,7 @@ const LISTE = JSON.stringify([
 const detail = (id) => JSON.stringify({ is_seller: true, item: { id: 9000 + id, title: 'x', prices: { final: 5800 } }, step: { status: 'done', label: 'Vente finalisée' } });
 
 (async () => {
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const ctx = await nav.newContext();
   const pg = await ctx.newPage();
   const requetes = [];

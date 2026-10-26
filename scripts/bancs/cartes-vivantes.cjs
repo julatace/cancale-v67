@@ -87,7 +87,7 @@ const bouge = (p) => !!p && (p.avant.ombre !== p.apres.ombre || p.avant.tr !== p
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent — lance npm run build'); process.exit(1); }
   await ecouter();
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--disable-gpu-compositing'] });
 
   // ── OPTION 1 : LA PAGE D'ACCUEIL (publique, AUCUNE session) ────────────────
   console.log('── OPTION 1 · page d’accueil — les cartes s’élèvent au survol');

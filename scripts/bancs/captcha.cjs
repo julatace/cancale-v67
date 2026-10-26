@@ -286,7 +286,7 @@ async function scenarios(nav, taille) {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.error('dist/ absent — lance `npm run build` d’abord'); process.exit(2); }
   try { construireAvecCle(); } catch (e) { console.error('build avec clé impossible : ' + e.message); process.exit(2); }
   await ecouter();
-  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
     for (const t of [390, 1512]) {
       try { await scenarios(nav, t); } catch (e) { dit(false, `scénarios ${t} px`, e.message); }

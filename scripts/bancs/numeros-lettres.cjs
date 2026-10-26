@@ -88,7 +88,7 @@ const local = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStora
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     console.log('\n── Numérotation en chiffres (aucun réglage) : B125 est déjà pris par 9201');
     {
       const main = { vinted_annonce_numeros: { '9201': { numero: 'B125' }, '9202': { numero: '7' } }, vinted_used_numeros: POOL };
