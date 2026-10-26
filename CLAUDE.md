@@ -9,7 +9,8 @@
 > écrit (`Pourquoi ecrit`), plus un ⓘ seul sous chaque carte ; le tableau par période ne
 > s'allonge plus de mois anciens sans aucune vente (`n === 0` partout). Banc
 > `annonces-ventes-brouillon.cjs` (vues `dashboard`, `compta`, `cat_bord`) : 9 rouges sur main,
-> vert après.
+> vert après. Même règle sur Paramètres (`vrm-set-tete`) et Organisation (`ops-entete-doublon`,
+> vendeur seul) : 2 rouges sur main, vert après.
 
 > **26 octobre — Colis et Ma journée, même traitement :** Ma journée au téléphone : dans la
 > carte « Vendu », « Reçu en … » et « Chiffre d'affaires {année} » se CHEVAUCHAIENT (la règle
