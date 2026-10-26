@@ -113,13 +113,17 @@ const projette = (row, sel) => {
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'lbc-relier-' + vp.width + '.png') });
       dit(!!vu, 'l’annonce non reliée est listée');
       dit(!!(vu && vu.img), 'elle montre sa PHOTO');
+      // L'écran se relit quelques secondes après l'ouverture (données qui
+      // arrivent) : une saisie faite pendant ce rendu repart à vide. On tape,
+      // et on attend que la valeur TIENNE avant de cliquer (jamais un délai seul).
+      const taper = async (v) => { for (let i = 0; i < 6; i++) { await pg.fill(bloc + ' input', v); await pg.waitForTimeout(400); if (await pg.inputValue(bloc + ' input').catch(() => '') === v) return; } };
       try {
-        await pg.fill(bloc + ' input', '999'); await pg.click(bloc + ' button');
+        await taper('999'); await pg.locator(bloc + ' button', { hasText: /^Relier$/ }).click();
         await pg.waitForTimeout(500);
         const t = await pg.evaluate((s) => (document.querySelector(s) || {}).innerText || '', bloc);
-        dit(/Aucune paire ne porte le N°999/.test(t), 'un N° inconnu de VRM est refusé', t.split('\n').slice(-2).join(' | '));
+        dit(/Aucun(e)? (paire|article) ne porte le N°999/.test(t), 'un N° inconnu de VRM est refusé', t.split('\n').slice(-2).join(' | '));
         dit(!await pg.evaluate(() => localStorage.getItem('vrm_lbc_liens')), 'et rien n’est écrit');
-        await pg.fill(bloc + ' input', '12'); await pg.click(bloc + ' button');
+        await taper('12'); await pg.locator(bloc + ' button', { hasText: /^Relier$/ }).click();
         await pg.waitForTimeout(2500);
       } catch (e) { dit(false, 'le champ N° et « Relier » se manipulent', String(e.message).slice(0, 90)); }
       const liens = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_lbc_liens') || 'null'); } catch (_) { return null; } });
