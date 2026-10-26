@@ -8277,6 +8277,15 @@ const fusionNumerosAuChargement = (k, nuage, local) => {
   return { val: nuage, ajoute: 0 };
 };
 const CLES_FUSION_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros'];
+// (26 oct.) Les liens annonce→article Leboncoin (`vrm_lbc_liens`) fusionnent
+// LOCAL PAR-DESSUS NUAGE à la restauration — c'est ce que `delierAnnonceLbc`
+// suppose déjà (une suppression est une valeur VIDE, jamais une clé retirée,
+// donc l'union ne ressuscite jamais un lien). Sans ça, un lien posé à la main
+// puis un rechargement AVANT que le push (débounce ~500 ms) n'ait atteint le
+// nuage était écrasé par l'ancienne valeur → la protection double-vente de cette
+// annonce disparaissait en silence (§5.49, « ne jamais écraser une saisie
+// fraîche »). Prouvé par le scénario `course §5.49` de double-vente.cjs.
+const CLES_FUSION_LIENS = ['vrm_lbc_liens'];
 // La fenêtre de la panne de synchronisation (la ligne `main` refusée à chaque
 // écriture, du 11 octobre 14:58 à la migration 017 du 18 octobre). Une fiche
 // numérotée AUTOMATIQUEMENT pendant cette fenêtre a pu recevoir un numéro déjà
@@ -50464,6 +50473,16 @@ function AppCoeur() {
             let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
             const f = fusionNumerosAuChargement(k, val, loc);
             val = f.val; ajoutsLocaux += f.ajoute;
+          } else if (CLES_FUSION_LIENS.includes(k)) {
+            // Local PAR-DESSUS nuage, par clé : un lien posé à la main et pas
+            // encore poussé au nuage n'est pas écrasé par la restauration (§5.49).
+            // Une suppression (valeur vide) gagne aussi, donc rien n'est ressuscité.
+            let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
+            if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
+              const avant = JSON.stringify(val);
+              val = { ...(val && typeof val === 'object' && !Array.isArray(val) ? val : {}), ...loc };
+              if (JSON.stringify(val) !== avant) ajoutsLocaux++;
+            }
           }
           try { localStorage.setItem(k, JSON.stringify(val)); } catch (_) {}
         });
