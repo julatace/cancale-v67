@@ -381,12 +381,15 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ `liaison` (session adressée) : 5.171, PAS 5.169 — la 5.170 publiée par
 //    `main` ne l'a pas (pas de `demanderLiaison`, pas de canal adressé). La même
 //    frontière que `CODE_DANS_ETAT` : les deux arrivent ensemble.
-// ⚠️ `suivivinted` (le suivi Vinted des achats, `capterSuivisAchats`) : 5.216,
-//    PAS 5.214 ni 5.215 — la 5.214.0 (ad1b43b, PR #661) et la 5.215.0 (PR #667,
-//    messages aux favoris) PUBLIÉES par `main` n'ont pas `capterSuivisAchats`.
-//    À 5.214 ou 5.215, l'app promettait « l'extension relève le suivi » à une
-//    extension qui ne le fait pas (revue du 24 oct.).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.216.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+// ⚠️ `suivivinted` (le suivi Vinted des achats, `capterSuivisAchats`) : 5.217,
+//    PAS 5.214/5.215/5.216 — ces versions PUBLIÉES par `main` n'ont pas
+//    `capterSuivisAchats` (le code l'a posé sur une ligne « 5.214.0 » jamais
+//    publiée telle quelle ; `audit-coherence`, qui lit l'historique PUBLIÉ,
+//    confirme qu'elle n'arrive dans un zip publié qu'en 5.217.0). Promettre
+//    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
+//    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
+//    26 oct. avec la session extension, qui a relu l'historique).
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
