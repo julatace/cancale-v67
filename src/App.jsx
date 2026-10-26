@@ -45528,6 +45528,20 @@ function LeboncoinScreen() {
   const Card = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
   const Titre = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
   const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
+  // ── L'AGENT QUI CONSEILLE (26 oct., parité avec eBay — Julien : « une vraie
+  //    expérience ») : « À faire sur Leboncoin » range les actions du plus
+  //    urgent au moins, sur les signaux DÉJÀ calculés dans `data` (§11, aucun
+  //    nouveau calcul). Chaque ligne saute au bloc concerné. Rien quand il n'y
+  //    a rien à faire, muet tant que `data` n'est pas lu. Mêmes libellés que
+  //    les blocs eux-mêmes — pas de nouvelle consigne à vérifier.
+  const plurLbc = (n) => (n > 1 ? 's' : '');
+  const conseilsLbc = data ? [
+    data.removals && data.removals.length && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${data.removals.length} paire${plurLbc(data.removals.length)} vendue${plurLbc(data.removals.length)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
+    data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
+    data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
+  ].filter(Boolean) : [];
+  const allerLbc = (c) => () => { try { const el = document.querySelector(c.sel); if (el) el.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'center' }); } catch (_) {} };
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '16px 14px 40px', maxWidth: 920, margin: '0 auto' }}>
       {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
@@ -45538,6 +45552,19 @@ function LeboncoinScreen() {
         <button type="button" onClick={reload} style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: C.text }}>{loading ? '…' : '↻ Actualiser'}</button>
       </div>
       {erreurReception && <LignePanne>La relecture de tes données Leboncoin a échoué. Les informations précédentes restent affichées. Réessaie avec Actualiser.</LignePanne>}
+      {conseilsLbc.length > 0 && (
+        <Card data-lbc-conseils={conseilsLbc.length} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: C.text }}>À faire sur Leboncoin</div>
+          <div style={{ fontSize: 11, color: C.muted, margin: '1px 0 6px' }}>Tes priorités du moment, de la plus urgente à la moins.</div>
+          {conseilsLbc.slice(0, 4).map((c, i) => (
+            <div key={c.k} data-lbc-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? C.warn : C.accentSoft, flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.4 }}>{c.txt}</span>
+              <button type="button" data-lbc-conseil-go={c.k} onClick={allerLbc(c)} style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 8, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer', flexShrink: 0 }}>Voir</button>
+            </div>
+          ))}
+        </Card>
+      )}
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
           une deuxième fois. On le dit avec le N° et le lien ; VRM ne retire pas
