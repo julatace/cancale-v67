@@ -384,35 +384,35 @@
    Montant désigne le prix de vente, sans le présenter comme un revenu net. */
 .vrm-ledger-heading{display:none;}
 @media(max-width:767px){
- .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;gap:12px;padding:9px 10px 9px 54px;background:var(--studio-soft,#edf2ef);border-bottom:1px solid var(--studio-line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--studio-ledger-label,#52636b);}
+ .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;gap:12px;padding:9px 10px 9px 78px;background:var(--studio-soft,#edf2ef);border-bottom:1px solid var(--studio-line);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--studio-ledger-label,#52636b);}
  .vrm-main .vrm-ventes-liste{border-radius:8px!important;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:8px 9px 2px!important;gap:4px!important;}
- .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:2px 8px!important;}
- .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:36px!important;height:48px!important;border-radius:4px!important;}
- .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:12px!important;font-weight:600!important;line-height:1.35!important;letter-spacing:-.1px!important;}
- .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:10px!important;gap:4px 7px!important;margin-top:4px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:60px minmax(0,1fr) auto!important;gap:2px 10px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:60px!important;height:80px!important;border-radius:8px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:13.5px!important;font-weight:600!important;line-height:1.35!important;letter-spacing:-.1px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:11.5px!important;gap:4px 7px!important;margin-top:4px!important;}
  .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:15px!important;font-variant-numeric:tabular-nums;letter-spacing:-.2px!important;}
  .vrm-main .vrm-ventes-liste [data-benef-vente]{font-variant-numeric:tabular-nums;}
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:2px!important;}
- .vrm-main .vrm-shared-sale .vrm-sale-photo{width:36px!important;height:48px!important;border-radius:4px!important;}
- .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:36px minmax(0,1fr) auto!important;gap:5px 8px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{width:60px!important;height:80px!important;border-radius:8px!important;}
+ .vrm-main .vrm-shared-sale .vrm-sale-overview{grid-template-columns:60px minmax(0,1fr) auto!important;gap:5px 10px!important;}
  .vrm-main .vrm-shared-sale .vrm-display{font-variant-numeric:tabular-nums;}
 }
 
 /* Même grille de lecture pour l'inventaire publié : photo, article, prix. */
 @media(max-width:767px){
- .vrm-main .vrm-ann-ledger-heading{border:1px solid var(--studio-line);border-radius:8px 8px 0 0;padding-left:54px;}
+ .vrm-main .vrm-ann-ledger-heading{border:1px solid var(--studio-line);border-radius:8px 8px 0 0;padding-left:106px;}
  .vrm-main .vrm-ann-ledger-heading+.vrm-ann-grid{border-top:0;border-radius:0 0 8px 8px;}
- .vrm-main .vrm-ann-card .vrm-ann-overview{padding:8px 9px!important;gap:8px!important;}
- .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:36px!important;height:48px!important;border-radius:4px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview{padding:10px!important;gap:12px!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-overview>a{width:84px!important;height:112px!important;border-radius:10px!important;}
  .vrm-main .vrm-ann-card .vrm-ann-ledger-info{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px!important;align-content:start;}
  .vrm-main .vrm-ann-ledger-info>div{grid-column:1 / -1;min-width:0;}
- .vrm-main .vrm-ann-ledger-info>[data-titre]{grid-column:1;grid-row:1;font-size:12px!important;font-weight:600!important;line-height:1.35!important;}
+ .vrm-main .vrm-ann-ledger-info>[data-titre]{grid-column:1;grid-row:1;font-size:14px!important;font-weight:600!important;line-height:1.35!important;}
  .vrm-main .vrm-ann-ledger-info>.vrm-ann-price-line{grid-column:2;grid-row:1 / span 2;display:flex!important;flex-direction:column;align-items:flex-end!important;gap:4px!important;max-width:100px;}
- .vrm-main .vrm-ann-card [data-prix]{font-size:15px!important;font-variant-numeric:tabular-nums;line-height:1.35;}
- .vrm-main .vrm-ann-ledger-info>div:nth-child(3){grid-column:1;grid-row:2;font-size:10px!important;}
+ .vrm-main .vrm-ann-card [data-prix]{font-size:17px!important;font-variant-numeric:tabular-nums;line-height:1.35;}
+ .vrm-main .vrm-ann-ledger-info>div:nth-child(3){grid-column:1;grid-row:2;font-size:12px!important;}
  .vrm-main .vrm-ann-card [data-chiffres]{font-variant-numeric:tabular-nums;padding-top:3px;}
- .vrm-main .vrm-ann-card .vrm-ann-actions{padding:0 9px 3px 53px!important;border-top:0!important;}
+ .vrm-main .vrm-ann-card .vrm-ann-actions{padding:0 10px 3px 106px!important;border-top:0!important;}
  .vrm-main .vrm-ann-card .vrm-ann-actions>summary{min-height:44px;margin-block:-6px;display:flex;align-items:center;gap:5px;font-size:10px!important;}
  .vrm-main .vrm-ann-card .vrm-ann-actions[open]{padding-left:9px!important;}
  .vrm-main .vrm-shared-sale .vrm-sale-title{line-height:1.35!important;overflow-wrap:anywhere;}
