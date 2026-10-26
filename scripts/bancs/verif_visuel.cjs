@@ -12,7 +12,38 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts');
+// ⚠️⚠️ #3 FIXTURES SYNTHÉTIQUES (26 octobre). Les `fx/` sont une copie de SA base,
+// gitignorée : ce banc ne tournait que sur sa machine. Hors de là, il mourait en
+// ENOENT — le filet anti-régression le plus large du projet, aveugle partout
+// ailleurs. Or il n'assert JAMAIS sur le CONTENU des fx (ses contrôles vivent sur
+// `LISTV`/`LBCV`/`EBAYO`, déjà synthétiques et inline) : les familles peuvent donc
+// être VIDES, et `main`/`accounts` tomber sur un secours synthétique INLINE. Il
+// tourne alors partout, sans fixture — et sans aucun risque de faux-vert, puisque
+// ce qu'il juge vient de données que le banc contrôle lui-même. Sur SA machine
+// (fx/ présent), il lit la vraie base, inchangé.
+const FXok=f=>{ try{ return FX(f); }catch(_){ return []; } };
+const MAIN_SYNTH=[{ id:'main', data:{ vinted_dark:false } }];
+const ACCOUNTS_SYNTH=[
+  { vinted_user_id:'111', login:'boutique_test_a', domain:'www.vinted.fr', updated_at:new Date().toISOString(), created_at:new Date(Date.now()-500*3600e3).toISOString() },
+  { vinted_user_id:'222', login:'boutique_test_b', domain:'www.vinted.fr', updated_at:new Date().toISOString(), created_at:new Date(Date.now()-500*3600e3).toISOString() },
+];
+const FX_PRESENT=fs.existsSync(path.join(SC,'fx','accounts.json'));
+const main=(()=>{ try{ return FX('main'); }catch(_){ return MAIN_SYNTH; } })();
+const accounts=(()=>{ try{ return FX('accounts'); }catch(_){ return ACCOUNTS_SYNTH; } })();
+// En mode synthétique (fx/ absent), une vente Vinted FINALISÉE + son versement :
+// un revendeur en a toujours, donc leur absence est irréaliste. Sans elle, le CA
+// Vinted est nul et la carte « Total finalisé » du tableau de bord (qui exige ≥2
+// plateformes avec CA) ne peut jamais s'exercer. La forme est celle, éprouvée, de
+// `vendu-recu.cjs` : orders_sold « Commande finalisée » + txn status 450 +
+// status_updated_at. La requête versement passe par la branche `transaction->>id`
+// (⇒ `txn`), d'où la version aliasée {tx,item,s,su,ss}. Gardé au compte[0], et
+// UNIQUEMENT quand fx/ est absent (sinon collision d'id avec sa vraie base).
+const ISO=ms=>new Date(Date.now()-ms).toISOString();
+function SOLDV(){ const uid=accounts[0]?accounts[0].vinted_user_id:'111';
+  return [{ id:`harvest_${uid}_orders_sold`, data:{ capturedAt:ISO(5*60e3), payload:{ my_orders:[
+    { transaction_id:'500001', title:'Paire finalisée test', price:{amount:'60',currency_code:'EUR'}, status:'Commande finalisée', date:ISO(5*86400e3) },
+  ] } } }]; }
+const TXN_SYNTH=[{ tx:'500001', item:'syn_item_500001', s:'450', su:ISO(86400e3), ss:'' }];
 // ⚠️ ANNONCES — donnée SYNTHÉTIQUE (aucune vraie photo/acheteur : vit DANS le
 // banc, comme EBAYO/LBCV). Les fixtures `listings`/`sold`/`inbox` exportées sont
 // VIDES ; sans au moins une annonce captée, l'effet `liveStats` de la coque ne
@@ -22,7 +53,8 @@ const main=FX('main'), accounts=FX('accounts');
 // est pire qu'absent, §6). Une annonce par compte suffit à peupler liveStats ;
 // le solde, lui, vient des fixtures `billing`.
 function LISTV(){ return accounts.map((a,i)=>({ id:`harvest_${a.vinted_user_id}_listings`, data:{ payload:{ items:[{ id:`syn_${a.vinted_user_id}_${i}`, title:'Paire test '+(i+1), brand_title:'Nike', size_title:'42', price:{amount:'40',currency_code:'EUR'}, is_closed:false, is_hidden:false, is_draft:false, photo:{url:''} }], pagination:null } } })); }
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...LISTV(),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing'),...LBCV(),...EBAYO()]; const txn=FX('txn');
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(FXok('listings')),...LISTV(),...(FX_PRESENT?[]:SOLDV()),...FXok('inbox'),...FXok('track'),...FXok('bord'),...FXok('label'),...FXok('billing'),...LBCV(),...EBAYO()];
+const txnFx=FXok('txn'); const txn=txnFx.length?txnFx:TXN_SYNTH;
 // ⚠️ VENTES LEBONCOIN — donnée SYNTHÉTIQUE (aucun acheteur, aucune adresse : elle
 // peut donc vivre DANS le banc, dépôt public). Sans elle, l'écran Ventes rend le
 // bloc « Ventes Leboncoin » VIDE, et un piège §4.6 (TDZ) ou un mensonge §5 (un
@@ -151,7 +183,7 @@ const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire
         txt:(document.body.innerText||'')}));
       if(t==='cat_ventes') venteTxt=r.txt;
       if(t==='plat_leboncoin') lbcTxt=r.txt;   // le bloc « Ventes Leboncoin » vit ICI maintenant
-      if(t==='dashboard') { dashTxt=r.txt;
+      if(t==='dashboard') { await pg.waitForFunction(()=>/Finalisé par plateforme/i.test(document.body.innerText||''),null,{timeout:8000}).catch(()=>{}); dashTxt=await pg.evaluate(()=>document.body.innerText||'');
         // La carte héros du « finalisé » porte la notion qu'elle mesure
         // (`data-notion="finalise-vinted"`) : on juge SON texte, pas la page.
         heroTxt=await pg.evaluate(()=>{ const e=document.querySelector('[data-stats-carte="hero"]'); return e ? (e.innerText||'') : null; }); }
