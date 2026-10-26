@@ -91,6 +91,7 @@ const projette = (row, sel) => {
       const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      let bloquerPush = false;   // (26 oct.) course §5.49 : simule un push non abouti (le nuage ne garde pas l'écriture)
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
@@ -101,8 +102,7 @@ const projette = (row, sel) => {
         // fiction (§6.3 — le lien posé « disparaissait » au rechargement).
         if (route.request().method() !== 'GET') {
           try {
-            const corps = JSON.parse(route.request().postData() || 'null');
-            for (const l of [].concat(corps || [])) if (l && l.id === 'main' && l.data) rows[0].data = l.data;
+            if (!bloquerPush) { const corps = JSON.parse(route.request().postData() || 'null'); for (const l of [].concat(corps || [])) if (l && l.id === 'main' && l.data) rows[0].data = l.data; }
           } catch (_) {}
           return j([]);
         }
@@ -194,6 +194,22 @@ const projette = (row, sel) => {
       dit(v3.doublons.map((d) => d.num).join() === '12' && v3.aRelier === 1, 'après rechargement : plus d’alerte pour la N°15, la vente redemande « quel article ? »', JSON.stringify(v3.doublons.map((d) => d.num)) + ' · ' + v3.aRelier);
       const nLiens = await pg.evaluate(() => (document.querySelector('[data-lbc-liens]') || {}).getAttribute ? document.querySelector('[data-lbc-liens]').getAttribute('data-lbc-liens') : null);
       dit(nLiens === '1', 'la liste « Paires que tu as reliées » ne garde que le lien restant (N°12)', String(nLiens));
+      // (26 oct.) COURSE §5.49 : un lien posé puis un rechargement AVANT que le
+      // push n'ait atteint le nuage ne doit PAS être perdu. On empêche le nuage
+      // de garder l'écriture (`bloquerPush`), on relie lbc2 à la N°14, on
+      // recharge : le lien doit SURVIVRE (fusion local-par-dessus-nuage,
+      // CLES_FUSION_LIENS). Pré-correctif, la restauration le réécrit avec
+      // l'ancien nuage → lien perdu, protection double-vente disparue en silence.
+      bloquerPush = true;
+      await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('[data-lbc-suggestions="lbc2"] [data-suggestion="14"]', { timeout: 15000 }).catch(() => {});
+      await pg.click('[data-lbc-suggestions="lbc2"] [data-suggestion="14"]').catch(() => {});
+      await pg.waitForTimeout(900);
+      await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(1500);
+      const course = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_lbc_liens') || 'null'); } catch (_) { return null; } });
+      dit(course && course.lbc2 === '14', 'un lien posé survit à un rechargement avant que le push n’ait atteint le nuage (course §5.49)', JSON.stringify(course));
+      bloquerPush = false;
       dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
       await ctx.close();
     }

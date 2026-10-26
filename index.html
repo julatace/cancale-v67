@@ -38,7 +38,20 @@
        Bricolage Grotesque a du caractère (terminaisons coupées, chiffres
        larges) sans être fantaisiste — et elle est superbe en gros chiffre,
        ce que cette app affiche partout. -->
-  <title>VRM</title>
+  <title>VRM — revente de sneakers centralisée (Vinted, Leboncoin, eBay)</title>
+  <!-- SEO page d'accueil publique (26 oct.) : description + canonical + Open
+       Graph. L'app est derrière connexion ; seule l'accueil `/` et les pages
+       légales (fichiers séparés) sont publiques. Le canonical pointe `/` : les
+       routes applicatives (?tab=…) servent ce même index.html et ne doivent pas
+       être indexées à part. -->
+  <meta name="description" content="VRM centralise ta revente de sneakers d'occasion : annonces, ventes, achats, colis, numéros de rangement et comptabilité, sur Vinted, Leboncoin et eBay. Un seul outil pour tout piloter." />
+  <link rel="canonical" href="https://vrm.center/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="VRM — ta revente de sneakers, centralisée" />
+  <meta property="og:description" content="Annonces, ventes, achats, colis et comptabilité sur Vinted, Leboncoin et eBay — dans un seul outil." />
+  <meta property="og:url" content="https://vrm.center/" />
+  <meta property="og:image" content="https://vrm.center/logo-vrm.png" />
+  <meta name="twitter:card" content="summary" />
   <!-- ⚠️ AVANT LE PREMIER RENDU, sinon l'app s'affiche en clair puis bascule.
        On lit le MÊME réglage que React (`vinted_dark`) et on estampille la
        racine : le CSS ci-dessous et la barre d'état suivent aussitôt. Trois
