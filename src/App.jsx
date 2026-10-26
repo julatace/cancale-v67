@@ -18395,9 +18395,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     }catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}
     finally{setSaving(false);}
   };
+  const [supprimee,setSupprimee]=React.useState(false);
   const terminer=async()=>{
-    if(!await askConfirm({title:'Terminer cette annonce ?',desc:`${it.title || it.itemId}\nElle ne sera plus proposée à la vente sur eBay.`,ok:'Terminer sur eBay',cancel:'Annuler'}))return;
-    setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce terminée sur eBay.');if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
+    if(!await askConfirm({title:'Supprimer cette annonce d’eBay ?',desc:`${it.title || it.itemId}${nomCompteConfirm?` · ${nomCompteConfirm}`:''}\nElle est terminée tout de suite sur eBay et n’est plus proposée à la vente. C’est sans retour côté eBay : il faudrait la republier.`,ok:'Oui, supprimer d’eBay',cancel:'Annuler',danger:true}))return;
+    setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce supprimée d’eBay.');setSupprimee(true);if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
   const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?prixEbayTexte(n,c):'';};
@@ -18439,6 +18440,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           pour le reste (modifier, détails). Avant : deux ou trois boutons
           pleine hauteur empilés par carte. ── */}
       <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
+      {/* (26 octobre) Julien : « sur eBay je veux pouvoir supprimer les annonces ».
+          Le geste était caché dans la carte dépliée : il est sur la carte. */}
+      <button type="button" data-ebay-supprimer={it.itemId} disabled={saving || supprimee} onClick={terminer} style={btnE}>{supprimee ? 'Supprimée d’eBay' : 'Supprimer d’eBay'}</button>
+      {msg && !open && <span data-ebay-supprimer-msg={it.itemId} style={{ fontSize: 12, color: E.muted }}>{msg}</span>}
       {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à un article</button>}
       {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
       {/* ── (9 octobre) LA RÈGLE D'OFFRE : une ligne, ou une porte. Trois
@@ -18576,7 +18581,6 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               {/* Le lien se change ici (la confirmation dit « tu pourras la
                   changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
               {numero && <button type="button" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Changer la paire reliée</button>}
-              <button type="button" disabled={saving} onClick={terminer} style={btnE}>Terminer l’annonce</button>
               {onRelire && <button type="button" data-ebay-regle-relire-carte={it.itemId} onClick={async()=>{await onRelire();setRelectureNecessaire(false);}} style={btnE}>{relectureNecessaire?'Vérifier la règle sur eBay':'Actualiser la règle d’offre'}</button>}
               {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
             </div>
