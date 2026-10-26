@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.227.0';
+const CODE_VERSION = '5.228.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1684,8 +1684,9 @@ async function archiveNotifications(uid,{payload,domain,url,cycle,page,ownerAtte
         data.creations=[...data.creations.filter(x=>x.contexteFavori!==preuve.contexteFavori||x.body!==preuve.body),preuve].slice(-100);
       }
       if(lectureLiee){
-        if(String(lectureLiee.uid)!==String(uid)||lectureLiee.method!=='GET'||!lectureLiee.contexteFavori)return null;
-        data.lecturesLiees=[...data.lecturesLiees.filter(x=>x.contexteFavori!==lectureLiee.contexteFavori||x.conversationId!==lectureLiee.conversationId),lectureLiee].slice(-50);
+        if(String(lectureLiee.uid)!==String(uid)||!['GET','NAV'].includes(lectureLiee.method)||!lectureLiee.contexteFavori)return null;
+        if(lectureLiee.method==='NAV'){const p=pageFavoriNative(lectureLiee.contexteFavori,domain);if(!p||!natifConcorde({itemId:lectureLiee.itemId,receiverId:lectureLiee.recipientId},p)||!natifFavoriSur({chemin:lectureLiee.path,itemId:lectureLiee.itemId,receiverId:lectureLiee.recipientId}))return null;}
+        data.lecturesLiees=[...data.lecturesLiees.filter(x=>x.contexteFavori!==lectureLiee.contexteFavori||x.method!==lectureLiee.method||x.conversationId!==lectureLiee.conversationId||x.recipientId!==lectureLiee.recipientId),lectureLiee].slice(-50);
       }
       const cond=Number.isSafeInteger(avant?.archiveRev)?`data->>archiveRev=eq.${avant.archiveRev}`:'data->>archiveRev=is.null';
       if(!await encore())return null;
@@ -1722,10 +1723,32 @@ function suivreFavoriAffiche(cible,activer=false){
  };
  const tous=[...document.querySelectorAll('a[href]')].slice(0,10000).map(a=>({a,url:normaliser(a.href)}));
  const exacts=tous.filter(x=>x.url===attendu),liens=exacts.filter(x=>visible(x.a));
- const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===item(attendu)).length,exacts:exacts.length,visibles:liens.length};
- if(liens.length!==1)return {trouve:false,inspection};
- if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
- return {trouve:true,inspection};
+ // Native bell rows may render the same favorite as ?receiver_id=&item_id=
+ // (measured on the seller's real page, 25 Oct). Accepted only by identity:
+ // same article, and receiver_id equal to the single numeric parameter of the
+ // captured link. Exactly these two keys, once each, numeric; messaging route.
+ const num=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:'';
+ const article=item(attendu);let destinataire='';
+ try{const p=new URL(attendu).searchParams,ks=[...p.keys()];if(ks.length===1&&p.getAll(ks[0]).length===1&&num(p.get(ks[0]))!==article)destinataire=num(p.get(ks[0]));}catch{}
+ const natif=url=>{try{
+  const u=new URL(url),p=u.searchParams,ks=[...p.keys()].sort();
+  if(ks.join(',')!=='item_id,receiver_id'||p.getAll('item_id').length!==1||p.getAll('receiver_id').length!==1)return null;
+  const it=num(p.get('item_id')),re=num(p.get('receiver_id'));if(!it||!re)return null;
+  if(!/^\/(?:inbox|conversations?|messages?)(?:\/[a-z_-]{1,40}){0,2}\/?$/.test(u.pathname)&&!new RegExp('^/items/'+it+'/[a-z_-]{1,40}(?:/new)?/?$').test(u.pathname))return null;
+  return {chemin:u.pathname.replace(/\/$/,'')||'/',itemId:it,receiverId:re};
+ }catch{return null;}};
+ const natifs=tous.map(x=>({...x,n:x.url&&natif(x.url)})).filter(x=>x.n),natifsArticle=natifs.filter(x=>x.n.itemId===article);
+ const candidats=destinataire?natifsArticle.filter(x=>x.n.receiverId===destinataire):[],candidatsVisibles=candidats.filter(x=>visible(x.a));
+ const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===article).length,exacts:exacts.length,visibles:liens.length,natifsMemeArticle:natifsArticle.length,natifs:candidats.length,natifsVisibles:candidatsVisibles.length};
+ if(exacts.length){
+  if(liens.length!==1)return {trouve:false,inspection};
+  if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
+  return {trouve:true,inspection};
+ }
+ // Exactly one visible candidate; two (even same href) is refused, as above.
+ if(candidatsVisibles.length!==1)return {trouve:false,inspection};
+ if(activer){candidatsVisibles[0].a.scrollIntoView({block:'center'});candidatsVisibles[0].a.click();}
+ return {trouve:true,inspection,natif:candidatsVisibles[0].n};
 }
 // Semantic native controls only. No guessed CSS class, router or API call.
 function clocheFavorisNative(activer=false,origine){
@@ -1781,18 +1804,63 @@ async function naviguerFavoriDansPage(tabId,action,cible){
    if(r.id!==id||r.origine!==origine)return finir(null,'favoris_relais_origine');
    const v=r.resultat;
    if(cloche){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return finir(null,'favoris_relais_invalide');finir({etat:v.etat});}
-   else {if(!v||typeof v.trouve!=='boolean')return finir(null,'favoris_relais_invalide');finir({trouve:v.trouve,...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})});}
+   else {if(!v||typeof v.trouve!=='boolean')return finir(null,'favoris_relais_invalide');const nat=v.trouve&&v.natif?natifFavoriSur(v.natif):null;if(v.trouve&&v.natif&&!nat)return finir(null,'favoris_relais_invalide');finir({trouve:v.trouve,...(nat?{natif:nat}:{}),...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})});}
   });}catch{finir(null,'favoris_relais_indisponible');}
  });
 }
+function natifFavoriSur(v){
+ const n=x=>typeof x==='string'&&/^[1-9]\d{0,19}$/.test(x)?x:'';
+ if(!v||!n(v.itemId)||!n(v.receiverId)||typeof v.chemin!=='string'||v.chemin.length>120||!/^\/[a-z0-9_\/-]*$/.test(v.chemin))return null;
+ return {chemin:v.chemin,itemId:v.itemId,receiverId:v.receiverId};
+}
 function inspectionFavoriSure(v){
- const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
+ const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles','natifsMemeArticle','natifs','natifsVisibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
 }
 function refusRelaisFavori(e,refus){
  const code=String(e?.message||'');
  if(!/^favoris_relais_(indisponible|sans_reponse|origine|invalide)$/.test(code))return null;
  const message=code==='favoris_relais_indisponible'?'Ce navigateur ne permet pas de transmettre la commande à l’onglet Vinted. Aucun message envoyé.':code==='favoris_relais_sans_reponse'?'La page Vinted n’a pas confirmé la commande. Recharge Vinted avant de réessayer. Aucun renvoi automatique.':'La réponse de l’onglet Vinted n’a pas été reconnue. Aucune autre page n’a été utilisée.';
  return refus(message,code);
+}
+// The captured favorite link carries the article in its path and one numeric
+// parameter. A native row matches only if item_id and receiver_id are equal to
+// them: an identity comparison, never a translation of an unknown name.
+function destinataireLienFavori(page){
+ try{const u=new URL(page.url),ks=[...u.searchParams.keys()];if(ks.length!==1||u.searchParams.getAll(ks[0]).length!==1)return '';const v=u.searchParams.get(ks[0]);return /^[1-9]\d{0,19}$/.test(v)&&v!==page.itemId?v:'';}catch{return '';}
+}
+function natifConcorde(n,page){const d=destinataireLienFavori(page);return !!d&&n.itemId===page.itemId&&n.receiverId===d;}
+// After the click, the tab must show exactly the native route of that row
+// (same path, item_id and receiver_id only). Only then is the binding stored.
+async function confirmerNavigationNative(tabId,uid,owner,domain,contexte,natif){
+ const cle=cleOngletFavori(tabId),origine=new URL(contexte).origin;
+ const lire=async()=>(await stockageFavorisOnglets().get(cle))?.[cle];
+ // SPA routes can be replaced quickly: keep every URL the tab reports.
+ const vues=[];const ecoute=(id,ch)=>{if(id===tabId&&typeof ch?.url==='string')vues.push(ch.url);};
+ try{chrome.tabs.onUpdated.addListener(ecoute);}catch{}
+ const juger=v=>{
+  let u;try{u=new URL(v);}catch{return '';}
+  if(u.origin!==origine||(u.pathname.replace(/\/$/,'')||'/')!==natif.chemin)return '';
+  const ks=[...u.searchParams.keys()].sort().join(',');
+  if(ks!=='item_id,receiver_id'||u.searchParams.getAll('item_id').length!==1||u.searchParams.getAll('receiver_id').length!==1)return 'autre';
+  return u.searchParams.get('item_id')===natif.itemId&&u.searchParams.get('receiver_id')===natif.receiverId?'ok':'autre';
+ };
+ try{
+  for(let i=0;i<24;i++){
+   await new Promise(r=>setTimeout(r,250));
+   const r=await lire();if(!r||r.etat!=='attente'||r.contexteFavori!==contexte)return;
+   try{const t=await chrome.tabs.get(tabId);if(t?.url)vues.push(t.url);}catch{return;}
+   const verdicts=vues.map(juger);
+   if(verdicts.includes('autre')){await stockageFavorisOnglets().set({[cle]:{...r,etat:'erreur',raison:'destinataire_different'}});return;}
+   if(!verdicts.includes('ok'))continue;
+   if((await loadSession())?.user_id!==owner||String(await compteConnecte(domain))!==String(uid)){await stockageFavorisOnglets().set({[cle]:{...r,etat:'erreur',raison:'compte_different'}});return;}
+   await stockageFavorisOnglets().set({[cle]:{...r,etat:'capture'}});
+   const lectureLiee={uid:String(uid),method:'NAV',path:natif.chemin,itemId:natif.itemId,recipientId:natif.receiverId,contexteFavori:contexte,capturedAt:new Date().toISOString()};
+   const conserve=await archiveNotifications(uid,{domain,ownerAttendu:owner,lectureLiee});
+   await stockageFavorisOnglets().set({[cle]:{...r,etat:conserve?'confirmee':'erreur',raison:conserve?'':'enregistrement_non_confirme'}});
+   return;
+  }
+  const r=await lire();if(r?.etat==='attente'&&r.contexteFavori===contexte)await stockageFavorisOnglets().set({[cle]:{...r,etat:'erreur',raison:'navigation_non_confirmee'}});
+ }finally{try{chrome.tabs.onUpdated.removeListener(ecoute);}catch{}}
 }
 async function ouvrirFavoriNatif(uid,acc,body){
  const s=await authToken(),owner=s?.user_id;
@@ -1836,13 +1904,25 @@ async function ouvrirFavoriNatif(uid,acc,body){
    }
    if(present?.[0]?.result?.trouve!==true){
     const inspection=present?.[0]?.result?.inspection;
-    return refus(inspection?.visibles>1?'Plusieurs liens visibles correspondent exactement à ce favori. La vérification est arrêtée sans choisir à ta place. Aucun message envoyé.':'La notification peut être affichée, mais son lien exact n’a pas été reconnu. Aucun autre destinataire n’a été choisi et aucun message envoyé.',inspection?.visibles>1?'favori_lien_ambigu':'favori_non_trouve',inspection);
+    const ambigu=inspection?.visibles>1||inspection?.natifsVisibles>1;
+    return refus(ambigu?'Plusieurs liens visibles correspondent exactement à ce favori. La vérification est arrêtée sans choisir à ta place. Aucun message envoyé.':'La notification peut être affichée, mais son lien exact n’a pas été reconnu. Aucun autre destinataire n’a été choisi et aucun message envoyé.',ambigu?'favori_lien_ambigu':'favori_non_trouve',inspection);
    }
   }
-  await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now()}});
+  // A native receiver_id/item_id row is followed only when both identities
+  // equal those of the captured link (article, its single numeric parameter).
+  const natifSonde=present?.[0]?.result?.natif?natifFavoriSur(present[0].result.natif):null;
+  if(present?.[0]?.result?.natif&&(!natifSonde||!natifConcorde(natifSonde,liens[0])))return refus('Le lien affiché par Vinted ne désigne pas le même article et le même destinataire. Aucun message envoyé.','favori_destinataire_different');
+  await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'attente',at:Date.now(),...(natifSonde?{natif:natifSonde}:{})}});
   if((await loadSession())?.user_id!==owner||String(await compteConnecte(acc.domain))!==String(uid))throw Error();
   const activation=await naviguerFavoriDansPage(tab.id,'ouvrir',liens[0].url);
   if(activation?.[0]?.result?.trouve!==true)throw Error();
+  const natifClic=activation[0].result.natif?natifFavoriSur(activation[0].result.natif):null;
+  // The clicked row must be the probed one; never switch to a different row.
+  if(!!natifClic!==!!natifSonde||(natifClic&&(natifClic.chemin!==natifSonde.chemin||natifClic.itemId!==natifSonde.itemId||natifClic.receiverId!==natifSonde.receiverId))){
+   await stockageFavorisOnglets().set({[cleOngletFavori(tab.id)]:{uid:String(uid),owner,contexteFavori:liens[0].url,notificationId:body.notificationId,etat:'erreur',raison:'destinataire_different',at:Date.now()}});
+   return {ok:true,status:200,json:{ouvert:true,version:CODE_VERSION,preuve:'non_confirmee',raison:'destinataire_different'}};
+  }
+  if(natifClic)await confirmerNavigationNative(tab.id,uid,owner,acc.domain,liens[0].url,natifClic);
   for(let i=0;i<40;i++){
     if((await loadSession())?.user_id!==owner)return refus('La session VRM a changé pendant l’ouverture.');
     const record=(await stockageFavorisOnglets().get(cleOngletFavori(tab.id)))?.[cleOngletFavori(tab.id)];
@@ -1867,6 +1947,7 @@ async function capterLectureFavori(uid,domain,id,payload,url,tabId,owner,method,
   const cle=cleOngletFavori(tabId),attente=(await stockageFavorisOnglets().get(cle))?.[cle];
   if(!attente||attente.etat!=='attente'||attente.owner!==owner||String(attente.uid)!==String(uid)||Date.now()-attente.at<0||Date.now()-attente.at>60000)return;
   if(pageFavoriNative(attente.contexteFavori)?.itemId!==items[0])return;
+  if(attente.natif&&attente.natif.receiverId!==recipient){await stockageFavorisOnglets().set({[cle]:{...attente,etat:'erreur',raison:'destinataire_different'}});return;}
   // A prefetched thread must not steal the binding: this must be the thread
   // actually displayed in the browser tab that VRM opened.
   const tab=await chrome.tabs.get(tabId),visible=new URL(tab.url||'');
@@ -2830,6 +2911,7 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
       }catch{}
       // Unrelated native traffic must not steal this one-use selection, nor
       // overwrite a different link observed from a trusted native click.
+      if(attente.natif){try{const c=JSON.parse(body);const d=Number.isSafeInteger(c?.opposite_user_id)?String(c.opposite_user_id):String(c?.opposite_user_id??'');if(memeArticle&&d!==attente.natif.receiverId){await stockageFavorisOnglets().set({[cle]:{...attente,etat:'erreur',raison:'destinataire_different'}});memeArticle=false;}}catch{memeArticle=false;}}
       if(attente.etat==='attente'&&Date.now()-attente.at>=0&&Date.now()-attente.at<=60000&&memeArticle&&memeLien){
         contexteFavori=attente.contexteFavori;ouvertureLiee={cle,record:attente};await stockageFavorisOnglets().set({[cle]:{...attente,etat:'capture'}});
       }

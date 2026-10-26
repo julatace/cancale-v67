@@ -163,10 +163,32 @@ function suivreFavoriAffiche(cible,activer=false){
  };
  const tous=[...document.querySelectorAll('a[href]')].slice(0,10000).map(a=>({a,url:normaliser(a.href)}));
  const exacts=tous.filter(x=>x.url===attendu),liens=exacts.filter(x=>visible(x.a));
- const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===item(attendu)).length,exacts:exacts.length,visibles:liens.length};
- if(liens.length!==1)return {trouve:false,inspection};
- if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
- return {trouve:true,inspection};
+ // Native bell rows may render the same favorite as ?receiver_id=&item_id=
+ // (measured on the seller's real page, 25 Oct). Accepted only by identity:
+ // same article, and receiver_id equal to the single numeric parameter of the
+ // captured link. Exactly these two keys, once each, numeric; messaging route.
+ const num=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v)?v:'';
+ const article=item(attendu);let destinataire='';
+ try{const p=new URL(attendu).searchParams,ks=[...p.keys()];if(ks.length===1&&p.getAll(ks[0]).length===1&&num(p.get(ks[0]))!==article)destinataire=num(p.get(ks[0]));}catch{}
+ const natif=url=>{try{
+  const u=new URL(url),p=u.searchParams,ks=[...p.keys()].sort();
+  if(ks.join(',')!=='item_id,receiver_id'||p.getAll('item_id').length!==1||p.getAll('receiver_id').length!==1)return null;
+  const it=num(p.get('item_id')),re=num(p.get('receiver_id'));if(!it||!re)return null;
+  if(!/^\/(?:inbox|conversations?|messages?)(?:\/[a-z_-]{1,40}){0,2}\/?$/.test(u.pathname)&&!new RegExp('^/items/'+it+'/[a-z_-]{1,40}(?:/new)?/?$').test(u.pathname))return null;
+  return {chemin:u.pathname.replace(/\/$/,'')||'/',itemId:it,receiverId:re};
+ }catch{return null;}};
+ const natifs=tous.map(x=>({...x,n:x.url&&natif(x.url)})).filter(x=>x.n),natifsArticle=natifs.filter(x=>x.n.itemId===article);
+ const candidats=destinataire?natifsArticle.filter(x=>x.n.receiverId===destinataire):[],candidatsVisibles=candidats.filter(x=>visible(x.a));
+ const inspection={liensFavoris:tous.filter(x=>x.url&&item(x.url)).length,memeArticle:tous.filter(x=>x.url&&item(x.url)===article).length,exacts:exacts.length,visibles:liens.length,natifsMemeArticle:natifsArticle.length,natifs:candidats.length,natifsVisibles:candidatsVisibles.length};
+ if(exacts.length){
+  if(liens.length!==1)return {trouve:false,inspection};
+  if(activer){liens[0].a.scrollIntoView({block:'center'});liens[0].a.click();}
+  return {trouve:true,inspection};
+ }
+ // Exactly one visible candidate; two (even same href) is refused, as above.
+ if(candidatsVisibles.length!==1)return {trouve:false,inspection};
+ if(activer){candidatsVisibles[0].a.scrollIntoView({block:'center'});candidatsVisibles[0].a.click();}
+ return {trouve:true,inspection,natif:candidatsVisibles[0].n};
 }
 // Semantic native controls only. No guessed CSS class, router or API call.
 function clocheFavorisNative(activer=false,origine){
