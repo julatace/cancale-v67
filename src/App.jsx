@@ -15670,6 +15670,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   // 0 : un total partiel présenté comme complet est pire qu'un absent).
   const liens = React.useMemo(() => load('vrm_lbc_liens', {}) || {}, [lbcVentes]);
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [lbcVentes]);
+  const numerosFiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [lbcVentes]);
   // La carte des annonces LBC donne la réf VRM ; en l'attendant, `null` ⇒ le
   // lien posé à la main suffit déjà (c'est l'identité la plus forte).
   const [itemsLbc, setItemsLbc] = useState(null);
@@ -15677,7 +15678,16 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   const infoVente = (o) => {
     const num = numeroLbcIdentite(o, itemsLbc, liens);
     const prix = o.price != null ? Number(o.price) / 100 : null;
-    const achat = num ? prixAchatDe({ numero: num }, buyByNum) : null;
+    // ⚠️ BÉNÉFICE SEULEMENT SI UNE SEULE FICHE PORTE CE N° (revue du 26 oct.,
+    //    §11) — le MÊME garde que le total de la compta (`ficheUniqueDuNumero`
+    //    → `achatDuNum`). Mesuré : 13 N° hérités d'août sont portés par
+    //    plusieurs fiches à des prix d'achat différents ; `buyByNum[num]` n'en
+    //    garde qu'UN (arbitraire). La carte montrait alors un bénéfice que le
+    //    total disait « inconnu » : un chiffre d'argent faux présenté comme
+    //    certain. Le N° reste affiché (l'identité de la vente est connue) ;
+    //    seul le bénéfice est tu quand le coût est ambigu.
+    const fiche = num ? ficheUniqueDuNumero(numerosFiches, num) : null;
+    const achat = fiche ? prixAchatDe({ numero: num }, buyByNum) : null;
     const benef = (prix != null && achat != null && !lbcAnnulee(o)) ? prix - achat : null;
     return { num, benef };
   };
@@ -45558,8 +45568,16 @@ function LeboncoinScreen() {
   //    a rien à faire, muet tant que `data` n'est pas lu. Mêmes libellés que
   //    les blocs eux-mêmes — pas de nouvelle consigne à vérifier.
   const plurLbc = (n) => (n > 1 ? 's' : '');
+  // ⚠️ NE COMPTER QUE LES VENTES PROUVÉES (revue du 26 oct.). `data.removals`
+  //    mélange trois états — vendue (prouvée) · pause (masquée sur Vinted, PAS
+  //    vendue, rien à faire) · doute (fermée sans preuve). Compter le TOTAL
+  //    affichait « N vendues à retirer » en rouge sur des paires non vendues :
+  //    exactement la régression que le bloc détaillé (« VENDUE SE PROUVE »)
+  //    existe pour empêcher. Aligné sur eBay (`dvVue.aRetirerEbay`) et la
+  //    cloche (`lbcRemoveCount`), qui ne comptent que le prouvé.
+  const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue').length : 0;
   const conseilsLbc = data ? [
-    data.removals && data.removals.length && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${data.removals.length} paire${plurLbc(data.removals.length)} vendue${plurLbc(data.removals.length)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${nRetirerLbc} paire${plurLbc(nRetirerLbc)} vendue${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
     data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
     data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
     data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
