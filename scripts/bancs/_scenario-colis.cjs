@@ -39,7 +39,7 @@ const STATUT_FINAL = 'Commande finalisée';          // classifyOrderStatus → 
 const STATUT_NONRECL = "Commande non réclamée - Retournée à l'expéditeur.rice";
 
 // Un objet `my_orders` (achat OU vente) à la forme de Vinted.
-function ordre({ tx, conv, titre, prix, dateMs, statut, tus }) {
+function ordre({ tx, conv, titre, prix, dateMs, statut, tus, item }) {
   const o = {
     transaction_id: String(tx), title: titre,
     price: { amount: Number(prix).toFixed(2), currency_code: 'EUR' },
@@ -47,6 +47,7 @@ function ordre({ tx, conv, titre, prix, dateMs, statut, tus }) {
   };
   if (conv != null) o.conversation_id = String(conv);
   if (tus) o.transaction_user_status = tus;
+  if (item != null) o.item_id = String(item);   // relie la vente à une annonce numérotée (identiteAnnonce)
   return o;
 }
 const lignePurch = (uid, orders) => ({ id: `harvest_${uid}_orders_purchased`, data: { payload: { my_orders: orders } } });
@@ -149,11 +150,60 @@ function achatsScenario() {
   };
 }
 
+// Une conversation moissonnée (`harvest_{uid}_conv_{cid}`), à la forme profonde
+// que lit la messagerie (`payload.conversation.transaction/opposite_user/messages`).
+function ligneConv({ uid, cid, titre, oppId, oppLogin, itemId }) {
+  return { id: `harvest_${uid}_conv_${cid}`, data: { payload: { conversation: {
+    id: String(cid),
+    transaction: { id: String(cid), item_id: String(itemId || ''), status: 1, item_title: titre, current_user_side: 'buyer', item_photo: { url: '' } },
+    opposite_user: { id: String(oppId), login: oppLogin },
+    messages: [{ entity: { user_id: String(oppId) }, created_at_ts: iso(NOW - 2 * 3600e3), body: 'Bonjour, est-ce encore disponible ?' }],
+    allow_reply: true, unread: true,
+  } } } };
+}
+
+// ── SCÉNARIO « COQUE » (feuilles-coque) : une base RICHE et cohérente ─────────
+// Le banc des feuilles (layout/empilement) ouvre 14 feuilles de tout l'app : il
+// lui faut des annonces en ligne numérotées (⋯ Outils, Gérer l'annonce), des
+// ventes dont UNE en LOT de 2 articles (tiroir + « Paires du lot »), des
+// bordereaux prêts (« Tout imprimer »), une conversation (Messages) et des
+// comptes (Réglages). Tout synthétique, aux formes mesurées — vit dans le dépôt.
+function coqueScenario() {
+  const U = UID[0], BR = ['Nike', 'Adidas', 'Puma', 'New Balance'];
+  const ann = [], num = {};
+  for (let i = 0; i < 8; i++) {
+    const id = 'an' + i, titre = `${BR[i % 4]} modèle ${i} ${34 + i}`;
+    ann.push(annonce({ id, titre, prix: 50 + i, taille: 34 + i, marque: BR[i % 4] }));
+    num[id] = { numero: String(i + 1), title: titre, price: 50 + i };
+  }
+  const sold = [
+    ordre({ tx: '70001', titre: 'Lot 2 articles Nike + Adidas', prix: 90, statut: STATUT_FINAL, dateMs: NOW - 10 * 86400e3 }),
+    ordre({ tx: '70002', titre: 'Nike Air Max finalisée',  prix: 40, statut: STATUT_FINAL, dateMs: NOW - 12 * 86400e3 }),
+    ordre({ tx: '70003', titre: 'Adidas Samba finalisée',  prix: 45, statut: STATUT_FINAL, dateMs: NOW - 14 * 86400e3 }),
+    ordre({ tx: '70004', titre: 'Puma Suede finalisée',    prix: 38, statut: STATUT_FINAL, dateMs: NOW - 16 * 86400e3 }),
+    ordre({ tx: '70010', titre: 'Reebok Club à expédier',  prix: 42, statut: STATUT_AEXP, tus: 'needs_action', dateMs: NOW - 2 * 86400e3, item: 'an4' }),
+    ordre({ tx: '70011', titre: 'Asics Gel à expédier',    prix: 44, statut: STATUT_AEXP, tus: 'needs_action', dateMs: NOW - 3 * 86400e3, item: 'an5' }),
+  ];
+  // Quelques achats (section Achats « Tous » → carte → ⋯ → « note interne »).
+  const achats = [
+    ordre({ tx: '80001', conv: uuid(31), titre: 'Nike Air Max achetée', prix: 28, statut: STATUT_FINAL, dateMs: NOW - 20 * 86400e3 }),
+    ordre({ tx: '80002', conv: uuid(32), titre: 'Adidas Gazelle achetée', prix: 22, statut: STATUT_FINAL, dateMs: NOW - 22 * 86400e3 }),
+    ordre({ tx: '80003', conv: uuid(33), titre: 'Puma Suede achetée', prix: 18, statut: STATUT_FINAL, dateMs: NOW - 24 * 86400e3 }),
+  ];
+  return {
+    accounts: comptes(), main: ligneMain({ vinted_annonce_numeros: num }),
+    listings: [ligneListings(U, ann)], sold: [ligneSold(U, sold)], purch: [lignePurch(U, achats)],
+    bord: [bordereau({ tx: '70010' }), bordereau({ tx: '70011' })],
+    label: [labelLatest(U, { tx: '70010' })],
+    conv: [ligneConv({ uid: U, cid: '5001', titre: 'Nike modèle 0 34', oppId: '44001', oppLogin: 'acheteur_test', itemId: 'an0' })],
+  };
+}
+
 // fx/ présent ? (sur SA machine on lit la vraie base, ces builders dorment.)
 const present = (SC) => fs.existsSync(path.join(SC, 'fx', 'accounts.json'));
 
 module.exports = {
   present, comptes, ligneMain, ordre, lignePurch, ligneSold,
-  bordereau, labelLatest, trackColis, panelRelais, panelComptesEtat, annonce, ligneListings, achatsScenario, uuid, UID,
+  bordereau, labelLatest, trackColis, panelRelais, panelComptesEtat, annonce, ligneListings, achatsScenario, ligneConv, coqueScenario, uuid, UID,
   STATUT_RELAIS, STATUT_AEXP, STATUT_FINAL, STATUT_NONRECL, iso, NOW,
 };

@@ -54,12 +54,20 @@ const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist'), SC = __dirname;
-if (!fs.existsSync(path.join(SC, 'fx', 'main.json'))) { console.log('⚠️ fixtures absentes (scripts/bancs/fx) — banc non lancé'); process.exit(0); }
+const sc = require('./_scenario-colis.cjs');
+const present = fs.existsSync(path.join(SC, 'fx', 'main.json'));
+// ⚠️ fx/ absent (toute session hors la sienne) : on monte une base RICHE et
+// cohérente (coqueScenario) — annonces en ligne numérotées, une vente en LOT de
+// 2 articles, bordereaux prêts, une conversation, des comptes — pour que CHAQUE
+// feuille s'ouvre vraiment. Aucune donnée réelle (§6.3). Avant, ce banc s'arrêtait
+// en exit(0) sans fx (« non lancé ») : honnête, mais il ne tournait jamais ailleurs.
+const CO = present ? null : sc.coqueScenario();
 const FX = f => JSON.parse(fs.readFileSync(path.join(SC, 'fx', f + '.json'), 'utf8'));
-const main = FX('main');
+const FXok = f => { try { return FX(f); } catch (_) { return []; } };
+const main = present ? FX('main') : CO.main;
 // Les lignes de comptes portent le propriétaire de la copie : la session du
 // banc en est un autre. Sans owner, la porte des bancs pose le sien.
-const accounts = FX('accounts').map(a => { const { owner, ...r } = a; return r; });
+const accounts = present ? FX('accounts').map(a => { const { owner, ...r } = a; return r; }) : CO.accounts;
 // Reçus d'achat par email : INVENTÉS (aucun dans les fixtures), sans PDF, pour
 // que l'app ouvre sa feuille « Reçu d'achat » et non un PDF.
 // ⚠️ (revue du 23 oct.) À LA FORME MESURÉE EN PRODUCTION (lecture seule, 117
@@ -81,8 +89,8 @@ const texteRecu = (i) => [
   "L'équipe Vinted",
 ].join('\n');
 const recus = [1, 2, 3].map(i => ({ id: 'email_achat_banc' + i, data: { type: 'achat', article: 'Paire inventée ' + i, account: 'compte_banc', uid: '', receivedAt: `2026-10-1${i}T10:00:00Z`, transaction: '99900000' + i, prix: '42,70', subject: 'Ton reçu pour ta commande', filename: '', texte: texteRecu(i) } }));
-const rows = [...FX('sold'), ...FX('purch'), ...dressingsDuJour(FX('listings')), ...FX('inbox'), ...FX('track'), ...FX('bord'), ...FX('label'), ...FX('billing'), ...recus];
-const txn = FX('txn');
+const rows = [...(present ? FX('sold') : CO.sold), ...(present ? FX('purch') : CO.purch), ...dressingsDuJour(present ? FX('listings') : CO.listings), ...FXok('inbox'), ...FXok('track'), ...(present ? FX('bord') : CO.bord), ...(present ? FX('label') : CO.label), ...FXok('billing'), ...(present ? [] : CO.conv), ...recus];
+const txn = present ? FX('txn') : [];
 function projette(row, select) {
   if (!select || select === '*') return row;
   const out = {};
@@ -350,14 +358,24 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     { nom: 'Annonces · Audit du stock', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Audit du stock') },
     { nom: "Annonces · Compléter les prix d'achat", tab: 'plat_vinted', section: 'Annonces', etapes: outil("Compléter les prix d'achat") },
     { nom: 'Annonces · Studio photo', tab: 'plat_vinted', section: 'Annonces', etapes: outil('Studio photo') },
-    { nom: 'Annonces · Passeport de l’article', tab: 'plat_vinted', section: 'Annonces', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer l’annonce")', 700); await clic(pg, 'button:has-text("Passeport de l’article")'); } },
+    // ⚠️ Le bouton rend « Passeport de l'article » avec une apostrophe DROITE
+    //    (App.jsx) ; `has-text` ne normalise pas les apostrophes. On vise une
+    //    sous-chaîne sans apostrophe (§6.5, le texte rendu).
+    { nom: 'Annonces · Passeport de l’article', tab: 'plat_vinted', section: 'Annonces', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer l’annonce")', 700); await clic(pg, 'button:has-text("Passeport de l")'); } },
     { nom: 'Ventes · Rapport comptable', tab: 'plat_vinted', section: 'Ventes', etapes: outilVentes('Rapport comptable') },
     { nom: 'Ventes · Registre annuel', tab: 'plat_vinted', section: 'Ventes', etapes: outilVentes('Registre annuel') },
     { nom: 'Ventes · Paires du lot', tab: 'plat_vinted', section: 'Ventes', cible: 'Paires du lot', etapes: ouvrirLotDuTiroir },
     { nom: 'Colis · Tout imprimer', tab: 'cat_bord', etapes: async (pg) => { await clic(pg, 'button:has-text("Tout imprimer")'); } },
     { nom: 'Compta · Nouvelle facture', tab: 'compta', section: 'Factures', etapes: async (pg) => { await clic(pg, 'button:has-text("Nouvelle facture")'); } },
     { nom: 'Réglages · Supprimer un compte Vinted', tab: 'vintedaccounts', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer ce compte")', 700); await clic(pg, 'button:has-text("Supprimer des données…")'); } },
-    { nom: 'Messages · Conversation (témoin)', tab: 'plat_vinted', section: 'Messages', tactile: true, etapes: async (pg) => { await clic(pg, '.vrm-inbox-row', 2000); } },
+    // ⚠️ TÉMOIN, et il exige une CONVERSATION CAPTÉE qui traverse tout le
+    //    pipeline de la messagerie (résumés + offres + favoris + sélection de
+    //    compte). Une conversation synthétique n'y suffit pas (l'écran tombe en
+    //    « Réessayer »). On ne prétend donc PAS qu'il passe sans fx : il reste
+    //    actif sur la vraie base (fx présent), et il est sauté — avec raison
+    //    loggée — en mode synthétique. Ce n'est pas un test de feuille piégée
+    //    (la conversation sort dans document.body, hors de la coque).
+    { nom: 'Messages · Conversation (témoin)', tab: 'plat_vinted', section: 'Messages', tactile: true, fxSeul: true, etapes: async (pg) => { await clic(pg, '.vrm-inbox-row', 2000); } },
   ];
   const filtre = process.env.SCENARIOS ? new RegExp(process.env.SCENARIOS, 'i') : null;
   // 390 tactile : l'iPhone (règle de WebKit appliquée, barre d'accueil de 34 px), clair.
@@ -378,6 +396,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     }
     for (const sc of SCENARIOS) {
       if (filtre && !filtre.test(sc.nom)) continue;
+      if (sc.fxSeul && !present) { console.log(`-- [${tag}] ${sc.nom} : témoin ignoré sans fx/ (conversation captée réelle requise)`); continue; }
       if (sc.tactile && !tactile) continue; // sur ordinateur la conversation s'ouvre dans l'écran, pas en feuille
       let r = null, avant = null, ouvert = null;
       try {
@@ -425,10 +444,19 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     await pg.waitForTimeout(600);
     return num;
   };
+  // ⚠️ La confirmation ne se déclenche QUE si un N° imprimé est ambigu (porté par
+  //    deux fiches, ou réattribué non écrit). Le banc l'injecte sur le N° que la
+  //    LIGNE du lot affiche — qui, sur la vraie base, correspond à une vraie fiche
+  //    (poke → vrai doublon). En synthétique, la numérotation auto donne à la paire
+  //    un N° sans fiche jumelle : le doublon ne peut pas se former fidèlement. On
+  //    garde donc cette partie sur fx réel (comme le témoin Messages), sans
+  //    prétendre qu'elle passe en synthétique — les 13 feuilles, elles, tournent
+  //    partout (c'est l'objet du banc : aucune feuille sous la barre).
+  if (partie('confirmation') && !present) console.log('-- [confirmation] ignorée sans fx/ : exige une paire au N° ambigu dans un lot imprimable réel');
   for (const [W, H, tactile, sombre, iphone, tag] of TAILLES2) {
-    if (!partie('confirmation')) break;
+    if (!partie('confirmation') || !present) break;
     for (const cas of [
-      { nom: 'N° porté par deux fiches', ok: "C'est la bonne paire, imprimer", poser: (n) => { const k = 'vinted_annonce_numeros'; const f = JSON.parse(localStorage.getItem(k) || '{}'); f.banc_doublon_invente = { numero: n, title: 'Paire inventée (doublon)' }; localStorage.setItem(k, JSON.stringify(f)); } },
+      { nom: 'N° porté par deux fiches', ok: "C'est le bon article, imprimer", poser: (n) => { const k = 'vinted_annonce_numeros'; const f = JSON.parse(localStorage.getItem(k) || '{}'); f.banc_doublon_invente = { numero: n, title: 'Paire inventée (doublon)' }; localStorage.setItem(k, JSON.stringify(f)); } },
       { nom: 'N° réattribué pas encore écrit', ok: "Oui, c'est écrit", poser: (n) => { const k = 'vinted_annonce_numeros'; const f = JSON.parse(localStorage.getItem(k) || '{}'); for (const x of Object.values(f)) { if (x && String(x.numero) === String(n)) x.reattribue = { de: '9' + n, vers: String(n), at: '2026-10-20T08:00:00Z' }; } localStorage.setItem(k, JSON.stringify(f)); } },
     ]) {
       const { ctx, pg } = await contexte(b, W, H, tactile, sombre, iphone);
