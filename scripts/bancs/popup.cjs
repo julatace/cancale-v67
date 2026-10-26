@@ -44,7 +44,12 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
     : { colorScheme: scheme, viewport: carte ? { width: 300, height: 380 } : { width: 360, height: 900 } });
   const pg = await ctx.newPage();
   const html = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8')
-    .replace('<script src="popup.js"></script>', '');
+    .replace('<script src="popup.js"></script>', '')
+    // (26 oct.) popup.html charge aussi `parcours-popup.js` (enregistreur de
+    // favoris local, ajouté après ce banc). Le banc n'exerce que la fenêtre
+    // d'AUTH : on le retire comme popup.js, sinon la route fourre-tout sert le
+    // HTML de la page pour ce <script> → « SyntaxError: Unexpected token '<' ».
+    .replace('<script src="parcours-popup.js"></script>', '');
   const js = fs.readFileSync(path.join(EXT, 'popup.js'), 'utf8');
 
   const erreurs = [];

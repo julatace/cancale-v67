@@ -106,7 +106,13 @@ const projette = (row, sel) => {
           } catch (_) {}
           return j([]);
         }
-        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        // (26 oct.) La base de PRODUCTION est cloisonnée (migration 004) : la sonde
+        // de schéma doit répondre 200 avec une ligne `owner`, comme `_porte-banc`
+        // le suppose depuis le 21 oct. Avant, ce banc répondait 400 → l'app se
+        // croyait NON cloisonnée → `cloudPush` coupé → un lien posé à la main
+        // n'était jamais sauvé au nuage et la boucle de restauration l'écrasait au
+        // rechargement. C'était un artefact du banc, pas un défaut de l'app.
+        if (/select=owner/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify([{ owner: process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' }]) });
         if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
         const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
         const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
