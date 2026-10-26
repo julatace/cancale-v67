@@ -52031,6 +52031,24 @@ function AppCoeur() {
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
           <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
+          {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
+              faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma
+              journée » — mais depuis l'espace Vinted elle n'était joignable
+              nulle part. Une entrée, pas un second calcul : « Ma journée » est
+              cross-plateforme et reste l'unique propriétaire de la liste (§11,
+              aucun compteur dupliqué ici qui pourrait diverger). */}
+          {!baseKO && !premierJour && (
+            <div style={{ padding: '10px 16px 0' }}>
+              <button type="button" data-vinted-majournee="" onClick={() => setTab('journee')} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <span aria-hidden="true" style={{ fontSize: 18, flexShrink: 0 }}>🗓️</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13.5, fontWeight: 800, color: C.text }}>À faire aujourd'hui</span>
+                  <span style={{ display: 'block', fontSize: 11, color: C.muted, lineHeight: 1.4 }}>Ma journée rassemble tes colis à poster et à retirer, messages et offres — sur tous tes comptes.</span>
+                </span>
+                <span aria-hidden="true" style={{ fontSize: 16, color: C.muted, flexShrink: 0 }}>›</span>
+              </button>
+            </div>
+          )}
           {/* ⚠️ 4 octobre — Julien : « dans Vinted […] il y ait les messages ».
               L'écran complet existait (liste tous comptes, fil, réponse, offres)
               mais n'avait plus AUCUNE porte dans Vinted : seulement la cloche. */}
