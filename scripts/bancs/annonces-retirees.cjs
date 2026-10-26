@@ -205,8 +205,8 @@ const lireDash = (pg) => pg.evaluate(() => {
     await essaie('4', async () => {
       const r = await rendre(b, { lignes: BASE(null), onglet: 'vintedaccounts' });
       await r.pg.waitForFunction(() => /compte_vivant/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
-      const cartes = r.pg.locator('button', { hasText: 'Supprimer ce compte' });
-      dit(await cartes.count() === 2, 'deux comptes, deux boutons « Supprimer ce compte »', String(await cartes.count()));
+      const cartes = r.pg.locator('button', { hasText: 'Supprimer des données…' });
+      dit(await cartes.count() === 2, 'deux comptes, deux boutons « Supprimer des données… »', String(await cartes.count()));
       // Le premier compte affiché : on ouvre sa fenêtre, on retire ses annonces.
       // Le bouton vit dans le repli « Gérer ce compte » de la carte : on l'ouvre comme lui.
       await r.pg.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));

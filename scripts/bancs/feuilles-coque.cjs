@@ -35,7 +35,7 @@
 //   · la CONFIRMATION posée par « Tout imprimer » (N° porté par deux fiches,
 //     N° réattribué pas encore écrit) passe au-dessus du lot et se touche ;
 //   · un MESSAGE (toast) dit depuis une feuille se lit et se touche, sans
-//     couvrir le pied de la feuille (« Supprimer ce compte » qui échoue,
+//     couvrir le pied de la feuille (« Supprimer des données… » qui échoue,
 //     « Tout imprimer » sans PDF) ;
 //   · les feuilles de l'EN-TÊTE (« Tous les écrans », l'état des actions) ne
 //     passent plus sous la barre du bas en paysage (844×390) et sur iPad
@@ -193,7 +193,7 @@ async function contexte(b, W, H, tactile, sombre, iphone, opts = {}) {
     const lu = decodeURIComponent(route.request().url());
     const j = d => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
-    // « Supprimer ce compte » : sa lecture des lignes du compte échoue (le toast d'échec).
+    // « Supprimer des données… » : sa lecture des lignes du compte échoue (le toast d'échec).
     if (etat.echecSuppr && /or=\(id\.like\.harvest_/.test(lu)) return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
     if (etat.pdf && /select=[^&]*b:data->>pdfB64/.test(lu)) return j([{ b: PDF_B64 }]);
     if (/select=owner(&|$)/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
@@ -356,7 +356,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
     { nom: 'Ventes · Paires du lot', tab: 'plat_vinted', section: 'Ventes', cible: 'Paires du lot', etapes: ouvrirLotDuTiroir },
     { nom: 'Colis · Tout imprimer', tab: 'cat_bord', etapes: async (pg) => { await clic(pg, 'button:has-text("Tout imprimer")'); } },
     { nom: 'Compta · Nouvelle facture', tab: 'compta', section: 'Factures', etapes: async (pg) => { await clic(pg, 'button:has-text("Nouvelle facture")'); } },
-    { nom: 'Réglages · Supprimer un compte Vinted', tab: 'vintedaccounts', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer ce compte")', 700); await clic(pg, 'button:has-text("Supprimer ce compte")'); } },
+    { nom: 'Réglages · Supprimer un compte Vinted', tab: 'vintedaccounts', etapes: async (pg) => { await clic(pg, 'summary:has-text("Gérer ce compte")', 700); await clic(pg, 'button:has-text("Supprimer des données…")'); } },
     { nom: 'Messages · Conversation (témoin)', tab: 'plat_vinted', section: 'Messages', tactile: true, etapes: async (pg) => { await clic(pg, '.vrm-inbox-row', 2000); } },
   ];
   const filtre = process.env.SCENARIOS ? new RegExp(process.env.SCENARIOS, 'i') : null;
@@ -457,27 +457,27 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
   // couvrir le pied de la feuille.
   for (const [W, H, tactile, sombre, iphone, tag] of TAILLES2) {
     if (!partie('messages')) break;
-    // 1. « Supprimer ce compte » : la lecture des lignes du compte échoue.
+    // 1. « Supprimer des données… » : la lecture des lignes du compte échoue.
     {
       const { ctx, pg } = await contexte(b, W, H, tactile, sombre, iphone);
       pg.__etat.echecSuppr = true;
       try {
         await aller(pg, 'vintedaccounts');
         await clic(pg, 'summary:has-text("Gérer ce compte")', 700);
-        await clic(pg, 'button:has-text("Supprimer ce compte")');
+        await clic(pg, 'button:has-text("Supprimer des données…")');
         await clic(pg, 'button:text-is("Supprimer")', 300);
         const vu = await attendre(pg, () => !!document.querySelector('.vrm-toast'));
-        if (!vu) dit(false, `[${tag}] Supprimer ce compte (échec) : un message est dit`, 'aucun toast');
+        if (!vu) dit(false, `[${tag}] Supprimer des données… (échec) : un message est dit`, 'aucun toast');
         else {
           const feuille = await voileOuvert(pg, 'Supprimer les données de');
           const t = await touchable(pg, '.vrm-toast');
           const pied = await touchable(pg, 'button', 'Annuler');
           const txt = await pg.evaluate(() => (document.querySelector('.vrm-toast').innerText || '').trim().slice(0, 60));
-          dit(!!feuille && t.ok, `[${tag}] Supprimer ce compte (échec) : le message se lit et se touche au-dessus de la feuille`, `« ${txt} » · ${t.ok ? 'touchable' : 'sous ' + t.dessus}${feuille ? '' : ' · feuille fermée'}`);
-          dit(pied.ok, `[${tag}] Supprimer ce compte (échec) : le message ne couvre pas le pied de la feuille (« Annuler »)`, pied.ok ? '' : 'sous ' + pied.dessus);
+          dit(!!feuille && t.ok, `[${tag}] Supprimer des données… (échec) : le message se lit et se touche au-dessus de la feuille`, `« ${txt} » · ${t.ok ? 'touchable' : 'sous ' + t.dessus}${feuille ? '' : ' · feuille fermée'}`);
+          dit(pied.ok, `[${tag}] Supprimer des données… (échec) : le message ne couvre pas le pied de la feuille (« Annuler »)`, pied.ok ? '' : 'sous ' + pied.dessus);
         }
         if (process.env.CAPTURES) { fs.mkdirSync(process.env.CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.CAPTURES, `${W}-message-suppression.png`) }).catch(() => {}); }
-      } catch (e) { dit(false, `[${tag}] Supprimer ce compte (échec)`, e.message.split('\n')[0].slice(0, 140)); }
+      } catch (e) { dit(false, `[${tag}] Supprimer des données… (échec)`, e.message.split('\n')[0].slice(0, 140)); }
       await ctx.close();
     }
     // 2. « Tout imprimer » sur des bordereaux sans PDF lisible.
