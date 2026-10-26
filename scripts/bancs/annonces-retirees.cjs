@@ -31,12 +31,19 @@ const dressing = (uid, items) => ({ id: `harvest_${uid}_listings`, data: { uid, 
 const ITEMS_111 = [ann(7001, 'Zeta Bloque Alpha 42'), ann(7002, 'Zeta Bloque Beta 41', { is_hidden: true })];
 const VENTE_111 = { id: 'harvest_111_orders_sold', data: { uid: '111', capturedAt: new Date(now - 5 * 60e3).toISOString(), nItems: 1,
   payload: { my_orders: [{ transaction_id: 1110001, title: 'Zeta Vente Bloque', status: 'Commande finalisée', price: { amount: '30.0', currency_code: 'EUR' }, date: iso(30) }], pagination: { total_pages: 1 } } } };
-const BASE = (retirees) => [
+// La boîte de réception : fetchVintedConversations lit `harvest_{uid}_inbox` →
+// data.conversations ({ id, description, unread, updated_at, opposite_user }).
+const conv = (id, login, descr) => ({ id, description: descr, unread: true, updated_at: iso(1), opposite_user: { id: 'opp' + id, login } });
+const inbox = (uid, convs) => ({ id: `harvest_${uid}_inbox`, data: { uid, capturedAt: iso(0.1), payload: { conversations: convs, pagination: { current_page: 1, total_pages: 1 } } } });
+const BASE = (retirees, msgRet) => [
   { id: 'main', data: Object.assign({ vinted_annonce_numeros: { '7001': { numero: '11' }, '7002': { numero: '12' }, '8001': { numero: '21' } } },
-    retirees ? { vrm_annonces_retirees: retirees } : {}) },
+    retirees ? { vrm_annonces_retirees: retirees } : {}, msgRet ? { vrm_messages_retires: msgRet } : {}) },
   dressing('111', ITEMS_111), dressing('222', [ann(8001, 'Zeta Vivant Delta 40')]), VENTE_111,
+  inbox('111', [conv(610001, 'acheteur_bloque', 'Message compte bloqué')]),
+  inbox('222', [conv(620001, 'acheteur_vivant', 'Message compte vivant')]),
 ];
 const RETIRE_111 = { '111': { at: iso(1), login: 'compte_bloque' } };
+const MSGRET_111 = { '111': { at: iso(1), login: 'compte_bloque' } };
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -231,6 +238,44 @@ const lireDash = (pg) => pg.evaluate(() => {
       await r.pg.waitForTimeout(500);
       const m2 = await r.pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_annonces_retirees') || '{}'));
       dit(!Object.keys(m2).length, '« Les remettre » : plus aucun compte retiré', JSON.stringify(m2));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    });
+    console.log('── 5. Messages retirés pour de bon : hors de l’écran Messages, l’autre compte reste');
+    await essaie('5', async () => {
+      const r = await rendre(b, { lignes: BASE(null, MSGRET_111), onglet: 'cat_msg' });
+      await r.pg.waitForFunction(() => document.querySelector('[data-messagerie]'), null, { timeout: 15000 }).catch(() => {});
+      await r.pg.waitForTimeout(1500);
+      const m = await r.pg.evaluate(() => ({ txt: document.body.innerText, nonlus: (document.querySelector('[data-messagerie-tete]') || {}).getAttribute ? document.querySelector('[data-messagerie-tete]').getAttribute('data-nonlus') : null }));
+      dit(!/acheteur_bloque/.test(m.txt) && /acheteur_vivant/.test(m.txt), 'la conversation du compte retiré a quitté Messages, l’autre reste', (m.txt.match(/acheteur_\w+/g) || []).join(' · '));
+      dit(m.nonlus === '1', 'le compteur de non-lus ne compte que l’autre compte (1)', String(m.nonlus));
+      await r.ctx.close();
+      // L'autre sens : sans retrait, les deux conversations sont là.
+      const r2 = await rendre(b, { lignes: BASE(null, null), onglet: 'cat_msg' });
+      await r2.pg.waitForFunction(() => document.querySelector('[data-messagerie]'), null, { timeout: 15000 }).catch(() => {});
+      await r2.pg.waitForTimeout(1500);
+      const m2 = await r2.pg.evaluate(() => ({ txt: document.body.innerText, nonlus: (document.querySelector('[data-messagerie-tete]') || {}).getAttribute ? document.querySelector('[data-messagerie-tete]').getAttribute('data-nonlus') : null }));
+      dit(/acheteur_bloque/.test(m2.txt) && /acheteur_vivant/.test(m2.txt), 'sans retrait, les deux conversations sont là', (m2.txt.match(/acheteur_\w+/g) || []).join(' · '));
+      dit(m2.nonlus === '2', 'et le compteur en voit 2', String(m2.nonlus));
+      await r2.ctx.close();
+    });
+    console.log('── 6. Le geste « Retirer les messages pour de bon », puis « Les remettre »');
+    await essaie('6', async () => {
+      const r = await rendre(b, { lignes: BASE(null, null), onglet: 'vintedaccounts' });
+      await r.pg.waitForFunction(() => /compte_vivant/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+      await r.pg.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
+      await r.pg.locator('button', { hasText: 'Supprimer des données…' }).first().click();
+      await r.pg.locator('[data-retirer-messages]').click();
+      await r.pg.getByRole('button', { name: 'Retirer ses messages', exact: true }).click();
+      await r.pg.waitForTimeout(800);
+      const m = await r.pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_messages_retires') || 'null'); } catch (_) { return 'illisible'; } });
+      const uid = m && typeof m === 'object' ? Object.keys(m)[0] : null;
+      dit(uid === '111' || uid === '222', 'le choix est rangé (clé synchronisée vrm_messages_retires), par identifiant de compte', JSON.stringify(m));
+      dit(await r.pg.locator(`[data-messages-retires="${uid}"]`).count() === 1, 'la carte du compte le dit, avec « Les remettre »', '');
+      await r.pg.locator(`[data-messages-retires="${uid}"] button`).click();
+      await r.pg.waitForTimeout(500);
+      const m2 = await r.pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_messages_retires') || '{}'));
+      dit(!Object.keys(m2).length, '« Les remettre » : plus aucun compte en messages retirés', JSON.stringify(m2));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.ctx.close();
     });
