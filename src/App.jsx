@@ -3886,6 +3886,9 @@ function FactureSousVente({ factures, compte }) {
           </select>
         </label>
         {!drafts.length && <span style={{fontSize:11,color:C.muted}}>Aucun brouillon à envoyer pour ce compte. Les reçus restent disponibles dans Factures.</span>}
+        {inv && <span data-facture-retour={inv.retourNom ? 'oui' : 'non'} style={{fontSize:11,color:inv.retourNom?C.muted:C.warn,lineHeight:1.4}}>{inv.retourNom
+          ? 'Les 2 documents Vinted Pro partent ensemble : la facture + le formulaire de retour en pièce jointe.'
+          : 'Vinted Pro demande 2 documents : seule la facture part (le formulaire de retour n’a pas été reçu avec l’email de vente — joins-le toi-même à l’acheteur).'}</span>}
         {inv && <button type="button" disabled={busy} onClick={async()=>{
           if(!await askConfirm(`Mettre la facture ${inv.number} (${inv.prix} €) en file d'envoi à ${inv.buyerEmail} ?`))return;
           setBusy(true);const ok=await setProInvoiceStatus(inv,'queued');setBusy(false);

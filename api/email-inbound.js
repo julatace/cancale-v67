@@ -259,6 +259,19 @@ function transactionVentePro(body, attachments) {
   if (!m) m = String(body || '').match(/Num[ée]ro\s+de\s+(?:la\s+)?transaction\s*:?\s*(\d{6,})/i);
   return m ? m[1] : '';
 }
+// ── LE 2e DOCUMENT QUE VINTED PRO EXIGE (26 octobre) ────────────────────────
+// Vinted dit « tu dois envoyer à l'acheteur 2 documents » : la FACTURE (que VRM
+// fabrique) ET le « Formulaire-retour-commande-{tx}.pdf » qu'il joint à l'email
+// de vente. On ne le jetait pas vraiment : `transactionVentePro` en lisait juste
+// le NOM pour le n° de transaction. On garde maintenant ses OCTETS pour les
+// joindre à la facture envoyée à l'acheteur. Absent/illisible ⇒ rien (l'app le
+// dit, Julien le joint lui-même : mieux vaut un blanc qu'un faux).
+function formulaireRetourDe(attachments) {
+  const a = (attachments || []).find((x) => x && x.contentB64
+    && (/Formulaire[-_ ]retour[-_ ]commande/i.test(String(x.filename || ''))
+        || (/application\/pdf/i.test(x.contentType || '') && /retour/i.test(String(x.filename || '')))));
+  return a ? { b64: a.contentB64, nom: String(a.filename || 'Formulaire-retour-commande.pdf') } : null;
+}
 function parseSaleEmail({ subject, text, html, attachments }) {
   let body = text || '';
   // ⚠️ On ne REMPLACE le texte par la version HTML que si elle apporte
@@ -417,7 +430,7 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
     `</div>`;
 }
 
-async function createProInvoice(sale, acc, cfg, now) {
+async function createProInvoice(sale, acc, cfg, now, attachments) {
   // L'IDENTITÉ d'une facture est la transaction quand l'email la porte (pièce
   // jointe « Formulaire-retour-commande-{tx} ») : deux ventes au même pseudo,
   // prix et titre ne partagent plus une facture. Sans transaction : l'ancienne clé.
@@ -445,14 +458,19 @@ async function createProInvoice(sale, acc, cfg, now) {
   const dateStr = new Date().toLocaleDateString('fr-FR');
   const html = buildInvoiceHtml(cfg, sale, number, dateStr);
   const status = cfg.autoSend ? 'queued' : 'draft';
+  // Le 2e document Vinted Pro (formulaire de retour), joint à la facture envoyée
+  // à l'acheteur. On garde ses octets jusqu'à l'envoi (puis `facture-envoyee` les
+  // purge — hygiène d'égress). Absent ⇒ chaîne vide, l'app le signale.
+  const retour = formulaireRetourDe(attachments);
   await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
     type: 'facture_pro', number, status,
     designation: sale.designation || '', prix: sale.prix || '',
     buyerName: sale.nomComplet || '', buyerEmail: sale.email, buyerAddress: sale.adresse || '',
     numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction || '',
     account: acc.login || '', html, createdAt: now,
+    retourB64: retour ? retour.b64 : '', retourNom: retour ? retour.nom : '',
   } }]);
-  return { number, status };
+  return { number, status, retour: !!retour };
 }
 
 // Journal des emails traités (30 derniers, même les « ignorés ») : permet de
@@ -1729,7 +1747,8 @@ export async function modeScript(mode, req, res) {
     const cfg = (cfgRows[0] && cfgRows[0].data) || null;
     if (!cfg || !cfg.actif) { res.status(200).json({ ok: true, actif: false, factures: [] }); return; }
     const factures = rows.filter((r) => r && r.data && r.data.buyerEmail)
-      .map((r) => ({ id: r.id, number: r.data.number || '', buyerEmail: r.data.buyerEmail, html: r.data.html || '' }));
+      .map((r) => ({ id: r.id, number: r.data.number || '', buyerEmail: r.data.buyerEmail, html: r.data.html || '',
+        retourB64: r.data.retourB64 || '', retourNom: r.data.retourNom || '' }));
     res.status(200).json({ ok: true, actif: true, nom: cfg.nom || '', logo: cfg.logo || '', factures });
     return;
   }
@@ -1741,7 +1760,10 @@ export async function modeScript(mode, req, res) {
     const rows = await lireLignes(`id=eq.${encodeURIComponent(id)}&select=id,data`);
     if (rows === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
     if (!rows[0]) { res.status(404).json({ ok: false, error: 'facture introuvable' }); return; }
-    const data = { ...(rows[0].data || {}), status: 'sent', sentAt: new Date().toISOString() };
+    // Envoyée ⇒ on purge les octets du formulaire de retour (plus besoin, et
+    // ça évite de garder un PDF dans le JSONB — même hygiène que la purge des
+    // bordereaux). Le NOM reste, pour dire « formulaire joint » dans l'app.
+    const data = { ...(rows[0].data || {}), status: 'sent', sentAt: new Date().toISOString(), retourB64: '' };
     const ecrit = await supabaseUpsert([{ id, data }]);
     if (!ecrit) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
     res.status(200).json({ ok: true });
@@ -2144,7 +2166,7 @@ export async function traiterEmail(req, res) {
           if (!cfgLu.lu) marquerEcritureRatee();
           const cfg = cfgLu.lu ? cfgLu.data : null;
           if (cfg && cfg.actif) {
-            facture = await createProInvoice(data, acc, cfg, now);
+            facture = await createProInvoice(data, acc, cfg, now, mail.attachments);
             if (facture && !facture.deja) try { await pushOnce({
               title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
               body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
