@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.226.0';
+const CODE_VERSION = '5.227.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -11548,7 +11548,22 @@ async function storeLbcAccountUneFois(acc,owner) {
       const ancien = merged[String(acc.id)] || {};
       // Une entrée de SESSION garde sa source d'avant si elle en avait une « moi »
       // (on ne remplace pas un nom lu par une source sans nom).
-      merged[String(acc.id)] = Object.assign({}, ancien, sansCourant, { seenAt: nowIso }, acc.session === true ? { sessionAt: nowIso } : {}); }
+      merged[String(acc.id)] = Object.assign({}, ancien, sansCourant, { seenAt: nowIso }, acc.session === true ? { sessionAt: nowIso } : {});
+      // ⚠️ (26 oct., mesuré sur sa base) Un même compte s'écrit sous DEUX clés : `X`
+      // (le compteur de messagerie, celui que portent ses annonces) et `lbc-account:X`
+      // (la source privée, qui a le nom). Le compteur passait d'abord, sans nom ; la
+      // source privée ensuite ne le lui rendait jamais. L'autre forme, si elle EXISTE,
+      // reçoit le nom et le type qui lui manquent — rien n'est créé, rien n'est écrasé.
+      const nu = idCompteLbc(acc.id), jumeau = nu === String(acc.id) ? 'lbc-account:' + nu : nu;
+      const ici = merged[String(acc.id)], la = merged[jumeau];
+      if (la && !(la.source && LBC_URL_AUTRUI.test(String(la.source)) && !la.sessionAt)) {
+        const comp = {};
+        if (!la.name && ici.name) comp.name = ici.name;
+        if (!la.type && ici.type) comp.type = ici.type;
+        if (Object.keys(comp).length) merged[jumeau] = Object.assign({}, la, comp);
+        if (!ici.name && la.name) ici.name = la.name;
+        if (!ici.type && la.type) ici.type = la.type;
+      } }
     // Le compte Leboncoin CONNECTÉ, gardé dans le navigateur : la petite carte
     // de l'extension le nomme sans relire la base. Seulement sur un endpoint
     // « moi » (jamais la fiche d'autrui — même règle que la détection, §11).
