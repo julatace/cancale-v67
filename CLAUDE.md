@@ -1,5 +1,18 @@
 # VRM — dossier de passation
 
+> **26 octobre — Colis et Ma journée, même traitement :** Ma journée au téléphone : dans la
+> carte « Vendu », « Reçu en … » et « Chiffre d'affaires {année} » se CHEVAUCHAIENT (la règle
+> de `styles-mobile-studio.css` rangeait UN bloc dans une colonne à droite ; le second s'y
+> empilait) — chacun a maintenant sa ligne. Ordinateur : bonjour, date (« lundi 26 octobre »,
+> plus « Lundi 26 Octobre ») et « N choses à faire » sur une ligne ; « En attente » en haut de
+> sa carte. Colis : la date limite d'une carte revient à la ligne (elle débordait à 390 px) et
+> un retard est ambre, plus rouge (§7 ; idem cartes eBay) ; « ✓ Ventes Vinted à jour » ne
+> s'affiche plus quand tout est à jour (l'alerte d'une capture ancienne reste) ; imprimante
+> et son explication sur une ligne. CSS dans `styles-annonces-ventes.css` (chargé en dernier).
+> Banc `annonces-ventes-brouillon.cjs` (vues `cat_bord`, `journee`) : 7 rouges sur main, vert
+> après (les contrôles de la ligne de date limite n'ont rien à mesurer sur l'avant : la
+> capture montrait le débordement et le rouge).
+
 > **26 octobre — Achats et Messages, même traitement :** dans l'espace Vinted, plus de
 > second titre « Achats » / « Messages » sous l'onglet déjà sélectionné, et la carte
 > « Reçus d'achat par email » passe SOUS la liste (une archive, pas le geste du jour ;

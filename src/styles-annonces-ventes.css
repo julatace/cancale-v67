@@ -93,3 +93,32 @@
 
 /* Achats : les reçus par email descendent sous la liste (26 octobre). */
 .vrm-app-shell .vrm-main .vrm-achats-recus-bas { margin-top: 18px; }
+
+/* ── Colis et Ma journée (26 octobre, même passe) ───────────────────────────── */
+/* Ma journée, téléphone : la carte « Vendu » rangeait « Reçu en … » dans une
+   colonne à droite, écrite pour UN bloc ; « Chiffre d'affaires {année} » est venu
+   s'y empiler et les deux textes se chevauchaient. Chaque bloc a sa ligne, sous
+   le montant du mois. */
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-day-money .vrm-day-recu {
+    grid-column: 1 / -1 !important; grid-row: auto !important; max-width: none !important;
+    flex-direction: row !important; align-items: center !important; justify-content: space-between !important;
+    border-left: 0 !important; border-top: 1px solid var(--vrm-line) !important;
+    margin: 8px 0 0 !important; padding: 8px 0 0 !important;
+  }
+}
+/* La date du jour : « lundi 26 octobre », une majuscule au début, pas à chaque mot. */
+.vrm-app-shell .vrm-day-greeting .vrm-day-date { text-transform: none; }
+.vrm-app-shell .vrm-day-greeting .vrm-day-date::first-letter { text-transform: uppercase; }
+/* Ordinateur : bonjour, date, « N choses à faire » et « Modifier » sur UNE ligne
+   (la grille à deux colonnes les éparpillait en deux lignes décalées). */
+@media (min-width: 768px) {
+  .vrm-app-shell .vrm-day-layout .vrm-day-greeting { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .vrm-app-shell .vrm-day-greeting .vrm-day-todo { margin-left: auto; }
+  /* « En attente » : le montant en haut de sa carte, pas centré dans un grand vide. */
+  .vrm-app-shell .vrm-day-layout .vrm-day-wallet { justify-content: flex-start !important; align-content: start !important; }
+}
+/* Colis : le choix de l'imprimante et son explication sur une seule ligne. */
+.vrm-app-shell .vrm-colis-imprimante { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.vrm-app-shell .vrm-colis-imprimante > .vrm-colis-imprimante-aide { margin-top: 0 !important; }
+.vrm-app-shell .vrm-colis-fraicheur:empty { display: none; }

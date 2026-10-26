@@ -42,13 +42,15 @@ const rows=[{id:'main',data:{vinted_annonce_numeros:num}},
 {id:'harvest_111_inbox',data:{capturedAt:iso(0),payload:{conversations:C1}}},{id:'harvest_222_inbox',data:{capturedAt:iso(0),payload:{conversations:C2}}},
 {id:'harvest_111_listings',data:{capturedAt:iso(0),payload:{items:A1}}},{id:'harvest_222_listings',data:{capturedAt:iso(0),payload:{items:A2}}},
 {id:'harvest_111_orders_sold',data:{capturedAt:iso(0),payload:{my_orders:V1}}},{id:'harvest_222_orders_sold',data:{capturedAt:iso(0),payload:{my_orders:V2}}},
+...[0,5,7].map(i=>({id:'email_bord_'+(7700+i),data:{transaction:String(7700+i),filename:'bordereau-'+(7700+i)+'.pdf',pdfB64:'JVBERi0x',modele:V1[i].title,account:'julatace35260',receivedAt:iso(i/10),dateLimite:new Date(now+(i+1)*86400000).toLocaleDateString('fr-FR')+' 10 h 00',type:'vinted'}})),
+{id:'email_track_mondialrelay_12345678',data:{carrier:'mondialrelay',status:'disponible',suivi:'12345678',code:'482913',lieu:'TABA\'VAP\n12 rue des Lilas\n35000 Rennes',subject:'Votre colis est disponible',receivedAt:iso(1),arriveLe:iso(1),dateLimite:new Date(now+4*86400000).toISOString()}},
 {id:'harvest_111_billing',data:{capturedAt:iso(0),payload:{user_balance:{available_amount:{amount:'42.5'},escrow_amount:{amount:'310.0'}}}}}];
 const ACCS=[{id:1,vinted_user_id:'111',login:'julatace35260',domain:'www.vinted.fr',updated_at:iso(0),created_at:iso(90)},{id:2,vinted_user_id:'222',login:'tomj606',domain:'www.vinted.fr',updated_at:iso(0),created_at:iso(60)}];
 const types={'.js':'text/javascript','.css':'text/css','.html':'text/html','.png':'image/png','.svg':'image/svg+xml','.json':'application/json','.webmanifest':'application/json','.woff2':'font/woff2'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0];if(f==='/'||!path.extname(f))f='/index.html';const p=path.join(DIST,f);if(!fs.existsSync(p)){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':types[path.extname(p)]||'application/octet-stream'});fs.createReadStream(p).pipe(r);}).listen(PORT);
 const projette=(row,sel)=>{const out={};for(const part of sel.split(',')){const m=/^(?:([^:]+):)?(.+)$/.exec(part.trim());if(!m)continue;const src=m[2],al=m[1]||src.split(/->>|->/).pop();if(src==='id'){out[al]=row.id;continue;}if(src==='data'){out[al]=row.data;continue;}let v=row.data;for(const s of src.replace(/^data(->>|->)/,'').split(/->>|->/))v=v==null?null:v[s];out[al]=v==null?null:(src.includes('->>')&&typeof v==='object'?JSON.stringify(v):v);}return out;};
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
-const plan=(process.env.VUES||'plat_vinted:ventes,plat_vinted:annonces,plat_vinted:achats,plat_vinted:messages').split(',');
+const plan=(process.env.VUES||'plat_vinted:ventes,plat_vinted:annonces,plat_vinted:achats,plat_vinted:messages,cat_bord,journee').split(',');
 for(const vp of [{width:390,height:844},{width:1512,height:950}]){for(const sombre of (process.env.SOMBRE?[false,true]:[false])){
 const ctx=await b.newContext({viewport:vp,colorScheme:sombre?'dark':'light',...(vp.width<600?{isMobile:true,hasTouch:true}:{})});const pg=await ctx.newPage();const errs=[];pg.on('pageerror',e=>errs.push(e.message));
 await pg.addInitScript((s)=>{try{localStorage.setItem('vrm_acces_direct','1');if(s)localStorage.setItem('vinted_dark','true');}catch(_){}},sombre);
@@ -78,6 +80,11 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
     recusTop:top(document.querySelector('[data-recus-email]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
     colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),
+    chev:(()=>{const a=document.querySelector('.vrm-day-money [data-recu-mois]'),c=document.querySelector('.vrm-day-money [data-ca-annee]');if(!a||!c)return null;const r1=a.getBoundingClientRect(),r2=c.getBoundingClientRect();return !(r1.bottom<=r2.top+1||r2.bottom<=r1.top+1||r1.right<=r2.left+1||r2.right<=r1.left+1);})(),
+    dateCap:(()=>{const d=document.querySelector('.vrm-day-greeting .vrm-day-date');return d&&d.getBoundingClientRect().height>0?getComputedStyle(d).textTransform:null;})(),
+    tete:(()=>{const h=document.querySelector('.vrm-day-greeting .vrm-day-hello'),t=document.querySelector('.vrm-day-greeting .vrm-day-todo');return h&&t?Math.abs(top(h)-top(t)):null;})(),
+    limites:[...document.querySelectorAll('[data-bord-card]')].map(c=>{const s=c.querySelector('[data-colis-limite-texte]');if(!s)return null;const rc=c.getBoundingClientRect(),rs=s.getBoundingClientRect();const m=/rgba?\((\d+), ?(\d+), ?(\d+)/.exec(getComputedStyle(s).color)||[];return {deborde:rs.right>rc.right+1,rouge:+m[1]>170&&+m[2]<80&&+m[3]<80,t:s.textContent.trim().slice(0,40)};}).filter(Boolean),
+    fraiche:vis(document.querySelector('[data-fraicheur-ventes]')),
     v0:top(ventes[0]),a0:top(cartes[0]),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,nA:cartes.length,
     deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1};});
 if(sub==='ventes'){
@@ -95,6 +102,15 @@ if(sub==='ventes'){
 } else if(sub==='messages'){
   dit(!m.titreMsg,`[${W}] pas de second titre « Messages » sous l'onglet Messages`);
   dit(m.convTop!=null&&m.convTop<=(W<600?380:470),`[${W}] la recherche des conversations arrive plus haut`,String(m.convTop));
+} else if(v==='journee'){
+  dit(m.chev===false,`[${W}] « Reçu » et « Chiffre d'affaires » ne se chevauchent pas dans la carte Vendu`,String(m.chev));
+  dit(m.dateCap!=='capitalize',`[${W}] la date s'écrit « lundi 26 octobre », pas « Lundi 26 Octobre »`,String(m.dateCap));
+  if(W>=768)dit(m.tete!=null&&m.tete<=12,`[${W}] bonjour et « N choses à faire » sur la même ligne`,String(m.tete));
+} else if(v==='cat_bord'){
+  dit(m.limites.length>=3,`[${W}] les cartes de Colis portent leur date limite`,String(m.limites.length));
+  dit(m.limites.every(x=>!x.deborde),`[${W}] la date limite ne déborde pas de sa carte`,JSON.stringify(m.limites.filter(x=>x.deborde)));
+  dit(m.limites.every(x=>!x.rouge),`[${W}] un retard est ambre, pas rouge (§7)`,JSON.stringify(m.limites.filter(x=>x.rouge)));
+  dit(!m.fraiche,`[${W}] pas de « Ventes Vinted à jour » quand tout est à jour`);
 } else {
   dit(m.nA>=10,`[${W}] les annonces sont rendues`,String(m.nA));
   dit(!m.titreAnn,`[${W}] pas de second titre « Annonces en ligne » sous l'onglet Annonces`);
