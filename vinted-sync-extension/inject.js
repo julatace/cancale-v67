@@ -148,6 +148,9 @@
     dernierFavoriClique=null;if(!e.isTrusted)return;
     const a=e.target?.closest?.('a[href]'),url=a&&lienContexteFavori(a.href);
     if(url)dernierFavoriClique={url,at:Date.now()};
+    // The bell renders favorites as ?receiver_id=&item_id= (measured 25-26 Oct).
+    // Only the URL goes to the extension; it checks everything itself.
+    else if(a){try{const v=new URL(a.href,location.origin);if(v.origin===location.origin&&v.searchParams.has('receiver_id')&&v.searchParams.has('item_id')&&v.href.length<=2000)post({kind:'favoriNatifClic',url:v.href});}catch{}}
   },true);
 
 function suivreFavoriAffiche(cible,activer=false){
