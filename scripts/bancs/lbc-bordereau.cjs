@@ -116,10 +116,12 @@ async function rendre(b, version) {
       try { await r.pg.click('[data-imprime-lbc="A1"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton « Imprimer » du colis existe', String(e.message).slice(0, 80)); }
       await r.pg.waitForTimeout(2500);
       dit(r.appels.length === 1 && r.appels[0] === VOUCHER, 'le pont est appelé avec l’adresse EXACTE du bordereau de CE colis', JSON.stringify(r.appels));
-      dit(onglets.length === 1 && /^blob:/.test(onglets[0].url()), 'un onglet s’ouvre sur le PDF (pas un téléchargement)', JSON.stringify(onglets.map((p) => p.url())));
+      // 26 oct. : le PDF s'ouvre DANS VRM (visionneuse), plus dans un onglet réservé.
+      const srcPdf = await r.pg.evaluate(() => { const f = document.querySelector('[data-visionneuse-cadre]'); return f && f.getAttribute('src'); });
+      dit(onglets.length === 0 && /^blob:/.test(srcPdf || ''), 'le PDF s’ouvre dans VRM (aucun onglet, pas un téléchargement)', JSON.stringify({ onglets: onglets.map((p) => p.url()), srcPdf }));
       dit(telecharges.length === 0, 'aucun téléchargement', JSON.stringify(telecharges));
-      if (onglets[0]) {
-        const b64 = await r.pg.evaluate(async (u) => { const t = new Uint8Array(await (await fetch(u)).arrayBuffer()); let s = ''; for (const x of t) s += String.fromCharCode(x); return btoa(s); }, onglets[0].url());
+      if (srcPdf) {
+        const b64 = await r.pg.evaluate(async (u) => { const t = new Uint8Array(await (await fetch(u)).arrayBuffer()); let s = ''; for (const x of t) s += String.fromCharCode(x); return btoa(s); }, srcPdf);
         const brut = Buffer.from(b64, 'base64');
         // pdf-lib compresse ses flux : on les décompresse tous pour chercher le
         // tampon (le texte s'écrit en hexadécimal, `<4A6F…> Tj`).

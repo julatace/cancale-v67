@@ -8,6 +8,13 @@
 > stats-compta, retours-stock, glisser-onglet, revendeurs, messages-priorite, session,
 > extension-leboncoin-installee.
 
+> **26 octobre — bordereaux sur ordinateur :** « bègues, ne s'ouvrent pas ». L'onglet
+> vide réservé au clic prenait le premier plan, cachait la confirmation du N° (à
+> vérifier, deux paires) et se refermait au bout de 25 s. Le PDF s'ouvre maintenant
+> DANS VRM (`VisionneusePdf`, z 9500, sous les confirmations) : cadre sur le PDF,
+> « Imprimer », « Ouvrir dans un onglet », « Télécharger ». iPhone inchangé.
+> Banc `ventes-bordereau.cjs` : 4 rouges sur main, vert après.
+
 > **26 octobre — Leboncoin relu sans geste (5.231) :** toutes les 30 min l'extension
 > regarde si la page « Mes annonces » a été lue depuis 6 h ; sinon elle l'ouvre EN
 > ARRIÈRE-PLAN, laisse la page faire ses lectures (captées comme d'habitude), puis
