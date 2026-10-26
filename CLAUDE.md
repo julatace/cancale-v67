@@ -4,9 +4,19 @@
 > « Supprimer ce compte » → « Retirer ses annonces pour de bon » (`vrm_annonces_retirees`,
 > synchronisé) : ses annonces sortent d'Annonces, des totaux et des files Leboncoin/eBay ;
 > ses ventes restent. « Les remettre » annule. Banc `annonces-retirees.cjs`. Navigateur des
-> bancs : `/opt/pw-browsers/chromium` (lien stable). Rouges À L'IDENTIQUE sur main :
-> stats-compta, retours-stock, glisser-onglet, revendeurs, messages-priorite, session,
-> extension-leboncoin-installee.
+> bancs : `/opt/pw-browsers/chromium` (lien stable).
+
+> **26 octobre (soir) — les bancs rouges réparés, tous en retard sur le code (l'app intacte) :**
+> stats-compta (détail replié), retours-stock (base cloisonnée, sinon rien ne part au nuage),
+> glisser-onglet (balayage souris retiré le 24 oct. ⇒ l'autre sens au doigt), revendeurs (le
+> rappel URSSAF de fin de mois faisait dépendre la vue globale de la DATE), messages-priorite
+> (« Envoyer l'offre » dans un repli), extension-leboncoin-installee (Chrome 153 : prendre le
+> service worker VIVANT, servir la session privée `members/me/account`), audits supprimees,
+> impression, politique-hotes. `audit-preuve-vente` et `session` exigent l'historique Git
+> complet (`git fetch --unshallow`). **Chrome 153 (chromium-1243)** : une extension posée par
+> CDP n'est plus rechargée au redémarrage ⇒ `--load-extension` ; et une extension
+> `--load-extension` rechargée (⟳) DISPARAÎT ⇒ `session` G/P : la réparation automatique n'est
+> pas mesurable ici (4 rouges, limite du navigateur, pas de l'app).
 
 > **26 octobre — bordereaux sur ordinateur :** « bègues, ne s'ouvrent pas ». L'onglet
 > vide réservé au clic prenait le premier plan, cachait la confirmation du N° (à
