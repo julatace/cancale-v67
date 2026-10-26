@@ -76,6 +76,7 @@ function faire(seed) {
 }
 
 const LIES = JSON.stringify({ linked_accounts: [{ user_id: PRO, email: 'pro@ex.fr', display_name: 'BOUTIQUEPRO', is_business_user: true, profile_picture: { default: true }, unread_notifications: 0 }] });
+const UUID7 = '7a7a7a7a-1111-4222-8333-944444444444', UUID9 = '9b9b9b9b-1111-4222-8333-944444444444';
 const MEMBER = JSON.stringify({ account: { account_id: 'acc-1', type: 'private', status: 'active' }, member: { member_id: 'm-1', account_id: 'acc-1', first_name: 'J', last_name: 'F', contact: { email: 'part@ex.fr' }, nickname: { value: 'Particulier35' } } });
 const CARTE = (id, name, type) => JSON.stringify({ user_id: id, name, account_type: type, total_ads: 10, store_id: 0, feedback: { overall_score: 1 } });
 const MYADS = JSON.stringify({ ads: [
@@ -195,6 +196,28 @@ const lies = (env) => env.envoyer({ from: 'cancale-lbc', action: 'lbcComptes', c
     const r = await env.ctx.lireLbcAnnonces();
     const ids = (r.items || []).map((i) => i.id);
     dit(ids.length === 1 && ids[0] === '701', 'son annonce (compte de session) gardée, celle d’autrui ignorée', JSON.stringify(ids));
+  });
+
+  // 26 oct., mesuré sur sa base : le MÊME compte rangé deux fois — `lbc-account:X`
+  // (source privée : nom + type) et `X` (compteur de messagerie : SANS nom). Ses
+  // annonces et son compteur portent `X` : le nom ne les rejoignait jamais.
+  console.log('\n── 7. LE COMPTEUR RETROUVE LE NOM RANGÉ PAR LA SOURCE PRIVÉE (deux écritures d’un même compte)');
+  await essaie('nom privé repris', async () => {
+    const env = faire();
+    // L'ordre mesuré chez lui : le compteur d'abord (14:21, entrée nue sans nom), la source privée ensuite (19:58).
+    await lies(env);
+    await compteur(env, UUID7);
+    dit(!!env.base.lbc_accounts?.accounts?.[UUID7] && !env.base.lbc_accounts.accounts[UUID7].name, 'le scénario est réel : le compteur range l’entrée nue, sans nom');
+    await env.envoyer({ from: 'cancale-lbc', action: 'lbcSessionPrivee', url: 'https://api.leboncoin.fr/api/account/v2/members/me/account', preuve: JSON.parse(MEMBER.split('acc-1').join(UUID7)) });
+    dit(env.base.lbc_accounts?.accounts?.['lbc-account:' + UUID7]?.name === 'Particulier35', '… puis la source privée range lbc-account:{uuid} avec son nom');
+    const nu = env.base.lbc_accounts?.accounts?.[UUID7] || null;
+    dit(!!nu && nu.sessionAt && nu.name === 'Particulier35' && nu.type === 'particulier', 'l’entrée nue (celle de ses annonces et de son compteur) reçoit le nom et le type', JSON.stringify(nu));
+    // L'autre sens : un compteur d'un compte jamais nommé reste sans nom (rien d'inventé).
+    const env2 = faire();
+    await lies(env2);
+    await compteur(env2, UUID9);
+    const n2 = env2.base.lbc_accounts?.accounts?.[UUID9] || null;
+    dit(!!n2 && !n2.name, 'un compte jamais nommé reste sans nom', JSON.stringify(n2));
   });
 
   console.log(ko === 0 ? '\nLe compte connecté et ses annonces : lus par identité, jamais devinés.' : '\n' + ko + ' contrôle(s) au rouge.');
