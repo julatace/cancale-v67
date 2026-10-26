@@ -26,8 +26,17 @@ export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations
  const natifs=[trace,...(Array.isArray(traces)?traces.slice(-100):[])].map(t=>{const c=corpsNatif(t,uid);return c?{...c,contexte:lien({link:t.contexteFavori},capture.domain)}:null;}).filter(Boolean);
  for(const l of (Array.isArray(lectures)?lectures.slice(-50):[])){
   const conv=id(l?.conversationId),item=id(l?.itemId),recipient=id(l?.recipientId);
-  if(String(l?.uid)!==String(uid)||l?.method!=='GET'||!conv||!item||!recipient||recipient===String(uid)||!new RegExp('^/api/v[0-9]+/conversations/'+conv+'$').test(String(l.path||'')))continue;
+  if(String(l?.uid)!==String(uid)||!item||!recipient||recipient===String(uid))continue;
   const contexte=lien({link:l.contexteFavori},capture.domain);if(!contexte||contexte.itemId!==item)continue;
+  if(l?.method==='NAV'){
+   // The tab showed Vinted's own receiver_id/item_id route for this favorite.
+   // It counts only if receiver_id equals the single numeric parameter of the
+   // captured link (identity, not a translated name) and the path is a
+   // messaging route of that article.
+   const path=String(l.path||''),ks=[...contexte.params.keys()];
+   if(!/^\/(?:inbox|conversations?|messages?)(?:\/[a-z_-]{1,40}){0,2}$/.test(path)&&!new RegExp('^/items/'+item+'/[a-z_-]{1,40}(?:/new)?$').test(path))continue;
+   if(ks.length!==1||contexte.params.getAll(ks[0]).length!==1||id(contexte.params.get(ks[0]))!==recipient||recipient===item)continue;
+  }else if(l?.method!=='GET'||!conv||!new RegExp('^/api/v[0-9]+/conversations/'+conv+'$').test(String(l.path||'')))continue;
   natifs.push({itemId:item,recipientId:recipient,initiator:corps.initiator,contexte});
  }
  const paires=new Set(conversations.filter(c=>String(c.uid)===String(uid)&&id(c.conversationId)&&id(c.itemId)&&id(c.recipientId)&&id(c.recipientId)!==String(uid)).map(c=>id(c.itemId)+':'+id(c.recipientId)));
@@ -52,7 +61,7 @@ export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations
  // it can address favorites that have never been opened natively.
  parametres=parametres.filter(p=>new Set(parametres.filter(q=>q.forme===p.forme&&q.cle===p.cle).map(q=>q.recipientId)).size>=2);
  const erreurRaccordement=(message,code)=>{const e=new RefusFavoris(message);e.code=code;e.diagnostic={notifications:candidats.length,tracesNatives:natifs.length,pairesNatives:paires.size,formesUserId:formes.size,liensExacts:exacts.size,parametresConfirmes:new Set(parametres.map(p=>p.forme+':'+p.cle)).size,selection:selection.length};return e;};
- if(!formes.size&&!exacts.size&&!parametres.length){throw erreurRaccordement('Le lien du favori n’est pas confirmé. Utilise « Vérifier sur Vinted » sur sa ligne, puis vérifie que « Lien enregistré » apparaît avant de relancer. Aucun message envoyé.','favoris_preuve_absente');}
+ if(!formes.size&&!exacts.size&&!parametres.length){throw erreurRaccordement('Le lien du favori n’est pas confirmé. Avec l’extension 5.229 ou plus récente, ouvre ce favori depuis la cloche de Vinted (connecté sur ce compte), attends que sa page de message s’affiche, puis relance. Aucun message envoyé.','favoris_preuve_absente');}
  return selection.map(notificationId=>{
   const ns=parId.get(notificationId)||[],n=ns[0]?.n,l=ns[0]?.l;
   if(ns.length!==1||!l)throw new RefusFavoris('Un favori sélectionné n’a pas de destinataire confirmé. Aucun envoi lancé.');

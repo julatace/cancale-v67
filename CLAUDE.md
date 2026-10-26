@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **26 octobre — favoris 5.228 :** le rapport du parcours manuel montre que la cloche
+> affiche le favori avec un lien `receiver_id`/`item_id`, pas le lien enregistré
+> (`/items/{article}/want_it/new?offering_id=…`). Ce lien est suivi seulement par
+> identités : même article, et receiver_id égal à l’unique paramètre numérique
+> enregistré. L’onglet doit ensuite montrer cette route, sinon rien n’est rangé.
+> Serveur : une preuve `NAV` confirme CE favori ; il en faut deux de destinataires
+> distincts pour les autres. Parcours réel non vérifié, aucun message envoyé.
+> 5.229 : le clic du vendeur lui-même dans la cloche produit aussi la preuve (mêmes
+> contrôles) ; compteurs `favori_clic_*` dans `panel_diag_capture`.
+> Voir `docs/passation/2026-10-26-favoris-lien-natif.md`.
+
 > **25 octobre — VRM Capture 1.0.0 indépendant :** source
 > `vrm-capture-extension/`, bouton directement visible, sans connexion ni moteur
 > VRM. Archives dédiées Chrome et Orion, stockage et indicateur distincts.

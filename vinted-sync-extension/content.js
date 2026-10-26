@@ -137,8 +137,13 @@
     const m=event.data;if(event.source!==window||m?.__tag!=='CANCALE_VINTED_FAVORI_REP')return;
     const f=attentesFavoris.get(m.id);if(f){attentesFavoris.delete(m.id);f(m);}
   });
+  function natifFavoriSur(v){
+   const n=x=>typeof x==='string'&&/^[1-9]\d{0,19}$/.test(x)?x:'';
+   if(!v||!n(v.itemId)||!n(v.receiverId)||typeof v.chemin!=='string'||v.chemin.length>120||!/^\/[a-z0-9_\/-]*$/.test(v.chemin))return null;
+   return {chemin:v.chemin,itemId:v.itemId,receiverId:v.receiverId};
+  }
   function inspectionFavoriSure(v){
- const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
+ const r={};for(const k of ['liensFavoris','memeArticle','exacts','visibles','natifsMemeArticle','natifs','natifsVisibles'])if(Number.isSafeInteger(v?.[k])&&v[k]>=0&&v[k]<=10000)r[k]=v[k];return r;
 }
   function traiterFavoriPage(m,sender,sendResponse){
     if(m?.vrm!=='favoriPage'||window.top!==window)return false;
@@ -151,7 +156,7 @@
       clearTimeout(timer);if(r.origine!==location.origin)return sendResponse(null);
       const v=r.resultat;
       if(m.action.startsWith('cloche_')){if(!v||!['disponible','deja_ouverte','activee','absente','ambigue','indisponible','origine'].includes(v.etat))return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{etat:v.etat}});}
-      else {if(!v||typeof v.trouve!=='boolean')return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{trouve:v.trouve,...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})}});}
+      else {if(!v||typeof v.trouve!=='boolean')return sendResponse(null);const nat=v.trouve&&v.natif?natifFavoriSur(v.natif):null;if(v.trouve&&v.natif&&!nat)return sendResponse(null);sendResponse({id:m.id,origine:location.origin,resultat:{trouve:v.trouve,...(nat?{natif:nat}:{}),...(v.inspection?{inspection:inspectionFavoriSure(v.inspection)}:{})}});}
     });
     try{window.postMessage({__tag:'CANCALE_VINTED_FAVORI_REQ',id:m.id,action:m.action,cible:m.cible},location.origin);}catch{clearTimeout(timer);attentesFavoris.delete(m.id);sendResponse(null);}
     return true;
