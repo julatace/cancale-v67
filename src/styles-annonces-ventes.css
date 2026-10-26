@@ -1,0 +1,92 @@
+/* Annonces et Ventes — la mise en page FINALE des deux listes (26 octobre).
+   Julien (après l'avis d'un ami) : « trop brouillon ». Mesuré au rendu : une
+   annonce occupait 165 px au téléphone et 160 px à l'ordinateur pour un titre,
+   un prix et trois chiffres ; une vente ne disait ni sa date ni son compte, et
+   « À expédier » avait la même teinte grise que « Vendue ».
+   Ce fichier est chargé EN DERNIER : il décide de ces deux listes. Les règles
+   plus anciennes (minéral, studio, gestion) restent pour le reste de l'app. */
+
+.vrm-app-shell { --av-warn: #A15C00; }
+:root[data-theme=dark] .vrm-app-shell { --av-warn: #FFB23E; }
+
+/* ── Ventes : une ligne = titre, puis date · compte en dessous ─────────────── */
+.vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title {
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  white-space: normal; overflow: hidden; min-width: 0;
+}
+.vrm-app-shell .vrm-main .vrm-ledger-sale-nom {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vrm-app-shell .vrm-main .vrm-ledger-sale-sous {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 11px; font-weight: 500; color: var(--vrm-muted);
+}
+.vrm-app-shell .vrm-main .vrm-ledger-sale-state[data-ton=action] { color: var(--av-warn) !important; font-weight: 700; }
+.vrm-app-shell .vrm-main .vrm-ledger-sale-state[data-ton=annule] { opacity: .75; }
+
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle { min-height: 52px; }
+  .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title { font-size: 12.5px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-sous { font-size: 10.5px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-state { font-size: 10.5px; max-width: 86px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-amount { font-size: 13px; }
+}
+
+/* ── Annonces : une carte compacte, le « ⋯ » dans la carte ─────────────────── */
+.vrm-app-shell .vrm-main .vrm-ann-card { position: relative; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-overview > a { width: 64px !important; height: 84px !important; border-radius: 8px !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card [data-chiffres] {
+  border: 0 !important; margin-top: 2px !important; padding: 0 44px 0 0 !important;
+  font-size: 12px; align-items: center !important;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card [data-etat-ligne] { font-size: 12px; }
+
+/* Le « ⋯ » (Gérer l'annonce) : fermé, c'est un bouton de 44 px en bas à droite
+   de la carte — plus une ligne entière de 40 px sous chaque annonce. Ouvert, le
+   panneau reprend toute la largeur sous la carte. */
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions.vrm-ann-actions:not([open]) {
+  position: absolute !important; right: 4px; bottom: 4px; padding: 0 !important;
+  border: 0 !important; background: transparent !important; width: 44px; height: 44px;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary {
+  position: static !important; width: 44px; height: 44px; min-height: 44px !important;
+  margin: 0 !important; padding: 0 !important; display: flex !important;
+  align-items: center; justify-content: center; border-radius: 10px;
+  font-size: 0 !important; color: var(--vrm-muted) !important;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary > * { display: none !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary::before { content: '⋯'; font-size: 20px; line-height: 1; letter-spacing: 1px; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary::after { content: none !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions[open] {
+  position: static !important; display: block !important; grid-column: 1 / -1;
+  padding: 0 12px 12px !important; border-top: 1px solid var(--vrm-line) !important; border-left: 0 !important;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions[open] > summary { margin-left: auto !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions[open] > div { padding: 0 !important; margin-top: 0 !important; }
+@media (hover: hover) {
+  .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary:hover { background: var(--vrm-bg); color: var(--vrm-ink) !important; }
+}
+
+@media (min-width: 768px) {
+  /* Une seule colonne : la carte n'a plus besoin de la colonne de droite du « ⋯ ». */
+  .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card { display: block !important; }
+  .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-overview { padding: 10px 16px 10px 12px !important; }
+  .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions.vrm-ann-actions:not([open]) { right: 8px; bottom: 6px; }
+
+  /* Stock et Publier : côte à côte, comme au téléphone (deux lignes pleine
+     largeur pour deux entrées repliées). Ouvert, chacun reprend la largeur. */
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools,
+  .vrm-app-shell .vrm-main [data-places-wrap] {
+    display: inline-block; width: calc(50% - 6px); vertical-align: top; margin-bottom: 12px !important;
+  }
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools { margin-right: 8px; }
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools[open],
+  .vrm-app-shell .vrm-main [data-places-wrap][open] { display: block; width: auto; margin-right: 0; }
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools > summary {
+    min-height: 48px; box-sizing: border-box; padding: 0 14px !important; border: 1px solid var(--vrm-line);
+    border-radius: 12px; background: var(--vrm-surface); color: var(--vrm-ink) !important; font-size: 13px; font-weight: 600;
+  }
+}
+
+/* « Retirer mon argent » se tait sans argent à retirer : son emplacement aussi. */
+.vrm-app-shell .vrm-retirer-hote:empty { display: none; }

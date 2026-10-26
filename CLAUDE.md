@@ -1,5 +1,17 @@
 # VRM — dossier de passation
 
+> **26 octobre — Annonces et Ventes « trop brouillon » (avis d'un ami de Julien) :** dans
+> l'espace Vinted, plus de second titre (« Ventes », « Vos ventes », « Annonces en ligne »), ni
+> « Annonces de N comptes » sous le sélecteur (sauf connexion refusée) ; « À faire aujourd'hui »
+> tient sur une ligne ; « Retirer mon argent » se tait sans argent ; « Bordereaux auto » et « Mes
+> vues » dans « ⋯ Outils » à toutes les tailles. Une vente dit sa date et son compte
+> (`LigneVenteCompacte sous`) et « À expédier » est en ambre (`data-ton="action"`). Une annonce :
+> état + logos sur une ligne (taille seulement si absente du titre, `tailleDansTitre`), vues et âge
+> à côté de l'achat, « ⋯ » dans la carte. Mise en page finale de ces deux listes :
+> `src/styles-annonces-ventes.css`, chargé EN DERNIER. Banc `annonces-ventes-brouillon.cjs`
+> (16 rouges sur main, vert après ; CSS et ton retirés ⇒ 5 rouges). Première vente 844 → 609 px
+> (ordinateur), une annonce 159 → 105 px.
+
 > **26 octobre — annonces d'un compte bloqué, bancs :** Comptes liés → un compte →
 > « Supprimer ce compte » → « Retirer ses annonces pour de bon » (`vrm_annonces_retirees`,
 > synchronisé) : ses annonces sortent d'Annonces, des totaux et des files Leboncoin/eBay ;
