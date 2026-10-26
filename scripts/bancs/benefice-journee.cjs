@@ -101,7 +101,9 @@ async function page(b, T, opts={}){
       try{ const corps=JSON.parse(route.request().postData()||'null'); for(const x of [].concat(corps||[])) if(x&&x.id==='main'&&x.data&&typeof x.data==='object') opts.main=x.data; }catch(_){}
       return route.fulfill({status:201,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'[]'}); }
     if(opts.ventesKO && /orders_sold|orders_\*|_orders_/.test(u)) return route.fulfill({status:522,contentType:'text/html',body:'<html>522</html>'});
-    if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
+    // Base CLOISONNÉE, comme en production : sinon l'app ne pousse jamais `main`
+    // au nuage, et « éteint » revenait « allumé » au rechargement (§6.3).
+    if(/select=owner/.test(u)) return j([{ owner: process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' }]);
     const S=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
     const eq=/id=eq\.([^&]*)/.exec(u);
