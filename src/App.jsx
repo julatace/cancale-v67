@@ -45491,6 +45491,31 @@ function LeboncoinScreen() {
         if (!r.lbc && r.numero !== '?' && vuesLbc.has(cleNum(r.numero))) removals.splice(i, 1);
       }
     }
+    // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire VENDUE SUR eBAY et
+    //    encore en ligne ici doit en sortir, sinon elle se vend deux fois.
+    //    `commandesEbayTous` rend null si un compte eBay est illisible ⇒ « pas
+    //    su », on ne retire RIEN (rien lu ne vaut pas rien). Identité par le SKU
+    //    VRM-{n°} (§5), jamais le titre. Une paire déjà « à retirer » (vendue
+    //    sur Vinted) n'est pas doublée — une paire, une ligne.
+    try {
+      const cmdsEbay = await commandesEbayTous();   // null si un compte eBay illisible ⇒ pas su
+      if (Array.isArray(cmdsEbay)) {
+        const soldEbay = new Set();
+        for (const o of cmdsEbay) { if (!commandeEbayEngagee(o)) continue; for (const li of (Array.isArray(o.lineItems) ? o.lineItems : [])) { const k = cleNum(numLigneEbay(o, li)); if (k) soldEbay.add(k); } }
+        if (soldEbay.size) {
+          const parN = new Map(); removals.forEach((r) => { const k = cleNum(r.numero); if (k && !parN.has(k)) parN.set(k, r); });
+          for (const ad of liveAds) {
+            const k = adKeys(ad).filter((x) => keysKnown.has(x)).find((x) => soldEbay.has(x));
+            if (!k) continue;
+            const ex = parN.get(k);
+            if (ex && ex.etat === 'vendue') continue;   // déjà « à retirer » (vendue ailleurs, prouvée) — une paire, une ligne
+            if (ex) { const i = removals.indexOf(ex); if (i >= 0) removals.splice(i, 1); }   // un simple doute devient une vente eBay PROUVÉE
+            const entry = { numero: k, title: ad.subject || '', lbc: true, ou: 'eBay', url: ad.url || '', etat: 'vendue', id: ad.id != null ? String(ad.id) : '', prix: ad.price != null && isFinite(Number(ad.price)) ? Number(ad.price) : null };
+            removals.push(entry); parN.set(k, entry);
+          }
+        }
+      }
+    } catch (_) { /* une lecture eBay qui tombe ne casse jamais l'écran Leboncoin */ }
     removals.sort((a, b) => triNum(a.numero, b.numero));
     // ── L'AUTRE SENS : VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED ────────
     // Les paires que Vinted propose encore à la vente (`onlineIds`), et celles que
@@ -45615,9 +45640,11 @@ function LeboncoinScreen() {
   //    exactement la régression que le bloc détaillé (« VENDUE SE PROUVE »)
   //    existe pour empêcher. Aligné sur eBay (`dvVue.aRetirerEbay`) et la
   //    cloche (`lbcRemoveCount`), qui ne comptent que le prouvé.
-  const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue').length : 0;
+  const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
+  const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
     nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${nRetirerLbc} paire${plurLbc(nRetirerLbc)} vendue${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    nRetirerLbcEbay && { k: 'retirer-ebay', urg: true, sel: '[data-lbc-retirer-ebay]', txt: `${nRetirerLbcEbay} paire${plurLbc(nRetirerLbcEbay)} vendue${plurLbc(nRetirerLbcEbay)} sur eBay, encore en ligne ici — à retirer de Leboncoin` },
     data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
     data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
     data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
@@ -45787,7 +45814,8 @@ function LeboncoinScreen() {
             encore. Trois états, et seul le prouvé est rouge — §5 « mieux vaut un
             blanc qu'un faux », et on dit « à vérifier », jamais « vendu ». */}
         {data.removals.length > 0 && (() => {
-          const vendues = data.removals.filter(r => r.etat === 'vendue');
+          const vendues = data.removals.filter(r => r.etat === 'vendue' && r.ou !== 'eBay');
+          const venduesEbay = data.removals.filter(r => r.etat === 'vendue' && r.ou === 'eBay');
           const pause = data.removals.filter(r => r.etat === 'pause');
           const doute = data.removals.filter(r => r.etat !== 'vendue' && r.etat !== 'pause');
           const pe = pauseEtat();
@@ -45826,6 +45854,16 @@ function LeboncoinScreen() {
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
                 {carteDoute === 'vendues' ? phraseDoute : null}
+              </Card>
+            )}
+            {venduesEbay.length > 0 && (
+              <Card style={{ borderColor: C.warn }}>
+                <Titre>{venduesEbay.length} vendue{venduesEbay.length > 1 ? 's' : ''} sur eBay — à retirer de Leboncoin</Titre>
+                <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
+                  {venduesEbay.some((r) => r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
+                  {venduesEbay.some((r) => r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
+                </div>
+                {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
               </Card>
             )}
             {doute.length > 0 && (
