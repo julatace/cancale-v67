@@ -228,6 +228,21 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dit(dv().length === 0, 'aucune notification : un titre n’est pas une identité', `${dv().length}`);
   });
 
+  // ══ 4bis. Un SKU qu'AUCUNE fiche ne porte ⇒ rien (parité avec l'app) ════════
+  // VRM-230 publiée pendant la panne de synchro, la paire est devenue N°53 ;
+  // plus aucune fiche ne porte 230. App ouverte, `numEbayLu` la classe « non
+  // reliée » (null). Le push serveur doit en faire autant — sinon « N°230
+  // encore en vente sur eBay » part, app fermée, sur une annonce qui n'est PAS
+  // cette paire. Les fiches sont NON VIDES (ce n'est pas « pas su »).
+  console.log('\n── 4bis. Un SKU VRM-230 qu’aucune fiche actuelle ne porte');
+  await essaie('ebay-sku-orphelin', async () => {
+    reset();
+    pose(A, 'main', { vinted_annonce_numeros: { v1: { numero: '53', title: 'Autre paire' } } });
+    pose(A, 'ebay_listings', { items: [{ itemId: '1111', sku: 'VRM-230', title: 'Nike Air Max 90' }] });
+    await recoit(bordereau('a@vrm.test', 'Nike Air Max 90 n230'));
+    dit(dv().length === 0, 'un SKU VRM-230 qu’AUCUNE fiche ne porte ne déclenche aucune notification (parité avec l’app)', `${dv().length}`);
+  });
+
   // ══ 5. Lectures ratées ⇒ rien ═══════════════════════════════════════════════
   console.log('\n── 5. « Pas su » ⇒ rien');
   await essaie('passu-ebay', async () => {

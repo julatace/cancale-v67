@@ -80,6 +80,13 @@ export function numeroAnnonceEbay(a, mk, fiches, liensEbay) {
     if (Number.isFinite(pub) && Number.isFinite(quand) && quand > pub + 60000) return '';
     if (!Number.isFinite(pub) && ficheAVerifier(f)) return '';
   }
+  // ⚠️ AUCUNE FICHE ACTUELLE NE PORTE CE N° ⇒ le SKU ne désigne plus une paire :
+  //    on ne rapproche RIEN (parité avec l'app, App.jsx `numEbayLu` : « VRM-82
+  //    publiée pendant la panne, paire devenue N°53, plus aucune fiche ne porte
+  //    82 → non reliée »). Sans ça, un push « N°82 encore en vente sur eBay »
+  //    partait, app fermée, sur une annonce qui n'est PAS cette paire. `fiches`
+  //    vides = « pas su » (l'appelant ne lit rien) ⇒ on ne juge pas.
+  if (!porteurs.length && Object.keys(F).length) return '';
   return k;
 }
 export function annoncesEbayParNumero(lignes, idsActifs, mk, fiches, liensEbay) {

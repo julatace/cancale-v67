@@ -22,12 +22,18 @@ const PORT = 4341;
 
 const auj = new Date();
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
-const annonce = (id, titre, prix) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: titre.split(' ')[0], size_title: (/taille (\d+)/.exec(titre) || [])[1] || '', is_closed: false, is_hidden: false, is_draft: false, photo: { url: 'https://img.test/v' + id + '.jpg' } });
+const annonce = (id, titre, prix, extra) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: titre.split(' ')[0], size_title: (/taille (\d+)/.exec(titre) || [])[1] || '', is_closed: false, is_hidden: false, is_draft: false, photo: { url: 'https://img.test/v' + id + '.jpg' }, ...(extra || {}) });
 const LISTINGS = { capturedAt: auj.toISOString(), payload: { items: [
   annonce(5001, 'Nike Air Max 1 olive taille 42', 80),
   annonce(5002, 'Salomon XT-6 blanc taille 40', 99),
   annonce(5003, 'Adidas Samba noir taille 39', 70),
   annonce(5004, 'Adidas Samba noir taille 39', 70),     // sa jumelle exacte
+  // Trois paires POSTÉES sur Leboncoin dont l'annonce Vinted n'est plus en
+  // ligne — removals à 3 états : 5010 fermée+prouvée vendue → « vendue » ;
+  // 5011 masquée → « pause » (PAS vendue) ; 5012 fermée sans preuve → doute.
+  annonce(5010, 'Reebok Club C taille 41', 60, { is_closed: true }),
+  annonce(5011, 'Asics Gel taille 43', 55, { is_hidden: true }),
+  annonce(5012, 'New Balance 550 taille 42', 90, { is_closed: true }),
 ] } };
 const MAIN = {
   vinted_annonce_numeros: {
@@ -35,10 +41,19 @@ const MAIN = {
     '5002': { numero: '13', title: 'Salomon XT-6 blanc taille 40', mp: { lbc: true } },
     '5003': { numero: '14', title: 'Adidas Samba noir taille 39', mp: { lbc: true } },
     '5004': { numero: '15', title: 'Adidas Samba noir taille 39', mp: { lbc: true } },
+    '5010': { numero: '20', title: 'Reebok Club C taille 41' },
+    '5011': { numero: '21', title: 'Asics Gel taille 43' },
+    '5012': { numero: '22', title: 'New Balance 550 taille 42' },
+    // DEUX fiches portent le N°40 (prix d'achat ≠) → coût AMBIGU : la carte
+    // Ventes ne doit PAS montrer de bénéfice (le total de la compta ne le fait
+    // pas non plus — ficheUniqueDuNumero).
+    '5040': { numero: '40', title: 'Puma Suede taille 41', buyPrice: '20' },
+    '5041': { numero: '40', title: 'Puma Suede taille 41', buyPrice: '35' },
   },
   vrm_lbc_liens: { lbc1: '12' },
-  // Prix d'achat SAISI de la N°12 (par numéro) → bénéfice de la vente reliée.
-  vinted_buyprice_by_num: { '12': '30' },
+  // Prix d'achat SAISI par numéro : N°12 → bénéfice de la vente reliée ; N°40
+  // existe mais est porté par deux fiches → ambigu, pas de bénéfice.
+  vinted_buyprice_by_num: { '12': '30', '40': '20' },
 };
 const MON = 'acc9';
 const ITEMS = {
@@ -46,16 +61,23 @@ const ITEMS = {
   lbc2: { id: 'lbc2', subject: 'Adidas Samba noir taille 39', price: 72, account: MON, platform: 'leboncoin', status: 'active', images: ['https://img.test/lbc2.jpg'] },
   lbc3: { id: 'lbc3', subject: 'Salomon XT-6 blanc T40', price: 105, account: MON, platform: 'leboncoin', status: 'active', images: ['https://img.test/lbc3.jpg'] },
   lbc4: { id: 'lbc4', subject: 'Chalet 8 personnes', price: 900, account: 'inconnu', platform: 'leboncoin', status: 'active', images: [] },
+  lbc5: { id: 'lbc5', subject: 'Puma Suede T41', price: 50, account: MON, platform: 'leboncoin', status: 'active', ref: '40', images: ['https://img.test/lbc5.jpg'] },
 };
 const VENTES = {
   t1: { txId: 't1', itemId: 'lbc1', isSeller: true, stepStatus: 'action', stepLabel: 'Colis à envoyer', price: 8500, title: 'Nike Air Max 1 olive T42', at: auj.toISOString() },
   t2: { txId: 't2', itemId: 'lbc2', isSeller: true, stepStatus: 'validation', stepLabel: 'Paiement effectué', price: 7200, title: 'Adidas Samba noir taille 39', at: auj.toISOString() },
+  // Reliée (lien → N°40) mais N°40 porté par DEUX fiches → coût ambigu → aucun bénéfice.
+  t3: { txId: 't3', itemId: 'lbc5', isSeller: true, stepStatus: 'action', stepLabel: 'Colis à envoyer', price: 5000, title: 'Puma Suede T41', at: auj.toISOString() },
 };
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: LISTINGS },
   { id: 'lbc_listings', data: { items: ITEMS } },
   { id: 'lbc_ventes', data: { ventes: VENTES } },
+  // Trois paires postées sur Leboncoin (removals) ; 5010 a une transaction
+  // finalisée ⇒ vente PROUVÉE (vendue), 5011 masquée (pause), 5012 fermée (doute).
+  { id: 'vinted_lbc_posted', data: { ids: ['5010', '5011', '5012'] } },
+  { id: 'harvest_111_txn_990010', data: { capturedAt: auj.toISOString(), payload: { transaction: { id: '990010', item_id: '5010', status: 450, status_title: 'Vendu', status_updated_at: auj.toISOString() } } } },
 ];
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -147,6 +169,7 @@ const projette = (row, sel) => {
         }).map((e) => (e.getAttribute('aria-label') || e.textContent.trim().slice(0, 14) || e.tagName)),
         // L'agent qui conseille (parité eBay) : la liste rangée des priorités.
         conseils: [...document.querySelectorAll('[data-lbc-conseil]')].map((e) => e.getAttribute('data-lbc-conseil')),
+        retirerTxt: (document.querySelector('[data-lbc-conseil="retirer"]') || { textContent: '' }).textContent.trim(),
       }));
       const v1 = await lire();
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'double-vente-' + vp.width + '.png'), fullPage: true });
@@ -157,6 +180,10 @@ const projette = (row, sel) => {
       dit(v1.conseils.length > 0, '« À faire sur Leboncoin » liste les priorités', JSON.stringify(v1.conseils));
       dit(['retirer', 'doublons'].includes(v1.conseils[0]), 'la première priorité est urgente (à retirer d’une plateforme)', v1.conseils[0] || '(aucune)');
       dit(v1.conseils.includes('doublons') && v1.conseils.includes('relier-ventes'), 'elle porte la double vente ET la vente à relier de cet écran', JSON.stringify(v1.conseils));
+      // ⚠️ RÉGRESSION #718 : le conseil « à retirer » comptait les 3 removals
+      //    (1 vendue + 1 pause + 1 doute) comme « vendues ». Il ne doit compter
+      //    que la vente PROUVÉE (N°20). Rouge-avant : « 3 paires vendues… ».
+      dit(/(^|[^0-9])1 paire vendue sur Vinted/.test(v1.retirerTxt), 'le conseil « à retirer » ne compte que la vente PROUVÉE (1), jamais les paires en pause/doute', v1.retirerTxt.slice(0, 60));
       dit(v1.relier.length > 0 && v1.deborde.length === 0, 'aucun bouton ni champ rogné par le bord de l’écran (N°, Relier, Actualiser…)', v1.deborde.join(', ') || (v1.relier.length ? '' : 'aucune ligne'));
       dit(v1.sugg.includes('14') && v1.sugg.includes('15'), 'et PROPOSE les deux paires identiques — sans en choisir une', JSON.stringify(v1.sugg));
       dit(v1.relier.includes('lbc3'), 'son annonce jamais reliée (compte prouvé par une vente) est listée', JSON.stringify(v1.relier));

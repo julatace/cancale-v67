@@ -98,6 +98,7 @@ const LISTINGS = { capturedAt: auj.toISOString(), payload: { items: [
   annonce(7005, 'Asics Gel 1130 argent taille 39', 70),
   annonce(7006, 'Puma Suede rouge taille 42', 60, true),          // N°26 : vendue (bordereau)…
   annonce(7007, 'Puma Suede rouge taille 42', 65),                // … mais REVENUE : republiée sous le même N°
+  annonce(7027, 'Reebok Club C blanc taille 44', 55),             // N°27 : en ligne sur Vinted, vendue sur Leboncoin (croisement eBay↔LBC)
 ] } };
 const fiche = (numero, title, id) => ({ numero, title, photo: 'https://img.test/v' + id + '.jpg' });
 const MAIN = { vinted_annonce_numeros: {
@@ -108,6 +109,7 @@ const MAIN = { vinted_annonce_numeros: {
   '7005': fiche('25', 'Asics Gel 1130 argent taille 39', 7005),
   '7006': fiche('26', 'Puma Suede rouge taille 42', 7006),
   '7007': fiche('26', 'Puma Suede rouge taille 42', 7007),
+  '7027': fiche('27', 'Reebok Club C blanc taille 44', 7027),
 } };
 const txn = (tx, item, statut, titre) => ({ id: `harvest_111_txn_${tx}`, data: { payload: { transaction: { id: tx, item_id: item, status: statut, status_title: titre } } } });
 const TXN = [
@@ -132,6 +134,9 @@ const EBAY_ANNONCES = () => [
   { itemId: '110000000003', title: 'Salomon XT-6 noir taille 41', price: '120.0', sku: 'VRM-23', observateurs: null, photo: 'https://img.test/e3.jpg' },
   { itemId: '110000000005', title: 'Asics Gel 1130 argent taille 39', price: '75.0', sku: 'VRM-25', observateurs: 0, photo: 'https://img.test/e5.jpg' },
   { itemId: '110000000006', title: 'Puma Suede rouge taille 42', price: '70.0', sku: 'VRM-26', observateurs: 0, photo: 'https://img.test/e6.jpg' },
+  // (26 oct.) N°27 : VENDUE SUR LEBONCOIN (vl27), encore en vente ici ⇒ croisement
+  // eBay↔LBC « à retirer d'eBay » — affichage + clic, JAMAIS automatique.
+  { itemId: '110000000007', title: 'Reebok Club C blanc taille 44', price: '55.0', sku: 'VRM-27', depuis: recent(100), observateurs: 0, photo: 'https://img.test/e7.jpg', url: 'https://www.ebay.fr/itm/110000000007' },
 ];
 const EBAY_COMMANDES = [
   { orderId: '01-001', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', lineItems: [{ sku: 'VRM-24', title: 'New Balance 550 blanc taille 43', legacyItemId: '110000000004' }], pricingSummary: { total: { value: '90.00', currency: 'EUR' } } },
@@ -160,7 +165,7 @@ const remettre = () => {
       { itemId: '110000000924', sku: 'VRM-24', title: 'New Balance 550 blanc taille 43', price: '90.0', debut: new Date(Date.now() + 4 * 86400000).toISOString(), photo: '' },
       { itemId: '110000000921', sku: 'VRM-21', title: 'Nike Dunk Low panda taille 42', price: '95.0', debut: new Date(Date.now() + 5 * 86400000).toISOString(), photo: '' },
     ], enLigne: [{ itemId: '110000000966', sku: 'VRM-22' }], complet: true, capturedAt: Date.now() } },
-    { id: 'lbc_ventes', data: { ventes: { vl21: { isSeller: true, itemId: 6021, title: 'Nike Dunk Low panda n21', stepStatus: 'finished' } } } },
+    { id: 'lbc_ventes', data: { ventes: { vl21: { isSeller: true, itemId: 6021, title: 'Nike Dunk Low panda n21', stepStatus: 'finished' }, vl27: { isSeller: true, itemId: 6027, title: 'Reebok Club C blanc n27', stepStatus: 'finished' } } } },
     // (6 octobre) Trois brouillons « programmee » : la N°22 (celle de la liste
     // d'eBay, 922) ; une N°25 (955) qu'eBay ne liste PLUS, relue complète une
     // heure après sa programmation (annulée dans le Seller Hub, ou terminée) ;
@@ -313,6 +318,8 @@ const lire = (pg) => pg.evaluate(() => {
     relie,
     doublons: a('[data-ebay-doublon]', 'data-ebay-doublon'),
     retirer: a('[data-retirer-ebay]', 'data-retirer-ebay'),
+    ailleurs: [...document.querySelectorAll('[data-ebay-doublon-ailleurs]')].map((e) => ({ num: e.getAttribute('data-ebay-doublon-ailleurs'), ou: e.getAttribute('data-ebay-ailleurs-ou'), btn: !!e.querySelector('[data-retirer-ebay-ailleurs]') })),
+    conseilAilleurs: !!document.querySelector('[data-ebay-conseil="retirer-ailleurs"]'),
     vendues: [...document.querySelectorAll('[data-ebay-vendue]')].map((e) => ({ num: e.getAttribute('data-ebay-vendue'), href: (e.querySelector('a[href*="vinted.fr/items/"]') || {}).href || '' })),
     offres: [...document.querySelectorAll('[data-offre-ouvrir]')].map((e) => ({ id: e.getAttribute('data-offre-ouvrir'), t: e.textContent })),
     relierBtn: a('[data-relier-ouvrir]', 'data-relier-ouvrir'),
@@ -374,6 +381,14 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
           'le bouton d\'offre n\'existe QUE sur l\'annonce qu\'eBay déclare éligible, avec son nombre d\'observateurs', JSON.stringify(v.offres));
         dit(v.sansObs === 1 && v.sansObsTxt === 1, '« pas d\'observateur à qui l\'envoyer » est dit UNE fois, pas sur chaque carte', `bloc ×${v.sansObs} · phrase ×${v.sansObsTxt}`);
         dit(v.pasSu.length === 0, 'en marche normale, aucune ligne « je n\'ai pas pu lire »');
+        // ── CROISEMENT eBay ↔ LEBONCOIN (26 oct.) ──────────────────────────────
+        // La N°27 est vendue sur Leboncoin (vl27) et encore en vente sur eBay :
+        // « à retirer d'eBay », sur son CLIC (jamais le retrait automatique, qui
+        // ne lit que la preuve Vinted). Ni la N°21 (son annonce eBay n'a pas de
+        // SKU : non reliée), ni la N°24 (vendue sur eBay ⇒ « à retirer de Vinted »).
+        dit(v.ailleurs.length === 1 && v.ailleurs[0].num === '27' && v.ailleurs[0].ou === 'Leboncoin' && v.ailleurs[0].btn,
+          'vendue sur Leboncoin, encore en vente sur eBay ⇒ « Retirer d\'eBay » pour la N°27 (sur son clic), et elle seule', JSON.stringify(v.ailleurs));
+        dit(v.conseilAilleurs, 'et « À faire sur eBay » le liste aussi (croisement eBay↔Leboncoin)');
       });
       // ── L'OFFRE AUX OBSERVATEURS ────────────────────────────────────────
       await essaie('offre', async () => {

@@ -3869,9 +3869,9 @@ const fetchEmailSales = async () => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_sale_*&select=data`, {
       headers: sbAuth(),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;                    // « rien lu » ≠ « rien » : null, comme fetchEmailBordereaux/Tracking/Billing
     return (await res.json()).map(r => r.data).filter(Boolean);
-  } catch (_) { return []; }
+  } catch (_) { return null; }
 };
 // Reconstitue des VENTES à partir des emails « X a acheté ton article ».
 // Pourquoi : les emails arrivent 24/7, même quand l'extension n'a rien
@@ -15710,6 +15710,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   // 0 : un total partiel présenté comme complet est pire qu'un absent).
   const liens = React.useMemo(() => load('vrm_lbc_liens', {}) || {}, [lbcVentes]);
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [lbcVentes]);
+  const numerosFiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [lbcVentes]);
   // La carte des annonces LBC donne la réf VRM ; en l'attendant, `null` ⇒ le
   // lien posé à la main suffit déjà (c'est l'identité la plus forte).
   const [itemsLbc, setItemsLbc] = useState(null);
@@ -15717,7 +15718,16 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   const infoVente = (o) => {
     const num = numeroLbcIdentite(o, itemsLbc, liens);
     const prix = o.price != null ? Number(o.price) / 100 : null;
-    const achat = num ? prixAchatDe({ numero: num }, buyByNum) : null;
+    // ⚠️ BÉNÉFICE SEULEMENT SI UNE SEULE FICHE PORTE CE N° (revue du 26 oct.,
+    //    §11) — le MÊME garde que le total de la compta (`ficheUniqueDuNumero`
+    //    → `achatDuNum`). Mesuré : 13 N° hérités d'août sont portés par
+    //    plusieurs fiches à des prix d'achat différents ; `buyByNum[num]` n'en
+    //    garde qu'UN (arbitraire). La carte montrait alors un bénéfice que le
+    //    total disait « inconnu » : un chiffre d'argent faux présenté comme
+    //    certain. Le N° reste affiché (l'identité de la vente est connue) ;
+    //    seul le bénéfice est tu quand le coût est ambigu.
+    const fiche = num ? ficheUniqueDuNumero(numerosFiches, num) : null;
+    const achat = fiche ? prixAchatDe({ numero: num }, buyByNum) : null;
     const benef = (prix != null && achat != null && !lbcAnnulee(o)) ? prix - achat : null;
     return { num, benef };
   };
@@ -20338,7 +20348,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     const a = d.annonce;
     const ok = await askConfirm({
       title: `Retirer « ${a.title || a.itemId} » d'eBay ?`,
-      desc: `L'article N°${d.numero} est vendu sur Vinted. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
+      desc: `L'article N°${d.numero} est vendu sur ${d.ou || 'Vinted'}. L'annonce eBay est terminée tout de suite : c'est sans retour côté eBay (il faudrait la republier).`,
       ok: 'Oui, retirer d\'eBay', cancel: 'Annuler', danger: true,
     });
     if (!ok) return;
@@ -20456,11 +20466,12 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const dvVue = {
     aAnnulerEbay: dv.aAnnulerEbay.filter((d) => dansVue(d.annonce)),
     aRetirerEbay: dv.aRetirerEbay.filter((d) => dansVue(d.annonce)),
+    aRetirerEbayAilleurs: (dv.aRetirerEbayAilleurs || []).filter((d) => dansVue(d.annonce)),
     aRetirerVinted: dv.aRetirerVinted.filter((d) => dansVue(d.commande)),
     nonReliees: dv.nonReliees.filter((a) => dansVue(a)),
   };
   const deuxComptesVue = surDeuxComptes.filter((d) => d.annonces.some((a) => dansVue(a)));
-  const alertesAilleurs = (dv.aAnnulerEbay.length - dvVue.aAnnulerEbay.length) + (dv.aRetirerEbay.length - dvVue.aRetirerEbay.length) + (dv.aRetirerVinted.length - dvVue.aRetirerVinted.length) + (surDeuxComptes.length - deuxComptesVue.length);
+  const alertesAilleurs = (dv.aAnnulerEbay.length - dvVue.aAnnulerEbay.length) + (dv.aRetirerEbay.length - dvVue.aRetirerEbay.length) + ((dv.aRetirerEbayAilleurs || []).length - dvVue.aRetirerEbayAilleurs.length) + (dv.aRetirerVinted.length - dvVue.aRetirerVinted.length) + (surDeuxComptes.length - deuxComptesVue.length);
   // Le compte d'une ligne, dit seulement quand la vue en MÉLANGE plusieurs (§7).
   const surCompte = (x) => (plusieursComptes && !vueSeule && x && x._compte) ? ` · ${nomCompteEbay(comptesEbay.find((c) => c.ref === x._compte) || { pseudo: x._pseudo })}` : '';
   // ── 1. ANTI DOUBLE VENTE — EN PREMIER, c'est le seul geste urgent ─────────
@@ -20533,6 +20544,25 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
                 {etat && etat !== '…' && <div data-ebay-retrait-erreur={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat}</div>}
               </div>
               <button type="button" data-retirer-ebay={id} disabled={etat === '…'} onClick={() => retirer(d)} style={{ ...lienE, opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Retrait…' : 'Retirer d\'eBay'}</button>
+            </div>
+          );
+        })}
+      </div>
+    )}
+    {dvVue.aRetirerEbayAilleurs.length > 0 && (
+      <div data-ebay-a-retirer-ailleurs={dvVue.aRetirerEbayAilleurs.length} style={bloc(E.warn)}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: E.text }}>{dvVue.aRetirerEbayAilleurs.length} paire{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} vendue{dvVue.aRetirerEbayAilleurs.length > 1 ? 's' : ''} sur Leboncoin — encore en vente sur eBay <Pourquoi>Retire-{dvVue.aRetirerEbayAilleurs.length > 1 ? 'les' : 'la'} d'eBay, sinon quelqu'un peut l'acheter une deuxième fois. VRM ne le fait jamais tout seul pour une vente Leboncoin : confirme, une annonce eBay terminée ne revient pas.</Pourquoi></div>
+        {dvVue.aRetirerEbayAilleurs.map((d) => {
+          const id = String(d.annonce.itemId); const etat = retraits[id];
+          return (
+            <div key={id} data-ebay-doublon-ailleurs={d.numero} data-ebay-ailleurs-ou={d.ou} data-ebay-compte={d.annonce._compte || ''} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${E.border}`, flexWrap: 'wrap' }}>
+              <PhotoVente src={d.annonce.photo} size={44} />
+              <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>N°{d.numero} · {d.annonce.title || id}</div>
+                <div style={{ fontSize: 11, color: E.muted }}>{d.ou} : vendue · eBay : encore en vente{d.annonce.price ? ` à ${euroE(d.annonce.price)}` : ''}{surCompte(d.annonce)}{(() => { const k = regleEngage(etatDe(d.annonce)); return k ? <span data-ebay-ailleurs-regle={id} style={{ color: E.warn, fontWeight: 700 }}>{k === 'oui' ? ' · elle a une règle d\'offre : eBay peut la vendre à tout moment' : ' · elle a peut-être une règle d\'offre chez eBay (pas relue) : eBay peut la vendre à tout moment'}</span> : null; })()}</div>
+                {etat && etat !== '…' && <div data-ebay-retrait-erreur={id} style={{ fontSize: 11, color: E.warn, marginTop: 2 }}>{etat}</div>}
+              </div>
+              <button type="button" data-retirer-ebay-ailleurs={id} disabled={etat === '…'} onClick={() => retirer(d)} style={{ ...lienE, opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Retrait…' : 'Retirer d\'eBay'}</button>
             </div>
           );
         })}
@@ -20901,6 +20931,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const plurCons = (n) => (n > 1 ? 's' : '');
   const conseils = [
     dvVue.aRetirerEbay.length && { k: 'retirer', urg: true, sel: '[data-ebay-a-retirer]', cta: 'Voir', txt: `${dvVue.aRetirerEbay.length} paire${plurCons(dvVue.aRetirerEbay.length)} vendue${plurCons(dvVue.aRetirerEbay.length)} sur Vinted, encore en vente ici — à retirer d'eBay` },
+    dvVue.aRetirerEbayAilleurs.length && { k: 'retirer-ailleurs', urg: true, sel: '[data-ebay-a-retirer-ailleurs]', cta: 'Voir', txt: `${dvVue.aRetirerEbayAilleurs.length} paire${plurCons(dvVue.aRetirerEbayAilleurs.length)} vendue${plurCons(dvVue.aRetirerEbayAilleurs.length)} sur Leboncoin, encore en vente ici — à retirer d'eBay` },
     dvVue.aAnnulerEbay.length && { k: 'annuler', urg: true, sel: '[data-ebay-a-annuler]', cta: 'Voir', txt: `${dvVue.aAnnulerEbay.length} programmée${plurCons(dvVue.aAnnulerEbay.length)} sur eBay, déjà vendue${plurCons(dvVue.aAnnulerEbay.length)} ailleurs — à annuler` },
     dvVue.aRetirerVinted.length && { k: 'retirer-vinted', urg: true, sel: '[data-ebay-retirer-vinted]', cta: 'Voir', txt: `${dvVue.aRetirerVinted.length} vendue${plurCons(dvVue.aRetirerVinted.length)} sur eBay, encore sur Vinted — à retirer là-bas` },
     setRelierAnn.size && { k: 'relier', filtre: 'relier', cta: 'Filtrer', txt: `${setRelierAnn.size} annonce${plurCons(setRelierAnn.size)} à relier à un article — sans ce lien, VRM ne peut pas la retirer quand elle se vend` },
@@ -33352,6 +33383,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // maintenant la même exclusion. Se recalcule seul à chaque passage ici.
   useEffect(() => {
     if (!listings.items) return;
+    // ⚠️ « RIEN LU » ≠ « RIEN » (revue du 26 oct.). `emailSoldIds` est RECONSTRUIT
+    //    à partir des emails de vente ET des bordereaux ; si une de ces deux
+    //    sources n'a PAS pu être lue (`null`), la reconstruction est incomplète
+    //    et RÉTRÉCIRAIT la liste persistée — on réécrirait `vinted_annonces_email_sold`
+    //    (clé SYNCHRONISÉE → poussée au nuage, tous appareils) amputée, et une
+    //    paire déjà vendue redeviendrait « en ligne » → reproposée ailleurs →
+    //    DOUBLE VENTE. On ne réécrit QUE quand les deux sources sont lues.
+    if (emailSales === null || emailBords === null) return;
     const arr = [...emailSoldIds];
     const prev = load('vinted_annonces_email_sold', []) || [];
     if (arr.length !== prev.length || arr.some(x => !prev.includes(x))) save('vinted_annonces_email_sold', arr);
@@ -44980,7 +45019,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
     if (!parNum.has(k)) parNum.set(k, []);
     parNum.get(k).push(String(id));
   }
-  const aRetirerEbay = [], aRetirerVinted = [], nonReliees = [], aAnnulerEbay = [];
+  const aRetirerEbay = [], aRetirerVinted = [], nonReliees = [], aAnnulerEbay = [], aRetirerEbayAilleurs = [];
   // (6 octobre) `ventes` — le verdict de `numerosDejaVendus` — juge les
   // programmées sur TOUTES les plateformes, par le N° (§11). Sans lui, l'ancienne
   // règle (Vinted seul) s'applique.
@@ -45004,14 +45043,25 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
     if (!a || !a.itemId) continue;
     const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
     if (!n) { nonReliees.push(a); continue; }
-    if (!vendusVinted) continue;                                  // pas su : on n'affirme rien
     const ids = parNum.get(n) || [];
-    const vendues = ids.filter((id) => vendusVinted.has(id));
-    if (!vendues.length) continue;
-    // Une AUTRE annonce Vinted de ce numéro, en vente et pas vendue : la paire
-    // est revenue (retour, republiée) — elle n'est pas partie.
-    if (enLigne && ids.some((id) => enLigne.has(id) && !vendusVinted.has(id))) continue;
-    aRetirerEbay.push({ annonce: a, numero: n, vinted: vendues });
+    // Vendue sur Vinted : règle INCHANGÉE — c'est elle, et elle seule, qui
+    // alimente le retrait AUTOMATIQUE (`retraitsEbayAutoPermis`, preuve Vinted
+    // stricte). « pas su » (vendusVinted non-Set) ⇒ on n'affirme rien.
+    if (vendusVinted && typeof vendusVinted.has === 'function') {
+      const vendues = ids.filter((id) => vendusVinted.has(id));
+      // Une AUTRE annonce Vinted de ce numéro, en vente et pas vendue : la paire
+      // est revenue (retour, republiée) — elle n'est pas partie.
+      const revenue = enLigne && ids.some((id) => enLigne.has(id) && !vendusVinted.has(id));
+      if (vendues.length && !revenue) { aRetirerEbay.push({ annonce: a, numero: n, vinted: vendues }); continue; }
+    }
+    // ── CROISEMENT eBay ↔ LEBONCOIN (§1, 26 oct.) ─────────────────────────────
+    // Vendue sur une AUTRE place (Leboncoin), encore en vente sur eBay : à
+    // retirer d'eBay. DISPLAY SEULEMENT, sur son clic — le retrait automatique
+    // ne consomme QUE `aRetirerEbay` (preuve Vinted), donc une vente Leboncoin
+    // ne retire JAMAIS une annonce eBay toute seule. `verdict` = numerosDejaVendus
+    // (toutes plateformes) ; « pas su » ⇒ pas d'entrée (aucune fausse alerte).
+    const ou = verdict ? verdict.get(n) : null;
+    if (ou && ou !== 'eBay' && ou !== 'Vinted') aRetirerEbayAilleurs.push({ annonce: a, numero: n, ou });
   }
   if (enLigne) for (const o of (Array.isArray(commandes) ? commandes : [])) {
     if (!commandeEbayEngagee(o)) continue;
@@ -45024,7 +45074,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
       if (surVinted.length || vendueVinted.length) aRetirerVinted.push({ commande: o, ligne: li, numero: n, surVinted, vendueVinted });
     }
   }
-  return { aRetirerEbay, aRetirerVinted, nonReliees, aAnnulerEbay };
+  return { aRetirerEbay, aRetirerVinted, nonReliees, aAnnulerEbay, aRetirerEbayAilleurs };
 }
 
 function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = false, cleRangement = '' }) {
@@ -45630,8 +45680,16 @@ function LeboncoinScreen() {
   //    a rien à faire, muet tant que `data` n'est pas lu. Mêmes libellés que
   //    les blocs eux-mêmes — pas de nouvelle consigne à vérifier.
   const plurLbc = (n) => (n > 1 ? 's' : '');
+  // ⚠️ NE COMPTER QUE LES VENTES PROUVÉES (revue du 26 oct.). `data.removals`
+  //    mélange trois états — vendue (prouvée) · pause (masquée sur Vinted, PAS
+  //    vendue, rien à faire) · doute (fermée sans preuve). Compter le TOTAL
+  //    affichait « N vendues à retirer » en rouge sur des paires non vendues :
+  //    exactement la régression que le bloc détaillé (« VENDUE SE PROUVE »)
+  //    existe pour empêcher. Aligné sur eBay (`dvVue.aRetirerEbay`) et la
+  //    cloche (`lbcRemoveCount`), qui ne comptent que le prouvé.
+  const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue').length : 0;
   const conseilsLbc = data ? [
-    data.removals && data.removals.length && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${data.removals.length} paire${plurLbc(data.removals.length)} vendue${plurLbc(data.removals.length)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
+    nRetirerLbc && { k: 'retirer', urg: true, sel: '[data-lbc-retirer]', txt: `${nRetirerLbc} paire${plurLbc(nRetirerLbc)} vendue${plurLbc(nRetirerLbc)} sur Vinted, encore en ligne ici — à retirer de Leboncoin` },
     data.doublons && data.doublons.length && { k: 'doublons', urg: true, sel: '[data-lbc-doublons]', txt: `${data.doublons.length} vendue${plurLbc(data.doublons.length)} sur Leboncoin, encore sur Vinted — à retirer là-bas` },
     data.aRelierVentes && data.aRelierVentes.length && { k: 'relier-ventes', sel: '[data-lbc-ventes-a-relier]', txt: `${data.aRelierVentes.length} vente${plurLbc(data.aRelierVentes.length)} Leboncoin à relier à un article` },
     data.queue && data.queue.length && { k: 'publier', sel: '.vrm-lbc-a-publier', txt: `${data.queue.length} paire${plurLbc(data.queue.length)} prête${plurLbc(data.queue.length)} à publier sur Leboncoin` },
@@ -51455,7 +51513,7 @@ function AppCoeur() {
       // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
       // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
       // ratée/vide ⇒ 0, jamais un colis inventé (§5).
-      let ebayShipCount=0, ebayARetirer=0, ebayARetirerVinted=0, ebayAAnnuler=0, ebayAAnnulerOu='sur Vinted';
+      let ebayShipCount=0, ebayARetirer=0, ebayARetirerAilleurs=0, ebayARetirerVinted=0, ebayAAnnuler=0, ebayAAnnulerOu='sur Vinted';
       try{
         // §4.4 : la liste des commandes seulement, et les annonces eBay (petites).
         // (5 octobre) + les annonces PROGRAMMÉES : une paire vendue sur Vinted
@@ -51491,7 +51549,7 @@ function AppCoeur() {
         let ventesE=verdict(lbcItemsLu);
         if(ventesE.lbcSansPaire>0 && (progE||[]).length){ const items=await lbcAnnoncesSession(); ventesE=verdict(items||null); }
         const dvE=doublesVenteEbay({annonces:annE||[], commandes:ords||[], numeros:nums, enLigne:enLigneE, vendusVinted:vendusE, programmees:progE||[], ventes:ventesE});
-        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length; ebayAAnnulerOu=ouVenduesTexte(dvE.aAnnulerEbay);
+        ebayARetirer=dvE.aRetirerEbay.length; ebayARetirerAilleurs=(dvE.aRetirerEbayAilleurs||[]).length; ebayARetirerVinted=dvE.aRetirerVinted.length; ebayAAnnuler=dvE.aAnnulerEbay.length; ebayAAnnulerOu=ouVenduesTexte(dvE.aAnnulerEbay);
         // Retrait automatique (proposition 8) : allumé par lui, nuage là AU
         // DÉPART du passage, passage pas annulé, toutes ses annonces Vinted
         // lues — puis la règle la plus stricte (`retraitsEbayAutoPermis`), jugée
@@ -51561,6 +51619,7 @@ function AppCoeur() {
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
       if(ebayARetirer>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirer} paire${ebayARetirer>1?'s':''} vendue${ebayARetirer>1?'s':''} sur Vinted, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirer, tab:'ebay_annonces', dv:true});
+      if(ebayARetirerAilleurs>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerAilleurs} paire${ebayARetirerAilleurs>1?'s':''} vendue${ebayARetirerAilleurs>1?'s':''} sur Leboncoin, encore en vente sur eBay — à retirer d'eBay`, n:ebayARetirerAilleurs, tab:'ebay_annonces', dv:true});
       if(ebayAAnnuler>0) items.push({icon:'🔵', ic:'tag', text:`${ebayAAnnuler} paire${ebayAAnnuler>1?'s':''} vendue${ebayAAnnuler>1?'s':''} ${ebayAAnnulerOu}, programmée${ebayAAnnuler>1?'s':''} sur eBay — à annuler`, n:ebayAAnnuler, tab:'ebay_annonces', dv:true});
       if(ebayARetirerVinted>0) items.push({icon:'🔵', ic:'tag', text:`${ebayARetirerVinted} paire${ebayARetirerVinted>1?'s':''} vendue${ebayARetirerVinted>1?'s':''} sur eBay, encore en vente sur Vinted — à retirer de Vinted`, n:ebayARetirerVinted, tab:'ebay_annonces', dv:true});
       // ⚠️ Retirés le 30 septembre, à la demande de Julien : « N messages non
