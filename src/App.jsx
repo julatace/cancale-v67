@@ -1640,6 +1640,7 @@ const SYNC_KEYS = [
   // éteint par défaut, rattrapé par `onCloudReady` seulement s'il est resté au
   // défaut (`useBeneficeJournee`).
   'vrm_journee_benefice',
+  'vrm_annonces_retirees',
   // (21 octobre) La disposition des widgets de Ma journée (quels blocs, dans
   // quel ordre, à quelle taille) : un CHOIX, absent par défaut (= la
   // disposition d'aujourd'hui), rattrapé par `onCloudReady` seulement s'il est
@@ -2427,7 +2428,7 @@ const familiesDeCompte = (uid, id, scopes) => {
   if (id.startsWith(cp)) return scopes.annonces;          // le coffre = annonces archivées
   if (!id.startsWith(hp)) return false;                   // garde EXACTE (pas de 35→352)
   const r = id.slice(hp.length);
-  if (/^(listings$|item_)/.test(r)) return scopes.annonces;
+  if (/^(listings$|enligne$|item_)/.test(r)) return scopes.annonces;   // `enligne` : la relecture publique (5.170)
   if (/^(orders_sold$|txn_|label|releve_|billing$)/.test(r)) return scopes.ventes;
   if (/^(orders_purchased$)/.test(r)) return scopes.achats;
   if (/^(conv_)/.test(r)) return scopes.messages;
@@ -2778,7 +2779,44 @@ const lireEnLigneTous = async () => {
 // la règle « en ligne » appliquée (la même que l'écran Annonces et l'extension) :
 // sans les supprimées, sans celles qu'une lecture plus récente ne montre plus, et
 // sans celles « à confirmer » (rendues à part, dans `aConfirmer`).
-const lireLignesEnLigne = async (lignesL) => enLigneDesLignes(lignesL || [], await lireEnLigneTous(), await lireSupprimeesTous(), Date.now());
+// ── ANNONCES RETIRÉES POUR DE BON (26 octobre, demande de Julien) ─────────────
+// « Pour les annonces de shop_cancale, je veux pouvoir les supprimer : ce compte
+// est bloqué par Vinted et ses annonces ne sont plus vendables. » Effacer ses
+// lignes ne suffit pas : une re-capture (ou la relecture publique) les ramène.
+// ⇒ `vrm_annonces_retirees` = { [uid]: { at, login } } (synchronisée, posée
+// SEULEMENT sur son clic). Pour un tel compte, toutes ses annonces passent
+// FERMÉES (`_vrmRetiree`), même recaptées : hors de la grille, des totaux, de
+// « à confirmer », des files Leboncoin/eBay et de la protection des N° (une
+// annonce fermée n'est pas une paire présente). Elles restent lisibles comme
+// fermées pour relier ses anciennes ventes (photo, N°). Ses VENTES, sa compta,
+// ses achats et ses messages ne bougent pas. La règle partagée avec
+// l'extension (<enligne-regle>) n'est pas touchée : on l'applique APRÈS elle,
+// dans les deux seules portes de l'app (`lireLignesEnLigne`, `dressingEnLigne`).
+// Illisible ⇒ aucun compte retiré (« pas su » ne cache rien).
+const ANNONCES_RETIREES = 'vrm_annonces_retirees';
+const annoncesRetirees = () => {
+  try { const m = load(ANNONCES_RETIREES, {}); return new Set(m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m).map(String) : []); }
+  catch (_) { return new Set(); }
+};
+const fermerRetirees = (items) => (items || []).map((it) => (it ? { ...it, is_closed: true, is_hidden: false, _vrmRetiree: true } : it));
+// Un résultat de `enLigneDuCompte` pour un compte retiré : tout passe fermé.
+const resRetire = (res) => ({ ...res,
+  fermees: fermerRetirees([...(res.fermees || []), ...(res.absentes || []), ...(res.enLigne || []), ...(res.aConfirmer || [])]),
+  absentes: [], enLigne: [], aConfirmer: [] });
+const retirerAnnoncesRetirees = (out) => {
+  const ret = annoncesRetirees();
+  if (!ret.size || !out) return out;
+  const lignes = (out.lignes || []).map((r) => {
+    const d = r && r.data; const k = /^harvest_(\d+)_listings$/.exec(String((r && r.id) || ''));
+    const uid = k ? k[1] : (d && d.uid != null ? String(d.uid) : '');
+    if (!uid || !ret.has(uid) || !d || !d.payload) return r;
+    return { ...r, data: { ...d, payload: { ...d.payload, items: fermerRetirees(d.payload.items) } } };
+  });
+  const aConfirmer = new Map([...(out.aConfirmer || new Map())].filter(([u]) => !ret.has(String(u))));
+  const parCompte = new Map([...(out.parCompte || new Map())].map(([u, res]) => [u, ret.has(String(u)) ? resRetire(res) : res]));
+  return { ...out, lignes, aConfirmer, parCompte };
+};
+const lireLignesEnLigne = async (lignesL) => retirerAnnoncesRetirees(enLigneDesLignes(lignesL || [], await lireEnLigneTous(), await lireSupprimeesTous(), Date.now()));
 // ── DE QUAND DATE LA LECTURE DU DRESSING, COMPTE PAR COMPTE (5.165) ─────────
 // L'écran Annonces n'en disait RIEN : la lecture du 8 au soir de cinq comptes
 // s'affichait comme l'état du 9 (§4.3, §5 : un chiffre qu'on ne peut pas
@@ -3219,8 +3257,10 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
   // §4.3) — la même fonction que ses autres lecteurs (`dateLectureDressing`, §11).
   const ts = row ? dateLectureDressing(row) : NaN;
   const supp = await lireSupprimees(uid);
-  const res = enLigneDuCompte(payload && Array.isArray(payload.items) ? { items: payload.items, cap: ts } : null,
+  const res0 = enLigneDuCompte(payload && Array.isArray(payload.items) ? { items: payload.items, cap: ts } : null,
     pub, supp, Date.now());
+  // Annonces retirées pour de bon (compte bloqué par Vinted) : toutes fermées.
+  const res = annoncesRetirees().has(String(uid)) ? resRetire(res0) : res0;
   if (isFinite(res.lu)) _harvestSeen[`${uid}_listings`] = res.lu; else if (!isNaN(ts)) _harvestSeen[`${uid}_listings`] = ts;
   const maxAge = opts.maxAgeMs != null ? opts.maxAgeMs : 0;
   if (maxAge > 0 && isFinite(res.lu) && (Date.now() - res.lu) > maxAge) return null;
@@ -26245,6 +26285,29 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     setAccounts(prev => prev.filter(a => a.vinted_user_id !== acc.vinted_user_id));
   };
 
+  // ── ANNONCES RETIRÉES POUR DE BON (26 oct.) — voir `annoncesRetirees` ─────────
+  const [retireesAnn, setRetireesAnn] = useState(() => { const m = load(ANNONCES_RETIREES, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; });
+  useEffect(() => onCloudReady(() => setRetireesAnn((v) => (Object.keys(v || {}).length ? v : ((() => { const m = load(ANNONCES_RETIREES, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; })())))), []);
+  const retirerAnnoncesPourDeBon = async (acc) => {
+    if (!acc) return;
+    if (!await askConfirm({
+      title: `Retirer les annonces de « ${accountName(acc)} » ?`,
+      desc: "Ses annonces sortent de VRM pour de bon — elles ne reviennent pas, même si l'extension recapte ce compte. Ses ventes, sa compta, ses achats et ses messages restent. Rien n'est supprimé sur Vinted. Tu peux les remettre depuis cette carte.",
+      ok: 'Retirer ses annonces', cancel: 'Annuler',
+    })) return;
+    const uid = String(acc.vinted_user_id);
+    const suivant = { ...retireesAnn, [uid]: { at: new Date().toISOString(), login: acc.login || '' } };
+    setRetireesAnn(suivant); save(ANNONCES_RETIREES, suivant);
+    setDelCible(null);
+    toast(`Annonces de « ${accountName(acc)} » retirées — rouvre l'onglet Annonces.`);
+  };
+  const remettreAnnonces = (acc) => {
+    const uid = String(acc.vinted_user_id);
+    const suivant = { ...retireesAnn }; delete suivant[uid];
+    setRetireesAnn(suivant); save(ANNONCES_RETIREES, suivant);
+    toast(`Annonces de « ${accountName(acc)} » remises.`);
+  };
+
   // ── SUPPRESSION CIBLÉE (modale, récupérable) ────────────────────────────────
   // Julien : « on doit pouvoir sélectionner si on veut tout enlever — la compta,
   // les ventes, les achats, les annonces » + « pour récupérer, je reconnecte
@@ -26492,6 +26555,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                            : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
                     </button>
                   ); })()}
+                  {retireesAnn[String(acc.vinted_user_id)] && (
+                    <span data-annonces-retirees={String(acc.vinted_user_id)} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,color:C.muted}}>
+                      <Icon name="eyeOff" size={12}/>Annonces retirées
+                      <button type="button" className="vrm-lien-action" onClick={()=>remettreAnnonces(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
+                    </span>
+                  )}
                   <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer ce compte</span>
@@ -26550,6 +26619,9 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                 <button type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
                 <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
               </div>
+              {!retireesAnn[String(acc.vinted_user_id)] && (
+                <button type="button" data-retirer-annonces onClick={()=>retirerAnnoncesPourDeBon(acc)} disabled={delBusy} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px 12px',fontSize:13,fontWeight:600,cursor:delBusy?'default':'pointer',fontFamily:'inherit'}}>Compte bloqué par Vinted ? Retirer ses annonces pour de bon (ventes gardées)</button>
+              )}
               <button type="button" onClick={bloquerDefinitif} disabled={delBusy} style={{border:'none',background:'transparent',color:C.muted,borderRadius:10,padding:'4px',fontSize:12,fontWeight:500,cursor:delBusy?'default':'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Compte fermé par Vinted ? Le bloquer définitivement</button>
             </div>
           </div>
