@@ -20469,11 +20469,13 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         ))}
       </div>
     )}
-    {/* Retrait automatique (proposition 8) — éteint par défaut, son choix.
-        (11 octobre) Julien le croyait éteint : il était ALLUMÉ dans sa base.
-        L'état se dit d'abord, en un mot, et ce qu'il fait EN SON NOM ; tant que
-        le réglage n'est pas relu du nuage, on ne dit ni l'un ni l'autre (sur un
-        appareil neuf, « éteint » serait un faux). On ne touche pas à SON choix. */}
+  </>);
+  // Retrait automatique (proposition 8) — éteint par défaut, son choix. DÉMOTÉ
+  // sous la liste (26 oct., Julien : « ça part dans tous les sens ») : c'est un
+  // réglage, pas une action du moment. L'état se dit d'abord, en un mot, et ce
+  // qu'il fait EN SON NOM ; tant que le nuage n'a pas répondu, on ne dit ni
+  // « allumé » ni « éteint » (sur un appareil neuf, « éteint » serait un faux).
+  const reglageAuto = (
     <div data-ebay-retrait-auto={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', minWidth: 0 }}>
@@ -20493,7 +20495,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       )}
       {journalAuto === null && retraitAuto && <div style={{ fontSize: 11.5, color: E.muted }}>Je n'ai pas pu relire la liste de ce qui a été retiré en ton nom — rouvre l'écran dans un moment.</div>}
     </div>
-  </>);
+  );
   // ── 2. CE QUI N'A PAS PU ÊTRE LU, DIT UNE FOIS (§7) ────────────────────────
   // « Pas su » ne vaut pas « rien à retirer » : sans les ventes Vinted, une
   // paire vendue là-bas reste ici sans alerte — on le dit, avec ce que ça empêche.
@@ -20793,30 +20795,6 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {ligneComptesIllisibles}
     {lignePasSu}
     {ligneSansPreuve}
-    {blocEngagement}
-    {lignePasSuRegle}
-    {!blocEngagement && !lignePasSuRegle && porteToutes && <div style={{ margin: '0 2px 10px' }}>{porteToutes}</div>}
-    {relectureRegles && <div data-regles-relecture style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, margin: '0 2px 10px' }}>{relectureRegles}</div>}
-    {bloqueCommun && (
-      <div data-regles-bloquees-commun={bloqueCommun} style={{ fontSize: 12, color: bloqueCommun === 'pas-su' ? E.warn : E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        {bloqueCommun === 'pas-su'
-          ? `Je n'ai pas pu vérifier ${pasSuVentes.length <= 1 ? (pasSuVentes[0] || 'tes ventes') : pasSuVentes.slice(0, -1).join(', ') + ' ni ' + pasSuVentes[pasSuVentes.length - 1]} : pas de règle d'offre tant que je ne sais pas si la paire est déjà vendue.`
-          : 'Je vérifie encore que tes paires ne sont pas déjà vendues (Vinted, eBay, Leboncoin) : la règle d\'offre attend cette vérification.'}
-      </div>
-    )}
-    {lotInterrompu && (
-      <div data-regles-lot-interrompu={lotInterrompu.n} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        <span style={{ flex: 1, minWidth: 0 }}>Le dernier lot a été interrompu : {lotInterrompu.n} annonce{lotInterrompu.n > 1 ? 's' : ''} non envoyée{lotInterrompu.n > 1 ? 's' : ''}. Rouvre « Une règle pour toutes » pour {lotInterrompu.n > 1 ? 'les' : 'la'} reprendre.</span>
-        <button className="vrm-icon-control" type="button" data-regles-lot-interrompu-fermer aria-label="Effacer ce message" onClick={() => { try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} setLotInterrompu(null); }} style={{ ...lienE, padding: '4px 9px' }}>✕</button>
-      </div>
-    )}
-    {toutesOuvert && connected === true && regles !== undefined && (
-      <EbayReglesToutes items={itemsVue} etatDe={etatDe} prixDe={prixDe} regleBloquee={regleBloquee} achats={achats} nomRef={nomRef}
-        plusieursComptes={melangeAnnonces} relit={relitRegles} onRelire={relireRegles} onRelireBase={relireBase}
-        onLot={(ids) => setEnLot(new Set(ids))} onRegle={surRegle} onInterrompu={(v) => setLotInterrompu(v)}
-        onDebut={() => { setLotInterrompu(null); try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} }}
-        onFini={async () => { if (comptesEbay) { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); } }} />
-    )}
     <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
       {itemsVue.map((it, i) => {
         const n = numEbayLu(it.sku, it.itemId, null, it.depuis);
@@ -20848,6 +20826,41 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       </div>
     )}
       {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
+    </div>
+    {/* ── Réglages & sécurité de cet écran — DÉMOTÉS sous la liste (26 oct.) ──
+        « ça part dans tous les sens » : la règle d'offre et le retrait
+        automatique sont des RÉGLAGES/états, pas des actions du moment. La liste
+        passe en premier, eux en dessous, groupés et annoncés. Rien n'est caché —
+        chaque bloc garde ses data-* et son texte (les bancs les lisent par
+        attribut, pas par position). Les ALERTES urgentes (vendue ici → retire
+        là) restent en haut, dans {alertes}. */}
+    <div className="vrm-ebay-reglages" style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${E.border}` }}>
+      <div style={{ fontSize: 11, color: E.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '0 2px 12px' }}>Réglages &amp; sécurité de cet écran</div>
+      {blocEngagement}
+      {lignePasSuRegle}
+      {!blocEngagement && !lignePasSuRegle && porteToutes && <div style={{ margin: '0 2px 10px' }}>{porteToutes}</div>}
+      {relectureRegles && <div data-regles-relecture style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, margin: '0 2px 10px' }}>{relectureRegles}</div>}
+      {bloqueCommun && (
+        <div data-regles-bloquees-commun={bloqueCommun} style={{ fontSize: 12, color: bloqueCommun === 'pas-su' ? E.warn : E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
+          {bloqueCommun === 'pas-su'
+            ? `Je n'ai pas pu vérifier ${pasSuVentes.length <= 1 ? (pasSuVentes[0] || 'tes ventes') : pasSuVentes.slice(0, -1).join(', ') + ' ni ' + pasSuVentes[pasSuVentes.length - 1]} : pas de règle d'offre tant que je ne sais pas si la paire est déjà vendue.`
+            : 'Je vérifie encore que tes paires ne sont pas déjà vendues (Vinted, eBay, Leboncoin) : la règle d\'offre attend cette vérification.'}
+        </div>
+      )}
+      {lotInterrompu && (
+        <div data-regles-lot-interrompu={lotInterrompu.n} style={{ ...bloc(E.warn), fontSize: 12.5, color: E.text, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <span style={{ flex: 1, minWidth: 0 }}>Le dernier lot a été interrompu : {lotInterrompu.n} annonce{lotInterrompu.n > 1 ? 's' : ''} non envoyée{lotInterrompu.n > 1 ? 's' : ''}. Rouvre « Une règle pour toutes » pour {lotInterrompu.n > 1 ? 'les' : 'la'} reprendre.</span>
+          <button className="vrm-icon-control" type="button" data-regles-lot-interrompu-fermer aria-label="Effacer ce message" onClick={() => { try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} setLotInterrompu(null); }} style={{ ...lienE, padding: '4px 9px' }}>✕</button>
+        </div>
+      )}
+      {toutesOuvert && connected === true && regles !== undefined && (
+        <EbayReglesToutes items={itemsVue} etatDe={etatDe} prixDe={prixDe} regleBloquee={regleBloquee} achats={achats} nomRef={nomRef}
+          plusieursComptes={melangeAnnonces} relit={relitRegles} onRelire={relireRegles} onRelireBase={relireBase}
+          onLot={(ids) => setEnLot(new Set(ids))} onRegle={surRegle} onInterrompu={(v) => setLotInterrompu(v)}
+          onDebut={() => { setLotInterrompu(null); try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} }}
+          onFini={async () => { if (comptesEbay) { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); } }} />
+      )}
+      {reglageAuto}
     </div>
   </>);
 }
