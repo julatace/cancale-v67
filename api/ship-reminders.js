@@ -10,10 +10,11 @@
 // et envoie UNE notification récapitulative sur les appareils du vendeur.
 //
 // Il porte aussi, faute d'un second cron : le rappel URSSAF du 1er du mois, et
-// le BILAN DE LA SEMAINE du lundi matin (api/_lib/bilan-semaine.js dit pourquoi
-// le lundi et pas le dimanche soir).
+// le BILAN DE LA SEMAINE — envoyé le DIMANCHE SOIR (via le cron du soir), avec
+// le lundi matin en RATTRAPAGE (même clé de dédoublonnage, un seul bilan par
+// semaine ; api/_lib/bilan-semaine.js dit le pourquoi).
 // Et, appelé par le SECOND cron (`/api/rappel-soir`, réécrit en `?moment=soir`, 18:00 UTC), le RAPPEL DE LA
-// VEILLE AU SOIR (« Demain : N colis à poster ») — et rien d'autre.
+// VEILLE AU SOIR (« Demain : N colis à poster ») — plus, le dimanche, le bilan de la semaine.
 //
 // ⚠ N'appelle JAMAIS l'API Vinted (aucun risque de blocage) : il ne lit que
 //   Supabase et envoie une notification. Déclenché par le cron Vercel (vercel.json).
@@ -21,7 +22,7 @@
 
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
-import { semainePassee, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
+import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
 // l'app et de l'extension par audit-statuts.cjs). Importée, jamais recopiée.
@@ -239,9 +240,13 @@ function txsAExpedier(d) {
   return { vinted: new Set(txs.map(String).filter(pasPartie)), ebay: eb };
 }
 
-async function bilanDeLaSemaine(maintenant = Date.now()) {
-  const sem = semainePassee(maintenant);
-  if (sem.jour > 3) return null;                                  // lundi, ou rattrapage mardi/mercredi
+// `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS
+// mais sa clé de dédoublonnage est le lundi de cette semaine — exactement celle
+// que le bilan du lundi matin utilisera le lendemain : un seul bilan part, le
+// dimanche soir, et le lundi devient un rattrapage (si le dimanche a échoué).
+async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
+  const sem = soir ? semaineCourante(maintenant) : semainePassee(maintenant);
+  if (soir ? sem.jour !== 7 : sem.jour > 3) return null;          // soir → dimanche seul · matin → lundi (rattrapage mar/mer)
   const deja = await getRow('bilan_semaine_dedup');
   if (deja === undefined) return 'mémo illisible — rien envoyé';   // pas su ⇒ on ne risque pas un doublon
   if (deja && deja.semaine === sem.lundi) return 'déjà envoyé';
@@ -251,7 +256,7 @@ async function bilanDeLaSemaine(maintenant = Date.now()) {
   const b = calculerBilan({
     ...d, colis: colisAExpedier(d), colisAuMoins: !Array.isArray(d.ebay),
     dorment: d.main ? d.main.vrm_paires_dorment : null,
-    debut: sem.debut, fin: sem.fin, maintenant,
+    debut: sem.debut, fin: sem.fin, seuilCapture: sem.seuilCapture, maintenant,
   });
   if (!bilanAEnvoyer(b)) return 'données illisibles — réessai demain';
   // Le mémo AVANT l'envoi, et CONFIRMÉ : un bilan par semaine, jamais deux.
@@ -631,7 +636,12 @@ async function rappelDuSoir() {
 async function traiterVendeurSoir() {
   const relu = await relireEbayDuVendeur();
   const out = await rappelDuSoir();
-  return { ...out, ebayRelu: resumeRelecture(relu) };
+  // Le bilan de la semaine part le DIMANCHE SOIR (26 oct.) — même dédoublonnage
+  // que le lundi matin (un seul bilan par semaine). Un échec du bilan n'empêche
+  // jamais le rappel d'expédition du soir.
+  let bilan = null;
+  try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  return { ...out, bilan, ebayRelu: resumeRelecture(relu) };
 }
 
 export default async function handler(req, res) {

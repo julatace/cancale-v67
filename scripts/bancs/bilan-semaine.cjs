@@ -161,7 +161,9 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   let cron, widget;
   try { cron = (await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'))).default; } catch (e) { dit(false, 'api/ship-reminders.js se charge', e.message); }
   try { widget = (await import('file://' + path.join(RACINE, 'api', 'widget.js'))).default; } catch (e) { dit(false, 'api/widget.js se charge', e.message); }
-  const lancer = async (t) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); return r; } finally { Date.now = vraiNow; } };
+  const lancerQ = async (t, q) => { Date.now = () => t; try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: q }, r); return r; } finally { Date.now = vraiNow; } };
+  const lancer = (t) => lancerQ(t, {});
+  const lancerSoir = (t) => lancerQ(t, { moment: 'soir' });
   const bilansDe = (o) => pushes.filter((p) => /^bilan-/.test(p.tag || '') && p.endpoint.includes('/' + o));
   const ctx = regleApp();
   const attendu = (o) => {
@@ -196,6 +198,35 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     const memA = (memos.A || {}).bilan_semaine_dedup, memB = (memos.B || {}).bilan_semaine_dedup;
     dit(memA && memA.semaine === '2026-09-28' && memB && memB.semaine === '2026-09-28', 'le mémo de la semaine est écrit POUR CHAQUE vendeur (lundi 28 septembre)');
     dit(a[0] && a[0].url === '/?tab=journee' && /28 sept/.test(a[0].title || '') && /4 oct/.test(a[0].title || ''), 'titre : la semaine nommée (28 sept. → 4 oct.), et le clic ouvre Ma journée', a[0] && a[0].title);
+  });
+
+  // ── LE BILAN DU DIMANCHE SOIR (26 octobre) ──────────────────────────────────
+  // Le cron du SOIR (`?moment=soir`) un DIMANCHE envoie le bilan de la semaine
+  // EN COURS (qui s'achève ce soir). Sa clé de dédoublonnage est le lundi de
+  // cette semaine — la MÊME que le bilan du lundi matin — donc le lundi se tait
+  // ensuite : un seul bilan par semaine.
+  const DIM_SOIR = Date.parse('2026-10-04T18:10:00Z');   // dimanche 4 oct., 20 h 10 à Paris (CEST)
+  const SAM_SOIR = Date.parse('2026-10-03T18:10:00Z');   // samedi soir : rien ne doit partir
+  await essaie('dimanche soir', async () => {
+    reset();
+    // Capture faite dimanche après-midi (≤ l'envoi du soir) : semaine « complète » à ce soir.
+    V.A.ventes[11].cap = new Date(Date.parse('2026-10-04T12:00:00Z')).toISOString();
+    V.B.ventes[22].cap = new Date(Date.parse('2026-10-04T12:00:00Z')).toISOString();
+    const r = await lancerSoir(DIM_SOIR);
+    const a = bilansDe('A'), b = bilansDe('B');
+    dit(a.length === 1 && b.length === 1, 'dimanche soir : un bilan part pour CHAQUE vendeur (semaine en cours)', `A=${a.length} B=${b.length} · code ${r.code}`);
+    const memA = (memos.A || {}).bilan_semaine_dedup;
+    dit(memA && memA.semaine === '2026-09-28', 'la clé de dédoublonnage est le LUNDI de la semaine (2026-09-28) — la même que le lundi matin', memA && memA.semaine);
+    const ea = attendu('A'); const ca = (a[0] && a[0].body) || '';
+    dit(ca.includes(`${ea.n} vente`) && ca.includes(euros(ea.eur)), `les mêmes nombres que le lundi (ventesFaites) : ${ea.n} ventes · ${euros(ea.eur)}`, ca.split('\n')[0]);
+    // Le lundi matin SUIVANT : le mémo du dimanche le fait taire (un seul bilan).
+    const r2 = await lancer(LUNDI); void r2;
+    dit(bilansDe('A').length === 1, 'le lundi matin ne RENVOIE pas : le mémo du dimanche soir a la même clé (un bilan par semaine)', `${bilansDe('A').length} au total`);
+  });
+  await essaie('soir hors dimanche', async () => {
+    reset();
+    const r = await lancerSoir(SAM_SOIR);
+    dit(bilansDe('A').length === 0, 'un cron du soir un SAMEDI n’envoie AUCUN bilan (dimanche seulement)', `${bilansDe('A').length} · code ${r.code}`);
   });
 
   // (9 octobre) PLUSIEURS COMPTES eBAY : chaque compte a SA ligne de commandes
