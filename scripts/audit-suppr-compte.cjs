@@ -46,7 +46,7 @@ try {
 
 let ko = 0;
 const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
-const TOUT = { annonces: true, ventes: true, achats: true, messages: true, compte: true };
+const TOUT = { annonces: true, ventes: true, bordereaux: true, releves: true, achats: true, messages: true, compte: true };
 const essaie = (nom, fn) => { try { fn(); } catch (e) { ko++; console.log(`❌ ${nom} — a levé : ${e.message}`); } };
 
 // ── 1. LE GARDE DE PRÉFIXE EXACT (le plus dangereux) ────────────────────────
@@ -64,7 +64,7 @@ essaie('garde de préfixe', () => {
 });
 
 // ── 2. LE BON PÉRIMÈTRE PAR CASE ────────────────────────────────────────────
-const SEUL = (k) => ({ annonces: false, ventes: false, achats: false, messages: false, compte: false, [k]: true });
+const SEUL = (k) => ({ annonces: false, ventes: false, bordereaux: false, releves: false, achats: false, messages: false, compte: false, [k]: true });
 essaie('périmètre par case', () => {
   const u = '7';
   // Annonces
@@ -72,12 +72,21 @@ essaie('périmètre par case', () => {
   dit(familiesDeCompte(u, 'harvest_7_item_99', SEUL('annonces')) === true, 'annonces → item_*');
   dit(familiesDeCompte(u, 'coffre_7_42', SEUL('annonces')) === true, 'annonces → coffre');
   dit(familiesDeCompte(u, 'harvest_7_orders_sold', SEUL('annonces')) === false, 'annonces NE prend PAS les ventes');
-  // Ventes (+ la compta en découle)
+  // Ventes (+ la compta en découle) — SANS les bordereaux ni les relevés (26 oct.)
   dit(familiesDeCompte(u, 'harvest_7_orders_sold', SEUL('ventes')) === true, 'ventes → orders_sold');
   dit(familiesDeCompte(u, 'harvest_7_txn_123', SEUL('ventes')) === true, 'ventes → txn_*');
-  dit(familiesDeCompte(u, 'harvest_7_label_latest', SEUL('ventes')) === true, 'ventes → bordereaux');
   dit(familiesDeCompte(u, 'harvest_7_billing', SEUL('ventes')) === true, 'ventes → porte-monnaie');
+  dit(familiesDeCompte(u, 'harvest_7_label_latest', SEUL('ventes')) === false, '⚠️ ventes NE prend PLUS les bordereaux (séparés)');
+  dit(familiesDeCompte(u, 'harvest_7_releve_2026_09', SEUL('ventes')) === false, '⚠️ ventes NE prend PLUS les relevés (séparés)');
   dit(familiesDeCompte(u, 'harvest_7_orders_purchased', SEUL('ventes')) === false, 'ventes NE prend PAS les achats');
+  // Bordereaux (séparés)
+  dit(familiesDeCompte(u, 'harvest_7_label_latest', SEUL('bordereaux')) === true, 'bordereaux → label_latest');
+  dit(familiesDeCompte(u, 'harvest_7_label_123', SEUL('bordereaux')) === true, 'bordereaux → label_{tx}');
+  dit(familiesDeCompte(u, 'harvest_7_orders_sold', SEUL('bordereaux')) === false, 'bordereaux NE prend PAS les ventes');
+  // Relevés (séparés)
+  dit(familiesDeCompte(u, 'harvest_7_releve_2026_09', SEUL('releves')) === true, 'relevés → releve_*');
+  dit(familiesDeCompte(u, 'harvest_7_orders_sold', SEUL('releves')) === false, 'relevés NE prend PAS les ventes');
+  dit(familiesDeCompte(u, 'harvest_7_label_latest', SEUL('releves')) === false, 'relevés NE prend PAS les bordereaux');
   // Achats
   dit(familiesDeCompte(u, 'harvest_7_orders_purchased', SEUL('achats')) === true, 'achats → orders_purchased');
   dit(familiesDeCompte(u, 'harvest_7_orders_sold', SEUL('achats')) === false, 'achats NE prend PAS les ventes');
@@ -91,9 +100,11 @@ essaie('périmètre par case', () => {
 
 // ── 3. RIEN DE COCHÉ ⇒ RIEN NE PART ─────────────────────────────────────────
 essaie('rien coché', () => {
-  const RIEN = { annonces: false, ventes: false, achats: false, messages: false, compte: false };
+  const RIEN = { annonces: false, ventes: false, bordereaux: false, releves: false, achats: false, messages: false, compte: false };
   dit(familiesDeCompte('7', 'harvest_7_listings', RIEN) === false, 'aucune case ⇒ aucune ligne (listings)');
   dit(familiesDeCompte('7', 'harvest_7_orders_sold', RIEN) === false, 'aucune case ⇒ aucune ligne (ventes)');
+  dit(familiesDeCompte('7', 'harvest_7_label_latest', RIEN) === false, 'aucune case ⇒ aucune ligne (bordereaux)');
+  dit(familiesDeCompte('7', 'harvest_7_releve_2026_09', RIEN) === false, 'aucune case ⇒ aucune ligne (relevés)');
 });
 
 console.log(ko ? `\n❌ ${ko} échec(s)` : '\n✅ suppression ciblée : le filtre efface le bon compte, et seulement lui');
