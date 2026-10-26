@@ -15,9 +15,21 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 3 annonces EN LIGNE numérotées (sur un compte lié). Le banc
+// force ensuite le conflit (même N° posé sur deux) — c'est SA méthode, déjà là.
+const listSc = present ? [] : [sc.ligneListings(sc.UID[0], [
+  sc.annonce({id:'ann1', titre:'Nike Air Force 1', prix:50}),
+  sc.annonce({id:'ann2', titre:'Adidas Gazelle',   prix:55}),
+  sc.annonce({id:'ann3', titre:'Veja Campo',       prix:48}),
+])];
+const main=present?FX('main'):sc.ligneMain({vinted_annonce_numeros:{ann1:{numero:'101'},ann2:{numero:'102'},ann3:{numero:'103'}}});
+const accounts=present?FX('accounts'):sc.comptes(), txn=present?FX('txn'):[];
+const LIST=present?FX('listings'):listSc;
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(LIST),...FXok('inbox'),...FXok('track'),...FXok('bord'),...FXok('label'),...FXok('billing')];
 function projette(row,select){
   if(!select||select==='*') return row;
   const out={};
@@ -43,7 +55,7 @@ srv.listen(4417);
 // l'erreur que j'ai commise le 7 septembre avant de vérifier la forme du champ.
 const num=JSON.parse(JSON.stringify((main[0].data.vinted_annonce_numeros)||{}));
 const enLigne=new Set(); const idsEnLigne=[];
-FX('listings').forEach(r=>{ const p=(r.data||{}).payload||{}; const it=p.items||p.listings||[];
+LIST.forEach(r=>{ const p=(r.data||{}).payload||{}; const it=p.items||p.listings||[];
   (Array.isArray(it)?it:[]).forEach(x=>{ if(x&&x.id!=null&&!x.is_closed){ enLigne.add(String(x.id)); idsEnLigne.push(String(x.id)); } }); });
 // ⚠️ ON FORCE LE CAS. Aujourd'hui il n'a AUCUN conflit vivant (vérifié) — donc
 // sans ça, ce banc ne prouverait rien : il constaterait une absence. On donne
@@ -91,7 +103,10 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
     console.log('      diag :', JSON.stringify(diag));
     // (21 oct.) Depuis #623 l'app RÈGLE elle-même deux annonces en ligne sous un
     // même N° (numéro neuf, « à écrire sur le carton ») : dit OU réglé, jamais rien.
-    const m=/(\d+)\s+num[ée]ros?\s+port[ée]s?\s+par\s+deux\s+paires/.exec(t2)
+    // ⚠️ §6.5 : le bandeau de Colis dit « portés par deux ARTICLES » (celui de
+    //    Ma journée « deux paires/annonces ») — on suit le texte RENDU, pas une
+    //    seule orthographe, sinon le contrôle de Colis est rouge sur une app juste.
+    const m=/(\d+)\s+num[ée]ros?\s+port[ée]s?\s+par\s+deux\s+(?:paires|articles|annonces)/.exec(t2)
       || /(Un|\d+)\s+nouveaux?\s+num[ée]ros?\s+[àa]\s+[ée]crire/.exec(t2);
     vus[t]=m?(m[1]==='Un'?1:+m[1]):0;
     console.log('   '+t.padEnd(14)+' → '+(m?m[0]:'RIEN'));

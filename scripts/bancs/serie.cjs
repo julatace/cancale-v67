@@ -11,9 +11,17 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const accounts=FX('accounts'); const main=FX('main'); const txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox')];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 60 paires numérotées sans prix d'achat + leurs achats (18 au
+// titre identique → « C'est ça », 42 marque+taille → « à vérifier »), dont 20
+// aussi vendues pour que l'écran Ventes ait sa case « Bénéfice ». Le moteur de
+// suggestion (§5.23) est réellement exercé — aucune donnée réelle.
+const S=present?null:sc.achatsScenario();
+const accounts=present?FX('accounts'):S.accounts, main=present?FX('main'):S.main, txn=present?FX('txn'):[];
+const rows=[...(present?FX('sold'):S.sold),...(present?FX('purch'):S.purch),...dressingsDuJour(present?FX('listings'):S.listings),...FXok('inbox')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
@@ -85,7 +93,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   for(let i=0;i<80;i++){ const enCours=await pg.evaluate(()=>/recherche de tes achats/i.test(document.body.innerText||'')); if(!enCours) break; await pg.waitForTimeout(100); }
   const sugInfo=await pg.evaluate(()=>{
     const t=document.body.innerText||'';
-    const m=/(\d+)\s+paires?\s+avec\s+une\s+piste/.exec(t);
+    const m=/(\d+)\s+(?:paires?|articles?)\s+avec\s+une\s+piste/.exec(t);
     // une ligne = le plus haut ancêtre du champ qui ne contient QUE ce champ
     const ligne=inp=>{ let n=inp; while(n.parentElement && n.parentElement.querySelectorAll('[data-fillbuy]').length===1) n=n.parentElement; return n; };
     const rendues=[...document.querySelectorAll('[data-fillbuy]')].map(ligne)
@@ -103,7 +111,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // être celui qu'on peut vraiment saisir.
   const cmp=await pg.evaluate(()=>{
     const t=document.body.innerText||'';
-    const m=/(\d+)\s+paires?\s+sans\s+co[ûu]t/.exec(t);
+    const m=/(\d+)\s+(?:paires?|articles?)\s+sans\s+co[ûu]t/.exec(t);
     return {annonce:m?+m[1]:null, rendus:document.querySelectorAll('[data-fillbuy]').length};
   });
   dit(cmp.annonce!=null && cmp.annonce===cmp.rendus,
@@ -125,7 +133,16 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   const local=await pg.evaluate(()=>{ try{const n=JSON.parse(localStorage.getItem('vinted_annonce_numeros')||'{}');
     const k=Object.keys(n).filter(k=>n[k]&&n[k].buyFromId); return k.length?`${k[0]} -> ${n[k[0]].buyPrice} €`:null; }catch(_){return null;} });
   dit(!!local, 'le prix d\'achat est écrit sur la paire', local||'rien écrit');
-  dit(ecrits.length>avant, 'et poussé dans le cloud', (ecrits.length-avant)+' écriture(s)');
+  // ⚠️ PLUS DE CONTRÔLE « poussé dans le cloud » ICI. Depuis le durcissement du
+  //    4 octobre, `cloudPush` sort d'emblée sans une VRAIE session cloisonnée
+  //    (`if (!owner || !AUTH.session?.access_token || !CLOISONNE) return`). Ce
+  //    banc rend l'app en ACCÈS DIRECT (`vrm_acces_direct`, sans session) : le
+  //    push y est désactivé PAR CONCEPTION. Exiger un POST ici ne mesurerait plus
+  //    l'app, mais l'absence de session du banc — un contrôle qui ne peut JAMAIS
+  //    passer est aussi trompeur qu'un qui ne peut jamais échouer. Le prix est
+  //    bien écrit (contrôle au-dessus) ; la synchro cloud, gardée par la session,
+  //    est prouvée par `demarrage.cjs` (qui en simule une). §6.3 dans l'autre sens.
+  console.log('    (synchro cloud gardée par la session — hors accès direct ; voir demarrage.cjs)');
   dit(errs.length===0, 'aucune erreur d\'app', errs.slice(0,2).join(' | '));
   await b.close(); srv.close();
   console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLa saisie en serie fonctionne.');

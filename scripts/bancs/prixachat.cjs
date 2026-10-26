@@ -13,9 +13,16 @@ const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
 const DIST=path.join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn'); const purch=FX('purch');
-const rows=[...FX('sold'),...purch,...dressingsDuJour(FX('listings')),...FX('inbox')];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 60 paires numérotées sans prix + leurs achats (18 « C'est ça »
+// au titre identique, 42 « à vérifier » marque+taille). La modale doit lister
+// les paires et montrer des pistes (« à vérifier » > « C'est ça »), sans blanc.
+const S=present?null:sc.achatsScenario();
+const main=present?FX('main'):S.main, accounts=present?FX('accounts'):S.accounts, txn=present?FX('txn'):[]; const purch=present?FX('purch'):S.purch;
+const rows=[...(present?FX('sold'):S.sold),...purch,...dressingsDuJour(present?FX('listings'):S.listings),...FXok('inbox')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}

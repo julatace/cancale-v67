@@ -16,8 +16,20 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 3 ventes à expédier dont 2 ont déjà leur bordereau par email
+// (`email_bord_*` avec `filename` → prêtes) et une sans (en attente) ; et deux
+// « derniers bordereaux captés » (`label_latest`) AVEC leur PDF, pour le bandeau
+// « tamponner en 1 clic » et le contrôle d'égress (0 octet de PDF à l'ouverture).
+const soldSc = present ? [] : [sc.ligneSold(sc.UID[0], ['6001','6002','6003'].map((tx,i)=>
+  sc.ordre({tx, titre:'Nike Pegasus 41 '+(i+1), prix:45+i, statut:sc.STATUT_AEXP, tus:'needs_action', dateMs:sc.NOW-(i+1)*86400e3})))];
+const bordSc = present ? [] : [sc.bordereau({tx:'6001'}), sc.bordereau({tx:'6002'})];
+const labelSc = present ? [] : [sc.labelLatest(sc.UID[0],{tx:'6001'}), sc.labelLatest(sc.UID[1],{tx:'6002'})];
+const SOLD=present?FX('sold'):soldSc, BORD=present?FX('bord'):bordSc, LABEL=present?FX('label'):labelSc;
+const main=present?FX('main'):sc.ligneMain(), accounts=present?FX('accounts'):sc.comptes(), txn=present?FX('txn'):[];
 
 // ── LA LIGNE `label_latest` PÈSE CE QU'ELLE PÈSE EN VRAI ────────────────────
 // ⚠️⚠️ UN BANC QUI SERT UNE LIGNE LÉGÈRE NE PEUT PAS VOIR UN DÉFAUT D'ÉGRESS.
@@ -31,7 +43,7 @@ const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
 // mesure une fiction. On regonfle donc chaque PDF à sa taille mesurée.
 const PDF_KO = 237;                       // 1 663 Ko / 7 lignes, mesuré
 const MAINTENANT = Date.now();
-const labelRows = FX('label').map((r) => {
+const labelRows = LABEL.map((r) => {
   if (!/_label_latest$/.test(r.id)) return r;
   const d = { ...(r.data || {}) };
   if (d.pdfB64) d.pdfB64 = 'JVBERi0'.repeat(Math.ceil((PDF_KO * 1024) / 7));
@@ -86,7 +98,7 @@ const pesePdf = (d) => {
   voir(d); return n;
 };
 
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...labelRows,...FX('billing')];
+const rows=[...SOLD,...FXok('purch'),...dressingsDuJour(FXok('listings')),...FXok('inbox'),...FXok('track'),...BORD,...labelRows,...FXok('billing')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.zip':'application/zip'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
@@ -117,7 +129,7 @@ function projette(row,select){
 }
 let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
 // ce que la base contient vraiment
-const bord=FX('bord'); const sold=FX('sold');
+const bord=BORD; const sold=SOLD;
 const parTx={}; bord.forEach(r=>{const d=r.data||{}; if(d.transaction&&d.filename) parTx[String(d.transaction)]=1;});
 let ventes=[]; sold.forEach(r=>(((r.data||{}).payload||{}).my_orders||[]).forEach(o=>ventes.push(o)));
 const aEnvoyer=ventes.filter(o=>/Bordereau envoyé au vendeur|Le paiement a été validé|en attente|à expédier/i.test(o.status||''));
