@@ -88,7 +88,8 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
     //    (`styles-mineral.css` : vignette portrait 52 × 68). Ce banc est à 390 px : c'est cette taille-là qu'il exige.
     //    (20 octobre) Et depuis fc4c73e (« ventes mobiles sur une seule ligne », styles-mobile-studio.css), les DEUX listes
     //    ont au téléphone la même vignette portrait 36 × 48, ouverte comme repliée. Une taille exacte, jugée vente ouverte.
-    const attendu={w:36,h:48,nom:'photo portrait à gauche '};
+    //    (26 octobre) Julien : « on voit à peine les photos » — la vignette passe à 60 × 80 (décision de sa demande).
+    const attendu={w:60,h:80,nom:'photo portrait à gauche '};
     check(pos.w===attendu.w && pos.h===attendu.h && pos.right>pos.left,attendu.nom+tab+' ('+pos.w+'×'+pos.h+')');
     // ⚠️ Ventes Vinted (b8d11f2, 16 octobre) : la LIGNE (`.vrm-sale-overview` : vignette, titre, statut, montant,
     //    bouton du bordereau sous le titre) reste sous 200 px ; les gestes du coût d'achat et « Modifier › »

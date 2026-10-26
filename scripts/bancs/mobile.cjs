@@ -82,7 +82,7 @@ const menuEcrans=(p)=>p.locator('button.vrm-nav-more').first();
         // ⚠️ (20 octobre) La vente est REPLIÉE depuis fc4c73e/5cdffcb (design de Julien) : on l'ouvre au doigt,
         //    et la vignette du détail a la taille du design (36 px de large au téléphone, comme compact.cjs).
         await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().tap();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});
-        {const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg===36,largeur+' photo de vente compacte ('+lg+' px)');}
+        {const lg=(await p.locator('.vrm-sale-row[data-ligne-ouverte=true] .vrm-sale-photo').first().boundingBox()).width;check(lg===60,largeur+' photo de vente compacte ('+lg+' px)');}
         const filtre=p.getByRole('button',{name:'Toutes',exact:true}).first();await filtre.scrollIntoViewIfNeeded();await filtre.tap();
         check((await p.locator('main').innerText()).includes('Nike P-6000'),largeur+' filtre accessible au doigt');
         check(!(await p.getByRole('button',{name:'7 jours',exact:true}).isVisible()),largeur+' périodes secondaires repliées');

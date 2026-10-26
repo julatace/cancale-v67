@@ -97,7 +97,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.229.0';
+const EXT_ATTENDUE = '5.230.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -18421,9 +18421,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
     }catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}
     finally{setSaving(false);}
   };
+  const [supprimee,setSupprimee]=React.useState(false);
   const terminer=async()=>{
-    if(!await askConfirm({title:'Terminer cette annonce ?',desc:`${it.title || it.itemId}\nElle ne sera plus proposée à la vente sur eBay.`,ok:'Terminer sur eBay',cancel:'Annuler'}))return;
-    setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce terminée sur eBay.');if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
+    if(!await askConfirm({title:'Supprimer cette annonce d’eBay ?',desc:`${it.title || it.itemId}${nomCompteConfirm?` · ${nomCompteConfirm}`:''}\nElle est terminée tout de suite sur eBay et n’est plus proposée à la vente. C’est sans retour côté eBay : il faudrait la republier.`,ok:'Oui, supprimer d’eBay',cancel:'Annuler',danger:true}))return;
+    setSaving(true);setMsg('');try{const r=await fetch('/api/ebay',{method:'POST',headers:{'content-type':'application/json',...enTeteSession()},body:JSON.stringify({action:'terminerannonce',itemId:it.itemId,...corpsCompteEbay(it._compte),confirme:true})});const j=await r.json();if(r.ok && j?.ok){setMsg('Annonce supprimée d’eBay.');setSupprimee(true);if(onSaved)onSaved();}else setMsg(j?.error || 'eBay a refusé cette action.');}catch(_){setMsg('État incertain : actualise l’annonce avant de recommencer.');}finally{setSaving(false);}
   };
   const inpE = { width: 92, boxSizing: 'border-box', border: `1px solid ${E.border}`, background: E.bg || E.card, color: E.text, borderRadius: 8, padding: '9px 10px', fontSize: 16, fontFamily: 'inherit' };
   const euro=p=>{if(p==null || String(p).trim()==='')return '—';const n=Number(p),c=it.currency || it.detail?.currency;return Number.isFinite(n)?prixEbayTexte(n,c):'';};
@@ -18465,6 +18466,10 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           pour le reste (modifier, détails). Avant : deux ou trois boutons
           pleine hauteur empilés par carte. ── */}
       <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
+      {/* (26 octobre) Julien : « sur eBay je veux pouvoir supprimer les annonces ».
+          Le geste était caché dans la carte dépliée : il est sur la carte. */}
+      <button type="button" data-ebay-supprimer={it.itemId} disabled={saving || supprimee} onClick={terminer} style={{ ...btnE, border: 'none', background: 'transparent', padding: '8px 4px', minHeight: 44, color: E.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>{supprimee ? 'Supprimée d’eBay' : 'Supprimer d’eBay'}</button>
+      {msg && !open && <span data-ebay-supprimer-msg={it.itemId} style={{ fontSize: 12, color: E.muted }}>{msg}</span>}
       {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à un article</button>}
       {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
       {/* ── (9 octobre) LA RÈGLE D'OFFRE : une ligne, ou une porte. Trois
@@ -18602,7 +18607,6 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               {/* Le lien se change ici (la confirmation dit « tu pourras la
                   changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
               {numero && <button type="button" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Changer la paire reliée</button>}
-              <button type="button" disabled={saving} onClick={terminer} style={btnE}>Terminer l’annonce</button>
               {onRelire && <button type="button" data-ebay-regle-relire-carte={it.itemId} onClick={async()=>{await onRelire();setRelectureNecessaire(false);}} style={btnE}>{relectureNecessaire?'Vérifier la règle sur eBay':'Actualiser la règle d’offre'}</button>}
               {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, fontSize: 12.5, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
             </div>
@@ -29284,7 +29288,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
-      {note && <div className="vrm-set-pied" style={{ color: C.muted }}>{note}</div>}
+      {note && <div className="vrm-set-pied" style={{ color: C.muted }}><Pourquoi label="À quoi ça sert ?">{note}</Pourquoi></div>}
     </section>
   );
 }
@@ -30103,12 +30107,22 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 
   return (
     <div className="vrm-finance-page" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Comptabilité" desc="Tes charges, tes abonnements et ton chiffre d'affaires par période — chaque euro compte dans ton résultat." />
+      <ScreenHead icon="euro" title="Comptabilité" desc="Ton résultat, ta déclaration URSSAF, tes charges et tes factures." />
+      {/* (26 octobre) Julien : « la compta, c'est horrible ». La page fait plus de
+          6 000 px au téléphone : un sommaire en tête mène à chaque partie, et la
+          déclaration URSSAF remonte juste sous le bénéfice. Aucune règle de
+          calcul ne change ; les explications longues passent derrière « Pourquoi ? ». */}
+      <nav aria-label="Parties de la comptabilité" data-compta-sommaire="" className="vrm-rangee vrm-compta-sommaire" style={{ display: 'flex', gap: 8, margin: '-4px 0 0' }}>
+        {[['compta-resultat', 'Résultat'], ['compta-benefice', 'Bénéfice'], ['compta-urssaf', 'URSSAF'], ['compta-charges', 'Charges'], ['compta-ca', 'Chiffre d\'affaires'], ['compta-factures', 'Factures']].map(([id, l]) => (
+          <button key={id} type="button" data-compta-aller={id} onClick={() => { const e = document.getElementById(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+            style={{ flex: '0 0 auto', minHeight: 40, padding: '0 14px', borderRadius: 999, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{l}</button>
+        ))}
+      </nav>
 
       {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────
           Recettes déclarées (ligne publiée par Ventes, §11) − charges. Le seul
           endroit où l'accent est permis (§7 : rare) : le filet du haut. */}
-      <Card className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden' }}>
+      <Card id="compta-resultat" className="vrm-finance-result" style={{ padding: 0, overflow: 'hidden', scrollMarginTop: 72 }}>
         <div style={{ padding: '16px 18px' }} data-compta-resultat={resultatAnnee == null ? '' : String(Math.round(resultatAnnee * 100) / 100)} data-compta-ca={recettesAnnee == null ? '' : String(Math.round(recettesAnnee * 100) / 100)} data-compta-charges={String(Math.round(chargesAnnee * 100) / 100)} data-compta-ca-etat={etatCa} data-compta-ca-at={caAt ? new Date(caAt).toISOString() : ''}>
           <div style={{ fontSize: 13, color: C.muted, fontWeight: 500, marginBottom: 6 }}>Résultat {annee} · CA déclaré − charges</div>
           {recettesAnnee == null ? (
@@ -30139,24 +30153,28 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   {/* (17 oct., revue) La carte URSSAF, juste en dessous sur le même écran,
                       écrit déjà « N ventes sans date de versement (X €) » avec le
                       geste : ici on y renvoie, sans redire les mêmes nombres (§7). */}
-                  {couvertureCa.aDater && <div>Des ventes finalisées n'ont pas encore de date de versement : elles ne sont dans aucun mois pour l'instant (le détail est dans « Ta déclaration URSSAF »).</div>}
+                  {couvertureCa.aDater && <div>Des ventes finalisées attendent leur date de versement (détail dans « URSSAF »).</div>}
                 </div>
               )}
-              <div style={{ fontSize: 13, color: C.muted, marginTop: 12, lineHeight: 1.45, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                Ce résultat ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est juste en dessous.
-              </div>
+              <div style={{ marginTop: 10 }}><Pourquoi label="Ce que ce résultat compte">Le CA déclaré de l'année (toutes plateformes) moins tes charges. Il ne déduit pas le prix d'achat de tes articles : ton bénéfice brut et net, qui le déduit, est juste en dessous.</Pourquoi></div>
             </div>
           )}
         </div>
       </Card>
 
+      <div id="compta-benefice" style={{ scrollMarginTop: 72 }}>
       <BeneficeCompta compta={data} onNav={onNav}
         onSansDepenses={() => repondreSansDepenses(data, maj)}
         onAjouterDepense={() => { setOuvert('dep'); setVersDepense((n) => n + 1); }} />
+      </div>
+
+      <div id="compta-urssaf" style={{ scrollMarginTop: 72 }}>
+      <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
+      </div>
 
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
           libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
-      <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+      <section id="compta-charges" className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0, scrollMarginTop: 72 }}>
         <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted }}>Tes charges</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           {[
@@ -30178,9 +30196,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         </div>
       </section>
 
-      <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
 
+      <div id="compta-ca" style={{ scrollMarginTop: 72 }}>
       <CaParPeriodeCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+      </div>
 
       <RecapComptableMensuel />
 
@@ -30307,7 +30326,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </div>
 
       {/* FACTURES — reçues (reçus Vinted par email) + le reste vit dans Factures */}
-      <section className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
+      <section id="compta-factures" className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0, scrollMarginTop: 72 }}>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           <button type="button" className="vrm-set-ligne" onClick={() => onNav && onNav('invoices')}>
             <IconeReglage name="receipt" />
@@ -38445,6 +38464,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // le mois de déclaration, qui peut être un autre (revue du 6 octobre).
         const recuMois = declarables ? recuDuMois(declarables.lignes, ymIci) : null;
         const moisNom = new Date().toLocaleDateString('fr-FR',{month:'long'});
+        // (26 octobre) Julien : « le chiffre d'affaires total ». Celui de l'ANNÉE,
+        // toutes plateformes, sur les MÊMES lignes et le même mois que le CA déclaré
+        // de Compta (`declarables`, `l.ym`) — jamais un second calcul (§11).
+        const anIci = String(new Date().getFullYear());
+        const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) : null;
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
         // Ce qui a été versé ce mois-ci mais DÉCLARÉ dans un autre mois : c'est
         // de l'argent reçu, ce n'est pas le CA déclaré de ce mois. La phrase sous
@@ -38601,6 +38625,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
+            </div>
+            <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
+              <div style={{minWidth:0}}>
+                <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
+                <div className="vrm-day-note" style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : `le CA déclaré, comme dans Compta · toutes plateformes${recuSans || adVinted>0 ? ' · au moins' : ''}`}</div>
+              </div>
+              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${(recuSans || adVinted>0) ? '≥ ' : ''}${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
             <BeneficeJournee onNav={onNav} place="integre"/>
           </div>
