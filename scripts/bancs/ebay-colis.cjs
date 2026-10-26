@@ -43,7 +43,7 @@ const cmd = (id, o = {}) => ({
   ...(o.x || {}),
 });
 const COMMANDES = [
-  cmd('E-1', { dj: -1, sku: 'VRM-12' }),
+  cmd('E-1', { dj: -1, sku: 'VRM-12', x: { fulfillmentStartInstructions: [{ fulfillmentInstructionsType: 'SHIP_TO', shippingStep: { shipTo: { fullName: 'Acheteur Inventé', contactAddress: { city: 'Londres', countryCode: 'GB' } } } }] } }),
   cmd('E-2', { dj: 1, sku: 'VRM-13', li: { program: { authenticityVerification: { status: 'PENDING' } } } }),
   cmd('E-3', { x: { orderFulfillmentStatus: 'FULFILLED' } }),
   cmd('E-4', { sku: 'VRM-14', x: { cancelStatus: { cancelState: 'CANCEL_REQUESTED' } } }),
@@ -124,7 +124,7 @@ const lireColis = (pg) => pg.evaluate(() => {
     recap: rc ? rc.getAttribute('data-colis-recap') : null, recapEbay: rc ? rc.getAttribute('data-colis-recap-ebay') : null,
     bloc: bl ? bl.getAttribute('data-colis-ebay') : null,
     cmds: [...document.querySelectorAll('[data-colis-ebay-cmd]')].map((x) => ({ id: x.getAttribute('data-colis-ebay-cmd'), num: x.getAttribute('data-numero'), j: x.getAttribute('data-jours'),
-      auth: !!x.querySelector('[data-colis-ebay-auth]'), lien: (x.querySelector('[data-lien-etiquette-ebay]') || {}).href || '' })),
+      auth: !!x.querySelector('[data-colis-ebay-auth]'), dest: (x.querySelector('[data-colis-ebay-dest]') || { getAttribute: () => null }).getAttribute('data-colis-ebay-dest'), destTxt: (x.querySelector('[data-colis-ebay-dest]') || {}).innerText || '', lien: (x.querySelector('[data-lien-etiquette-ebay]') || {}).href || '' })),
     ne: ne ? [...ne.querySelectorAll('[data-ebay-ne-pas-poster-cmd]')].map((x) => x.getAttribute('data-ebay-ne-pas-poster-cmd')) : null,
     phrases: (document.body.innerText.match(/L'étiquette se prend dans eBay : elle est prépayée/g) || []).length,
   };
@@ -150,6 +150,9 @@ const lireColis = (pg) => pg.evaluate(() => {
         const e1 = c.cmds.find((x) => x.id === 'E-1') || {}, e2 = c.cmds.find((x) => x.id === 'E-2') || {};
         dit(e1.num === '12' && e2.num === '13', 'Colis : le N° vient du SKU VRM-{n°}', JSON.stringify([e1.num, e2.num]));
         dit(e1.j === '-1' && e2.j === '1', 'Colis : les jours viennent de la date limite d\'eBay (en retard · demain)', JSON.stringify([e1.j, e2.j]));
+        dit(e1.dest === 'douane' && /Royaume-Uni/.test(e1.destTxt) && /CN22/.test(e1.destTxt), 'Colis : vente vers le Royaume-Uni ⇒ « International — Royaume-Uni », déclaration en douane', JSON.stringify([e1.dest, e1.destTxt]));
+        dit(e2.dest == null, 'Colis : rien d\'international sur la vente authentifiée (centre en France)', String(e2.dest));
+        dit(!/Londres|Inventé/.test(e1.destTxt), 'Colis : ni le nom ni la ville de l\'acheteur dans la ligne');
         dit(e2.auth && !e1.auth, 'Colis : l\'authentificateur d\'eBay signalé sur E-2 seulement');
         dit(/ebay\.fr\/.*orderid=E-1/.test(e1.lien), 'Colis : le lien mène à la commande E-1 sur ebay.fr', e1.lien);
         dit(c.phrases === 1, 'Colis : la phrase « l\'étiquette se prend dans eBay » est dite UNE fois (§7)', `${c.phrases} fois`);

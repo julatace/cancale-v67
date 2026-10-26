@@ -15892,6 +15892,33 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
     </div>
   );
 }
+// ── OÙ PART UN COLIS eBAY (26 octobre) — `destinationEbay` (§11) ──────────
+// Une ligne sur la carte, seulement pour un envoi qui n'est PAS ordinaire :
+// international par le programme d'eBay (on poste en France, eBay fait la
+// douane), international en direct (hors UE : déclaration en douane à joindre),
+// ou pays illisible alors que le programme d'eBay est en jeu. Un envoi en
+// France ne dit rien (§7). Le nom du pays vient du navigateur (Intl).
+function nomPaysEbay(c) {
+  try { return new Intl.DisplayNames(['fr'], { type: 'region' }).of(c) || c; } catch (_) { return c; }
+}
+function LigneDestinationEbay({ d }) {
+  if (!d || d.programme === 'authentification') return null;
+  let txt = null, cle = '';
+  if (d.programme === 'international') {
+    cle = 'programme';
+    txt = d.pays
+      ? `International — ${nomPaysEbay(d.pays)}, par la livraison internationale d'eBay. Poste à l'adresse indiquée sur l'étiquette d'eBay (un centre en France) : eBay s'occupe du transport à l'étranger et de la douane, l'acheteur a déjà payé les droits et taxes.`
+      : `Envoi par la livraison internationale d'eBay : poste à l'adresse indiquée sur l'étiquette d'eBay, eBay s'occupe de la suite et de la douane.`;
+  } else if (d.international === true) {
+    cle = d.douane ? 'douane' : 'ue';
+    txt = d.douane
+      ? `International — ${nomPaysEbay(d.pays)} (hors Union européenne) : joins une déclaration en douane (CN22, ou CN23 au-delà de 425 €) avec le contenu et la valeur. Les droits d'importation sont à la charge de l'acheteur.`
+      : `International — ${nomPaysEbay(d.pays)} (Union européenne) : pas de douane, l'étiquette d'eBay suffit.`;
+  }
+  if (!txt) return null;
+  return <div data-colis-ebay-dest={cle} data-pays={d.pays || ''} style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>{txt}</div>;
+}
+
 // ── PUBLIER une annonce sur eBay depuis VRM ─────────────────────────────────
 // Piloté par la MESURE : on demande à eBay (action pubinfo) la catégorie et les
 // attributs OBLIGATOIRES à partir du titre, et on ne montre QUE les champs
@@ -42376,6 +42403,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {!num && <span data-colis-ebay-sans-num="">· annonce pas reliée à un article (pas de SKU VRM) — vérifie l'article avant d'emballer</span>}
                       {plusieurs && <span>· {x.pseudo || x.compte}</span>}
                     </div>
+                    <LigneDestinationEbay d={x.destination}/>
                     {x.authentification && <div data-colis-ebay-auth="" style={{fontSize:12,color:C.text,marginTop:4,lineHeight:1.45}}>Part vers l'authentificateur d'eBay (garantie d'authenticité) : l'étiquette d'eBay l'y envoie, pas chez l'acheteur.</div>}
                     <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
                       <a data-lien-etiquette-ebay="" href={lienCommandeEbay(x.orderId)} target="_blank" rel="noreferrer" style={{display:'inline-flex',alignItems:'center',minHeight:44,boxSizing:'border-box',fontSize:13,fontWeight:600,color:C.text,textDecoration:'none',border:`1px solid ${C.border}`,borderRadius:10,padding:'0 14px'}}>Étiquette sur eBay ↗</a>
