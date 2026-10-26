@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.230.0';
+const CODE_VERSION = '5.231.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -6809,13 +6809,14 @@ function alarmeSiAbsente(nom, opts) {
 // ouvert, on complète tout seul (Julien, 29 sept.). Voir `tickPhotos`.
 // 5.183 : le relais du téléphone (`vrm-relais`, 30 s, le minimum de Chrome).
 // Rien ne part sans session VRM (voir `relaisTick`).
-const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5 };
+const PERIODES = { 'cancale-sync': 10, 'cancale-active': 20, 'vrm-session': 40, 'vrm-photos': 1, 'vrm-relais': 0.5, 'vrm-lbc': 30 };
 function surAlarme(a) {
   if (a.name === 'cancale-sync') captureAllAccounts();
   else if (a.name === 'cancale-active') runActive();
   else if (a.name === 'vrm-session') { loadSession().then(s => { if (s) authToken(); }); }
   else if (a.name === 'vrm-photos') tickPhotos();
   else if (a.name === 'vrm-relais') relaisTick('alarme');
+  else if (a.name === 'vrm-lbc') relireLbcEnFond().catch(() => {});
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
   // faut-il qu'il PARTE un jour. Sans ce réveil, un tampon posé juste avant
   // une longue période calme attendrait la prochaine capture pour être écrit.
@@ -11609,6 +11610,67 @@ async function pauseLbcDepuisApp(msg) {
     return { accepte: true, etape: 'refuse', statut, reponse };
   } finally {
     PAUSE_LBC_EN_VOL = false;
+    if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
+  }
+}
+// ── LEBONCOIN RELU SANS QU'IL OUVRE « MES ANNONCES » (26 octobre, 5.231) ────
+// Julien : « je veux que la capture leboncoin se fasse sans que j'ai à ouvrir
+// annonce ». Les annonces Leboncoin (et leur état : active, désactivée, expirée)
+// n'arrivaient que quand IL ouvrait la page « Mes annonces ». L'extension ouvre
+// maintenant cette page elle-même, EN ARRIÈRE-PLAN (jamais au premier plan),
+// laisse la page faire ses propres lectures (celles que `lbc-inject.js` capte
+// déjà), puis referme l'onglet. Aucune requête écrite par nous, aucun clic.
+// Garde-fous : session VRM exigée · un compte Leboncoin déjà vu dans CE Chrome
+// (`vrmLbcCompte`) — sinon on n'ouvre rien · au plus une fois toutes les 6 h,
+// notée AVANT d'ouvrir (un service worker redémarré ne rejoue pas) · rien si la
+// page a déjà été lue par lui depuis moins de 6 h · une à la fois, jamais
+// pendant une mise en pause · page sans session (déconnecté) ⇒ 24 h de recul.
+const LBC_RELECTURE_MS = 6 * 3600e3;
+const LBC_RELECTURE_RECUL_MS = 24 * 3600e3;
+const LBC_RELECTURE_ATTENTE_MS = 30000;
+let RELECTURE_LBC_EN_VOL = false;
+async function relireLbcEnFond(maintenant = Date.now()) {
+  if (RELECTURE_LBC_EN_VOL || PAUSE_LBC_EN_VOL) return { fait: false, raison: 'en-cours' };
+  RELECTURE_LBC_EN_VOL = true;
+  let ouvert = null;
+  try {
+    let session = null;
+    try { session = await loadSession(); } catch (_) { session = null; }
+    if (!session) return { fait: false, raison: 'sans-session' };
+    let local;
+    try { local = await chrome.storage.local.get(['vrmLbcCompte', 'vrmLbcRelecture', 'vrmLbcTransport']); } catch (_) { return { fait: false, raison: 'stockage' }; }
+    const compte = local.vrmLbcCompte;
+    if (!compte || compte.v !== 2 || !compte.id) return { fait: false, raison: 'jamais-vu' };
+    const rel = local.vrmLbcRelecture || {};
+    if (Number(rel.prochaine) > maintenant) return { fait: false, raison: 'trop-tot' };
+    // Déjà lue par lui (un onglet qu'il a ouvert) : rien à refaire.
+    for (const c of Object.values(local.vrmLbcTransport || {})) {
+      const r = c && c.receptions && c.receptions.annonces;
+      if (r && maintenant - Number(r.at) < LBC_RELECTURE_MS) return { fait: false, raison: 'deja-lue' };
+    }
+    try { await chrome.storage.local.set({ vrmLbcRelecture: { at: maintenant, prochaine: maintenant + LBC_RELECTURE_MS } }); } catch (_) { return { fait: false, raison: 'stockage' }; }
+    try { ouvert = await chrome.tabs.create({ url: 'https://www.leboncoin.fr/compte/part/mes-annonces', active: false }); } catch (_) { ouvert = null; }
+    if (!ouvert || ouvert.id == null) { noterDiag('lbc_relecture_onglet_refuse'); return { fait: false, raison: 'onglet' }; }
+    const s = await attendreSessionOnglet(ouvert.id, LBC_RELECTURE_ATTENTE_MS);
+    if (!s || !s.compte) {
+      noterDiag('lbc_relecture_sans_session');
+      try { await chrome.storage.local.set({ vrmLbcRelecture: { at: maintenant, prochaine: maintenant + LBC_RELECTURE_RECUL_MS, sansSession: true } }); } catch (_) {}
+      return { fait: false, raison: 'session' };
+    }
+    // La liste arrive par les lectures de la page : on attend qu'elle soit RANGÉE.
+    const fin = Date.now() + LBC_RELECTURE_ATTENTE_MS;
+    while (Date.now() < fin) {
+      try {
+        const c = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[ouvert.id];
+        const r = c && c.receptions && c.receptions.annonces;
+        if (r && Number(r.at) >= maintenant) { noterDiag('lbc_relecture_' + r.etat); return { fait: true, etat: r.etat, nombre: r.nombre }; }
+      } catch (_) {}
+      await new Promise((ok) => setTimeout(ok, 500));
+    }
+    noterDiag('lbc_relecture_rien');
+    return { fait: false, raison: 'rien-recu' };
+  } finally {
+    RELECTURE_LBC_EN_VOL = false;
     if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
   }
 }

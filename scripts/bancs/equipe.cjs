@@ -352,7 +352,7 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
           dit(pdf.length === 1 && pdf[0].entete === V, 'imprimer lit le PDF avec x-vrm-equipe', pdf.map((j) => j.entete).join(','));
           const m = await pg.evaluate(() => { const e = document.querySelector('[data-equipe-msg="9001"]'); return e ? e.innerText : ''; });
           dit(!m, 'l’impression aboutit (aucun message d’erreur)', m);
-          dit(popups.length >= 1 || await pg.evaluate(() => !!document.querySelector('[data-colis-equipe] a[href^="blob:"]')), 'le bordereau est ouvert (onglet, ou lien « Ouvrir »)');
+          dit(popups.length >= 1 || await pg.evaluate(() => !!document.querySelector('[data-colis-equipe] a[href^="blob:"], [data-visionneuse-cadre][src^="blob:"]')), 'le bordereau est ouvert (visionneuse, onglet, ou lien « Ouvrir »)');
         }
         dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | ').slice(0, 160));
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

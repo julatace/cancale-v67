@@ -8,6 +8,21 @@
 > stats-compta, retours-stock, glisser-onglet, revendeurs, messages-priorite, session,
 > extension-leboncoin-installee.
 
+> **26 octobre — bordereaux sur ordinateur :** « bègues, ne s'ouvrent pas ». L'onglet
+> vide réservé au clic prenait le premier plan, cachait la confirmation du N° (à
+> vérifier, deux paires) et se refermait au bout de 25 s. Le PDF s'ouvre maintenant
+> DANS VRM (`VisionneusePdf`, z 9500, sous les confirmations) : cadre sur le PDF,
+> « Imprimer », « Ouvrir dans un onglet », « Télécharger ». iPhone inchangé.
+> Banc `ventes-bordereau.cjs` : 4 rouges sur main, vert après.
+
+> **26 octobre — Leboncoin relu sans geste (5.231) :** toutes les 30 min l'extension
+> regarde si la page « Mes annonces » a été lue depuis 6 h ; sinon elle l'ouvre EN
+> ARRIÈRE-PLAN, laisse la page faire ses lectures (captées comme d'habitude), puis
+> referme l'onglet (`relireLbcEnFond`). Session VRM et compte Leboncoin déjà vu dans
+> ce Chrome exigés ; déconnecté ⇒ 24 h de recul. `audit-lbc-relecture-fond.cjs`
+> (rouge sur la 5.230, mutations rouges). Non mesuré : un vrai Chrome (l'onglet
+> apparaît ~5-30 s dans la barre), et la page « part » pour un compte pro.
+
 > **26 octobre — favoris 5.228 :** le rapport du parcours manuel montre que la cloche
 > affiche le favori avec un lien `receiver_id`/`item_id`, pas le lien enregistré
 > (`/items/{article}/want_it/new?offering_id=…`). Ce lien est suivi seulement par
