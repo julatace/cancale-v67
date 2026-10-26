@@ -16,9 +16,27 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn'); const purch=FX('purch');
-const rows=[...FX('sold'),...purch,...dressingsDuJour(FX('listings')),...FX('inbox')];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 3 colis au relais (MÊME compte, aucun code en base → le compte
+// doit être nommé UNE fois, §7) + 2 commandes finalisées que le préparateur de
+// ce banc transforme en « non réclamées ». conversation_id en UUID (le lien doit
+// y mener, entier — §6.3), prix et date portés (chaque carte les montre).
+const purchSc = present ? [] : [
+  sc.lignePurch(sc.UID[0], [
+    sc.ordre({tx:9001, conv:sc.uuid(11), titre:'Nike Air Max 1',  prix:55, statut:sc.STATUT_RELAIS}),
+    sc.ordre({tx:9002, conv:sc.uuid(12), titre:'New Balance 550', prix:70, statut:sc.STATUT_RELAIS}),
+    sc.ordre({tx:9003, conv:sc.uuid(13), titre:'Asics Gel 1130',  prix:48, statut:sc.STATUT_RELAIS}),
+    sc.ordre({tx:9101, conv:sc.uuid(14), titre:'Puma Suede',      prix:30, statut:sc.STATUT_FINAL, dateMs:sc.NOW-20*86400e3}),
+  ]),
+  sc.lignePurch(sc.UID[1], [
+    sc.ordre({tx:9102, conv:sc.uuid(15), titre:'Reebok Club C',   prix:35, statut:sc.STATUT_FINAL, dateMs:sc.NOW-22*86400e3}),
+  ]),
+];
+const main=present?FX('main'):sc.ligneMain(), accounts=present?FX('accounts'):sc.comptes(), txn=present?FX('txn'):[]; const purch=present?FX('purch'):purchSc;
+const rows=[...FXok('sold'),...purch,...dressingsDuJour(FXok('listings')),...FXok('inbox')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}

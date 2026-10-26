@@ -15,9 +15,22 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn'); const track=FX('track');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...track];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 3 colis « disponibles » vieux de 30 j, hors fenêtre de retrait
+// — un avec code+QR, un QR seul, un code seul. C'est la plainte mesurée (« il
+// n'y a pas tous les codes ») : le bloc « à vérifier » doit tous les montrer,
+// code ET QR. QR via une URL /api/barcode/datamatrix (la seule que l'app accepte).
+const trackSc = present ? [] : [
+  sc.trackColis({n:1, code:'483921', qr:true}),
+  sc.trackColis({n:2, qr:true}),
+  sc.trackColis({n:3, code:'B4821'}),
+];
+const main=present?FX('main'):sc.ligneMain(), accounts=present?FX('accounts'):sc.comptes(), txn=present?FX('txn'):[];
+const track=present?FX('track'):trackSc;
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(FXok('listings')),...FXok('inbox'),...track];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.zip':'application/zip'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
@@ -27,7 +40,7 @@ srv.listen(4401);
 // ⚠️ Les n° de suivi de SES bordereaux se lisent dans `bord` : `rows` ne porte
 // aucune ligne `email_bord_*`, et l'ancien filtre sur `rows` rendait toujours un
 // ensemble VIDE — la réplique n'écartait donc aucun colis sortant.
-const env=new Set(FX('bord').map(r=>String((r.data||{}).suivi||'').trim().toUpperCase()).filter(Boolean));
+const env=new Set(FXok('bord').map(r=>String((r.data||{}).suivi||'').trim().toUpperCase()).filter(Boolean));
 // ⚠️ UN QR EN BASE ≠ UN VRAI QR. `qrUrl` porte AUSSI des bannières et des
 // mouchards Pickup (`/tracking/1/open/…`, `avn-prod/…_PARCEL`, `banner-mail`) :
 // l'app les écarte à l'affichage (`URL_PAS_UN_QR`) — c'est VOULU (§5.28). Un

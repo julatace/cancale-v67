@@ -40,13 +40,23 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const mainFx=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const purchFx=FX('purch');
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent (toute session hors la sienne) : on monte LA situation que ce
+// banc mesure — deux colis au relais sur un compte lié, prêts à cocher. Formes
+// et statut exacts (`isAtRelayStatus`), aucune donnée réelle (§6.3).
+const scenarioPurch = present ? [] : [sc.lignePurch(sc.UID[0], [
+  sc.ordre({tx:7701, conv:sc.uuid(1), titre:'Nike Air Zoom Pegasus', prix:48, statut:sc.STATUT_RELAIS}),
+  sc.ordre({tx:7702, conv:sc.uuid(2), titre:'Adidas Samba OG',        prix:62, statut:sc.STATUT_RELAIS}),
+])];
+const mainFx=present?FX('main'):sc.ligneMain(), accounts=present?FX('accounts'):sc.comptes(), txn=present?FX('txn'):[];
+const purchFx=present?FX('purch'):scenarioPurch;
 // §6.3 : TOUTES les familles qu'Achats lit — sans les emails de suivi
 // (`email_track_*`) ni les bordereaux (`email_bord_*`), l'écran affichait
 // « 7 comptes ne reçoivent aucun email » : un artefact du banc, pas la base.
-const autres=[...FX('sold'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord')];
+const autres=[...FXok('sold'),...dressingsDuJour(FXok('listings')),...FXok('inbox'),...FXok('track'),...FXok('bord')];
 // Réponse de /api/relais INVENTÉE (même forme que api/relais.js :
 // { city, center, points:[{nom,rue,type,carrier,locker,lat,lon}] }). Elle ne
 // sert que si un appel repart — et dans ce cas il est compté (contrôle 1).

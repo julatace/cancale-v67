@@ -27,9 +27,20 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
 const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const sc=require('./_scenario-colis.cjs');
 const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox')];
+const FXok=f=>{try{return FX(f);}catch(_){return [];}};
+const present=sc.present(SC);
+// ⚠️ fx/ absent : 6 ventes à expédier, dont 2 DÉJÀ cochées « posté »
+// (`vinted_ship_done`). C'est la situation que ce banc mesure — il en coche 2 de
+// plus, puis déroule « Déjà postés ». Statut `needs_action`+« paiement validé »
+// = `aExpedier` vrai (mesuré dans App.jsx), aucune donnée réelle.
+const PRE=['8801','8802']; const now=sc.NOW;
+const soldSc = present ? [] : [sc.ligneSold(sc.UID[0], ['8801','8802','8803','8804','8805','8806'].map((tx,i)=>
+  sc.ordre({tx, titre:'Nike Dunk Low '+(i+1), prix:40+i, statut:sc.STATUT_AEXP, tus:'needs_action', dateMs:now-(i+1)*86400e3})))];
+const main=present?FX('main'):sc.ligneMain({vinted_ship_done:Object.fromEntries(PRE.map(t=>[t,sc.iso(now-3*86400e3)]))});
+const accounts=present?FX('accounts'):sc.comptes(), txn=present?FX('txn'):[];
+const rows=[...(present?FX('sold'):soldSc),...FXok('purch'),...dressingsDuJour(FXok('listings')),...FXok('inbox')];
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
