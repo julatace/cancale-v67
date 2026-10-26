@@ -1,8 +1,6 @@
 // COMBIEN COÛTE L'ÉCRAN VENTES ? Il fait 19 844 px de haut au banc : on mesure
 // le nombre de nœuds, le temps de rendu, et ce que coûte un filtre.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
-const { metaVersData } = require('./_meta.cjs');
-const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -11,29 +9,15 @@ const fs=require('fs'), http=require('http'), path=require('path');
 // d'avant, et sortait VERT sur le défaut. Un banc qui ne peut pas échouer est
 // pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
 // toujours en 0). Le dist se déduit de l'emplacement DU BANC.
-const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
-const FX=f=>JSON.parse(fs.readFileSync(path.join(SC,'fx',f+'.json'),'utf8'));
-const main=FX('main'), accounts=FX('accounts'), txn=FX('txn');
-const rows=[...FX('sold'),...FX('purch'),...dressingsDuJour(FX('listings')),...FX('inbox'),...FX('track'),...FX('bord'),...FX('label'),...FX('billing')];
-const chemin=null;
-function projette(row,select){
-  if(!select || select==='*') return row;
-  const out={};
-  for(const part of select.split(',')){
-    const m=/^(?:([^:]+):)?(.+)$/.exec(part.trim()); if(!m) continue;
-    const alias=m[1]||m[2].split('->').pop().replace(/^>/,''); const src=m[2];
-    if(src==='id'||src==='updated_at'){ out[alias]=row[src]; continue; }
-    if(src==='data'){ out[alias]=row.data; continue; }
-    if(/^data(->|->>)/.test(src)){
-      const reste=src.replace(/^data(->>|->)/,'');
-      let v=row.data;
-      for(const seg of reste.split(/->>|->/)) v=(v==null?null:v[seg]);
-      out[alias]=(v==null)?null:v; continue;
-    }
-    out[alias]=row[src];
-  }
-  return out;
-}
+const DIST=require('path').join(__dirname,'..','..','dist');
+// ⚠️ fx/ est une copie de SA base (jamais dans le dépôt). Ce banc de VITESSE
+// mesure le coût de l'écran Ventes À SON VOLUME : il lui faut des centaines de
+// ventes, pas les deux lignes d'un secours minimal. `_base-volume.cjs` fabrique
+// une base À LA FORME et au POIDS mesurés (aucune donnée réelle, elle vit dans
+// le dépôt) et `repondre` émule PostgREST — exactement comme ses bancs sœurs
+// `vitesse.cjs` et `ventes-frappe.cjs`. Tourne donc partout, fx/ ou pas.
+const { fabriquer, repondre } = require('./_base-volume.cjs');
+const base = fabriquer();
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
   const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
@@ -45,18 +29,11 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   for(const [W,H,tag] of [[390,844,'iPhone'],[1512,950,'ordinateur']]){
   const pg=await b.newPage({viewport:{width:W,height:H}});
   await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
-  await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
-    const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
-    if(route.request().method()!=='GET') return j([]);
-    if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
-    const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
-    if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
-    if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
-    if(/transaction->>id/.test(u)) return j(txn);
-    const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}
-    const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
-      return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
-    return j([]);});
+  await pg.route('**/rest/v1/**',async route=>{const rq=route.request();
+    if(rq.method()!=='GET') return route.fulfill({status:201,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'[]'});
+    const h=await rq.allHeaders();
+    const rep=repondre(rq.url(),h.range,base);
+    return route.fulfill({status:rep.status,contentType:'application/json',headers:{'access-control-allow-origin':'*',...(rep.headers||{})},body:JSON.stringify(rep.body)});});
   await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
   const t0=Date.now();
   await pg.goto('http://localhost:'+PORT+'/?tab=cat_ventes',{waitUntil:'domcontentloaded'});
