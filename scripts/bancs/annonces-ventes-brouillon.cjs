@@ -31,7 +31,15 @@ const num={};[...A1,...A2].forEach((a,i)=>{if(i<13)num[a.id]={numero:String(20+i
 const st=['Le paiement a été validé','Commande finalisée','Colis en cours d\'acheminement','Commande finalisée','Remboursement effectué','Bordereau envoyé au vendeur','Commande finalisée'];
 const vente=(i)=>({transaction_id:7700+i,title:`${marques[(i+2)%5]} ${modeles[(i+3)%8]} taille ${39+i%6}`,price:{amount:String(45+i*6),currency_code:'EUR'},status:st[i%7],transaction_user_status:i%7===0||i%7===5?'needs_action':(i%7===4?'failed':'completed'),date:iso(i*2),photo:null});
 const V1=Array.from({length:14},(_,i)=>vente(i)),V2=Array.from({length:6},(_,i)=>vente(20+i));
+const stA=['Colis en cours d\'acheminement','Colis déposé au point relais','Commande finalisée','Le paiement a été validé','Commande finalisée','Colis déposé en point relais'];
+const achat=(i)=>({transaction_id:8800+i,title:`${marques[(i+1)%5]} ${modeles[(i+5)%8]} taille ${40+i%5}`,price:{amount:String(30+i*5),currency_code:'EUR'},status:stA[i%6],transaction_user_status:/relais/.test(stA[i%6])?'needs_action':(/finalis/.test(stA[i%6])?'completed':'waiting'),date:iso(1+i*3),photo:null,conversation_id:9900+i});
+const B1=Array.from({length:9},(_,i)=>achat(i)),B2=Array.from({length:4},(_,i)=>achat(20+i));
+const conv=(id,login,desc,unread,h)=>({id,unread,updated_at:iso(h/24),description:desc,opposite_user:{id:5000+id,login}});
+const C1=[conv(301,'acheteuse_1','Vous feriez 45 € ?',true,2),conv(302,'marc_b','Merci, bien reçu !',false,20),conv(303,'sneaker_fan','Toujours dispo en 42 ?',true,30),conv(304,'lea.v','Je peux venir la chercher ?',false,50)];
+const C2=[conv(402,'acheteur_2','Est-ce que la boîte est fournie ?',true,5),conv(403,'paul75','Ok je prends',false,80)];
 const rows=[{id:'main',data:{vinted_annonce_numeros:num}},
+{id:'harvest_111_orders_purchased',data:{capturedAt:iso(0),payload:{my_orders:B1}}},{id:'harvest_222_orders_purchased',data:{capturedAt:iso(0),payload:{my_orders:B2}}},
+{id:'harvest_111_inbox',data:{capturedAt:iso(0),payload:{conversations:C1}}},{id:'harvest_222_inbox',data:{capturedAt:iso(0),payload:{conversations:C2}}},
 {id:'harvest_111_listings',data:{capturedAt:iso(0),payload:{items:A1}}},{id:'harvest_222_listings',data:{capturedAt:iso(0),payload:{items:A2}}},
 {id:'harvest_111_orders_sold',data:{capturedAt:iso(0),payload:{my_orders:V1}}},{id:'harvest_222_orders_sold',data:{capturedAt:iso(0),payload:{my_orders:V2}}},
 {id:'harvest_111_billing',data:{capturedAt:iso(0),payload:{user_balance:{available_amount:{amount:'42.5'},escrow_amount:{amount:'310.0'}}}}}];
@@ -40,7 +48,7 @@ const types={'.js':'text/javascript','.css':'text/css','.html':'text/html','.png
 const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0];if(f==='/'||!path.extname(f))f='/index.html';const p=path.join(DIST,f);if(!fs.existsSync(p)){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':types[path.extname(p)]||'application/octet-stream'});fs.createReadStream(p).pipe(r);}).listen(PORT);
 const projette=(row,sel)=>{const out={};for(const part of sel.split(',')){const m=/^(?:([^:]+):)?(.+)$/.exec(part.trim());if(!m)continue;const src=m[2],al=m[1]||src.split(/->>|->/).pop();if(src==='id'){out[al]=row.id;continue;}if(src==='data'){out[al]=row.data;continue;}let v=row.data;for(const s of src.replace(/^data(->>|->)/,'').split(/->>|->/))v=v==null?null:v[s];out[al]=v==null?null:(src.includes('->>')&&typeof v==='object'?JSON.stringify(v):v);}return out;};
 (async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
-const plan=(process.env.VUES||'plat_vinted:ventes,plat_vinted:annonces').split(',');
+const plan=(process.env.VUES||'plat_vinted:ventes,plat_vinted:annonces,plat_vinted:achats,plat_vinted:messages').split(',');
 for(const vp of [{width:390,height:844},{width:1512,height:950}]){for(const sombre of (process.env.SOMBRE?[false,true]:[false])){
 const ctx=await b.newContext({viewport:vp,colorScheme:sombre?'dark':'light',...(vp.width<600?{isMobile:true,hasTouch:true}:{})});const pg=await ctx.newPage();const errs=[];pg.on('pageerror',e=>errs.push(e.message));
 await pg.addInitScript((s)=>{try{localStorage.setItem('vrm_acces_direct','1');if(s)localStorage.setItem('vinted_dark','true');}catch(_){}},sombre);
@@ -66,6 +74,10 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     titreAnn:[...document.querySelectorAll('h1,h2,h3')].some(h=>/Annonces en ligne/.test(h.textContent)&&vis(h)),
     titreVentes:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^(Ventes|Vos ventes)$/.test(h.textContent.trim())&&vis(h)),
     lignesComptes:vis(document.querySelector('[data-comptes-annonces]')),
+    titreAch:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Achats$/.test(h.textContent.trim())&&vis(h)),
+    titreMsg:[...document.querySelectorAll('.vrm-main h1,.vrm-main h2')].some(h=>/^Messages$/.test(h.textContent.trim())&&vis(h)),
+    recusTop:top(document.querySelector('[data-recus-email]')),ongletsTop:top(document.querySelector('[data-achats-onglet]')),
+    colis0:top(document.querySelector('[data-achats-onglet]')),convTop:top(document.querySelector('.vrm-msg-search')),
     v0:top(ventes[0]),a0:top(cartes[0]),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,nA:cartes.length,
     deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1};});
 if(sub==='ventes'){
@@ -76,6 +88,13 @@ if(sub==='ventes'){
   dit(!m.retirer,`[${W}] pas de « Retirer mon argent » sans argent disponible`);
   dit(!m.titreVentes,`[${W}] pas de second titre « Ventes » sous l'onglet Ventes`);
   dit(m.v0!=null&&m.v0<=(W<600?560:660),`[${W}] la première vente arrive plus haut`,String(m.v0));
+} else if(sub==='achats'){
+  dit(!m.titreAch,`[${W}] pas de second titre « Achats » sous l'onglet Achats`);
+  dit(m.recusTop!=null&&m.ongletsTop!=null&&m.recusTop>m.ongletsTop,`[${W}] les reçus par email passent sous la liste, plus en tête`,`${m.recusTop} / ${m.ongletsTop}`);
+  dit(m.colis0!=null&&m.colis0<=(W<600?360:420),`[${W}] les étapes des achats arrivent plus haut`,String(m.colis0));
+} else if(sub==='messages'){
+  dit(!m.titreMsg,`[${W}] pas de second titre « Messages » sous l'onglet Messages`);
+  dit(m.convTop!=null&&m.convTop<=(W<600?380:470),`[${W}] la recherche des conversations arrive plus haut`,String(m.convTop));
 } else {
   dit(m.nA>=10,`[${W}] les annonces sont rendues`,String(m.nA));
   dit(!m.titreAnn,`[${W}] pas de second titre « Annonces en ligne » sous l'onglet Annonces`);
