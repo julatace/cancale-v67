@@ -123,11 +123,11 @@ srv.listen(PORT);
 
     // ── 3. LA RECHERCHE SURLIGNE LE CARTON, PAS TOUTE LA PILE ────────────────
     await essaie('recherche', async () => {
-      await pg.fill('input[placeholder^="Cherche un N° → le meuble"]', '203'); await pg.waitForTimeout(1500);
+      await pg.fill('[data-stock-saisie]', '203'); await pg.waitForTimeout(1500);
       const hi = await sonde('contour', 'hi'), sel = await sonde('contour', 'sel');
       dit(!!hi && hi.sy < 0.7, 'le N° cherché est surligné sur SON carton (hauteur ≈ une boîte)', hi ? `hauteur ${hi.sy.toFixed(2)} m` : 'aucun contour');
       dit(!!hi && !!sel && sel.sy > hi.sy * 1.5, 'et pas sur toute la pile', sel && hi ? `pile ${sel.sy.toFixed(2)} m / carton ${hi.sy.toFixed(2)} m` : '');
-      await pg.fill('input[placeholder^="Cherche un N° → le meuble"]', ''); await pg.waitForTimeout(400);
+      await pg.fill('[data-stock-saisie]', ''); await pg.waitForTimeout(400);
     });
 
     // ── 4. LA MOLETTE : PLUS VITE, ET VERS LE POINT VISÉ ─────────────────────

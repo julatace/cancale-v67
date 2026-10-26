@@ -19,7 +19,7 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -24057,6 +24057,149 @@ function PlanDessus({ room, poly, items, sel, onSelect, onPoly, onMove, cibles }
   );
 }
 
+// ── L'ASSISTANT DU STOCK (26 oct.) ──────────────────────────────────────────
+// Julien : « le stock en 3D n'est pas pratique et ne fait pas gagner de temps…
+// on n'a pas d'agent qui aide pour créer la pièce et pour gérer comment on range ».
+// Un assistant à RÈGLES (aucune IA, rien de payant, §2.9) qui PROPOSE et attend
+// son « oui » : il ne range rien et ne crée rien tout seul, et ne touche jamais
+// à un numéro (§5) — il dit seulement OÙ.
+// « Tout ranger » : chaque article à ranger, dans l'ordre des numéros, va à la
+// première place libre (la plus basse d'abord : `premiereCaseLibre`), posé par
+// la règle de chaque geste (`rangerNumeroDansPlan` : jamais deux fois le même N°).
+// Les numéros qui se suivent se retrouvent donc côte à côte.
+const proposerToutRanger = (plan, numeros) => {
+  let p = plan; const poses = []; let deja = 0, sansPlace = 0;
+  for (const n of (numeros || [])) {
+    if (ouEstNumero(p, n)) { deja++; continue; }
+    const libre = premiereCaseLibre(p);
+    if (!libre) { sansPlace++; continue; }
+    const r = rangerNumeroDansPlan(p, libre.itemId, libre.key, n);
+    if (r.erreur) { sansPlace++; continue; }
+    p = r.plan; poses.push({ numero: String(n).trim(), itemId: libre.itemId, itemName: r.ou.itemName, roomName: r.ou.roomName, nom: r.ou.nom });
+  }
+  return { plan: p, poses, deja, sansPlace };
+};
+// Les places proposées, regroupées par case (« Étagère métal 1 · 1ᵉʳ plateau · case 1 — N°12, N°13 »).
+const groupesToutRanger = (poses) => {
+  const out = [];
+  poses.forEach(x => { const k = x.itemId + '|' + x.nom; const g = out[out.length - 1]; if (g && g.k === k) g.nums.push(x.numero); else out.push({ k, itemName: x.itemName, roomName: x.roomName, nom: x.nom, nums: [x.numero] }); });
+  return out;
+};
+function FeuilleToutRanger({ plan, numeros, plusieursPieces, onValider, onClose }) {
+  const prop = useMemo(() => proposerToutRanger(plan, numeros), [plan, numeros]);
+  const groupes = useMemo(() => groupesToutRanger(prop.poses), [prop]);
+  const n = prop.poses.length;
+  return createPortal(
+    <SheetShell onClose={onClose} maxWidth={540} z={2100}>
+      <div data-tout-ranger={n} data-tout-ranger-sans-place={prop.sansPlace} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Tout ranger d'un geste</div>
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
+          {n > 0
+            ? <>Je range {n} article{n > 1 ? 's' : ''} dans l'ordre des numéros, de la place la plus basse à la plus haute : les numéros qui se suivent restent côte à côte. Rien n'est rangé avant ton « Ranger », et aucun numéro ne change.</>
+            : <>Aucune place libre dans tes meubles : ajoute une étagère, une table ou un portant (Aménager).</>}
+        </div>
+        {prop.sansPlace > 0 && n > 0 && <div data-tout-ranger-reste={prop.sansPlace} style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{prop.sansPlace} article{prop.sansPlace > 1 ? 's' : ''} n'{prop.sansPlace > 1 ? 'ont' : 'a'} pas de place : il manque un meuble.</div>}
+        {n > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 'min(46vh, 380px)', overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 10px', background: C.card }}>
+            {groupes.map(g => (
+              <div key={g.k} data-tout-ranger-groupe="" style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}>
+                <b>{g.nums.length > 1 ? `N°${g.nums[0]} à N°${g.nums[g.nums.length - 1]}` : `N°${g.nums[0]}`}</b>
+                <span style={{ color: C.muted }}> → {g.itemName}{plusieursPieces ? ` (${g.roomName})` : ''} · {g.nom}</span>
+                {g.nums.length > 2 && <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{g.nums.map(v => 'N°' + v).join(', ')}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>{n > 0 ? 'Annuler' : 'Fermer'}</button>
+          {n > 0 && <button type="button" data-tout-ranger-ok="" onClick={() => onValider(prop)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Ranger les {n}</button>}
+        </div>
+      </div>
+    </SheetShell>, document.body
+  );
+}
+// « Créer ma pièce en 3 questions » : la taille, le meuble, combien d'articles.
+// La règle de disposition vit dans src/stockRegles.js (`proposerPiece`).
+const PIECE_MEUBLES = ['metal', 'bois', 'cintres', 'table'];
+const modeleMeublePiece = (type, wallH) => {
+  const t = FURN_TYPES[type] || FURN_TYPES.metal;
+  const m = { w: t.cases && t.build === 'metal' ? Math.max(0.6, +(t.cols * 0.6).toFixed(2)) : t.w, h: t.h, rows: t.rows, cols: t.cols, h3d: t.h3d };
+  return { ...m, cap: m.rows * m.cols * capaciteCase(t, m, wallH || 3.4) };
+};
+const nbPiece = (v) => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : NaN; };
+function AssistantPiece({ room, vide, nbArticles, onCreer, onClose }) {
+  const [lg, setLg] = useState(String(vide && room && room.w ? room.w : 4).replace('.', ','));
+  const [pr, setPr] = useState(String(vide && room && room.h ? room.h : 3).replace('.', ','));
+  const [type, setType] = useState('metal');
+  const [nb, setNb] = useState(nbArticles != null ? String(nbArticles) : '');
+  const wallH = (room && room.wallH) || 3.4;
+  const t = FURN_TYPES[type];
+  const modele = useMemo(() => modeleMeublePiece(type, wallH), [type, wallH]);
+  const W = nbPiece(lg), H = nbPiece(pr), N = Math.floor(nbPiece(nb));
+  const ok = W >= 1.5 && W <= 40 && H >= 1.5 && H <= 40 && N >= 1;
+  const prop = useMemo(() => ok ? proposerPiece({ w: W, h: H, mw: modele.w, md: modele.h, cap: modele.cap, besoin: N }) : null, [ok, W, H, N, modele]);
+  const champ = { border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', minWidth: 0 };
+  const etiquette = { fontSize: 13, fontWeight: 650, color: C.text, marginBottom: 6, display: 'block' };
+  const nomPluriel = (k) => k > 1 ? t.label.replace(/^(\S+)/, '$1s') : t.label;
+  const creer = () => {
+    if (!prop || !prop.meubles.length) return;
+    const base = Date.now();
+    const meubles = prop.meubles.map((m, i) => ({ id: 'f' + base + '_' + i, type, name: `${t.label} ${i + 1}`, emoji: t.emoji, color: t.color, h3d: modele.h3d, x: +(m.cx - modele.w / 2).toFixed(2), y: +(m.cy - modele.h / 2).toFixed(2), w: modele.w, h: modele.h, rows: modele.rows, cols: modele.cols, rot: m.rot, slots: {} }));
+    const tp = FURN_TYPES.porte;
+    const porte = { id: 'f' + base + '_p', type: 'porte', name: 'Porte', emoji: tp.emoji, color: tp.color, h3d: tp.h3d, x: +(prop.porte.cx - tp.w / 2).toFixed(2), y: +(prop.porte.cy - tp.h / 2).toFixed(2), w: tp.w, h: tp.h, rows: 1, cols: 1, rot: prop.porte.rot, slots: {} };
+    onCreer({ w: +W.toFixed(2), h: +H.toFixed(2) }, [...meubles, porte]);
+  };
+  return createPortal(
+    <SheetShell onClose={onClose} maxWidth={540} z={2100}>
+      <div data-assistant-piece="" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>Créer ma pièce en 3 questions</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 3, lineHeight: 1.45 }}>Je te propose une disposition ; rien n'est créé avant ton « oui ». Tu pourras tout déplacer ensuite.{!vide ? ' Ta pièce actuelle ne change pas : c\'est une nouvelle pièce.' : ''}</div>
+        </div>
+        <div>
+          <span style={etiquette}>1. Ta pièce fait combien ? (en mètres)</span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input aria-label="Longueur de la pièce en mètres" data-piece-longueur="" inputMode="decimal" value={lg} onChange={e => setLg(e.target.value)} style={champ} />
+            <span style={{ color: C.muted, fontSize: 14 }}>×</span>
+            <input aria-label="Profondeur de la pièce en mètres" data-piece-profondeur="" inputMode="decimal" value={pr} onChange={e => setPr(e.target.value)} style={champ} />
+          </div>
+        </div>
+        <div>
+          <span style={etiquette}>2. Tu ranges sur quoi ?</span>
+          <Segmente label="Meuble de rangement" plein value={type} onChange={setType}
+            options={PIECE_MEUBLES.map(k => ({ v: k, l: FURN_TYPES[k].label.replace('Étagère ', 'Étag. ').replace('Portant à cintres', 'Portant'), data: { 'data-piece-meuble': k } }))} />
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{t.label} : {modele.cap} place{modele.cap > 1 ? 's' : ''} chacune ({modele.w.toLocaleString('fr-FR')} × {modele.h.toLocaleString('fr-FR')} m au sol).</div>
+        </div>
+        <div>
+          <span style={etiquette}>3. Combien d'articles à ranger ?</span>
+          <input aria-label="Nombre d'articles à ranger" data-piece-nombre="" inputMode="numeric" value={nb} onChange={e => setNb(e.target.value.replace(/[^\d]/g, ''))} style={champ} placeholder="ex : 60" />
+          {nbArticles != null && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Tu as {nbArticles} article{nbArticles > 1 ? 's' : ''} en stock en ce moment.</div>}
+        </div>
+        {!ok && <div data-piece-incomplet="" style={{ fontSize: 13, color: C.muted }}>Une pièce d'au moins 1,5 × 1,5 m et au moins un article.</div>}
+        {prop && (
+          <div data-piece-proposition={prop.meubles.length} data-piece-places={prop.capacite} data-piece-manque={prop.manque} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <svg viewBox={`-0.1 -0.1 ${W + 0.2} ${H + 0.2}`} role="img" aria-label="La pièce proposée, vue du dessus" style={{ width: '100%', maxHeight: 220, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+              <rect x="0" y="0" width={W} height={H} fill="none" stroke={C.text} strokeWidth={Math.max(W, H) / 120} />
+              {prop.meubles.map((m, i) => <rect key={i} x={m.cx - modele.w / 2} y={m.cy - modele.h / 2} width={modele.w} height={modele.h} rx="0.04" fill={C.accent} fillOpacity="0.22" stroke={C.accent} strokeWidth={Math.max(W, H) / 220} />)}
+              <rect x={prop.porte.cx - 0.5} y={H - 0.06} width="1" height="0.12" fill={C.muted} />
+            </svg>
+            <div data-piece-resume="" style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>
+              {prop.meubles.length > 0
+                ? <><b>{prop.meubles.length} {nomPluriel(prop.meubles.length).toLowerCase()}</b> le long des murs, une porte devant · <b>{prop.capacite} places</b> pour {N} article{N > 1 ? 's' : ''}.</>
+                : <>Aucun meuble ne tient dans une pièce aussi petite.</>}
+              {prop.manque > 0 && prop.meubles.length > 0 && <span style={{ display: 'block', color: C.muted }}>La pièce ne tient pas tout : il manque {prop.manque} place{prop.manque > 1 ? 's' : ''}. Agrandis la pièce ou choisis un meuble plus grand.</span>}
+            </div>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button type="button" onClick={onClose} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 14, fontWeight: 600, padding: '0 16px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+          <button type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 14, fontWeight: 650, padding: '0 18px', minHeight: 44, cursor: prop && prop.meubles.length ? 'pointer' : 'default', opacity: prop && prop.meubles.length ? 1 : 0.5, fontFamily: 'inherit' }}>Créer cette pièce</button>
+        </div>
+      </div>
+    </SheetShell>, document.body
+  );
+}
+
 function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const [plan, setPlan] = useState(() => normalizePlan(load('vrm_room_plan', null)));
   // Le plan du nuage a-t-il été relu ? undefined = en cours · false = la base
@@ -24770,6 +24913,77 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const [editionChoisie, setEdition] = useState(false);
   const edition = editionChoisie || items.length === 0;   // une pièce vide n’a rien à ranger : elle s’ouvre en « Aménager »
   const [pairePrete, setPairePrete] = useState(null);   // un N° choisi dans « À ranger », en attente d'une place
+  // (26 oct.) L'ASSISTANT : créer la pièce en 3 questions, tout ranger d'un geste.
+  const [assistPiece, setAssistPiece] = useState(false);
+  const [toutRanger, setToutRanger] = useState(false);
+  const nbEnStock = useMemo(() => { const pr = numsPresents(); return pr ? pr.size : null; }, [plan]);
+  const creerPiece = (dims, meubles) => {
+    setAssistPiece(false);
+    const neuve = (r) => { const { poly: _p, ...reste } = r || ROOM_DEFAULT; return { ...reste, w: dims.w, h: dims.h }; };
+    if (items.length === 0) patchRoom(r => ({ room: neuve(r.room), items: meubles }));
+    else { const id = 'r' + Date.now(); persist({ ...plan, rooms: [...plan.rooms, { id, name: 'Pièce ' + (plan.rooms.length + 1), room: neuve(room), items: meubles }], active: id }); }
+    setEdition(false); setSel(null); setOpenItem(null); setHi(null); signalerDisposition();
+    const nm = meubles.filter(m => m.type !== 'porte').length;
+    toast(`Pièce créée : ${nm} meuble${nm > 1 ? 's' : ''}. Range tes articles d'un geste avec « Tout ranger ».`);
+  };
+  // (26 oct.) AU CLAVIER, PAVÉ NUMÉRIQUE : Julien — « la plupart des personnes
+  // utilisent un ordi avec un pavé numérique ». Un N° puis Entrée : déjà rangé
+  // ⇒ on montre où ; à ranger ⇒ il va à la prochaine place libre (la plus basse,
+  // `premiereCaseLibre`, la même règle que « Tout ranger ») ; « Annuler » ou
+  // Échap le ressort. Un N° qui n'est pas parmi les articles en stock n'est
+  // JAMAIS rangé (rien n'est deviné), et aucun numéro ne change.
+  // Pavé numérique « Verr Num » éteint : la touche 5 arrive en « Clear », 1 en
+  // « End »… On lit aussi la touche PHYSIQUE (`Numpad5`) : marche dans les deux cas.
+  const chiffreTouche = (e) => /^[0-9]$/.test(e.key) ? e.key : ((/^Numpad([0-9])$/.exec(e.code || '') || [])[1] || '');
+  const refRecherche = React.useRef(null);
+  const [rangeClavier, setRangeClavier] = useState(null);   // { numero, itemId, nom, itemName } | { info }
+  const sansSourisStock = useSansSouris();
+  const entreeClavier = () => {
+    const v = String(search || '').trim(); if (!v) return;
+    if (ouEstNumero(plan, v)) { doSearch(v); setRangeClavier(null); return; }
+    const cle = cleNum(v);
+    const p = aRanger.find(x => cleNum(x.numero) === cle);
+    if (!p || !p.sur) { setRangeClavier({ info: `N°${v} n'est pas parmi tes articles en stock — rien n'est rangé.` }); return; }
+    const libre = premiereCaseLibre(plan);
+    if (!libre) { setRangeClavier({ info: `Plus aucune place libre pour la N°${p.numero} : ajoute un meuble (Aménager).` }); return; }
+    const r = rangerNumeroDansPlan(plan, libre.itemId, libre.key, p.numero);
+    if (r.erreur) { setRangeClavier({ info: r.erreur }); return; }
+    persist({ ...r.plan, active: libre.roomId || r.plan.active });
+    setSel(libre.itemId); setHi({ itemId: libre.itemId, cell: libre.key, roomId: libre.roomId, roomName: libre.roomName });
+    setDepot({ itemId: libre.itemId, cellKey: libre.key, num: p.numero, at: Date.now() });
+    setRangeClavier({ numero: p.numero, itemId: libre.itemId, itemName: r.ou.itemName, nom: r.ou.nom });
+    setSearch('');
+  };
+  const annulerClavier = () => {
+    const d = rangeClavier; if (!d || !d.numero) { setRangeClavier(null); return; }
+    const next = libererNumeroDuPlan(plan, d.itemId, d.numero);
+    if (next) persist(next);
+    setRangeClavier(null); setHi(null);
+    toast(`N°${d.numero} ressortie de « ${d.itemName} » : elle est de nouveau à ranger.`);
+  };
+  // Taper un chiffre n'importe où sur l'écran Stock (ordinateur) ouvre la saisie.
+  React.useEffect(() => {
+    if (sansSourisStock) return;
+    const surTouche = (e) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target, tag = (t && t.tagName) || '';
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
+      if (assistPiece || toutRanger || ranger || document.querySelector('[role="dialog"]')) return;
+      if (e.key === 'Escape' && rangeClavier && rangeClavier.numero) { e.preventDefault(); annulerClavier(); return; }
+      const ch = chiffreTouche(e); if (!ch) return;
+      const el = refRecherche.current; if (!el) return;
+      e.preventDefault(); el.focus(); setSearch(ch); doSearch(ch); setRangeClavier(null);
+    };
+    window.addEventListener('keydown', surTouche);
+    return () => window.removeEventListener('keydown', surTouche);
+  });
+  const validerToutRanger = (prop) => {
+    setToutRanger(false); setPairePrete(null);
+    if (!prop || !prop.poses.length) return;
+    persist(prop.plan);
+    const premier = prop.poses[0]; setSel(premier.itemId);
+    toast(`${prop.poses.length} article${prop.poses.length > 1 ? 's' : ''} rangé${prop.poses.length > 1 ? 's' : ''} — de N°${premier.numero} à N°${prop.poses[prop.poses.length - 1].numero}.`);
+  };
   const viseurRef = React.useRef(null);                 // ce qui est sous le doigt dans la 3D (glisser-déposer)
   const refFantome = React.useRef(null);                // la vignette qui suit le doigt pendant un glisser
   const capacity = useMemo(() => {
@@ -24916,12 +25130,21 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       <div data-stock-barre="" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Segmente label="Ce que je fais" className="vrm-seg-stock" value={edition ? 'amenager' : 'ranger'} onChange={(v) => setEdition(v === 'amenager')}
           options={[{ v: 'ranger', l: 'Ranger', icone: 'box', data: { 'data-mode-stock': 'ranger' } }, { v: 'amenager', l: 'Aménager', icone: 'pencil', data: { 'data-mode-stock': 'amenager' } }]} />
+        {edition && items.length > 0 && <button type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 13.5, fontWeight: 600, padding: '0 12px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit' }}>Nouvelle pièce en 3 questions</button>}
         <div style={{ flex: '1 1 200px', display: 'flex', gap: 6, minWidth: 0 }}>
-          <input value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); }} placeholder="Cherche un N° → le meuble + la case" inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
+          <input ref={refRecherche} data-stock-saisie="" aria-label="Numéro : Entrée pour le trouver ou le ranger" value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); if (rangeClavier && !rangeClavier.numero) setRangeClavier(null); }}
+            onKeyDown={e => { const ch = !/^[0-9]$/.test(e.key) && chiffreTouche(e); if (ch) { e.preventDefault(); const v = search + ch; setSearch(v); doSearch(v); return; } if (e.key === 'Enter') { e.preventDefault(); entreeClavier(); } else if (e.key === 'Escape') { e.preventDefault(); if (search) { setSearch(''); setHi(null); } else if (rangeClavier && rangeClavier.numero) annulerClavier(); } }}
+            placeholder={sansSourisStock ? 'Cherche un N° → le meuble + la case' : 'Tape un N° puis Entrée : trouver ou ranger'} inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
           {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
         </div>
       </div>
-      {hi && hi.notFound && <div style={{ fontSize: 12.5, color: C.warn, fontWeight: 600 }}>Aucune case ne contient « {search} ». Range-le : choisis-le dans « À ranger » puis touche une place libre.</div>}
+      {hi && hi.notFound && <div data-stock-pas-range="" style={{ fontSize: 12.5, color: C.warn, fontWeight: 600 }}>Aucune case ne contient « {search} ».{!sansSourisStock && aRanger.some(x => x.sur && cleNum(x.numero) === cleNum(search)) ? <> Appuie sur <b>Entrée</b> pour la ranger à la prochaine place libre.</> : <> Range-le : choisis-le dans « À ranger » puis touche une place libre.</>}</div>}
+      {rangeClavier && (
+        <div data-stock-clavier={rangeClavier.numero ? 'range' : 'info'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: C.text, lineHeight: 1.45, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px' }}>
+          <span style={{ flex: '1 1 220px', minWidth: 0 }}>{rangeClavier.numero ? <><b>N°{rangeClavier.numero}</b> rangée : {rangeClavier.itemName} · {rangeClavier.nom}. Tape le N° suivant.</> : rangeClavier.info}</span>
+          {rangeClavier.numero && <button type="button" data-stock-clavier-annuler="" onClick={annulerClavier} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, padding: '0 12px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler{sansSourisStock ? '' : ' (Échap)'}</button>}
+        </div>
+      )}
       {hi && hi.itemId && (()=>{
         const it=items.find(x=>x.id===hi.itemId); if(!it) return null;
         let pos=null;
@@ -24938,7 +25161,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div data-bande-a-ranger={aRanger.length} style={{ display: 'flex', flexDirection: 'column', gap: 8, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 14, fontWeight: 650, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
-              <span style={{ fontSize: 12.5, color: C.muted }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
+              <span style={{ fontSize: 12.5, color: C.muted, flex: '1 1 160px' }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
+              <button type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', fontSize: 13.5, fontWeight: 650, padding: '0 14px', minHeight: 40, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Tout ranger</button>
             </div>
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {aRanger.slice(0, 60).map(p => {
@@ -24965,6 +25189,22 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           </div>
         );
       })()}
+      {/* (16 oct.) UNE PIÈCE VIDE NE SE TAIT PAS — et (26 oct.) elle passe AU-DESSUS de la
+          3D : sous elle, sur téléphone, le geste était hors de l'écran. : la scène 3D sans meuble ne dit
+          rien de ce qu'il faut faire. On dit le geste, et le bouton y mène. */}
+      {items.length === 0 && (
+        <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ flex: '1 1 220px', minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
+            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dis-moi sa taille, ton meuble et combien d'articles tu ranges : je te propose une pièce prête, tu valides. VRM retrouve ensuite chaque article par son numéro.</span>
+          </span>
+          <span data-piece-vide-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
+            <button type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Créer ma pièce en 3 questions</button>
+            <button type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Ajouter un meuble à la main</button>
+          </span>
+        </div>
+      )}
+
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
         <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
       </React.Suspense>
@@ -24987,18 +25227,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           ))}
         </div>
       )}
-      {/* (16 oct.) UNE PIÈCE VIDE NE SE TAIT PAS : la scène 3D sans meuble ne dit
-          rien de ce qu'il faut faire. On dit le geste, et le bouton y mène. */}
-      {items.length === 0 && (
-        <div data-piece-vide="" style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ flex: '1 1 220px', minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>Ta pièce est vide</span>
-            <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Dessine ta pièce vue du dessus, puis ajoute une étagère, une table ou un portant : tu y ranges tes articles, et VRM retrouve chacun par son numéro.</span>
-          </span>
-          <button type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '0 16px', minHeight: 40, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Ajouter un meuble</button>
-        </div>
-      )}
-
+      {assistPiece && <AssistantPiece room={room} vide={items.length === 0} nbArticles={nbEnStock} onCreer={creerPiece} onClose={() => setAssistPiece(false)} />}
+      {toutRanger && <FeuilleToutRanger plan={plan} numeros={aRanger.map(p => p.numero)} plusieursPieces={plan.rooms.length > 1} onValider={validerToutRanger} onClose={() => setToutRanger(false)} />}
       {ranger && (
         <RangerSheet
           paires={aRanger}
@@ -25343,6 +25573,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   const [placer, setPlacer] = useState(null);   // N° en cours de placement « autre case »
   const [flash, setFlash] = useState(null);     // { itemId, key } — la case qu'on vient de remplir
   const [voirLiberer, setVoirLiberer] = useState(false);
+  const [toutRanger, setToutRanger] = useState(false);
   const presents = useMemo(() => numsPresents(), [plan]);
   const meubles = useMemo(() => meublesDuPlan(plan), [plan]);
   const plusieursPieces = ((plan && plan.rooms) || []).filter(rm => (rm.items || []).some(meubleACases)).length > 1;
@@ -25420,7 +25651,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 
       {/* Où est la N° X ? — une lecture, aucune écriture. */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Où est la N° … ?" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key !== 'Enter') return; e.preventDefault(); const v = q.trim(); if (!v || ouEstNumero(plan, v)) return; const p = aRanger.find(x => cleNum(x.numero) === cleNum(v)); if (p && prochaine) { ranger(p.numero, prochaine.itemId, prochaine.key); setQ(''); } else toast(p ? 'Plus aucune case libre.' : `N°${v} n'est pas parmi tes articles en stock — rien n'est rangé.`); }} placeholder="Où est la N° … ? (Entrée : la ranger)" inputMode={clavierNum()} aria-label="Chercher un numéro dans le stock" data-rgt-cherche=""
           style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 16, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
         {q && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche" onClick={() => setQ('')} style={{ ...btn(false), padding: '0 12px' }}><Icon name="close" size={15} /></button>}
       </div>
@@ -25434,6 +25665,8 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
           {sur && (
             <div style={carte} data-rgt-liste="">
               {titreBloc('À ranger', aRanger.length)}
+              {aRanger.length > 0 && prochaine && <button type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ ...btn(true), width: '100%', minHeight: 44, marginBottom: 10 }}>Tout ranger d'un geste</button>}
+              {toutRanger && <FeuilleToutRanger plan={plan} numeros={aRanger.map(p => p.numero)} plusieursPieces={plusieursPieces} onClose={() => setToutRanger(false)} onValider={(prop) => { setToutRanger(false); if (!prop || !prop.poses.length) return; ecrire(prop.plan); toast(`${prop.poses.length} article${prop.poses.length > 1 ? 's' : ''} rangé${prop.poses.length > 1 ? 's' : ''}.`); }} />}
               {aRanger.length === 0
                 ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Tout ce qui est chez toi est déjà posé dans une case.</div>
                 : (<>
