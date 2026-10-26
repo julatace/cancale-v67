@@ -19808,6 +19808,17 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     window.addEventListener('vrm:ext', f);
     return () => { clearTimeout(t); window.removeEventListener('vrm:ext', f); };
   }, []);
+  // (26 oct.) PRATIQUE À 2000 ARTICLES — on ne rend pas 2000 cartes d'un coup
+  // (jank, DOM énorme) et on ne cherche pas à l'œil : une recherche, des
+  // filtres-conseils (à relier, qui dorment, à retirer) avec leur compte, et
+  // « Voir plus » — le motif éprouvé de l'écran Ventes (§ perf). La recherche
+  // est différée pour garder la frappe instantanée ; la tranche repart à 60 à
+  // chaque changement de recherche ou de filtre.
+  const [q, setQ] = React.useState('');
+  const [filtreAnn, setFiltreAnn] = React.useState('toutes');   // toutes · relier · dorment · retirer
+  const [annMax, setAnnMax] = React.useState(60);
+  const qAnn = React.useDeferredValue(q);
+  React.useEffect(() => { setAnnMax(60); }, [qAnn, filtreAnn]);
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
   // Retrait automatique (proposition 8) : l'interrupteur, et ce qui a été retiré
@@ -20787,6 +20798,24 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       {porteToutes}
     </div>
   );
+  // ── Recherche + filtres-conseils + pagination (pratique à 2000) ──────────
+  // Les comptes des chips sont calculés sur l'ENSEMBLE (itemsVue), pas sur la
+  // tranche affichée — « À relier 150 » doit dire 150 même si on en voit 60.
+  const DORT_ANN_J = 30;
+  const estDortAnn = (it) => { const t = Date.parse((it && it.depuis) || ''); return Number.isFinite(t) ? (Date.now() - t) / 86400000 >= DORT_ANN_J : false; };
+  const idSetAnn = (l) => new Set((l || []).map((d) => String((d && (d.annonce ? d.annonce.itemId : d.itemId)) || '')));
+  const setRelierAnn = idSetAnn(dvVue.nonReliees);
+  const setRetirerAnn = idSetAnn(dvVue.aRetirerEbay);
+  const nDortAnn = itemsVue.filter(estDortAnn).length;
+  const passeFiltreAnn = (it) => filtreAnn === 'relier' ? setRelierAnn.has(String(it.itemId))
+    : filtreAnn === 'dorment' ? estDortAnn(it)
+    : filtreAnn === 'retirer' ? setRetirerAnn.has(String(it.itemId))
+    : true;
+  const qnAnn = qAnn.trim().toLowerCase();
+  const passeQAnn = (it) => { if (!qnAnn) return true; const num = numEbayLu(it.sku, it.itemId, null, it.depuis); return [it.title, it.sku, num, num && ('n°' + num)].filter(Boolean).some((s) => String(s).toLowerCase().includes(qnAnn)); };
+  const itemsAffiches = itemsVue.filter((it) => passeFiltreAnn(it) && passeQAnn(it));
+  const annVus = itemsAffiches.slice(0, annMax);
+  const chipsAnn = [['toutes', 'Toutes', itemsVue.length], ['relier', 'À relier', setRelierAnn.size], ['dorment', 'Qui dorment', nDortAnn], ['retirer', 'À retirer', setRetirerAnn.size]].filter(([k, , n]) => k === 'toutes' || n > 0);
   return wrap(<>
     {head(itemsVue.length)}
     <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique} — ` : (melangeAnnonces ? `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay — ` : 'Tes annonces en ligne sur eBay — ')}touche une annonce pour la modifier</div>
@@ -20795,8 +20824,20 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {ligneComptesIllisibles}
     {lignePasSu}
     {ligneSansPreuve}
+    <div className="vrm-ebay-outils" style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 0 10px' }}>
+      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un article (titre, N°, SKU)…" aria-label="Chercher une annonce eBay" data-ebay-recherche
+        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 10, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
+      {chipsAnn.length > 1 && (
+        <div className="vrm-rangee" style={{ gap: 8 }}>
+          {chipsAnn.map(([k, label, n]) => (
+            <button key={k} type="button" data-ebay-filtre={k} aria-pressed={filtreAnn === k} onClick={() => setFiltreAnn(k)}
+              style={{ ...lienE, padding: '5px 11px', whiteSpace: 'nowrap', fontWeight: filtreAnn === k ? 800 : 600, color: filtreAnn === k ? E.accentSoft : E.muted, borderColor: filtreAnn === k ? E.accentSoft : E.border }}>{label} {n}</button>
+          ))}
+        </div>
+      )}
+    </div>
     <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
-      {itemsVue.map((it, i) => {
+      {annVus.map((it, i) => {
         const n = numEbayLu(it.sku, it.itemId, null, it.depuis);
         const cle = cleAnnonce(it);
         return (
@@ -20814,6 +20855,13 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         );
       })}
     </div>
+    {itemsAffiches.length > annVus.length && (
+      <button type="button" data-ebay-voir-plus onClick={() => setAnnMax((m) => m + 60)}
+        style={{ ...lienE, width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '10px', textAlign: 'center' }}>Voir plus — {annVus.length} affichées sur {itemsAffiches.length}</button>
+    )}
+    {annVus.length === 0 && (qnAnn || filtreAnn !== 'toutes') && (
+      <div style={{ color: E.muted, fontSize: 13, textAlign: 'center', padding: '16px 0' }}>Aucune annonce ne correspond{qnAnn ? ' à cette recherche' : ' à ce filtre'}. <button type="button" onClick={() => { setQ(''); setFiltreAnn('toutes'); }} style={{ ...lienE, padding: '3px 9px', marginLeft: 6 }}>Tout voir</button></div>
+    )}
     <div className="vrm-ebay-suite">
     {nSans > 0 && (
       <div className="vrm-plat-note" data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
