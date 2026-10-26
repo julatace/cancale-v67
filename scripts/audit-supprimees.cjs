@@ -262,8 +262,11 @@ const numsDe = (r) => ((r && r.queue) || []).map((a) => String(a.numero)).sort()
     dit(supp.every((p) => !('body' in p) && Object.keys(p).sort().join(',') === '__tag,at,itemId,kind,status'), 'jamais de corps : l’identifiant, le statut, l’heure', JSON.stringify(supp[0]));
     console.log('── 2. Le relais (content.js) la transmet au service worker');
     const env = relais(page);
-    // 20 octobre : content.js demande aussi, une fois, si le fond veut les cookies de la page (`vrm-cookies`, étiqueté par nous).
-    dit(env.filter((m) => m.kind === 'suppression').length === 2 && env.filter((m) => m.from !== 'vrm-cookies').every((m) => m.from === 'cancale-content' && m.domain === 'www.vinted.fr'),
+    // content.js envoie aussi ses propres messages au chargement (`vrm-cookies` le 20 oct., `vrm-parcours` le
+    // 23 oct.) : ce ne sont pas des relais de la page. La règle porte sur les SUPPRESSIONS relayées — chacune
+    // étiquetée par nous (from, domain), jamais par la page.
+    const envSupp = env.filter((m) => m.kind === 'suppression');
+    dit(envSupp.length === 2 && envSupp.every((m) => m.from === 'cancale-content' && m.domain === 'www.vinted.fr'),
       'les deux suppressions arrivent au fond, étiquetées par NOUS (from, domain)', JSON.stringify(env));
   });
 
