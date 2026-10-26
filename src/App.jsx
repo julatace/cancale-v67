@@ -1667,6 +1667,10 @@ const SYNC_KEYS = [
   // défaut (`useBeneficeJournee`).
   'vrm_journee_benefice',
   'vrm_annonces_retirees',
+  // (26 octobre) Les messages retirés POUR DE BON d'un compte (même famille que
+  // `vrm_annonces_retirees`) : un CHOIX, synchronisé, réactivable depuis la carte
+  // du compte dans les Réglages.
+  'vrm_messages_retires',
   // (21 octobre) La disposition des widgets de Ma journée (quels blocs, dans
   // quel ordre, à quelle taille) : un CHOIX, absent par défaut (= la
   // disposition d'aujourd'hui), rattrapé par `onCloudReady` seulement s'il est
@@ -2843,6 +2847,23 @@ const retirerAnnoncesRetirees = (out) => {
   return { ...out, lignes, aConfirmer, parCompte };
 };
 const lireLignesEnLigne = async (lignesL) => retirerAnnoncesRetirees(enLigneDesLignes(lignesL || [], await lireEnLigneTous(), await lireSupprimeesTous(), Date.now()));
+// ── MESSAGES RETIRÉS POUR DE BON (26 octobre, demande de Julien) ──────────────
+// « Le retrait définitif par catégorie : annonce + message, et la possibilité de
+// les réactiver dans les paramètres. » Même mécanisme que les annonces, et pour
+// la même raison : effacer les conversations d'un compte bloqué ne suffit pas,
+// une recapture les ramène. Les messages ne nourrissent AUCUN chiffre (ni compta,
+// ni prix d'achat) : les cacher pour de bon ne fausse rien — contrairement aux
+// ventes et aux achats, qu'on ne propose donc PAS (c'est le « pas les ventes » de
+// Julien). `vrm_messages_retires` = { [uid]: { at, login } }, synchronisée, posée
+// SEULEMENT sur son clic, réactivable. On l'applique aux TROIS portes de lecture
+// des conversations (`loadConvs` la liste et ses compteurs, `fetchResumes...` et
+// `fetchOffres...` les résumés/offres). Illisible ⇒ Set vide, aucun compte caché
+// (« pas su » ne cache rien).
+const MESSAGES_RETIRES = 'vrm_messages_retires';
+const messagesRetires = () => {
+  try { const m = load(MESSAGES_RETIRES, {}); return new Set(m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m).map(String) : []); }
+  catch (_) { return new Set(); }
+};
 // ── DE QUAND DATE LA LECTURE DU DRESSING, COMPTE PAR COMPTE (5.165) ─────────
 // L'écran Annonces n'en disait RIEN : la lecture du 8 au soir de cinq comptes
 // s'affichait comme l'état du 9 (§4.3, §5 : un chiffre qu'on ne peut pas
@@ -4966,10 +4987,11 @@ const fetchResumesConversations = async () => {
     }
     if (rows === null) rows = await lireTout(RESUME_CONV_BASE, { strict: true });
     if (rows === null) return null;
+    const mr = messagesRetires();
     const out = new Map();
     for (const r of rows) {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
-      if (!m) continue;
+      if (!m || mr.has(m[1])) continue;
       out.set(`${m[1]}_${m[2]}`, r);
     }
     return out;
@@ -4996,10 +5018,11 @@ const fetchOffresConversations = async () => {
   try {
     const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
     if (rows === null) return null;
+    const mr = messagesRetires();
     const out = new Map();
     for (const r of rows) {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
-      if (!m) continue;
+      if (!m || mr.has(m[1])) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
       if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '' });
     }
@@ -26411,6 +26434,29 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     toast(`Annonces de « ${accountName(acc)} » remises.`);
   };
 
+  // ── MESSAGES RETIRÉS POUR DE BON (26 oct.) — voir `messagesRetires` ──────────
+  const [retiresMsg, setRetiresMsg] = useState(() => { const m = load(MESSAGES_RETIRES, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; });
+  useEffect(() => onCloudReady(() => setRetiresMsg((v) => (Object.keys(v || {}).length ? v : ((() => { const m = load(MESSAGES_RETIRES, {}); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; })())))), []);
+  const retirerMessagesPourDeBon = async (acc) => {
+    if (!acc) return;
+    if (!await askConfirm({
+      title: `Retirer les messages de « ${accountName(acc)} » ?`,
+      desc: "Ses conversations sortent de VRM pour de bon — elles ne reviennent pas, même si l'extension recapte ce compte. Ses ventes, sa compta, ses achats et ses annonces restent. Rien n'est supprimé sur Vinted. Tu peux les remettre depuis cette carte.",
+      ok: 'Retirer ses messages', cancel: 'Annuler',
+    })) return;
+    const uid = String(acc.vinted_user_id);
+    const suivant = { ...retiresMsg, [uid]: { at: new Date().toISOString(), login: acc.login || '' } };
+    setRetiresMsg(suivant); save(MESSAGES_RETIRES, suivant);
+    setDelCible(null);
+    toast(`Messages de « ${accountName(acc)} » retirés — rouvre l'onglet Messages.`);
+  };
+  const remettreMessages = (acc) => {
+    const uid = String(acc.vinted_user_id);
+    const suivant = { ...retiresMsg }; delete suivant[uid];
+    setRetiresMsg(suivant); save(MESSAGES_RETIRES, suivant);
+    toast(`Messages de « ${accountName(acc)} » remis.`);
+  };
+
   // ── SUPPRESSION CIBLÉE (modale, récupérable) ────────────────────────────────
   // Julien : « on doit pouvoir sélectionner si on veut tout enlever — la compta,
   // les ventes, les achats, les annonces » + « pour récupérer, je reconnecte
@@ -26664,6 +26710,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                       <button type="button" className="vrm-lien-action" onClick={()=>remettreAnnonces(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
                     </span>
                   )}
+                  {retiresMsg[String(acc.vinted_user_id)] && (
+                    <span data-messages-retires={String(acc.vinted_user_id)} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,color:C.muted}}>
+                      <Icon name="eyeOff" size={12}/>Messages retirés
+                      <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
+                    </span>
+                  )}
                   <button type="button" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension."
                     style={{background:'transparent',border:`1px solid ${C.danger}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:C.danger}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="trash" size={12}/>Supprimer des données…</span>
@@ -26722,9 +26774,28 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
                 <button type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
                 <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:10,padding:'12px',fontSize:14,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
               </div>
-              {!retireesAnn[String(acc.vinted_user_id)] && (
-                <button type="button" data-retirer-annonces onClick={()=>retirerAnnoncesPourDeBon(acc)} disabled={delBusy} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px 12px',fontSize:13,fontWeight:600,cursor:delBusy?'default':'pointer',fontFamily:'inherit'}}>Compte bloqué par Vinted ? Retirer ses annonces pour de bon (ventes gardées)</button>
-              )}
+              {/* ── POUR DE BON : par catégorie (26 oct., demande de Julien) ──────
+                  « Annonce + message, pas les ventes. » Ne revient jamais, même
+                  recapté. Seules les annonces et les messages : ni les ventes (ta
+                  compta/URSSAF en dépend), ni les achats (ton repère de prix).
+                  Réactivable ici et sur la carte du compte. */}
+              {(()=>{ const uid=String(acc.vinted_user_id); const annR=!!retireesAnn[uid]; const msgR=!!retiresMsg[uid];
+                const BtnPDB = ({ retire, onRetirer, onRemettre, label, attr }) => (
+                  <button type="button" {...attr} onClick={()=>!delBusy&&(retire?onRemettre(acc):onRetirer(acc))} disabled={delBusy}
+                    style={{flex:1,border:`1px solid ${retire?C.accent:C.border}`,background:retire?`${C.accent}0d`:'transparent',color:retire?C.accent:C.text,borderRadius:10,padding:'9px 10px',fontSize:12.5,fontWeight:600,cursor:delBusy?'default':'pointer',fontFamily:'inherit',lineHeight:1.3}}>
+                    {retire ? `${label} retirées ✓ — les remettre` : `Retirer les ${label.toLowerCase()}`}
+                  </button>
+                );
+                return (
+                <div style={{border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>Pour de bon <span style={{fontWeight:500,color:C.muted}}>— ne revient jamais, même recapté</span></div>
+                  <div style={{fontSize:11,color:C.muted,lineHeight:1.45,margin:'3px 0 8px'}}>Compte bloqué par Vinted ? Sors ses annonces ou ses messages pour de bon. Ses ventes, sa compta et ses achats restent (le CA et tes prix d'achat en dépendent).</div>
+                  <div style={{display:'flex',gap:8}}>
+                    <BtnPDB retire={annR} onRetirer={retirerAnnoncesPourDeBon} onRemettre={remettreAnnonces} label="Annonces" attr={{'data-retirer-annonces':true}}/>
+                    <BtnPDB retire={msgR} onRetirer={retirerMessagesPourDeBon} onRemettre={remettreMessages} label="Messages" attr={{'data-retirer-messages':true}}/>
+                  </div>
+                </div>
+                ); })()}
               <button type="button" onClick={bloquerDefinitif} disabled={delBusy} style={{border:'none',background:'transparent',color:C.muted,borderRadius:10,padding:'4px',fontSize:12,fontWeight:500,cursor:delBusy?'default':'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Compte fermé par Vinted ? Le bloquer définitivement</button>
             </div>
           </div>
@@ -35147,7 +35218,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const loadConvs = async (force) => {
     const demandes = cleComptesVinted(accounts);
     const cached = !force && entreeCache('convs');
-    if (cached) { setConvs({ loading:false, items:cached.items, comptes:cached.comptes }); return; }
+    if (cached) { const mrc = messagesRetires(); setConvs({ loading:false, items:(cached.items||[]).filter(c=>!mrc.has(String(c._acc&&c._acc.vinted_user_id))), comptes:cached.comptes }); return; }
     setConvs({ loading:true, items:null, error:false });
     const out = []; let anyOk=false, anyErr=false;
     // PARALLÈLE (voir loadOrders) : tous les comptes en même temps.
@@ -35160,7 +35231,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    L'entrée de cache dit QUELS comptes elle couvre (`demandes`, revue DAC7
     //    du 9 octobre) : un compte lié depuis n'est pas servi par l'ancienne.
     const ko = []; const failedUids = [];
-    for (const { acc, r } of results) { if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); failedUids.push(String(acc.vinted_user_id)); } }
+    const mr = messagesRetires();  // messages retirés POUR DE BON : hors de la liste, de ses compteurs ET de « boîte pas lue »
+    for (const { acc, r } of results) { if (mr.has(String(acc.vinted_user_id))) continue; if (r.ok) { anyOk=true; r.items.forEach(c => out.push({ ...c, _acc:acc })); } else { anyErr=true; ko.push(acc); failedUids.push(String(acc.vinted_user_id)); } }
     out.sort((a,b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
     const error = out.length===0 && anyErr && !anyOk;
     if (!anyErr) putCache('convs', out, { failedUids }, demandes);
