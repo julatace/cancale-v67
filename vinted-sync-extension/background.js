@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.232.0';
+const CODE_VERSION = '5.233.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7024,6 +7024,120 @@ async function issueVisite(uid, marque, r) {
   if (avant === 0) await rendreGardeVisite(uid, marque);
   else noterDiag('visite_echec_repete');
 }
+// ══ ACCEPTATION AUTOMATIQUE DES OFFRES (Vinted) — DÉCISION DE JULIEN, 27 OCT ══
+// Elle avait été RETIRÉE les 4-5 octobre, à sa demande. Le 27 octobre il la
+// REDEMANDE, explicitement, et choisit « Moteur auto (accepte seul) » après que
+// je lui aie remis le risque sous les yeux. C'est sa décision d'owner — il
+// possède les comptes.
+// ⚠️ NE PAS RE-RÉGLER CE QUE JULIEN A TRANCHÉ : en propriétaire du compte, il a
+//    dit que l'acceptation automatique N'EST PAS ce qui a fait bloquer
+//    `vanessa5723` (« enlève-toi ça de la tête »). On ne fait donc plus porter
+//    cette théorie au code, et l'espacement entre deux acceptations est
+//    ALÉATOIRE, comme il l'a demandé (« ça peut être aléatoire ») : un simple
+//    étalement. Le vrai rate-limiting vient d'ailleurs — plafond 20/h et « une
+//    requête à la fois » — et ne bouge pas.
+// GARDE-FOUS, jamais retirés : compte connecté dans l'onglet seulement (`garde`
+// → `compteConnecte` + `compterAction` = plafond 20/h), une requête à la fois
+// (`vintedSend`/la file), arrêt net sur une pause Vinted (429/403), volume borné
+// par visite, et chaque offre traitée UNE fois (mémo `vrmOffresFaites`, 7 j).
+const OFFRE_EN_ATTENTE = 10;
+const OFFRES_MAX_PAR_VISITE = 3;          // limite de VOLUME
+const ESPACE_ACCEPT_MIN_MS = 15000;       // étalement ALÉATOIRE entre deux acceptations (demandé par Julien)…
+const ESPACE_ACCEPT_MAX_MS = 45000;       // …le rate-limit réel reste le plafond 20/h + « une requête à la fois »
+function espaceAcceptMs() { return ESPACE_ACCEPT_MIN_MS + Math.floor(Math.random() * (ESPACE_ACCEPT_MAX_MS - ESPACE_ACCEPT_MIN_MS + 1)); }
+// Trois états : objet lu · `null` pas su (⇒ éteint) · éteint par défaut. L'app
+// est propriétaire de `vinted_offres_auto` et des `min` (vinted_annonce_numeros) ;
+// l'extension les LIT (§11).
+async function offreAutoReglages() {
+  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros']);
+  if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
+  const actif = m.vinted_offres_auto === true;
+  const nums = m.vinted_annonce_numeros || {};
+  const mins = {};
+  for (const k in nums) { const n = Number(nums[k] && nums[k].min); if (isFinite(n) && n > 0) mins[String(k)] = n; }
+  return { actif, mins };
+}
+// Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
+// conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
+// `offreEnAttenteDe` de l'app (§11), bornée par identité d'offre.
+async function offresEnAttente(uid) {
+  const out = [];
+  try {
+    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`) || [])
+      .map((r) => ({ cap: r.cap, cid: r.cid, opp: r.opp, descr: r.descr, it: r.it, msgs: Array.isArray(r.msgs) ? r.msgs : [] }));
+    rows.sort((a, b) => (Date.parse(b.cap || '') || 0) - (Date.parse(a.cap || '') || 0));
+    const vus = new Set();
+    for (const r of rows) {
+      const cid = String(r.cid || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+      const opp = r.opp != null ? Number(r.opp) : null;
+      let derniere = null;
+      for (const msg of r.msgs) {
+        if (!msg || msg.entity_type !== 'offer_request_message') continue;
+        const e = msg.entity || {};
+        if (opp != null && e.user_id !== opp) continue;
+        if (e.current === false) continue;
+        if (e.status !== OFFRE_EN_ATTENTE) continue;
+        if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+        const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
+        const prix = Number(String(px == null ? '' : px).replace(',', '.'));
+        if (!isFinite(prix) || prix <= 0) continue;
+        if (e.transaction_id == null || e.offer_request_id == null) continue;
+        derniere = { conv: cid, prix, tx: String(e.transaction_id), oid: String(e.offer_request_id), item: String(r.it || ''), titre: String(r.descr || '') };
+      }
+      if (derniere) out.push(derniere);
+    }
+  } catch (_) { /* forme inattendue ⇒ aucune offre plutôt qu'une fausse */ }
+  return out;
+}
+async function repondreOffre({ uid, tx, oid, quoi, prix }) {
+  if (!uid || !tx || !oid) return { ok: false, error: 'offre incomplète' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await garde(uid, acc); if (stop) return stop;          // anti-blocage : compte de l'onglet + plafond horaire + pause
+  let r;
+  if (quoi === 'accept') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, null);
+  else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
+  else return { ok: false, error: 'action inconnue' };
+  noterDiag(r.ok ? `offre_auto_${quoi}` : `offre_auto_${quoi}_refuse_${r.status}`);
+  return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+// Le moteur. Appelé à CHAQUE visite sur Vinted, APRÈS la moisson (offres fraîches).
+async function autoAccepterOffres(uid) {
+  try {
+    const reg = await offreAutoReglages();
+    if (!reg || !reg.actif) return 0;                  // éteint (ou « pas su »)
+    const accts = await getStoredAccounts();
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    if (await garde(uid, acc)) return 0;               // compte de l'onglet, plafond, pause
+    const offres = await offresEnAttente(uid);
+    if (!offres.length) return 0;
+    const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
+    const limite = Date.now() - 7 * 86400000;
+    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
+    let faites = 0;
+    for (const o of offres) {
+      if (faites >= OFFRES_MAX_PAR_VISITE) break;       // volume borné
+      if (st[o.oid]) continue;                          // déjà traitée : jamais deux fois
+      const min = o.item ? reg.mins[o.item] : null;
+      if (!(isFinite(min) && min > 0)) continue;        // pas de prix mini posé ⇒ on ne touche à rien
+      if (o.prix < min) continue;                       // sous le mini : c'est à toi de contrer (le refus auto arrive — PR suivante)
+      if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux acceptations
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi: 'accept' });
+      st[o.oid] = Date.now();
+      await chrome.storage.local.set({ vrmOffresFaites: st });   // écrit AVANT de boucler : un worker tué ne ré-accepte pas
+      if (r && r.ok) {
+        faites += 1;
+        logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
+        notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
+      } else if (r && r.code) { break; }                // garde-fou atteint (pause/plafond/autre compte) : on arrête le lot
+    }
+    if (faites) noterDiag(`offres_auto_acceptees_${faites}`);
+    return faites;
+  } catch (_) { return 0; }
+}
+
 async function visiteVinted() {
   // 22 oct. : une visite, c'est lui sur Vinted — les photos de fond attendent
   // qu'il ait fini (`PHOTOS_CALME_MS` après la fin de la visite, `finally`).
@@ -7103,6 +7217,11 @@ async function visiteVinted() {
     //    double vente ne les voit pas (la N°553 du 10 octobre, restée en vente
     //    sur eBay). La moisson de 20:34 l'aurait prouvée dans la minute.
     await capterPreuvesVente(uid);
+    // ACCEPTATION AUTOMATIQUE DES OFFRES (27 oct., décision de Julien) : APRÈS la
+    // moisson (offres fraîches), AVANT les lecteurs. Éteinte par défaut ; tous les
+    // garde-fous du §3 gardés ; temps FIXE entre deux acceptations (jamais au
+    // hasard). Rien ne part si la base n'a pas répondu (« pas su » ⇒ éteint).
+    await autoAccepterOffres(uid);
     await capterRetraits(uid);
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
@@ -8806,15 +8925,17 @@ async function garde(uid, acc) {
   return null;
 }
 
-// ── L'ACCEPTATION AUTOMATIQUE DES OFFRES A ÉTÉ RETIRÉE (5.159, 5 octobre) ───
-// Coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »),
-// puis RETIRÉE le 5 octobre à sa demande (« enlève l'acceptation de l'offre ») :
-// le moteur, ses planchers, son salut automatique et `repondreOffre` ne servaient
-// plus qu'à lui. Accepter une offre à sa place ressemble à un robot (§3) et
-// engage une vente ferme. ⚠️ NE PAS LE RÉÉCRIRE sans sa demande explicite.
-// L'acceptation MANUELLE depuis la messagerie de l'app (son clic, avec
-// confirmation) passe par `executerPourApp` / EXEC_PERMIS : elle reste.
-// `scripts/audit-offres-auto.cjs` refuse tout autre chemin vers /accept.
+// ── L'ACCEPTATION AUTOMATIQUE DES OFFRES — RÉTABLIE LE 27 OCTOBRE ───────────
+// Elle avait été retirée les 4-5 octobre. Le 27 octobre Julien la REDEMANDE et
+// choisit « Moteur auto (accepte seul) », le risque de blocage rappelé. Le
+// moteur vit plus haut (`autoAccepterOffres`, sous `garde` : compte connecté,
+// plafond 20/h, pause 429/403, volume borné, chaque offre une fois) ; il est
+// éteint par défaut (`vinted_offres_auto`). `scripts/audit-moteur-offres.cjs`
+// l'EXÉCUTE (§4.10). L'acceptation MANUELLE depuis la messagerie de l'app passe,
+// elle, par `executerPourApp` / EXEC_PERMIS, sur son clic.
+// ⚠️ Julien, propriétaire du compte, a dit que l'acceptation auto n'est PAS ce
+//    qui a bloqué `vanessa5723` — ne pas re-régler l'espacement en « fixe » sur
+//    cette théorie (il est aléatoire, à sa demande).
 // ══════════════════════════════════════════════════════════════════════════════
 // LE COFFRE — chaque annonce enregistrée EN ENTIER, chez toi
 // ══════════════════════════════════════════════════════════════════════════════

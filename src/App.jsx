@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.232.0';
+const EXT_ATTENDUE = '5.233.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.233.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -32105,6 +32105,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
+  // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
+  // Éteinte par défaut, synchronisée (`vinted_offres_auto`, rattrapée au nuage).
+  // L'extension LIT ce réglage ; l'app en est propriétaire (§11). Allumer demande
+  // une confirmation qui dit le risque (un programme qui accepte sur Vinted).
+  const [offresAuto, setOffresAuto] = useState(() => load('vinted_offres_auto', false) === true);
+  React.useEffect(() => onCloudReady(() => setOffresAuto(load('vinted_offres_auto', false) === true)), []);
+  const basculerOffresAuto = async () => {
+    if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
+    const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place (une à la fois, un court délai entre chaque, uniquement le compte ouvert dans ce Chrome, plafond 20/h).\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
+    if (!ok) return;
+    setOffresAuto(true); save('vinted_offres_auto', true);
+  };
   // Répartiteur de lot : ventile le prix d'un achat groupé sur plusieurs paires.
   const [lotOpen, setLotOpen] = useState(false);
   const [lotTotal, setLotTotal] = useState('');
@@ -41506,6 +41520,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" aria-label="J’ai compris, masquer cette astuce" onClick={()=>{ save('vrm_astuce_numeros', false); setAstuceNum(false); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:16,lineHeight:1,padding:2,fontFamily:'inherit'}}>✕</button>
           </div>
         )}
+        {/* (27 oct.) Acceptation automatique des offres — interrupteur, éteint par
+            défaut. Le risque est dit à l'allumage (askConfirm). L'extension doit
+            savoir le faire (capacité `offresauto`) et tourner dans CE Chrome. */}
+        {listings.items?.length>0 && (
+          <div data-offres-auto-carte style={{display:'flex',flexDirection:'column',gap:8,border:`1px solid ${offresAuto?C.accent:C.border}`,background:offresAuto?`${C.accent}0c`:C.card,borderRadius:10,padding:'10px 12px',margin:'0 0 12px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Rien sous le mini." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+              </div>
+              <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
+                style={{flexShrink:0,width:46,height:26,borderRadius:13,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
+                <span style={{position:'absolute',top:3,left:offresAuto?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
+              </button>
+            </div>
+            {offresAuto && extSait('offresauto')!=='ok' && (
+              <div data-offres-auto-ext={extSait('offresauto')} style={{fontSize:11.5,color:C.warn,lineHeight:1.4}}>{extSait('offresauto')==='absente'
+                ? "Pour que l'acceptation tourne, ouvre VRM dans le Chrome (ordinateur) où l'extension est installée et connectée."
+                : `Mets l'extension à jour (${EXT_CAPACITES.offresauto.replace(/\.0$/,'')}) : celle installée ne sait pas encore accepter les offres. En attendant, rien ne part.`}</div>
+            )}
+          </div>
+        )}
         <div className="vrm-workbar vrm-ann-workbar">
         {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <div className="vrm-ann-search"><Icon name="search" size={17}/>
@@ -42232,7 +42268,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           programme qui accepte = signal robot, le compte bloqué, §3) : c'est
                           TON tap qui vend. L'app est propriétaire du mini, l'extension le lit (§11). */}
                       {(()=>{ const min = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.')); return (
-                      <span style={pillEdit} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap (rien n'est accepté tout seul)"><span style={lab}>mini</span><EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
+                      <span style={pillEdit} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place"><span style={lab}>mini</span><EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
                         titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={val}>{min!=null&&isFinite(min)&&min>0?prixCourt(min):'—'}</span>}/></span>); })()}
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
@@ -42489,7 +42525,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {nAuDessusMini>0 && messageFilter!=='offres' && (
                 <button type="button" data-offres-au-mini={nAuDessusMini} onClick={()=>{setMessageFilter('offres');setConvMax(40);}} style={{display:'flex',gap:8,alignItems:'center',width:'100%',textAlign:'left',fontSize:12.5,color:C.text,lineHeight:1.4,border:`1px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:8,padding:'9px 11px',marginBottom:10,cursor:'pointer'}}>
                   <span aria-hidden="true" style={{flexShrink:0}}><Icon name="tag" size={15} style={{color:C.accent}}/></span>
-                  <span><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — ouvre-la{nAuDessusMini>1?'s':''} pour accepter en 1 tap. <span style={{color:C.muted}}>Rien n'est accepté tout seul.</span></span>
+                  <span><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — ouvre-la{nAuDessusMini>1?'s':''} pour accepter en 1 tap. <span style={{color:C.muted}}>{offresAuto ? "L'acceptation automatique est activée." : "Rien n'est accepté tout seul."}</span></span>
                 </button>
               )}
               {boitesPerimees.length>0 && (

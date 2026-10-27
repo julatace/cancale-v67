@@ -53,47 +53,57 @@ essaie('lecture du code', () => {
   APP = sansCommentaires(lire('src/App.jsx'), true);
 });
 
-// ── 1. La route d'acceptation n'existe que dans la liste blanche ────────────
-essaie('route accept', () => {
-  const debut = BG.indexOf('EXEC_PERMIS');
-  const fin = debut >= 0 ? BG.indexOf('];', debut) : -1;
-  const hors = [];
-  const re = /accept/g; let m;
-  while ((m = re.exec(BG))) {
-    if (debut >= 0 && m.index > debut && m.index < fin) continue;           // la liste blanche
-    const autour = BG.slice(Math.max(0, m.index - 60), m.index + 30);
-    // `Accept:` / `'accept'` d'un en-tête HTTP ne sont pas une offre
-    if (/offer|offre|\/accept\b|quoi\s*:\s*['"]accept/i.test(autour)) hors.push('l.' + ligneDe(BG, m.index) + ' « ' + autour.replace(/\s+/g, ' ').trim().slice(0, 70) + ' »');
-  }
-  dit(debut >= 0, "l'extension garde sa liste blanche des actions permises (EXEC_PERMIS)");
-  dit(hors.length === 0, "aucun code de l'extension ne construit l'acceptation d'une offre hors de la liste blanche",
-    hors.slice(0, 3).join(' · '));
+// ── 1-2. L'ACCEPTATION AUTOMATIQUE EST PERMISE (27 oct.) — SOUS GARDE ──────────
+// Julien l'a REDEMANDÉE, en connaissance de cause, et a choisi « Moteur auto
+// (accepte seul) » le risque sous les yeux. Elle n'est PLUS interdite ; ce qui
+// reste exigé, c'est ce qui sépare un moteur SOUS CONTRÔLE d'un robot :
+//   · chaque acceptation passe par `garde` (compte connecté dans l'onglet,
+//     plafond 20/h, arrêt sur une pause 429/403) AVANT d'appeler Vinted ;
+//   · les acceptations sont ESPACÉES (étalement) ; l'aléatoire est AUTORISÉ —
+//     Julien, propriétaire du compte, a dit que ce n'est pas ce qui a bloqué
+//     `vanessa5723` ; le vrai rate-limit reste le plafond 20/h + une requête à
+//     la fois, et il ne bouge pas ;
+//   · le moteur est éteint par défaut et NE tourne que si l'interrupteur est
+//     allumé ; « pas su » (base muette) ⇒ éteint ; le volume par visite est borné.
+// La voie MANUELLE (executerPourApp / EXEC_PERMIS) reste, intacte.
+essaie('moteur sous garde', () => {
+  dit(BG.indexOf('EXEC_PERMIS') >= 0, "l'extension garde sa liste blanche des actions permises (EXEC_PERMIS, voie manuelle)");
+  const iAuto = BG.indexOf('async function autoAccepterOffres');
+  dit(iAuto >= 0, "le moteur d'acceptation automatique existe (autoAccepterOffres) — il a été redemandé");
+  const finAuto = BG.indexOf('async function', iAuto + 20);
+  const corps = iAuto >= 0 ? BG.slice(iAuto, finAuto > 0 ? finAuto : iAuto + 4000) : '';
+  // GARDE avant d'appeler Vinted : dans `repondreOffre`, `garde` précède le /accept.
+  const iRep = BG.indexOf('async function repondreOffre');
+  const finRep = BG.indexOf('async function', iRep + 20);
+  const corpsRep = iRep >= 0 ? BG.slice(iRep, finRep > 0 ? finRep : iRep + 2000) : '';
+  dit(/await garde\([\s\S]*offer_requests\/\$\{oid\}\/accept/.test(corpsRep),
+    "chaque acceptation passe par `garde` (compte connecté, plafond 20/h, pause) AVANT d'appeler Vinted");
+  dit(/await garde\(/.test(corps), "le moteur vérifie `garde` avant d'agir");
+  // ESPACEMENT entre deux acceptations : il doit EXISTER (étalement + laisser le
+  // worker souffler) ; l'aléatoire est autorisé (décision de Julien, 27 oct.).
+  dit(/espaceAcceptMs\(\)|ESPACE_ACCEPT|setTimeout/.test(corps), "les acceptations sont espacées dans le temps (étalement ; le rate-limit réel = plafond 20/h + une requête à la fois)");
+  dit(/OFFRES_MAX_PAR_VISITE/.test(corps), "le volume par visite est borné (OFFRES_MAX_PAR_VISITE)");
+  dit(/!reg\.actif/.test(corps), "le moteur ne tourne que si l'interrupteur est allumé (reg.actif)");
+  const iReg = BG.indexOf('async function offreAutoReglages');
+  const finReg = BG.indexOf('async function', iReg + 20);
+  const corpsReg = iReg >= 0 ? BG.slice(iReg, finReg > 0 ? finReg : iReg + 1500) : '';
+  dit(/=== null\) return null|m === null/.test(corpsReg), "« pas su » (base muette) ⇒ moteur éteint (offreAutoReglages rend null)");
 });
 
-// ── 2. Aucun reste du moteur ────────────────────────────────────────────────
-essaie('restes du moteur', () => {
-  const restes = ['autoAccepterOffres', 'offresAutoActif', 'offresEnAttente', 'saluerAcheteurApresOffre', 'repondreOffre',
-    'OFFRE_SALUT', 'OFFRES_MAX_PAR_VISITE', 'panel_min_prices', 'vrmAutoOffres', 'offresAutoLocal']
-    .filter((n) => new RegExp('\\b' + n + '\\b').test(BG));
-  dit(restes.length === 0, "aucun reste du moteur d'acceptation dans l'extension", restes.join(', '));
-  dit(!/\bfunction\s+planchers\b/.test(BG), "plus aucune lecture des prix planchers dans l'extension");
-});
-
-// ── 3. L'app : un prix MINI + acceptation en 1 TAP, jamais une boucle ────────
+// ── 3. L'app : prix mini + interrupteur HONNÊTE, et elle ne boucle pas ────────
 // Décision de Julien, 27 octobre : « à côté du numéro on met un prix minimum et
-// tout ce qui est au-dessus est accepté », puis « fais en sorte que je ne sois
-// pas bloqué, trouve quelque chose ». Sur Vinted il n'y a PAS de seuil natif
-// (contrairement à eBay) : un PROGRAMME qui accepte = signal robot = le compte
-// bloqué (`vanessa5723`, §3). La seule voie sans blocage : un prix mini met
-// l'offre en avant, et c'est le TAP de Julien qui accepte (voie `vmrExec` /
-// EXEC_PERMIS, garde stricte, plafond, une requête à la fois — déjà couverte
-// par les contrôles 1, 2 et 4). Ce qui doit rester vrai côté app :
-//   · pas de capacité « offres » rallumée (ce serait l'ancien moteur) ;
-//   · AUCUNE acceptation déclenchée par une minuterie ou un effet : chaque
-//     `actionOffre('accept', …)` part d'un `onClick` — jamais seule ;
-//   · là où l'app met une offre en avant pour l'accepter, elle DIT que rien
-//     n'est accepté tout seul (la garde est EXIGÉE, pas un mot interdit — §6.5,
-//     sinon la phrase honnête « rien n'est accepté tout seul » serait rouge).
+// tout ce qui est au-dessus est accepté », puis « non je veux que ça accepte
+// tout seul » → « Moteur auto (accepte seul) », le risque sous les yeux. Le
+// MOTEUR vit dans l'extension (contrôles 1-2, sous garde). L'APP, elle, a deux
+// rôles — et aucun des deux n'est une boucle côté app :
+//   · la messagerie accepte UNE offre précise sur un `onClick` (jamais une
+//     minuterie, jamais un effet) ;
+//   · l'interrupteur `vinted_offres_auto` allume le moteur de l'extension — et
+//     comme ça accepte VRAIMENT tout seul, l'app doit le DIRE (une confirmation
+//     qui prévient que des offres seront acceptées sans lui). C'est la garde
+//     d'honnêteté retournée : avant elle promettait « rien tout seul » ; depuis
+//     le revirement elle doit AVERTIR, pas rassurer (§6.5 : on exige la garde,
+//     pas un mot).
 essaie('app', () => {
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   dit(!!cap && !/\boffres\s*:|\boffresapp\s*:/.test(cap[1]), "l'app ne déclare pas de capacité « offres » à l'extension (ce serait l'ancien moteur)",
@@ -111,11 +121,19 @@ essaie('app', () => {
     "aucune minuterie n'accepte une offre");
   dit(!/useEffect\(\s*(?:async\s*)?\(?\)?\s*=>[\s\S]{0,600}?actionOffre\(\s*['"]accept/.test(APP),
     "aucun effet n'accepte une offre au montage");
-  // Là où le prix mini met une offre en avant, la garde d'honnêteté est présente.
+  // Le prix mini existe, et l'interrupteur qui allume le moteur AVERTIT que ça
+  // accepte vraiment tout seul (la garde d'honnêteté, RETOURNÉE depuis le
+  // revirement : on exige l'avertissement, pas un mot — §6.5).
   const miniPose = /data=["']min["']|updatePair\(item,\s*\{\s*min:/.test(APP);
   dit(miniPose, "le prix mini d'acceptation existe (data=\"min\")");
-  if (miniPose) dit(/rien n['’]est accepté tout seul/i.test(APP),
-    "l'app DIT que rien n'est accepté tout seul (la garde d'honnêteté, pas un mot interdit)");
+  // L'interrupteur appelle une confirmation qui dit que VRM accepte À TA PLACE
+  // et nomme le risque de blocage — sinon on allumerait un moteur en silence.
+  const iBasc = APP.indexOf('const basculerOffresAuto');
+  const corpsBasc = iBasc >= 0 ? APP.slice(iBasc, iBasc + 1200) : '';
+  dit(/l['’]accepte à ta place/i.test(corpsBasc) && /robot|risque pour le compte|peut être vu/i.test(corpsBasc),
+    "l'interrupteur AVERTIT que VRM accepte à ta place et nomme le risque (honnêteté retournée : il prévient, il ne rassure pas)",
+    iBasc < 0 ? 'basculerOffresAuto introuvable' : '');
+  dit(/data-offres-auto-toggle/.test(APP), "l'interrupteur d'acceptation auto existe dans l'app (data-offres-auto-toggle)");
 });
 
 // ── 4. L'autre sens : la voie manuelle reste, et l'ancien réglage reste éteint
@@ -187,5 +205,5 @@ essaie('eBay', () => {
   dit(!/function RepondreSetting|<RepondreSetting/.test(app), "l'app ne propose plus d'allumer une réponse automatique");
 }
 
-console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — rien n'accepte une offre tout seul`);
+console.log(ko ? `\n❌ audit-offres-auto : ${ko} contrôle(s) rouge(s), ${ok} vert(s)` : `\n✅ audit-offres-auto : ${ok} contrôles — le moteur d'acceptation auto reste sous garde (compte connecté, plafond 20/h, pause, éteint par défaut)`);
 process.exit(ko ? 1 : 0);
