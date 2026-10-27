@@ -90,7 +90,7 @@ const m=await pg.evaluate(()=>{const top=(e)=>e?Math.round(e.getBoundingClientRe
     lignesZero:[...document.querySelectorAll('[data-ca-ligne]')].filter(tr=>[...tr.querySelectorAll('td')].slice(1).every(td=>/^0,00/.test(td.textContent.trim()))).length,
     nLignesCa:document.querySelectorAll('[data-ca-ligne]').length,
     pictoSeuls:[...document.querySelectorAll('[data-compta-section] .vrm-pourquoi > summary')].filter(x=>x.textContent.trim().length<3).length,
-    v0:top(ventes[0]),a0:top(cartes[0]),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,nA:cartes.length,
+    v0:top(ventes[0]),a0:top(cartes[0]),hA:cartes.length?Math.round(cartes[0].getBoundingClientRect().height):null,pA:(()=>{const a=cartes[0]&&cartes[0].querySelector('.vrm-ann-overview > a');return a?Math.round(a.getBoundingClientRect().height):null;})(),nA:cartes.length,
     deborde:document.documentElement.scrollWidth>document.documentElement.clientWidth+1};});
 if(sub==='ventes'){
   dit(m.nVentes>=10,`[${W}] les ventes sont rendues`,String(m.nVentes));
@@ -131,8 +131,11 @@ if(sub==='ventes'){
   dit(m.nA>=10,`[${W}] les annonces sont rendues`,String(m.nA));
   dit(!m.titreAnn,`[${W}] pas de second titre « Annonces en ligne » sous l'onglet Annonces`);
   dit(!m.lignesComptes,`[${W}] pas de ligne « Annonces de 2 comptes » sous le sélecteur « Compte »`);
-  dit(m.hA!=null&&m.hA<=(W<600?150:115),`[${W}] une annonce est compacte`,`${m.hA} px`);
-  dit(m.a0!=null&&m.a0<=(W<600?640:660),`[${W}] la première annonce arrive plus haut`,String(m.a0));
+  // (27 oct.) Julien a renversé la décision « compacte » du 26 : « les annonces sont
+  // beaucoup trop petites, on ne voit même pas la première photo ». La fiche montre
+  // la première photo EN GRAND ; elle arrive quand même plus haut qu'avant (685/707 px).
+  dit(m.pA!=null&&m.pA>=180,`[${W}] la première photo d'une annonce est en grand`,`${m.pA} px (fiche ${m.hA} px)`);
+  dit(m.a0!=null&&m.a0<=680,`[${W}] la première annonce arrive plus haut`,String(m.a0));
 }
 dit(!m.deborde,`[${W}] aucun débordement horizontal (${nom})`);
 dit(!errs.length,`[${W}] aucune erreur (${nom})`,errs[0]);
