@@ -186,7 +186,8 @@ if (process.argv.includes('--recopie')) {
     const m = (a, b) => { if (!g.includes(a)) { console.log('❌ mutation impossible : motif absent'); process.exit(2); } g = g.replace(a, b); };
     if (MUT === 'serveur-registre') m('const declare = objet(mm.vrm_urssaf_declare);', 'const declare = {};');
     else if (MUT === 'serveur-montant') m('const ligne = mm.vinted_urssaf_mois && Array.isArray(mm.vinted_urssaf_mois.mois) ? mm.vinted_urssaf_mois : null;', 'const ligne = null;');
-    else if (MUT === 'serveur-passu') m("if (main === undefined) return { envoyer: true,", "if (main === undefined) return { envoyer: false, raison: 'pas su' }; if (false) return { envoyer: true,");
+    else if (MUT === 'serveur-passu') m("if (main === undefined) return { envoyer: false,", "if (main === undefined) return { envoyer: true, titre: TITRE_URSSAF, corps: RAPPEL_SANS_MONTANT, url, montant: null, raison: 'x' }; if (false) return { envoyer: false,");
+    else if (MUT === 'serveur-statut') m("if (!main || main.vinted_regime !== 'micro')", "if (!main)");
     else if (MUT === 'serveur-ancienne') {
       const f2 = path.join(API, '_lib', 'urssaf-regle.js');
       const motif = 'if (atPub < debutPeriode || (!porte && partiel)) return { ca: null, apayer: null, partiel: false };';
@@ -212,14 +213,16 @@ if (process.argv.includes('--recopie')) {
     ];
     const diff = cas.filter((c) => JSON.stringify(r(c)) !== JSON.stringify(srv.rappelUrssaf({ taux: 13.5, ...c })));
     dit(!diff.length, `exécutés sur les mêmes dates, l'app et le miroir rendent la même chose (${cas.length} cas)`, diff.map((c) => c.freq + ' ' + c.now.toISOString().slice(0, 10)).join(' · '));
-    dit(srv.tauxDe && srv.tauxDe('12,3') === 12.3 && srv.tauxDe(undefined) === 13.5 && srv.tauxDe('99') === 13.5, 'le taux se lit par la règle de l\'app (virgule, défaut 13,5, borné à 50)');
+    dit(srv.tauxDe && srv.tauxDe('12,3') === 12.3 && srv.tauxDe(undefined) === 12.4 && srv.tauxDe('99') === 12.4, 'le taux se lit par la règle de l\'app (virgule, défaut 12,4 = achat-revente, borné à 50)');
   }
 
   // ── 2. La notification : la règle, le montant publié, « pas su » ──────────
   console.log('\n── 2. La notification du 1er (règle pure, api/_lib/rappel-urssaf.js)');
   // Publiée le 1er octobre au matin (après la fin de septembre) : un total complet.
   const PUB = { at: Date.parse('2026-10-01T06:00:00Z'), mois: [{ ym: '2026-09', ca: 4330.9, n: 89 }, { ym: '2026-10', ca: 999, n: 9 }] };
-  const N = (main, today = '2026-10-01') => glue.notificationUrssaf({ today, main });
+  // (27 oct.) Le rappel ne concerne qu'un micro-entrepreneur : les scénarios
+  // ci-dessous sont les siens (`vinted_regime: 'micro'`), la section « statut » juge les autres.
+  const N = (main, today = '2026-10-01') => glue.notificationUrssaf({ today, main: main && typeof main === 'object' && !('vinted_regime' in main) ? { vinted_regime: 'micro', vinted_urssaf_taux: '13,5', ...main } : main });
   await essaie('notification : mois à déclarer', () => {
     const n = N({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB });
     dit(!!(n && n.envoyer), 'mensuel, 1er octobre, septembre pas noté : la notification part', n && n.raison);
@@ -253,9 +256,16 @@ if (process.argv.includes('--recopie')) {
   });
   await essaie('notification : pas su', () => {
     const n = N(undefined);
-    dit(!!(n && n.envoyer && n.montant == null && !/€/.test(n.corps)), '« pas su » (main illisible) : le rappel d\'aujourd\'hui part, SANS montant', n && n.corps);
+    dit(!!(n && !n.envoyer), '« pas su » (main illisible) : on ne sait pas s\'il est micro-entrepreneur — rien ne part (Ma journée le rappelle)', n && n.raison);
     const s = N({ vinted_urssaf_freq: 'mensuel' });
     dit(!!(s && s.envoyer && s.montant == null && !/\d,\d\d €/.test(s.corps)), 'jamais publiée : le rappel, sans montant (jamais 0)', s && s.corps);
+  });
+
+  await essaie('notification : statut (27 oct.)', () => {
+    for (const [r, nom] of [[undefined, 'jamais choisi'], ['particulier', 'particulier'], ['societe', 'société'], ['marge', 'régime de la marge']]) {
+      const n = glue.notificationUrssaf({ today: '2026-10-01', main: { ...(r ? { vinted_regime: r } : {}), vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB } });
+      dit(!!(n && !n.envoyer), `statut ${nom} : aucune notification URSSAF`, n && n.raison);
+    }
   });
 
   // ── 3. Le VRAI cron, un 1er octobre ─────────────────────────────────────────
@@ -305,7 +315,7 @@ if (process.argv.includes('--recopie')) {
   await essaie('api/ship-reminders.js se charge', async () => { cron = (await import('file://' + path.join(API, 'ship-reminders.js'))).default; });
   const vraiNow = Date.now;
   const lancer = async (main, iso = '2026-10-01T08:10:00Z', ko = false) => {
-    MAIN = main; ecrits = []; mainKO = ko; pushes.length = 0;
+    MAIN = main && !('vinted_regime' in main) ? { vinted_regime: 'micro', vinted_urssaf_taux: '13,5', ...main } : main; ecrits = []; mainKO = ko; pushes.length = 0;
     Date.now = () => Date.parse(iso);
     try {
       const res = { code: null, corps: null, status(n) { this.code = n; return this; }, json(o) { this.corps = o; return this; }, setHeader() {}, end() { return this; } };
@@ -332,7 +342,13 @@ if (process.argv.includes('--recopie')) {
     await essaie('cron : pas su', async () => {
       await lancer({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB }, '2026-10-01T08:10:00Z', true);
       const u = urssafDe();
-      dit(u.length === 1 && !/€/.test(u[0].body), '« pas su » (main illisible) : le rappel d\'aujourd\'hui part, sans montant', u[0] && u[0].body);
+      dit(u.length === 0, '« pas su » (main illisible) : statut inconnu, aucune notification URSSAF', `${u.length} envoi(s)`);
+    });
+    await essaie('cron : statut pas micro', async () => {
+      await lancer({ vinted_regime: 'societe', vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB });
+      dit(urssafDe().length === 0, 'statut société : le cron n\'envoie aucune notification URSSAF', `${urssafDe().length} envoi(s)`);
+      await lancer({ vinted_regime: undefined, vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: PUB });
+      dit(urssafDe().length === 0, 'statut jamais choisi : aucune notification URSSAF', `${urssafDe().length} envoi(s)`);
     });
     await essaie('cron : trimestriel en cours', async () => {
       await lancer({ vinted_urssaf_freq: 'trimestriel', vinted_urssaf_mois: PUB }, '2026-11-01T08:10:00Z');
@@ -374,7 +390,7 @@ if (process.argv.includes('--recopie')) {
       vm.createContext(ctx); vm.runInContext(fs.readFileSync(dossier + '/regle.js', 'utf8'), ctx);
       for (const c of cas) {
         const ligne = { at: Date.parse(c.at), mois: [{ ym: c.ym, ca: 1000, n: 10 }], aDater: { n: 0 } };
-        if (mode === 'miroir') { out.push(glue.notificationUrssaf({ today: c.today, main: { vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: ligne, vrm_urssaf_declare: {} } }).corps); continue; }
+        if (mode === 'miroir') { out.push(glue.notificationUrssaf({ today: c.today, main: { vinted_regime: 'micro', vinted_urssaf_taux: '13,5', vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: ligne, vrm_urssaf_declare: {} } }).corps); continue; }
         const [y, m, d] = c.today.split('-').map(Number);
         const now = mode === 'app' ? new Date(c.appNow) : new Date(y, m - 1, d, 12);
         const x = ctx.rappelUrssaf({ freq: 'mensuel', now, declare: {}, ligne, taux: 13.5 });

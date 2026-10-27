@@ -56,7 +56,7 @@ const accounts=[
   { id:1, vinted_user_id:'111', login:'atelier_sneak', domain:'www.vinted.fr', updated_at:iso(maintenant), created_at:iso(moisPasse(1)), owner:null },
   { id:2, vinted_user_id:'222', login:'paris_kicks', domain:'www.vinted.fr', updated_at:iso(maintenant), created_at:iso(moisPasse(1)), owner:null },
 ];
-const main=[{ id:'main', data:{} }];
+const main=[{ id:'main', data:{ vinted_regime:'micro', vinted_urssaf_taux:13.5 } }];
 // [compte, tx, prix, statut, date de vente, date de versement (null = pas de transaction captée)]
 const VENTES=[
   ['111','90001',48.5,'Commande finalisée',moisPasse(27),ceMois(1,9)],   // vendue le mois dernier, versée ce mois-ci

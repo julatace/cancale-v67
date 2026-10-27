@@ -109,7 +109,7 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   const ctx3 = Object.assign({}, ctx);
   ctx3.load = (k, d) => (k === 'vinted_urssaf_taux' ? 'nawak' : d);
   vm.createContext(ctx3); vm.runInContext(bloc + EXPORTE, ctx3);
-  ctx3.tauxUrssaf() === 13.5
+  ctx3.tauxUrssaf() === 12.4   // (27 oct.) le défaut est le taux officiel de l'achat-revente
     ? ok('un taux illisible retombe sur le défaut, jamais sur zéro')
     : nok('un taux illisible retombe sur le défaut', 'obtenu ' + ctx3.tauxUrssaf());
 }
@@ -578,7 +578,7 @@ for (const [nom, txt] of [['mensuel', mensuel], ['annuel', annuel]]) {
   /nMasq\s*\+=\s*1/.test(txt)
     ? ok(`le rapport ${nom} compte les ventes masquées à part`)
     : nok(`le rapport ${nom} compte les ventes masquées à part`);
-  /const taux = tauxUrssaf\(\)/.test(txt)
+  /const taux = (urssafConcerne\(regime\) \? )?tauxUrssaf\(\)/.test(txt)   // (27 oct.) micro seulement : la règle reste « le taux réglable »
     ? ok(`le rapport ${nom} applique le taux réglable`)
     : nok(`le rapport ${nom} applique le taux réglable`, 'taux en dur');
 }

@@ -18,7 +18,7 @@
 import { rappelUrssaf, tauxDe, nextUrssafDeadline, moisPeriodeUrssaf, moisDeclare, _startOfDay } from './urssaf-regle.js';
 
 // Les seules clés de `main` qu'elle lit (§4.4 : `main` pèse ~200 Ko).
-export const MAIN_URSSAF = ['vinted_urssaf_freq', 'vinted_urssaf_taux', 'vrm_urssaf_declare', 'vinted_urssaf_mois'];
+export const MAIN_URSSAF = ['vinted_regime', 'vinted_urssaf_freq', 'vinted_urssaf_taux', 'vrm_urssaf_declare', 'vinted_urssaf_mois'];
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 export const TITRE_URSSAF = '🧾 Déclaration URSSAF';
 export const RAPPEL_SANS_MONTANT = 'Nouveau mois : pense à déclarer ton chiffre d\'affaires sur autoentrepreneur.urssaf.fr.';
@@ -28,7 +28,12 @@ export const RAPPEL_SANS_MONTANT = 'Nouveau mois : pense à déclarer ton chiffr
 // montant, raison }` — `montant` = à payer (nombre) ou `null`.
 export function notificationUrssaf({ today, main }) {
   const url = '/?tab=journee';
-  if (main === undefined) return { envoyer: true, titre: TITRE_URSSAF, corps: RAPPEL_SANS_MONTANT, url, montant: null, raison: 'réglages illisibles — rappel sans montant' };
+  // (27 oct.) SEUL un micro-entrepreneur reçoit ce rappel : un particulier, une
+  // société, un régime de la marge, ou un statut jamais choisi n'ont rien à
+  // déclarer à l'URSSAF (règle de l'app : `urssafConcerne`). Réglages illisibles
+  // ⇒ on ne sait pas s'il est concerné : rien (Ma journée le rappelle, elle).
+  if (main === undefined) return { envoyer: false, raison: 'réglages illisibles — statut pas su' };
+  if (!main || main.vinted_regime !== 'micro') return { envoyer: false, raison: 'pas micro-entrepreneur (statut : ' + ((main && main.vinted_regime) || 'pas choisi') + ')' };
   const [y, m, d] = String(today || '').split('-').map(Number);
   const now = new Date(y, (m || 1) - 1, d || 1, 12);
   const mm = objet(main);

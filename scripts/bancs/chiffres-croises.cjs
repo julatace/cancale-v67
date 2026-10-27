@@ -65,7 +65,7 @@ const VENTES=[
   ['222','91008',27,  'Commande finalisée',ilYa(3,10),ilYa(3,12)],
 ];
 const vente=(v)=>({ transaction_id:Number(v[1]), id:Number(v[1]), title:'Baskets inventées '+v[1], price:{amount:String(v[2]),currency_code:'EUR'}, status:v[3], date:iso(v[4]) });
-const rows=[{ id:'main', data:{} }];
+const rows=[{ id:'main', data:{ vinted_regime:'micro', vinted_urssaf_taux:13.5 } }];
 for(const a of accounts){
   const uid=a.vinted_user_id;
   rows.push({ id:`harvest_${uid}_orders_sold`, data:{ capturedAt:iso(maintenant), payload:{ my_orders:VENTES.filter(v=>v[0]===uid).map(vente) } } });
@@ -123,7 +123,7 @@ async function page(b, opts={}){
     if(opts.lignes){ const eq0=/id=eq\.([^&]*)/.exec(u); if(eq0 && opts.lignes[eq0[1]]) return j([projette({ id:eq0[1], data:opts.lignes[eq0[1]] },(/[?&]select=([^&]*)/.exec(u)||[])[1]||null)]); }
     const S=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
-    const eq=/id=eq\.([^&]*)/.exec(u); if(eq&&eq[1]==='main'&&opts.main) return j([projette({id:'main',data:opts.main},S)]);
+    const eq=/id=eq\.([^&]*)/.exec(u); if(eq&&eq[1]==='main'&&opts.main) return j([projette({id:'main',data:{ vinted_regime:'micro', vinted_urssaf_taux:13.5, ...opts.main }},S)]);
     if(eq) return j(rows.filter(r=>r.id===eq[1]).map(r=>projette(r,S)));
     const lk=/id=like\.([^&]*)/.exec(u); if(lk){ const re=new RegExp('^'+lk[1].replace(/[.]/g,'\\.').replace(/[*%]/g,'.*')+'$'); return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S))); }
     return j([]);

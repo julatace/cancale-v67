@@ -121,7 +121,7 @@ const ouvrir = async (b, vp, opts = {}) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_ca_objectif', '2000'); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_ca_objectif', '2000'); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

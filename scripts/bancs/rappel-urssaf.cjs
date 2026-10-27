@@ -31,7 +31,7 @@ const LIGNE = { at: '2026-10-27T07:00:00Z', mois: [{ ym: '2026-07', ca: 100, n: 
 const VENTES_T = [[9101, 100, '2026-06-20T10:00:00Z', '2026-07-15T10:00:00Z'], [9102, 200, '2026-07-25T10:00:00Z', '2026-08-14T10:00:00Z'], [9103, 300, '2026-08-25T10:00:00Z', '2026-09-15T10:00:00Z'], [9104, 999, '2026-10-01T10:00:00Z', '2026-10-15T10:00:00Z']];
 const DECLARE = { '2026-07': { ids: ['vinted:9101'], n: 1, ca: 100 }, '2026-08': { ids: ['vinted:9102'], n: 1, ca: 200 }, '2026-09': { ids: ['vinted:9103'], n: 1, ca: 300 } };
 const rowsDe = (declare) => [
-  { id: 'main', data: { vinted_urssaf_freq: 'trimestriel', vinted_urssaf_mois: LIGNE, ...(declare ? { vrm_urssaf_declare: declare } : {}) } },
+  { id: 'main', data: { vinted_regime: 'micro', vinted_urssaf_taux: 13.5, vinted_urssaf_freq: 'trimestriel', vinted_urssaf_mois: LIGNE, ...(declare ? { vrm_urssaf_declare: declare } : {}) } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: '2026-10-27T07:30:00Z', payload: { my_orders: VENTES_T.map(([tx, eur, vendu]) => ({ transaction_id: tx, id: tx, title: 'Baskets inventées ' + tx, price: { amount: String(eur), currency_code: 'EUR' }, status: 'Commande finalisée', date: vendu })) } } },
   ...VENTES_T.map(([tx, , , verse]) => ({ id: 'harvest_111_txn_' + tx, data: { capturedAt: '2026-10-27T07:30:00Z', payload: { transaction: { id: tx, status: 450, status_title: 'Commande finalisée', status_updated_at: verse } } } })),
 ];
