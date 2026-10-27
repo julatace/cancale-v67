@@ -52267,7 +52267,11 @@ function AppCoeur() {
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
     if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',onMsg);
-    return ()=>{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); };
+    // Hook de navigation pour le mode ciné (`?cine`, CineStudio) : saute d'un
+    // vrai écran à l'autre sans rechargement. N'ouvre rien d'autre (même effet
+    // qu'un clic sur la barre d'onglets), et retiré au démontage.
+    try{ window.__vrmGoto=(s)=>goto(s); }catch(_){}
+    return ()=>{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',onMsg); try{ if(window.__vrmGoto) delete window.__vrmGoto; }catch(_){} };
   },[]);
   const [dark,setDark]=useState(()=>load('vinted_dark',false));
   // Applique le thème (clair/sombre) en réassignant C avant chaque rendu

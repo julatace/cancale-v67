@@ -52,6 +52,9 @@ const App = React.lazy(() => import('./App.jsx'));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
 const Film = React.lazy(() => import('./AccueilFilm.jsx'));
+// Mode ciné (`?cine`) : un film joué PAR-DESSUS le vrai app, sur les vraies
+// données, pour l'enregistrement d'écran (réseaux). Chargé seulement si demandé.
+const CineStudio = React.lazy(() => import('./CineStudio.jsx'));
 // Polices HÉBERGÉES SUR LE SITE (30 sept.) : charger Google Fonts envoyait
 // l'adresse IP de chaque visiteur à Google (recommandation CNIL, jugement
 // LG München 3 O 17493/20). Mêmes familles, même rendu, plus aucun tiers.
@@ -132,10 +135,11 @@ const veutLApp = () => {
   // d'abord la connexion), jamais la page d'accueil.
   // `?confirmer-adresse=` (22 oct.) : le lien de confirmation d'une adresse de
   // réception — droit dans l'app (connexion d'abord s'il le faut), jamais l'accueil.
-  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
+  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse|cine)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
 };
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
+const cineDemande = /[?&]cine(=|&|$)/.test(window.location.search || '');
 // Une session existe : on lance le téléchargement de l'app TOUT DE SUITE, avant
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
 if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
@@ -156,7 +160,7 @@ function Racine() {
       setVue('app');
     }} />;
   }
-  return <React.Suspense fallback={<FondApp />}><App /></React.Suspense>;
+  return <React.Suspense fallback={<FondApp />}><App />{cineDemande && <CineStudio />}</React.Suspense>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
