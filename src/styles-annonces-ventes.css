@@ -160,3 +160,6 @@
 .vrm-app-shell .vrm-main .vrm-num-plat-champ input { width: 110px; min-height: 36px; box-sizing: border-box; padding: 6px 10px; border: 1px solid var(--vrm-line); border-radius: 8px; background: var(--vrm-surface, transparent); color: var(--vrm-ink); font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-app-shell .vrm-main .vrm-num-plat-msg[data-num-plat-msg=ok] { color: var(--vrm-ink); font-weight: 600; }
 .vrm-app-shell [data-num-trouve] { outline: 2px solid var(--vrm-accent, #2458E6); outline-offset: -2px; border-radius: 10px; }
+/* (27 oct.) Dans une barre d'outils (Annonces) : pas de marge, le N° à côté de la recherche ; l'invite se tait (le champ dit « + Entrée »), le résultat s'écrit à côté. */
+.vrm-app-shell .vrm-main .vrm-num-plat.vrm-num-plat-barre { padding: 0; }
+.vrm-app-shell .vrm-main .vrm-num-plat.vrm-num-plat-barre .vrm-num-plat-msg:empty { display: none; }

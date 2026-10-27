@@ -15558,7 +15558,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
 // `e.code` (`Numpad5`), comme le Stock.
 const DEMANDE_NUM_PLAT = { plateforme: '', section: '', q: '', at: 0 };
 const chiffrePave = (e) => /^[0-9]$/.test(e.key) ? e.key : ((/^Numpad([0-9])$/.exec(e.code || '') || [])[1] || '');
-function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, nom = '', invite = '' }) {
+function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, nom = '', invite = '', barre = false }) {
   const sansSouris = useSansSouris();
   const champ = React.useRef(null);
   const [v, setV] = React.useState('');
@@ -15615,7 +15615,7 @@ function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, no
     if (vu) setV('');
   };
   return (
-    <div className="vrm-num-plat" data-num-plat={plateforme}>
+    <div className={barre ? 'vrm-num-plat vrm-num-plat-barre' : 'vrm-num-plat'} data-num-plat={plateforme}>
       <label className="vrm-num-plat-champ"><span>N°</span>
         <input ref={champ} data-num-plat-saisie="" value={v} inputMode="numeric" autoComplete="off" placeholder="+ Entrée"
           aria-label={`Numéro : Entrée pour trouver la paire ${nom || (plateforme === 'ebay' ? 'sur eBay' : 'sur Leboncoin')}`}
@@ -15625,7 +15625,7 @@ function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, no
             const ch = chiffrePave(e); if (ch && ch !== e.key) { e.preventDefault(); e.stopPropagation(); setV((x) => x + ch); setMsg(null); return; }
             if (e.key === 'Enter') { e.preventDefault(); valider(); } else if (e.key === 'Escape') { e.preventDefault(); setV(''); setMsg(null); e.currentTarget.blur(); } }}/>
       </label>
-      <span role="status" className="vrm-num-plat-msg" data-num-plat-msg={msg ? msg.ton : undefined}>{occupe ? 'Je cherche…' : (msg ? msg.texte : (invite || 'Tape un N° au clavier : je montre la paire sur ce site.'))}</span>
+      <span role="status" className="vrm-num-plat-msg" data-num-plat-msg={msg ? msg.ton : undefined}>{occupe ? 'Je cherche…' : (msg ? msg.texte : (barre ? '' : (invite || 'Tape un N° au clavier : je montre la paire sur ce site.')))}</span>
     </div>
   );
 }
@@ -38189,6 +38189,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const plus = tous.length > 1 ? ` · ${tous.length} ventes portent ce N°, voici la plus récente` : '';
     return { section: 'ventes', sel, texte: `N°${cle} — ${venteStage(o).label}${plus}`, texteSiAbsent: `La vente N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
   };
+  // (27 oct.) Même pavé sur Achats et Annonces. Achats : un achat porte un N°
+  // seulement s'il a été RELIÉ à une paire (sur son clic : `buyFromId` posé par
+  // Annonces ou par une vente) — jamais deviné. Annonces : la carte dont la fiche
+  // porte ce N°, en ligne sur Vinted.
+  const chercherNumAchat = async (cle) => {
+    if (!Array.isArray(buys.items)) return null;
+    const txs = new Set();
+    for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && cleNum(e.numero || '') === cle) txs.add(String(e.buyFromId)); }
+    for (const o of (sales.items || [])) { const ov = o && o.transaction_id != null ? saleOv[String(o.transaction_id)] : null; if (ov && ov.buyFromId && cleNum(effEntry(o)?.numero || '') === cle) txs.add(String(ov.buyFromId)); }
+    if (!txs.size) return { texte: `Aucun achat n'est relié au N°${cle} — tu relies un achat depuis la carte de l'annonce ou depuis sa vente.` };
+    const o = buysBase.filter(b => txs.has(String(b.transaction_id))).sort(parDateDesc)[0];
+    if (!o) return { texte: `L'achat relié au N°${cle} n'est pas dans tes achats captés (compte écarté ou plus relu).` };
+    const tx = String(o.transaction_id);
+    if (!achatsAffiches.some(x => String(x.o.transaction_id) === tx)) { setAFilter('all'); setOrdSearch(''); setPeriode(null); }
+    const sel = () => { const el = document.querySelector(`.vrm-buy-row[data-achat-tx="${tx}"]`); if (!el) setAchatsMax(n => n + 120); return el; };
+    return { section: 'achats', sel, texte: `N°${cle} — acheté le ${o.date ? new Date(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '?'}, ${achatStage(o, trackForBuy(o)).label}`, texteSiAbsent: `L'achat du N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
+  };
+  const chercherNumAnnonce = async (cle) => {
+    if (!Array.isArray(listings.items)) return null;
+    const it = annBase.find(x => cleNum(numeros[x.id]?.numero || '') === cle);
+    if (it) {
+      if (!annShown.some(x => x.id === it.id)) { setAnnSearch(''); setAnnSort('oldest'); }
+      return { section: 'annonces', sel: `[data-carte-annonce="${it.id}"]`, texte: `N°${cle} — en ligne sur Vinted`, texteSiAbsent: `L'annonce N°${cle} est en ligne, mais je n'ai pas pu l'afficher dans la liste.` };
+    }
+    const v = (sales.items || []).filter(o => o && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc)[0];
+    if (v) return { texte: `N°${cle} n'est plus en ligne — sa vente : ${venteStage(v).label}. Elle est dans Ventes.` };
+    if (Object.values(numeros).some(e => e && cleNum(e.numero || '') === cle)) return { texte: `N°${cle} n'est pas en ligne sur Vinted en ce moment (retirée, ou à confirmer).` };
+    return { texte: `Aucune annonce ne porte le N°${cle}.` };
+  };
   const chercherNumColis = async (cle) => {
     if (!Array.isArray(sales.items)) return null;
     const numEx = (e) => (e.b ? numForBord(e.b) : '') || (e.o ? (effEntry(e.o)?.numero || '') : '');
@@ -40318,6 +40347,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<div className="vrm-achats">
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
         {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>}
+        <SaisieNumeroPlateforme plateforme="achats" nom="dans tes achats" invite="Tape un N° au clavier : je montre l'achat relié à cette paire." chercher={chercherNumAchat}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -41483,6 +41513,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
             <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
+            {/* (27 oct.) Le pavé numérique : dans la barre, pas une ligne de plus avant la grille. */}
+            <SaisieNumeroPlateforme barre plateforme="annonces" nom="dans tes annonces" chercher={chercherNumAnnonce}/>
             <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>

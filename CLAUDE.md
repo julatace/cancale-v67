@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> **27 octobre — le pavé numérique sur Achats et Annonces (Vinted) :** même saisie. Achats : un
+> achat n'a un N° que s'il a été RELIÉ à une paire sur son clic (`buyFromId` d'une fiche ou d'une
+> vente) — jamais deviné ; N° + Entrée montre cet achat (onglet « Tous », filtres et « Voir plus »
+> levés) ; aucun achat relié ⇒ dit. Annonces : la carte en ligne de ce N° (vue rapide ou recherche
+> levées) ; plus en ligne ⇒ sa vente nommée. Sur Annonces la saisie vit DANS la barre d'outils
+> (`barre`) : une ligne de plus faisait passer la première carte sous le seuil du 26 oct. (684 px).
+> Banc `pave-vinted.cjs` : 8 rouges sur main pour ces deux écrans, 30 verts après ; filtres non
+> levés ⇒ 3 rouges.
+
 > **27 octobre — le pavé numérique sur Ventes et Colis (Vinted) :** même saisie que Leboncoin et
 > eBay (`SaisieNumeroPlateforme`). Ventes : N° + Entrée montre SA vente (le N° de la ligne,
 > `effEntry`) ; cachée par un filtre, une recherche, la période, « masquées » ou au-delà des
