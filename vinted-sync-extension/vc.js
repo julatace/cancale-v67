@@ -58,6 +58,13 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAchats', achats, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
         return;
       }
+      // 5.243 : le catalogue du dépôt (libellés publics du site, jamais une personne).
+      if (d.kind === 'vccatalogue') {
+        const chemin = String(d.chemin || '');
+        if (!/^\/[a-z0-9/_-]*deposit\/(catalog|brands)/i.test(chemin)) return;
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCatalogue', chemin: chemin.slice(0, 160), body: String(d.body || '').slice(0, 3000000), coupe: !!d.coupe }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcpublie') {
         chrome.runtime.sendMessage({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(d.productId || '').slice(0, 40) }, () => { void chrome.runtime.lastError; });
         return;

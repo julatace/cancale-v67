@@ -516,7 +516,11 @@
     if (!estFormulaire()) return;
     const r = await send({ action: 'getPending' });
     const ad = (r && r.ok && r.ad) ? r.ad : null;
-    if (!ad) return;
+    // 5.243 : la STRUCTURE du formulaire (noms de champs, libellés et codes des
+    // options — jamais une saisie) se relève aussi quand le dépôt est ouvert à
+    // la main, sans paire lancée depuis VRM : c'est elle qui permettra de
+    // choisir la catégorie tout seul. Rien n'est rempli ni cliqué ici.
+    if (!ad) { releverSansDepot(); return; }
     bandeau(0, ad);
     surveiller(ad);
     // Un clic « Publier » déjà fait dans cet onglet (la page a rechargé après) :
@@ -556,6 +560,16 @@
       const hay = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.placeholder || '') + ' ' + lab).toLowerCase();
       return !PAS_UN_CHAMP_DE_DEPOT.test(hay);
     } catch (_) { return false; }
+  }
+  let _releveMinuteur = null;
+  function releverSansDepot() {
+    if (_releveMinuteur || !/sell|deposit|vendre/i.test(location.pathname)) return;
+    let tours = 0;
+    _releveMinuteur = setInterval(() => {
+      tours += 1;
+      try { if (formulaireVisible()) rapporterEtape(); } catch (_) {}
+      if (tours > 90) { clearInterval(_releveMinuteur); _releveMinuteur = null; }
+    }, 2000);
   }
   function rapporterEtape() {
     try {

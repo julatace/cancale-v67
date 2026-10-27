@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.242.0';
+const CODE_VERSION = '5.243.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2606,7 +2606,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus });
+          await noterVcCapte('annonces', ok === true, Array.isArray(msg.items) ? msg.items.length : 0);
           sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.243 : le catalogue du dépôt Vestiaire (catégories, marques — libellés publics).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcCatalogue') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          sendResponse({ ok: (await storeVcCatalogue(msg.chemin, msg.body, !!msg.coupe)) === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
       return true;
@@ -2618,6 +2630,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcVentes(msg);
+          await noterVcCapte('ventes', ok === true, Array.isArray(msg.ventes) ? msg.ventes.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2630,6 +2643,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages } : msg);
+          await noterVcCapte('messages', ok === true, msg.action === 'vcCompteur' ? Number(msg.messages) || 0 : (Array.isArray(msg.conversations) ? msg.conversations.length : 0));
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2642,6 +2656,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcAchats(msg);
+          await noterVcCapte('achats', ok === true, Array.isArray(msg.achats) ? msg.achats.length : 0);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -2912,6 +2927,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 23 oct. : jugée sur l'ONGLET qui l'envoie, jamais sur ce que dit le message
     // (`ficheDeLaPage`).
     ficheDeLaPage(msg, sender, domain);
+  } else if (msg.kind === 'catalogueVinted' && typeof msg.body === 'string') {
+    // 5.243 : l'arbre des catégories Vinted (libellés publics), une ligne à part.
+    if (/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) storeVintedCatalogue(msg.body);
   } else if (msg.kind === 'suivi') {
     // 5.214 : le suivi / l'expédition / le code de retrait qu'une page Vinted
     // vient de recevoir — sa FORME, et pour le suivi le contenu allégé (voir
@@ -8236,6 +8254,17 @@ const avecVivant = (jobId) => (/^bord:/.test(String(jobId)) && BORD_EN_COURS.has
 // Le petit écran de l'extension le dit, plateforme par plateforme : dernier
 // envoi réussi, dernier envoi refusé. MESURÉ aux points d'écriture, jamais
 // supposé (« pas su » ≠ « oui ») — c'est `chrome.storage` (§4.9).
+// 5.243 : ce que l'extension a RANGÉ de Vestiaire (ventes, annonces, messages,
+// achats) — pour que la carte du logo dise ce qui est capté, au lieu de
+// « VRM apprend à lire » (faux depuis la 5.236). Local, sans réseau.
+async function noterVcCapte(quoi, ok, n) {
+  try {
+    const cur = (await chrome.storage.local.get('vrmVcCapte')).vrmVcCapte || {};
+    if (ok) cur[quoi] = { at: Date.now(), n: Number(n) || 0 };
+    await chrome.storage.local.set({ vrmVcCapte: cur });
+    await noterFlux('vestiaire', ok);
+  } catch (_) {}
+}
 async function noterFlux(plateforme, ok) {
   try {
     const cur = (await chrome.storage.local.get('vrmFlux')).vrmFlux || {};
@@ -8313,7 +8342,7 @@ async function etatSite(url,tabId) {
   const brut = await authEtatRapide(1500).catch(() => null);
   const vrm = brut && brut.connecte !== null ? brut : null;
   let local = {};
-  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte','vrmLbcTransport']); } catch (_) {}
+  try { local = await chrome.storage.local.get(['vrmFlux', 'vrmBascule', 'vrmLbcCompte','vrmLbcTransport','vrmVcCapte']); } catch (_) {}
   // Le compte du SITE : sur Vinted le cookie le dit (une identité) ; sur
   // Leboncoin le dernier compte « moi » vu ; eBay et Vestiaire ne sont pas
   // encore captés par VRM — on le dit plutôt que de laisser croire.
@@ -8333,16 +8362,17 @@ async function etatSite(url,tabId) {
     // parfois un autre compte lié ou un vendeur) n'est plus montrée.
     site = c && c.v === 2 && c.id ? { id: c.id, nom: c.name || '', type: c.type || '' } : { id: null, nom: '' };
   }
-  const capte = plateforme === 'vinted' || plateforme === 'leboncoin';
+  const capte = plateforme === 'vinted' || plateforme === 'leboncoin' || plateforme === 'vestiaire';
   // Vestiaire : rien n'est capté, mais le site est MESURÉ (5.154) — la carte le
   // dit, avec le dernier envoi de la mesure. Jamais « Tes données » ni
   // « Envoyées » : ce serait un faux vert sur des données qui ne sont pas lues.
-  const mesure = plateforme === 'vestiaire';
+  const mesure = false;
+  const vcCapte = plateforme === 'vestiaire' ? (local.vrmVcCapte || {}) : null;
   const flux = (capte || mesure) ? ((local.vrmFlux || {})[plateforme] || {}) : null;
   const b = local.vrmBascule;
   const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
   const transport=plateforme==='leboncoin'?(local.vrmLbcTransport?.[tabId]||null):null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport };
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -13018,6 +13048,48 @@ function viderLbcCatalogue() {
   });
   _lbcCatChaine = p.catch(() => {});
   return _lbcCatChaine;
+}
+// 5.243 — LE CATALOGUE DU DÉPÔT VESTIAIRE (`vc_catalogue`), une place par
+// endpoint (`deposit/catalog`, `deposit/brands`), gardé entier (≤ 3 Mo) et
+// réécrit seulement s'il CHANGE (empreinte dans `chrome.storage.local`). Une
+// lecture ratée de la ligne n'écrit rien (on n'efface pas l'autre endpoint).
+const VINTED_CAT_VU = 'vrmVintedCatalogueVu';
+async function storeVintedCatalogue(body) {
+  try {
+    const corps = String(body || '').slice(0, 3000000);
+    if (!corps) return false;
+    const h = await empreinteTexte(corps);
+    let vu = ''; try { vu = (await chrome.storage.local.get(VINTED_CAT_VU))[VINTED_CAT_VU] || ''; } catch (_) { return false; }
+    if (vu === h) return true;
+    const ok = await supabaseUpsert('app_data', [{ id: 'vinted_catalogue', data: { at: new Date().toISOString(), taille: corps.length, corps } }], 'id');
+    if (ok === false) return false;
+    try { await chrome.storage.local.set({ [VINTED_CAT_VU]: h }); } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
+const VC_CAT_VU = 'vrmVcCatalogueVu';
+let _vcCatChaine = Promise.resolve();
+function storeVcCatalogue(chemin, body, coupe) {
+  const run = _vcCatChaine.then(async () => {
+    const cle = String(chemin || '').replace(/^\/+|\/+$/g, '').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80);
+    if (!/^deposit_(catalog|brands)/.test(cle)) return false;
+    const corps = String(body || '');
+    if (!corps) return false;
+    const h = await empreinteTexte(corps + '|' + (coupe ? 1 : 0));
+    let vu = {}; try { vu = (await chrome.storage.local.get(VC_CAT_VU))[VC_CAT_VU] || {}; } catch (_) { return false; }
+    if (vu[cle] === h) return true;
+    const prevRows = await sbGet('app_data?id=eq.vc_catalogue&select=data');
+    if (prevRows === null) return false;
+    const prev = (prevRows[0] && prevRows[0].data) || {};
+    const next = Object.assign({}, prev, { [cle]: { at: new Date().toISOString(), taille: corps.length, coupe: !!coupe, corps } });
+    next.updatedAt = new Date().toISOString();
+    const ok = await supabaseUpsert('app_data', [{ id: 'vc_catalogue', data: next }], 'id');
+    if (ok === false) return false;
+    vu[cle] = h; try { await chrome.storage.local.set({ [VC_CAT_VU]: vu }); } catch (_) {}
+    return true;
+  });
+  _vcCatChaine = run.then(() => {}, () => {});
+  return run.catch(() => false);
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // CE QUI EST PRÊT POUR PUBLIER SUR LEBONCOIN — PUBLIÉ, PAS DEVINÉ
