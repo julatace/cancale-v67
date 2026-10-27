@@ -1,5 +1,15 @@
 # VRM — dossier de passation
 
+> **27 octobre — le pavé numérique sur Leboncoin et eBay :** comme sur le Stock, sur ordinateur
+> un chiffre tapé n'importe où dans l'espace Leboncoin ou eBay ouvre la saisie (sous les onglets,
+> `SaisieNumeroPlateforme`, `data-num-plat`) ; N° + Entrée MONTRE la paire, en lecture seule, par
+> identité seulement (§5) : Leboncoin = vente (`numeroLbcIdentite`), sinon annonce en ligne, sinon
+> la carte « à publier » ; eBay = commande (`numLigneEbay`), sinon annonce (`numEbayLu`, recherche
+> « n°X »). Rien trouvé ⇒ dit. Écoute en CAPTURE (sinon ← → de la coque changeait de site avec
+> Verr Num éteint : `e.code` `Numpad4`), jamais dans un champ ni une feuille ouverte ; Échap la
+> vide ; rien sur téléphone. Banc `pave-plateformes.cjs` : 12 rouges sur main, 16 verts après ;
+> mutation (sans capture ni conversion) 5 rouges.
+
 > **27 octobre — Leboncoin et eBay, même traitement (« fais pareil ») :** comme l'espace
 > Vinted : une vente dit quand / par quoi sous son titre (Leboncoin : date de VENTE relevée,
 > jamais l'heure de capture, et le transporteur ; eBay : date de commande, et le compte s'il y
