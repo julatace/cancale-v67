@@ -15495,9 +15495,14 @@ function PhotoVente({ src, size = 64, portrait = false }) {
 function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées', count, plateforme }) {
   const tabs=[['all','Toutes'],['pending','À expédier'],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
-    {plateforme && <VuesVentes owner={AUTH.user?.id} plateforme={plateforme} valeur={{filtre:value,recherche:search}} onAppliquer={v=>{onChange(v.filtre);onSearch(v.recherche);}}/>}
     <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:8,background:C.card,color:C.text,marginBottom:10}}/>
+    {/* (27 oct., « pareil que Vinted ») « Mes vues » ne prend plus une ligne à
+        lui seul : il est au bout de la ligne des filtres, et ne reprend toute
+        la largeur que déplié (styles-annonces-ventes.css). */}
+    <div className="vrm-ventes-filtres-ligne">
     <div className="vrm-rangee vrm-sales-filters vrm-filtres" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
+    {plateforme && <VuesVentes owner={AUTH.user?.id} plateforme={plateforme} valeur={{filtre:value,recherche:search}} onAppliquer={v=>{onChange(v.filtre);onSearch(v.recherche);}}/>}
+    </div>
     {(search || value!=='all') && <div className="vrm-filter-recap"><span role="status">{count==null?'Filtres actifs':`${count} résultat${count===1?'':'s'}`}</span><button type="button" onClick={()=>{onSearch('');onChange('all');}}>Réinitialiser</button></div>}
   </div>;
 }
@@ -15541,8 +15546,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details }) {
-  return <LigneVenteCompacte photo={photo} titre={titre} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '' }) {
+  return <LigneVenteCompacte photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -15784,7 +15789,16 @@ function CarteLbc({ o, num = '', benef = null }) {
   // Les deux ne s'affichent QUE connus (§5) : un N° ambigu ou un prix d'achat
   // manquant ⇒ rien, jamais 0.
   const titre = num ? `N°${num} · ${o.title || ''}` : o.title;
-  return <LigneVente photo={photoArticle(o)} titre={titre} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
+  // (27 oct., « pareil que Vinted ») La ligne repliée dit QUAND (la date de
+  // VENTE relevée, jamais `at` = heure de capture) et PAR QUOI elle part ;
+  // l'étape qui demande un geste (colis à envoyer) passe en ambre.
+  const dv = Date.parse(o.dateVente || '');
+  const sous = [isNaN(dv) ? '' : new Date(dv).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), o.deliveryLabel || ''].filter(Boolean).join(' · ');
+  // « À envoyer » = la règle de l'onglet Colis (vente prouvée, ni annulée, ni
+  // finalisée, pas encore partie) — jamais une lecture du libellé (§11).
+  const aLabel = !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
+  const ton = lbcAnnulee(o) ? 'annule' : ((o.isSeller === true || (o.isSeller !== false && aLabel)) && !lbcFinalisee(o) && !lbcExpediee(o) && !((load('vrm_lbc_colis_done', {}) || {})[o.txId]) ? 'action' : '');
+  return <LigneVente photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · bénéfice {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -15925,7 +15939,6 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
     const lu = !!lbcVentes.maj;
     return (
       <div data-lbc-achats-vide={lu ? 'lu' : 'jamais'} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>Achats Leboncoin</div>
         {lu
           ? <>Aucun achat Leboncoin dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}).</>
           : <>Tes achats Leboncoin arrivent quand l’extension passe sur leboncoin.fr (« Mes transactions »). Seules les transactions où tu es l’acheteur sont rangées ici.</>}
@@ -15941,10 +15954,9 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{arr.map(o => <LigneAchatLbc key={o.txId} o={o} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <PlateformeLogo p="lbc" />
-        <div style={{ fontWeight: 800, fontSize: 14, color: C.text }}>Achats Leboncoin{achats.length ? ` (${achats.length})` : ''}</div>
-      </div>
+      {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
+          Leboncoin (2) » sous l'onglet « Achats » de l'espace Leboncoin. */}
+      <h2 className="vrm-sr">Achats Leboncoin</h2>
       {/* Côté achat : « Reçus » = colis arrivé · « En route » = en cours de
           livraison. Deux chiffres, deux mots, jamais mélangés (comme les ventes). */}
       {actives.length > 0 && (
@@ -15968,7 +15980,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
             transporteur — qui ne dit pas de quelle plateforme vient le colis :
             il rejoint donc la liste « À retirer » des achats, comme ceux de
             Vinted. On le dit une fois, plutôt qu'un « en route » muet. */}
-        {enRoute.some(o => o.deliveryLabel) && <div data-lbc-code-ou="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Quand un colis arrive au point relais, son code de retrait vient de l’e-mail du transporteur : il s’affiche dans Achats → À retirer, avec les colis Vinted.</div>}
+        {enRoute.some(o => o.deliveryLabel) && <div data-lbc-code-ou="" style={{ fontSize: 11.5, color: C.muted, marginTop: 6, lineHeight: 1.45 }}><Pourquoi ecrit label="Où arrive le code de retrait ?">Quand un colis arrive au point relais, son code de retrait vient de l’e-mail du transporteur : il s’affiche dans Achats → À retirer, avec les colis Vinted.</Pourquoi></div>}
       </>)}
       {recus.length > 0 && (<>
         <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
@@ -18280,7 +18292,6 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande owner={AUTH.user?.id || 'installation'} key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
     {!cible && <FiltresVentes plateforme="ebay" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} doneLabel="Expédiées"/>}
-    {!cible && <div className="vrm-ebay-results" role="status">{visibles.length} commande{visibles.length>1?'s':''} affichée{visibles.length>1?'s':''}{(recherche || filtre!=='all') && <button type="button" onClick={()=>{setRecherche('');setFiltre('all');}}>Effacer les filtres</button>}</div>}
     {!cible && !visibles.length && <div className="vrm-ebay-empty"><b>Aucune commande dans cette sélection</b><p>Essaie un titre, un acheteur, une référence ou un numéro de commande.</p></div>}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
       {visibles.map((o, i) => {
@@ -18289,8 +18300,9 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const etat=etatCommandeEbay(o);
         const statut=etat.label;
 
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut}
-          etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span>{comptesEbay?.length>1 && <span data-ebay-ligne-compte="" style={{color:C.muted,fontWeight:500}}>{' · '}{o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}</span>}</>}
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
+          sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
+          etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
 
@@ -21157,11 +21169,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   };
   return wrap(<>
     {head(itemsVue.length)}
-    <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique} — ` : (melangeAnnonces ? `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay — ` : 'Tes annonces en ligne sur eBay — ')}touche une annonce pour la modifier</div>
+    {(compteUnique || melangeAnnonces) && <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique}.` : `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay.`}</div>}
     {conseils.length > 0 && (
       <div data-ebay-conseils={conseils.length} style={{ ...bloc(), marginBottom: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 800, color: E.text }}>À faire sur eBay</div>
-        <div style={{ fontSize: 11, color: E.muted, margin: '1px 0 6px' }}>Tes priorités du moment, de la plus urgente à la moins.</div>
         {conseils.slice(0, 4).map((c, i) => (
           <div key={c.k} data-ebay-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
             <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? E.warn : E.accentSoft, flexShrink: 0 }} />
@@ -46327,7 +46338,6 @@ function LeboncoinScreen() {
       {conseilsLbc.length > 0 && (
         <Card data-lbc-conseils={conseilsLbc.length} style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 13.5, fontWeight: 800, color: C.text }}>À faire sur Leboncoin</div>
-          <div style={{ fontSize: 11, color: C.muted, margin: '1px 0 6px' }}>Tes priorités du moment, de la plus urgente à la moins.</div>
           {conseilsLbc.slice(0, 4).map((c, i) => (
             <div key={c.k} data-lbc-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
               <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? C.warn : C.accentSoft, flexShrink: 0 }} />
@@ -46653,12 +46663,12 @@ function LeboncoinScreen() {
                 quatre fois (le zip, les codes de retrait, les places, eBay). */}
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>
               {extSait('lbctitre') === 'ok'
-                ? <>Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). L'extension y joint la description et les photos, puis publie sans option payante.</>
+                ? <Pourquoi ecrit label="Ce que VRM publie">Voici le titre <b>exactement tel qu'il partira</b> sur Leboncoin (50 caractères max, la taille à la fin). L'extension y joint la description et les photos, puis publie sans option payante.</Pourquoi>
                 : extSait('lbctitre') === 'absente'
                   /* Revue du 16 octobre : « la publication se fait depuis ton
                      ordinateur » était dit ici ET dans la ligne juste dessous
                      (`RaisonPublication`) — une cause, une phrase (§7). */
-                  ? <>Voici le titre <b>que VRM proposera</b> sur Leboncoin (50 caractères max, la taille à la fin).</>
+                  ? <Pourquoi ecrit label="Ce que VRM publie">Voici le titre <b>que VRM proposera</b> sur Leboncoin (50 caractères max, la taille à la fin).</Pourquoi>
                   : <>Voici le titre <b>que VRM propose</b>. ⚠️ <b>Ton extension est plus ancienne que la {EXT_CAPACITES.lbctitre}</b> : elle publiera encore l'ancien titre (coupé en plein mot). Mets-la à jour depuis Réglages pour que ce soit ce titre-là qui parte.</>}
             </div>
             {/* ⚠️ LA LISTE SE GROUPE SUR CE QU'IL PEUT FAIRE, pas sur le numéro.
@@ -52864,7 +52874,6 @@ function AppCoeur() {
           <Comptabilite key={'pv_'+platSub} accounts={vintedAccounts} only={platSub==='apercu'?'ventes':platSub} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme/>
         </section>)}
         {tab==='plat_leboncoin'&&(<section className="vrm-market-space" aria-label="Leboncoin"><EntetePlateforme nom="Leboncoin" plateforme="leboncoin"/>
-          <div style={{padding:'0 16px'}}><DiagnosticLeboncoin lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
@@ -52891,7 +52900,7 @@ function AppCoeur() {
                 { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
                 { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
                 { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
-              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? `Lu sur Leboncoin ${ilYaCourt(lbcVentes.maj)} — ouvre « Mes transactions » avec l'extension pour rafraîchir.` : null)}/>; })()}
+              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
           {platSub==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
@@ -52900,6 +52909,9 @@ function AppCoeur() {
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
           {platSub==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
+          {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
+              l'espace, plus une ligne en tête de chaque section. */}
+          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
         </section>)}
         {tab==='plat_ebay'&&(<section className="vrm-market-space" aria-label="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
