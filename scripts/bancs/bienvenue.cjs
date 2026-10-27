@@ -10,7 +10,7 @@ require('./_porte-banc.cjs');
 //   · « Écouter la visite » fait parler le navigateur en français, et la fin de
 //     la lecture passe à l'écran suivant ;
 //   · « Commencer » la ferme et la note vue : rechargée, elle ne revient pas ;
-//   · Réglages → « Présentation de VRM » la rouvre ;
+//   · Réglages ne la propose plus (27 oct., sa demande) ;
 //   · l'autre sens : un vendeur qui a déjà un compte Vinted ne la voit pas ;
 //   · changer d'écran rejoue une entrée en fondu, et rien si « réduire les animations ».
 'use strict';
@@ -109,11 +109,9 @@ async function page(nav, { telephone, comptes = [], reduit = false, tab = 'journ
       await pg.waitForTimeout(1500);
       await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3500);
       dit(await pg.locator('.vrm-bienvenue').count() === 0, `[${W}] rechargée, elle ne revient pas`);
-      // Réglages → la revoir.
+      // 27 oct. — Julien : « supprime Présentation de VRM dans les paramètres ».
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(3000);
-      const revoir = pg.locator('[data-reglage-bienvenue]');
-      if (await revoir.count()) { await revoir.first().scrollIntoViewIfNeeded(); await revoir.first().click(); await pg.waitForTimeout(500); }
-      dit(await etat() === 'univers', `[${W}] Réglages → « Présentation de VRM » la rouvre`, String(await etat()));
+      dit(await pg.locator('[data-reglage-bienvenue]').count() === 0 && !/Présentation de VRM/.test(await pg.evaluate(() => document.body.innerText)), `[${W}] Réglages ne propose plus « Présentation de VRM »`);
       await ctx.close();
       // L'autre sens : un vendeur qui a déjà un compte Vinted.
       const b = await page(nav, { telephone, comptes: [{ vinted_user_id: '777', login: 'vendeuse', owner: SESSION.user.id }] });

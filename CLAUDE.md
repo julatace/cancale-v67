@@ -18,7 +18,7 @@
 > de démonstration marqués « exemple », lus à voix haute sur demande (`speechSynthesis` du navigateur, fr-FR,
 > gratuit ; la fin de la lecture passe à l'écran suivant ; pas de voix ⇒ pas de bouton), puis « Commencer »
 > (Ma journée et ses premiers pas). Jamais le statut fiscal ni une plateforme imposés. Vue ⇒ `vrm_bienvenue_vue`
-> (SYNC_KEYS) ; Réglages → Affichage → « Présentation de VRM · Revoir » (`vrm:bienvenue`). `_porte-banc.cjs`
+> (SYNC_KEYS) ; Réglages ne la propose plus (retirée le 27 oct., sa demande). `_porte-banc.cjs`
 > la marque vue pour les autres bancs (sauf `vrm_banc_bienvenue`). Mouvement (`styles-mouvement.css`) : entrée
 > en fondu de 220 ms à chaque écran (classe rejouée sur `<main>`, rien remonté, animation sans remplissage),
 > boutons qui s'enfoncent, rien avec « réduire les animations ». Banc `bienvenue.cjs` (22 contrôles, 390/1512 ;
