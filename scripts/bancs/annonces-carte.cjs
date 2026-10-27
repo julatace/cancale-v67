@@ -122,7 +122,7 @@ const projette = (row, sel) => {
       });
       await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(4000);
-      if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});}
+      if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});const g=pg.locator('.vrm-ann-grid').first();if(await g.count())await g.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-fiches-'+vp.width+'.png')});}
       const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
       const c = await pg.evaluate(() => {
         const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: (() => { const k = el.cloneNode(true); k.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return k.outerHTML; })(), marques: [...el.querySelectorAll('[data-marque]')].map((m) => m.getAttribute('data-marque')).join(','), boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
@@ -260,9 +260,14 @@ const projette = (row, sel) => {
         await pg.getByRole('button',{name:'Réinitialiser les annonces',exact:true}).click();
         await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length>0);
         dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='', 'réinitialiser retrouve le stock sans recherche');
-        if(vp.width>=1024){
+        // (27 oct., Julien : « les annonces sont beaucoup trop petites, on ne voit
+        // même pas la première photo ») Les annonces sont des FICHES PRODUIT côte à
+        // côte, la première photo en grand — y compris au téléphone (deux par rangée).
+        {
           const premier=await pg.locator('.vrm-ann-card').nth(0).boundingBox(), suivant=await pg.locator('.vrm-ann-card').nth(1).boundingBox();
-          dit(Math.abs(premier.x-suivant.x)<2 && suivant.y>=premier.y+premier.height-1, 'ordinateur : annonces alignées dans une seule liste');
+          dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1, 'les annonces sont des fiches côte à côte', JSON.stringify({premier,suivant}));
+          const photo=await pg.locator('.vrm-ann-card').nth(0).locator('.vrm-ann-overview > a').boundingBox();
+          dit(photo && photo.height>=180 && photo.width>=premier.width-2, 'la première photo occupe toute la largeur de la fiche, en grand', photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 
       } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }

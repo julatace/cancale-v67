@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — les ANNONCES en fiches produit, la photo en grand :** Julien : « les annonces sont
+> beaucoup trop petites, on ne voit même pas la première photo… on est obligé d'appuyer dessus — fais ça
+> comme les pros ». Décision du 26 (« compacte ») RENVERSÉE : chaque annonce est une fiche (première photo
+> 4:5 sur toute la largeur, « Boostée » posé dessus, titre, prix + N°, état + logos, achat · mini · refus ·
+> Préparer, vues/favoris/âge, « Gérer l'annonce » en bas) ; grille de fiches sur ordinateur, deux par rangée
+> au téléphone ; une fiche dépliée prend toute la largeur. `src/styles-annonces-pro.css` chargé EN DERNIER
+> (aucun JSX touché, tous les `data-*` gardés) ; entrée en fondu décalé, soulèvement au survol (souris
+> seule), rien si « réduire les animations ». Cibles 44 px gardées. Bancs : `annonces-carte` (fiches côte à
+> côte, photo pleine largeur), `annonces-ventes-brouillon` (photo ≥ 180 px, 1ʳᵉ annonce ≤ 680 px : 4 rouges
+> sur main — 84 px, 685/707 —, vert après), `plateformes-premium` vert.
+
 > **27 octobre (soir) — le STATUT FISCAL s'adapte à la personne, et les vrais taux :** Julien : « des gens
 > sont en société, d'autres pas revendeurs ; ils n'ont pas besoin du taux URSSAF » et « base-toi sur de
 > vrais taux ». Mesuré : 4 vendeurs sur 6 n'avaient JAMAIS choisi de régime et recevaient le rappel
