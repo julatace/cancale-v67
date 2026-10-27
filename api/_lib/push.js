@@ -99,6 +99,7 @@ export const PUSH_DEFAUT = {
   argent:   true,   // virement reçu
   colis:    true,   // colis à retirer (porte le code de retrait)
   offre:    true,   // une offre attend une réponse
+  offremini: true,  // une offre a passé ton prix mini — à accepter en 1 tap (api/ship-reminders.js)
   expedier: true,   // colis à poster (rappel quotidien)
   soir:     true,   // la veille au soir : « Demain : N colis à poster » (api/ship-reminders.js?moment=soir)
   urssaf:   true,   // rappel de déclaration, le 1er du mois
