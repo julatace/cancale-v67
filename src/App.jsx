@@ -5019,7 +5019,7 @@ const fetchResumesConversations = async () => {
 const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
 // (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
 // `description` d'une conversation de la boîte est le dernier message, pas la paire.
-const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,titre:data->payload->conversation->transaction->>item_title,msgs:data->payload->conversation->messages';
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages';
 const fetchOffresConversations = async () => {
   try {
     const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
@@ -5030,7 +5030,7 @@ const fetchOffresConversations = async () => {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
       if (!m || mr.has(m[1])) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
-      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '' });
+      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null });
     }
     return out;
   } catch (_) { return null; }
@@ -42322,6 +42322,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
           };
           const nOffres = liste.filter(c=>offreDeConv(c)).length;
+          // (27 oct.) Offres ≥ au prix mini posé sur l'annonce (par identité, l'item_id,
+          // §5) : on les surface pour les accepter en 1 tap, sans ouvrir chaque fil.
+          // Rien n'est accepté tout seul — c'est le tap dans le fil qui vend (§3).
+          const auMini = (c)=>{ const o=offreDeConv(c); if(!o||o.item==null) return false; const mn=Number(String((numeros[String(o.item)]||{}).min ?? '').replace(',','.')); return isFinite(mn)&&mn>0&&o.prix>=mn; };
+          const nAuDessusMini = liste.filter(auMini).length;
           // ⚠️ (16 octobre) Depuis qu'un choix EXPLICITE filtre la liste
           //    (13 octobre), `liste` ne porte plus les autres comptes : compté
           //    dessus, ce nombre valait toujours 0, et l'en-tête passait à « tout
@@ -42401,6 +42406,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Réessaie avec « ↻ Actualiser » ; si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
                   </span>
                 </div>
+              )}
+              {nAuDessusMini>0 && messageFilter!=='offres' && (
+                <button type="button" data-offres-au-mini={nAuDessusMini} onClick={()=>{setMessageFilter('offres');setConvMax(40);}} style={{display:'flex',gap:8,alignItems:'center',width:'100%',textAlign:'left',fontSize:12.5,color:C.text,lineHeight:1.4,border:`1px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:8,padding:'9px 11px',marginBottom:10,cursor:'pointer'}}>
+                  <span aria-hidden="true" style={{flexShrink:0}}><Icon name="tag" size={15} style={{color:C.accent}}/></span>
+                  <span><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — ouvre-la{nAuDessusMini>1?'s':''} pour accepter en 1 tap. <span style={{color:C.muted}}>Rien n'est accepté tout seul.</span></span>
+                </button>
               )}
               {boitesPerimees.length>0 && (
                 <div data-boites-perimees={boitesPerimees.map(b=>String(b.acc.vinted_user_id)).join(',')} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:12.5,color:C.text,lineHeight:1.45,border:`1px solid ${C.warn}55`,background:`${C.warn}0e`,borderRadius:8,padding:'8px 11px',marginBottom:10}}>
