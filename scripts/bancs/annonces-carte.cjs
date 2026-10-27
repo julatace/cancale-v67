@@ -281,6 +281,35 @@ const projette = (row, sel) => {
         failSale = false;
         dit(garde.includes('9101'), 'un échec de lecture des emails de vente n’efface PAS vinted_annonces_email_sold (pas de double vente)', JSON.stringify(garde));
       } catch (e) { dit(false, 'scénario « lecture email de vente ratée »', String(e.message).slice(0, 120)); }
+      // ── ATELIER tranche 1 : préparer un brouillon VRM (9101 → N°41) ──────────
+      // Non destructif : ouvrir la modale depuis la carte, éditer titre+prix,
+      // enregistrer ; le brouillon doit être gardé AVEC le N° (jamais recréé, §5)
+      // et la carte doit ensuite porter le badge « Brouillon VRM ».
+      try {
+        const ouvrir = pg.locator('[data-carte-annonce="9101"] [data-atelier-ouvrir]').first();
+        dit(await ouvrir.count() > 0, 'carte : le bouton « Préparer » (atelier) est présent');
+        if (await ouvrir.count() > 0) {
+          await ouvrir.click();
+          const modal = pg.locator('[data-atelier-brouillon]');
+          await modal.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+          const ouverte = await modal.count() > 0;
+          dit(ouverte, 'clic « Préparer » ⇒ la modale d’atelier s’ouvre');
+          if (ouverte) {
+            dit(/N°\s*41/.test(await modal.first().innerText()), 'la modale montre le N° VRM conservé (41)');
+            await pg.locator('[data-atelier-titre]').fill('Nike Air Max 1 obsidian — remis en ligne');
+            await pg.locator('[data-atelier-prix]').fill('54');
+            await pg.locator('[data-atelier-enregistrer]').click();
+            await pg.waitForTimeout(900);   // `save` écrit le localStorage après un anti-rebond de 500 ms
+            const d = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_drafts') || '{}'); } catch (_) { return {}; } });
+            const e41 = d['41'] || {};
+            dit(e41.title === 'Nike Air Max 1 obsidian — remis en ligne' && Number(e41.price) === 54, 'le brouillon est enregistré avec le titre et le prix édités', JSON.stringify(e41).slice(0, 120));
+            dit(e41.numero === '41', 'le N° VRM est conservé dans le brouillon (jamais recréé)', String(e41.numero));
+            dit(Array.isArray(e41.photos), 'les photos de l’annonce sont gardées dans le brouillon');
+            await pg.waitForTimeout(600);
+            dit(await pg.locator('[data-carte-annonce="9101"] [data-brouillon-vrm]').count() > 0, 'la carte porte ensuite le badge « Brouillon VRM »');
+          }
+        }
+      } catch (e) { dit(false, 'scénario « atelier — brouillon VRM »', String(e.message).slice(0, 140)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }

@@ -10794,6 +10794,57 @@ function CountUp({ value, format, duration = 950, style }) {
 // doublon (refus tenu, cf. dossier). ⚠️ On ne charge pas l'image CDN de Vinted
 // dans le canvas : cross-origin → canvas « tainted » → export interdit. On
 // travaille donc sur un fichier local (aucun souci CORS).
+// ── ATELIER DE REPUBLICATION — tranche 1 : préparer un brouillon VRM ─────────
+// Modale NON destructive : on prépare le titre et le prix d'une annonce, on voit
+// ses photos et son N° (qui ne change jamais, §5), on enregistre un brouillon
+// DANS VRM. Rien n'est envoyé à Vinted ici — c'est le socle ; la publication et
+// le retrait réels viennent dans une tranche ultérieure, sur confirmation.
+function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
+  const prix0 = (it && it.price && typeof it.price === 'object') ? it.price.amount : (it && it.price);
+  const [title, setTitle] = useState(draft && draft.title != null ? draft.title : (it.title || ''));
+  const [price, setPrice] = useState(() => { const p = draft && draft.price != null ? draft.price : prix0; return p == null ? '' : String(p); });
+  const [done, setDone] = useState(false);
+  const photos = ((draft && draft.photos && draft.photos.length) ? draft.photos
+    : (Array.isArray(it.photos) && it.photos.length ? it.photos : [it.photo])).filter(Boolean);
+  const prixNum = String(price).trim() === '' ? null : Number(String(price).replace(',', '.'));
+  const prixOk = isFinite(prixNum) && prixNum > 0;
+  const manques = [];
+  if (!String(title).trim()) manques.push('le titre');
+  if (!prixOk) manques.push('le prix');
+  if (!photos.length) manques.push('au moins une photo');
+  const enregistrer = () => { onSave({ title: String(title).trim(), price: prixOk ? prixNum : null, photos, id: it.id }); setDone(true); setTimeout(onClose, 700); };
+  const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
+  return (
+    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={ev => ev.stopPropagation()} data-atelier-brouillon={k} style={{ background: C.bg, width: '100%', maxWidth: 560, maxHeight: '92vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Préparer l'annonce</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Brouillon gardé dans VRM — <b>rien n'est envoyé à Vinted</b>. Le N° de l'article ne change pas.</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.muted }}>
+            <span style={{ flexShrink: 0, fontWeight: 700, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 8, padding: '2px 8px' }}>N°{(e && e.numero) || '—'}</span>
+            <span>conservé — une republication ne lui donne jamais un nouveau numéro.</span>
+          </div>
+          {photos.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{photos.slice(0, 12).map((p, i) => (<div key={i} style={{ width: 54, height: 70, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}><PhotoVinted src={p} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>))}</div>}
+          <label style={{ display: 'block' }}><span style={maj}>Titre</span>
+            <textarea value={title} onChange={ev => setTitle(ev.target.value)} rows={2} data-atelier-titre style={{ ...champ, resize: 'vertical' }} /></label>
+          <label style={{ display: 'block' }}><span style={maj}>Prix (€)</span>
+            <input value={price} onChange={ev => setPrice(ev.target.value)} inputMode="decimal" data-atelier-prix style={{ ...champ, maxWidth: 160 }} /></label>
+          {manques.length > 0 && <div data-atelier-manque style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>À compléter avant de publier : {manques.join(', ')}.</div>}
+          {draft && <div style={{ fontSize: 11.5, color: C.muted }}>Dernier brouillon{draft.updatedAt ? ` le ${new Date(draft.updatedAt).toLocaleDateString('fr-FR')}` : ''}{draft.versions && draft.versions.length ? ` · ${draft.versions.length} version${draft.versions.length > 1 ? 's' : ''} gardée${draft.versions.length > 1 ? 's' : ''}` : ''}.</div>}
+          <button type="button" data-atelier-enregistrer onClick={enregistrer} disabled={done}
+            style={{ border: `1px solid ${C.accent}`, background: done ? C.accent : `${C.accent}12`, color: done ? '#fff' : C.accent, borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {done ? '✓ Brouillon enregistré' : '💾 Enregistrer le brouillon'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
   const [img, setImg] = useState(null);          // HTMLImageElement chargée
   const [zoom, setZoom] = useState(1);
@@ -31696,6 +31747,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  données du nuage au passage d'un écran.)
   const [repubAi, setRepubAi] = useState({ busy:false, key:'', res:null, why:'', reason:'' }); // état de la rédaction IA
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
+  // ══ ATELIER DE REPUBLICATION — TRANCHE 1 : brouillon VRM (socle, non destructif) ══
+  // Préparer/conserver le contenu d'une annonce DANS VRM, sans rien toucher sur
+  // Vinted. Clé = N° VRM (sinon id d'annonce — le N° ne change JAMAIS, §5).
+  // Valeur = { title, price, photos:[url], numero, id, versions:[…], updatedAt }.
+  // Synchronisé (`vinted_annonce_drafts`). ⚠️ CARTE : au retour du nuage on
+  // FUSIONNE (une clé éditée pendant le chargement n'est jamais écrasée, §5.49).
+  const [drafts, setDrafts] = useState(() => { const d = load('vinted_annonce_drafts', {}); return d && typeof d === 'object' && !Array.isArray(d) ? d : {}; });
+  React.useEffect(() => onCloudReady(() => setDrafts(local => { const nu = load('vinted_annonce_drafts', {}) || {}; return { ...nu, ...(local || {}) }; })), []);
+  const [atelier, setAtelier] = useState(null); // id de l'annonce en préparation, ou null
+  // Enregistre/complète un brouillon sans jamais perdre l'ancienne version (§31).
+  // `patch` ne remplace que ce qu'il porte ; le reste (et surtout le N°) est gardé.
+  const saveDraft = (key, patch) => {
+    const k = String(key || '').trim(); if (!k) return;
+    setDrafts(prev => {
+      const cur = prev[k] || {};
+      const avant = (cur.title != null || cur.price != null || cur.desc != null)
+        ? [{ title: cur.title, price: cur.price, desc: cur.desc, at: cur.updatedAt }] : [];
+      const versions = [...avant, ...(Array.isArray(cur.versions) ? cur.versions : [])].slice(0, 10);
+      const next = { ...prev, [k]: { ...cur, ...patch, numero: cur.numero || k, versions, updatedAt: new Date().toISOString() } };
+      save('vinted_annonce_drafts', next); return next;
+    });
+  };
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -42458,6 +42531,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(()=>{ const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.')); return (
                       <span style={pillEdit} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)"><span style={lab}>{'refuse <'}</span><EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
                         titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={val}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/></span>); })()}
+                      {(()=>{ const kd=String((e&&e.numero)||item.id); const d=drafts[kd]; return (<>
+                        <button type="button" data-atelier-ouvrir={kd} onClick={()=>setAtelier(item.id)}
+                          style={{...pillEdit,cursor:'pointer',border:`1px solid ${d?C.accent:C.border}`,color:d?C.accent:C.text,fontWeight:600}}
+                          title="Préparer cette annonce dans VRM — un brouillon, sans rien toucher sur Vinted">✨ Préparer</button>
+                        {d && <span data-brouillon-vrm={kd} title={`Brouillon VRM enregistré${d.updatedAt?` le ${new Date(d.updatedAt).toLocaleDateString('fr-FR')}`:''}`} style={{...pillEdit,color:C.accent,border:`1px solid ${C.accent}`,fontWeight:700}}>Brouillon VRM</span>}
+                      </>); })()}
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>
@@ -45157,6 +45236,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Éditeur de photo (recadrer / zoomer) — retouche manuelle, Julien
              téléverse lui-même sur Vinted. Aucune modif auto (refus tenu). ── */}
       {photoEdit && <PhotoEditor refPhoto={photoEdit.refPhoto} refTitle={photoEdit.refTitle} onClose={()=>setPhotoEdit(null)} toast={toast} />}
+      {atelier!=null && (()=>{ const it=(listings.items||[]).find(x=>String(x.id)===String(atelier)); if(!it) return null; const e=numeros[atelier]||{}; const k=String((e&&e.numero)||atelier); return (
+        <AtelierBrouillon it={it} e={e} k={k} draft={drafts[k]} onSave={(p)=>saveDraft(k,p)} onClose={()=>setAtelier(null)} />
+      ); })()}
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
