@@ -10,6 +10,9 @@
 //  3. le Stock dit « Sortis du stock car partis » avec les deux, et « Remettre »
 //     la remet dans sa case ; elle n'est plus retirée au passage suivant ;
 //  4. « pas su » : ventes illisibles ⇒ rien ne bouge.
+//  5. (même jour) Leboncoin et eBay : N°48 (Leboncoin « Colis envoyé », relié à la
+//     main) et N°49 (eBay « Expédiée », SKU VRM-49) sortent ; N°50 et N°51, à
+//     envoyer, restent.
 const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -21,7 +24,7 @@ const iso = (h) => new Date(now - h * 3600e3).toISOString();
 
 const PLAN = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 'm1', type: 'metal', name: 'Étagère B', x: 0.2, y: 0.1, w: 1.2, h: 0.5, rows: 5, cols: 2, h3d: 1.25,
-    slots: { '0_0': ['41'], '1_0': ['42'], '2_0': ['43'], '3_0': ['44'], '0_1': ['46'] } },
+    slots: { '0_0': ['41'], '1_0': ['42'], '2_0': ['43'], '3_0': ['44'], '0_1': ['46'], '4_0': ['48'], '4_1': ['50'], '1_1': ['49'], '2_1': ['51'] } },
   { id: 'p1', type: 'pile', name: 'Cartons au sol', x: 3, y: 2, w: 1.5, h: 0.5, rows: 3, cols: 3, cell: 0.5, h3d: 0.34, nums: ['45', '47'], lift: 0 },
 ] }], active: 'r1' };
 const vente = (tx, titre, status) => ({ transaction_id: tx, title: titre, status, price: { amount: '40.0', currency_code: 'EUR' }, date: iso(48) });
@@ -30,10 +33,17 @@ const VENTES = [vente(9001, 'Paire quarante et un', 'Commande finalisée'), vent
   vente(9005, 'Paire quarante-cinq', 'Colis livré'), vente(9006, 'Paire quarante-six', 'Retour initié')];
 const OV = { '9001': { numero: '41' }, '9002': { numero: '42' }, '9003': { numero: '43' }, '9004': { numero: '44' }, '9005': { numero: '45' }, '9006': { numero: '46' } };
 const ANN = { id: 7044, title: 'Paire quarante-quatre', price: { amount: '40.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: null, status: 'Très bon état', nPhotos: 3 };
-const FICHES = { '7044': { numero: '44' }, '7047': { numero: '47' } };
+const FICHES = { '7044': { numero: '44' }, '7047': { numero: '47' }, '7048': { numero: '48' }, '7049': { numero: '49' }, '7050': { numero: '50' }, '7051': { numero: '51' } };
+// Leboncoin : reliées à la main (`vrm_lbc_liens`) ; eBay : par le SKU VRM-{n°}.
+const LBC = { L1: { txId: 'L1', id: 'L1', itemId: '601', isSeller: true, price: 5000, parcelStatus: 'in_transit', stepLabel: 'Colis envoyé', title: 'Paire quarante-huit LBC' },
+  L2: { txId: 'L2', id: 'L2', itemId: '602', isSeller: true, price: 5000, stepLabel: 'À envoyer', title: 'Paire cinquante LBC' } };
+const cmdEbay = (orderId, sku, ful) => ({ orderId, orderPaymentStatus: 'PAID', orderFulfillmentStatus: ful, creationDate: iso(30), pricingSummary: { total: { value: '60.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '55.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '5.00', currency: 'EUR' }, lineItems: [{ sku, legacyItemId: '9' + orderId.replace(/\D/g, ''), title: 'Paire ' + sku + ' eBay' }] });
+const EBAY = [cmdEbay('E-49', 'VRM-49', 'FULFILLED'), cmdEbay('E-51', 'VRM-51', 'NOT_STARTED')];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: iso(0), created_at: iso(500) }];
 const lignes = () => [
-  { id: 'main', data: { vinted_annonce_numeros: FICHES, vinted_sale_overrides: OV } },
+  { id: 'main', data: { vinted_annonce_numeros: FICHES, vinted_sale_overrides: OV, vrm_lbc_liens: { '601': '48', '602': '50' } } },
+  { id: 'lbc_ventes', data: { ventes: LBC } },
+  { id: 'ebay_orders', data: { orders: EBAY, capturedAt: iso(0.1) } },
   { id: 'vrm_room', data: JSON.parse(JSON.stringify(PLAN)) },
   { id: 'harvest_111_listings', data: { uid: '111', capturedAt: iso(0.1), nItems: 1, payload: { items: [ANN], pagination: { total_entries: 1, total_pages: 1 } } } },
   { id: 'harvest_111_orders_sold', data: { uid: '111', capturedAt: iso(0.1), nItems: VENTES.length, payload: { my_orders: VENTES, pagination: { total_pages: 1 } } } },
@@ -104,18 +114,22 @@ const attendre = async (fn, ms = 20000) => { const t0 = Date.now(); while (Date.
     const T = ' [' + vp.width + ']';
     try {
       const { ctx, pg, errs, L } = await rendre(b, vp);
-      const sorti = await attendre(() => !posesDuPlan(planNuage(L)).includes('41'), 25000);
+      const sorti = await attendre(() => { const p = posesDuPlan(planNuage(L)); return !p.includes('41') && !p.includes('48') && !p.includes('49'); }, 25000);
       await pg.waitForTimeout(800);
       const poses = posesDuPlan(planNuage(L));
       dit(sorti && !poses.includes('41'), 'N°41 (« Commande finalisée ») sort de sa case, au nuage' + T, poses.join(','));
       dit(!poses.includes('45') && poses.includes('47'), 'N°45 (« Colis livré ») sort de la pile, N°47 reste' + T, poses.join(','));
       dit(['42', '43', '44', '46'].every((n) => poses.includes(n)), 'restent : à poster (42), annulée (43), encore en ligne (44), retour (46)' + T, poses.join(','));
+      dit(!poses.includes('48') && !poses.includes('49'), 'N°48 (Leboncoin « Colis envoyé ») et N°49 (eBay « Expédiée ») sortent' + T, poses.join(','));
+      dit(poses.includes('50') && poses.includes('51'), 'restent : N°50 (Leboncoin à envoyer) et N°51 (eBay à expédier)' + T, poses.join(','));
       const main = (L.find((r) => r.id === 'main') || {}).data || {};
       dit(JSON.stringify((main.vinted_sale_overrides || OV)['9001']) === JSON.stringify({ numero: '41' }), 'la vente garde son numéro (41)' + T);
       await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
       const vu = await pg.waitForSelector('[data-stock-sortis]', { timeout: 30000 }).then(() => true).catch(() => false);
       const liste = vu ? await pg.$$eval('[data-stock-sorti]', (els) => els.map((e) => e.getAttribute('data-stock-sorti')).sort().join(',')) : '';
-      dit(liste === '41,45', 'le Stock dit « Sortis du stock car partis » : N°41 et N°45' + T, liste);
+      dit(liste === '41,45,48,49', 'le Stock dit « Sortis du stock car partis » : N°41, 45, 48, 49' + T, liste);
+      const tE = vu ? await pg.$eval('[data-stock-sorti="49"]', (e) => e.innerText).catch(() => '') : '';
+      dit(/eBay : Expédiée/.test(tE), 'la ligne eBay dit ce que dit eBay' + T, tE.replace(/\s+/g, ' '));
       const txt = vu ? await pg.$eval('[data-stock-sorti="41"]', (e) => e.innerText) : '';
       dit(/Étagère B/.test(txt) && /Commande finalisée/.test(txt), 'la ligne dit d’où elle sort et ce que dit Vinted' + T, txt.replace(/\s+/g, ' '));
       const h = vu ? await pg.$eval('[data-stock-remettre="41"]', (e) => e.getBoundingClientRect().height) : 0;
