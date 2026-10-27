@@ -288,9 +288,14 @@
     const pied = doigt
       ? (v && v.connecte ? '' : '<b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.')
       : v && v.connecte ? 'Clique sur le logo pour <b>ouvrir VRM</b>.' : 'Clique sur le logo : <b>VRM s’ouvre et connecte l’extension</b> — rien à taper ici.';
-    const gesteDoigt = doigt
-      ? `<button class="b" data-ouvrir-vrm>${v && v.connecte ? 'Ouvrir VRM' : 'Se connecter avec VRM'}</button>`
-      : '';
+    // Julien, 27 oct. : « je veux pouvoir me connecter à mon compte VRM depuis
+    // Vestiaire et Leboncoin aussi ». Les gestes sont dans la carte sur TOUS
+    // les sites et à la souris comme au doigt ; « Changer de compte VRM » ouvre
+    // VRM, qui relie l'extension au compte connecté DANS l'app (la session est
+    // celle du navigateur : elle vaut pour Vinted, Leboncoin et Vestiaire).
+    const gesteDoigt = v && v.connecte
+      ? `<div class="gestes">${doigt ? '<button class="b" data-ouvrir-vrm>Ouvrir VRM</button>' : ''}<button class="b sec" data-changer-vrm>Changer de compte VRM</button></div>`
+      : `<button class="b" data-ouvrir-vrm>Se connecter avec VRM</button>`;
     carte.classList.toggle('doigt', doigt);
     poserHtml(carte, `${doigt ? '<button class="fermer" data-fermer-carte title="Fermer" aria-label="Fermer">×</button>' : ''}<div class="tete"><b>VRM</b><span class="ver">${e.version ? 'extension ' + esc(e.version) : ''}</span></div>
       ${lignePerime}
@@ -302,6 +307,8 @@
       ${bascule}
       ${pied ? `<div class="pied">${pied}</div>` : ''}
       ${gesteDoigt}`);
+    const changer = carte.querySelector('[data-changer-vrm]');
+    if (changer) changer.addEventListener('click', () => { carte.classList.remove('on'); lierVRM(); });
     const ouvrir = carte.querySelector('[data-ouvrir-vrm]');
     if (ouvrir) ouvrir.addEventListener('click', () => { carte.classList.remove('on'); actionLogo(); });
     const fermerC = carte.querySelector('[data-fermer-carte]');
@@ -411,6 +418,9 @@
     //    connexion) lui adresse sa session. La carte de mot de passe ne revient
     //    qu'en secours, si le service worker ne sait pas faire la liaison
     //    (code périmé : il ne connaît pas ce message).
+    lierVRM();
+  }
+  function lierVRM() {
     let repondu = false;
     const secours = setTimeout(() => { if (!repondu) ouvrirConnexion(); }, 2500);
     try {
