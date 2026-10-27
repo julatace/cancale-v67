@@ -1,5 +1,23 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — Vestiaire : publier tout seul SANS BOOSTER, et le boost lu (5.236) :** Julien :
+> « je veux que ça publie tout seul sans booster » et « l'extension doit sur Vestiaire, comme pour Vinted
+> et Leboncoin, capter si des annonces ont été boostées ». `vc-depot.js` `publierSansBooster` (copie des
+> gardes de `lbc.js`) : feu vert `ad.publier` (posé par le fond, `msg.publier !== false`), photos
+> attachées d'abord, un champ OBLIGATOIRE vide (catégorie, modèle) ⇒ attend et le NOMME, prix de la page
+> = prix de VRM, options payantes (nom boost/promot/featur/sponsor/vitrine/mise en avant… ou libellé à
+> prix hors livraison) décochées puis relues deux fois, bouton publier/soumettre jamais à prix, jamais
+> dans la carte d'une option, un clic par onglet (`sessionStorage`), « publiée » notée SEULEMENT sur
+> confirmation vue (`action: 'publiee'`, onglet du dépôt), formulaire refusé (`aria-invalid`) ⇒ clic
+> rendu, 3 essais. Le boost : `vc-inject.js` lit `users/me/product-listings` (seule liste vue, vide au
+> relevé du 26 : FORME JAMAIS VUE) — id, boost sur une clé dont le NOM le dit (sinon `null`, « pas
+> su »), la référence `VRM-{n°}` seule ; l'id d'une annonce CRÉÉE dans l'onglet du dépôt la relie à la
+> paire (`vcPublie`). Rangé dans `vc_listings` (`rangerVcAnnonces`, une écriture à la fois, lecture
+> ratée ⇒ rien ; liste entière ⇒ remplace, page partielle ⇒ complète). App : « Publier sur Vestiaire »
+> (`extSait('vcauto')`, 5.236), « N annonces … : X boostées (N°…) », « Déjà sur Vestiaire · boostée ».
+> `audit-vc-publier.cjs` 50 (mutations : bouton à prix, décochage, obligatoires, prix, boost null ⇒ rouges).
+> ⚠️ Non mesuré : le vrai formulaire et la vraie réponse de Vestiaire (bloqués d'ici).
+
 > **27 octobre — Vestiaire Collective depuis VRM (5.235) :** Julien : « je veux pouvoir le faire
 > sur VRM directement, pouvoir publier ». Écran Vestiaire → « Mettre une paire en vente » : les paires
 > en ligne et numérotées (`useEbayPaires`, §11), « Préparer sur Vestiaire » (`vcPreparer`, l'id SEUL)
