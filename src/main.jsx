@@ -80,6 +80,7 @@ import './styles-annonces-pro.css';
 import './styles-mouvement.css';
 import './styles-bienvenue.css';
 import './styles-disposition.css';
+import './styles-telephone.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

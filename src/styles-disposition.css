@@ -61,3 +61,65 @@
   .vrm-main button, .vrm-day-layout .vrm-day-bar > button { transition: none; }
   .vrm-main button:not(:disabled):active, .vrm-day-layout .vrm-day-bar > button:hover { transform: none; }
 }
+
+/* ── Effets (27 oct., Julien : « mets des effets ») ───────────────────────────
+   Transform et opacité seulement ; les entrées n'ont AUCUN remplissage après la
+   fin (`backwards`) : rien ne reste posé sur les cartes une fois arrivées (pas de
+   contexte d'empilement durable, §7). Tout s'éteint avec « réduire les animations ». */
+
+/* 1. Ma journée : les cartes arrivent en cascade, les tuiles d'abord. */
+.vrm-day-layout .vrm-day-bar > button { animation: vrm-fx-monte .42s cubic-bezier(.23,1,.32,1) backwards; }
+.vrm-day-layout .vrm-day-bar > button:nth-child(2) { animation-delay: .04s; }
+.vrm-day-layout .vrm-day-bar > button:nth-child(3) { animation-delay: .08s; }
+.vrm-day-layout .vrm-day-bar > button:nth-child(4) { animation-delay: .12s; }
+.vrm-widgets .vrm-widget { animation: vrm-fx-monte .5s cubic-bezier(.23,1,.32,1) backwards; }
+.vrm-widgets .vrm-widget:nth-child(2) { animation-delay: .06s; }
+.vrm-widgets .vrm-widget:nth-child(3) { animation-delay: .12s; }
+.vrm-widgets .vrm-widget:nth-child(4) { animation-delay: .18s; }
+.vrm-widgets .vrm-widget:nth-child(5) { animation-delay: .24s; }
+.vrm-widgets .vrm-widget:nth-child(n+6) { animation-delay: .3s; }
+@keyframes vrm-fx-monte { from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.985); } }
+
+/* 2. Les grands chiffres des tuiles « sautent » doucement à l'arrivée. */
+.vrm-day-layout .vrm-day-bar-n { display: inline-block; animation: vrm-fx-chiffre .5s cubic-bezier(.34,1.56,.64,1) .18s backwards; }
+@keyframes vrm-fx-chiffre { from { opacity: 0; transform: translate3d(0, 6px, 0) scale(.8); } }
+
+/* 3. Barre du bas (téléphone) : l'icône de l'onglet choisi fait un petit rebond. */
+.vrm-tab[aria-current="page"] .vrm-tab-ic { animation: vrm-fx-rebond .38s cubic-bezier(.34,1.56,.64,1); }
+@keyframes vrm-fx-rebond { 0% { transform: scale(.82); } 60% { transform: scale(1.08); } 100% { transform: none; } }
+
+/* 4. Ordinateur : les cartes se soulèvent au survol, le bouton principal brille. */
+@media (hover: hover) and (pointer: fine) {
+  .vrm-widgets:not([data-edition]) .vrm-widget > .vrm-widget-in > * { transition: transform .2s cubic-bezier(.23,1,.32,1), box-shadow .2s ease; }
+  .vrm-widgets:not([data-edition]) .vrm-widget:hover > .vrm-widget-in > :is(.vrm-day-card, .vrm-day-week, .vrm-day-money) {
+    transform: translateY(-3px); box-shadow: 0 2px 6px rgba(25,59,67,.06), 0 18px 40px rgba(25,59,67,.11) !important;
+  }
+  .vrm-button { position: relative; overflow: hidden; }
+  .vrm-button::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.22) 50%, transparent 65%);
+    transform: translateX(-120%);
+  }
+  .vrm-button:hover:not(:disabled)::after { transform: translateX(120%); transition: transform .6s cubic-bezier(.23,1,.32,1); }
+  .vrm-sidebar-link { transition: background-color .15s ease, color .15s ease, transform .15s cubic-bezier(.23,1,.32,1); }
+  .vrm-sidebar-link:hover { transform: translateX(2px); }
+}
+
+/* 5. Le trait de l'écran actif du rail apparaît en glissant. */
+.vrm-sidebar-link[aria-current="page"]::before { animation: vrm-fx-trait .3s cubic-bezier(.23,1,.32,1); transform-origin: center; }
+@keyframes vrm-fx-trait { from { transform: scaleY(0); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-day-layout .vrm-day-bar > button, .vrm-widgets .vrm-widget, .vrm-day-layout .vrm-day-bar-n,
+  .vrm-tab[aria-current="page"] .vrm-tab-ic, .vrm-sidebar-link[aria-current="page"]::before { animation: none !important; }
+  .vrm-button::after { display: none; }
+  .vrm-widgets .vrm-widget:hover > .vrm-widget-in > *, .vrm-sidebar-link:hover { transform: none !important; }
+}
+
+/* Ordinateur : le halo posé sur <main> (styles-gestion) s'arrêtait net en haut
+   (sous la barre d'actions) et à droite — on lisait un « panneau » pâle fantôme
+   derrière chaque écran. La page reste unie ; le téléphone garde son grain. */
+@media (min-width: 768px) { .vrm-app-shell .vrm-main { background-image: none !important; } }
+
+/* Vinted : « À faire aujourd'hui » et le choix du compte se touchaient (2 px). */
+.vrm-market-space .vrm-compte-choix { margin-top: 10px; }
