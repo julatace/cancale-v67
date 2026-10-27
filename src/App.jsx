@@ -27832,6 +27832,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
   const telNorm = (t) => { const d = String(t || '').replace(/\D/g, ''); return d.startsWith('33') && d.length === 11 ? '0' + d.slice(2) : d; };
   const [reput, setReput] = useState({}); // { uid: { rating, count, pos, neg } } — note vendeur captée
   const [typesProfil, setTypesProfil] = useState({}); // { uid: true (pro) | false (particulier) } — lu dans le profil capté
+  const [photosProfil, setPhotosProfil] = useState({}); // { uid: adresse de la photo de profil Vinted } — lue dans le profil capté
   const setAcctEmail = (uid, val) => {
     const conflit=conflitAdresseCompte(acctEmails,uid,val);
     if(conflit){const autre=accounts.find(a=>String(a.vinted_user_id)===conflit);toast(`Cette adresse est déjà associée à ${autre?.login||'un autre compte Vinted'}. Chaque compte doit avoir son adresse.`);return;}
@@ -27861,6 +27862,20 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
         }
       });
       if (Object.keys(rep).length) setReput(rep);
+      // Photo de profil Vinted (Julien, 27 oct. : « dans Comptes liés, la photo
+      // de profil, pour tous les comptes »). Le profil capté la porte déjà ;
+      // un compte sans photo sur Vinted garde son initiale.
+      const ph = {};
+      rows.forEach(r => {
+        const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
+        const photo = r.data && r.data.payload && r.data.payload.user && r.data.payload.user.photo;
+        if (!uid || !photo || typeof photo !== 'object') return;
+        const th = Array.isArray(photo.thumbnails) ? photo.thumbnails : [];
+        const petit = th.find(t => t && /100|150|thumb/.test(String(t.type || '')) && t.url);
+        const u = (petit && petit.url) || photo.url || photo.full_size_url || '';
+        if (/^https:\/\//.test(u)) ph[uid] = u;
+      });
+      if (Object.keys(ph).length) setPhotosProfil(ph);
       const typ = {};
       rows.forEach(r => {
         const uid = String((r.data && r.data.uid) || ((r.id || '').match(/^harvest_(\d+)_profile$/) || [])[1] || '');
@@ -28247,8 +28262,10 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
             return (
               <div key={acc.vinted_user_id} style={{borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
                 <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
-                  <span style={{width:36,height:36,flexShrink:0,borderRadius:8,background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
-                    {accountName(acc).slice(0,1).toUpperCase()}
+                  <span data-compte-photo={photosProfil[String(acc.vinted_user_id)] ? 'oui' : 'non'} style={{width:40,height:40,flexShrink:0,borderRadius:999,overflow:'hidden',background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
+                    {photosProfil[String(acc.vinted_user_id)]
+                      ? <PhotoVinted src={photosProfil[String(acc.vinted_user_id)]} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      : accountName(acc).slice(0,1).toUpperCase()}
                   </span>
                   <div style={{minWidth:0}}>
                     {editingLabel === acc.vinted_user_id ? (
