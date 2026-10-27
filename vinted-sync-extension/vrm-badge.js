@@ -253,6 +253,9 @@
     else if (e.site && e.site.nom && e.site.choix === 'non') compteSite = `<div class="val gris" data-compte-ignore>${esc(e.site.nom)} — ignoré dans ce navigateur (ton choix) : rien n'est capté pour lui.</div><button class="b sec" data-capter>Capter ce compte</button>`;
     else if (e.site && e.site.nom) compteSite = `<div class="val">${esc(e.site.nom)}${e.site.type === 'pro' ? ' · pro' : ''}</div>`;
     else if (e.site && e.site.id) compteSite = e.plateforme==='leboncoin' ? '<div class="val">Identifiant détecté · identité à confirmer</div>' : `<div class="val">compte n° ${esc(e.site.id)}</div>`;
+    else if (e.plateforme === 'vestiaire') compteSite = (e.vcCapte && Object.keys(e.vcCapte).length)
+      ? '<div class="val">connecté — VRM lit ton compte en passant</div>'
+      : '<div class="val gris">pas encore lu — ouvre « Mon compte » sur Vestiaire (ventes, articles, messages)</div>';
     else if (e.plateforme === 'vinted') compteSite = '<div class="val gris">aucun compte Vinted connecté dans ce navigateur</div>';
     else compteSite = '<div class="val gris">pas encore reconnu</div>';
 
@@ -267,6 +270,12 @@
       else flux = '<div class="val gris">Rien envoyé depuis ce navigateur pour l\'instant</div>';
     }
 
+    // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.
+    if (e.plateforme === 'vestiaire' && e.vcCapte) {
+      const noms = { ventes: 'Ventes', annonces: 'Annonces', messages: 'Messages', achats: 'Achats' };
+      const lignes = Object.keys(noms).filter((k) => e.vcCapte[k]).map((k) => `<div class="val">${noms[k]} : lues ${esc(depuis(e.vcCapte[k].at))}</div>`);
+      if (lignes.length) flux = lignes.join('') + flux.replace(/<div class="val gris">Rien envoyé[^<]*<\/div>/, '');
+    }
     if(e.plateforme==='leboncoin'){
       const labels={annonces:'Annonces',transactions:'Transactions'};
       for(const famille of ['annonces','transactions']){
@@ -465,7 +474,7 @@
   try {
     chrome.storage.onChanged.addListener((ch, zone) => {
       if (zone !== 'local') return;
-      if (ch.vrmSession || ch.vrmFlux || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
+      if (ch.vrmSession || ch.vrmFlux || ch.vrmVcCapte || ch.vrmBascule || ch.vrmLbcCompte || ch.vrmChoixComptes || ch.vrmLoginsVus || ch.vrmLogins) rafraichir();
     });
   } catch (_) {}
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rafraichir(); });

@@ -283,6 +283,26 @@
     visite(e, 0);
     return out;
   }
+  // 5.243 (Julien, 27 oct. : « l'extension doit s'adapter à la différence entre
+  // les catégories Vinted et Vestiaire pour publier toute seule ») : le
+  // CATALOGUE du dépôt — `deposit/catalog` (univers → catégories) et
+  // `deposit/brands` — que la page de dépôt charge déjà. Ce sont des libellés
+  // PUBLICS (ceux du site), aucune donnée de personne : on le garde ENTIER,
+  // comme le catalogue Leboncoin, et on dit s'il a été coupé.
+  const VC_CATALOGUE_MAX = 3000000;
+  const vcCatVu = {};
+  function noteCatalogue(url, texte) {
+    try {
+      let p = ''; try { p = new URL(url, location.origin).pathname; } catch (_) { return; }
+      if (!/\/deposit\/(catalog|brands)(\/|$)/i.test(p)) return;
+      const t = String(texte || '');
+      if (!t || t[0] !== '{' && t[0] !== '[') return;
+      const cle = p.replace(/\/+$/, '');
+      if (vcCatVu[cle] === t.length) return;
+      vcCatVu[cle] = t.length;
+      post({ kind: 'vccatalogue', chemin: cle.slice(0, 160), body: t.slice(0, VC_CATALOGUE_MAX), coupe: t.length > VC_CATALOGUE_MAX });
+    } catch (_) {}
+  }
   function noteVentes(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
@@ -445,7 +465,7 @@
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteCatalogue(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -464,7 +484,7 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteCatalogue(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

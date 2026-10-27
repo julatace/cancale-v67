@@ -738,6 +738,25 @@ function contratSuivi(a) {
     if (j && typeof j === 'object' && !Array.isArray(j)) for (const k of Object.keys(j)) { const t = essai(j[k]); if (t) return t; }
     return '';
   };
+  // 5.243 (Julien, 27 oct. : « l'extension doit s'adapter à la différence entre
+  // les catégories Vinted et Vestiaire ») : l'ARBRE des catégories Vinted
+  // (`GET /api/v2/item_upload/catalogs`, chargé par la page de dépôt — vu dans
+  // ses chemins). Des libellés PUBLICS du site, aucune personne : gardé entier.
+  let catalogueVu = 0;
+  const noteCatalogueVinted = (method, url, status, lireTexte) => {
+    try {
+      if (String(method || 'GET').toUpperCase() !== 'GET' || !(Number(status) >= 200 && Number(status) < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !/^\/api\/v\d+\/item_upload\/catalogs\/?$/.test(U.pathname)) return;
+      Promise.resolve().then(lireTexte).then((t) => {
+        if (typeof t !== 'string' || t.length < 2 || t.length > 3000000 || t.length === catalogueVu) return;
+        let j = null; try { j = JSON.parse(t); } catch (_) { return; }
+        if (!j || typeof j !== 'object' || (typeof j.code === 'number' && j.code !== 0)) return;
+        catalogueVu = t.length;
+        post({ kind: 'catalogueVinted', body: t });
+      }).catch(() => {});
+    } catch (_) {}
+  };
   const noteSuivi = (method, url, status, lireTexte) => {
     try {
       if (String(method || 'GET').toUpperCase() !== 'GET') return;
@@ -814,6 +833,7 @@ function contratSuivi(a) {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
+            noteCatalogueVinted(method, url, res.status, () => res.clone().text());
             noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
@@ -858,6 +878,7 @@ function contratSuivi(a) {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
+            noteCatalogueVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
