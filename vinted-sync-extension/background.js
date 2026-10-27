@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.239.0';
+const CODE_VERSION = '5.240.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -11378,6 +11378,7 @@ const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/sell-clothes-online/'
 // qui dise le boost : « pas su », jamais « non boostée ».
 // ── VESTIAIRE : TES VENTES (5.237) ──────────────────────────────────────────
 // `vc_ventes` = { ventes: { [id]: { productId, ref, etat, date, montant, aExpedier,
+// limite, suivi, transporteur, etiquette (5.240 : true/false/null, jamais l'adresse),
 // sources, vuAt } }, lectures: { 'a-expedier'|'ventes': { at, total, complet } },
 // forme: { [source]: [chemins de clés] } }. Une écriture à la fois ; lecture
 // ratée ⇒ rien n'est écrit. Une liste « à expédier » lue EN ENTIER fait foi :
@@ -11407,6 +11408,8 @@ async function rangerVcVentesMaintenant(m) {
       productId: x.productId || prev.productId || '', ref: x.ref || prev.ref || '',
       etat: x.etat || prev.etat || '', date: x.date || prev.date || '',
       montant: x.montant || prev.montant || null,
+      limite: x.limite || prev.limite || '', suivi: x.suivi || prev.suivi || '', transporteur: x.transporteur || prev.transporteur || '',
+      etiquette: x.etiquette === true || x.etiquette === false ? x.etiquette : (prev.etiquette === true || prev.etiquette === false ? prev.etiquette : null),
       aExpedier: source === 'a-expedier' ? true : (prev.aExpedier === true),
       sources, vuAt: now, premiereVue: prev.premiereVue || now,
     };

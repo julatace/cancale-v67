@@ -262,6 +262,27 @@
     visite(e, 0);
     return ref;
   }
+  // 5.240 — LE COLIS d'une vente : la date limite d'envoi (une clé dont le NOM
+  // le dit), le transporteur et le n° de suivi (la règle des achats), et SI un
+  // bordereau existe — seulement `true` : son adresse ne part jamais (elle peut
+  // suffire à l'ouvrir), on l'imprime sur Vestiaire.
+  const CLE_LIMITE = /^(shipBy|ship_by|shipByDate|ship_by_date|shippingDeadline|shipping_deadline|deadline|dueDate|due_date|sendBefore|send_before|shippingLimitDate|expectedShippingDate|expected_shipping_date|limitDate|limit_date)$/i;
+  const CLE_ETIQUETTE = /^(label|labelUrl|label_url|shippingLabel|shipping_label|shippingLabelUrl|waybill|waybillUrl|prepaidLabel|labelPdf|label_pdf)$/i;
+  function colisVente(e) {
+    const out = { limite: '', etiquette: null };
+    const visite = (x, prof) => {
+      if (!x || typeof x !== 'object' || prof > 3) return;
+      for (const k of Object.keys(x).slice(0, 80)) {
+        const v = x[k];
+        if (PAS_ACHETEUR.test(k)) continue;
+        if (!out.limite && CLE_LIMITE.test(k) && typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v) && isFinite(Date.parse(v))) out.limite = v.slice(0, 30);
+        if (CLE_ETIQUETTE.test(k)) { if ((typeof v === 'string' && /^https?:\/\//i.test(v)) || (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length)) out.etiquette = true; else if (out.etiquette !== true && (v === null || v === '' || v === false)) out.etiquette = false; continue; }
+        if (v && typeof v === 'object' && !Array.isArray(v)) visite(v, prof + 1);
+      }
+    };
+    visite(e, 0);
+    return out;
+  }
   function noteVentes(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
@@ -280,7 +301,8 @@
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
         const sc = scalairesVente(e);
-        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant };
+        const cv = colisVente(e); const sv = suiviAchat(e);
+        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant, limite: cv.limite, etiquette: cv.etiquette, suivi: sv.suivi, transporteur: sv.transporteur };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];

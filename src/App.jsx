@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.239.0';
+const EXT_ATTENDUE = '5.240.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -22118,6 +22118,73 @@ function VentesVestiaire({ comptes }) {
   );
 }
 // ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE PARTOUT (27 octobre, 5.240) — UNE lecture, UNE règle (§11)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « fais pareil pour les colis Vestiaire », puis « pour tout Vestiaire ».
+// `lireVestiaireColis` lit en une requête les lignes rangées par l'extension ;
+// `colisVestiaire` dit, sur CES données : les ventes à envoyer (N° par la
+// référence VRM ou l'annonce créée par VRM — jamais le titre, §5), les achats en
+// route (un n° de suivi et un état qui ne dit ni livré, ni annulé), le nombre de
+// messages non lus. Un champ jamais rangé vaut `null` (« pas su »), jamais 0.
+async function lireVestiaireColis() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_messages,vc_achats,vc_listings)&select=id,ventes:data->ventes,compteur:data->compteur,achats:data->achats,liens:data->liens`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const par = Object.fromEntries(j.map((x) => [x.id, x]));
+    return { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, compteur: (par.vc_messages && par.vc_messages.compteur) || null,
+      achats: (par.vc_achats && par.vc_achats.achats) || null, liens: (par.vc_listings && par.vc_listings.liens) || {} };
+  } catch (_) { return null; }
+}
+const VC_ACHAT_FINI = /deliver|livr|re[cç]u|receiv|complet|termin|finali|cancel|annul|refund|rembours|return|retour/i;
+function colisVestiaire(d) {
+  if (d === undefined) return undefined;
+  if (d === null) return null;
+  const aEnvoyer = d.ventes ? Object.entries(d.ventes).filter(([, v]) => v && v.aExpedier === true).map(([id, v]) => ({
+    id, num: cleNum((v.productId && d.liens && d.liens[v.productId]) || v.ref || ''), limite: v.limite || '', suivi: v.suivi || '',
+    transporteur: v.transporteur || '', etiquette: v.etiquette === true ? true : v.etiquette === false ? false : null, date: v.date || '',
+  })).sort((a, z) => String(a.limite || '9999').localeCompare(String(z.limite || '9999'))) : null;
+  const enRoute = d.achats ? Object.entries(d.achats).filter(([, v]) => v && v.suivi && !VC_ACHAT_FINI.test(String(v.etat || ''))).map(([id, v]) => ({
+    id, nom: v.nom || '', suivi: v.suivi, transporteur: v.transporteur || '', etat: v.etat || '', date: v.date || '',
+  })) : null;
+  const messages = d.compteur && typeof d.compteur.messages === 'number' ? d.compteur.messages : null;
+  return { aEnvoyer, enRoute, messages };
+}
+function joursAvant(iso) { const t = Date.parse(iso || ''); if (!isFinite(t)) return null; const a = new Date(); a.setHours(0,0,0,0); const b = new Date(t); b.setHours(0,0,0,0); return Math.round((b - a) / 86400000); }
+function ColisVestiaireBloc({ vc }) {
+  if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
+  if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
+  const E = vc.aEnvoyer || [], R = vc.enRoute || [];
+  if (!E.length && !R.length) return null;
+  const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
+  return (
+    <div data-colis-vestiaire={E.length} data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+      {E.length > 0 && <>
+        {titre('Ventes Vestiaire à envoyer', E.length)}
+        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Le bordereau se prend sur Vestiaire (onglet « articles à expédier »). Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
+        {E.map((v) => { const j = joursAvant(v.limite); return (
+          <div key={v.id} data-vc-colis={v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}
+              {j != null ? <span style={{ marginLeft: 8, color: j <= 1 ? C.warn : C.muted, fontWeight: 600 }}>· {j < 0 ? `date limite passée (${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})` : j === 0 ? 'à envoyer aujourd’hui' : j === 1 ? 'à envoyer demain' : `à envoyer avant le ${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}</span> : null}</div>
+            <div style={{ fontSize: 11.5, color: C.muted }}>{v.limite ? '' : 'date limite non dite par Vestiaire · '}{v.etiquette === true ? 'bordereau disponible sur Vestiaire' : v.etiquette === false ? 'pas encore de bordereau' : 'bordereau : pas su'}{v.transporteur ? ` · ${v.transporteur}` : ''}{v.suivi ? ` · suivi ${v.suivi}` : ''}</div>
+            {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
+          </div>); })}
+      </>}
+      {R.length > 0 && <>
+        {titre('Achats Vestiaire en route', R.length)}
+        {R.map((v) => (
+          <div key={v.id} data-vc-route={v.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
+            <div style={{ fontSize: 11.5, color: C.muted }}>{v.etat ? `Vestiaire : « ${v.etat} » · ` : ''}suivi {v.suivi}{v.transporteur ? ` (${v.transporteur})` : ''}</div>
+            <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/>
+          </div>
+        ))}
+      </>}
+    </div>
+  );
+}
+// ══════════════════════════════════════════════════════════════════════════════
 // VESTIAIRE COLLECTIVE : TES MESSAGES (27 octobre, 5.238)
 // ══════════════════════════════════════════════════════════════════════════════
 // Julien : « fais pareil pour les messages Vestiaire ». L'extension relève ce
@@ -32293,6 +32360,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [ebayCmd, setEbayCmd] = useState(undefined);
   const [ebayMsg, setEbayMsg] = useState(undefined);   // messages eBay sans réponse (Ma journée) — voir `etatMessagesEbay`
   const [ebayLuA, setEbayLuA] = useState(null);       // la plus ancienne capture des commandes eBay (ms)
+  // (27 oct., 5.240) VESTIAIRE dans Ma journée et Colis : ce que l'extension a
+  // rangé (`vc_ventes`, `vc_messages`, `vc_achats`, `vc_listings.liens`), lu
+  // DANS la même vague que les commandes eBay (aucun rendu de plus). Trois
+  // états : undefined en cours · null pas su · objet (champs absents = jamais lu).
+  const [vcEtat, setVcEtat] = useState(undefined);
   // Les dates de VERSEMENT des ventes Vinted — trois états (undefined en
   // cours · null pas su · map lue). Relues quand l'extension annonce des ventes.
   const [versements, setVersements] = useState(undefined);
@@ -32327,11 +32399,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (21 oct.) Sur Ma journée, les résumés des messages eBay partent EN MÊME
     // TEMPS et sont posés dans le même rendu (un rendu de plus au démarrage
     // coûtait au téléphone — banc `vitesse.cjs`).
-    const [r, rm] = await Promise.all([
+    const [r, rm, rv] = await Promise.all([
       lireEbayTous('ebay_orders', 'orders:data->orders,capturedAt:data->>capturedAt', 'orders'),
       only === 'journee' ? lireEbayParCompte('ebay_messages', 'n:data->>nonLus,complet:data->>complet,capturedAt:data->>capturedAt') : Promise.resolve(undefined),
+      (only === 'journee' || only === 'bordereaux') ? lireVestiaireColis() : Promise.resolve(undefined),
     ]);
     if (only === 'journee') setEbayMsg(etatMessagesEbay(rm));
+    if (only === 'journee' || only === 'bordereaux') setVcEtat(rv);
     setEbayCmd((!r || r.illisibles.length) ? null : r.items);
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
@@ -40085,6 +40159,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } else if (ebayMsg === null || (ebayMsg && ebayMsg.illisibles.length)) {
           tuiles.messages = { ...tuiles.messages, ebay: null, sub: `${tuiles.messages.sub} · messages eBay pas lus` };
         }
+        // (27 oct., 5.240) VESTIAIRE : ventes à envoyer, messages non lus — la
+        //    règle de Colis (`colisVestiaire`, §11). Jamais rien sur « pas su ».
+        { const vc = colisVestiaire(vcEtat);
+          if (vc && vc.aEnvoyer && vc.aEnvoyer.length) {
+            const n = vc.aEnvoyer.length, j = vc.aEnvoyer.map((v) => joursAvant(v.limite)).filter((x) => x != null);
+            const presse = j.length && Math.min(...j) <= 1;
+            jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse,
+              title: `${n} vente${n > 1 ? 's' : ''} Vestiaire à envoyer`,
+              sub: presse ? (Math.min(...j) < 0 ? 'Une date limite est passée — prends le bordereau sur Vestiaire' : 'À envoyer d’ici demain — le bordereau est sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
+              tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
+          }
+          if (vc && vc.messages > 0) jobs.push({ id: 'vestiaire-messages', n: vc.messages, icon: 'chat', color: C.text,
+            title: `${vc.messages} message${vc.messages > 1 ? 's' : ''} Vestiaire non lu${vc.messages > 1 ? 's' : ''}`, sub: 'Réponds sur Vestiaire', tab: 'plat_vestiaire', prio: 2.1 }); }
         tuiles.prix = { n: repriceList.length, sub: repriceList.length ? 'Des paires vues mais qui ne partent pas' : 'Aucune paire à baisser' };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
@@ -44038,6 +44125,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             eBay : l'acheteur a payé le port, VRM n'achète rien (§2.8). La phrase
             commune est dite UNE fois (§7) ; la ligne ne garde que ce qui la
             distingue. */}
+        {only === 'bordereaux' ? <ColisVestiaireBloc vc={colisVestiaire(vcEtat)}/> : null}
         {colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
         {colisEb && colisEb.aPoster.length>0 && (()=>{
           const L = colisEb.aPoster, n = L.length;
