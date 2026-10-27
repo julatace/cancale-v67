@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.236.0';
+const EXT_ATTENDUE = '5.237.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -21685,6 +21685,84 @@ function PublierVestiaire({ comptes }) {
     </Card>
   );
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE COLLECTIVE : TES VENTES (27 octobre, 5.237)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « fais pareil pour capter les ventes Vestiaire ». L'extension lit ce
+// que la page charge déjà (`vc_ventes`). Ici on les MONTRE, par IDENTITÉ : la
+// référence VRM-{n°} de l'article, ou l'id de l'annonce créée par VRM
+// (`vc_listings.liens`) — jamais le titre (§5). Une vente reliée dont la paire
+// est encore en ligne sur Vinted ⇒ « retire-la de Vinted » (VRM ne la retire
+// pas : §3). ⚠️ Le montant n'entre dans AUCUN total (CA, URSSAF, bénéfice) : on
+// ne sait pas encore si c'est le prix ou ce que Vestiaire te verse ; sa clé est
+// dite. La forme d'une vente n'a jamais été vue : un état inconnu est recopié tel quel.
+function VentesVestiaire({ comptes }) {
+  const { paires, enLigne } = useEbayPaires(comptes);
+  const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const relire = React.useCallback(async () => {
+    try {
+      const [rv, rl] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes,lectures:data->lectures`, { headers: sbAuth() }),
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens`, { headers: sbAuth() }),
+      ]);
+      if (!rv.ok || !rl.ok) throw new Error('lecture');
+      const [jv, jl] = await Promise.all([rv.json(), rl.json()]);
+      setD({ ventes: (jv && jv[0] && jv[0].ventes) || null, lectures: (jv && jv[0] && jv[0].lectures) || {}, liens: (jl && jl[0] && jl[0].liens) || {} });
+    } catch (_) { setD(null); }
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => {
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const enLigneParNum = React.useMemo(() => {
+    const m = new Map();
+    for (const p of (paires || [])) { const k = cleNum(p.num); if (k) m.set(k, p); }
+    return m;
+  }, [paires]);
+  const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  let corps;
+  if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
+  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
+  else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues. Ouvre <b style={{ color: C.text }}>tes ventes</b> et <b style={{ color: C.text }}>« articles à expédier »</b> sur Vestiaire, dans le Chrome où l'extension VRM est installée{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''} : elle les lit en passant.</div>;
+  else {
+    const liste = Object.entries(d.ventes).map(([id, v]) => {
+      const num = cleNum((v.productId && d.liens[v.productId]) || v.ref || '');
+      return { id, ...v, num };
+    }).sort((a, z) => String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
+    const aExp = liste.filter((v) => v.aExpedier);
+    const lue = d.lectures && d.lectures['a-expedier'];
+    if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture.</div>;
+    else corps = (
+      <div data-vc-ventes="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div data-vc-ventes-resume="" style={style}>
+          {liste.length} vente{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''} · <b style={{ color: C.text }}>{aExp.length} à expédier</b>{lue && !lue.complet ? ' (au moins)' : ''}.
+          {' '}Les montants ne comptent dans aucun total tant qu'on ne sait pas si c'est le prix ou ce que Vestiaire te verse.
+        </div>
+        {liste.slice(0, 30).map((v) => {
+          const enV = v.num && enLigne ? enLigneParNum.get(v.num) : null;
+          return (
+            <div key={v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+              <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}{v.aExpedier ? <span data-vc-vente-aexp="" style={{ marginLeft: 8, color: C.warn }}>· à expédier</span> : null}</div>
+              <div style={{ fontSize: 11.5, color: C.muted }}>
+                {v.etat ? `Vestiaire : « ${v.etat} »` : 'état non dit'}{v.date ? ` · ${new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
+                {v.montant ? ` · ${fmt(v.montant.valeur)}${v.montant.devise && v.montant.devise !== 'EUR' ? ' ' + v.montant.devise : ''} (« ${v.montant.cle} »)` : ''}
+              </div>
+              {!v.num ? <div style={{ fontSize: 11, color: C.muted }}>Aucune référence VRM-n° lue sur l'article : VRM ne devine pas la paire.</div> : null}
+              {enV ? <div data-vc-vente-vinted="" style={{ fontSize: 11.5, color: C.warn, marginTop: 2 }}>Encore en ligne sur Vinted — retire-la de Vinted pour ne pas la vendre deux fois. <a href={`https://www.vinted.fr/items/${enV.id}`} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>Ouvrir l'annonce ↗</a></div> : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes ventes Vestiaire</div>
+      {corps}
+    </Card>
+  );
+}
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
   useEffect(() => { let stop = false; (async () => {
@@ -21804,6 +21882,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
         {plat==='Vestiaire Collective' && <PublierVestiaire comptes={comptes}/>}
+        {plat==='Vestiaire Collective' && <VentesVestiaire comptes={comptes}/>}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'

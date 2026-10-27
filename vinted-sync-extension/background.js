@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.236.0';
+const CODE_VERSION = '5.237.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2606,6 +2606,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus });
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.237 : tes VENTES Vestiaire (vc-inject.js, réponses que la page charge déjà).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcVentes') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcVentes(msg);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -11340,6 +11352,51 @@ const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/sell-clothes-online/'
 // autant d'annonces que le total annoncé) remplace les annonces ; une page
 // partielle ne fait que compléter. `boost: null` = la réponse n'a aucune clé
 // qui dise le boost : « pas su », jamais « non boostée ».
+// ── VESTIAIRE : TES VENTES (5.237) ──────────────────────────────────────────
+// `vc_ventes` = { ventes: { [id]: { productId, ref, etat, date, montant, aExpedier,
+// sources, vuAt } }, lectures: { 'a-expedier'|'ventes': { at, total, complet } },
+// forme: { [source]: [chemins de clés] } }. Une écriture à la fois ; lecture
+// ratée ⇒ rien n'est écrit. Une liste « à expédier » lue EN ENTIER fait foi :
+// une vente qui n'y est plus n'est plus « à expédier » (expédiée ou annulée —
+// on ne dit PAS laquelle). Une vente n'est jamais effacée.
+let _vcVentesChaine = Promise.resolve();
+function rangerVcVentes(m) {
+  const run = _vcVentesChaine.then(() => rangerVcVentesMaintenant(m)).catch(() => false);
+  _vcVentesChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function rangerVcVentesMaintenant(m) {
+  const rows = await sbGet('app_data?id=eq.vc_ventes&select=data');
+  if (rows === null) return false;
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const now = new Date().toISOString();
+  const source = m.source === 'a-expedier' ? 'a-expedier' : 'ventes';
+  const ventes = Object.assign({}, cur.ventes || {});
+  const lus = new Set();
+  for (const x of (Array.isArray(m.ventes) ? m.ventes : []).slice(0, 200)) {
+    const id = String((x && x.id) || '');
+    if (!/^[\w-]{1,40}$/.test(id)) continue;
+    lus.add(id);
+    const prev = ventes[id] || {};
+    const sources = Array.from(new Set([...(prev.sources || []), source]));
+    ventes[id] = {
+      productId: x.productId || prev.productId || '', ref: x.ref || prev.ref || '',
+      etat: x.etat || prev.etat || '', date: x.date || prev.date || '',
+      montant: x.montant || prev.montant || null,
+      aExpedier: source === 'a-expedier' ? true : (prev.aExpedier === true),
+      sources, vuAt: now, premiereVue: prev.premiereVue || now,
+    };
+  }
+  const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
+  const entier = offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total;
+  if (source === 'a-expedier' && entier) for (const [id, v] of Object.entries(ventes)) if (v.aExpedier && !lus.has(id)) ventes[id] = { ...v, aExpedier: false, plusAExpedierDepuis: now };
+  const lectures = Object.assign({}, cur.lectures || {}, { [source]: { at: now, total, complet: entier } });
+  const forme = Object.assign({}, cur.forme || {});
+  if (Array.isArray(m.forme) && m.forme.length) forme[source] = m.forme.slice(0, 120);
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: { ventes, lectures, forme, capturedAt: now } }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
 let _vcAnnoncesChaine = Promise.resolve();
 function rangerVcAnnonces(patch) {
   const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(patch)).catch(() => false);
