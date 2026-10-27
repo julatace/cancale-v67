@@ -1,5 +1,17 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — l'ARRIVÉE guidée et le MOUVEMENT :** Julien : « univers personnalisable en un clic,
+> avec une voix, une démonstration » et « des effets entre les pages ». `src/Bienvenue.jsx` : pour un compte
+> neuf (`premierJour`, après le nuage), une fois — univers Clair/Nuit en un clic (`vinted_dark`), cinq écrans
+> de démonstration marqués « exemple », lus à voix haute sur demande (`speechSynthesis` du navigateur, fr-FR,
+> gratuit ; la fin de la lecture passe à l'écran suivant ; pas de voix ⇒ pas de bouton), puis « Commencer »
+> (Ma journée et ses premiers pas). Jamais le statut fiscal ni une plateforme imposés. Vue ⇒ `vrm_bienvenue_vue`
+> (SYNC_KEYS) ; Réglages → Affichage → « Présentation de VRM · Revoir » (`vrm:bienvenue`). `_porte-banc.cjs`
+> la marque vue pour les autres bancs (sauf `vrm_banc_bienvenue`). Mouvement (`styles-mouvement.css`) : entrée
+> en fondu de 220 ms à chaque écran (classe rejouée sur `<main>`, rien remonté, animation sans remplissage),
+> boutons qui s'enfoncent, rien avec « réduire les animations ». Banc `bienvenue.cjs` (22 contrôles, 390/1512 ;
+> rouge sur main ; mutation « sans styles-mouvement » ⇒ 2 rouges). ⚠️ Non mesuré : la voix réelle d'un iPhone.
+
 > **27 octobre (soir) — les ANNONCES en fiches produit, la photo en grand :** Julien : « les annonces sont
 > beaucoup trop petites, on ne voit même pas la première photo… on est obligé d'appuyer dessus — fais ça
 > comme les pros ». Décision du 26 (« compacte ») RENVERSÉE : chaque annonce est une fiche (première photo
