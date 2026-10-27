@@ -35,17 +35,23 @@ const VENTES = [
 ];
 for (let k = 0; k < 70; k++) VENTES.push(vente(600 + k, `Paire de remplissage ${k} taille 40`, 40 + k, 3 + (k % 20) / 10, 'Commande finalisée', 'completed'));
 const MAIN = {
-  vinted_annonce_numeros: {},
-  vinted_sale_overrides: { '501': { numero: '51' }, '502': { numero: '52' }, '503': { numero: '53' }, '504': { numero: '54' } },
+  vinted_annonce_numeros: { '9101': { numero: '41', buyFromId: '801' }, '9102': { numero: '42' }, '9104': { numero: '44' } },
+  vinted_sale_overrides: { '501': { numero: '51' }, '502': { numero: '52', buyFromId: '802' }, '503': { numero: '53' }, '504': { numero: '54' } },
   vinted_ship_done: { '504': Date.now() },
 };
+const annonce = (id, titre, prix, j) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: titre.split(' ')[0], size_title: '42', status: 'Très bon état', is_closed: false, is_hidden: false, is_draft: false, photo: photo('a' + id), nPhotos: 4, view_count: 30, favourite_count: 2, created_at_ts: Math.floor(ilYaJ(j).getTime() / 1000) });
+const ANNONCES = [annonce(9101, 'Nike Air Max 1 obsidian lilac taille 42', 119, 20), annonce(9102, 'Salomon XT-6 Advanced blanc taille 40', 145, 5), annonce(9103, 'New Balance 550 blanc vert taille 43', 79, 8)];
+const achat = (tx, titre, prix, j, statut) => ({ transaction_id: tx, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, status: statut, transaction_user_status: 'completed', date: iso(j), photo: photo('b' + tx) });
+const ACHATS = [achat(801, 'Nike Air Max 1 lilac taille 42', 45, 25, 'Commande finalisée'), achat(802, 'Adidas Samba noir taille 38,5', 30, 40, 'Commande finalisée')];
+for (let k = 0; k < 70; k++) ACHATS.push(achat(900 + k, `Achat de remplissage ${k}`, 20, 1 + (k % 20) / 10, 'Commande finalisée'));
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'julatace35260', domain: 'www.vinted.fr', updated_at: cap }];
 const EBAY_COMMANDES = [
   { orderId: '07-001', creationDate: iso(1), orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', lineItems: [{ sku: 'VRM-44', title: 'New Balance 550 blanc vert taille 43', legacyItemId: '110000000044', lineItemFulfillmentInstructions: { shipByDate: new Date(maintenant.getTime() + 2 * 86400000).toISOString() } }], fulfillmentStartInstructions: [{ fulfillmentInstructionsType: 'SHIP_TO' }], paymentSummary: { totalDueSeller: { value: '80.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '9.00', currency: 'EUR' }, pricingSummary: { total: { value: '89.00', currency: 'EUR' } } },
 ];
 const ROWS = [
   { id: 'main', data: MAIN },
-  { id: 'harvest_111_listings', data: { capturedAt: cap, payload: { items: [], pagination: { total_entries: 0 } } } },
+  { id: 'harvest_111_listings', data: { capturedAt: cap, payload: { items: ANNONCES, pagination: { total_entries: ANNONCES.length } } } },
+  { id: 'harvest_111_orders_purchased', data: { capturedAt: cap, payload: { my_orders: ACHATS } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: cap, payload: { my_orders: VENTES } } },
   { id: 'ebay_orders', data: { orders: EBAY_COMMANDES, capturedAt: Date.now() } },
 ];
@@ -135,7 +141,7 @@ const verrNumEteint = (pg, chiffres) => pg.evaluate((cs) => {
   for (const c of cs) { const t = document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', { key: sans[c], code: 'Numpad' + c, bubbles: true, cancelable: true })); }
 }, chiffres);
 const allerA = async (pg, tab, quoi) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector(quoi, { timeout: 15000 }); await pg.waitForTimeout(1500); await pg.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur()); };
-const etat = (pg) => pg.evaluate(() => ({ sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"],[data-section][aria-selected="true"]') || {}).getAttribute ? document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"],[data-section][aria-selected="true"]').getAttribute('data-section') : '', trouve: [...document.querySelectorAll('[data-num-trouve]')].map((e) => e.getAttribute('data-tx-colis') || e.getAttribute('data-colis-ebay-cmd') || e.getAttribute('data-tx') || e.tagName), msg: (document.querySelector('[data-num-plat] [role=status]') || {}).textContent || '', ton: (document.querySelector('[data-num-plat-msg]') || {}).getAttribute ? (document.querySelector('[data-num-plat-msg]') || { getAttribute: () => '' }).getAttribute('data-num-plat-msg') : '', valeur: (document.querySelector('[data-num-plat-saisie]') || {}).value, focus: !!(document.activeElement && document.activeElement.matches('[data-num-plat-saisie]')) }));
+const etat = (pg) => pg.evaluate(() => ({ sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"],[data-section][aria-selected="true"]') || {}).getAttribute ? document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"],[data-section][aria-selected="true"]').getAttribute('data-section') : '', trouve: [...document.querySelectorAll('[data-num-trouve]')].map((e) => e.getAttribute('data-tx-colis') || e.getAttribute('data-achat-tx') || e.getAttribute('data-carte-annonce') || e.getAttribute('data-colis-ebay-cmd') || e.getAttribute('data-tx') || e.tagName), msg: (document.querySelector('[data-num-plat] [role=status]') || {}).textContent || '', ton: (document.querySelector('[data-num-plat-msg]') || {}).getAttribute ? (document.querySelector('[data-num-plat-msg]') || { getAttribute: () => '' }).getAttribute('data-num-plat-msg') : '', valeur: (document.querySelector('[data-num-plat-saisie]') || {}).value, focus: !!(document.activeElement && document.activeElement.matches('[data-num-plat-saisie]')) }));
 const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = await etat(pg); if (!/Je cherche/.test(e.msg) && e.ton) return e; await pg.waitForTimeout(200); } return etat(pg); };
 
 (async () => {
@@ -200,6 +206,42 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         await tape(pg, '999'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
         dit(!e.trouve.length && /999/.test(e.msg), 'N°999 : rien, et c’est dit', JSON.stringify(e));
         dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+)(,|$)/.test(x)).length, 'aucune écriture en base venue du pavé', ECRITURES.join(' | ').slice(0, 300));
+        dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
+      });
+      console.log('\n── Achats, 1512 px');
+      await allerA(pg, 'cat_achats', '[data-achats-onglet]');
+      await essaie('Achats', async () => {
+        dit(!!(await pg.$('[data-num-plat="achats"] [data-num-plat-saisie]')), 'la saisie N° est sur Achats');
+        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+        await tape(pg, '41'); await pg.keyboard.press('Enter'); let e = await attendTrouve(pg);
+        const onglet = await pg.$eval('[data-achats-onglet][aria-pressed="true"]', (x) => x.getAttribute('data-achats-onglet')).catch(() => '');
+        dit(e.trouve.includes('801') && onglet === 'all', 'N°41 (relié depuis l’annonce) : « Tous » s’ouvre et son achat est montré, au-delà des 60 premiers', JSON.stringify({ e, onglet }));
+        await pg.waitForTimeout(1500);
+        const pos = await pg.evaluate(() => { const x = document.querySelector('.vrm-buy-row[data-achat-tx="801"]'); if (!x) return null; const r = x.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), h: innerHeight }; });
+        dit(!!pos && pos.haut >= 0 && pos.bas <= pos.h, 'l’achat trouvé est amené à l’écran', JSON.stringify(pos));
+        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+        await verrNumEteint(pg, '52'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
+        dit(e.trouve.includes('802'), 'Verr Num éteint, N°52 (relié depuis la vente) : son achat est montré', JSON.stringify(e));
+        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+        await tape(pg, '42'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
+        dit(!e.trouve.length && /Aucun achat n'est relié/.test(e.msg), 'N°42 (aucun achat relié) : rien n’est deviné, et c’est dit', JSON.stringify(e));
+      });
+      console.log('\n── Annonces, 1512 px');
+      await allerA(pg, 'cat_annonces', '[data-carte-annonce="9101"]');
+      await essaie('Annonces', async () => {
+        dit(!!(await pg.$('[data-num-plat="annonces"] [data-num-plat-saisie]')), 'la saisie N° est sur Annonces');
+        await pg.click('.vrm-stock-views button:has-text("Sans numéro")', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
+        const cache = !(await pg.$('[data-carte-annonce="9101"]'));
+        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+        await tape(pg, '41'); await pg.keyboard.press('Enter'); let e = await attendTrouve(pg);
+        dit(cache && e.trouve.includes('9101') && /en ligne/.test(e.msg), 'N°41 caché par « Sans numéro » : la vue se lève et son annonce est montrée', JSON.stringify({ cache, e }));
+        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+        await tape(pg, '51'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
+        dit(!e.trouve.length && /plus en ligne/.test(e.msg), 'N°51 (vendue) : plus en ligne, et sa vente est nommée', JSON.stringify(e));
+        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+        await tape(pg, '999'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
+        dit(!e.trouve.length && /999/.test(e.msg), 'N°999 : rien, et c’est dit', JSON.stringify(e));
+        dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'toujours aucune écriture venue du pavé', ECRITURES.join(' | ').slice(0, 300));
         dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       });
       await ctx.close();
