@@ -1,5 +1,18 @@
 # VRM — dossier de passation
 
+> **27 octobre — Vestiaire Collective depuis VRM (5.235) :** Julien : « je veux pouvoir le faire
+> sur VRM directement, pouvoir publier ». Écran Vestiaire → « Mettre une paire en vente » : les paires
+> en ligne et numérotées (`useEbayPaires`, §11), « Préparer sur Vestiaire » (`vcPreparer`, l'id SEUL)
+> et « Déjà publiée » (`vcMarque` → `vinted_vc_posted`). L'extension (`publierVestiaire`) relit la paire
+> (en ligne, N°, jamais prouvée vendue — illisible ⇒ refus —, ni retirée du stock, ni déjà notée),
+> ouvre `fr.vestiairecollective.com/sell-clothes-online/` (⚠️ adresse NON mesurée) ; `vc-depot.js`,
+> copie d'`ebay.js`, attend le formulaire DANS CET onglet seulement, remplit description (avec VRM-{n°}),
+> prix, état/marque/taille/couleur au libellé EXACT, attache SES photos (Photoroom si sa clé est posée),
+> relève la structure (`panel_vc_form`, jamais une valeur). **Aucun clic « Publier »** : le formulaire
+> n'a jamais été vu. Ventes Vestiaire toujours pas captées (rien vu : listes vides au relevé du 26).
+> `audit-vc-publier.cjs` (29, vrai background.js + vrai vc-depot.js dans Chromium ; mutations onglet,
+> photos, vendue, état ⇒ rouges), banc `vc-publier.cjs` (390/1512 ; liste non filtrée ⇒ 6 rouges).
+
 > **27 octobre — même chose pour Leboncoin et eBay :** une vente Leboncoin reliée PAR IDENTITÉ
 > (`numeroLbcIdentite` : lien posé à la main ou référence VRM) et dite partie (`lbcExpediee` ou
 > `lbcFinalisee`, jamais annulée), ou une commande eBay « Expédiée » (`etatCommandeEbay`, SKU
@@ -10137,6 +10150,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `preuves` | `capterPreuvesVente` | **5.172.0** (11 oct. — ni la 5.167, ni la 5.168, ni la 5.170 publiées ne l'ont ; la 5.169 et la 5.171 sont prises par d'autres chantiers) | « l'extension lit toute seule la transaction des ventes en cours pas encore reliées (anti double vente) » |
 | `relais` | `traiterRelais` | **5.183.0** (16 oct. — la 5.182 publiée par main, fiche Leboncoin, ne l'a pas) | « sur le téléphone : actions via ton ordinateur » (le relais lit le signe de vie, pas le pont) |
 | `lbcpack` | `noterPackPhoto` | **5.185.0** (17 oct.) | « l'extension voit si tu as un pack photo Leboncoin » (`lbc_pack_photo`) |
+| `vcpublier` | `publierVestiaire` | **5.235.0** (27 oct.) | « Préparer sur Vestiaire » depuis l'app |
 | `annulee` | `purgeBordereauxAnnules` | **5.185.0** (17 oct.) | « le bordereau d'une vente annulée part tout seul » |
 | `liaison` | `demanderLiaison` | **5.171.0** (11 oct. — la 5.170 de production ne la porte pas) | « je connecte l'extension à ton compte VRM — rien à taper » (session adressée) |
 | `etatcompte` | `noterEtatCompte` | **5.181.0** (16 oct.) | « compte actif / banni par Vinted » relevé par l'extension (`panel_comptes_etat`) |

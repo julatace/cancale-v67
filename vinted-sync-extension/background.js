@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.234.0';
+const CODE_VERSION = '5.235.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2529,6 +2529,43 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
               { url: msg.url, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: msg.fichiers || 0, at: new Date().toISOString() };
             await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { ...cur, url: msg.url, fields: msg.fields.slice(0, 150), etapes, at: new Date().toISOString() } }], 'id');
+            sendResponse({ ok: true }); return;
+          }
+          sendResponse({ ok: false, error: 'action inconnue' });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // ── VESTIAIRE : LA PRÉPARATION D'UN DÉPÔT (5.235, vc-depot.js) ──────────
+    if (msg && msg.from === 'cancale-vcdepot') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const g = await chrome.storage.local.get('vrmPendingVc');
+          const p = g && g.vrmPendingVc;
+          const frais = p && p.ad && p.at && (Date.now() - p.at) < 30 * 60 * 1000;
+          // Seulement l'onglet ouvert pour CETTE paire : une autre page
+          // Vestiaire ne se remplit jamais toute seule.
+          const sienne = frais && (p.tabId == null || (sender && sender.tab && sender.tab.id === p.tabId));
+          if (msg.action === 'getPending') { sendResponse({ ok: true, ad: sienne ? p.ad : null }); return; }
+          if (!sienne) { sendResponse({ ok: false, error: 'pas-de-depot' }); return; }
+          if (msg.action === 'photoBytes' && Array.isArray(msg.urls)) {
+            const urls = msg.urls.filter((u) => (p.ad.photos || []).indexOf(u) >= 0).slice(0, 12);
+            const ph = await photosPourVestiaire(urls, 12);
+            sendResponse({ ok: true, photos: ph }); return;
+          }
+          if (msg.action === 'fini') { await chrome.storage.local.set({ vrmPendingVc: null }); await majCmd('vc:' + p.ad.id, { etape: 'abandonne', raison: 'ferme', tabId: null }); sendResponse({ ok: true }); return; }
+          if (msg.action === 'vcForm' && Array.isArray(msg.fields)) {
+            const prev = await sbGet('app_data?id=eq.panel_vc_form&select=data');
+            if (prev === null) { sendResponse({ ok: false, error: 'lecture' }); return; }
+            const cur = (prev && prev[0] && prev[0].data) || {};
+            const etapes = Object.assign({}, cur.etapes || {});
+            const cle = String(msg.etape || Object.keys(etapes).length).slice(0, 120);
+            if (!etapes[cle] && Object.keys(etapes).length >= 24) { sendResponse({ ok: true }); return; }
+            let chemin = ''; try { chemin = new URL(String(msg.url || '')).pathname.replace(/\d{3,}/g, '{id}').slice(0, 120); } catch (_) {}
+            etapes[cle] = { chemin, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: Number(msg.fichiers) || 0, fichiersMultiple: !!msg.fichiersMultiple, ver: EXT_VERSION, at: new Date().toISOString() };
+            await supabaseUpsert('app_data', [{ id: 'panel_vc_form', data: { ...cur, etapes, at: new Date().toISOString() } }], 'id');
             sendResponse({ ok: true }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -8385,14 +8422,14 @@ async function depotOngletFerme(tabId) {
   const cmds = await lireCmds();
   for (const jid of Object.keys(cmds)) {
     const c = cmds[jid];
-    if (!/^(lbc|ebay):/.test(jid) || !c || c.tabId !== tabId) continue;
+    if (!/^(lbc|ebay|vc):/.test(jid) || !c || c.tabId !== tabId) continue;
     if (c.etape === 'depot') await majCmd(jid, { etape: 'abandonne', raison: 'onglet-ferme', tabId: null });
     else if (c.etape === 'abandonne') await majCmd(jid, { tabId: null });
     else continue;
     // La paire n'est plus « en dépôt » : une page de dépôt ouverte plus tard ne
     // doit pas se remplir toute seule avec elle.
     try {
-      const cle = /^lbc:/.test(jid) ? 'vrmPendingAd' : 'vrmPendingEbay';
+      const cle = /^lbc:/.test(jid) ? 'vrmPendingAd' : (/^vc:/.test(jid) ? 'vrmPendingVc' : 'vrmPendingEbay');
       const p = (await chrome.storage.local.get(cle))[cle];
       if (p && p.ad && String(p.ad.id) === String(c.id)) await chrome.storage.local.set({ [cle]: null });
     } catch (_) {}
@@ -8515,6 +8552,7 @@ async function executerCommande(msg) {
   // 22 oct. : mettre UNE annonce Leboncoin en pause, sur son clic (voir `pauseLbcDepuisApp`).
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
+  if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
@@ -11145,6 +11183,116 @@ async function buildEbayData() {
   queue.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
   return { queue, retirees, vendues, aConfirmer, preuveKO: preuve.echec, postedCount: posted.size, echec: pos.echec };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE COLLECTIVE — ON PRÉPARE, C'EST LUI QUI PUBLIE (27 octobre, 5.235)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux pouvoir le faire sur VRM directement, pouvoir publier ».
+// ⚠️ JE N'AI JAMAIS VU LE FORMULAIRE DE DÉPÔT DE VESTIAIRE (403 d'ici, et son
+//    relevé ne montre que l'accueil et /listings/). Donc, le modèle d'eBay :
+//    on ouvre Vestiaire, on remplit les champs qu'on RECONNAÎT, on attache les
+//    photos (détourées par Photoroom avec SA clé quand elle est posée, sinon
+//    celles d'origine), on relève la STRUCTURE de chaque étape
+//    (`panel_vc_form`, jamais un contenu) et le bandeau dit le CHIFFRE.
+//    AUCUN clic « Publier » : il relit, choisit catégorie/modèle, et publie.
+// ⚠️ Le clic dans l'app EST le choix : pas de case « Vestiaire » à cocher
+//    d'abord. Les gardes, elles, sont celles des autres places : une paire en
+//    ligne, numérotée, jamais prouvée vendue, jamais retirée du stock, jamais
+//    d'un compte supprimé, jamais déjà notée publiée sur Vestiaire.
+const VC_POSTED = 'vinted_vc_posted';
+async function readVcPosted() {
+  const rows = await sbGet(`app_data?id=eq.${VC_POSTED}&select=data`);
+  const d = (rows && rows[0] && rows[0].data) || {};
+  return { echec: rows === null, ids: (d.ids || []).map(String) };
+}
+async function markVcPosted(id, on) {
+  const d = await readVcPosted();
+  if (d.echec) return false;
+  const s = new Set(d.ids);
+  if (on === false) s.delete(String(id)); else s.add(String(id));
+  return await supabaseUpsert('app_data', [{ id: VC_POSTED, data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
+}
+// Une seule paire, celle du clic — jamais une file entière (rien ne part seul).
+async function annonceVestiaire(id) {
+  const main = (await lireMain(MAIN_FILE)) || {};
+  const numeros = main.vinted_annonce_numeros || {};
+  const labels = main.vinted_account_labels || {};
+  const uid2login = {};
+  (main.vinted_accounts || []).forEach((a) => { uid2login[String(a.vinted_user_id)] = labels[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id); });
+  const off = new Set((main.vinted_accounts_hidden || []).map(String));
+  { const noirs = await blockedAccounts(); if (noirs) noirs.forEach((u) => off.add(String(u))); }
+  const lost = main.vinted_pairs_lost || {};
+  const pos = await readVcPosted();
+  if (pos.echec) return { code: 'lecture', raison: "la base VRM n'a pas répondu — réessaie dans un moment" };
+  if (pos.ids.indexOf(String(id)) >= 0) return { code: 'deja-publiee', raison: 'elle est déjà notée publiée sur Vestiaire' };
+  const enl = await lireDressingsEnLigne();
+  if (enl.echec) return { code: 'lecture', raison: "je n'ai pas pu relire tes annonces Vinted — réessaie dans un moment" };
+  let trouve = null;
+  for (const r of enl.lignes) {
+    const d = r.data || {}; const p = d.payload || {}; const uid = String(d.uid);
+    if (off.has(uid)) continue;
+    for (const it of (p.items || [])) {
+      if (String(it.id) !== String(id)) continue;
+      if (it.is_closed || it.is_hidden || it.is_draft) continue;
+      trouve = { it, uid };
+    }
+  }
+  if (!trouve) return { code: 'absente', raison: "elle n'est plus en ligne sur Vinted (ou son compte est écarté)" };
+  const e = numeros[String(id)]; const num = e && e.numero;
+  if (!num || String(num).trim() === '') return { code: 'sans-numero', raison: 'elle n\'a pas encore de N° de rangement' };
+  if (lost[String(num).trim()]) return { code: 'absente', raison: 'elle est notée retirée du stock' };
+  const preuve = await lireVentesProuvees();
+  if (preuve.echec) return { code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };
+  if (preuve.vendus.has(String(id))) return { code: 'vendue', raison: 'elle est déjà vendue sur Vinted' };
+  const det = {};
+  const ri = await sbGet(`app_data?id=eq.harvest_${trouve.uid}_item_${String(id)}&select=data`);
+  if (ri && ri[0]) { const p = (ri[0].data || {}).payload || {}; Object.assign(det, (p && p.item) || p || {}); }
+  // Une lecture de la ligne entière, sur SON clic seulement (une clé numérique
+  // en projection `data->123` serait lue comme un indice de tableau).
+  const rp = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  const pd = ((rp && rp[0] && rp[0].data) || {})[String(id)] || {};
+  if (!det.description && pd.description) det.description = pd.description;
+  if ((!det.photos || !det.photos.length) && pd.photos && pd.photos.length) det.photos = pd.photos.map((u) => ({ url: u }));
+  return { ad: buildEbayAd(trouve.it, det, num, uid2login[trouve.uid]) };
+}
+async function publierVestiaire(msg) {
+  const cmd = String(msg.cmd || ''); const id = String(msg.id || '');
+  if (!/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  const cleJob = 'vc:' + id;
+  if (cmd === 'vcMarque') {
+    const note = (await markVcPosted(id, msg.etat === 'posted')) === true;
+    if (!note) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est noté, réessaie dans un moment" };
+    notifierApp({ type: 'maj', quoi: 'vestiaire' });
+    return { accepte: true, etape: 'fait' };
+  }
+  if (PUBLICATIONS_EN_VOL.has(cleJob)) return { accepte: false, code: 'en-cours', raison: 'elle est déjà en train de partir' };
+  PUBLICATIONS_EN_VOL.add(cleJob);
+  try {
+    const jobDeja = (await lireCmds())[cleJob];
+    if (jobDeja && jobDeja.etape === 'depot') {
+      const onglet = jobDeja.tabId != null ? await ongletOuvert(jobDeja.tabId) : undefined;
+      const url = String((onglet && (onglet.url || onglet.pendingUrl)) || '');
+      if (onglet && /^https:\/\/([a-z0-9-]+\.)*vestiairecollective\.com\//i.test(url)) {
+        try { await chrome.tabs.update(onglet.id, { active: true }); if (onglet.windowId != null) chrome.windows.update(onglet.windowId, { focused: true }); } catch (_) {}
+        return { accepte: false, code: 'en-cours', ouvert: true, raison: 'sa préparation Vestiaire est encore ouverte — je te la remets devant' };
+      }
+    }
+    try { const cu = await compteConnecte('www.vinted.fr'); if (cu) await avecVinted(() => completerPhotosSiManque(cu, id)).catch(() => {}); } catch (_) {}
+    await viderFiches({ force: true }).catch(() => {});
+    const r = await annonceVestiaire(id);
+    if (!r.ad) return { accepte: false, code: r.code || 'absente', raison: r.raison || 'annonce introuvable' };
+    let tab = null;
+    try { tab = await chrome.tabs.create({ url: VC_PAGE_VENDRE, active: true }); } catch (_) { tab = null; }
+    await chrome.storage.local.set({ vrmPendingVc: { ad: r.ad, at: Date.now(), tabId: tab && tab.id != null ? tab.id : null } });
+    await majCmd(cleJob, { etape: 'depot', id, numero: r.ad.numero || '', tabId: tab && tab.id != null ? tab.id : null, raison: null });
+    return { accepte: true, jobId: cleJob, etape: 'depot' };
+  } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
+}
+// ⚠️ ADRESSE NON MESURÉE : la page « vendre » publique de Vestiaire (vue sur
+//    us.vestiairecollective.com, même chemin supposé en fr). Elle mène à
+//    « Vendre un article » ; vc-depot.js attend le formulaire quel que soit
+//    son chemin, seulement dans CET onglet.
+const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/sell-clothes-online/';
 
 async function buildLbcData() {
   const main = (await lireMain(MAIN_FILE)) || {};
