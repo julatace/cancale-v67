@@ -15558,7 +15558,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
 // `e.code` (`Numpad5`), comme le Stock.
 const DEMANDE_NUM_PLAT = { plateforme: '', section: '', q: '', at: 0 };
 const chiffrePave = (e) => /^[0-9]$/.test(e.key) ? e.key : ((/^Numpad([0-9])$/.exec(e.code || '') || [])[1] || '');
-function SaisieNumeroPlateforme({ plateforme, chercher, onSection }) {
+function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, nom = '', invite = '' }) {
   const sansSouris = useSansSouris();
   const champ = React.useRef(null);
   const [v, setV] = React.useState('');
@@ -15618,14 +15618,14 @@ function SaisieNumeroPlateforme({ plateforme, chercher, onSection }) {
     <div className="vrm-num-plat" data-num-plat={plateforme}>
       <label className="vrm-num-plat-champ"><span>N°</span>
         <input ref={champ} data-num-plat-saisie="" value={v} inputMode="numeric" autoComplete="off" placeholder="+ Entrée"
-          aria-label={`Numéro : Entrée pour trouver la paire sur ${plateforme === 'ebay' ? 'eBay' : 'Leboncoin'}`}
+          aria-label={`Numéro : Entrée pour trouver la paire ${nom || (plateforme === 'ebay' ? 'sur eBay' : 'sur Leboncoin')}`}
           onChange={(e) => { setV(e.target.value); setMsg(null); }}
           onKeyDown={(e) => {
             // Verr Num éteint, DANS le champ : « ArrowDown » + Numpad2 ne tape rien ; on pose le chiffre.
             const ch = chiffrePave(e); if (ch && ch !== e.key) { e.preventDefault(); e.stopPropagation(); setV((x) => x + ch); setMsg(null); return; }
             if (e.key === 'Enter') { e.preventDefault(); valider(); } else if (e.key === 'Escape') { e.preventDefault(); setV(''); setMsg(null); e.currentTarget.blur(); } }}/>
       </label>
-      <span role="status" className="vrm-num-plat-msg" data-num-plat-msg={msg ? msg.ton : undefined}>{occupe ? 'Je cherche…' : (msg ? msg.texte : 'Tape un N° au clavier : je montre la paire sur ce site.')}</span>
+      <span role="status" className="vrm-num-plat-msg" data-num-plat-msg={msg ? msg.ton : undefined}>{occupe ? 'Je cherche…' : (msg ? msg.texte : (invite || 'Tape un N° au clavier : je montre la paire sur ce site.'))}</span>
     </div>
   );
 }
@@ -38166,6 +38166,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // en suivant chaque identifiant libre de son rendu). Une valeur oubliée ici
   // ferait garder une ligne périmée : tout ce que `rendre` lit dans l'écran
   // doit passer par `preparerLigneVente` ou par `actionsVentes`.
+  // ── (27 oct.) LE PAVÉ NUMÉRIQUE SUR VENTES ET COLIS — Julien : « fais pareil
+  // pour le pavé numérique sur Colis et Ventes ». Même saisie que Leboncoin et
+  // eBay (`SaisieNumeroPlateforme`) : N° + Entrée MONTRE la vente / le colis,
+  // en lecture seule. Le N° est celui que la ligne affiche elle-même (Ventes :
+  // `effEntry(o).numero`, celui de `preparerLigneVente` ; Colis : `numForBord`, sinon la fiche de
+  // la vente) — aucune autre règle, jamais le titre (§5). Si la vente est cachée
+  // par un filtre, une recherche, la période ou « Voir plus », on la remontre
+  // (un geste qui ne trouve pas ce qu'il cherche à cause d'un filtre ment).
+  const chercherNumVente = async (cle) => {
+    if (!Array.isArray(sales.items)) return null;   // pas encore lu : « pas su »
+    const tous = sales.items.filter(o => o && o.transaction_id != null && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc);
+    if (!tous.length) return { texte: `Aucune vente Vinted ne porte le N°${cle}.` };
+    const o = tous[0], tx = String(o.transaction_id);
+    if (!ventesAffichees.some(x => String(x.transaction_id) === tx)) {
+      const st = classifyOrderStatus(o.status);
+      setOrdSearch(''); setPeriode(null);
+      if (isHidden(o)) setShowHidden(true);
+      setVFilter(st === 'cancelled' && !venteQuiRevient(o) ? 'annulees' : 'all');
+    }
+    const sel = () => { const el = document.querySelector(`.vrm-ventes-liste .vrm-sale-row[data-tx="${tx}"]`); if (!el) setVentesMax(n => n + 120); return el; };
+    const plus = tous.length > 1 ? ` · ${tous.length} ventes portent ce N°, voici la plus récente` : '';
+    return { section: 'ventes', sel, texte: `N°${cle} — ${venteStage(o).label}${plus}`, texteSiAbsent: `La vente N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
+  };
+  const chercherNumColis = async (cle) => {
+    if (!Array.isArray(sales.items)) return null;
+    const numEx = (e) => (e.b ? numForBord(e.b) : '') || (e.o ? (effEntry(e.o)?.numero || '') : '');
+    const ex = expeditions().filter(e => cleNum(numEx(e)) === cle);
+    if (ex.length) {
+      const e = ex[0];
+      const poste = !!(e.o ? isShipDone(e.o) : isBordShippedManual(e.b));
+      if (poste && !voirPostes) setVoirPostes(true);
+      if (e.o && !matchOrd(e.o)) setOrdSearch('');
+      const plus = ex.length > 1 ? ` · ${ex.length} colis portent ce N°` : '';
+      return { section: 'bordereaux', sel: `[data-bord-card][data-tx-colis="${e.txn}"]`, texte: `N°${cle} — ${poste ? 'marqué « posté »' : 'à envoyer'}${plus}` };
+    }
+    const xe = colisEb && colisEb.aPoster ? colisEb.aPoster.find(x => x.ordre && cleNum(numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') === cle) : null;
+    if (xe) return { section: 'bordereaux', sel: `[data-colis-ebay-cmd="${xe.orderId}"]`, texte: `N°${cle} — vente eBay à poster` };
+    const v = sales.items.filter(o => o && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc)[0];
+    if (v) return { texte: `N°${cle} n'est pas dans tes colis à envoyer — sa vente : ${venteStage(v).label}. Elle est dans Ventes.` };
+    return { texte: `Aucun colis ni vente Vinted ne porte le N°${cle}.` };
+  };
   const preparerLigneVente = (o) => {
     const tx = String(o.transaction_id);
     const e = effEntry(o); const num = e?.numero;
@@ -39462,6 +39503,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
+        <SaisieNumeroPlateforme plateforme="ventes" nom="dans tes ventes" invite="Tape un N° au clavier : je montre sa vente." chercher={chercherNumVente}/>
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -42528,6 +42570,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
         <ScreenHead icon="doc" title="Colis" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
+        <SaisieNumeroPlateforme plateforme="colis" nom="dans tes colis" invite="Tape un N° au clavier : je montre son colis." chercher={chercherNumColis}/>
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
