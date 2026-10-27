@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.233.0';
+const EXT_ATTENDUE = '5.235.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.233.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1598,7 +1598,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -7671,6 +7671,7 @@ function raisonExtGlobale(sansSouris, opt) {
     // Trois états, jamais deux : vivant · éteint · pas su.
     const rl = etatRelais();
     if (rl.niveau === 'vivant') {
+      if (cap === 'vcpublier') return { code: 'telephone', relais: 'vestiaire', texte: "Préparer sur Vestiaire Collective se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis et que tu publies." };
       if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis." };
       if (cap !== 'publication' && rl.pauseMs > 0) return { code: 'pause', relais: 'vivant', texte: `Vinted a demandé de ralentir : l'extension de ton ordinateur n'envoie rien chez Vinted pendant encore ${Math.max(1, Math.ceil(rl.pauseMs / 60000))} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
       return null;
@@ -10794,6 +10795,57 @@ function CountUp({ value, format, duration = 950, style }) {
 // doublon (refus tenu, cf. dossier). ⚠️ On ne charge pas l'image CDN de Vinted
 // dans le canvas : cross-origin → canvas « tainted » → export interdit. On
 // travaille donc sur un fichier local (aucun souci CORS).
+// ── ATELIER DE REPUBLICATION — tranche 1 : préparer un brouillon VRM ─────────
+// Modale NON destructive : on prépare le titre et le prix d'une annonce, on voit
+// ses photos et son N° (qui ne change jamais, §5), on enregistre un brouillon
+// DANS VRM. Rien n'est envoyé à Vinted ici — c'est le socle ; la publication et
+// le retrait réels viennent dans une tranche ultérieure, sur confirmation.
+function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
+  const prix0 = (it && it.price && typeof it.price === 'object') ? it.price.amount : (it && it.price);
+  const [title, setTitle] = useState(draft && draft.title != null ? draft.title : (it.title || ''));
+  const [price, setPrice] = useState(() => { const p = draft && draft.price != null ? draft.price : prix0; return p == null ? '' : String(p); });
+  const [done, setDone] = useState(false);
+  const photos = ((draft && draft.photos && draft.photos.length) ? draft.photos
+    : (Array.isArray(it.photos) && it.photos.length ? it.photos : [it.photo])).filter(Boolean);
+  const prixNum = String(price).trim() === '' ? null : Number(String(price).replace(',', '.'));
+  const prixOk = isFinite(prixNum) && prixNum > 0;
+  const manques = [];
+  if (!String(title).trim()) manques.push('le titre');
+  if (!prixOk) manques.push('le prix');
+  if (!photos.length) manques.push('au moins une photo');
+  const enregistrer = () => { onSave({ title: String(title).trim(), price: prixOk ? prixNum : null, photos, id: it.id }); setDone(true); setTimeout(onClose, 700); };
+  const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
+  return (
+    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={ev => ev.stopPropagation()} data-atelier-brouillon={k} style={{ background: C.bg, width: '100%', maxWidth: 560, maxHeight: '92vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Préparer l'annonce</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Brouillon gardé dans VRM — <b>rien n'est envoyé à Vinted</b>. Le N° de l'article ne change pas.</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.muted }}>
+            <span style={{ flexShrink: 0, fontWeight: 700, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 8, padding: '2px 8px' }}>N°{(e && e.numero) || '—'}</span>
+            <span>conservé — une republication ne lui donne jamais un nouveau numéro.</span>
+          </div>
+          {photos.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{photos.slice(0, 12).map((p, i) => (<div key={i} style={{ width: 54, height: 70, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}><PhotoVinted src={p} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>))}</div>}
+          <label style={{ display: 'block' }}><span style={maj}>Titre</span>
+            <textarea value={title} onChange={ev => setTitle(ev.target.value)} rows={2} data-atelier-titre style={{ ...champ, resize: 'vertical' }} /></label>
+          <label style={{ display: 'block' }}><span style={maj}>Prix (€)</span>
+            <input value={price} onChange={ev => setPrice(ev.target.value)} inputMode="decimal" data-atelier-prix style={{ ...champ, maxWidth: 160 }} /></label>
+          {manques.length > 0 && <div data-atelier-manque style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>À compléter avant de publier : {manques.join(', ')}.</div>}
+          {draft && <div style={{ fontSize: 11.5, color: C.muted }}>Dernier brouillon{draft.updatedAt ? ` le ${new Date(draft.updatedAt).toLocaleDateString('fr-FR')}` : ''}{draft.versions && draft.versions.length ? ` · ${draft.versions.length} version${draft.versions.length > 1 ? 's' : ''} gardée${draft.versions.length > 1 ? 's' : ''}` : ''}.</div>}
+          <button type="button" data-atelier-enregistrer onClick={enregistrer} disabled={done}
+            style={{ border: `1px solid ${C.accent}`, background: done ? C.accent : `${C.accent}12`, color: done ? '#fff' : C.accent, borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {done ? '✓ Brouillon enregistré' : '💾 Enregistrer le brouillon'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
   const [img, setImg] = useState(null);          // HTMLImageElement chargée
   const [zoom, setZoom] = useState(1);
@@ -21415,6 +21467,102 @@ function PhotoroomCle() {
     </div>
   );
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE COLLECTIVE : PRÉPARER UNE PAIRE DEPUIS VRM (27 octobre, 5.235)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux pouvoir le faire sur VRM directement, pouvoir publier ».
+// Les paires en ligne et numérotées (la même source que l'écran eBay,
+// `useEbayPaires`, §11) ; un clic ⇒ l'extension ouvre Vestiaire, remplit ce
+// qu'elle RECONNAÎT et attache les photos ; IL relit et publie (le formulaire
+// n'a jamais été vu : VRM ne clique jamais « Publier » à sa place). « Déjà
+// publiée » note la paire (`vinted_vc_posted`) : elle sort de la liste.
+function PublierVestiaire({ comptes }) {
+  const { paires, enLigne } = useEbayPaires(comptes);
+  const { jobs } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const [publiees, setPubliees] = React.useState(undefined);   // undefined en cours · null pas su · Set
+  const [msg, setMsg] = React.useState({});
+  const [envoi, setEnvoi] = React.useState('');
+  const [tout, setTout] = React.useState(false);
+  const relire = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_vc_posted&select=ids:data->ids`, { headers: sbAuth() });
+      if (!r.ok) throw new Error('lecture');
+      const rows = await r.json();
+      setPubliees(new Set(((rows && rows[0] && rows[0].ids) || []).map(String)));
+    } catch (_) { setPubliees(null); }
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'vestiaire') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const glob = raisonExtGlobale(sansSouris, { cap: 'vcpublier', role: 'prépare tes annonces Vestiaire' });
+  const liste = (paires || []).filter((p) => !(publiees && publiees.has(String(p.id))));
+  const visibles = tout ? liste : liste.slice(0, 12);
+  const preparer = async (p) => {
+    if (envoi) return;
+    if (glob) { setMsg((m) => ({ ...m, [p.id]: glob.texte })); return; }
+    setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
+    const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id) }, 30000);
+    setEnvoi('');
+    if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
+    if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
+    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier();
+  };
+  const marquer = async (p) => {
+    if (envoi) return;
+    const ok = await askConfirm({ title: `N°${p.num} déjà publiée sur Vestiaire ?`, desc: "Elle sort de cette liste. Rien n'est envoyé à Vestiaire.", ok: 'Oui, elle est en ligne', cancel: 'Annuler' });
+    if (!ok) return;
+    setEnvoi(p.id);
+    const r = await vmrCmd({ cmd: 'vcMarque', id: String(p.id), etat: 'posted' }, 15000);
+    setEnvoi('');
+    if (!r || !r.accepte) { setMsg((m) => ({ ...m, [p.id]: (r && r.raison) || "L'extension n'a pas répondu — rien n'est noté." })); return; }
+    relire();
+  };
+  const btn = (accent) => ({ display: 'inline-flex', alignItems: 'center', minHeight: 36, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5, padding: '7px 11px', cursor: 'pointer',
+    border: `1px solid ${accent && !glob ? C.accent : C.border}`, background: accent && !glob ? `${C.accent}14` : 'transparent', color: accent && !glob ? C.accent : C.muted });
+  let corps;
+  if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes paires en ligne…</div>;
+  else if (enLigne === null) corps = <div data-vc-publier="pas-su" style={{ fontSize: 12.5, color: C.muted }}>Je n'ai pas pu lire tes annonces Vinted — rien n'est perdu, réessaie dans un moment.</div>;
+  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Toutes tes paires en ligne sont notées publiées sur Vestiaire.' : "Aucune paire en ligne et numérotée pour l'instant."}</div>;
+  else corps = (
+    <div data-vc-publier="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {publiees === null && <div style={{ fontSize: 11.5, color: C.muted }}>Je n'ai pas pu lire lesquelles sont déjà notées publiées sur Vestiaire — l'extension le revérifie au clic.</div>}
+      {visibles.map((p) => {
+        const job = jobs['vc:' + p.id] || null;
+        const ouvert = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 30 * 60000);
+        return (
+          <div key={p.id} data-vc-paire={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8, flexWrap: 'wrap' }}>
+            {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 36, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}/> : null}
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>N°{p.num} · {p.title || '—'}</div>
+              <div style={{ fontSize: 11.5, color: C.muted }}>{p.prix != null ? fmt(p.prix) : 'prix —'}{p.photos && p.photos.length ? ` · ${p.photos.length} photo${p.photos.length > 1 ? 's' : ''}` : ''}</div>
+              {msg[p.id] ? <div data-vc-refus="" style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg[p.id]}</div> : null}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" data-vc-preparer={p.id} aria-disabled={glob ? 'true' : undefined} title={glob ? glob.texte : "L'extension ouvre Vestiaire et remplit ce qu'elle reconnaît — tu relis et tu publies"} onClick={() => preparer(p)} style={btn(true)}>
+                {envoi === p.id ? 'Envoi…' : ouvert ? 'Ouvert sur Vestiaire' : 'Préparer sur Vestiaire'}
+              </button>
+              <button type="button" data-vc-marquer={p.id} onClick={() => marquer(p)} style={btn(false)}>Déjà publiée</button>
+            </div>
+          </div>
+        );
+      })}
+      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} paires</button>}
+    </div>
+  );
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
+        L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b> : VRM ne publie jamais à ta place sur Vestiaire.
+        {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
+      </div>
+      {corps}
+    </Card>
+  );
+}
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
   useEffect(() => { let stop = false; (async () => {
@@ -21475,7 +21623,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Bientôt disponible' : `Ce que VRM sait de ${court}`}/>
+      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Mets tes paires en vente sur Vestiaire depuis VRM' : `Ce que VRM sait de ${court}`}/>
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
@@ -21533,14 +21681,16 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
+        {plat==='Vestiaire Collective' && <PublierVestiaire comptes={comptes}/>}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
-              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/><PhotoroomCle/></>
+              ? <>Tes ventes Vestiaire ne remontent pas encore dans VRM : le total ci-dessus ne compte rien d'inventé. Pour <b>mettre une paire en vente</b>, choisis-la ci-dessous : l'extension ouvre Vestiaire et remplit ce qu'elle reconnaît.<PhotoroomCle/></>
               : plat==='Leboncoin'
               ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
               : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
           </div>
+          {plat==='Vestiaire Collective' && <VestiaireMesure/>}
           {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
             <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
               Ouvrir l'écran Annonces →
@@ -31696,6 +31846,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //  données du nuage au passage d'un écran.)
   const [repubAi, setRepubAi] = useState({ busy:false, key:'', res:null, why:'', reason:'' }); // état de la rédaction IA
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
+  // ══ ATELIER DE REPUBLICATION — TRANCHE 1 : brouillon VRM (socle, non destructif) ══
+  // Préparer/conserver le contenu d'une annonce DANS VRM, sans rien toucher sur
+  // Vinted. Clé = N° VRM (sinon id d'annonce — le N° ne change JAMAIS, §5).
+  // Valeur = { title, price, photos:[url], numero, id, versions:[…], updatedAt }.
+  // Synchronisé (`vinted_annonce_drafts`). ⚠️ CARTE : au retour du nuage on
+  // FUSIONNE (une clé éditée pendant le chargement n'est jamais écrasée, §5.49).
+  const [drafts, setDrafts] = useState(() => { const d = load('vinted_annonce_drafts', {}); return d && typeof d === 'object' && !Array.isArray(d) ? d : {}; });
+  React.useEffect(() => onCloudReady(() => setDrafts(local => { const nu = load('vinted_annonce_drafts', {}) || {}; return { ...nu, ...(local || {}) }; })), []);
+  const [atelier, setAtelier] = useState(null); // id de l'annonce en préparation, ou null
+  // Enregistre/complète un brouillon sans jamais perdre l'ancienne version (§31).
+  // `patch` ne remplace que ce qu'il porte ; le reste (et surtout le N°) est gardé.
+  const saveDraft = (key, patch) => {
+    const k = String(key || '').trim(); if (!k) return;
+    setDrafts(prev => {
+      const cur = prev[k] || {};
+      const avant = (cur.title != null || cur.price != null || cur.desc != null)
+        ? [{ title: cur.title, price: cur.price, desc: cur.desc, at: cur.updatedAt }] : [];
+      const versions = [...avant, ...(Array.isArray(cur.versions) ? cur.versions : [])].slice(0, 10);
+      const next = { ...prev, [k]: { ...cur, ...patch, numero: cur.numero || k, versions, updatedAt: new Date().toISOString() } };
+      save('vinted_annonce_drafts', next); return next;
+    });
+  };
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -32234,6 +32406,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // une confirmation qui dit le risque (un programme qui accepte sur Vinted).
   const [offresAuto, setOffresAuto] = useState(() => load('vinted_offres_auto', false) === true);
   React.useEffect(() => onCloudReady(() => setOffresAuto(load('vinted_offres_auto', false) === true)), []);
+  // (27 oct., refus auto) Le message envoyé à l'acheteur quand VRM refuse une offre
+  // trop basse — SON texte, vide par défaut (refus sans message). Synchronisé ;
+  // rattrapé au nuage et SEULEMENT s'il est resté vide (§5.49 : jamais par-dessus
+  // un texte tapé pendant le chargement).
+  const [refusMsg, setRefusMsg] = useState(() => load('vinted_offre_refus_msg', '') || '');
+  React.useEffect(() => onCloudReady(() => setRefusMsg(v => (v && v.trim()) ? v : (load('vinted_offre_refus_msg', '') || ''))), []);
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
@@ -32306,6 +32484,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // `mp` : sans ça, poser un mini sur une annonce sans N° ni prix d'achat
       // effacerait l'entrée — donc le mini — à la ligne suivante.
       const emptyMin = next.min == null || String(next.min).trim() === '';
+      // (27 oct., refus auto) Le seuil de refus `refuse` compte aussi comme une valeur.
+      const emptyRefuse = next.refuse == null || String(next.refuse).trim() === '';
       // ⚠️ (relecture du 11 octobre) Après une remise à zéro, la base REFUSE
       //    qu'une fiche numérotée disparaisse (`vrm_fiche_perdue` : c'est la
       //    signature d'un appareil chargé avant qu'un autre ne numérote). Effacer
@@ -32313,7 +32493,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    appareil… »), et plus rien ne se synchronisait. On garde la fiche,
       //    son N° vide — elle compte exactement comme une fiche absente partout.
       const etaitNumerotee = !!String(c.numero || '').trim();
-      if (emptyNum && emptyBuy && emptyMp && emptyMin && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
+      if (emptyNum && emptyBuy && emptyMp && emptyMin && emptyRefuse && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -41697,13 +41877,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Rien sous le mini." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
                 style={{flexShrink:0,width:46,height:26,borderRadius:13,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
                 <span style={{position:'absolute',top:3,left:offresAuto?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
               </button>
             </div>
+            {offresAuto && (
+              <div data-offre-refus style={{display:'flex',flexDirection:'column',gap:4,marginTop:2}}>
+                <div style={{fontSize:11.5,color:C.muted,lineHeight:1.4}}>Pose aussi un <b style={{color:C.text,fontWeight:600}}>{'« refuse < »'}</b> sur une annonce : une offre sous ce montant est refusée toute seule. Le message ci-dessous part à l'acheteur quand VRM refuse — <b style={{color:C.text,fontWeight:600}}>ton texte</b>, laissé vide = refus sans message.</div>
+                <textarea data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
+                  rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"
+                  style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12.5,background:C.card,color:C.text,outline:'none',resize:'vertical',fontFamily:'inherit',boxSizing:'border-box'}}/>
+              </div>
+            )}
             {offresAuto && extSait('offresauto')!=='ok' && (
               <div data-offres-auto-ext={extSait('offresauto')} style={{fontSize:11.5,color:C.warn,lineHeight:1.4}}>{extSait('offresauto')==='absente'
                 ? "Pour que l'acceptation tourne, ouvre VRM dans le Chrome (ordinateur) où l'extension est installée et connectée."
@@ -42439,6 +42627,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(()=>{ const min = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.')); return (
                       <span style={pillEdit} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place"><span style={lab}>mini</span><EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
                         titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={val}>{min!=null&&isFinite(min)&&min>0?prixCourt(min):'—'}</span>}/></span>); })()}
+                      {(()=>{ const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.')); return (
+                      <span style={pillEdit} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)"><span style={lab}>{'refuse <'}</span><EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
+                        titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={val}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/></span>); })()}
+                      {(()=>{ const kd=String((e&&e.numero)||item.id); const d=drafts[kd]; return (<>
+                        <button type="button" data-atelier-ouvrir={kd} onClick={()=>setAtelier(item.id)}
+                          style={{...pillEdit,cursor:'pointer',border:`1px solid ${d?C.accent:C.border}`,color:d?C.accent:C.text,fontWeight:600}}
+                          title="Préparer cette annonce dans VRM — un brouillon, sans rien toucher sur Vinted">✨ Préparer</button>
+                        {d && <span data-brouillon-vrm={kd} title={`Brouillon VRM enregistré${d.updatedAt?` le ${new Date(d.updatedAt).toLocaleDateString('fr-FR')}`:''}`} style={{...pillEdit,color:C.accent,border:`1px solid ${C.accent}`,fontWeight:700}}>Brouillon VRM</span>}
+                      </>); })()}
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>
@@ -45138,6 +45335,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Éditeur de photo (recadrer / zoomer) — retouche manuelle, Julien
              téléverse lui-même sur Vinted. Aucune modif auto (refus tenu). ── */}
       {photoEdit && <PhotoEditor refPhoto={photoEdit.refPhoto} refTitle={photoEdit.refTitle} onClose={()=>setPhotoEdit(null)} toast={toast} />}
+      {atelier!=null && (()=>{ const it=(listings.items||[]).find(x=>String(x.id)===String(atelier)); if(!it) return null; const e=numeros[atelier]||{}; const k=String((e&&e.numero)||atelier); return (
+        <AtelierBrouillon it={it} e={e} k={k} draft={drafts[k]} onSave={(p)=>saveDraft(k,p)} onClose={()=>setAtelier(null)} />
+      ); })()}
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
@@ -53388,7 +53588,7 @@ function AppCoeur() {
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
-        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} comptes={vintedAccounts}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
