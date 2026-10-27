@@ -41,6 +41,10 @@ const SCRIPT = `(() => {
   const poserProprio = () => { try { const c = JSON.parse(ls.getItem('vrm_session') || 'null'); if (c && c.user && c.user.id && !ls.getItem('vrm_local_owner')) Storage.prototype.setItem.call(ls, 'vrm_local_owner', c.user.id); } catch (_) {} };
   try { const si2 = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { si2.call(this, k, v); if (this === ls && k === 'vrm_session') poserProprio(); }; } catch (_) {}
   poserProprio();
+  // (27 oct.) La présentation d'arrivée (src/Bienvenue.jsx) s'ouvre pour un compte
+  // neuf — ce que simulent la plupart des bancs. Elle recouvrirait l'écran qu'ils
+  // jugent : on la marque vue, sauf pour un banc qui la juge (vrm_banc_bienvenue).
+  try { if (ls.getItem('vrm_banc_bienvenue') !== '1' && !ls.getItem('vrm_bienvenue_vue')) Storage.prototype.setItem.call(ls, 'vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); } catch (_) {}
   const vrai = window.fetch.bind(window);
   window.fetch = async function (entree, init) {
     const url = typeof entree === 'string' ? entree : (entree && entree.url) || '';

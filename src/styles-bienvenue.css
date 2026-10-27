@@ -1,0 +1,72 @@
+/* La présentation d'arrivée (src/Bienvenue.jsx). Hors de la coque (portail sur
+   <body>) : ses couleurs suivent `data-theme` de la racine, pas les variables de
+   l'app. Une seule teinte d'accent (§7), le reste neutre. */
+.vrm-bienvenue {
+  --b-fond: rgba(10, 14, 20, .46); --b-carte: #ffffff; --b-encre: #0e1116; --b-doux: #5b6472;
+  --b-filet: #e4e8ef; --b-sol: #f4f6fa; --b-accent: #2458e6;
+  position: fixed; inset: 0; z-index: 19000; display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: var(--b-fond); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: vrm-b-voile .25s ease both; font-family: inherit;
+}
+:root[data-theme="dark"] .vrm-bienvenue {
+  --b-fond: rgba(2, 3, 5, .62); --b-carte: #10141b; --b-encre: #eef1f6; --b-doux: #98a2b3;
+  --b-filet: #222a36; --b-sol: #07090d; --b-accent: #3d7bff;
+}
+.vrm-bienvenue-panneau {
+  width: min(520px, 100%); max-height: 100%; overflow-y: auto; outline: none;
+  background: var(--b-carte); color: var(--b-encre); border: 1px solid var(--b-filet); border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 30px 80px -30px rgba(0,0,0,.45);
+  padding: 18px 22px 22px; animation: vrm-b-monte .38s cubic-bezier(.2,.7,.2,1) both;
+}
+.vrm-bienvenue-tete { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.vrm-bienvenue-progres { flex: 1; display: flex; gap: 5px; }
+.vrm-bienvenue-progres span { flex: 1; height: 4px; border-radius: 4px; background: var(--b-filet); transition: background .3s ease; }
+.vrm-bienvenue-progres span[data-fait="1"] { background: var(--b-accent); }
+.vrm-bienvenue-passer { min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--b-doux); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 10px; }
+.vrm-bienvenue-passer:hover { color: var(--b-encre); }
+.vrm-bienvenue-corps { animation: vrm-b-entre .32s cubic-bezier(.2,.7,.2,1) both; }
+.vrm-bienvenue-sur { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--b-accent); letter-spacing: .01em; }
+.vrm-bienvenue h2 { margin: 0 0 10px; font-family: 'Space Grotesk', inherit; font-size: 27px; line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
+.vrm-bienvenue-texte { margin: 0 0 18px; font-size: 15.5px; line-height: 1.55; color: var(--b-doux); }
+.vrm-bienvenue-univers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 20px; }
+.vrm-bienvenue-univers button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; min-height: 44px; text-align: left;
+  border: 1.5px solid var(--b-filet); border-radius: 14px; background: var(--b-sol); color: var(--b-encre); font: inherit; cursor: pointer;
+  transition: border-color .2s ease, transform .15s ease;
+}
+.vrm-bienvenue-univers button[data-choisi="1"] { border-color: var(--b-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--b-accent) 18%, transparent); }
+.vrm-bienvenue-univers button:active { transform: scale(.98); }
+.vrm-bienvenue-univers b { font-size: 15px; margin-top: 8px; }
+.vrm-bienvenue-univers small { font-size: 12.5px; color: var(--b-doux); }
+.vrm-bienvenue-apercu { width: 100%; aspect-ratio: 16 / 10; border-radius: 9px; padding: 9px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(0,0,0,.06); }
+.vrm-bienvenue-apercu.clair { background: #f4f6fa; }
+.vrm-bienvenue-apercu.nuit { background: #07090d; border-color: #222a36; }
+.vrm-bienvenue-apercu i { display: block; height: 22%; border-radius: 5px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.vrm-bienvenue-apercu.nuit i { background: #10141b; box-shadow: none; }
+.vrm-bienvenue-apercu i:first-child { width: 55%; background: #2458e6; }
+.vrm-bienvenue-apercu.nuit i:first-child { background: #3d7bff; }
+.vrm-bienvenue-demo { position: relative; margin: 6px 0 16px; padding: 14px; border-radius: 14px; background: var(--b-sol); border: 1px solid var(--b-filet); display: flex; flex-direction: column; gap: 8px; }
+.vrm-bienvenue-demo > div { display: flex; justify-content: space-between; gap: 10px; padding: 11px 12px; border-radius: 10px; background: var(--b-carte); border: 1px solid var(--b-filet); font-size: 14px; animation: vrm-b-ligne .4s cubic-bezier(.2,.7,.2,1) both; }
+.vrm-bienvenue-demo > div span { color: var(--b-doux); }
+.vrm-bienvenue-demo > div b { font-weight: 650; font-variant-numeric: tabular-nums; }
+.vrm-bienvenue-exemple { position: absolute; top: -9px; right: 12px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--b-doux); background: var(--b-carte); border: 1px solid var(--b-filet); }
+.vrm-bienvenue-gestes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.vrm-bienvenue-principal, .vrm-bienvenue-second { min-height: 46px; padding: 0 18px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 650; cursor: pointer; transition: transform .12s ease, filter .15s ease; }
+.vrm-bienvenue-principal { border: 0; background: var(--b-accent); color: #fff; margin-left: auto; }
+.vrm-bienvenue-principal:hover { filter: brightness(1.06); }
+.vrm-bienvenue-second { border: 1px solid var(--b-filet); background: transparent; color: var(--b-encre); }
+.vrm-bienvenue-principal:active, .vrm-bienvenue-second:active { transform: scale(.97); }
+@media (max-width: 420px) {
+  .vrm-bienvenue { align-items: flex-end; padding: 0; }
+  .vrm-bienvenue-panneau { border-radius: 20px 20px 0 0; padding: 14px 18px calc(18px + env(safe-area-inset-bottom)); }
+  .vrm-bienvenue h2 { font-size: 24px; }
+  .vrm-bienvenue-gestes > * { flex: 1 1 auto; }
+}
+@keyframes vrm-b-voile { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vrm-b-monte { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes vrm-b-entre { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes vrm-b-ligne { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-bienvenue, .vrm-bienvenue-panneau, .vrm-bienvenue-corps, .vrm-bienvenue-demo > div { animation: none !important; }
+}

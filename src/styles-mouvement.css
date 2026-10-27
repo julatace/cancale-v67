@@ -1,0 +1,26 @@
+/* ── Le mouvement de VRM (27 oct., Julien : « du motion design, des effets entre
+   les pages »). Trois gestes, tous courts et sobres, aucun qui fasse attendre :
+   1. changer d'écran : le contenu arrive en fondu, glissé de 6 px (220 ms) ;
+   2. presser un bouton : il s'enfonce à peine (retour immédiat au doigt) ;
+   3. les sections d'une plateforme et les cartes posées arrivent en fondu.
+   Opacité et transform seulement ; l'animation se retire à la fin (`fill: none`)
+   pour ne laisser AUCUN contexte d'empilement durable sur `<main>` (§7, les
+   feuilles sous la barre du bas sur iPhone, 23 oct.).
+   « Réduire les animations » : tout s'éteint. */
+
+.vrm-app-shell .vrm-main.vrm-ecran-anime { animation: vrm-ecran-entree .22s cubic-bezier(.2,.7,.2,1); }
+@keyframes vrm-ecran-entree { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.vrm-main button:not(:disabled), .vrm-main [role="button"], .vrm-main summary {
+  transition: transform .12s cubic-bezier(.2,.7,.2,1), background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.vrm-main button:not(:disabled):active, .vrm-main [role="button"]:active { transform: scale(.97); }
+
+.vrm-main .vrm-platform-tabs + * { animation: vrm-section-entree .24s cubic-bezier(.2,.7,.2,1); }
+@keyframes vrm-section-entree { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-app-shell .vrm-main.vrm-ecran-anime, .vrm-main .vrm-platform-tabs + * { animation: none !important; }
+  .vrm-main button, .vrm-main [role="button"], .vrm-main summary { transition: none !important; }
+  .vrm-main button:active, .vrm-main [role="button"]:active { transform: none !important; }
+}

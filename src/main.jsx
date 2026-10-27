@@ -77,6 +77,8 @@ import './styles-captures.css';
 import './styles-annonces-ventes.css';
 import './styles-statut.css';
 import './styles-annonces-pro.css';
+import './styles-mouvement.css';
+import './styles-bienvenue.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

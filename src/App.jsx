@@ -31,6 +31,7 @@ import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "rea
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
 import { createPortal } from "react-dom";
+import Bienvenue from "./Bienvenue.jsx";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans } from "./plantages.js";
 import * as photosVinted from "./photosVinted.js";
@@ -1593,6 +1594,8 @@ const SYNC_KEYS = [
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
+  'vrm_bienvenue_vue',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
   'vrm_ebay_liens',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
@@ -48897,6 +48900,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
       { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
+      { id:'bienvenue', type:'action', ic:'info', lib:'Présentation de VRM', val:'Revoir', onClick:()=>{ try{ window.dispatchEvent(new Event('vrm:bienvenue')); }catch(_){} }, data:{ 'data-reglage-bienvenue':'1' } },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
@@ -52202,6 +52206,18 @@ function AppCoeur() {
   //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
   //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
   const [tab,setTabBrut]=useState('journee');
+  // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
+  // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
+  // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si
+  // la personne a demandé de réduire les animations.
+  useEffect(() => {
+    const m = document.querySelector('.vrm-main');
+    if (!m) return;
+    m.classList.remove('vrm-ecran-anime'); void m.offsetWidth; m.classList.add('vrm-ecran-anime');
+    const fin = (e) => { if (e.target === m) m.classList.remove('vrm-ecran-anime'); };
+    m.addEventListener('animationend', fin);
+    return () => m.removeEventListener('animationend', fin);
+  }, [tab]);
   // (17 oct., Julien) TROIS ÉCRANS QUITTENT LE MENU, SANS DISPARAÎTRE : « Prix
   // qui marche » devient une rubrique de Statistiques, « Factures » une rubrique
   // de Comptabilité, et « Collectif » (déjà dans Statistiques) est retiré. Les
@@ -52679,6 +52695,16 @@ function AppCoeur() {
   //    hoquette accueille quelqu'un qui a neuf comptes par « installe
   //    l'extension ».
   const premierJour = accountsLoaded && !baseKO && vintedAccounts.length === 0;
+  // (27 oct.) La présentation d'arrivée (src/Bienvenue.jsx) : une fois, pour une
+  // nouvelle personne (aucun compte Vinted lié, base lue), seulement quand le
+  // nuage est arrivé (« pas su » ne la rouvre pas sur un autre appareil). Elle se
+  // revoit depuis Réglages → Affichage (évènement `vrm:bienvenue`).
+  const [bienvenue,setBienvenue]=useState(false);
+  useEffect(()=>{
+    if(!premierJour) return undefined;
+    return onCloudReady(()=>{ if(!load('vrm_bienvenue_vue',null)) setBienvenue(true); });
+  },[premierJour]);
+  useEffect(()=>{ const o=()=>setBienvenue(true); window.addEventListener('vrm:bienvenue',o); return ()=>window.removeEventListener('vrm:bienvenue',o); },[]);
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   // Les ventes Vinted de TOUS les comptes liés, telles que l'écran Ventes les lit
   // (`_acc` posé) : `undefined` pas encore lu · `null` aucune lecture n'a abouti.
@@ -54570,6 +54596,9 @@ function AppCoeur() {
         </>)}
         </EcranGardeFou>
       </main>
+      {bienvenue && <Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark}
+        onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
+        onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/>}
       <MemoireDefilement ecran={`${tab}:${tab.startsWith('plat_')?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
