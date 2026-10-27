@@ -1598,7 +1598,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -3647,8 +3647,11 @@ const fetchDescLens = async () => {
         // Photos EFFECTIVEMENT captées de la page (≤ nPhotos tant que le
         // carrousel Vinted n'a pas tout livré) : sert au signal « toute
         // l'annonce captée → prête pour Leboncoin ».
-        const ph = Array.isArray(d[k] && d[k].photos) ? d[k].photos.length : 0;
-        if (len || ph) out[String(k)] = { len, ph };
+        const photos = Array.isArray(d[k] && d[k].photos) ? d[k].photos.filter(Boolean) : [];
+        const ph = photos.length;
+        // On garde les URL (petites, pas le texte lourd — §34 vise la description) :
+        // l'atelier en a besoin pour l'aperçu et les réglages photo (tranche 2).
+        if (len || ph) out[String(k)] = { len, ph, photos };
       }
     }
   } catch (_) { /* réseau : on se passe du complément */ }
@@ -10806,14 +10809,48 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   const [price, setPrice] = useState(() => { const p = draft && draft.price != null ? draft.price : prix0; return p == null ? '' : String(p); });
   const [done, setDone] = useState(false);
   const photos = ((draft && draft.photos && draft.photos.length) ? draft.photos
-    : (Array.isArray(it.photos) && it.photos.length ? it.photos : [it.photo])).filter(Boolean);
+    : (Array.isArray(it.photosDetail) && it.photosDetail.length ? it.photosDetail
+      : (Array.isArray(it.photos) && it.photos.length ? it.photos : [it.photo]))).filter(Boolean);
+  // ── Réglages photo (tranche 2) — NON destructifs : on garde des VALEURS, pas
+  //    des pixels (§15 : « les valeurs décrivent un rendu à partir de l'original,
+  //    pas une succession de recompressions »). L'aperçu est en CSS (filtre +
+  //    transform) : il marche sur les photos CDN de Vinted, qu'un canvas ne
+  //    pourrait pas exporter (cross-origin → tainted). La photo finale sera
+  //    produite À PARTIR DE L'ORIGINAL au moment de la publication (côté
+  //    extension, qui a les octets) — jamais une recompression dans l'app (§11).
+  //    Ordre de rendu prévu, stable (§15) : orientation → zoom → lumière/couleur.
+  const DEF_R = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
+  const [rCommun, setRCommun] = useState(() => ({ ...DEF_R, ...((draft && draft.photoReglages && draft.photoReglages.commun) || {}) }));
+  const [rParPhoto, setRParPhoto] = useState(() => ({ ...((draft && draft.photoReglages && draft.photoReglages.parPhoto) || {}) }));
+  const [actif, setActif] = useState(0);            // photo en cours d'aperçu
+  const [presets, setPresets] = useState(() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p : []; });
+  const [presetNom, setPresetNom] = useState('');
+  const aException = (i) => Object.prototype.hasOwnProperty.call(rParPhoto, i);
+  const regDe = (i) => (aException(i) ? rParPhoto[i] : rCommun);
+  const nExceptions = Object.keys(rParPhoto).length;
+  const nCommunes = Math.max(0, photos.length - nExceptions);
+  const cssDe = (r) => ({ filter: `brightness(${r.bright}) contrast(${r.contrast}) saturate(${r.sat})`, transform: `rotate(${r.rot}deg) scale(${r.zoom})`, transformOrigin: 'center center' });
+  const rActif = regDe(actif);
+  const majActif = (patch) => { if (aException(actif)) setRParPhoto(p => ({ ...p, [actif]: { ...p[actif], ...patch } })); else setRCommun(c => ({ ...c, ...patch })); };
+  const basculeException = () => setRParPhoto(p => { const u = { ...p }; if (u[actif]) delete u[actif]; else u[actif] = { ...rCommun }; return u; });
+  const appliquerToutes = () => setRParPhoto({});          // tout revient aux réglages communs (§13)
+  const reinitPhotos = () => { setRCommun({ ...DEF_R }); setRParPhoto({}); };
+  const enregistrerPreset = () => { const nom = presetNom.trim(); if (!nom) return; const next = [...presets.filter(x => x && x.nom !== nom), { nom, r: { ...rCommun } }].slice(-12); setPresets(next); save('vrm_photo_presets', next); setPresetNom(''); };
+  const slider = (lab, cle, min, max, step) => (
+    <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+      <span style={{ width: 86, flexShrink: 0, color: C.muted }}>{lab}</span>
+      <input type="range" min={min} max={max} step={step} value={rActif[cle]} data-reglage={cle}
+        onChange={ev => majActif({ [cle]: Number(ev.target.value) })} style={{ flex: 1, accentColor: C.accent }} />
+    </label>
+  );
   const prixNum = String(price).trim() === '' ? null : Number(String(price).replace(',', '.'));
   const prixOk = isFinite(prixNum) && prixNum > 0;
   const manques = [];
   if (!String(title).trim()) manques.push('le titre');
   if (!prixOk) manques.push('le prix');
   if (!photos.length) manques.push('au moins une photo');
-  const enregistrer = () => { onSave({ title: String(title).trim(), price: prixOk ? prixNum : null, photos, id: it.id }); setDone(true); setTimeout(onClose, 700); };
+  const photoReglages = { commun: rCommun, parPhoto: rParPhoto };
+  const enregistrer = () => { onSave({ title: String(title).trim(), price: prixOk ? prixNum : null, photos, photoReglages, id: it.id }); setDone(true); setTimeout(onClose, 700); };
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
   return (
@@ -10831,7 +10868,46 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             <span style={{ flexShrink: 0, fontWeight: 700, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 8, padding: '2px 8px' }}>N°{(e && e.numero) || '—'}</span>
             <span>conservé — une republication ne lui donne jamais un nouveau numéro.</span>
           </div>
-          {photos.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{photos.slice(0, 12).map((p, i) => (<div key={i} style={{ width: 54, height: 70, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}><PhotoVinted src={p} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>))}</div>}
+          {photos.length > 0 && (
+            <div data-atelier-photos style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span style={maj}>Photos — réglages (aperçu ; la photo finale repart de l'original à la publication)</span>
+              <div style={{ display: 'flex', justifyContent: 'center', background: C.card, borderRadius: 10, padding: 8 }}>
+                <div style={{ width: 160, height: 210, overflow: 'hidden', borderRadius: 8, background: C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <PhotoVinted src={photos[actif]} alt="" data-photo-apercu loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssDe(rActif) }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {photos.slice(0, 12).map((p, i) => (
+                  <button key={i} type="button" data-photo-vignette={i} onClick={() => setActif(i)}
+                    style={{ position: 'relative', width: 46, height: 60, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0, padding: 0, cursor: 'pointer', border: `2px solid ${i === actif ? C.accent : 'transparent'}` }}>
+                    <PhotoVinted src={p} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssDe(regDe(i)) }} />
+                    {aException(i) && <span title="réglages à part" style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: C.accent }} />}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ width: 86, flexShrink: 0, fontSize: 12, color: C.muted }}>Rotation</span>
+                  <button type="button" data-reglage-rot onClick={() => majActif({ rot: ((rActif.rot || 0) + 90) % 360 })} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↻ {rActif.rot || 0}°</button>
+                </div>
+                {slider('Luminosité', 'bright', 0.5, 1.5, 0.01)}
+                {slider('Contraste', 'contrast', 0.5, 1.5, 0.01)}
+                {slider('Saturation', 'sat', 0, 2, 0.01)}
+                {slider('Zoom', 'zoom', 1, 2, 0.01)}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12 }}>
+                <span data-photos-compte style={{ color: C.muted }}>{aException(actif) ? 'cette photo a ses propres réglages' : `réglages communs à ${nCommunes} photo${nCommunes > 1 ? 's' : ''}`}{nExceptions ? ` · ${nExceptions} exception${nExceptions > 1 ? 's' : ''}` : ''}</span>
+                <button type="button" data-photo-exception onClick={basculeException} style={{ marginLeft: 'auto', border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '5px 9px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{aException(actif) ? 'remettre au commun' : 'régler à part'}</button>
+                <button type="button" data-appliquer-toutes onClick={appliquerToutes} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '5px 9px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Appliquer à toutes</button>
+                <button type="button" data-reset-photos onClick={reinitPhotos} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 8, padding: '5px 9px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réinitialiser</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                {presets.map((p, i) => (<button key={i} type="button" data-preset-apply={p.nom} onClick={() => majActif({ ...p.r })} style={{ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 999, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{p.nom}</button>))}
+                <input value={presetNom} onChange={ev => setPresetNom(ev.target.value)} placeholder="Nom du préréglage" data-preset-nom style={{ ...champ, flex: '1 1 120px', maxWidth: 180, padding: '6px 9px', fontSize: 12 }} />
+                <button type="button" data-preset-save onClick={enregistrerPreset} disabled={!presetNom.trim()} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: presetNom.trim() ? C.text : C.muted, borderRadius: 8, padding: '6px 10px', fontSize: 11.5, fontWeight: 600, cursor: presetNom.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>Enregistrer</button>
+              </div>
+            </div>
+          )}
           <label style={{ display: 'block' }}><span style={maj}>Titre</span>
             <textarea value={title} onChange={ev => setTitle(ev.target.value)} rows={2} data-atelier-titre style={{ ...champ, resize: 'vertical' }} /></label>
           <label style={{ display: 'block' }}><span style={maj}>Prix (€)</span>
@@ -36030,6 +36106,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (it.descLen == null && info.len) it.descLen = info.len;
         // Combien de photos on a VRAIMENT captées de la page (pour « X/Y captées »).
         if (info.ph) it.captPhotos = info.ph;
+        if (info.photos && info.photos.length && !(Array.isArray(it.photos) && it.photos.length)) it.photosDetail = info.photos;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer, masquees });

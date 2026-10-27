@@ -298,6 +298,17 @@ const projette = (row, sel) => {
             dit(/N°\s*41/.test(await modal.first().innerText()), 'la modale montre le N° VRM conservé (41)');
             await pg.locator('[data-atelier-titre]').fill('Nike Air Max 1 obsidian — remis en ligne');
             await pg.locator('[data-atelier-prix]').fill('54');
+            // ── tranche 2 : réglages photo (aperçu CSS, sélection + exception) ──
+            dit(await pg.locator('[data-atelier-photos]').count() > 0, 'atelier : la section réglages photo est présente (l’annonce a des photos)');
+            const setRange = async (cle, v) => pg.locator(`[data-reglage="${cle}"]`).evaluate((el, val) => { const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'); d.set.call(el, String(val)); el.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+            await setRange('bright', 1.3);          // réglage COMMUN (photo active = 0)
+            await pg.waitForTimeout(150);
+            const filt = await pg.locator('[data-photo-apercu]').first().evaluate(el => el.style.filter);
+            dit(/brightness\(1\.3\)/.test(filt), 'l’aperçu suit la luminosité EN DIRECT (filtre CSS, aucune recompression)', filt);
+            await pg.locator('[data-photo-vignette="1"]').click();   // 2e photo
+            await pg.locator('[data-photo-exception]').click();      // la régler À PART
+            await setRange('contrast', 1.4);
+            await pg.waitForTimeout(150);
             await pg.locator('[data-atelier-enregistrer]').click();
             await pg.waitForTimeout(900);   // `save` écrit le localStorage après un anti-rebond de 500 ms
             const d = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_drafts') || '{}'); } catch (_) { return {}; } });
@@ -305,6 +316,9 @@ const projette = (row, sel) => {
             dit(e41.title === 'Nike Air Max 1 obsidian — remis en ligne' && Number(e41.price) === 54, 'le brouillon est enregistré avec le titre et le prix édités', JSON.stringify(e41).slice(0, 120));
             dit(e41.numero === '41', 'le N° VRM est conservé dans le brouillon (jamais recréé)', String(e41.numero));
             dit(Array.isArray(e41.photos), 'les photos de l’annonce sont gardées dans le brouillon');
+            const pr = e41.photoReglages || {};
+            dit(pr.commun && Number(pr.commun.bright) === 1.3, 'les réglages photo COMMUNS sont enregistrés dans le brouillon', JSON.stringify(pr.commun || null));
+            dit(pr.parPhoto && pr.parPhoto['1'] && Number(pr.parPhoto['1'].contrast) === 1.4, 'une photo réglée à PART est gardée comme exception', JSON.stringify(pr.parPhoto || null));
             await pg.waitForTimeout(600);
             dit(await pg.locator('[data-carte-annonce="9101"] [data-brouillon-vrm]').count() > 0, 'la carte porte ensuite le badge « Brouillon VRM »');
           }
