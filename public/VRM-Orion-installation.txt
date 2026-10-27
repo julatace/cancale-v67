@@ -1,10 +1,6 @@
 VRM POUR ORION — IPHONE ET IPAD
 
-<<<<<<< Updated upstream
 Version du moteur VRM : 5.241.0
-=======
-Version du moteur VRM : 5.241.0
->>>>>>> Stashed changes
 Paquet d’import WebExtension adapté à Orion, distinct du ZIP Chrome.
 Ni fiche de boutique ni application Safari signée par Apple.
 
