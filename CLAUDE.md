@@ -103,6 +103,15 @@
 > retrait, titre publié, états des annonces, rafraîchir les ventes) repliées derrière ⓘ. Banc
 > `plateformes-premium.cjs` : 26 rouges sur main, 176 verts après.
 
+> **27 octobre — Vestiaire 5.239, achats :** l'extension lit la liste de tes
+> achats (`users/me/…orders|purchases|bought…`, jamais vue d'ici : reconnue au
+> chemin ; jamais le panier `orders/current-light`) dans `vc_achats` : id,
+> article, NOM de l'article (affichage seul, jamais un rapprochement), état,
+> date, montant avec sa clé, n° de suivi + transporteur. Jamais le vendeur, ton
+> adresse, ton email ni ta carte. Le montant n'entre dans aucun prix d'achat
+> (§2.5). Carte « Tes achats Vestiaire » + « Suivre ↗ ». Preuves :
+> `audit-vc-publier.cjs` (80, 3 mutations rouges), banc `vestiaire.cjs` (5 rouges sur main).
+
 > **27 octobre — Vestiaire 5.238, messages :** l'extension relève le NOMBRE de
 > non-lus (compteur `notification-feed-counter/v2` → `data.unseen.messages`,
 > mesuré) et, messagerie ouverte, les conversations SANS texte ni nom (id,
@@ -10184,6 +10193,7 @@ arrivée** — vérifiée commit par commit sur `manifest.json`, pas devinée.
 | `lbcmsg` | `storeLbcMessages` | **5.153.0** (4 oct.) | Leboncoin → Messages : « l'extension relève tes non-lus, compte par compte » |
 | `vestiaire` | `storeVcRecon` | **5.154.0** (4 oct.) | Vestiaire : « ouvre Vestiaire dans ce Chrome, l'extension apprend à le lire » |
 | `vcmessages` | `rangerVcMessages` | **5.238.0** (27 oct.) | « elle relève le nombre de messages non lus Vestiaire en passant » |
+| `vcachats` | `rangerVcAchats` | **5.239.0** (27 oct.) | « elle lit tes achats Vestiaire en passant » |
 | ~~`detourage`~~ | `detourerPhotos` | ⛔ retiré de la table le 17 oct. (5.185) | Leboncoin/eBay ne détourent plus ; Vestiaire seul (`photosPourVestiaire`), sans réglage ni promesse |
 | `supprimees` | `noterSuppression` | **5.165.0** (11 oct.) | « une suppression faite sur vinted.fr dans ce Chrome sort d'ici tout de suite » |
 | `enligne` | `relireAnnoncesAutresComptes` | **5.170.0** (11 oct. — les 5.167/5.168 de production ne la portent pas) | « tes autres comptes sont relus à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes » — et seulement si l'extension est connectée à CE compte VRM (revue, 5.170) |

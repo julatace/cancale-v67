@@ -40,6 +40,10 @@ srv.listen(PORT);
           if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
           return j(etat === 'lu' ? [META] : []);
         }
+        if (/id=eq\.vc_achats/.test(route.request().url())) {
+          if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
+          return j(etat === 'lu' ? [{ achats: { O42: { productId: '700001', nom: 'Nike Dunk Low', etat: 'shipped', date: '2026-10-25T08:00:00Z', montant: { valeur: 88, devise: 'EUR', cle: 'totalPrice' }, suivi: 'XW123456789FR', transporteur: 'Chronopost' } }, lecture: { at: auj.toISOString(), total: 1, complet: true, page: '/my-orders/' } }] : []);
+        }
         if (/id=eq\.vc_messages/.test(route.request().url())) {
           if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
           return j(etat === 'lu' ? [{ compteur: { messages: 3, at: new Date(auj.getTime() - 30 * 60e3).toISOString() }, conversations: { C1: { productId: '900001', ref: '401', nonLu: true, date: '2026-10-27T09:00:00Z' }, C2: { productId: '900009', ref: '', nonLu: null, date: '' } }, lecture: { at: auj.toISOString(), total: 2, complet: true, page: '/messages/' } }] : []);
@@ -50,7 +54,8 @@ srv.listen(PORT);
       await pg.goto(`http://localhost:${PORT}/?tab=plat_vestiaire`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-vc-mesure]', { timeout: 10000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-vc-mesure]'); return e ? { etat: e.getAttribute('data-vc-mesure'), t: e.innerText } : null; });
-      const page = await pg.evaluate(() => document.body.innerText);
+      // Le texte de la page SANS la carte des achats : un montant d'achat n'est pas un chiffre d'affaires.
+      const page = await pg.evaluate(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-vc-achats]').forEach((e) => e.remove()); document.body.appendChild(c); c.style.position = 'absolute'; const t = c.innerText; c.remove(); return t; });
       if (etat === 'lu') dit(v && v.etat === 'lu' && /6 pages/.test(v.t) && /23 appels/.test(v.t) && /il y a 2 h/.test(v.t), 'relevé : les chiffres de la MESURE et sa date', v && v.t.slice(0, 120));
       if (etat === 'jamais') dit(v && v.etat === 'jamais' && /Vestiaire/.test(v.t), 'jamais relevé : le geste qui fait avancer', v && v.t.slice(0, 120));
       if (etat === 'panne') dit(v && v.etat === 'pas-su' && !/pages,/.test(v.t), 'lecture ratée : ni chiffre, ni « jamais »', v && v.t.slice(0, 120));
@@ -65,6 +70,16 @@ srv.listen(PORT);
       }
       if (etat === 'jamais') dit(m && m.etat === 'jamais' && !/\b0 message/.test(m.t), 'messages jamais relevés : le geste, aucun « 0 »', m && m.t.slice(0, 120));
       if (etat === 'panne') dit(m && m.etat === 'pas-su' && !/non lu/.test(m.t), 'messages illisibles : « pas su », aucun nombre', m && m.t.slice(0, 120));
+      // 5.239 : les achats Vestiaire — trois états.
+      await pg.waitForSelector('[data-vc-achats]:not([data-vc-achats="charge"])', { timeout: 10000 }).catch(() => {});
+      const ac = await pg.evaluate(() => { const e = document.querySelector('[data-vc-achats]'); if (!e) return null; const s = e.querySelector('[data-suivre-colis]'); return { etat: e.getAttribute('data-vc-achats'), t: e.innerText, suivre: s ? s.href : '', h: s ? s.getBoundingClientRect().height : 0 }; });
+      if (etat === 'lu') {
+        dit(ac && ac.etat === 'lu' && /Nike Dunk Low/.test(ac.t) && /shipped/.test(ac.t) && /suivi XW123456789FR/.test(ac.t), 'achats : le nom de l’article, l’état de Vestiaire, le n° de suivi', ac && ac.t.slice(0, 160));
+        dit(ac && /chronopost\.fr/.test(ac.suivre) && ac.h >= 44, 'le colis se suit sur le site du transporteur (44 px)', ac && ac.suivre);
+        dit(ac && /aucun prix d.achat/.test(ac.t), 'le montant n’entre dans aucun prix d’achat (c’est toi qui les saisis), et c’est dit', ac && ac.t.slice(0, 200));
+      }
+      if (etat === 'jamais') dit(ac && ac.etat === 'jamais' && /panier n'est jamais lu/.test(ac.t), 'achats jamais lus : le geste', ac && ac.t.slice(0, 120));
+      if (etat === 'panne') dit(ac && ac.etat === 'pas-su' && !/achat vu/.test(ac.t), 'achats illisibles : « pas su », aucune liste', ac && ac.t.slice(0, 120));
       // (la phrase « pas encore reliée » est partie avec la 5.235 : on juge le chiffre, pas la phrase)
       dit(!/Vestiaire[^\n]{0,40}\d+,\d{2}\s?€/.test(page) && !/chiffre d.affaires[^\n]{0,40}Vestiaire[^\n]{0,20}\d/i.test(page), 'aucun chiffre d’affaires Vestiaire n’est inventé');
       const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));

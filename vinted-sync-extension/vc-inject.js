@@ -224,7 +224,7 @@
   // ⚠️ JAMAIS le nom, l'adresse, l'email ni le message de l'acheteur.
   const CLE_ETAT = /^(status|state|orderStatus|order_status|shippingStatus|shipping_status|step|statusLabel|transactionStatus)$/i;
   const CLE_DATE = /date|created|sold|paid|ordered|At$/i;
-  const CLE_MONTANT = /^(price|amount|total|sellerPrice|seller_price|earning|earnings|payout|netAmount|net_amount|sellingPrice|selling_price)$/i;
+  const CLE_MONTANT = /^(price|amount|total|totalPrice|total_price|totalAmount|total_amount|paidAmount|paid_amount|sellerPrice|seller_price|earning|earnings|payout|netAmount|net_amount|sellingPrice|selling_price)$/i;
   const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member|interlocutor|sender|participant|author|counterpart|contact/i;
   function scalairesVente(e) {
     const out = { etat: '', date: '', montant: null };
@@ -346,6 +346,72 @@
     } catch (_) {}
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // TES ACHATS (27 octobre, 5.239)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « fais pareil pour les achats Vestiaire ». Ce que la page charge
+  // DÉJÀ, aucune requête de plus (§3). Mesuré le 26 oct. : seul le panier en
+  // cours (`orders/current-light`, 204) a été vu — JAMAIS lu ici (un panier
+  // n'est pas un achat). La liste de tes achats (`users/me/…orders|purchases|
+  // bought…`, `/purchases`) n'a jamais été vue d'ici : reconnue à son chemin.
+  // De chaque achat, des SCALAIRES seulement : son identifiant, celui de
+  // l'article, le NOM de l'article (pour que tu le reconnaisses — jamais un
+  // rapprochement, §5), un état, une date, un montant avec le nom de sa clé, et
+  // le n° de suivi du colis avec son transporteur. ⚠️ JAMAIS le vendeur, ton
+  // adresse, ton email, un message (PAS_ACHETEUR + vendeur).
+  const PAS_ACHAT = /seller|vendor|shop|store|address|recipient|email|phone|message|user|member|customer|buyer|contact|payment|card|iban/i;
+  const CLE_SUIVI = /^(trackingNumber|tracking_number|trackingCode|tracking_code|parcelNumber|parcel_number|shipmentNumber)$/i;
+  const CLE_TRANSP = /^(carrier|carrierName|carrier_name|shippingCarrier|transporter)$/i;
+  function nomArticle(prod) {
+    if (!prod || typeof prod !== 'object') return '';
+    const b = prod.brand && typeof prod.brand === 'object' ? prod.brand.name : prod.brand;
+    const t = typeof prod.name === 'string' ? prod.name : (typeof prod.title === 'string' ? prod.title : '');
+    return [typeof b === 'string' ? b : '', t].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+  function suiviAchat(e) {
+    const out = { suivi: '', transporteur: '' };
+    const visite = (x, prof) => {
+      if (!x || typeof x !== 'object' || prof > 3) return;
+      for (const k of Object.keys(x).slice(0, 80)) {
+        const v = x[k];
+        if (PAS_ACHAT.test(k)) continue;
+        if (!out.suivi && CLE_SUIVI.test(k) && (typeof v === 'string' || typeof v === 'number') && /^[A-Z0-9]{6,40}$/i.test(String(v))) out.suivi = String(v).toUpperCase();
+        if (!out.transporteur && CLE_TRANSP.test(k)) { const t = typeof v === 'string' ? v : (v && typeof v.name === 'string' ? v.name : ''); if (/^[\w .&'-]{1,30}$/.test(t)) out.transporteur = t; }
+        if (v && typeof v === 'object' && !Array.isArray(v)) visite(v, prof + 1);
+      }
+    };
+    visite(e, 0);
+    return out;
+  }
+  function scalairesAchat(e) {
+    // Les scalaires de la vente, mais sans jamais descendre chez le vendeur.
+    const propre = {};
+    for (const k of Object.keys(e || {}).slice(0, 80)) if (!PAS_ACHAT.test(k)) propre[k] = e[k];
+    return scalairesVente(propre);
+  }
+  function noteAchats(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url)) return;
+      const ch = u.pathname;
+      if (/current|cart|basket|checkout|sales|sold|awaiting-shipping|selling/i.test(ch)) return;
+      if (!(/\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch))) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const arr = tableauAnnonces(obj) || [];
+      const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
+      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const achats = arr.slice(0, 200).map((e) => {
+        const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
+        const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
+        const sc = scalairesAchat(e); const sv = suiviAchat(e);
+        return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', nom: nomArticle(prod), etat: sc.etat, date: sc.date, montant: sc.montant, suivi: sv.suivi, transporteur: sv.transporteur };
+      }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHAT.test(c.split(':')[0])).slice(0, 120) : [];
+      post({ kind: 'vcachats', achats, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)) });
+    } catch (_) {}
+  }
+
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
@@ -357,7 +423,7 @@
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -376,7 +442,7 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}
