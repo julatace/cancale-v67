@@ -130,6 +130,18 @@ const mode = (pg) => pg.locator('[data-file-modal]').first().getAttribute('data-
         await pg.locator('[data-file-monter="45"]').click();
         await pg.waitForTimeout(80);
         dit((await ordreFile(pg)).join(',') === '42,45,43', 'monter N°45 d’un cran réordonne la file', (await ordreFile(pg)).join(','));
+        // ── mode RÉEL : il ne DÉMARRE pas sans une double confirmation (§3) ──────
+        dit(await pg.locator('[data-file-reel]').count() > 0, 'une case « Publier pour de vrai sur Vinted » est présente');
+        await pg.locator('[data-file-reel]').check();
+        await pg.waitForTimeout(100);
+        dit(await pg.locator('[data-file-pct]').count() > 0, 'activée : un champ « baisser le prix de X % » apparaît');
+        dit(await pg.locator('[data-file-demarrer]').isDisabled(), 'mode réel coché mais PAS confirmé : « Publier pour de vrai » reste bloqué', 'disabled attendu');
+        await pg.locator('[data-file-reel-confirme]').check();
+        await pg.waitForTimeout(100);
+        dit(!(await pg.locator('[data-file-demarrer]').isDisabled()) && /vrai/i.test(await pg.locator('[data-file-demarrer]').innerText()), 'confirmé : le bouton devient « Publier pour de vrai » et se débloque');
+        // on redescend en essai à blanc pour la suite (pas de pont dans ce banc)
+        await pg.locator('[data-file-reel]').uncheck();
+        await pg.waitForTimeout(100);
         // démarrer : l’espacement GATE — rien ne doit être traité pendant le délai
         await pg.locator('[data-file-demarrer]').click();
         await pg.waitForTimeout(400);
