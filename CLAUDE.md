@@ -1,5 +1,17 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — les VENTES Vestiaire captées (5.237) :** Julien : « fais pareil pour capter les
+> ventes Vestiaire ». `vc-inject.js` `noteVentes` lit ce que la page charge déjà : `users/me/awaiting-
+> shipping-items` (à expédier, vue chez lui, vide le 26) et une liste de ventes reconnue à son chemin
+> (`users/me/…sales|sold|transactions`, `/sales` — JAMAIS VUE) ; jamais panier ni achats. Par vente : id,
+> article, réf `VRM-{n°}`, un état court, une date, un montant AVEC le nom de sa clé — rien de l'acheteur
+> (`PAS_ACHETEUR`). `rangerVcVentes` → `vc_ventes` (une écriture à la fois, lecture ratée ⇒ rien ; « à
+> expédier » lue EN ENTIER fait foi, une vente n'est jamais effacée). App `VentesVestiaire` : N° par
+> identité seulement (réf ou `vc_listings.liens`), « à expédier », « encore en ligne sur Vinted — retire-la ».
+> ⚠️ Le montant n'entre dans AUCUN total (prix ou versement : pas su) et la place du Stock ne se libère pas
+> encore (état « expédiée » jamais vu). `audit-vc-publier.cjs` 58 (mutations « page partielle retire » et
+> « montant sans sa clé » ⇒ rouges).
+
 > **27 octobre (soir) — Vestiaire : publier tout seul SANS BOOSTER, et le boost lu (5.236) :** Julien :
 > « je veux que ça publie tout seul sans booster » et « l'extension doit sur Vestiaire, comme pour Vinted
 > et Leboncoin, capter si des annonces ont été boostées ». `vc-depot.js` `publierSansBooster` (copie des
