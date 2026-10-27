@@ -10647,7 +10647,7 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
     return () => ro.disconnect();
   }, []);
   const uid = React.useId ? React.useId().replace(/:/g, '') : 'cs';
-  const H = compact ? 136 : hauteur, gx = 14, gd = 46, gy = 24, bas = 36;
+  const H = compact ? 150 : hauteur, gx = 14, gd = compact ? 14 : 46, gy = compact ? 26 : 24, bas = 36;
   const trait = C.accent;
   const vus = jours.filter(j => !j.futur);
   const max = Math.max(10, ...vus.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
@@ -10675,8 +10675,8 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
             <stop offset="100%" stopColor={trait} stopOpacity="0"/>
           </linearGradient>
         </defs>
-        {iAuj >= 0 && <rect x={X(iAuj) - bande / 2} y={gy - 10} width={bande} height={base - gy + 16} rx="10" fill={C.bg}/>}
-        {[0, 0.5, 1].map(f => <g key={f}><text x={W-1} y={Y(haut*f)+3} textAnchor="end" fontSize="10" fill={C.muted} style={{fontVariantNumeric:"tabular-nums"}}>{eur(haut*f)}</text><line x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeOpacity=".65" strokeDasharray="2 5"/></g>)}
+        {iAuj >= 0 && !compact && <rect x={X(iAuj) - bande / 2} y={gy - 10} width={bande} height={base - gy + 16} rx="10" fill={C.bg}/>}
+        {!compact && [0, 0.5, 1].map(f => <g key={f}><text x={W-1} y={Y(haut*f)+3} textAnchor="end" fontSize="10" fill={C.muted} style={{fontVariantNumeric:"tabular-nums"}}>{eur(haut*f)}</text><line x1={gx - 8} x2={W - gd + 8} y1={Y(haut * f)} y2={Y(haut * f)} stroke={C.border} strokeWidth="1" strokeOpacity=".65" strokeDasharray="2 5"/></g>)}
         <line x1={gx - 8} x2={W - gd + 8} y1={base} y2={base} stroke={C.border} strokeWidth="1"/>
         {pv.length > 1 && <path d={`${chemin(pv)} L${pv[pv.length - 1][0].toFixed(1)},${base} L${pv[0][0].toFixed(1)},${base} Z`} fill={`url(#csg${uid})`}/>}
         {avecRecu && <path d={chemin(points('recu'))} fill="none" stroke={C.muted} strokeWidth="1.5" strokeOpacity=".8" strokeDasharray="4 5" strokeLinecap="round"/>}
@@ -10687,10 +10687,11 @@ function CourbeSemaine({ jours, hauteur = 176 }) {
               <title>{`${j.long} · vendu ${eur(j.vendu.eur)} (${j.vendu.n} vente${j.vendu.n > 1 ? 's' : ''})${j.recu ? ` · reçu ${eur(j.recu.eur)}` : ''}`}</title>
               {avecRecu && j.recu.eur > 0 && <circle cx={X(i)} cy={Y(j.recu.eur)} r="2.8" fill={C.card} stroke={C.muted} strokeWidth="1.4"/>}
               <circle cx={X(i)} cy={Y(j.vendu.eur)} r={j.auj ? 4.3 : 2.8} fill={j.auj ? trait : C.card} stroke={trait} strokeWidth="1.8"/>
-              {i===pic && j.vendu.eur > 0 && <text x={Math.max(42,Math.min(W-42,X(i)))} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
+              {compact && j.vendu.eur > 0 && <text data-courbe-valeur="" x={Math.max(16,Math.min(W-16,X(i)))} y={Math.max(12, Y(j.vendu.eur) - 11)} textAnchor="middle" fontSize="11" fontWeight={j.auj || i===pic ? 700 : 600} fill={j.auj || i===pic ? C.text : C.muted} stroke={C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
+              {!compact && i===pic && j.vendu.eur > 0 && <text x={Math.max(42,Math.min(W-42,X(i)))} y={Math.max(14, Y(j.vendu.eur) - 10)} textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text} stroke={j.auj ? C.bg : C.card} strokeWidth="4" strokeLinejoin="round" paintOrder="stroke" style={{fontVariantNumeric:'tabular-nums'}}>{Math.round(j.vendu.eur)}</text>}
             </>}
             <text x={X(i)} y={H - 20} textAnchor="middle" fontSize="10" fontWeight="500" fill={C.muted} opacity={j.futur ? 0.55 : 1}>{j.jour.toLowerCase()}</text>
-            <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 600} fill={j.auj ? C.text : C.muted} opacity={j.futur ? 0.55 : 1} style={{fontVariantNumeric:'tabular-nums'}}>{j.num}</text>
+            <text x={X(i)} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={j.auj ? 700 : 600} fill={j.auj ? (compact ? trait : C.text) : C.muted} opacity={j.futur ? 0.55 : 1} style={{fontVariantNumeric:'tabular-nums'}}>{j.num}</text>
           </g>
         ))}
       </svg>

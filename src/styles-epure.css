@@ -59,13 +59,13 @@
   .vrm-app-shell .vrm-main a[style*="solid rgb(36, 78, 84)"]:not([style*="background: rgb(36, 78, 84)"]),
   .vrm-app-shell .vrm-main button[style*="solid rgb(217, 226, 208)"] {
     background: var(--ep-teinte) !important; border-color: transparent !important; box-shadow: none !important;
-    border-radius: 999px !important; color: var(--ep-encre) !important; font-weight: 600 !important;
+    border-radius: 22px !important; color: var(--ep-encre) !important; font-weight: 600 !important;
   }
   .vrm-app-shell .vrm-main button[style*="solid rgb(220, 228, 223)"]:active,
   .vrm-app-shell .vrm-main a[style*="solid rgb(220, 228, 223)"]:active { background: var(--ep-teinte-f) !important; }
   /* Le bouton principal (plein) : pastille aussi, même famille. */
   .vrm-app-shell .vrm-main button[style*="background: rgb(36, 78, 84)"],
-  .vrm-app-shell .vrm-main a[style*="background: rgb(36, 78, 84)"] { border-radius: 999px !important; box-shadow: none !important; }
+  .vrm-app-shell .vrm-main a[style*="background: rgb(36, 78, 84)"] { border-radius: 22px !important; box-shadow: none !important; }
 
   /* Les filtres, segments et étiquettes : même pastille, l'actif en encre. */
   .vrm-app-shell .vrm-main .vrm-seg { background: var(--ep-teinte) !important; border: 0 !important; border-radius: 999px !important; box-shadow: none !important; }
@@ -99,4 +99,30 @@
   /* Les contours teintés (ambre, accent à demi-transparence), clair comme sombre. */
   .vrm-app-shell .vrm-main [style*="solid rgba("]:not(input):not(select) { border-color: transparent !important; }
   .vrm-app-shell .vrm-main [data-colis-urgence] { border-radius: 16px !important; }
+}
+@media (max-width: 767px) {
+  /* Ma journée : les chiffres, sans les phrases dessous (Julien, 27 oct. :
+     « beaucoup trop d'explications, ça gâche l'utilisation »). Le détail vit
+     dans Comptabilité et dans Ventes ; un total partiel garde son « au moins ». */
+  .vrm-app-shell .vrm-day-layout .vrm-day-note,
+  .vrm-app-shell .vrm-day-layout [data-vendu-manque],
+  .vrm-app-shell .vrm-day-layout [data-depenses-choix],
+  .vrm-app-shell .vrm-day-layout [data-journee-benef-masquer] { display: none !important; }
+}
+@media (max-width: 767px) {
+  /* … sauf quand le bénéfice ne se calcule pas : la note dit où il se calcule. */
+  .vrm-app-shell .vrm-day-layout [data-journee-benef-etat]:not([data-journee-benef-etat="lu"]) .vrm-day-note { display: block !important; }
+  /* Dernières ventes (Julien, 27 oct. : « les dernières ventes coupent la photo ») :
+     la photo ENTIÈRE en haut de la carte, le titre et le prix dessous. */
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button { display: block !important; border-radius: 18px !important; overflow: hidden !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child {
+    min-height: 0 !important; aspect-ratio: 1 / 1 !important; width: 100% !important; background: #F1F3EF !important;
+  }
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child img {
+    object-fit: contain !important; padding: 6px; box-sizing: border-box;
+  }
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div + div { padding: 9px 11px 11px !important; }
+}
+@media (max-width: 767px) {
+  :root[data-theme="dark"] .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child { background: #1C3339 !important; }
 }
