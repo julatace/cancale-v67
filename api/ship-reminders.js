@@ -355,6 +355,68 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
     envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
+// ── OFFRE AU-DESSUS DE TON PRIX MINI (27 oct., demande de Julien) ───────────
+// Il pose un « prix mini » à côté du N° (vinted_annonce_numeros[id].min) ; dès
+// qu'une offre le dépasse, on le prévient sur le téléphone pour qu'il l'accepte
+// en 1 tap dans VRM. RIEN n'est accepté tout seul — c'est son tap qui vend (§3).
+// DÉTECTION SERVEUR, app fermée : les offres vivent dans les conversations
+// captées par l'extension, les planchers dans `main`. Vinted ne donne aucun
+// signal instantané : c'est le cron QUOTIDIEN (le bandeau in-app reste
+// l'instantané). Dédoublé par identité de l'offre (`offer_request_id`).
+const OFFRES_MINI_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
+// Copie FIDÈLE de `offreEnAttenteDe` (src/App.jsx, §11) : le serveur ne peut pas
+// importer App.jsx. `scripts/bancs/offres-mini-push.cjs` EXÉCUTE la règle, et
+// l'audit compare au besoin. Toute dérive = deux chiffres pour une notion.
+function offreCouranteServeur(opp, msgs) {
+  let d = null;
+  for (const m of (Array.isArray(msgs) ? msgs : [])) {
+    if (!m || m.entity_type !== 'offer_request_message') continue;
+    const e = m.entity || {};
+    if (opp != null && (e.user_id == null || String(e.user_id) !== String(opp))) continue;
+    if (e.current === false || e.status !== 10) continue;
+    if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
+    const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
+    const prix = Number(String(px == null ? '' : px).replace(',', '.'));
+    if (!isFinite(prix) || prix <= 0 || e.offer_request_id == null) continue;
+    d = { prix, oid: String(e.offer_request_id) };
+  }
+  return d;
+}
+async function rappelsOffresMini(maintenant = Date.now()) {
+  if (!(await pushCategorieActive('offremini'))) return 'désactivé par le vendeur';
+  const main = await getRowProjete('main', ['vinted_annonce_numeros']);
+  if (main === undefined) return 'main illisible — rien envoyé';           // « pas su » ⇒ on ne pousse pas
+  const nums = (main && main.vinted_annonce_numeros) || {};
+  const planchers = new Map();                                              // item_id → prix mini
+  for (const [id, e] of Object.entries(nums)) {
+    const v = e && e.min != null ? Number(String(e.min).replace(',', '.')) : NaN;
+    if (isFinite(v) && v > 0) planchers.set(String(id), v);
+  }
+  if (!planchers.size) return 'aucun prix mini posé';
+  const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_conv_%25&${OFFRES_MINI_FILTRE}&select=opp:data->payload->conversation->opposite_user->>id,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`));
+  if (rows === null) return 'conversations illisibles — rien envoyé';       // « pas su » ⇒ rien
+  const auMini = [];
+  for (const r of rows) {
+    const item = r && r.item != null && r.item !== '' ? String(r.item) : null;
+    if (!item || !planchers.has(item)) continue;
+    const off = offreCouranteServeur(r && r.opp != null ? r.opp : null, r && r.msgs);
+    if (off && off.prix >= planchers.get(item)) auMini.push(off.oid);
+  }
+  const deja = await getRow('offres_mini_dedup');
+  if (deja === undefined) return 'mémo illisible — rien envoyé';            // « pas su » ⇒ rien
+  const vus = new Set(Array.isArray(deja && deja.oids) ? deja.oids : []);
+  const nouveaux = [...new Set(auMini)].filter((o) => !vus.has(o));
+  if (!nouveaux.length) return auMini.length ? 'déjà notifiées' : 'aucune offre au-dessus du mini';
+  const garde = [...vus, ...nouveaux].slice(-400);                          // mémo borné
+  if (!(await ecrireDedup('offres_mini_dedup', { oids: garde, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
+  const n = nouveaux.length;
+  const envoi = await sendPushToAll({
+    title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
+    body: n > 1 ? `${n} offres à accepter en 1 tap dans VRM.` : 'À accepter en 1 tap dans VRM.',
+    tag: 'offremini', url: '/?tab=cat_msg' });
+  return { offremini: 'envoyé', n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+}
+
 // Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
 // vendeur d'une base non cloisonnée). Rend un bilan, n'écrit jamais dans `res`.
 // ── (20 octobre) RELIRE eBAY AVANT DE COMPTER, APP FERMÉE ──────────────────
@@ -427,6 +489,12 @@ async function traiterVendeurApresRelecture() {
     let retrait = null;
     try { retrait = await rappelsColisRetrait(); } catch (e) { retrait = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
+    // OFFRE AU-DESSUS DE TON PRIX MINI — à accepter en 1 tap (27 oct.). Posé
+    // comme les autres : un échec ici n'empêche rien, et le calcul des colis
+    // continue. Rien n'est accepté tout seul (§3).
+    let offremini = null;
+    try { offremini = await rappelsOffresMini(); } catch (e) { offremini = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
     // ── LES COLIS DU MATIN : LA RÈGLE DU SOIR, DU WIDGET ET DE L'APP (22 oct.) ──
     // ⚠️⚠️ CE RAPPEL ANNONÇAIT « RIEN À ENVOYER » À TORT. Mesuré le 22 octobre
     // sur sa base : `ship_reminder_dedup` = {total 0} le matin, alors que le
@@ -459,7 +527,7 @@ async function traiterVendeurApresRelecture() {
     else if (!Array.isArray(d.bords)) vintedSkip = 'bordereaux illisibles';
     // Vinted illisible et rien à dire pour eBay : on se tait, sans mémo (le
     // passage suivant, tout lu, ne doit pas se croire « déjà notifié »).
-    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -476,14 +544,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, nePasPoster, vinted: c });
       await sendPushToAll({ ...txt, tag: 'ship-reminder', url: '/?tab=cat_bord' });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
