@@ -61,11 +61,11 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
   ctx.readVcPosted = async () => ({ echec: postedKO, ids: posted.map(String) });
   const marques = [];
   ctx.markVcPosted = async (id) => { if (marque) marques.push(String(id)); return marque; };
-  const ecrits = []; let vcl = null; let vcv = null; const etat = { lectureKO: false };
-  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; if (r.id === 'vc_ventes') vcv = r.data; } return true; };
+  const ecrits = []; let vcl = null; let vcv = null; let vcm = null; const etat = { lectureKO: false };
+  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; if (r.id === 'vc_ventes') vcv = r.data; if (r.id === 'vc_messages') vcm = r.data; } return true; };
   ctx.notifierApp = async () => {};
   ctx.majCmd = async () => {};
-  ctx.sbGet = async (q) => /vc_ventes/.test(q) ? (etat.lectureKO ? null : (vcv ? [{ data: JSON.parse(JSON.stringify(vcv)) }] : [])) : /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
+  ctx.sbGet = async (q) => /vc_messages/.test(q) ? (etat.lectureKO ? null : (vcm ? [{ data: JSON.parse(JSON.stringify(vcm)) }] : [])) : /vc_ventes/.test(q) ? (etat.lectureKO ? null : (vcv ? [{ data: JSON.parse(JSON.stringify(vcv)) }] : [])) : /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
   ctx.compteConnecte = async () => null;
   ctx.viderFiches = async () => {};
   const vus = [];
@@ -141,6 +141,28 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const n0 = b.ecrits.length; b.lectureKO = true;
     const r4 = await vv({ source: 'ventes', ventes: [{ id: 'T9' }], offset: 0, total: 1, lus: 1 });
     dit(r4.ok === false && b.ecrits.length === n0, 'base illisible : rien n\'est écrit');
+  });
+  await essaie('messages', async () => {
+    const b = faire();
+    const vm_ = (m, url) => new Promise((res) => b.ecouteur(Object.assign({ from: 'cancale-vc' }, m), { tab: { id: 5, url: url || 'https://fr.vestiairecollective.com/members/' } }, res));
+    const dern = () => ((b.ecrits.filter((e) => e.id === 'vc_messages').pop() || {}).data || {});
+    const nE = () => b.ecrits.filter((e) => e.id === 'vc_messages').length;
+    const r1 = await vm_({ action: 'vcCompteur', messages: 3 });
+    dit(r1.ok && dern().compteur && dern().compteur.messages === 3, 'le nombre de messages non lus est rangé', JSON.stringify(dern().compteur));
+    const n1 = nE(); await vm_({ action: 'vcCompteur', messages: 3 }); await vm_({ action: 'vcCompteur', messages: 3 });
+    dit(nE() === n1, 'le même nombre relu par la page n\'est pas réécrit à chaque fois', String(nE() - n1));
+    await vm_({ action: 'vcCompteur', messages: 1 });
+    dit(dern().compteur.messages === 1, 'un nombre qui CHANGE est réécrit', JSON.stringify(dern().compteur));
+    const r2 = await vm_({ action: 'vcMessages', conversations: [{ id: 'C1', productId: '900001', ref: '', nonLu: true, date: '2026-10-27T09:00:00Z' }, { id: 'C2', ref: '402', nonLu: false }], offset: 0, total: 2, lus: 2, page: '/messages/' });
+    dit(r2.ok && dern().conversations.C1.nonLu === true && dern().conversations.C2.ref === '402' && dern().compteur.messages === 1 && dern().lecture.page === '/messages/', 'les conversations sont rangées sans effacer le compteur, avec la page vue', JSON.stringify(dern()));
+    await vm_({ action: 'vcMessages', conversations: [{ id: 'C2', ref: '402', nonLu: false }], offset: 0, total: 1, lus: 1 });
+    dit(dern().conversations.C1 && dern().conversations.C1.nonLu === null, 'liste lue EN ENTIER sans C1 : C1 n\'est plus « non lue », mais n\'est jamais effacée', JSON.stringify(dern().conversations.C1));
+    const n0 = b.ecrits.length; b.lectureKO = true;
+    const r4 = await vm_({ action: 'vcCompteur', messages: 7 });
+    dit(r4.ok === false && b.ecrits.length === n0, 'base illisible : rien n\'est écrit (« rien lu » ne vaut pas « rien »)');
+    b.lectureKO = false;
+    const r5 = await vm_({ action: 'vcCompteur', messages: 9 }, 'https://www.leboncoin.fr/');
+    dit(r5.ok === false && dern().compteur.messages !== 9, 'une page qui n\'est pas Vestiaire ne range rien');
   });
   const refus = async (quoi, opts, code) => essaie(quoi, async () => {
     const b = faire(opts);
@@ -283,6 +305,34 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const tout = JSON.stringify(mv);
     dit(!/Jeanne|Secret|Cach|jeanne@/.test(tout), 'rien de l\'acheteur ne sort (nom, adresse, email) — ni dans la vente, ni dans sa forme', tout.slice(0, 300));
     await cD.close();
+
+    // ── E. vc-inject.js : tes MESSAGES (5.238) ─────────────────────────────
+    const cE = await nav.newContext(); const pe = await cE.newPage();
+    await cE.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
+    await cE.route('https://apiv2.vestiairecollective.com/**', (r) => {
+      const u = r.request().url();
+      const body = /notification-feed-counter/.test(u) ? { meta: { limit: 1, offset: 0, count: 1 }, data: { unseen: { updates: 2, all: 6, messages: 4 } } }
+        : /\/conversations/.test(u) ? { meta: { limit: 20, offset: 0, count: 2 }, data: [
+            { id: 'C777', unreadCount: 2, updatedAt: '2026-10-27T10:00:00Z', product: { id: 900001, description: 'Réf. VRM-401' }, lastMessage: { text: 'Bonjour, mon adresse est 12 rue Cachée' }, interlocutor: { firstName: 'Jeanne' }, user: { name: 'Jeanne Secret' } },
+            { id: 'C778', isRead: true, product: { id: 900002 } }] }
+        : /zendesk/.test(u) ? { data: [{ id: 'Z1', unread: true }], token: 'jeton-secret' } : { data: [] };
+      return r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    });
+    await pe.goto('https://fr.vestiairecollective.com/messages/');
+    await pe.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
+    await pe.addScriptTag({ content: inj });
+    await pe.evaluate(() => Promise.all(['https://apiv2.vestiairecollective.com/notification-feed-counter/v2', 'https://apiv2.vestiairecollective.com/users/me/conversations', 'https://apiv2.vestiairecollective.com/partners/zendesk/conversations'].map((u) => fetch(u).then((r) => r.text()))));
+    await pe.waitForTimeout(800);
+    const me = await pe.evaluate(() => window.__msgs.filter((m) => m.kind === 'vccompteur' || m.kind === 'vcmessages'));
+    const cpt = me.find((m) => m.kind === 'vccompteur'); const lm = me.filter((m) => m.kind === 'vcmessages');
+    dit(cpt && cpt.messages === 4, 'le compteur de Vestiaire (`unseen.messages`) donne le nombre de non-lus', JSON.stringify(cpt));
+    dit(lm.length === 1, 'les conversations sont lues, et jamais celles du support (zendesk)', String(lm.length));
+    const c0 = lm[0] && lm[0].conversations.find((c) => c.id === 'C777'); const c1 = lm[0] && lm[0].conversations.find((c) => c.id === 'C778');
+    dit(c0 && c0.productId === '900001' && c0.ref === '401' && c0.nonLu === true && /2026-10-27/.test(c0.date) && c1 && c1.nonLu === false, 'une conversation : son id, son article, sa référence VRM-401, « non lue », sa date', JSON.stringify(lm[0] && lm[0].conversations));
+    dit(lm[0] && lm[0].page === '/messages/', 'la page où la liste a été vue part avec (VRM n\'invente pas l\'adresse)', lm[0] && lm[0].page);
+    const toutE = JSON.stringify(me);
+    dit(!/Jeanne|Secret|Cach|Bonjour|jeton-secret/.test(toutE), 'aucun texte de message, aucun nom ne sort — ni dans la conversation, ni dans sa forme', toutE.slice(0, 300));
+    await cE.close();
     await nav.close();
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
