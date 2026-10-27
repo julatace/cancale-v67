@@ -225,7 +225,7 @@
   const CLE_ETAT = /^(status|state|orderStatus|order_status|shippingStatus|shipping_status|step|statusLabel|transactionStatus)$/i;
   const CLE_DATE = /date|created|sold|paid|ordered|At$/i;
   const CLE_MONTANT = /^(price|amount|total|sellerPrice|seller_price|earning|earnings|payout|netAmount|net_amount|sellingPrice|selling_price)$/i;
-  const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member/i;
+  const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member|interlocutor|sender|participant|author|counterpart|contact/i;
   function scalairesVente(e) {
     const out = { etat: '', date: '', montant: null };
     const visite = (x, prof, chemin) => {
@@ -288,6 +288,64 @@
     } catch (_) {}
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // TES MESSAGES (27 octobre, 5.238)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « fais pareil pour les messages Vestiaire ». Même méthode : ce que
+  // la page charge DÉJÀ, aucune requête de plus (§3).
+  //   · Le COMPTEUR (mesuré le 26 oct. : `notification-feed-counter/v2` →
+  //     `data.unseen.messages`, un nombre) : le nombre de messages non lus.
+  //   · Une LISTE de conversations (`…/conversations`, `…/messages`, `…/inbox`,
+  //     `…/threads` — jamais vue d'ici : reconnue à son chemin), jamais le
+  //     support (`zendesk`, `partners`) ni le fil des notifications.
+  // De chaque conversation, des SCALAIRES seulement : son identifiant, celui de
+  // l'article, la référence `VRM-{n°}` lue sur l'ARTICLE, « non lu » (une clé
+  // dont le NOM le dit), une date. ⚠️ JAMAIS le texte d'un message, ni le nom,
+  // le pseudo ou la photo de l'autre personne (PAS_ACHETEUR écarte `message`,
+  // `user`, `member`, `buyer`…). Et la page où la liste a été vue (sans les
+  // identifiants) : c'est elle que VRM ouvre, jamais une adresse devinée.
+  const CLE_NON_LU = /^(unread|isUnread|is_unread|unreadCount|unread_count|unreadMessages|unreadMessagesCount|unseen|unseenCount|hasUnread|has_unread|read|isRead|is_read|seen|isSeen)$/i;
+  function nonLuDe(e) {
+    for (const k of Object.keys(e || {}).slice(0, 80)) {
+      if (!CLE_NON_LU.test(k)) continue;
+      const v = e[k]; const lu = /^(is_?)?(read|seen|isRead|isSeen)$/i.test(k);
+      if (typeof v === 'boolean') return lu ? !v : v;
+      if (typeof v === 'number' && isFinite(v)) return lu ? v === 0 : v > 0;
+    }
+    return null;   // aucune clé qui le dise : « pas su »
+  }
+  function noteCompteur(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/notification-feed-counter(\/v\d+)?\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      const un = obj && obj.data && obj.data.unseen;
+      if (!un || typeof un.messages !== 'number' || !isFinite(un.messages) || un.messages < 0) return;
+      post({ kind: 'vccompteur', messages: Math.floor(un.messages) });
+    } catch (_) {}
+  }
+  function noteMessages(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url)) return;
+      const ch = u.pathname;
+      if (/zendesk|partners|notification|support|help/i.test(ch)) return;
+      if (!/\/(conversations?|messages|messaging|inbox|threads?|chats?)\/?$/i.test(ch)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const arr = tableauAnnonces(obj) || [];
+      const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
+      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const conversations = arr.slice(0, 200).map((e) => {
+        const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
+        const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
+        return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), nonLu: nonLuDe(e), date: scalairesVente(e).date };
+      }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
+      post({ kind: 'vcmessages', conversations, offset, total, lus: arr.length, forme, page: normChemin(sansId(location.pathname)) });
+    } catch (_) {}
+  }
+
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
@@ -299,7 +357,7 @@
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -318,7 +376,7 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); noteCompteur(url, t); noteMessages(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

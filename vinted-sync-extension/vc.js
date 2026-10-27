@@ -31,6 +31,21 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcVentes', source: d.source === 'a-expedier' ? 'a-expedier' : 'ventes', ventes, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
         return;
       }
+      // 5.238 : tes messages Vestiaire — le NOMBRE de non-lus, et des conversations
+      // sans aucun texte ni nom (identifiants, référence, non lu, date).
+      if (d.kind === 'vccompteur') {
+        const n = Number(d.messages);
+        if (!isFinite(n) || n < 0) return;
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCompteur', messages: Math.floor(n) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
+      if (d.kind === 'vcmessages') {
+        const conversations = (Array.isArray(d.conversations) ? d.conversations : []).slice(0, 200).map((x) => ({
+          id: String((x && x.id) || '').slice(0, 40), productId: String((x && x.productId) || '').slice(0, 40), ref: String((x && x.ref) || '').slice(0, 12),
+          nonLu: x && (x.nonLu === true || x.nonLu === false) ? x.nonLu : null, date: String((x && x.date) || '').slice(0, 30) }));
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcMessages', conversations, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcpublie') {
         chrome.runtime.sendMessage({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(d.productId || '').slice(0, 40) }, () => { void chrome.runtime.lastError; });
         return;
