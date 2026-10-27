@@ -1,5 +1,19 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — le STATUT FISCAL s'adapte à la personne, et les vrais taux :** Julien : « des gens
+> sont en société, d'autres pas revendeurs ; ils n'ont pas besoin du taux URSSAF » et « base-toi sur de
+> vrais taux ». Mesuré : 4 vendeurs sur 6 n'avaient JAMAIS choisi de régime et recevaient le rappel
+> URSSAF (un « marge » aussi). UNE règle (`regimeFiscal`, `urssafConcerne`, `REGIMES_FISCAUX` :
+> particulier · micro · société · marge ; jamais choisi = `null`, plus de repli sur « micro ») pour le
+> rappel de Ma journée, la notification du 1er (`api/_lib/rappel-urssaf.js` lit `vinted_regime` ;
+> illisible ⇒ rien), les cotisations du bénéfice (`sansCotis`), les rapports (`libelleRegime`, taux 0
+> hors micro). Comptabilité → `StatutFiscal` : la question (jamais au démarrage), ou la carte du statut,
+> ou (micro) le taux composé par ses options. Taux : `TAUX_MICRO` achat-revente BIC 12,3 % + CFP 0,1 % =
+> **12,4 %** (défaut, était 13,5 % sans source), versement libératoire +1 %, ACRE 6,2 %. Julien
+> (`micro`, aucun taux rangé) passe de 13,5 à 12,4 % : le bouton « Versement libératoire » donne 13,4 %.
+> Banc `statut-fiscal.cjs` (20 rouges sur l'avant) ; `audit-rappel-urssaf` (mutations `serveur-statut`,
+> `serveur-passu` rouges). ⚠️ Taux lus sur des sources secondaires (urssaf.fr bloqué d'ici).
+
 > **27 octobre (soir) — les VENTES Vestiaire captées (5.237) :** Julien : « fais pareil pour capter les
 > ventes Vestiaire ». `vc-inject.js` `noteVentes` lit ce que la page charge déjà : `users/me/awaiting-
 > shipping-items` (à expédier, vue chez lui, vide le 26) et une liste de ventes reconnue à son chemin

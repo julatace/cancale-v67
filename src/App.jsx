@@ -5236,10 +5236,18 @@ const parDateDesc = (a, b) => tsCommande(b) - tsCommande(a);
 // (§5.57 : « on ne te parle pas de transfert d'argent, simplement des ventes
 // finalisées »). Annulées et remboursées ne comptent jamais — ce n'est pas du
 // chiffre d'affaires.
-const TAUX_URSSAF_DEFAUT = 13.5;
+const TAUX_URSSAF_DEFAUT = 12.4;
 // Le taux est un RÉGLAGE, pas une constante : il dépend de l'activité et de
-// l'option pour le versement libératoire, et lui seul connaît le sien. On garde
-// 13,5 % par défaut pour ne rien changer en silence à ce qu'il voyait avant.
+// l'option pour le versement libératoire, et lui seul connaît le sien.
+// (27 oct., Julien : « tu dois te baser sur de vrais taux ».) Le défaut n'est
+// plus 13,5 % (aucune source) mais le taux de l'ACHAT-REVENTE en micro-entreprise
+// (BIC, vente de marchandises) : 12,3 % de cotisations sociales + 0,1 % de
+// contribution à la formation (commerçant) = 12,4 %. Le versement libératoire
+// ajoute 1 % (13,4 %) ; l'ACRE divise les cotisations par deux la première
+// année (6,2 % + 0,1 %). `tauxMicroVente` les compose (`TAUX_MICRO`).
+const TAUX_MICRO = { cotisations: 12.3, acre: 6.2, formation: 0.1, liberatoire: 1 };
+const tauxMicroVente = ({ liberatoire = false, acre = false } = {}) =>
+  Math.round(((acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations) + TAUX_MICRO.formation + (liberatoire ? TAUX_MICRO.liberatoire : 0)) * 10) / 10;
 // (22 oct.) La règle de lecture est À PART de la lecture du navigateur : le
 // rappel URSSAF du serveur (api/ship-reminders.js) lit le MÊME réglage dans la
 // ligne `main` et passe par la même règle (`tauxDe`, recopiée dans
@@ -5249,6 +5257,34 @@ const tauxDe = (brut) => {
   return (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT;
 };
 const tauxUrssaf = () => tauxDe(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT));
+// ── LE STATUT FISCAL (27 octobre) ────────────────────────────────────────────
+// Julien : « tous les statuts sont différents : des gens sont en société, des
+// gens ne sont pas revendeurs ; ils n'ont pas besoin du taux URSSAF ; ça doit
+// s'adapter à la personne ». Mesuré : 4 vendeurs sur 6 n'avaient JAMAIS choisi
+// de régime et recevaient quand même le rappel URSSAF (un « régime de la marge »
+// aussi). UNE règle : `regimeFiscal()` rend le choix, ou `null` (jamais choisi —
+// on ne retombe plus sur « micro ») ; `urssafConcerne` n'est vrai QUE pour un
+// micro-entrepreneur. Rappel de Ma journée, notification du 1er (serveur),
+// cotisations du bénéfice, carte URSSAF : tous passent par elle (§11).
+const REGIMES_FISCAUX = [
+  ['particulier', 'Particulier', 'Je vends mes propres affaires', "Rien à déclarer à l'URSSAF : VRM ne calcule aucune cotisation."],
+  ['micro', 'Micro-entrepreneur', 'Auto-entrepreneur, achat-revente', 'VRM estime tes cotisations URSSAF sur ce que tu encaisses.'],
+  ['societe', 'Société', 'SAS, SASU, SARL, EURL…', "Tes impôts et cotisations ne se calculent pas sur le chiffre d'affaires : VRM ne les estime pas."],
+  ['marge', 'Régime de la marge', 'Société, TVA sur la marge', 'VRM calcule la TVA sur ta marge.'],
+];
+const regimeValide = (r) => REGIMES_FISCAUX.some((x) => x[0] === r) ? r : null;
+const regimeFiscal = () => regimeValide(load('vinted_regime', null));
+const urssafConcerne = (r = regimeFiscal()) => r === 'micro';
+const libelleRegime = (r) => (REGIMES_FISCAUX.find((x) => x[0] === r) || [])[1] || 'Statut pas encore choisi';
+// Trois états, comme tout réglage synchronisé : `undefined` tant que le nuage
+// n'est pas arrivé (on ne cache ni ne montre rien sur un « pas su »), puis le
+// choix ou `null`. Suit les écritures (`vrm:save`).
+function useRegimeFiscal() {
+  const [r, setR] = useState(() => isCloudReady() ? regimeFiscal() : undefined);
+  useEffect(() => onCloudReady(() => setR(regimeFiscal())), []);
+  useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_regime') setR(regimeFiscal()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  return r;
+}
 // À payer à l'URSSAF, arrondi UNE fois au centime (en centimes entiers), et le
 // net qui s'en DÉDUIT. Vu au banc le 5 octobre sur ses vraies données : CA
 // 157,00 €, « à payer 21,20 € », « net 135,81 € » — 157 × 13,5 % = 21,195,
@@ -29920,8 +29956,8 @@ function ProfilFiscalCarte({ onNav }) {
       } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
     }, 600);
   };
-  const [regime, setRegime] = React.useState(() => load('vinted_regime', 'micro'));
-  React.useEffect(() => onCloudReady(() => setRegime((v) => v === 'micro' ? load('vinted_regime', 'micro') : v)), []);
+  const [regime, setRegime] = React.useState(() => regimeFiscal());
+  React.useEffect(() => onCloudReady(() => setRegime((v) => v == null ? regimeFiscal() : v)), []);
   const virgule = (n) => String(n).replace('.', ',');
   const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
   React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
@@ -29990,11 +30026,13 @@ function ProfilFiscalCarte({ onNav }) {
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
             {/* (16 oct.) Contrôle segmenté PARTAGÉ (`.vrm-seg`) : plus de segment rempli d'accent. */}
             <nav role="group" aria-label="Régime fiscal" className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, margin: 0 }}>
-              {[['micro', 'Micro-entreprise (BIC)', 'Micro-entreprise'], ['marge', 'Société — régime de la marge', 'Régime de la marge']].map(([k, l, court]) => (
+              {REGIMES_FISCAUX.map(([k, court, l]) => (
                 <button key={k} type="button" aria-pressed={regime === k} aria-current={regime === k ? 'page' : undefined} data-regime-choix={k} title={l} onClick={() => { setRegime(k); save('vinted_regime', k); }} className="vrm-seg-btn">{court}</button>
               ))}
             </nav>
-            {regime !== 'marge' ? (
+            {regime !== 'micro' ? (
+              <div data-profil-regime-texte="" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{regime ? (REGIMES_FISCAUX.find((x) => x[0] === regime) || [])[3] : 'Choisis ton statut : VRM ne te parle d\'URSSAF que si tu es micro-entrepreneur.'}{regime === 'marge' ? <> Le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Réglages</button>.</> : null}</div>
+            ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
                 <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux
@@ -30002,8 +30040,6 @@ function ProfilFiscalCarte({ onNav }) {
                   style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600 }} />
                 <span style={{ fontSize: 13, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
               </div>
-            ) : (
-              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Régime de la marge : le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Réglages</button>.</div>
             )}
           </div>
         </div>
@@ -30329,6 +30365,82 @@ function useLigneUrssaf() {
   return v;
 }
 const MOIS_NOMS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+// ── TON STATUT (27 octobre) — la carte qui ADAPTE Comptabilité à la personne ──
+// Jamais choisi ⇒ la question, posée ICI (pas au démarrage, rien n'est forcé).
+// Micro-entrepreneur ⇒ la carte URSSAF, et le taux composé à partir de SES
+// options (versement libératoire, ACRE la première année) — les vrais taux de
+// l'achat-revente (`TAUX_MICRO`), toujours modifiables à la main dans Réglages.
+// Particulier, société, régime de la marge ⇒ AUCUNE cotisation estimée, et une
+// phrase qui dit pourquoi (un particulier lit aussi les seuils de Vinted).
+function StatutFiscal({ liveStats, onNav }) {
+  const regime = useRegimeFiscal();
+  const [changer, setChanger] = useState(false);
+  const [taux, setTaux] = useState(() => tauxUrssaf());
+  useEffect(() => { const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_taux') setTaux(tauxUrssaf()); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  useEffect(() => onCloudReady(() => setTaux(tauxUrssaf())), []);
+  if (regime === undefined) return null;
+  const choisir = (k) => { save('vinted_regime', k); setChanger(false); };
+  const vl = [tauxMicroVente({ liberatoire: true }), tauxMicroVente({ liberatoire: true, acre: true })].includes(taux);
+  const acre = [tauxMicroVente({ acre: true }), tauxMicroVente({ liberatoire: true, acre: true })].includes(taux);
+  const officiel = [false, true].some((a) => [false, true].some((l) => tauxMicroVente({ acre: a, liberatoire: l }) === taux));
+  const poserTaux = (o) => { const t = tauxMicroVente(o); save('vinted_urssaf_taux', t); setTaux(t); };
+  const choix = (
+    <div data-statut-choix="" className="vrm-statut-grille">
+      {REGIMES_FISCAUX.map(([k, t, sous, effet]) => (
+        <button key={k} type="button" data-statut={k} aria-pressed={regime === k} onClick={() => choisir(k)} className="vrm-statut-option">
+          <span className="vrm-statut-t">{t}</span>
+          <span className="vrm-statut-s">{sous}</span>
+          <span className="vrm-statut-e">{effet}</span>
+        </button>
+      ))}
+    </div>
+  );
+  if (!regime || changer) return (
+    <Card style={{ padding: 18 }}>
+      <div data-statut-carte={regime ? 'changer' : 'question'}>
+        <h3 className="vrm-titre-compta" style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: C.text }}>{regime ? 'Change ton statut' : 'Quel est ton statut ?'}</h3>
+        <p style={{ margin: '0 0 14px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>VRM adapte ta comptabilité à ta situation : il ne te parle d'URSSAF que si tu es micro-entrepreneur. Tu peux le changer à tout moment.</p>
+        {choix}
+        {regime && <button type="button" className="vrm-lien-action" onClick={() => setChanger(false)} style={{ marginTop: 10, border: 'none', background: 'transparent', color: C.muted, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Annuler</button>}
+      </div>
+    </Card>
+  );
+  const entete = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
+      <span data-statut-actuel={regime} style={{ fontSize: 13, color: C.muted }}>Statut : <b style={{ color: C.text }}>{libelleRegime(regime)}</b></span>
+      <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, fontFamily: 'inherit', fontSize: 13, cursor: 'pointer', padding: 0 }}>Changer</button>
+    </div>
+  );
+  if (regime !== 'micro') {
+    const texte = regime === 'particulier'
+      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000 €</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société ».</>
+      : regime === 'marge'
+        ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
+        : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent ci-dessus, pour ton comptable.</>;
+    return (
+      <>
+        {entete}
+        <Card style={{ padding: 18 }}><div data-statut-carte={regime} style={{ fontSize: 13.5, color: C.text, lineHeight: 1.6 }}>{texte}</div></Card>
+      </>
+    );
+  }
+  return (
+    <>
+      {entete}
+      <Card style={{ padding: '14px 16px', marginBottom: 12 }}>
+        <div data-statut-taux={String(taux)} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>Ton taux : <b className="vrm-display">{String(taux).replace('.', ',')} %</b> de ce que tu encaisses{officiel ? '' : ' (posé à la main)'}.</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" data-taux-option="liberatoire" aria-pressed={vl} className="vrm-pastille-choix" onClick={() => poserTaux({ liberatoire: !vl, acre })}>Versement libératoire de l'impôt</button>
+            <button type="button" data-taux-option="acre" aria-pressed={acre} className="vrm-pastille-choix" onClick={() => poserTaux({ liberatoire: vl, acre: !acre })}>ACRE (1ʳᵉ année)</button>
+          </div>
+          <Pourquoi label="D'où vient ce taux">Achat-revente en micro-entreprise (vente de marchandises, BIC) : {String(TAUX_MICRO.cotisations).replace('.', ',')} % de cotisations sociales + {String(TAUX_MICRO.formation).replace('.', ',')} % de contribution à la formation. Le versement libératoire ajoute {TAUX_MICRO.liberatoire} % (l'impôt sur le revenu payé en même temps). L'ACRE réduit les cotisations à {String(TAUX_MICRO.acre).replace('.', ',')} % la première année. Vérifie le tien sur ton espace autoentrepreneur.urssaf.fr ; un autre taux se pose à la main dans Réglages.</Pourquoi>
+        </div>
+      </Card>
+      <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
+    </>
+  );
+}
 function CarteUrssafMois({ liveStats, onNav }) {
   const v = useLigneUrssaf();
   const urssafMois = v ? v.mois : null;
@@ -30983,7 +31095,7 @@ const caBeneficeDuMois = (m, toutes) => {
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
 // `jours` = la publication de Ventes, `compta` = les charges, `ligneUrssaf` = le
 // CA déclaré publié (ou null), `taux` = le taux de cotisations.
-const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false }) => {
+const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true }) => {
   const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
   const v = beneficeDesJours(jours, de, a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
@@ -30995,11 +31107,12 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
     ? Math.round(ligneUrssaf.mois.filter((m) => yms.includes(String(m.ym))).reduce((t, m) => t + caBeneficeDuMois(m, toutes), 0) * 100) / 100
     : null;
-  const cotis = caDecl == null ? null : aPayerUrssaf(caDecl, taux);
+  // (27 oct.) Pas micro-entrepreneur ⇒ aucune cotisation estimée (0, dit `sansCotis`).
+  const cotis = !urssaf ? 0 : caDecl == null ? null : aPayerUrssaf(caDecl, taux);
   const complet = v.nCout === v.n;
   const netFinal = complet && v.net != null && cotis != null ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : '';
-  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta) };
+  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
@@ -31008,7 +31121,8 @@ function useBeneficeCalcul(compta, periode) {
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
   const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
-  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2 }) : null;
+  const regime = useRegimeFiscal();
+  const B = pub ? beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode, toutes: Number(pub.v) >= 2, urssaf: regime === undefined || urssafConcerne(regime) }) : null;
   return { pub, etat, B };
 }
 // (22 oct.) LE CHOIX, UNE SEULE FOIS : tant que rien n'a jamais été noté, le
@@ -31090,9 +31204,10 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
               <ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} />
             </span></div>
           )}
+          {B.sansCotis ? <div data-benef-ligne="cotis" data-benef-sans-cotis="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, padding: '2px 0' }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Comptabilité → Ton statut)'}.</div> :
           <Ligne lib="− cotisations URSSAF" val={B.cotis}
             sous={B.cotis == null ? 'ton CA déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % du CA ${B.toutes ? 'déclaré (Vinted, Leboncoin, eBay)' : 'Vinted'} versé sur la période (${fmt(B.caDecl)})`}
-            data={{ 'data-benef-ligne': 'cotis' }} />
+            data={{ 'data-benef-ligne': 'cotis' }} />}
           <Ligne lib={B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Bénéfice net'} fort val={B.netFinal}
             sous={B.raison === 'achats' ? <>il manque le prix d'achat de {sansAchat} vente{sansAchat > 1 ? 's' : ''} : sans lui, le net ne se calcule pas{(B.n > 0 && B.nCout !== B.n) ? '' : <> — {lienSaisie}</>}</>
               : B.raison === 'frais' ? 'des frais eBay ne sont pas connus : sans eux, le net ne se calcule pas'
@@ -31805,7 +31920,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       </div>
 
       <div id="compta-urssaf" style={{ scrollMarginTop: 72 }}>
-      <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
+      <StatutFiscal liveStats={liveStats} onNav={onNav} />
       </div>
 
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
@@ -38729,7 +38844,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // profileur, téléphone émulé : ~170 ms de processeur au démarrage. Seul ce
     // panneau (et ses boutons) le lit ; ouvert, il est calculé comme avant.
     if (!showReport) return null;
-    const regime = load('vinted_regime','micro');
+    const regime = regimeFiscal();   // (27 oct.) statut de la personne (null : pas choisi ⇒ aucune cotisation estimée)
     const tvaRate = Number(load('vinted_tva',20))||20;
     const monthLabel = (()=>{ const [y,m]=reportMonth.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); })();
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
@@ -38818,7 +38933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const marge = margeKnown - fraisConnu; // ventes - achats - boosts, sur les ventes au coût connu
     const tvaMarge = (regime==='marge' && marge>0) ? marge * (tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
-    const taux = tauxUrssaf();
+    const taux = urssafConcerne(regime) ? tauxUrssaf() : 0;   // (27 oct.) cotisations estimées pour un micro-entrepreneur seulement
     const urssaf = aPayerUrssaf(ca, taux);
     // Le registre de ses déclarations, pour CE mois (« J'ai déclaré ce mois »).
     const declaration = moisDeclare(declUrssaf, reportMonth) ? declUrssaf[reportMonth] : null;
@@ -38937,7 +39052,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const R=report; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
     const L=[];
     L.push([`Rapport ${R.monthLabel}`]);
-    L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    L.push([`Régime`, libelleRegime(R.regime)]);
     L.push([]);
     L.push(['VENTES']); L.push(['Date','N°','Titre','Vente','Achat','Boost','Bénéfice net']);
     R.saleLines.forEach(s=>L.push([s.date?new Date(s.date).toLocaleDateString('fr-FR'):'',s.num,(s.plateforme&&s.plateforme!=='Vinted'?'['+s.plateforme+'] ':'')+s.title,s.sell.toFixed(2),s.buy!=null?s.buy.toFixed(2):'',s.fee?s.fee.toFixed(2):'',s.buy!=null?(s.sell-s.buy-s.fee).toFixed(2):'']));
@@ -38973,7 +39088,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
     let y=800; const T=(t,x,s,f,c)=>page.drawText(String(t),{x,y,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur'),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
+    T('Rapport comptable',40,22,bold,rgb(0,0.47,0.51)); y-=22; T(R.monthLabel+'  ·  '+(libelleRegime(R.regime)),40,11,reg,rgb(0.4,0.4,0.4)); y-=28;
     const kv=(k,v,big)=>{ T(k,40,9,reg,rgb(0.45,0.45,0.45)); page.drawText(String(v),{x:40,y:y-14,size:big?15:12,font:big?bold:reg,color:rgb(0.1,0.1,0.1)}); y-=big?36:30; };
     kv('Chiffre d\'affaires des ventes finalisees', R.ca.toFixed(2)+' EUR', true);
     kv('Coût d\'achat', R.cout.toFixed(2)+' EUR ('+R.nbCout+'/'+R.nb+' renseignés)');
@@ -39038,7 +39153,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // profileur, téléphone émulé : ~125 ms de processeur au démarrage. Seul ce
     // panneau (et ses boutons) le lit ; ouvert, il est calculé comme avant.
     if (!showAnnual) return null;
-    const regime = load('vinted_regime','micro');
+    const regime = regimeFiscal();   // (27 oct.) statut de la personne (null : pas choisi ⇒ aucune cotisation estimée)
     const tvaRate = Number(load('vinted_tva',20))||20;
     const months = Array.from({length:12},(_,i)=>({ m:i, label:new Date(reportYear,i,1).toLocaleDateString('fr-FR',{month:'short'}).replace('.',''), ca:0, cout:0, frais:0, nb:0, nbCout:0 }));
     let ca=0, cout=0, frais=0, nb=0, nbCout=0, margeKnown=0, fraisConnu=0;
@@ -39105,7 +39220,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const marge = margeKnown - fraisConnu;
     const tvaMarge = (regime==='marge' && marge>0) ? marge*(tvaRate/(100+tvaRate)) : 0;
     const margeHT = marge - tvaMarge;
-    const taux = tauxUrssaf();
+    const taux = urssafConcerne(regime) ? tauxUrssaf() : 0;   // (27 oct.) cotisations estimées pour un micro-entrepreneur seulement
     const urssaf = aPayerUrssaf(ca, taux);
     return { regime, tvaRate, year:reportYear, months, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, achatsTotal, achatsNb, buyLines, saleLines, parPlateforme, charges, resultatCharges,
       enCours: declRapport.vinted === 'encours', vinted: declRapport.vinted,
@@ -39140,7 +39255,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const R=annual; const e=(v)=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
     const L=[];
     L.push([`Bilan annuel ${R.year}`]);
-    L.push([`Régime`, R.regime==='marge'?'Société (marge)':'Micro-entrepreneur']);
+    L.push([`Régime`, libelleRegime(R.regime)]);
     L.push([]);
     L.push(['Mois','CA des ventes finalisees','Cout achat','Boosts','Benefice net','Ventes']);
     R.months.forEach(m=>L.push([m.label, m.ca.toFixed(2), m.cout.toFixed(2), m.frais.toFixed(2), (m.ca-m.cout-m.frais).toFixed(2), String(m.nb)]));
@@ -39182,7 +39297,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold); const reg = await pdf.embedFont(StandardFonts.Helvetica);
     let y=800; const T=(t,x,yy,s,f,c)=>page.drawText(String(t),{x,y:yy,size:s,font:f||reg,color:c||rgb(0.1,0.1,0.1)});
-    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(R.regime==='marge'?'Société (régime de la marge)':'Micro-entrepreneur',40,y,11,reg,rgb(0.4,0.4,0.4)); y-=26;
+    T('Bilan annuel '+R.year,40,y,22,bold,rgb(0,0.47,0.51)); y-=20; T(libelleRegime(R.regime),40,y,11,reg,rgb(0.4,0.4,0.4)); y-=26;
     // Tableau mensuel
     const cols=[[40,'Mois'],[150,'CA'],[240,'Coût'],[330,'Boosts'],[420,'Bénéf.'],[510,'Ventes']];
     cols.forEach(([x,h])=>T(h,x,y,9,bold,rgb(0.3,0.3,0.3))); y-=4; page.drawLine({start:{x:40,y},end:{x:555,y},thickness:0.5,color:rgb(0.8,0.8,0.8)}); y-=14;
@@ -44763,7 +44878,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📚 Registre comptable {annual.year}</div>
-                <div style={{fontSize:11,color:C.muted}}>{annual.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>le CSV contient le détail ventes + achats ligne par ligne</span></div>
+                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(annual.regime)} · <span style={{opacity:0.8}}>le CSV contient le détail ventes + achats ligne par ligne</span></div>
               </div>
               <button type="button" onClick={()=>setShowAnnual(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -45314,7 +45429,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>📊 Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{report.regime==='marge'?'Société — régime de la marge':'Micro-entrepreneur'} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
+                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans ⚙️ Paramètres</span></div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -48419,7 +48534,7 @@ const PUSH_CATS = [
   { id:'soir',     def:true,  titre:'🌙 Colis de demain',   desc:"La veille vers 20 h : combien de colis poster demain, et lesquels sont en retard." },
   { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
   { id:'offremini',def:true,  titre:'🎯 Offre à accepter',   desc:"Une offre a passé ton prix mini — à accepter en 1 tap." },
-  { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er de chaque mois, pour penser à la faire.' },
+  { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er du mois, si tu es micro-entrepreneur (ton statut se choisit dans Comptabilité).' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
   { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
@@ -51861,11 +51976,11 @@ function EcranMasques({ comptes, ordi }) {
 // chiffres. Micro-entrepreneur (CA + estimation cotisations) ou société au
 // régime de la marge (marge + TVA sur la marge). Synchronisé (vinted_regime/tva).
 function RegimeSetting({ nu = false }) {
-  const [regime, setRegime] = useState(() => load('vinted_regime', 'micro'));
+  const [regime, setRegime] = useState(() => regimeFiscal());
   // §5.49 : la base du régime URSSAF (donc du taux affiché) est synchronisée et
   // lue au montage. Scalaire à défaut non vide : remplacer SEULEMENT s'il est
   // resté au défaut, jamais un choix fait pendant le chargement.
-  useEffect(() => onCloudReady(() => setRegime(v => v === 'micro' ? load('vinted_regime', 'micro') : v)), []);
+  useEffect(() => onCloudReady(() => setRegime(v => v == null ? regimeFiscal() : v)), []);
   const [tva, setTva] = useState(() => Number(load('vinted_tva', 20)) || 20);
   // ⚠️ LE TAUX DE COTISATIONS EST UN RÉGLAGE, PAS UNE CONSTANTE. Il était écrit
   // 13,5 % en dur à SIX endroits, et il tombe sur un document qu'il recopie
@@ -51886,8 +52001,7 @@ function RegimeSetting({ nu = false }) {
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>}
       <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {[['micro','Micro-entrepreneur','Pas de TVA. Rapport : CA des ventes finalisées, bénéfice net, estimation des cotisations.'],
-          ['marge','Société — régime de la marge','TVA sur la marge. Rapport : marge, TVA sur marge à reverser, registre d\'achats.']].map(([id,t,d])=>(
+        {REGIMES_FISCAUX.map(([id,t,,d])=>(
           <button type="button" key={id} onClick={()=>pick(id)} style={{textAlign:'left',display:'flex',gap:10,alignItems:'flex-start',padding:'10px 12px',borderRadius:8,cursor:'pointer',
             border:`1px solid ${regime===id?C.accent:C.border}`,background:regime===id?`${C.accent}12`:'transparent'}}>
             <span style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:8,border:`2px solid ${regime===id?C.accent:C.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -51900,7 +52014,7 @@ function RegimeSetting({ nu = false }) {
           </button>
         ))}
       </div>
-      {regime!=='marge' && (
+      {regime==='micro' && (
         <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <span style={{fontSize:12,fontWeight:500,color:C.text}}>Taux de cotisations</span>
@@ -53750,7 +53864,9 @@ function AppCoeur() {
       // (20 oct.) À L'ÉCHÉANCE : même notification, mais selon SON rythme, son
       // échéance et ce qu'il a déjà noté « déclaré » — `rappelUrssaf` (une règle).
       {
-        const r=rappelUrssaf({ freq: load('vinted_urssaf_freq','trimestriel'), declare: lireDeclarations(), ligne: lireLigneUrssaf() });
+        // (27 oct.) Seulement pour un micro-entrepreneur (`urssafConcerne`) :
+        // un particulier, une société ou un statut jamais choisi n'a rien à déclarer ici.
+        const r=urssafConcerne() ? rappelUrssaf({ freq: load('vinted_urssaf_freq','trimestriel'), declare: lireDeclarations(), ligne: lireLigneUrssaf() }) : null;
         if(r) items.push({icon:'🧾', ic:'receipt', text:r.text, sub:r.sub, n:1, tab:'compta', jr:true, job:'urssaf', urssaf:r});
       }
       // Une liste identique ne se repose pas : un tableau neuf re-rendait toute
