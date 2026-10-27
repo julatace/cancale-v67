@@ -103,6 +103,16 @@
 > retrait, titre publié, états des annonces, rafraîchir les ventes) repliées derrière ⓘ. Banc
 > `plateformes-premium.cjs` : 26 rouges sur main, 176 verts après.
 
+> **27 octobre — Vestiaire 5.240, colis et « partout » :** les ventes à
+> expédier portent la date limite, le transporteur, le n° de suivi et « bordereau
+> disponible » (true/false/null, JAMAIS son adresse). Une règle
+> (`lireVestiaireColis` + `colisVestiaire`, une requête `id=in.(vc_…)` dans la
+> vague eBay) pour Colis (« Ventes Vestiaire à envoyer », « Achats Vestiaire en
+> route » + Suivre) et Ma journée (`vestiaire-envoyer`, ambre si limite ≤ demain ;
+> `vestiaire-messages`). Pas su ⇒ Colis le dit une fois, Ma journée se tait.
+> Pas encore : CA/URSSAF (montant = prix ou versé ? inconnu), Stock libéré
+> (« expédiée » jamais vu). Banc `vestiaire-colis.cjs` (16 rouges sur main, mutation 6).
+
 > **27 octobre — Vestiaire 5.239, achats :** l'extension lit la liste de tes
 > achats (`users/me/…orders|purchases|bought…`, jamais vue d'ici : reconnue au
 > chemin ; jamais le panier `orders/current-light`) dans `vc_achats` : id,

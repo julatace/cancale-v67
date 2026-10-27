@@ -22151,7 +22151,7 @@ function colisVestiaire(d) {
   const messages = d.compteur && typeof d.compteur.messages === 'number' ? d.compteur.messages : null;
   return { aEnvoyer, enRoute, messages };
 }
-function joursAvant(iso) { const t = Date.parse(iso || ''); if (!isFinite(t)) return null; const a = new Date(); a.setHours(0,0,0,0); const b = new Date(t); b.setHours(0,0,0,0); return Math.round((b - a) / 86400000); }
+function joursAvantVc(iso) { const t = Date.parse(iso || ''); if (!isFinite(t)) return null; const a = new Date(); a.setHours(0,0,0,0); const b = new Date(t); b.setHours(0,0,0,0); return Math.round((b - a) / 86400000); }
 function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
@@ -22163,7 +22163,7 @@ function ColisVestiaireBloc({ vc }) {
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
         <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Le bordereau se prend sur Vestiaire (onglet « articles à expédier »). Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
-        {E.map((v) => { const j = joursAvant(v.limite); return (
+        {E.map((v) => { const j = joursAvantVc(v.limite); return (
           <div key={v.id} data-vc-colis={v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', background: C.card }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}
               {j != null ? <span style={{ marginLeft: 8, color: j <= 1 ? C.warn : C.muted, fontWeight: 600 }}>· {j < 0 ? `date limite passée (${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})` : j === 0 ? 'à envoyer aujourd’hui' : j === 1 ? 'à envoyer demain' : `à envoyer avant le ${new Date(v.limite).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}</span> : null}</div>
@@ -40163,7 +40163,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    règle de Colis (`colisVestiaire`, §11). Jamais rien sur « pas su ».
         { const vc = colisVestiaire(vcEtat);
           if (vc && vc.aEnvoyer && vc.aEnvoyer.length) {
-            const n = vc.aEnvoyer.length, j = vc.aEnvoyer.map((v) => joursAvant(v.limite)).filter((x) => x != null);
+            const n = vc.aEnvoyer.length, j = vc.aEnvoyer.map((v) => joursAvantVc(v.limite)).filter((x) => x != null);
             const presse = j.length && Math.min(...j) <= 1;
             jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse,
               title: `${n} vente${n > 1 ? 's' : ''} Vestiaire à envoyer`,
