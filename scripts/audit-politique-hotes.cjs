@@ -64,6 +64,7 @@ const COUPLES = {
   'src/App.jsx|supabase.com': ['lien', LIEN],
   'src/App.jsx|vercel.com': ['lien', LIEN],
   'src/App.jsx|www.autoentrepreneur.urssaf.fr': ['lien', LIEN],
+  'src/App.jsx|fr.vestiairecollective.com': ['lien', LIEN],
   'src/App.jsx|www.chronopost.fr': ['lien', LIEN],
   'src/App.jsx|www.ebay.fr': ['lien', LIEN],
   'src/App.jsx|www.google.com': ['lien', LIEN],
