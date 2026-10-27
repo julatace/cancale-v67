@@ -103,7 +103,7 @@
 > retrait, titre publié, états des annonces, rafraîchir les ventes) repliées derrière ⓘ. Banc
 > `plateformes-premium.cjs` : 26 rouges sur main, 176 verts après.
 
-> **27 octobre — Vestiaire 5.240, colis et « partout » :** les ventes à
+> **27 octobre — Vestiaire 5.241, colis et « partout »** (5.240 était déjà prise par l'atelier de republication : deux contenus, deux numéros) **:** les ventes à
 > expédier portent la date limite, le transporteur, le n° de suivi et « bordereau
 > disponible » (true/false/null, JAMAIS son adresse). Une règle
 > (`lireVestiaireColis` + `colisVestiaire`, une requête `id=in.(vc_…)` dans la
@@ -446,7 +446,7 @@ Ce ne sont pas des positions de principe : chacune a une raison technique.
 
 | demande | pourquoi non |
 |---|---|
-| republication automatique en file, avec délais aléatoires | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. C'est ce qui a fait bloquer `vanessa5723`. |
+| republication automatique en file, avec délais aléatoires, SANS lui | un délai « faussement humain » n'a qu'un usage : tromper la détection bot. ⚠️⚠️ **NUANCE DU 27 OCTOBRE, sa demande explicite — ne PAS confondre avec un refus de l'atelier.** Julien : « prépare le brouillon VRM → mets en brouillon sur Vinted → attends un peu → publie ; qu'on puisse baisser de tant de % le prix ; sélectionner les paires en ligne du compte ». L'**atelier de republication** (tranches 1-5, `AtelierBrouillon`/`AtelierLots`/`AtelierFile`) est à LUI : il choisit les annonces, l'ordre, l'espacement (fixe OU variable, SON choix), et il LANCE (double opt-in : case « Publier pour de vrai » + case « Je confirme »). Ce qui est livré en réel (tranche 5, `republierVinted`) est la forme **SÛRE et mesurée** : **baisser le prix EN PLACE** (`PUT …/item_upload/items/{id}`) — jamais une suppression, jamais une création, rien ne peut être perdu. Gardé par : confirmation · compte connecté (garde stricte) · **sauvegarde coffre vérifiée** · **modèle de CETTE annonce appris** du corps que Vinted a accepté (sinon refus — on ne devine pas une structure, §4.10). `audit-republier.cjs` l'EXÉCUTE (§4.10) : tout prêt ⇒ UN PUT au prix baissé · sept cas refusés ⇒ 0 requête · plancher (§19) respecté · Vinted refuse ⇒ « échec », annonce intacte ; `--prouve` : 0 sur le code d'avant. ⚠️ **Ce qui reste REFUSÉ** : la republication **à l'aveugle** (délais aléatoires sans qu'il la lance), et le **delete+recreate** « brouillon→publier » tant qu'un dépôt manuel n'en a pas fait MESURER la forme (photos à re-téléverser, champs exacts) — l'écrire avant serait le défaut le plus coûteux du projet. `EXT_CAPACITES.republier = '5.240.0'`. **Ne pas re-refuser l'atelier sur cette ligne.** |
 | **accepter une offre automatiquement** — ✅ **MOTEUR auto (Vinted) rétabli le 27 oct. (soir), ÉTEINT par défaut ; natif eBay** | coupée le 4 octobre (« je ne veux pas que ça accepte tout seul les offres »), **retirée** le 5 octobre (« enlève l'acceptation de l'offre ») : le moteur de l'extension, ses planchers, le champ « Min. accepté », l'interrupteur de Réglages. Accepter engage une vente ferme, et un programme qui accepte ressemble à un robot (le compte bloqué). **Ne jamais le reproposer** — je l'ai fait par erreur le 5 octobre en lisant l'ancienne version de cette ligne. Reste permis : accepter UNE offre depuis la messagerie, sur son clic, avec confirmation (`executerPourApp`). `audit-offres-auto.cjs` refuse tout autre chemin vers `/accept`. ⚠️ **Tout ce qui précède vaut pour VINTED. Sur eBay, Julien l'a demandé le 9 octobre**, en ses mots : « Je veux juste définir une règle sur chaque annonce et à chaque offre au-dessus ça accepte », puis, à la question « aussi sur Vinted ? » : « **eBay seulement** », et « J'accepte » sur le plan. Sur eBay c'est donc permis, sous UNE seule forme : le **seuil natif d'eBay** (`BestOfferAutoAcceptPrice`), posé annonce par annonce **sur son clic**, avec une confirmation qui dit qu'une offre acceptée vend la paire. C'est eBay qui accepte : VRM n'appelle aucune route d'acceptation et ne décide rien (`audit-offres-auto.cjs` le vérifie aussi pour `api/`, section 5). ⚠️⚠️ **VINTED — REVIREMENT DU 27 OCTOBRE, sa décision en connaissance de cause.** Julien : « à côté du numéro on met un prix minimum et tout au-dessus est accepté », puis, mis devant le risque (c'est le comportement qui a bloqué `vanessa5723`) : « **fais en sorte que je ne sois pas bloqué, trouve quelque chose** ». Vinted n'a **pas** de seuil natif : un moteur qui accepte seul = signal robot = compte bloqué. Un **prix mini** (`vinted_annonce_numeros[id].min`, à côté du N°, synchronisé, l'app propriétaire, l'extension le lit — §11) marque les annonces qu'il laisse partir à ce prix. D'abord livré en **1-tap** (l'offre ≥ mini mise en avant, SON tap accepte). Puis, le 27 octobre au soir : « **non je veux que ça accepte tout seul** » → choix explicite **« Moteur auto (accepte seul) »**, le risque de blocage remis sous ses yeux. ⚠️⚠️ **ET IL A DÉMENTI MA THÉORIE** : « c'est bien mais **ce n'est pas du tout ce qui a fait bloquer Vanessa, enlève-toi ça de la tête** ». En propriétaire du compte, il sait ce qui l'a bloqué, et ce n'est PAS l'acceptation auto. ⇒ Le moteur `autoAccepterOffres` (extension) est **RÉTABLI** : il accepte seul toute offre ≥ mini, **éteint par défaut** (`vinted_offres_auto` ; l'interrupteur de l'app AVERTIT que ça accepte à sa place, il ne rassure pas). Espacement **ALÉATOIRE** entre deux acceptations (il l'avait demandé — « ça peut être aléatoire » — j'avais refusé à tort sur la théorie vanessa, corrigé). GARDE-FOUS jamais retirés : `garde` (compte connecté dans l'onglet, plafond 20/h, arrêt net sur pause 429/403), une requête à la fois, volume borné par visite, chaque offre acceptée **une fois** (mémo `vrmOffresFaites`). `audit-offres-auto.cjs` vérifie que ces gardes tiennent ; `audit-moteur-offres.cjs` **EXÉCUTE** le moteur (§4.10) — offre ≥ mini ⇒ accepte · six cas interdits (sous le mini, éteint, pas su, autre compte, pause, déjà traitée) ⇒ rien · volume borné ⇒ 3 sur 4 ; `--prouve` : 0 sur le code d'avant. La voie MANUELLE (messagerie de l'app, son clic) reste via `executerPourApp`/`EXEC_PERMIS`. **REFUS AUTO (même décision, « tu proposes au vendeur de fixer SA règle ») :** à côté du mini, un seuil **`refuse`** par annonce — une offre SOUS ce seuil est refusée seule (`reject`), et SON message (`vinted_offre_refus_msg`, jamais inventé, **vide par défaut** ⇒ refus sans message) part à l'acheteur après le refus ; entre `refuse` et `min`, VRM ne touche à rien. Même file/garde/plafond que l'accept ; `audit-moteur-offres.cjs` le couvre (offre < refuse ⇒ reject (+ message si texte) · entre les deux ⇒ rien). ⚠️ **Ne JAMAIS re-régler l'espacement en « fixe » ni ré-interdire le moteur sur la théorie « auto = blocage vanessa »** : il l'a explicitement démentie. Détail : « eBay : au-dessus, ça accepte » plus bas. |
 | piloter la souris / le clavier | Vinted reçoit la **même requête** ; en plus un événement synthétique porte `isTrusted:false`, donc ça **ajoute** une preuve d'automatisation. Et un clic aveugle agit à côté quand la page bouge. |
 | modifier les photos pour republier / passer sur un autre compte | Vinted relie les comptes par **appareil, navigateur, adresse, moyen de paiement** — pas par les images. Tourner une photo ne protège de rien. |
@@ -10177,6 +10177,50 @@ lui), vert après.
 - Preuves : `audit-extension-5186.cjs` (12 contrôles, 7 rouges sur la 5.185) ; banc `leboncoin.cjs` fixtures `optionsreel` (vraie forme des six cases) et `confirmation` : **11 rouges sur l'ancien `lbc.js`**, dont `__paye=1` (un bouton payant cliqué).
 - ⚠️ **Non mesuré** : la vraie page d'options et de confirmation de leboncoin.fr (403 d'ici ; formes tirées de `lbc_recon.etapes`) ; la forme réelle de la réponse des packs et de la demande de retrait.
 - Extension **5.186.0**, zip régénéré, `EXT_ATTENDUE` suivie. Aucune entrée d'`EXT_CAPACITES` : des corrections et des mesures.
+
+### L'ATELIER DE REPUBLICATION — cinq tranches (27 octobre, « FAIS TOUT »)
+Demande de Julien (dossier de 40 sections + clarifications) : préparer/éditer ses
+annonces DANS VRM, en lots, et republier sur Vinted. Livré tranche par tranche,
+chacune son banc §6.1. **Non destructif sauf la 5, qui ne fait que BAISSER un
+prix en place.** Ouvre depuis **Annonces → ⋯ Outils**.
+- **T1 — `AtelierBrouillon`** (bouton « ✨ Préparer » par carte) : brouillon VRM
+  (titre, prix, photos) gardé dans `vinted_annonce_drafts`, **clé = N° VRM**
+  (jamais recréé, §5). Rien n'est envoyé à Vinted.
+- **T2 — réglages photo** (dans la modale) : rotation **fine ±15°** (le saut de
+  90° était trop brutal, 27 oct.), luminosité/contraste/saturation/zoom, aperçu
+  **CSS** (le CDN Vinted est *tainted*, pas d'export pixels — §15 : des VALEURS,
+  pas des pixels ; la photo finale repart de l'original à la publication).
+  Réglages communs à la sélection + exceptions, préréglages `vrm_photo_presets`.
+- **T3 — `AtelierLots`** (« Lots — titres & prix ») : titre (préfixe/suffixe/
+  remplacer/supprimer/insérer, pas de doublon, limite signalée **jamais coupée**)
+  et prix (ordre explicite non cumulatif : ajustement %/€ ou commun → arrondi →
+  terminaison → **plancher §19**), aperçu avant→après, écrit dans les brouillons.
+- **T4 — `AtelierFile`** (« File de publication ») : ordre (monter/descendre/
+  mélanger/trier), espacement fixe/variable **borné 1 h**, pause/reprise/arrêt,
+  **reprise après interruption** (état gardé SYNCHRONEMENT dans `vrm_atelier_file`,
+  jamais via `save` anti-rebondé, restauré EN PAUSE), éligibilité revérifiée
+  **juste avant** chaque article (incomplet/vendu ⇒ sauté), verrou un-à-la-fois.
+- **T5 — `republierVinted`** (extension) + mode réel de la file : **baisser le
+  prix SUR VINTED, en place** (`PUT …/item_upload/items/{id}`), jamais supprimer
+  ni créer. Double opt-in dans la file (case « Publier pour de vrai » + « Je
+  confirme »). L'extension revérifie TOUT : confirmation · garde stricte · coffre
+  vérifié · **modèle de CETTE annonce appris** (le corps que Vinted a accepté,
+  capté dans `noterFicheVinted` → `vrm_vinted_modele`) — sinon refus, on ne
+  devine pas. `EXT_CAPACITES.republier = '5.240.0'`.
+  ⚠️ **PAS ENCORE fait, et pourquoi** : le **delete+recreate** « brouillon→
+  publier » (remonter une annonce en tête) demande de re-téléverser les photos
+  (`POST /api/v2/photos`) et les champs EXACTS du `POST item_upload/items` — leur
+  forme n'a jamais été mesurée d'ici (Vinted 403). **À câbler après qu'un dépôt
+  manuel l'aura fait capter** (comme les formulaires eBay/Leboncoin) ; l'écrire
+  à l'aveugle serait le défaut le plus coûteux du projet. La baisse de prix en
+  place, elle, est sûre et livrée.
+  ⚠️ **Et le modèle `PUT` n'est encore appris pour AUCUNE annonce** tant que
+  Julien n'a pas modifié une annonce à la main avec la 5.240 : d'ici là la file
+  réelle ressort « échec : format pas encore vu » (dit à l'écran), rien n'est
+  touché. Premier geste : modifier une annonce à la main une fois.
+- Preuves : `audit-republier.cjs` (vm, 13 contrôles, §6.1 `--prouve`),
+  `bancs/atelier-file.cjs` (rendu, 390+1512 px, dont le double opt-in),
+  `bancs/annonces-carte.cjs` (T1/T2/T3). Extension **5.240.0**, zip régénéré.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
 Le défaut le plus coûteux du projet (l'app promet ce que l'extension installée
