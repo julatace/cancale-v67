@@ -1,5 +1,17 @@
 # VRM — dossier de passation
 
+> **27 octobre — Leboncoin et eBay, même traitement (« fais pareil ») :** comme l'espace
+> Vinted : une vente dit quand / par quoi sous son titre (Leboncoin : date de VENTE relevée,
+> jamais l'heure de capture, et le transporteur ; eBay : date de commande, et le compte s'il y
+> en a plusieurs) ; « à envoyer » (règle de l'onglet Colis) et « À expédier » en ambre
+> (`data-ton="action"`), l'état eBay n'est plus coupé (« À expédiei ») ; « Mes vues » au bout
+> de la ligne des filtres (`vrm-ventes-filtres-ligne`, pleine largeur seulement déplié) ; plus
+> de « N commandes affichées » ; le diagnostic Leboncoin en BAS de l'espace (`data-diag-lbc`) ;
+> plus de second titre « Achats Leboncoin » ; « Tes priorités du moment », « État de l'annonce
+> et suivi », « touche une annonce pour la modifier » retirés ; les explications (code de
+> retrait, titre publié, états des annonces, rafraîchir les ventes) repliées derrière ⓘ. Banc
+> `plateformes-premium.cjs` : 26 rouges sur main, 176 verts après.
+
 > **26 octobre — Stock : un assistant, et tout au pavé numérique :** Julien : « le stock 3D n'est
 > pas pratique, ne fait pas gagner de temps ; pas d'agent pour créer la pièce et gérer le
 > rangement » et « la plupart utilisent un ordi avec un pavé numérique ». Assistant À RÈGLES

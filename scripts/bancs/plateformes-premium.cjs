@@ -268,6 +268,38 @@ const ecrans = [
           dit(m.coupes.length === 0, 'aucun montant coupé', m.coupes.join(' | '));
           if (tel) dit(m.petites.length === 0, 'aucune cible tactile de moins de 44 px', `${m.petites.length} : ${m.petites.slice(0, 10).join(' | ')}`);
           for (const a of ec.attrs) dit(!!(await pg.$(a)), `${a} est rendu`);
+          // (27 oct.) « Fais pareil pour Leboncoin et eBay » — le traitement « trop
+          // brouillon » de l'espace Vinted : pas de texte redit, la date et
+          // l'état qui demande un geste sur la ligne, « Mes vues » sans ligne à lui.
+          const b2 = await pg.evaluate(() => {
+            const vis = (e) => !!e && e.getBoundingClientRect().height > 0 && !e.closest('details:not([open]) > :not(summary)');
+            const txt = document.querySelector('.vrm-market-space')?.innerText || '';
+            const top = (e) => e ? e.getBoundingClientRect().top : null;
+            const vues = document.querySelector('.vrm-market-space .vrm-vues');
+            const filtres = document.querySelector('.vrm-market-space .vrm-sales-filters');
+            const etats = [...document.querySelectorAll('.vrm-market-space .vrm-ledger-sale-state')].map((e) => ({ t: e.textContent.trim(), ton: e.getAttribute('data-ton') || '', coupe: e.scrollWidth > e.clientWidth + 2 }));
+            return {
+              diagAvantKpi: (() => { const d = document.querySelector('[data-diag-lbc]') || [...document.querySelectorAll('details')].find((x) => /problème de synchronisation/.test(x.textContent)); const k = document.querySelector('[data-ventes-kpi]'); return !!(d && k && top(d) < top(k)); })(),
+              vuesSeule: !!(vues && filtres && Math.abs(top(vues) - top(filtres)) > 12),
+              resultats: vis(document.querySelector('.vrm-ebay-results')),
+              sous: [...document.querySelectorAll('.vrm-market-space [data-vente-sous]')].map((e) => e.textContent.trim()),
+              etats,
+              titreAchats: [...document.querySelectorAll('.vrm-market-space *')].some((e) => !e.children.length && /^Achats Leboncoin/.test(e.textContent.trim()) && vis(e) && !e.classList.contains('vrm-sr')),
+              phrases: ['Tes priorités du moment', 'État de l’annonce et suivi de vente', 'touche une annonce pour la modifier', 'Quand un colis arrive au point relais', 'Les états reflètent la dernière lecture'].filter((p) => txt.includes(p)),
+            };
+          });
+          dit(b2.phrases.length === 0, 'aucune phrase d’explication dépliée d’office', b2.phrases.join(' | '));
+          if (/^leboncoin/.test(ec.nom)) dit(!b2.diagAvantKpi, 'le diagnostic Leboncoin n’est plus en tête de la section');
+          if (/ventes$/.test(ec.nom)) {
+            dit(!b2.vuesSeule, '« Mes vues » sur la ligne des filtres, pas une ligne à lui');
+            dit(!b2.resultats, 'pas de ligne « N commandes affichées »');
+            dit(b2.sous.length > 0 && b2.sous.every((x) => x.length > 0), 'chaque vente dit quand / par quoi sous son titre', JSON.stringify(b2.sous));
+            const exp = b2.etats.filter((e) => /envoyer|expédier/i.test(e.t));
+            dit(exp.length > 0 && exp.every((e) => e.ton === 'action'), 'l’état « à envoyer / à expédier » est en ambre (data-ton=action)', JSON.stringify(b2.etats));
+            dit(b2.etats.filter((e) => /^Paiement|^Expédiée|^En cours/.test(e.t)).every((e) => e.ton !== 'action'), 'les autres états ne le sont pas');
+            if (/^ebay/.test(ec.nom)) dit(b2.etats.every((e) => !e.coupe), 'l’état d’une vente eBay n’est pas coupé', JSON.stringify(b2.etats));
+          }
+          if (ec.nom === 'leboncoin-achats') dit(!b2.titreAchats, 'pas de second titre « Achats Leboncoin » sous l’onglet Achats');
           if (ec.evaluer && !tel) {
             // Annuler la confirmation n'envoie RIEN ; « Laisser l'évaluation » envoie
             // exactement { action:'evaluer', itemId, transactionId, buyer, confirme:true }.

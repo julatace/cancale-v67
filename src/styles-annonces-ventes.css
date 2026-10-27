@@ -140,3 +140,14 @@
   .vrm-app-shell .ops-entete-doublon .ops-surtitre,
   .vrm-app-shell .ops-entete-doublon h2 { display: none; }
 }
+
+/* ── Leboncoin et eBay, même traitement (27 octobre) ─────────────────────────
+   « Mes vues » au bout de la ligne des filtres (il prenait une ligne à lui
+   seul) ; déplié, il reprend toute la largeur sous les filtres. */
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 6px; }
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne > .vrm-rangee { flex: 1 1 0; min-width: 0; }
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne > .vrm-vues { flex: 0 0 auto; margin: 0 0 10px; }
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne > .vrm-vues:has(details[open]) { flex-basis: 100%; order: 2; }
+/* Une vente eBay : l'état (point + mot) ne se coupe plus (« À expédiei »). */
+.vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state { max-width: none; min-width: max-content; flex-shrink: 0; white-space: nowrap; }
+.vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state[data-ton=action] .vrm-ebay-sale-status { color: var(--av-warn) !important; }
