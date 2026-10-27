@@ -21997,7 +21997,7 @@ function MessagesVestiaire() {
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
           {n == null ? <>Nombre de non-lus pas encore relevé.</>
             : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b> sur Vestiaire, au dernier relevé ({age(d.compteur.at)}).</>}
-          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
+          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
           {!page ? <> (la messagerie est dans le menu de ton compte)</> : null}
         </div>
         {d.conversations ? (liste.length ? <>

@@ -225,7 +225,7 @@
   const CLE_ETAT = /^(status|state|orderStatus|order_status|shippingStatus|shipping_status|step|statusLabel|transactionStatus)$/i;
   const CLE_DATE = /date|created|sold|paid|ordered|At$/i;
   const CLE_MONTANT = /^(price|amount|total|sellerPrice|seller_price|earning|earnings|payout|netAmount|net_amount|sellingPrice|selling_price)$/i;
-  const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member/i;
+  const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member|interlocutor|sender|participant|author|counterpart|contact/i;
   function scalairesVente(e) {
     const out = { etat: '', date: '', montant: null };
     const visite = (x, prof, chemin) => {
