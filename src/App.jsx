@@ -32076,6 +32076,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    sur une annonce sans numéro ni prix d'achat effaçait l'entrée entière
       //    — donc le choix — à la ligne suivante, sans un mot.
       const emptyMp = !next.mp || Object.keys(next.mp).length === 0;
+      // (27 oct.) Le prix mini d'acceptation `min` compte comme une valeur, comme
+      // `mp` : sans ça, poser un mini sur une annonce sans N° ni prix d'achat
+      // effacerait l'entrée — donc le mini — à la ligne suivante.
+      const emptyMin = next.min == null || String(next.min).trim() === '';
       // ⚠️ (relecture du 11 octobre) Après une remise à zéro, la base REFUSE
       //    qu'une fiche numérotée disparaisse (`vrm_fiche_perdue` : c'est la
       //    signature d'un appareil chargé avant qu'un autre ne numérote). Effacer
@@ -32083,7 +32087,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    appareil… »), et plus rien ne se synchronisait. On garde la fiche,
       //    son N° vide — elle compte exactement comme une fiche absente partout.
       const etaitNumerotee = !!String(c.numero || '').trim();
-      if (emptyNum && emptyBuy && emptyMp && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
+      if (emptyNum && emptyBuy && emptyMp && emptyMin && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -38580,6 +38584,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const off = offreEnAttenteDe(openConv.conversation);
                   const tx = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.id;
                   if (!off && !tx) return null;
+                  // (27 oct.) Prix mini posé sur CETTE annonce (par identité, l'item_id,
+                  // §5). Une offre ≥ mini est pré-approuvée : l'Accepter est mis en avant.
+                  // Rien n'est accepté tout seul — c'est TON tap (garde stricte, §3).
+                  const itemF = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.item_id;
+                  const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
+                  const auDessusMini = !!(off && isFinite(minF) && minF>0 && off.prix >= minF);
                   const etat = msgRelais ? 'ok' : extSait('messagerie');
                   if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
@@ -38593,9 +38603,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return (
                     <div className="vrm-chat-offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
                       {off && (
-                        <div className="vrm-chat-offre-l">
-                          <span className="vrm-chat-offre-t" style={{color:C.text}}><small className="vrm-chat-offre-label">Offre reçue · à traiter</small><b data-montant="">{fmtE(off.prix)}</b></span>
-                          <button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1}}>Accepter</button>
+                        <div className="vrm-chat-offre-l" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined}>
+                          <span className="vrm-chat-offre-t" style={{color:C.text}}><small className="vrm-chat-offre-label">{auDessusMini?`Offre ≥ ton mini (${prixCourt(minF)}) · à accepter`:'Offre reçue · à traiter'}</small><b data-montant="">{fmtE(off.prix)}</b></span>
+                          <button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1,fontWeight:auDessusMini?700:undefined}}>{auDessusMini?`✓ Accepter ${fmtE(off.prix)}`:'Accepter'}</button>
                           <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button>
                         </div>
                       )}
@@ -42048,6 +42058,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
                       <span style={pillEdit}><span style={lab}>achat</span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
                         titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/></span>
+                      {/* (27 oct., demande de Julien) Prix MINI d'acceptation, à côté du N°.
+                          Une offre ≥ ce montant est mise en avant pour que tu l'acceptes en
+                          1 tap depuis Messages. Sur Vinted on n'accepte JAMAIS tout seul (un
+                          programme qui accepte = signal robot, le compte bloqué, §3) : c'est
+                          TON tap qui vend. L'app est propriétaire du mini, l'extension le lit (§11). */}
+                      {(()=>{ const min = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.')); return (
+                      <span style={pillEdit} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap (rien n'est accepté tout seul)"><span style={lab}>mini</span><EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
+                        titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={val}>{min!=null&&isFinite(min)&&min>0?prixCourt(min):'—'}</span>}/></span>); })()}
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>

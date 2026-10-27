@@ -1,22 +1,26 @@
-// L'ACCEPTATION AUTOMATIQUE DES OFFRES EST RETIRÉE — et ne doit pas revenir.
+// L'ACCEPTATION D'OFFRE SUR VINTED PART DU TAP DE JULIEN — JAMAIS D'UNE BOUCLE.
 //
-// Julien, 4 octobre : « je ne veux pas que ça accepte tout seul les offres »
-// (coupée), puis 5 octobre : « enlève l'acceptation de l'offre » (retirée).
-// Accepter une offre engage une VENTE FERME, et une acceptation faite par un
-// programme ressemble à un robot (§3, le compte bloqué). Ce qui reste permis :
-// accepter UNE offre précise depuis la messagerie de l'app, sur SON clic, avec
-// confirmation — c'est la voie `executerPourApp` / `EXEC_PERMIS`, couverte par
-// `audit-exec.cjs` (origine de l'app, compte connecté strict, plafond).
+// Histoire : l'acceptation AUTOMATIQUE (un moteur dans l'extension qui accepte
+// seul à chaque visite) a été retirée les 4-5 octobre, à sa demande, parce
+// qu'un programme qui accepte ressemble à un robot (§3, `vanessa5723` bloqué).
+// Le 27 octobre Julien la redemande (« à côté du numéro un prix mini, tout
+// au-dessus est accepté »), puis tranche la tension lui-même : « fais en sorte
+// que je ne sois pas bloqué, trouve quelque chose ». La seule voie SANS blocage
+// sur Vinted (qui n'a pas de seuil natif, contrairement à eBay) : un prix MINI
+// met l'offre en avant, et c'est SON TAP qui accepte (voie `vmrExec` /
+// `EXEC_PERMIS`, garde stricte, plafond, une requête à la fois). Ce n'est donc
+// PAS un moteur d'acceptation — aucun programme n'accepte seul.
 //
-// Avant, cet audit EXÉCUTAIT le moteur pour prouver qu'il n'acceptait rien.
-// Le moteur n'existe plus : on vérifie l'INVARIANT, sur le code SANS ses
-// commentaires (un commentaire qui raconte l'histoire n'est pas du code — leçon
-// des sondes et de « télécharg », treizième cri au loup) :
+// L'invariant, vérifié sur le code SANS ses commentaires (un commentaire n'est
+// pas du code — leçon des sondes et de « télécharg ») :
 //   1. dans l'extension, la route `/offer_requests/{id}/accept` n'apparaît QUE
 //      dans la liste blanche `EXEC_PERMIS` — aucun code ne la construit ;
-//   2. aucun reste du moteur (fonctions, planchers, interrupteur local) ;
-//   3. dans l'app : plus de champ « Min. accepté », plus de capacité « offres »,
-//      plus aucune phrase qui promet une acceptation automatique ;
+//   2. aucun MOTEUR d'acceptation dans l'extension (boucle, planchers lus,
+//      interrupteur local) : c'est lui qui bloquait le compte ;
+//   3. dans l'app : un prix mini (`data="min"`) et l'acceptation en 1 tap sont
+//      permis, MAIS chaque acceptation part d'un `onClick` (jamais une minuterie
+//      ni un effet), aucune capacité « offres » n'est rallumée, et l'app DIT que
+//      rien n'est accepté tout seul ;
 //   4. l'AUTRE SENS : l'acceptation manuelle existe toujours (liste blanche +
 //      bouton de la messagerie), et `vinted_offres_auto` reste synchronisé (les
 //      extensions 5.130 à 5.150 retomberaient sinon sur l'interrupteur local).
@@ -75,18 +79,43 @@ essaie('restes du moteur', () => {
   dit(!/\bfunction\s+planchers\b/.test(BG), "plus aucune lecture des prix planchers dans l'extension");
 });
 
-// ── 3. L'app ne promet plus rien ────────────────────────────────────────────
+// ── 3. L'app : un prix MINI + acceptation en 1 TAP, jamais une boucle ────────
+// Décision de Julien, 27 octobre : « à côté du numéro on met un prix minimum et
+// tout ce qui est au-dessus est accepté », puis « fais en sorte que je ne sois
+// pas bloqué, trouve quelque chose ». Sur Vinted il n'y a PAS de seuil natif
+// (contrairement à eBay) : un PROGRAMME qui accepte = signal robot = le compte
+// bloqué (`vanessa5723`, §3). La seule voie sans blocage : un prix mini met
+// l'offre en avant, et c'est le TAP de Julien qui accepte (voie `vmrExec` /
+// EXEC_PERMIS, garde stricte, plafond, une requête à la fois — déjà couverte
+// par les contrôles 1, 2 et 4). Ce qui doit rester vrai côté app :
+//   · pas de capacité « offres » rallumée (ce serait l'ancien moteur) ;
+//   · AUCUNE acceptation déclenchée par une minuterie ou un effet : chaque
+//     `actionOffre('accept', …)` part d'un `onClick` — jamais seule ;
+//   · là où l'app met une offre en avant pour l'accepter, elle DIT que rien
+//     n'est accepté tout seul (la garde est EXIGÉE, pas un mot interdit — §6.5,
+//     sinon la phrase honnête « rien n'est accepté tout seul » serait rouge).
 essaie('app', () => {
-  dit(!/Min\. accepté/.test(APP), "l'app ne propose plus de champ « Min. accepté »");
-  dit(!/onCommit=\{[^}]*minPrice/.test(APP), "aucun champ de l'app n'écrit un prix plancher (minPrice)");
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
-  dit(!!cap && !/\boffres\s*:|\boffresapp\s*:/.test(cap[1]), "l'app ne déclare plus de capacité « offres » à l'extension",
+  dit(!!cap && !/\boffres\s*:|\boffresapp\s*:/.test(cap[1]), "l'app ne déclare pas de capacité « offres » à l'extension (ce serait l'ancien moteur)",
     cap ? '' : 'EXT_CAPACITES introuvable');
-  dit(!/extSait\(\s*['"]offres(app)?['"]\s*\)/.test(APP), "plus aucune décision de l'app sur cette capacité");
-  const promesses = [];
-  const re = /accept\w*[^\n<>{}]{0,40}(automatiquement|tout(?:e)?\s+seule?)|acceptation\s+auto/gi; let m;
-  while ((m = re.exec(APP))) promesses.push('l.' + ligneDe(APP, m.index) + ' « ' + m[0].slice(0, 60) + ' »');
-  dit(promesses.length === 0, "aucune phrase de l'app ne promet une acceptation automatique", promesses.slice(0, 3).join(' · '));
+  dit(!/extSait\(\s*['"]offres(app)?['"]\s*\)/.test(APP), "aucune décision de l'app sur une capacité « offres »");
+  // Chaque acceptation part d'un clic. On prend chaque `actionOffre('accept'`
+  // et on vérifie qu'un `onClick` l'introduit (sur la portée qui précède).
+  const accepts = [...APP.matchAll(/actionOffre\(\s*['"]accept['"]/g)];
+  dit(accepts.length > 0, "la messagerie accepte bien une offre précise (actionOffre('accept'))");
+  const sansClic = accepts.filter((a) => !/onClick=\{\s*\(?\)?\s*=>\s*$/.test(APP.slice(Math.max(0, a.index - 40), a.index)));
+  dit(sansClic.length === 0, "chaque acceptation d'offre part d'un clic (jamais une boucle)",
+    sansClic.map((a) => 'l.' + ligneDe(APP, a.index)).join(' · '));
+  // Aucune minuterie ni aucun effet n'accepte une offre (le vrai « tout seul »).
+  dit(!/set(?:Interval|Timeout)\(\s*(?:async\s*)?\(?\)?\s*=>[\s\S]{0,400}?actionOffre\(\s*['"]accept/.test(APP),
+    "aucune minuterie n'accepte une offre");
+  dit(!/useEffect\(\s*(?:async\s*)?\(?\)?\s*=>[\s\S]{0,600}?actionOffre\(\s*['"]accept/.test(APP),
+    "aucun effet n'accepte une offre au montage");
+  // Là où le prix mini met une offre en avant, la garde d'honnêteté est présente.
+  const miniPose = /data=["']min["']|updatePair\(item,\s*\{\s*min:/.test(APP);
+  dit(miniPose, "le prix mini d'acceptation existe (data=\"min\")");
+  if (miniPose) dit(/rien n['’]est accepté tout seul/i.test(APP),
+    "l'app DIT que rien n'est accepté tout seul (la garde d'honnêteté, pas un mot interdit)");
 });
 
 // ── 4. L'autre sens : la voie manuelle reste, et l'ancien réglage reste éteint
