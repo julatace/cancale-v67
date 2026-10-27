@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.239.0';
+const EXT_ATTENDUE = '5.240.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11134,8 +11134,17 @@ function AtelierLots({ candidats, onSave, onClose }) {
 const FILE_ESP_MIN = 0;        // secondes — borne basse (0 = aussi vite que possible, pour l'essai à blanc)
 const FILE_ESP_MAX = 3600;     // secondes — borne haute (1 h) : au-delà ce n'est plus une file
 const fileClamp = (s) => Math.max(FILE_ESP_MIN, Math.min(FILE_ESP_MAX, Math.round(Number(s) || 0)));
-function AtelierFile({ candidats, verifier, onClose }) {
+function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
   const CAND = React.useMemo(() => { const m = {}; for (const c of candidats) m[c.key] = c; return m; }, [candidats]);
+  // ── Mode RÉEL (tranche 5) : publier pour de vrai sur Vinted (baisser le prix
+  //    en place). Éteint par défaut, et ARMÉ par une case de confirmation — le
+  //    §3 interdit de republier en file à l'aveugle. L'extension revérifie tout
+  //    (confirmation, compte, coffre, modèle) ; rien ne part sans elle.
+  const [reel, setReel] = useState(false);
+  const [reelOk, setReelOk] = useState(false);
+  const [pct, setPct] = useState('10');
+  const pctNum = Math.max(0, Math.min(90, Number(String(pct).replace(',', '.')) || 0));
+  const busy = React.useRef(false);
   const [q, setQ] = useState(() => {
     const raw = load('vrm_atelier_file', null);
     if (raw && typeof raw === 'object' && Array.isArray(raw.ordre)) {
@@ -11158,21 +11167,31 @@ function AtelierFile({ candidats, verifier, onClose }) {
   // coupée en deux parce qu'elle ne commence qu'à la fin du délai.
   React.useEffect(() => {
     if (q.mode !== 'run') return;
+    if (busy.current) return;                           // verrou : un seul article à la fois (§ anti-doublon)
     const k = q.ordre.find(x => (q.statuts[x] || 'attente') === 'attente');
     if (k == null) { setQ(p => (p.mode === 'run' ? { ...p, mode: 'idle' } : p)); return; }
     const delay = q.esp.type === 'variable'
       ? (fileClamp(q.esp.min) + Math.random() * Math.max(0, fileClamp(q.esp.max) - fileClamp(q.esp.min))) * 1000
       : fileClamp(q.esp.min) * 1000;
-    const t = setTimeout(() => {
-      setQ(p => {
-        if (p.mode !== 'run') return p;                 // pausé pendant l'attente : on ne traite pas
-        if ((p.statuts[k] || 'attente') !== 'attente') return p;
-        const v = (() => { try { return verifier(k); } catch (_) { return { ok: false, raison: 'vérification impossible' }; } })();
-        return { ...p, statuts: { ...p.statuts, [k]: v.ok ? 'fait' : 'saute' }, raisons: v.ok ? p.raisons : { ...p.raisons, [k]: v.raison || 'inéligible' } };
-      });
+    let annule = false;
+    const t = setTimeout(async () => {
+      if (annule) return;                               // pausé/arrêté PENDANT l'attente : rien n'a commencé
+      // 1. éligibilité revérifiée JUSTE AVANT (un article devenu vendu/incomplet est sauté)
+      const v = (() => { try { return verifier(k); } catch (_) { return { ok: false, raison: 'vérification impossible' }; } })();
+      if (!v.ok) { setQ(p => ({ ...p, statuts: { ...p.statuts, [k]: 'saute' }, raisons: { ...p.raisons, [k]: v.raison || 'inéligible' } })); return; }
+      // 2. essai à blanc : on marque « prête », rien ne part.
+      if (!(reel && typeof publier === 'function')) { setQ(p => (p.mode === 'run' ? { ...p, statuts: { ...p.statuts, [k]: 'fait' } } : p)); return; }
+      // 3. mode RÉEL : l'étape critique (le PUT sur Vinted) commence — on prend
+      //    le verrou, on la laisse FINIR même si on met en pause pendant (jamais
+      //    coupée en deux), et on enregistre son résultat quoi qu'il arrive.
+      busy.current = true;
+      setQ(p => ({ ...p, statuts: { ...p.statuts, [k]: 'encours' } }));
+      let res; try { res = await publier(CAND[k] ? CAND[k].id : k, pctNum); } catch (_) { res = { ok: false, raison: 'erreur' }; }
+      busy.current = false;
+      setQ(p => ({ ...p, statuts: { ...p.statuts, [k]: (res && res.ok) ? 'fait' : 'echec' }, raisons: (res && res.ok) ? p.raisons : { ...p.raisons, [k]: (res && res.raison) || 'échec' } }));
     }, delay);
-    return () => clearTimeout(t);
-  }, [q.mode, q.statuts, q.ordre, q.esp, verifier]);
+    return () => { annule = true; clearTimeout(t); };
+  }, [q.mode, q.statuts, q.ordre, q.esp, verifier, publier, reel, pctNum]);
   // La file traite PAR CLÉ : un article reste dans la file même si l'annonce
   // n'est plus proposée (devenue inéligible) — il y sera SAUTÉ, pas effacé en
   // silence (un article qui disparaît sans un mot se lit comme une perte).
@@ -11186,7 +11205,7 @@ function AtelierFile({ candidats, verifier, onClose }) {
   const bouge = (k, d) => setQ(p => { const o = [...p.ordre]; const i = o.indexOf(k); const j = i + d; if (i < 0 || j < 0 || j >= o.length) return p; [o[i], o[j]] = [o[j], o[i]]; return { ...p, ordre: o }; });
   const melanger = () => setQ(p => { const o = [...p.ordre]; for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } return { ...p, ordre: o }; });
   const trier = (cle) => setQ(p => { const o = [...p.ordre].sort((a, b) => { const A = CAND[a] || {}, B = CAND[b] || {}; if (cle === 'num') return (Number(a) || 1e9) - (Number(b) || 1e9); if (cle === 'prix') return (A.prix ?? 1e9) - (B.prix ?? 1e9); return 0; }); return { ...p, ordre: o }; });
-  const demarrer = () => { if (!reste) return; setQ(p => ({ ...p, mode: 'run' })); };
+  const demarrer = () => { if (!reste || (reel && !reelOk)) return; setQ(p => ({ ...p, mode: 'run' })); };
   const pause = () => setQ(p => ({ ...p, mode: 'pause' }));
   const reprendre = () => setQ(p => ({ ...p, mode: reste ? 'run' : 'idle' }));
   const arreter = () => setQ(p => ({ ...p, mode: 'idle' }));
@@ -11194,14 +11213,14 @@ function AtelierFile({ candidats, verifier, onClose }) {
   const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 9px', fontSize: 12.5, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 5 };
   const btn = (extra) => ({ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...extra });
-  const stLabel = { attente: 'en attente', fait: 'prête ✓', saute: 'sautée', echec: 'échec' };
+  const stLabel = { attente: 'en attente', fait: reel ? 'publiée ✓' : 'prête ✓', saute: 'sautée', echec: 'échec', encours: 'en cours…' };
   return (
     <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={ev => ev.stopPropagation()} data-file-modal data-file-mode={q.mode} style={{ background: C.bg, width: '100%', maxWidth: 620, maxHeight: '94vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ File de publication</div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ordonne et cadence tes brouillons. <b>Essai à blanc</b> — rien n'est publié : la publication réelle, sur ta confirmation, arrive en tranche 5.</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ordonne et cadence tes brouillons. {reel ? <><b style={{ color: C.warn }}>Publication réelle</b> — chaque annonce sera modifiée sur Vinted (prix baissé), une par une, à l'espacement choisi.</> : <><b>Essai à blanc</b> — rien n'est publié tant que tu n'actives pas la publication réelle, plus bas.</>}</div>
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
@@ -11262,9 +11281,26 @@ function AtelierFile({ candidats, verifier, onClose }) {
             </div>
             <div style={{ fontSize: 11, color: C.muted }}>Borné à {FILE_ESP_MAX / 60} min. L'éligibilité de chaque article est revérifiée juste avant — une paire devenue vendue ou incomplète est sautée, jamais publiée.</div>
           </div>
+          {/* ── mode RÉEL : publier pour de vrai (baisser le prix sur Vinted) ── */}
+          {typeof publier === 'function' && q.mode === 'idle' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, border: `1px solid ${reel ? C.warn : C.border}`, borderRadius: 10, padding: 10, background: reel ? `${C.warn}0c` : 'transparent' }}>
+              <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer' }}>
+                <input type="checkbox" data-file-reel checked={reel} onChange={ev => { setReel(ev.target.checked); if (!ev.target.checked) setReelOk(false); }} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, color: C.text }}><b>Publier pour de vrai sur Vinted</b> — baisser le prix de chaque annonce de la file. <span style={{ color: C.muted }}>En place : le N° ne change pas, rien n'est supprimé. L'extension revérifie chaque annonce (compte, sauvegarde, format) ; une qu'elle ne sait pas encore faire est sautée, jamais touchée.</span></span>
+              </label>
+              {majExt && <div data-file-reel-maj style={{ fontSize: 11.5, color: C.warn, paddingLeft: 27 }}>Sur cet ordinateur, l'extension doit être à jour ({EXT_ATTENDUE}) et connectée au bon compte — sinon chaque annonce ressortira « échec », rien ne sera touché.</div>}
+              {reel && <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: C.text }}>Baisser le prix de <input data-file-pct value={pct} onChange={ev => setPct(ev.target.value)} inputMode="numeric" style={{ ...champ, width: 64 }} /> % <span style={{ color: C.muted }}>(jamais sous le prix d'achat)</span></label>
+                <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer', fontSize: 12.5, color: C.text }}>
+                  <input type="checkbox" data-file-reel-confirme checked={reelOk} onChange={ev => setReelOk(ev.target.checked)} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
+                  <span>Je confirme : le prix de chaque annonce de la file sera <b>baissé de {pctNum} %</b> sur mon compte Vinted.</span>
+                </label>
+              </>}
+            </div>
+          )}
           {/* ── commandes ─────────────────────────────── */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {q.mode === 'idle' && <button type="button" data-file-demarrer onClick={demarrer} disabled={!reste} style={btn({ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700, opacity: reste ? 1 : 0.5, cursor: reste ? 'pointer' : 'default' })}>▶ Démarrer l'essai</button>}
+            {q.mode === 'idle' && <button type="button" data-file-demarrer onClick={demarrer} disabled={!reste || (reel && !reelOk)} style={btn({ border: `1px solid ${reel ? C.warn : C.accent}`, background: reel ? `${C.warn}12` : `${C.accent}12`, color: reel ? C.warn : C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700, opacity: (reste && (!reel || reelOk)) ? 1 : 0.5, cursor: (reste && (!reel || reelOk)) ? 'pointer' : 'default' })}>{reel ? `▶ Publier pour de vrai (${reste})` : "▶ Démarrer l'essai"}</button>}
             {q.mode === 'run' && <button type="button" data-file-pause onClick={pause} style={btn({ border: `1px solid ${C.accent}`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>⏸ Pause</button>}
             {q.mode === 'pause' && <button type="button" data-file-reprendre onClick={reprendre} style={btn({ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>▶ Reprendre</button>}
             {q.mode !== 'idle' && <button type="button" data-file-arreter onClick={arreter} style={btn({ padding: '10px 16px', fontSize: 13, color: C.warn })}>■ Arrêter</button>}
@@ -46040,7 +46076,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const prixDe = (d) => { const p = d&&d.price; const n = (p==null||p==='')?NaN:Number(p); return isFinite(n)?n:NaN; };
         const pretDraft = (key) => { const d=drafts[key]; if(!d) return {ok:false,raison:'pas de brouillon'}; if(!titreDe(d)) return {ok:false,raison:'titre manquant'}; if(!(prixDe(d)>0)) return {ok:false,raison:'prix manquant'}; if(!(Array.isArray(d.photos)&&d.photos.length)) return {ok:false,raison:'aucune photo'}; if(!onlineById[String(d.id)]) return {ok:false,raison:'plus en ligne'}; return {ok:true}; };
         const cands = Object.keys(drafts).filter(key=>pretDraft(key).ok).map(key=>{ const d=drafts[key]; return { key, id:d.id, titre:titreDe(d), prix:prixDe(d) }; });
-        return <AtelierFile candidats={cands} verifier={pretDraft} onClose={()=>setFileOpen(false)} />;
+        // Mode RÉEL (tranche 5) : baisser le prix de l'annonce SUR VINTED, en place.
+        // On envoie la commande à l'extension (origine de l'app, garde stricte,
+        // coffre vérifié, modèle appris — tout revérifié côté extension). Le prix
+        // d'achat de la paire sert de plancher (§19). L'app n'écrit JAMAIS sur
+        // Vinted elle-même : c'est l'extension, sur ce clic confirmé.
+        const publierReel = async (id, pct) => {
+          const it=(listings.items||[]).find(x=>String(x.id)===String(id)); if(!it) return { ok:false, raison:'annonce introuvable' };
+          const uid=it._acc&&it._acc.vinted_user_id; if(!uid) return { ok:false, raison:'compte introuvable' };
+          const e=numeros[id]||{}; const fl=prixAchatDe(e,buyByNum);
+          let r=null; try { r=await vmrCmd({ cmd:'republierVinted', uid:String(uid), id:String(id), baissePct:Number(pct)||0, plancher:(fl!=null&&!isNaN(fl))?Number(fl):null, confirme:true }, 30000); } catch(_) { r=null; }
+          if (r && r.accepte && r.etape==='fait') return { ok:true };
+          return { ok:false, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+        };
+        return <AtelierFile candidats={cands} verifier={pretDraft} publier={publierReel} majExt={extSait("republier")!=="ok"} onClose={()=>setFileOpen(false)} />;
       })()}
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}

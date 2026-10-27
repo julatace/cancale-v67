@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.239.0';
+const CODE_VERSION = '5.240.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7759,7 +7759,95 @@ async function noterFicheVinted(itemId, status, corps, domain) {
   if (!f.description && !f.codes) { noterDiag('fiche_modif_vide'); return false; }
   await enfilerFiches([{ id, src: 'modif', at: new Date(Date.now()).toISOString(), f }]);
   noterDiag('fiche_modif_vue');
+  // ── TRANCHE 5 : LE MODÈLE DE REPUBLICATION, PAR ANNONCE ────────────────────
+  // Le corps EXACT que Vinted vient d'accepter pour CETTE annonce (son propre
+  // body `item_upload`) : c'est le seul « format » qu'on puisse rejouer sans
+  // deviner (§4.10 : rien à l'aveugle). La republication (baisse de prix) le
+  // REJOUE tel quel, en ne changeant QUE le prix — jamais une structure devinée.
+  try { await noterModeleRepub(id, corps, uid, domain); } catch (_) {}
   return viderFiches({ force: true });
+}
+// Le modèle de republication vit dans sa propre ligne, par annonce :
+// `vrm_vinted_modele` = { [itemId]: { corps, at, uid } }. Lire-fusionner-réécrire
+// GARDÉ (une lecture ratée n'efface pas les modèles déjà appris — §« rien lu ne
+// vaut pas rien »). Le corps est SA donnée d'annonce (titre, description, codes,
+// prix, photos) — jamais un jeton (l'auth est dans les en-têtes, pas le corps).
+async function noterModeleRepub(itemId, corps, uid, domain) {
+  const id = String(itemId || '');
+  if (!/^\d{4,15}$/.test(id)) return false;
+  if (typeof corps !== 'string' || !corps || corps.length > 120000) return false;
+  let obj = null; try { obj = JSON.parse(corps); } catch (_) { return false; }
+  const it = obj && (obj.item && typeof obj.item === 'object' ? obj.item : obj);
+  if (!it || typeof it !== 'object') return false;          // pas un corps d'annonce lisible
+  const rows = await sbGet(`app_data?id=eq.vrm_vinted_modele&select=data`);
+  if (rows === null) return false;                           // pas su : on n'écrit pas
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  cur[id] = { corps, at: new Date().toISOString(), uid: uid ? String(uid) : null };
+  // on borne la ligne pour qu'elle ne gonfle pas sans fin (les 300 plus récents)
+  const ids = Object.keys(cur).sort((a, b) => new Date((cur[b] || {}).at || 0) - new Date((cur[a] || {}).at || 0)).slice(0, 300);
+  const garde = {}; for (const k of ids) garde[k] = cur[k];
+  return supabaseUpsert('app_data', [{ id: 'vrm_vinted_modele', data: garde }], 'id');
+}
+async function lireModeleRepub(itemId) {
+  const rows = await sbGet(`app_data?id=eq.vrm_vinted_modele&select=data`);
+  if (rows === null) return null;                            // pas su (lecture ratée)
+  const m = (rows && rows[0] && rows[0].data) || {};
+  const e = m[String(itemId)];
+  return (e && e.corps) ? e : { absent: true };              // lu, mais jamais appris pour CETTE annonce
+}
+// Rejoue le modèle en ne changeant QUE le prix (baisse de `pct` %), borné au
+// plancher s'il est fourni. On ne touche à AUCUN autre champ : c'est le corps
+// que Vinted a déjà accepté pour cette annonce. Rend null si on ne sait pas où
+// est le prix (on ne devine pas une structure — mieux vaut refuser).
+function corpsAvecPrixBaisse(corpsModele, pct, planation) {
+  let obj = null; try { obj = JSON.parse(corpsModele); } catch (_) { return null; }
+  const it = obj && (obj.item && typeof obj.item === 'object' ? obj.item : obj);
+  if (!it || typeof it !== 'object') return null;
+  const p = Math.max(0, Math.min(90, Number(pct) || 0));
+  // Vinted porte le prix soit en nombre/chaîne `price`, soit en objet `{amount}`.
+  const lis = (v) => (v && typeof v === 'object') ? Number(v.amount) : Number(v);
+  const base = isFinite(lis(it.price)) ? lis(it.price) : NaN;
+  if (!isFinite(base) || base <= 0) return null;             // pas de prix lisible : on refuse
+  let np = Math.round(base * (1 - p / 100) * 100) / 100;
+  if (planation != null && isFinite(planation) && np < planation) np = Math.round(planation * 100) / 100;
+  if (!(np > 0)) return null;
+  if (it.price && typeof it.price === 'object') it.price = { ...it.price, amount: String(np) };
+  else it.price = String(np);
+  return { corps: JSON.stringify(obj), ancien: base, nouveau: np };
+}
+// La republication (baisse de prix) d'UNE annonce, sur sa confirmation. Elle
+// MODIFIE l'annonce en place (`PUT …/item_upload/items/{id}`) — elle ne la
+// supprime JAMAIS et n'en crée aucune : rien ne peut être perdu. Gardée par :
+// confirmation · compte connecté (garde stricte) · sauvegarde coffre VÉRIFIÉE ·
+// modèle de CETTE annonce appris (sinon on refuse, on ne devine pas).
+async function republierVinted(msg) {
+  const uid = String(msg.uid || ''), id = String(msg.id || '');
+  if (!/^\d+$/.test(uid) || !/^\d+$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce incomplète' };
+  if (msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'cette action change le prix de ton annonce sur Vinted — elle demande ta confirmation' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
+  const stop = await gardeStricte(uid, acc);
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  // 1. SAUVEGARDE COFFRE vérifiée (filet : de quoi tout refaire si besoin).
+  let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
+  if (coffre === null) return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde — on ne touche à rien" };
+  const sauve = coffre && coffre[0] && coffre[0].data;
+  if (!sauve || !(sauve.photos && sauve.photos.length)) return { accepte: false, code: 'coffre-absent', raison: "cette annonce n'est pas encore sauvegardée dans le coffre — passe sur Vinted une fois pour la capturer, puis réessaie (on ne touche à rien sans filet)" };
+  // 2. MODÈLE de CETTE annonce appris (sinon on ne devine pas).
+  const modele = await lireModeleRepub(id);
+  if (modele === null) return { accepte: false, code: 'modele-lecture', raison: "je n'ai pas pu lire le format — réessaie dans un moment" };
+  if (!modele || !modele.corps) return { accepte: false, code: 'modele-absent', raison: "je n'ai pas encore vu le format de CETTE annonce sur Vinted. Modifie-la une fois à la main (change une virgule et enregistre) — l'extension apprend le format, puis la baisse de prix marchera." };
+  const built = corpsAvecPrixBaisse(modele.corps, msg.baissePct, msg.plancher);
+  if (!built) return { accepte: false, code: 'modele-illisible', raison: "le format appris n'est pas exploitable — refais une modification manuelle" };
+  // 3. PUT en place, dans la file Vinted (une requête à la fois). Jamais de
+  //    suppression, jamais de création : le pire cas est un prix refusé.
+  return await avecVinted(async () => {
+    const r = await vintedSend(acc, 'PUT', `/api/v2/item_upload/items/${id}`, built.corps);
+    if (!r || !r.ok) return { accepte: true, etape: 'echec', raison: `Vinted a refusé la baisse de prix (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau };
+    noterDiag('republier_vinted_ok');
+    return { accepte: true, etape: 'fait', ancien: built.ancien, nouveau: built.nouveau };
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8621,6 +8709,7 @@ async function executerCommande(msg) {
     return ok ? { accepte: true, etape: 'fait' } : { accepte: true, etape: 'echec', raison: "Vinted n'a pas rendu ses photos pour l'instant" };
   }
   // 22 oct. : mettre UNE annonce Leboncoin en pause, sur son clic (voir `pauseLbcDepuisApp`).
+  if (msg && msg.cmd === 'republierVinted') return await republierVinted(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
