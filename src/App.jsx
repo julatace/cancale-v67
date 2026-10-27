@@ -1610,7 +1610,7 @@ const SYNC_KEYS = [
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
-  'vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
+  'vrm_stock_sortis','vrm_stock_garder','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
   'vrm_lbc_liens',
@@ -23797,7 +23797,8 @@ const saveRoomPlan = async (data) => {
     const corps = v != null ? { ...data, numerotation: v } : data;
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'vrm_room', data: corps })) });
     if (!r.ok) { let t = ''; try { t = await r.text(); } catch (_) {} const code = codeRefusNumeros(t); if (code) signalerNumerosPerimes(code); }
-  } catch (_) {}
+    return r.ok;
+  } catch (_) { return false; }
 };
 // Catalogue de rangements.
 // (17 oct.) Julien : « des étagères en métal avec des barres, en bois, des
@@ -24059,6 +24060,121 @@ const libererNumeroDuPlan = (plan, itemId, num) => {
   }) }));
   return fait ? { ...plan, rooms } : null;
 };
+// ── (27 oct.) UN ARTICLE PARTI SORT TOUT SEUL DU STOCK ────────────────────────
+// Julien : « pour une vente où je ne suis pas allé dans le stock, enlever le
+// numéro si l'article est expédié » — tranché avec lui : on libère sa PLACE
+// (case ou pile), on garde son NUMÉRO (bordereau, achat relié, bénéfice,
+// retour : il sert encore, et il n'est jamais redonné).
+// Trois garde-fous, posés avec lui :
+//  · seulement quand VINTED dit que le colis est parti (acheminement, déposé,
+//    livré, finalisé). « Colis fait » coché ne suffit pas (un colis coché peut
+//    ne jamais être parti), un bordereau reçu non plus ;
+//  · ce qui est retiré est dit (journal `vrm_stock_sortis`, sur le Stock), avec
+//    « Remettre » — et une paire remise n'est plus jamais retirée toute seule
+//    (`vrm_stock_garder`) ;
+//  · « pas su » ne bouge rien : ventes ou annonces pas toutes lues, plan du
+//    stock pas relu, nuage pas arrivé ⇒ la boîte reste.
+// Une vente annulée ou qui revient (retour, non réclamée) garde sa place. Un N°
+// encore porté par une annonce présente (en ligne, à confirmer, masquée) ou par
+// une autre vente à envoyer n'est pas touché. Une « boîte seule » (un meuble à
+// elle seule) n'est pas retirée : elle reste dans « vendues mais au garage ».
+const COLIS_PARTI_VINTED = /achemin|en\s+transit|livr|remis|d[eé]pos|exp[eé]di[eé]|finalis|termin/i;
+const venteSortieDuStock = (o) => {
+  if (!o || o.transaction_id == null) return false;
+  const st = String(o.status || ''); if (!st) return false;
+  if (classifyOrderStatus(st) === 'cancelled' || venteQuiRevient(o)) return false;
+  if (aExpedier(o) || needsBordereau(st)) return false;
+  return COLIS_PARTI_VINTED.test(st);
+};
+const retirerPileDuPlan = (plan, itemId, idx) => {
+  let fait = false;
+  const rooms = ((plan && plan.rooms) || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => {
+    if (it.id !== itemId || !Array.isArray(it.nums)) return it;
+    const n2 = retirerDePile(it.nums, idx, Math.max(1, it.rows || 5)); if (!n2) return it;
+    fait = true; return { ...it, nums: n2 };
+  }) }));
+  return fait ? { ...plan, rooms } : null;
+};
+const STOCK_SORTIS_JOURS = 60;
+let _sortieStock = { enCours: false, derniere: '' };
+const sortirPartisDuStock = async (candidats) => {
+  if (_sortieStock.enCours || !isCloudReady()) return;
+  const garder = load('vrm_stock_garder', {}) || {};
+  const liste = (candidats || []).filter(c => c && c.cle && !garder[c.cle]);
+  const cleRun = liste.map(c => c.cle).sort().join(',');
+  if (!cleRun || cleRun === _sortieStock.derniere) return;
+  _sortieStock.enCours = true;
+  try {
+    const brut = await loadRoomPlan();
+    if (brut === undefined) return;                       // pas su : rien ne bouge, on réessaiera
+    _sortieStock.derniere = cleRun;
+    if (!brut || !(Array.isArray(brut.items) || Array.isArray(brut.rooms))) return;
+    let plan = normalizePlan(brut); const sortis = [];
+    for (const c of liste) {
+      const ou = ouEstNumero(plan, c.num); if (!ou) continue;
+      let next = null;
+      if (ou.key) next = libererNumeroDuPlan(plan, ou.itemId, c.num);
+      else if (ou.pileIdx != null && ou.pileIdx >= 0) next = retirerPileDuPlan(plan, ou.itemId, ou.pileIdx);
+      if (!next) continue;                                // boîte seule : à la main
+      plan = next;
+      sortis.push({ ...c, roomId: ou.roomId, roomName: ou.roomName || '', itemId: ou.itemId, itemName: ou.itemName || '', key: ou.key || null, nom: ou.nom || '', at: Date.now() });
+    }
+    if (!sortis.length) return;
+    if (!(await saveRoomPlan(plan))) { _sortieStock.derniere = ''; return; }   // refusé : rien n'est dit retiré
+    save('vrm_room_plan', plan);
+    const lim = Date.now() - STOCK_SORTIS_JOURS * 86400000;
+    const j = {}; const ancien = load('vrm_stock_sortis', {}) || {};
+    for (const k in ancien) if (ancien[k] && ancien[k].at > lim) j[k] = ancien[k];
+    for (const x of sortis) j[x.cle] = x;
+    save('vrm_stock_sortis', j);
+    try { window.dispatchEvent(new CustomEvent('vrm:stock-plan', { detail: plan })); } catch (_) {}
+    toast(sortis.length === 1 ? `N°${sortis[0].num} est partie : sa place dans « ${sortis[0].itemName} » est libérée (le numéro reste).` : `${sortis.length} articles partis : leurs places dans le stock sont libérées (les numéros restent).`);
+  } catch (_) { _sortieStock.derniere = ''; } finally { _sortieStock.enCours = false; }
+};
+// La liste de ce qui est sorti tout seul, sur le Stock, avec « Remettre ».
+function SortisDuStock({ plan, planLu, ecrire }) {
+  const [j, setJ] = React.useState(() => load('vrm_stock_sortis', {}) || {});
+  React.useEffect(() => {
+    const relire = () => setJ(load('vrm_stock_sortis', {}) || {});
+    window.addEventListener('vrm:stock-plan', relire); const off = onCloudReady(relire);
+    return () => { window.removeEventListener('vrm:stock-plan', relire); if (typeof off === 'function') off(); };
+  }, []);
+  const lim = Date.now() - 14 * 86400000;
+  const liste = Object.values(j || {}).filter(x => x && x.at > lim).sort((a, b) => b.at - a.at);
+  if (!liste.length) return null;
+  const jour = (t) => { try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+  const remettre = (x) => {
+    if (planLu !== true) { toast('Le plan du stock n\'est pas encore relu — réessaie dans un instant.'); return; }
+    let next = null;
+    if (ouEstNumero(plan, x.num)) next = plan;
+    else if (x.key) { const r = rangerNumeroDansPlan(plan, x.itemId, x.key, x.num); if (r.erreur) { toast(r.erreur); return; } next = r.plan; }
+    else {
+      let fait = false;
+      const rooms = (plan.rooms || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => { if (it.id !== x.itemId || !Array.isArray(it.nums)) return it; const n2 = ajouterAPile(it.nums, x.num); if (!n2) return it; fait = true; return { ...it, nums: n2 }; }) }));
+      if (!fait) { toast(`« ${x.itemName} » n'existe plus : range la N°${x.num} à la main.`); return; }
+      next = { ...plan, rooms };
+    }
+    if (next !== plan) ecrire(next);
+    const g = { ...(load('vrm_stock_garder', {}) || {}) }; g[x.cle] = Date.now(); save('vrm_stock_garder', g);
+    const nj = { ...j }; delete nj[x.cle]; save('vrm_stock_sortis', nj); setJ(nj);
+    toast(`N°${x.num} remise dans « ${x.itemName} ». Elle ne sera plus retirée toute seule.`);
+  };
+  return (
+    <div data-stock-sortis={liste.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Sortis du stock car partis · {liste.length}</div>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Vinted dit que leur colis est parti : leur place est libérée, leur numéro reste. Si l'un d'eux est encore chez toi, remets-le.</div>
+      {liste.map(x => (
+        <div key={x.cle} data-stock-sorti={x.num} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
+          <span style={{ flex: '1 1 260px', minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.4 }}>
+            <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
+            <span style={{ display: 'block', color: C.muted, fontSize: 11.5 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — Vinted : {x.statut || 'colis parti'}</span>
+          </span>
+          <button type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Remettre</button>
+        </div>
+      ))}
+    </div>
+  );
+}
 // Le bouton « Où sont-elles ? » de l'onglet Colis : il pose ici les numéros à
 // aller chercher, puis ouvre le Stock. Au niveau MODULE (comme
 // DEMANDE_SAISIE_PRIX) : au moment du clic, le Stock n'est pas monté.
@@ -24320,6 +24436,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   useEffect(() => { (async () => { const cloud = await loadRoomPlan(); if (cloud === undefined) { setPlanLu(false); return; } if (cloud && (Array.isArray(cloud.items) || Array.isArray(cloud.rooms))) { const np = normalizePlan(cloud); setPlan(np); save('vrm_room_plan', np); } setPlanLu(true); })(); }, []);
   // Écriture locale immédiate (fluide au drag) ; envoi cloud DÉBOUNCÉ (800 ms
   // après le dernier changement) → un glissement = un seul upload, pas 50.
+  // (27 oct.) Un article parti sorti tout seul (`sortirPartisDuStock`) : la pièce affichée suit.
+  useEffect(() => { const f = (e) => { if (e && e.detail && Array.isArray(e.detail.rooms)) setPlan(e.detail); }; window.addEventListener('vrm:stock-plan', f); return () => window.removeEventListener('vrm:stock-plan', f); }, []);
   const saveTimer = React.useRef(null);
   const persist = (next) => {
     setPlan(next); save('vrm_room_plan', next);
@@ -25221,9 +25339,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const annule = () => { window.removeEventListener('pointermove', suivre); window.removeEventListener('pointerup', fin); window.removeEventListener('pointercancel', annule); if (f) f.style.display = 'none'; };
     window.addEventListener('pointermove', suivre, { passive: false }); window.addEventListener('pointerup', fin); window.addEventListener('pointercancel', annule);
   };
-  if (mode === '2d') return <AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} />;
+  if (mode === '2d') return <><SortisDuStock plan={plan} planLu={planLu} ecrire={persist}/><AssistantRangement plan={plan} planLu={planLu} ecrire={persist} ficheParNum={ficheParNum} /></>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <SortisDuStock plan={plan} planLu={planLu} ecrire={persist}/>
       <style>{`@keyframes vrmpulse2{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,0.7);}50%{box-shadow:0 0 0 8px rgba(229,72,77,0);}}`}</style>
       {/* ⚠️ LA PIÈCE D'ABORD, LES RÉGLAGES ENSUITE.
           La vue 3D était sous quinze rangées de boutons : il fallait défiler
@@ -38188,6 +38307,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la vente) — aucune autre règle, jamais le titre (§5). Si la vente est cachée
   // par un filtre, une recherche, la période ou « Voir plus », on la remontre
   // (un geste qui ne trouve pas ce qu'il cherche à cause d'un filtre ment).
+  // (27 oct.) Les articles partis sortent tout seuls du Stock (`sortirPartisDuStock`).
+  // Seulement quand tout est lu : ventes de tous les comptes, annonces, nuage.
+  useEffect(() => {
+    if (baseKO || !Array.isArray(sales.items) || sales.loading || nomsVentesKO.length) return;
+    if (!Array.isArray(listings.items) || listings.loading || listings.incomplet || listings.error) return;
+    const parCle = new Map();
+    for (const o of sales.items) {
+      if (!venteSortieDuStock(o)) continue;
+      const num = effEntry(o)?.numero; const cle = cleNum(num || ''); if (!cle) continue;
+      // Encore porté par une annonce présente ou une autre vente à envoyer : on ne touche à rien.
+      if ((porteursNum[cle] || []).some(p => p.type !== 'garage')) continue;
+      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: o.status || '' });
+    }
+    if (parCle.size) sortirPartisDuStock([...parCle.values()]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, listings.items, porteursNum, baseKO]);
   const chercherNumVente = async (cle) => {
     if (!Array.isArray(sales.items)) return null;   // pas encore lu : « pas su »
     const tous = sales.items.filter(o => o && o.transaction_id != null && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc);
