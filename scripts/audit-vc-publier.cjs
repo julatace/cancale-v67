@@ -208,7 +208,9 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const nav = await chromium.launch(fs.existsSync('/opt/pw-browsers/chromium') ? { executablePath: '/opt/pw-browsers/chromium' } : {});
     const code = fs.readFileSync(path.join(EXT, 'vc-depot.js'), 'utf8');
     const AD = { id: '1001', numero: '401', title: 'Salomon XT-6 blanc T40', description: 'Paire propre.\nRéf. VRM-401', price: '99.00', photos: ['u1', 'u2'], etat: 'Très bon état', marque: 'Salomon', taille: '40' };
-    const fauxChrome = (ad) => `window.__envois=[];window.chrome={runtime:{id:'x',getManifest:()=>({version:'9.9.9'}),sendMessage:(m,cb)=>{window.__envois.push(m);let r={ok:false};if(m.action==='getPending')r={ok:true,ad:${JSON.stringify(ad)}};if(m.action==='photoBytes')r={ok:true,photos:m.urls.map(()=>({b64:'/9j/AA==',type:'image/jpeg'}))};if(m.action==='vcForm')r={ok:true};setTimeout(()=>cb&&cb(r),0);}}};`;
+    // Le fond rend des photos DÉTOURÉES en JPEG (« /9j/ » = FF D8 FF). `photos`
+    // permet de servir d'autres formes (pas détourées, WebP).
+    const fauxChrome = (ad, photos) => `window.__envois=[];window.chrome={runtime:{id:'x',getManifest:()=>({version:'9.9.9'}),sendMessage:(m,cb)=>{window.__envois.push(m);let r={ok:false};if(m.action==='getPending')r={ok:true,ad:${JSON.stringify(ad)}};if(m.action==='photoBytes')r={ok:true,photos:${photos ? JSON.stringify(photos) : "m.urls.map(()=>({b64:'/9j/AA==',type:'image/jpeg',detoure:true}))"}};if(m.action==='vcForm')r={ok:true};setTimeout(()=>cb&&cb(r),0);}}};`;
     const FORM = `<!doctype html><html><body><header><input name="q" placeholder="Rechercher"></header>
       <form><label for="d">Description</label><textarea id="d" name="description"></textarea>
       <label for="p">Prix</label><input id="p" name="price">
@@ -237,6 +239,22 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(st.c === 'tb', 'l\'état : le libellé EXACT (« Très bon état », jamais « Bon état »)', st.c + ' / ' + st.lab);
     dit(st.q === '', 'la recherche de l\'en-tête n\'est jamais touchée', st.q);
     dit(st.n === 2, 'les deux photos sont attachées au formulaire', String(st.n));
+    // 27 oct. — Vestiaire : JPG/PNG seulement, et détourées avant de publier.
+    for (const [quoi, photos, attendu] of [
+      ['pas détourées', [{ b64: '/9j/AA==', type: 'image/jpeg', detoure: false, detourage: 'session' }, { b64: '/9j/AA==', type: 'image/jpeg' }], 0],
+      ['détourées mais en WebP', [{ b64: 'UklGRgAAAABXRUJQ', type: 'image/webp', detoure: true }, { b64: 'UklGRgAAAABXRUJQ', type: 'image/jpeg', detoure: true }], 0],
+      ['une détourée PNG, une pas détourée', [{ b64: 'iVBORw0KGgo=', type: 'image/png', detoure: true }, { b64: '/9j/AA==', type: 'image/jpeg', detoure: false, detourage: 'delai' }], 1],
+    ]) {
+      const pq = await ctxN.newPage();
+      await pq.addInitScript(fauxChrome(Object.assign({}, AD, { publier: true }), photos));
+      await pq.goto('https://fr.vestiairecollective.com/sell/');
+      await pq.addScriptTag({ content: code });
+      await pq.waitForTimeout(3500);
+      const sq = await pq.evaluate(() => ({ n: document.getElementById('f').files.length, types: Array.from(document.getElementById('f').files).map((f) => f.type + ':' + f.name), pub: window.__pub || 0, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }));
+      dit(sq.n === attendu && sq.types.every((t) => /^image\/(jpeg|png):VRM-401-\d\.(jpg|png)$/.test(t)), `photos ${quoi} : ${attendu} attachée(s), en JPG/PNG seulement`, JSON.stringify(sq.types));
+      dit(sq.pub === 0 && /détour|JPG ou PNG/.test(sq.b), `photos ${quoi} : rien n'est publié, et le bandeau dit pourquoi`, sq.b.slice(0, 200));
+      await pq.close();
+    }
     dit(st.pub === 0, 'sans feu vert (app d\'avant / « préparer seulement ») : VRM ne clique pas « Publier »', String(st.pub));
     dit(/champ/.test(st.b) && /publies?/.test(st.b), 'le bandeau dit le chiffre et que c\'est lui qui publie', st.b);
     const form = st.envois.find((m) => m.action === 'vcForm');

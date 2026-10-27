@@ -126,18 +126,25 @@
     return Array.from(document.querySelectorAll('input[type="file"]'))
       .filter((el) => !el.disabled && !DANS_ENTETE(el));
   }
+  // 27 oct. — Julien : « doit être au format JPG, JPEG ou PNG pour Vestiaire, et
+  // on doit les détourer avant de les publier ». On ne garde donc qu'une photo
+  // DÉTOURÉE (`detoure: true`, rendue par le fond) dont les OCTETS sont un vrai
+  // JPEG (FF D8 FF) ou PNG (89 50 4E 47) — l'en-tête annoncé ne suffit pas.
+  // Jamais une photo d'origine du CDN (souvent WebP), jamais un autre format.
+  const FORMAT_DES_OCTETS = (buf) => (buf.length > 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) ? 'jpg'
+    : (buf.length > 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) ? 'png' : '';
   function fichiersDepuis(photos, numero) {
     const out = [];
     for (let i = 0; i < photos.length; i++) {
       const ph = photos[i];
-      if (!ph || !ph.b64) continue;
+      if (!ph || !ph.b64 || ph.detoure !== true) continue;
       try {
         const bin = atob(ph.b64);
         const buf = new Uint8Array(bin.length);
         for (let j = 0; j < bin.length; j++) buf[j] = bin.charCodeAt(j);
-        const type = ph.type || 'image/jpeg';
-        const ext = /png/.test(type) ? 'png' : (/webp/.test(type) ? 'webp' : 'jpg');
-        out.push(new File([buf], `VRM-${numero}-${i + 1}.${ext}`, { type }));
+        const ext = FORMAT_DES_OCTETS(buf);
+        if (!ext) continue;
+        out.push(new File([buf], `VRM-${numero}-${i + 1}.${ext}`, { type: ext === 'png' ? 'image/png' : 'image/jpeg' }));
       } catch (_) {}
     }
     return out;
@@ -150,10 +157,15 @@
     if (!cible && !zone) return { n: 0, raison: 'aucun champ photo sur cette étape' };
     const r = await send({ action: 'photoBytes', urls, max: 12 });
     const photos = (r && r.ok && Array.isArray(r.photos)) ? r.photos : [];
-    const fichiers = fichiersDepuis(photos, ad.numero);
     // ⚠️ Une photo que le CDN refuse n'est PAS une photo attachée : on le dit.
     const rates = photos.filter((ph) => ph && ph.erreur).length;
-    if (!fichiers.length) return { n: 0, rates, raison: rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo lisible' };
+    // Une photo lue mais PAS détourée n'est jamais attachée : on dit combien, et pourquoi.
+    const pasDetourees = photos.filter((ph) => ph && ph.b64 && ph.detoure !== true);
+    const raisonDetourage = pasDetourees.length ? String(pasDetourees[0].detourage || 'détourage pas fait') : '';
+    const fichiers = fichiersDepuis(photos, ad.numero);
+    const horsFormat = photos.filter((ph) => ph && ph.b64 && ph.detoure === true).length - fichiers.length;
+    const etat = { rates, pasDetourees: pasDetourees.length, raisonDetourage, horsFormat };
+    if (!fichiers.length) return Object.assign({ n: 0, raison: pasDetourees.length ? 'photos pas détourées (' + raisonDetourage + ') — Vestiaire les veut détourées' : (rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo en JPG ou PNG') }, etat);
     try {
       const dt = new DataTransfer();
       fichiers.forEach((f) => dt.items.add(f));
@@ -161,17 +173,17 @@
         cible.files = dt.files;
         cible.dispatchEvent(new Event('input', { bubbles: true }));
         cible.dispatchEvent(new Event('change', { bubbles: true }));
-        if (cible.files && cible.files.length) return { n: cible.files.length, rates };
+        if (cible.files && cible.files.length) return Object.assign({ n: cible.files.length }, etat);
       }
       if (zone) {
         const dt2 = new DataTransfer();
         fichiers.forEach((f) => dt2.items.add(f));
         zone.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt2 }));
         zone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt2 }));
-        return { n: fichiers.length, rates, voie: 'glisser-déposer' };
+        return Object.assign({ n: fichiers.length, voie: 'glisser-déposer' }, etat);
       }
-      return { n: 0, rates, raison: 'le champ n\'a pas accepté les fichiers' };
-    } catch (e) { return { n: 0, rates, raison: String((e && e.message) || e).slice(0, 60) }; }
+      return Object.assign({ n: 0, raison: 'le champ n\'a pas accepté les fichiers' }, etat);
+    } catch (e) { return Object.assign({ n: 0, raison: String((e && e.message) || e).slice(0, 60) }, etat); }
   }
   // Une liste déroulante : on ne retient une option que si son libellé correspond
   // VRAIMENT. Jamais « le premier de la liste » — laisser vide vaut toujours
@@ -426,6 +438,8 @@
     if (publication.etat === 'publiee' || publication.etat === 'clic' || publication.etat === 'pas-su' || publication.etat === 'stop') return;
     // Les photos d'abord : sans elles Vestiaire refuse (ou publie sans).
     if (!(photosEtat && photosEtat.n > 0)) { publication.raison = 'j\'attends que les photos soient attachées avant de publier'; return; }
+    // Toutes détourées, toutes en JPG/PNG — sinon VRM ne publie pas (sa règle du 27 oct.).
+    if (photosEtat.pasDetourees > 0 || photosEtat.horsFormat > 0) { publication.etat = 'stop'; publication.raison = (photosEtat.pasDetourees ? photosEtat.pasDetourees + ' photo(s) pas détourée(s) (' + photosEtat.raisonDetourage + ')' : photosEtat.horsFormat + ' photo(s) ni JPG ni PNG') + ' — je ne publie pas'; return; }
     if (publication.essais >= 3) { publication.etat = 'stop'; publication.raison = 'Vestiaire a refusé 3 fois — publie toi-même, sans booster'; return; }
     _pubEnCours = true;
     try {
@@ -445,7 +459,7 @@
     //    information utile — et la seule honnête quand c'est le cas.
     const photos = photosEtat
       ? (photosEtat.n > 0
-          ? `📷 <b>${photosEtat.n} photo${photosEtat.n > 1 ? 's' : ''} attachée${photosEtat.n > 1 ? 's' : ''}</b>${photosEtat.rates ? ` (${photosEtat.rates} illisible${photosEtat.rates > 1 ? 's' : ''})` : ''}.`
+          ? `📷 <b>${photosEtat.n} photo${photosEtat.n > 1 ? 's' : ''} attachée${photosEtat.n > 1 ? 's' : ''}</b>${photosEtat.n > 1 ? ' détourées' : ' détourée'}${photosEtat.rates ? ` (${photosEtat.rates} illisible${photosEtat.rates > 1 ? 's' : ''})` : ''}${photosEtat.pasDetourees ? ` · ${photosEtat.pasDetourees} pas détourée${photosEtat.pasDetourees > 1 ? 's' : ''} (${esc(photosEtat.raisonDetourage)}), laissée${photosEtat.pasDetourees > 1 ? 's' : ''} de côté` : ''}.`
           : `📷 aucune photo attachée — ${esc(photosEtat.raison || 'raison inconnue')}.`)
       : `📷 j'attache les photos dès que l'étape photo s'affiche.`;
     // ⚠️ L'ARRÊT AU BOUT DE 90 s SE DISAIT EN SILENCE. La mise en vente eBay se

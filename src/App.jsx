@@ -99,7 +99,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.243.0';
+const EXT_ATTENDUE = '5.244.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -48991,7 +48991,6 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
       { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
-      { id:'bienvenue', type:'action', ic:'info', lib:'Présentation de VRM', val:'Revoir', onClick:()=>{ try{ window.dispatchEvent(new Event('vrm:bienvenue')); }catch(_){} }, data:{ 'data-reglage-bienvenue':'1' } },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
