@@ -32405,7 +32405,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       (only === 'journee' || only === 'bordereaux') ? lireVestiaireColis() : Promise.resolve(undefined),
     ]);
     if (only === 'journee') setEbayMsg(etatMessagesEbay(rm));
-    if (only === 'journee' || only === 'bordereaux') setVcEtat(rv);
+    // Contenu identique ⇒ même objet : aucun rendu de plus (banc `vitesse.cjs`).
+    if (only === 'journee' || only === 'bordereaux') setVcEtat((v) => (v !== undefined && JSON.stringify(v) === JSON.stringify(rv)) ? v : rv);
     setEbayCmd((!r || r.illisibles.length) ? null : r.items);
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
