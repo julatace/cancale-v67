@@ -69,3 +69,37 @@
     display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
   }
 }
+
+/* ══ Épuré, 27 octobre (soir) ═══════════════════════════════════════════════
+   Julien : « beaucoup plus épuré, professionnel ». Sur téléphone, les phrases
+   qui EXPLIQUENT (classe vrm-aide, posée sur ~80 notes statiques) se taisent ;
+   celles qui disent un ÉTAT (« pas pu lire », « aucun », une conséquence)
+   restent, elles n'ont pas cette classe. Rien ne change sur ordinateur. */
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-aide,
+  .vrm-app-shell .vrm-pickup-foot,
+  .vrm-app-shell [data-suivi-vinted-etat]:not([data-suivi-vinted-etat="passu"]),
+  .vrm-app-shell .vrm-fe-trois,
+  .vrm-app-shell .vrm-colis-imprimante,
+  .vrm-app-shell .vrm-ledger-heading,
+  .vrm-app-shell [data-colis-urgence] > div + div { display: none !important; }
+
+  /* Les petits titres en capitales espacées crient : en minuscules, posés. */
+  .vrm-app-shell .vrm-main [style*="text-transform: uppercase"] {
+    text-transform: none !important; letter-spacing: 0 !important;
+    font-size: 13px !important; font-weight: 600 !important;
+  }
+
+  /* Une alerte se lit en deux lignes au plus. */
+  .vrm-app-shell .vrm-day-layout .vrm-day-task-title {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+
+  /* Des cartes plus calmes : un trait plutôt qu'une ombre, un rayon unique. */
+  .vrm-app-shell .vrm-main .vrm-surface { box-shadow: none !important; border-radius: 18px !important; }
+}
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-day-k, .vrm-app-shell .vrm-day-layout .vrm-label {
+    text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 600 !important;
+  }
+}
