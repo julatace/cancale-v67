@@ -61,11 +61,11 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
   ctx.readVcPosted = async () => ({ echec: postedKO, ids: posted.map(String) });
   const marques = [];
   ctx.markVcPosted = async (id) => { if (marque) marques.push(String(id)); return marque; };
-  const ecrits = []; let vcl = null; let vcv = null; let vcm = null; const etat = { lectureKO: false };
-  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; if (r.id === 'vc_ventes') vcv = r.data; if (r.id === 'vc_messages') vcm = r.data; } return true; };
+  const ecrits = []; let vcl = null; let vcv = null; let vcm = null; let vca = null; const etat = { lectureKO: false };
+  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; if (r.id === 'vc_ventes') vcv = r.data; if (r.id === 'vc_messages') vcm = r.data; if (r.id === 'vc_achats') vca = r.data; } return true; };
   ctx.notifierApp = async () => {};
   ctx.majCmd = async () => {};
-  ctx.sbGet = async (q) => /vc_messages/.test(q) ? (etat.lectureKO ? null : (vcm ? [{ data: JSON.parse(JSON.stringify(vcm)) }] : [])) : /vc_ventes/.test(q) ? (etat.lectureKO ? null : (vcv ? [{ data: JSON.parse(JSON.stringify(vcv)) }] : [])) : /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
+  ctx.sbGet = async (q) => /vc_achats/.test(q) ? (etat.lectureKO ? null : (vca ? [{ data: JSON.parse(JSON.stringify(vca)) }] : [])) : /vc_messages/.test(q) ? (etat.lectureKO ? null : (vcm ? [{ data: JSON.parse(JSON.stringify(vcm)) }] : [])) : /vc_ventes/.test(q) ? (etat.lectureKO ? null : (vcv ? [{ data: JSON.parse(JSON.stringify(vcv)) }] : [])) : /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
   ctx.compteConnecte = async () => null;
   ctx.viderFiches = async () => {};
   const vus = [];
@@ -163,6 +163,23 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     b.lectureKO = false;
     const r5 = await vm_({ action: 'vcCompteur', messages: 9 }, 'https://www.leboncoin.fr/');
     dit(r5.ok === false && dern().compteur.messages !== 9, 'une page qui n\'est pas Vestiaire ne range rien');
+  });
+  await essaie('achats', async () => {
+    const b = faire();
+    const va = (m, url) => new Promise((res) => b.ecouteur(Object.assign({ from: 'cancale-vc', action: 'vcAchats' }, m), { tab: { id: 5, url: url || 'https://fr.vestiairecollective.com/members/' } }, res));
+    const dern = () => ((b.ecrits.filter((e) => e.id === 'vc_achats').pop() || {}).data || {});
+    const r1 = await va({ achats: [{ id: 'A1', nom: 'Nike Dunk', etat: 'shipped', suivi: 'XW123456789FR', transporteur: 'Chronopost' }], offset: 0, total: 1, lus: 1, page: '/my-orders/' });
+    dit(r1.ok && dern().achats.A1.suivi === 'XW123456789FR' && dern().lecture.complet === true, 'un achat est rangé avec son n° de suivi', JSON.stringify(dern()));
+    await va({ achats: [{ id: 'A1', nom: '', etat: 'delivered', suivi: '' }], offset: 0, total: 1, lus: 1 });
+    dit(dern().achats.A1.etat === 'delivered' && dern().achats.A1.suivi === 'XW123456789FR' && dern().achats.A1.nom === 'Nike Dunk', 'l\'état se met à jour ; une valeur vide n\'efface jamais une pleine', JSON.stringify(dern().achats.A1));
+    await va({ achats: [{ id: 'A2' }], offset: 0, total: 1, lus: 1 });
+    dit(dern().achats.A1 && dern().achats.A2, 'un achat n\'est jamais effacé', JSON.stringify(Object.keys(dern().achats)));
+    const n0 = b.ecrits.length; b.lectureKO = true;
+    const r4 = await va({ achats: [{ id: 'A9' }], offset: 0, total: 1, lus: 1 });
+    dit(r4.ok === false && b.ecrits.length === n0, 'base illisible : rien n\'est écrit');
+    b.lectureKO = false;
+    const r5 = await va({ achats: [{ id: 'A8' }] }, 'https://www.vinted.fr/');
+    dit(r5.ok === false && !dern().achats.A8, 'une page qui n\'est pas Vestiaire ne range rien');
   });
   const refus = async (quoi, opts, code) => essaie(quoi, async () => {
     const b = faire(opts);
@@ -333,6 +350,33 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const toutE = JSON.stringify(me);
     dit(!/Jeanne|Secret|Cach|Bonjour|jeton-secret/.test(toutE), 'aucun texte de message, aucun nom ne sort — ni dans la conversation, ni dans sa forme', toutE.slice(0, 300));
     await cE.close();
+
+    // ── F. vc-inject.js : tes ACHATS (5.239) ───────────────────────────────
+    const cF = await nav.newContext(); const pf = await cF.newPage();
+    await cF.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
+    await cF.route('https://apiv2.vestiairecollective.com/**', (r) => {
+      const u = r.request().url();
+      const body = /users\/me\/orders/.test(u) ? { meta: { limit: 20, offset: 0, count: 1 }, data: [{ id: 'O42', seller: { firstName: 'Marc', lastName: 'Vendeur', createdAt: '2019-03-01T08:00:00Z', carrier: 'MarcExpress' }, status: 'shipped', createdAt: '2026-10-25T08:00:00Z', totalPrice: { amount: 88, currency: 'EUR' },
+          shipment: { trackingNumber: 'xw123456789fr', carrier: 'Chronopost' }, product: { id: 700001, name: 'Dunk Low', brand: { name: 'Nike' }, seller: { firstName: 'Marc' } },
+          shippingAddress: { street: '3 rue Secrète' }, buyer: { email: 'moi@exemple.fr' }, payment: { cardLast4: '4242' } }] }
+        : /current-light/.test(u) ? { data: [{ id: 'PANIER1', status: 'cart', product: { id: 1, name: 'Panier' } }] }
+        : /awaiting-shipping/.test(u) ? { meta: { count: 1 }, data: [{ id: 'V1', product: { id: 2 } }] } : { data: [] };
+      return r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    });
+    await pf.goto('https://fr.vestiairecollective.com/my-orders/');
+    await pf.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
+    await pf.addScriptTag({ content: inj });
+    await pf.evaluate(() => Promise.all(['https://apiv2.vestiairecollective.com/users/me/orders?offset=0', 'https://apiv2.vestiairecollective.com/orders/current-light', 'https://apiv2.vestiairecollective.com/users/me/awaiting-shipping-items'].map((u) => fetch(u).then((r) => r.text()))));
+    await pf.waitForTimeout(800);
+    const ma = await pf.evaluate(() => window.__msgs.filter((m) => m.kind === 'vcachats'));
+    const a0 = ma[0] && ma[0].achats && ma[0].achats[0];
+    dit(ma.length === 1, 'les achats sont lus — jamais le panier, jamais les ventes à expédier', String(ma.length));
+    dit(a0 && a0.id === 'O42' && a0.productId === '700001' && a0.nom === 'Nike Dunk Low' && a0.etat === 'shipped' && /2026-10-25/.test(a0.date), 'un achat : son id, son article, son nom, son état, sa date', JSON.stringify(a0));
+    dit(a0 && a0.suivi === 'XW123456789FR' && a0.transporteur === 'Chronopost', 'le n° de suivi du colis et son transporteur', JSON.stringify(a0 && { s: a0.suivi, t: a0.transporteur }));
+    dit(a0 && a0.montant && a0.montant.valeur === 88 && a0.montant.cle === 'totalPrice', 'le montant part avec le nom de sa clé', JSON.stringify(a0 && a0.montant));
+    const toutF = JSON.stringify(ma);
+    dit(!/Marc|Vendeur|Secr|moi@|4242|Panier/.test(toutF), 'rien du vendeur, de ton adresse, de ton email ni de ta carte ne sort', toutF.slice(0, 300));
+    await cF.close();
     await nav.close();
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
