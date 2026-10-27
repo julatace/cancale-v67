@@ -126,3 +126,15 @@
 @media (max-width: 767px) {
   :root[data-theme="dark"] .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child { background: #1C3339 !important; }
 }
+@media (max-width: 767px) {
+  /* Le défilement vit dans <main>, jamais dans la page (Julien, 27 oct. : « quand
+     je défile, ça descend tout en bas »). Un titre caché en position absolue
+     (« Vinted », espace des plateformes) avait pour repère la PAGE : il la
+     rallongeait de 1 000 px, et en bout de liste iOS faisait défiler la page
+     entière, barre du bas comprise. <main> devient son repère. */
+  .vrm-app-shell .vrm-main { position: relative; }
+  html:has(.vrm-app-shell), html:has(.vrm-app-shell) body { overflow: hidden; overscroll-behavior: none; }
+  /* « au moins » écrit en mot sous le titre : un « ≥ » suffit, comme le CA. */
+  .vrm-app-shell .vrm-day-layout [data-vendu-partiel="1"] > span:first-child { display: none !important; }
+  .vrm-app-shell .vrm-day-layout [data-vendu-partiel="1"]::before { content: "≥ "; }
+}
