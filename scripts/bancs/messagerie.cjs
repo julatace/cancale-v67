@@ -256,6 +256,10 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), c: x.getAttribute('data-conv-compte'), q: x.getAttribute('data-conv-quand') })));
       const i301 = ordre.findIndex((x) => x.id === '301'), i303 = ordre.findIndex((x) => x.id === '303');
       dit(i301 >= 0 && i303 >= 0 && i301 < i303, 'une conversation avec une offre en attente passe devant une plus récente sans offre', JSON.stringify(ordre));
+      // (27 oct.) Bandeau « N offres au-dessus de ton prix mini » dans la liste :
+      // l'offre 45 € de la 301 est ≥ au mini 40 € posé sur l'annonce 444.
+      const banMini = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-au-mini]'); return e ? { n: e.getAttribute('data-offres-au-mini'), txt: e.innerText } : null; });
+      dit(banMini && banMini.n === '1' && /prix mini/i.test(banMini.txt) && /1 tap/i.test(banMini.txt) && /rien n['’]est accepté tout seul/i.test(banMini.txt), 'le bandeau dit « 1 offre au-dessus de ton prix mini » + 1 tap + rien tout seul', JSON.stringify(banMini));
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
       dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
