@@ -32264,10 +32264,10 @@ function Skeleton({ variant='row', count=6 }) {
 // État d'erreur de chargement, avec un bouton « Réessayer ».
 function LoadError({ onRetry }) {
   return <div style={{textAlign:'center',padding:'28px 16px'}}>
-    <div style={{fontSize:32,marginBottom:8}}>😕</div>
+    <div aria-hidden="true" style={{width:44,height:44,margin:'0 auto 10px',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:C.card2,color:C.muted}}><Icon name="cloudOff" size={20}/></div>
     <div style={{fontSize:15,fontWeight:500,color:C.text,marginBottom:4}}>Impossible de charger ces données</div>
     <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.4}}>Vérifie ta connexion, ou que ton compte Vinted est toujours actif.</div>
-    <button type="button" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'8px 20px',cursor:'pointer',fontSize:13,fontWeight:500}}>Réessayer</button>
+    <button type="button" onClick={onRetry} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:12,padding:'0 22px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:650}}>Réessayer</button>
   </div>;
 }
 
@@ -44045,13 +44045,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{flex:1,minWidth:180}}>
                   <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
                     {tot>0 && <span className="vrm-display" style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:'-.035em',lineHeight:1,fontVariantNumeric:'tabular-nums'}}>{colisEb === null ? 'au moins ' : ''}{tot}</span>}
-                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : colisEb === null ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
+                    <span style={{fontSize:15,fontWeight:600,color:C.text}}>{tot>0 ? 'colis à envoyer' : (sales.error && !(sales.items||[]).length) ? 'Colis à envoyer : pas encore lus' : colisEb === null ? 'Aucun colis Vinted à envoyer' : 'Aucun colis à envoyer'}</span>
                   </div>
                   <div style={{fontSize:12.5,color:C.muted,marginTop:8,lineHeight:1.45}}>
                     {aPoster.length>0
                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
                       : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
-                      : nEb ? '' : 'Vinted ne te demande aucun envoi en ce moment.'}
+                      : nEb ? '' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n\'ont pas pu être lues : « aucun » n\'est pas su (voir dessous).' : 'Vinted ne te demande aucun envoi en ce moment.'}
                     {nEb>0 && <span data-colis-recap-ebay-ligne="">{aPoster.length>0?' · ':''}{nEb} vente{nEb>1?'s':''} eBay — l'étiquette se prend dans eBay (ci-dessous)</span>}
                     {colisEb === null && <span data-colis-recap-ebay-ligne="passu">{tot>0?' · ':''}ventes eBay pas lues pour l'instant</span>}
                   </div>
