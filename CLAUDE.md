@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> **27 octobre — le pavé numérique sur Ventes et Colis (Vinted) :** même saisie que Leboncoin et
+> eBay (`SaisieNumeroPlateforme`). Ventes : N° + Entrée montre SA vente (le N° de la ligne,
+> `effEntry`) ; cachée par un filtre, une recherche, la période, « masquées » ou au-delà des
+> 60 premières ⇒ remontrée (annulée ⇒ « Annulées »). Colis : son colis (`numForBord`, sinon la
+> fiche), un colis marqué « posté » est remontré, un colis eBay à poster aussi ; une vente pas à
+> envoyer dit son état. Lecture seule. Au passage : « Générer le bordereau » grisé débordait sur
+> « J'ai le PDF » à 1512 px (déjà en ligne) — il revient à la ligne dans sa colonne. Banc
+> `pave-vinted.cjs` : 16 rouges sur main, 19 verts après ; filtres non levés ⇒ 3 rouges.
+
 > **27 octobre — le pavé numérique sur Leboncoin et eBay :** comme sur le Stock, sur ordinateur
 > un chiffre tapé n'importe où dans l'espace Leboncoin ou eBay ouvre la saisie (sous les onglets,
 > `SaisieNumeroPlateforme`, `data-num-plat`) ; N° + Entrée MONTRE la paire, en lecture seule, par

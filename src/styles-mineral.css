@@ -1362,6 +1362,8 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="fait"] { grid-column:3; grid-row:1; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-geste="suivre"] { grid-column:4; grid-row:1; }
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-colis-source { grid-column:1 / -1; }
+  /* (27 oct.) « Générer le bordereau » grisé gardait son texte sur une ligne : 160 px dans une colonne de 108, par-dessus « J'ai le PDF ». Il revient à la ligne dans SA colonne. */
+  .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > [data-bouton-bord] > button { white-space:normal !important; line-height:1.2 !important; text-align:center !important; padding-left:6px !important; padding-right:6px !important; font-size:12px !important; }
 }
 
 /* Messages plus riches (19 oct.) : la paire de la conversation (N°, titre, prix)
