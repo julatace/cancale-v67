@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.231.0';
+  const CAPTEUR_VERSION='5.232.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -512,6 +512,17 @@
         if (m) { try { const o = JSON.parse(text); const n = Number(o && o.unread); if (Number.isFinite(n) && n >= 0) { post({ kind: 'lbcmsgcompteur', userId: m[1], unread: Math.round(n) }); noterCompteurDoc(m[1]); } } catch (_) {} }
         return;
       }
+      // ── UNE OFFRE / NÉGOCIATION : SA STRUCTURE SEULE, JAMAIS SES VALEURS (27 oct.) ──
+      // Julien veut « accepter au-dessus d'un prix mini » aussi sur Leboncoin. Pour
+      // le câbler sans deviner, il faut d'abord MESURER la forme d'une offre LBC et
+      // de son éventuel seuil d'auto-acceptation — ce que `noteSchema` (ci-dessus)
+      // fait déjà. MAIS le corps d'une offre porte le PRIX, le SEUIL, le NOM de
+      // l'acheteur : s'il mentionne l'annonce (`list_id`, `subject`, `owner`…), il
+      // passait `AD_HINT` et partait ENTIER en `lbcraw`. C'est le défaut de la
+      // messagerie (4 octobre), sur la négociation. On ne connaît pas encore
+      // l'endpoint réel (403) : on garde LARGE par prudence — la structure suffit à
+      // mesurer, la valeur ne doit jamais partir. `mieux vaut un blanc qu'un faux`.
+      if (/(negotiat|\boffers?\b|counter.?offer|best.?offer|\/deals?\b|accept.?price)/i.test(url)) return;
       // Ses comptes Leboncoin liés (le sélecteur de compte) : identifiant, nom,
       // pro ou non. JAMAIS l'email. Le relais habituel continue en dessous.
       if (/\/authenticator\/v\d+\/users\/me\/linked_accounts/i.test(url)) {
