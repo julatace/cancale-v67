@@ -59,15 +59,22 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
   ctx.lireDressingsEnLigne = async () => ({ echec: false, lignes: [{ data: { uid: 55, payload: { items: [it] } } }], aConfirmer: [] });
   ctx.lireVentesProuvees = async () => ({ echec: preuveKO, vendus: new Set(vendus.map(String)) });
   ctx.readVcPosted = async () => ({ echec: postedKO, ids: posted.map(String) });
-  ctx.markVcPosted = async () => marque;
-  ctx.sbGet = async (q) => (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
+  const marques = [];
+  ctx.markVcPosted = async (id) => { if (marque) marques.push(String(id)); return marque; };
+  const ecrits = []; let vcl = null; const etat = { lectureKO: false };
+  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; } return true; };
+  ctx.notifierApp = async () => {};
+  ctx.majCmd = async () => {};
+  ctx.sbGet = async (q) => /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
   ctx.compteConnecte = async () => null;
   ctx.viderFiches = async () => {};
   const vus = [];
   ctx.photosPourVestiaire = async (urls) => { vus.push(...urls); return urls.map((u) => ({ url: u, b64: 'AA==', type: 'image/jpeg' })); };
   const cmd = (msg) => new Promise((res) => { ecouteur(Object.assign({ from: 'vmr-bridge', action: 'cmd' }, msg), { origin: 'https://vrm.center', url: 'https://vrm.center/' }, res); });
   const page = (msg, url, tabId) => new Promise((res) => { ecouteur(Object.assign({ from: 'cancale-vcdepot' }, msg), { tab: { id: tabId, url } }, res); });
-  return { ctx, store, onglets, cmd, page, vus };
+  const o = { ctx, store, onglets, cmd, page, vus, ecrits, marques, ecouteur: (...a) => ecouteur(...a) };
+  Object.defineProperty(o, 'lectureKO', { get: () => etat.lectureKO, set: (v) => { etat.lectureKO = v; } });
+  return o;
 }
 
 (async () => {
@@ -80,7 +87,7 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(p && /Salomon/.test(p.title) && p.price === '99.00' && p.numero === '401', 'la paire est relue par l\'extension, jamais le contenu du message', JSON.stringify(p && { t: p.title, prix: p.price }));
     dit(p && /Paire propre/.test(p.description) && /VRM-401/.test(p.description), 'sa description Vinted part avec sa référence VRM-{n°}', p && p.description);
     dit(b.onglets.length === 1 && /^https:\/\/fr\.vestiairecollective\.com\//.test(b.onglets[0]), 'Vestiaire s\'ouvre', b.onglets.join(','));
-    dit(p && !p.publier, 'aucun feu vert de publication : VRM ne publie pas à sa place');
+    dit(p && p.publier === true, '5.236 : feu vert de publication (sans booster) par défaut');
     const tabId = b.store.vrmPendingVc.tabId;
     const g1 = await b.page({ action: 'getPending' }, 'https://fr.vestiairecollective.com/sell/', tabId);
     dit(g1 && g1.ad && g1.ad.id === '1001', 'l\'onglet ouvert pour elle la reçoit');
@@ -90,8 +97,36 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(g3 && g3.ok === false, 'une page qui n\'est pas Vestiaire n\'obtient rien', JSON.stringify(g3));
     const ph = await b.page({ action: 'photoBytes', urls: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://autre.example/x.jpg'] }, 'https://fr.vestiairecollective.com/sell/', tabId);
     dit(ph && ph.ok && b.vus.length === 1 && !b.vus.some((u) => /autre\.example/.test(u)), 'seules SES photos sont lues (jamais une adresse glissée par la page)', JSON.stringify(b.vus));
-    const r2 = await b.cmd({ cmd: 'vcPreparer', id: '1001' });
+    const r2 = await b.cmd({ cmd: 'vcPreparer', id: '1001', publier: false });
     dit(r2 && r2.accepte === true && b.onglets.length === 2, 'onglet fermé : un nouveau clic rouvre Vestiaire', JSON.stringify(r2));
+    dit(b.store.vrmPendingVc.ad.publier === false, 'l\'app peut demander « préparer seulement » (publier:false)');
+    const tab2 = b.store.vrmPendingVc.tabId;
+    const pu0 = await b.page({ action: 'publiee' }, 'https://fr.vestiairecollective.com/sell/', 999);
+    dit(pu0 && pu0.ok === false && b.store.vrmPendingVc, '« publiée » venue d\'un autre onglet : rien n\'est noté', JSON.stringify(pu0));
+    const lien = await b.page({ action: 'vcPublie', productId: '77001' }, 'https://fr.vestiairecollective.com/sell/', tab2);
+    dit(lien && lien.ok === true && b.ecrits.some((e) => e.id === 'vc_listings' && e.data.liens['77001'] === '401'), 'l\'id de l\'annonce créée est relié à SA paire (N°401)', JSON.stringify(b.ecrits.map((e) => e.id)));
+    const pu = await b.page({ action: 'publiee' }, 'https://fr.vestiairecollective.com/sell/', tab2);
+    dit(pu && pu.ok === true && b.store.vrmPendingVc === null && b.marques.includes('1001'), 'confirmation vue dans SON onglet : notée publiée, le dépôt se ferme', JSON.stringify(pu));
+  });
+  // ── A2. Tes annonces Vestiaire et leur boost (rangerVcAnnonces) ────────
+  await essaie('boost', async () => {
+    const b = faire();
+    const vc = (m) => new Promise((res) => b.ecouteur(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces' }, m), { tab: { id: 5, url: 'https://fr.vestiairecollective.com/members/' } }, res));
+    const r1 = await vc({ items: [{ id: 'a1', boost: true, cles: ['isBoosted'], ref: '401' }, { id: 'a2', boost: false, cles: ['promotion'] }, { id: 'a3', boost: null }], offset: 0, total: 3, lus: 3 });
+    const d1 = (b.ecrits.filter((e) => e.id === 'vc_listings').pop() || {}).data || {};
+    dit(r1 && r1.ok && d1.items && d1.items.a1.boost === true && d1.items.a2.boost === false && d1.items.a3.boost === null && d1.complet === true, 'les annonces sont rangées avec leur boost (true · false · « pas su »)', JSON.stringify(d1.items));
+    const r2 = await vc({ items: [{ id: 'a1', boost: false }], offset: 0, total: 1, lus: 1 });
+    const d2 = (b.ecrits.filter((e) => e.id === 'vc_listings').pop() || {}).data || {};
+    dit(r2.ok && Object.keys(d2.items).join() === 'a1' && d2.items.a1.boost === false, 'une liste lue EN ENTIER remplace (le boost fini n\'est plus « boosté »)', JSON.stringify(d2.items));
+    await vc({ items: [{ id: 'b9', boost: true }], offset: 20, total: 40, lus: 1 });
+    const d3 = (b.ecrits.filter((e) => e.id === 'vc_listings').pop() || {}).data || {};
+    dit(d3.items.a1 && d3.items.b9 && d3.complet === false, 'une page partielle complète sans rien effacer', JSON.stringify(Object.keys(d3.items)));
+    const n0 = b.ecrits.length; b.lectureKO = true;
+    const r4 = await vc({ items: [{ id: 'z', boost: true }], offset: 0, total: 1, lus: 1 });
+    dit(r4.ok === false && b.ecrits.length === n0, 'base illisible : rien n\'est écrit (« rien lu » ne vaut pas « rien »)');
+    b.lectureKO = false;
+    const r5 = await new Promise((res) => b.ecouteur({ from: 'cancale-vc', action: 'vcAnnonces', items: [{ id: 'x', boost: true }], offset: 0, total: 1, lus: 1 }, { tab: { id: 5, url: 'https://www.leboncoin.fr/' } }, res));
+    dit(r5.ok === false, 'une page qui n\'est pas Vestiaire ne range rien');
   });
   const refus = async (quoi, opts, code) => essaie(quoi, async () => {
     const b = faire(opts);
@@ -148,10 +183,68 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(st.c === 'tb', 'l\'état : le libellé EXACT (« Très bon état », jamais « Bon état »)', st.c + ' / ' + st.lab);
     dit(st.q === '', 'la recherche de l\'en-tête n\'est jamais touchée', st.q);
     dit(st.n === 2, 'les deux photos sont attachées au formulaire', String(st.n));
-    dit(st.pub === 0, 'VRM ne clique JAMAIS « Publier »', String(st.pub));
+    dit(st.pub === 0, 'sans feu vert (app d\'avant / « préparer seulement ») : VRM ne clique pas « Publier »', String(st.pub));
     dit(/champ/.test(st.b) && /publies?/.test(st.b), 'le bandeau dit le chiffre et que c\'est lui qui publie', st.b);
     const form = st.envois.find((m) => m.action === 'vcForm');
     dit(!!form && form.fields.some((f) => f.name === 'description') && !JSON.stringify(form).includes('Paire propre') && !JSON.stringify(form).includes('99.00'), 'la structure du formulaire est relevée, sans aucune valeur saisie', form ? JSON.stringify(form).slice(0, 160) : 'aucun relevé');
+
+    // ── B2. 5.236 : publier tout seul, SANS BOOSTER ─────────────────────────
+    const ADP = Object.assign({}, AD, { publier: true });
+    const formB = ({ categorie = false, boostCoche = true, boostRecoche = false, prix = '' } = {}) => `<!doctype html><html><body><header><input name="q"></header>
+      <form id="fm"><label for="d">Description</label><textarea id="d" name="description"></textarea>
+      <label for="p">Prix</label><input id="p" name="price" value="${prix}">
+      ${categorie ? '<label id="lc">Catégorie</label><div role="combobox" aria-labelledby="lc" aria-required="true" tabindex="0"></div>' : ''}
+      <input type="file" id="f" multiple accept="image/*">
+      <label><input type="checkbox" id="boost" name="boost_listing" ${boostCoche ? 'checked' : ''} ${boostRecoche ? 'onchange="setTimeout(()=>{this.checked=true},50)"' : ''}> Booster mon article — 4,99 €</label>
+      <button type="button" id="payant" onclick="window.__paye=(window.__paye||0)+1">Publier avec boost (4,99 €)</button>
+      <button type="button" id="annuler" onclick="window.__ann=(window.__ann||0)+1">Annuler</button>
+      <button type="button" id="gratuit" onclick="window.__pub=(window.__pub||0)+1;window.__boostAuClic=document.getElementById('boost').checked;document.body.innerHTML='<h1>Merci ! Ton article est soumis et en cours de vérification.</h1>'">Publier</button>
+      </form></body></html>`;
+    const scen = async (quoi, html, ad, ms) => {
+      const c = await nav.newContext(); const pg3 = await c.newPage();
+      await c.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html; charset=utf-8', body: html }));
+      await pg3.addInitScript(fauxChrome(ad));
+      await pg3.goto('https://fr.vestiairecollective.com/sell/');
+      await pg3.addScriptTag({ content: code });
+      await pg3.waitForTimeout(ms || 9000);
+      const r = await pg3.evaluate(() => ({ pub: window.__pub || 0, paye: window.__paye || 0, ann: window.__ann || 0, boostAuClic: window.__boostAuClic, b: (document.getElementById('vrm-vc-b') || {}).innerText || '', envois: window.__envois.map((m) => m.action) }));
+      await c.close(); return r;
+    };
+    const ok1 = await scen('complet', formB(), ADP);
+    dit(ok1.pub === 1 && ok1.boostAuClic === false, 'tout rempli : le boost coché est DÉCOCHÉ, puis « Publier » (gratuit) est cliqué une fois', JSON.stringify(ok1));
+    dit(ok1.paye === 0 && ok1.ann === 0, 'le bouton à prix (« Publier avec boost ») et « Annuler » ne sont JAMAIS cliqués', JSON.stringify(ok1));
+    dit(ok1.envois.includes('publiee'), 'la confirmation de Vestiaire est vue : « publiée » part au fond', JSON.stringify(ok1.envois));
+    const ok2 = await scen('categorie', formB({ categorie: true }), ADP, 7000);
+    dit(ok2.pub === 0 && /reste à choisir/i.test(ok2.b) && /Catégorie/.test(ok2.b), 'catégorie obligatoire vide : rien n\'est cliqué, le bandeau la NOMME', ok2.b);
+    const ok3 = await scen('recoche', formB({ boostRecoche: true }), ADP, 7000);
+    dit(ok3.pub === 0 && ok3.paye === 0 && /option payante/.test(ok3.b), 'une option payante qui se recoche : rien n\'est publié, et c\'est dit', ok3.b);
+    const ok4 = await scen('prix', formB({ prix: '120' }), ADP, 7000);
+    dit(ok4.pub === 0 && /prix/.test(ok4.b), 'un prix sur la page qui n\'est pas celui de VRM : rien n\'est publié', ok4.b);
+    const ok5 = await scen('sansfeu', formB(), AD, 7000);
+    dit(ok5.pub === 0 && ok5.paye === 0, 'sans feu vert : aucun clic', JSON.stringify(ok5));
+
+    // ── C. vc-inject.js : le boost de tes annonces, lu dans la réponse ──────
+    const inj = fs.readFileSync(path.join(EXT, 'vc-inject.js'), 'utf8');
+    const cI = await nav.newContext(); const pi = await cI.newPage();
+    await cI.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
+    await cI.route('https://apiv2.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ meta: { limit: 20, offset: 0, count: 3 }, data: [
+      { id: 900001, name: 'Salomon XT-6', description: 'Paire propre. Réf. VRM-401', isBoosted: true, seller: { email: 'secret@exemple.fr' } },
+      { id: 900002, name: 'Nike', promotion: { active: false } },
+      { id: 900003, name: 'Adidas', price: 50 } ] }) }));
+    await pi.goto('https://fr.vestiairecollective.com/members/');
+    await pi.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
+    await pi.addScriptTag({ content: inj });
+    await pi.evaluate(() => fetch('https://apiv2.vestiairecollective.com/users/me/product-listings?offset=0&limit=20').then((r) => r.text()));
+    await pi.waitForTimeout(800);
+    const msgs = await pi.evaluate(() => window.__msgs.filter((m) => m.kind === 'vcannonces'));
+    const it = (msgs[0] && msgs[0].items) || [];
+    const parId = Object.fromEntries(it.map((x) => [x.id, x]));
+    dit(parId['900001'] && parId['900001'].boost === true && parId['900001'].ref === '401', 'annonce boostée lue « boostée », reliée à la paire par sa référence VRM-401', JSON.stringify(parId['900001']));
+    dit(parId['900002'] && parId['900002'].boost === false, '`promotion.active: false` ⇒ pas boostée', JSON.stringify(parId['900002']));
+    dit(parId['900003'] && parId['900003'].boost === null, 'aucune clé de boost ⇒ « pas su », jamais « pas boostée »', JSON.stringify(parId['900003']));
+    dit(!JSON.stringify(msgs).includes('secret@') && !JSON.stringify(msgs).includes('Paire propre'), 'aucun texte ni email de l\'annonce ne sort (seulement la référence)', JSON.stringify(msgs).slice(0, 200));
+    dit(msgs[0] && msgs[0].total === 3 && msgs[0].lus === 3, 'le total annoncé part avec (liste entière ou non)', JSON.stringify(msgs[0] && { t: msgs[0].total, l: msgs[0].lus }));
+    await cI.close();
     await nav.close();
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);

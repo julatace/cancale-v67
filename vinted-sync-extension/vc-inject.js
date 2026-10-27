@@ -108,6 +108,103 @@
       nextData: !!document.getElementById('__NEXT_DATA__'), nextFlux: !!(window.self && window.self.__next_f) });
   }, 5000);
 
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TES ANNONCES ET LEUR BOOST (27 octobre, 5.236)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « l'extension doit sur Vestiaire, comme pour Vinted et Leboncoin,
+  // capter si des annonces ont été boostées — ce n'est pas au vendeur de le
+  // faire ». La seule liste de SES annonces vue chez lui est
+  // `users/me/product-listings` (mesuré le 26 oct., vide ce jour-là : la FORME
+  // d'une annonce n'a jamais été vue). Donc, sur cette réponse seulement :
+  //   · l'identifiant de chaque annonce (le sien, pas une donnée personnelle) ;
+  //   · son BOOST, lu sur une clé dont le NOM le dit (boost, promoted, featured,
+  //     sponsored, spotlight, highlight, bump…) : `true`/`false`, un nombre > 0,
+  //     une date encore à venir, ou un objet `{active|enabled|isActive}`. Aucune
+  //     clé de ce nom ⇒ `null` (« pas su »), jamais « non boostée » ;
+  //   · la référence `VRM-{n°}` si un texte de l'annonce la porte — SEULEMENT la
+  //     référence, jamais le texte (c'est elle qui relie à la paire, §5).
+  // Et le NOM des clés lues (jamais leur valeur), pour viser juste ensuite.
+  const BOOST_CLE = /boost|promot|featur|sponsor|spotlight|highlight|bump|mise.?en.?avant|visibility.?(?:option|boost)/i;
+  const RE_REF = /VRM-([A-Z]{0,3}\d{1,6})\b/i;
+  function lireBoost(v) {
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'number') return v > 0;
+    if (typeof v === 'string') {
+      if (/^(true|active|on|yes|enabled|boosted)$/i.test(v)) return true;
+      if (/^(false|inactive|off|no|disabled|none|)$/i.test(v)) return false;
+      const t = Date.parse(v); if (isFinite(t)) return t > Date.now();
+      return null;
+    }
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      for (const k of ['active', 'isActive', 'enabled', 'isEnabled', 'status']) if (k in v) { const r = lireBoost(v[k]); if (r !== null) return r; }
+      for (const k of ['endDate', 'endsAt', 'end_date', 'expiresAt', 'expirationDate', 'until']) if (v[k]) { const t = Date.parse(v[k]); if (isFinite(t)) return t > Date.now(); }
+    }
+    return null;
+  }
+  function boostDe(o) {
+    let res = null; const cles = [];
+    const visite = (x, prof) => {
+      if (!x || typeof x !== 'object' || prof > 2) return;
+      for (const k of Object.keys(x).slice(0, 80)) {
+        if (BOOST_CLE.test(k)) { cles.push(cleSure(k)); const b = lireBoost(x[k]); if (b === true) res = true; else if (b === false && res === null) res = false; }
+        else if (x[k] && typeof x[k] === 'object' && !Array.isArray(x[k])) visite(x[k], prof + 1);
+      }
+    };
+    visite(o, 0);
+    return { boost: res, cles: [...new Set(cles)].slice(0, 6) };
+  }
+  function refDe(o) {
+    let ref = '';
+    const visite = (x, prof) => {
+      if (ref || !x || prof > 2) return;
+      if (typeof x === 'string') { const m = x.match(RE_REF); if (m) ref = m[1].toUpperCase(); return; }
+      if (typeof x !== 'object') return;
+      for (const k of Object.keys(x).slice(0, 80)) visite(x[k], prof + 1);
+    };
+    visite(o, 0);
+    return ref;
+  }
+  function tableauAnnonces(obj) {
+    const cands = [];
+    const visite = (x, prof) => {
+      if (!x || typeof x !== 'object' || prof > 3) return;
+      if (Array.isArray(x)) { if (x.length && x.every((e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null))) cands.push(x); return; }
+      for (const k of Object.keys(x)) visite(x[k], prof + 1);
+    };
+    visite(obj, 0);
+    return cands.sort((a, b) => b.length - a.length)[0] || null;
+  }
+  const idDe = (e) => String(e.id != null ? e.id : (e.productId != null ? e.productId : e.product_id)).slice(0, 40);
+  function noteAnnonces(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/users\/me\/product-listings\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const arr = tableauAnnonces(obj) || [];
+      const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
+      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e) }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      post({ kind: 'vcannonces', items, offset, total, lus: arr.length });
+    } catch (_) {}
+  }
+  // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
+  // l'annonce à la paire que VRM vient de préparer dans cet onglet (le fond
+  // n'accepte que l'onglet du dépôt). Une écriture 2xx sur un chemin d'article.
+  function notePublication(url, methode, statut, texte) {
+    try {
+      if (!DE_VC(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || '')) || !(statut >= 200 && statut < 300)) return;
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!/product|listing|draft|item|article/i.test(u.pathname) || /search|like|recommend|cart|basket|order/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      const cand = obj && (obj.data && typeof obj.data === 'object' ? obj.data : obj);
+      const id = cand && (cand.id != null ? cand.id : (cand.productId != null ? cand.productId : cand.product_id));
+      if (id == null || !/^[\w-]{1,40}$/.test(String(id))) return;
+      post({ kind: 'vcpublie', productId: String(id), chemin: normChemin(sansId(u.pathname)), methode: String(methode).toUpperCase() });
+    } catch (_) {}
+  }
+
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
@@ -119,7 +216,7 @@
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => noteSchema(url, t)).catch(() => {});
+            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -138,7 +235,7 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t && /json/i.test(String(ct || ''))) noteSchema(url, t);
+            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

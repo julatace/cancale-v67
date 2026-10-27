@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.235.0';
+const EXT_ATTENDUE = '5.236.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -21568,19 +21568,61 @@ function PublierVestiaire({ comptes }) {
       setPubliees(new Set(((rows && rows[0] && rows[0].ids) || []).map(String)));
     } catch (_) { setPubliees(null); }
   }, []);
-  React.useEffect(() => { relire(); }, [relire]);
+  // 5.236 : tes annonces Vestiaire telles que l'extension les a lues, et leur
+  // BOOST (`vc_listings`). Trois états : undefined en cours · null pas su · objet.
+  const [vcAnn, setVcAnn] = React.useState(undefined);
+  const relireAnn = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total`, { headers: sbAuth() });
+      if (!r.ok) throw new Error('lecture');
+      const rows = await r.json();
+      setVcAnn(Array.isArray(rows) ? (rows[0] || {}) : null);
+    } catch (_) { setVcAnn(null); }
+  }, []);
+  React.useEffect(() => { relire(); relireAnn(); }, [relire, relireAnn]);
   React.useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'vestiaire') relire(); };
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'vestiaire') { relire(); relireAnn(); } };
     window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
   }, [relire]);
   const glob = raisonExtGlobale(sansSouris, { cap: 'vcpublier', role: 'prépare tes annonces Vestiaire' });
+  // 5.236 : une extension qui sait publier sans booster le fait ; plus ancienne,
+  // elle prépare seulement (et on le dit, jamais une promesse qu'elle ne tient pas).
+  const auto = extSait('vcauto') === 'ok';
+  // Le boost d'une paire : par IDENTITÉ seulement — le lien posé à la création
+  // (id Vestiaire → N°) ou la référence VRM-{n°} lue dans l'annonce (§5).
+  const boostParNum = React.useMemo(() => {
+    const m = new Map();
+    if (!vcAnn || !vcAnn.items) return m;
+    const liens = vcAnn.liens || {};
+    for (const [id, it] of Object.entries(vcAnn.items)) {
+      const n = cleNum(liens[id] || (it && it.ref) || '');
+      if (!n) continue;
+      const prev = m.get(n);
+      const b = it && (it.boost === true || it.boost === false) ? it.boost : null;
+      m.set(n, prev === true ? true : (b === true ? true : (prev === false || b === false ? (b === null && prev == null ? null : false) : null)));
+    }
+    return m;
+  }, [vcAnn]);
+  const resumeBoost = (() => {
+    if (vcAnn === undefined) return null;
+    if (vcAnn === null) return { code: 'pas-su', texte: "Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, réessaie dans un moment." };
+    const items = vcAnn.items ? Object.values(vcAnn.items) : null;
+    if (!items || !vcAnn.capturedAt) return { code: 'jamais', texte: "Tes annonces Vestiaire n'ont pas encore été lues : ouvre « Mes articles » sur Vestiaire dans ce Chrome, l'extension y lit lesquelles sont boostées." };
+    const n = items.length, b = items.filter((x) => x && x.boost === true).length, inc = items.filter((x) => !x || x.boost == null).length;
+    const quand = (() => { const h = Math.round((Date.now() - Date.parse(vcAnn.capturedAt)) / 3600000); return !isFinite(h) ? '' : h < 1 ? "il y a moins d'une heure" : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`; })();
+    const total = vcAnn.complet ? '' : (vcAnn.total != null ? ` (au moins — Vestiaire en annonce ${vcAnn.total})` : ' (au moins)');
+    if (!n) return { code: 'vide', texte: `Aucune annonce sur Vestiaire à la dernière lecture (${quand}).` };
+    const nums = [...boostParNum.entries()].filter(([, v]) => v === true).map(([k]) => 'N°' + k).sort((a, z) => a.localeCompare(z, 'fr', { numeric: true }));
+    const sansN = b - items.filter((x, i) => x && x.boost === true && cleNum(((vcAnn.liens || {})[Object.keys(vcAnn.items)[i]]) || x.ref || '')).length;
+    return { code: 'lu', b, texte: `${n} annonce${n > 1 ? 's' : ''} sur Vestiaire${total}, lue${n > 1 ? 's' : ''} ${quand} : ${b} boostée${b > 1 ? 's' : ''}${nums.length ? ` (${nums.join(', ')}${sansN > 0 ? ` et ${sansN} pas reliée${sansN > 1 ? 's' : ''} à une paire` : ''})` : ''}${inc ? ` · ${inc} dont Vestiaire ne dit pas le boost` : ''}.` };
+  })();
   const liste = (paires || []).filter((p) => !(publiees && publiees.has(String(p.id))));
   const visibles = tout ? liste : liste.slice(0, 12);
   const preparer = async (p) => {
     if (envoi) return;
     if (glob) { setMsg((m) => ({ ...m, [p.id]: glob.texte })); return; }
     setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
-    const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id) }, 30000);
+    const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
     setEnvoi('');
     if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
     if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
@@ -21613,12 +21655,13 @@ function PublierVestiaire({ comptes }) {
             {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 36, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}/> : null}
             <div style={{ flex: '1 1 160px', minWidth: 0 }}>
               <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>N°{p.num} · {p.title || '—'}</div>
-              <div style={{ fontSize: 11.5, color: C.muted }}>{p.prix != null ? fmt(p.prix) : 'prix —'}{p.photos && p.photos.length ? ` · ${p.photos.length} photo${p.photos.length > 1 ? 's' : ''}` : ''}</div>
+              <div style={{ fontSize: 11.5, color: C.muted }}>{p.prix != null ? fmt(p.prix) : 'prix —'}{p.photos && p.photos.length ? ` · ${p.photos.length} photo${p.photos.length > 1 ? 's' : ''}` : ''}{job && job.etape === 'fait' ? ' · publiée sur Vestiaire' : ''}</div>
+              {boostParNum.has(cleNum(p.num)) ? <div data-vc-boost={String(boostParNum.get(cleNum(p.num)))} style={{ fontSize: 11.5, color: C.muted }}>Déjà sur Vestiaire{boostParNum.get(cleNum(p.num)) === true ? ' · boostée' : boostParNum.get(cleNum(p.num)) === false ? ' · pas boostée' : ''}</div> : null}
               {msg[p.id] ? <div data-vc-refus="" style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg[p.id]}</div> : null}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button type="button" data-vc-preparer={p.id} aria-disabled={glob ? 'true' : undefined} title={glob ? glob.texte : "L'extension ouvre Vestiaire et remplit ce qu'elle reconnaît — tu relis et tu publies"} onClick={() => preparer(p)} style={btn(true)}>
-                {envoi === p.id ? 'Envoi…' : ouvert ? 'Ouvert sur Vestiaire' : 'Préparer sur Vestiaire'}
+              <button type="button" data-vc-preparer={p.id} aria-disabled={glob ? 'true' : undefined} title={glob ? glob.texte : auto ? "L'extension ouvre Vestiaire, remplit, attache les photos et publie SANS booster dès que tout est rempli" : "L'extension ouvre Vestiaire et remplit ce qu'elle reconnaît — tu relis et tu publies"} onClick={() => preparer(p)} style={btn(true)}>
+                {envoi === p.id ? 'Envoi…' : ouvert ? 'Ouvert sur Vestiaire' : auto ? 'Publier sur Vestiaire' : 'Préparer sur Vestiaire'}
               </button>
               <button type="button" data-vc-marquer={p.id} onClick={() => marquer(p)} style={btn(false)}>Déjà publiée</button>
             </div>
@@ -21632,8 +21675,11 @@ function PublierVestiaire({ comptes }) {
     <Card style={{ padding: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
-        L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b> : VRM ne publie jamais à ta place sur Vestiaire.
+        {auto
+          ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
+          : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
         {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
+        {resumeBoost ? <div data-vc-boost-resume={resumeBoost.code} style={{ marginTop: 6 }}>{resumeBoost.texte}</div> : null}
       </div>
       {corps}
     </Card>

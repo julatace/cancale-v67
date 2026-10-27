@@ -125,7 +125,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
         await pg.waitForFunction(() => window.__cmds && window.__cmds.length > 0, null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(500);
         let cmds = await pg.evaluate(() => window.__cmds);
-        dit(cmds.length === 1 && cmds[0] === 'cmd,id=vcPreparer:7001', 'le clic commande `vcPreparer` avec l\'identifiant SEUL', JSON.stringify(cmds));
+        dit(cmds.length === 1 && /^cmd,id(,publier)?=vcPreparer:7001$/.test(cmds[0]), 'le clic commande `vcPreparer` avec l\'identifiant seul (et le feu vert de publication), jamais un titre ni un prix', JSON.stringify(cmds));
         const t = await pg.evaluate(() => document.querySelector('[data-vc-preparer="7001"]').innerText);
         dit(/Ouvert sur Vestiaire/.test(t), 'le bouton suit l\'étape renvoyée (« Ouvert sur Vestiaire »)', t);
         await pg.click('[data-vc-marquer="7002"]');
