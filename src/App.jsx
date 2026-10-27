@@ -42806,7 +42806,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
-                style={{flexShrink:0,width:46,height:26,borderRadius:13,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
+                style={{flexShrink:0,width:46,height:26,borderRadius:999,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
                 <span style={{position:'absolute',top:3,left:offresAuto?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
               </button>
             </div>
@@ -43520,7 +43520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
-                      <span style={{marginLeft:'auto',flexShrink:0,display:'inline-block',verticalAlign:'middle',fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:'3px 9px'}}>
+                      <span style={{marginLeft:'auto',flexShrink:0,display:'inline-block',verticalAlign:'middle',fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 9px'}}>
                         <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
