@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.233.0';
+const EXT_ATTENDUE = '5.234.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.233.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -1598,7 +1598,7 @@ const SYNC_KEYS = [
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -32230,6 +32230,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // une confirmation qui dit le risque (un programme qui accepte sur Vinted).
   const [offresAuto, setOffresAuto] = useState(() => load('vinted_offres_auto', false) === true);
   React.useEffect(() => onCloudReady(() => setOffresAuto(load('vinted_offres_auto', false) === true)), []);
+  // (27 oct., refus auto) Le message envoyé à l'acheteur quand VRM refuse une offre
+  // trop basse — SON texte, vide par défaut (refus sans message). Synchronisé ;
+  // rattrapé au nuage et SEULEMENT s'il est resté vide (§5.49 : jamais par-dessus
+  // un texte tapé pendant le chargement).
+  const [refusMsg, setRefusMsg] = useState(() => load('vinted_offre_refus_msg', '') || '');
+  React.useEffect(() => onCloudReady(() => setRefusMsg(v => (v && v.trim()) ? v : (load('vinted_offre_refus_msg', '') || ''))), []);
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
@@ -32302,6 +32308,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // `mp` : sans ça, poser un mini sur une annonce sans N° ni prix d'achat
       // effacerait l'entrée — donc le mini — à la ligne suivante.
       const emptyMin = next.min == null || String(next.min).trim() === '';
+      // (27 oct., refus auto) Le seuil de refus `refuse` compte aussi comme une valeur.
+      const emptyRefuse = next.refuse == null || String(next.refuse).trim() === '';
       // ⚠️ (relecture du 11 octobre) Après une remise à zéro, la base REFUSE
       //    qu'une fiche numérotée disparaisse (`vrm_fiche_perdue` : c'est la
       //    signature d'un appareil chargé avant qu'un autre ne numérote). Effacer
@@ -32309,7 +32317,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    appareil… »), et plus rien ne se synchronisait. On garde la fiche,
       //    son N° vide — elle compte exactement comme une fiche absente partout.
       const etaitNumerotee = !!String(c.numero || '').trim();
-      if (emptyNum && emptyBuy && emptyMp && emptyMin && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
+      if (emptyNum && emptyBuy && emptyMp && emptyMin && emptyRefuse && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -41663,13 +41671,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6}}><Icon name="tag" size={14} style={{color:offresAuto?C.accent:C.muted}}/>Accepter les offres automatiquement</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Rien sous le mini." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
                 style={{flexShrink:0,width:46,height:26,borderRadius:13,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
                 <span style={{position:'absolute',top:3,left:offresAuto?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
               </button>
             </div>
+            {offresAuto && (
+              <div data-offre-refus style={{display:'flex',flexDirection:'column',gap:4,marginTop:2}}>
+                <div style={{fontSize:11.5,color:C.muted,lineHeight:1.4}}>Pose aussi un <b style={{color:C.text,fontWeight:600}}>{'« refuse < »'}</b> sur une annonce : une offre sous ce montant est refusée toute seule. Le message ci-dessous part à l'acheteur quand VRM refuse — <b style={{color:C.text,fontWeight:600}}>ton texte</b>, laissé vide = refus sans message.</div>
+                <textarea data-offre-refus-msg value={refusMsg} onChange={e=>{ setRefusMsg(e.target.value); save('vinted_offre_refus_msg', e.target.value); }}
+                  rows={2} placeholder="Ex. : Merci pour ton offre ! Je ne peux pas descendre aussi bas, mais n'hésite pas à m'en refaire une 🙂"
+                  style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:12.5,background:C.card,color:C.text,outline:'none',resize:'vertical',fontFamily:'inherit',boxSizing:'border-box'}}/>
+              </div>
+            )}
             {offresAuto && extSait('offresauto')!=='ok' && (
               <div data-offres-auto-ext={extSait('offresauto')} style={{fontSize:11.5,color:C.warn,lineHeight:1.4}}>{extSait('offresauto')==='absente'
                 ? "Pour que l'acceptation tourne, ouvre VRM dans le Chrome (ordinateur) où l'extension est installée et connectée."
@@ -42405,6 +42421,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(()=>{ const min = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.')); return (
                       <span style={pillEdit} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place"><span style={lab}>mini</span><EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
                         titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={val}>{min!=null&&isFinite(min)&&min>0?prixCourt(min):'—'}</span>}/></span>); })()}
+                      {(()=>{ const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.')); return (
+                      <span style={pillEdit} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)"><span style={lab}>{'refuse <'}</span><EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
+                        titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={val}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/></span>); })()}
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>

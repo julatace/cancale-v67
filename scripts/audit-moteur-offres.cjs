@@ -42,15 +42,15 @@ function conv({ item, tx, oid, price, user = 500 }) {
   };
 }
 
-// Construit un fond : une liste d'offres, chacune avec son mini sur l'annonce.
-function monter({ offres, actif = true, store = {}, lectureKO, connecte = UID, src } = {}) {
+// Construit un fond : une liste d'offres, chacune avec son mini / refus sur l'annonce.
+function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, connecte = UID, src } = {}) {
   const nums = {};
   const lignes = {};
   for (const o of offres) {
-    nums[String(o.item)] = { num: String(o.item), min: o.min };
+    nums[String(o.item)] = { num: String(o.item), min: o.min, refuse: o.refuse };
     lignes[`harvest_${UID}_conv_${o.oid}`] = conv(o);
   }
-  lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums };
+  lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus };
   return faireFond({
     src, lignes, connecte, store, lectureKO,
     // Le faux Vinted accepte tout ce qu'on lui demande (200) — on mesure ce qui PART.
@@ -59,6 +59,8 @@ function monter({ offres, actif = true, store = {}, lectureKO, connecte = UID, s
 }
 
 const accepts = (j) => j.vinted.filter((v) => v.methode === 'PUT' && /\/offer_requests\/\d+\/accept$/.test(v.chemin)).length;
+const refus = (j) => j.vinted.filter((v) => v.methode === 'PUT' && /\/offer_requests\/\d+\/reject$/.test(v.chemin)).length;
+const messages = (j) => j.vinted.filter((v) => v.methode === 'POST' && /\/conversations\/[^/]+\/replies$/.test(v.chemin)).length;
 
 async function run(opts) {
   const f = monter(opts);
@@ -115,6 +117,19 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
   { const quatre = [0, 1, 2, 3].map((i) => ({ item: 500 + i, tx: 9100 + i, oid: 7100 + i, price: 60, min: 40 }));
     const { f } = await run({ offres: quatre });
     dit(accepts(f.j) === 3, "volume borné : 4 offres éligibles ⇒ 3 acceptées au plus (OFFRES_MAX_PAR_VISITE)", `accepts=${accepts(f.j)}`); }
+
+  // I — offre SOUS le seuil de refus : UN refus part ; pas de message si aucun texte.
+  { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 20, refuse: 30 }] });  // 20 < 30
+    dit(refus(f.j) === 1 && accepts(f.j) === 0, "offre < refuse : UN refus part (PUT …/reject), aucune acceptation", `refus=${refus(f.j)} acc=${accepts(f.j)}`);
+    dit(messages(f.j) === 0, "aucun message configuré ⇒ refus SANS rien écrire à l'acheteur"); }
+
+  // J — offre ENTRE le refuse et le mini : rien (à lui de négocier).
+  { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 35, min: 40, refuse: 30 }] });  // 30 ≤ 35 < 40
+    dit(accepts(f.j) === 0 && refus(f.j) === 0, "offre entre le refuse et le mini : ni accepté ni refusé"); }
+
+  // K — refus AVEC le message du vendeur : le refus ET son message partent.
+  { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 20, refuse: 30 }], msgRefus: 'Merci, trop bas pour moi 🙂' });
+    dit(refus(f.j) === 1 && messages(f.j) === 1, "refus + message du vendeur : le refus ET SON message (POST …/replies) partent", `refus=${refus(f.j)} msg=${messages(f.j)}`); }
 
   console.log(ko
     ? `\n❌ audit-moteur-offres : ${ko} contrôle(s) rouge(s), ${ok} vert(s)`
