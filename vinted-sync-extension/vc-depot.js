@@ -9,7 +9,8 @@
 // dit le CHIFFRE de ce qui est rempli.
 //
 // ⚠️ JE N'AI JAMAIS VU CE FORMULAIRE : rien n'est promis, rien n'est deviné.
-// ⚠️ VRM NE PUBLIE RIEN : il relit, choisit catégorie et modèle, et publie.
+// ⚠️ 5.236 : VRM PUBLIE tout seul, SANS BOOSTER (`publierSansBooster`), quand
+//    tout est rempli ; une catégorie ou un modèle obligatoires restent à lui.
 // ⚠️ AUCUNE CATÉGORIE, AUCUN MODÈLE n'est choisi : une catégorie fausse fait
 //    plus de mal que pas de catégorie du tout (leçon eBay).
 // Ce fichier est une copie d'ebay.js : ses commentaires « eBay » disent pourquoi
@@ -278,6 +279,161 @@
     if (choisirListe([/pointure|taille|\bsize\b/], [ad.taille])) n++;
     return n + composFaits;
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // PUBLIER SANS BOOSTER (27 octobre, 5.236)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « je veux que ça publie tout seul sans booster ». Même garde que
+  // Leboncoin (`lbc.js`, `publierSansBooster`), parce que le risque est le même :
+  // DÉPENSER SON ARGENT. Le formulaire de Vestiaire n'a JAMAIS été vu d'ici :
+  //   · toute option payante (boost, mise en avant, vitrine, sponsorisé…, ou un
+  //     libellé qui porte un PRIX) est décochée, puis relue deux fois ; encore
+  //     active ⇒ rien n'est cliqué ;
+  //   · on ne clique qu'un bouton qui dit publier / mettre en vente / soumettre,
+  //     jamais un bouton à prix, jamais un bouton qui nomme une option, jamais
+  //     « annuler / brouillon / aperçu » ;
+  //   · un champ OBLIGATOIRE resté vide (catégorie, modèle… que VRM ne devine
+  //     pas) ⇒ on attend et on le DIT ; le prix affiché doit être celui de VRM ;
+  //   · un clic par onglet (`sessionStorage`), noté AVANT de cliquer : une page
+  //     rechargée ne republie jamais. Si Vestiaire REFUSE le formulaire (champ en
+  //     erreur, bouton toujours là), le clic est rendu et on réessaie quand le
+  //     champ est rempli — 3 fois au plus.
+  //   · « publiée » n'est noté que sur une CONFIRMATION vue (la page quitte le
+  //     formulaire, ou dit « soumis / en cours de vérification ») — jamais deviné.
+  const PRIX_ARGENT_VC = /€|\beuros?\b|\beur\b|\d[.,]\d{2}\b|booster|boost|payer|paiement|premium|\bpack\b|mise en avant|mettre en avant|sponsoris|vitrine|spotlight|featur|promot/i;
+  const NOM_BOOST_VC = /(boost|promot|featur|spotlight|sponsor|vitrine|mise en avant|mettre en avant|premium|\bpack\b|visibilit|highlight|top.?liste|remont|bump)/i;
+  const NOTRE_UI_VC = (el) => !!(el.closest && el.closest('#vrm-vc-b,#vrm-vc-toast,#vrm-badge,[data-vrm]'));
+  const attendreVc = (ms) => new Promise((r) => setTimeout(r, ms));
+  function libelleDe(el) {
+    try {
+      let t = (el.labels && el.labels[0] && el.labels[0].innerText) || el.getAttribute('aria-label') || '';
+      if (!t) { const l = el.closest('label'); if (l) t = l.innerText || ''; }
+      if (!t) { const lb = el.getAttribute('aria-labelledby'); if (lb) t = lb.split(/\s+/).map((id) => { const e = document.getElementById(id); return e ? e.innerText : ''; }).join(' '); }
+      if (!t && el.parentElement) t = el.parentElement.innerText || '';
+      return String(t || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    } catch (_) { return ''; }
+  }
+  function optionsPayantes() {
+    const tous = Array.from(document.querySelectorAll('input[type="checkbox"],input[type="radio"],[role="checkbox"],[role="switch"],[role="radio"],[aria-pressed]')).filter((cb) => {
+      if (DANS_ENTETE(cb) || NOTRE_UI_VC(cb)) return false;
+      const nom = ((cb.name || cb.getAttribute('name') || '') + ' ' + (cb.id || '') + ' ' + (cb.getAttribute('aria-label') || '')).toLowerCase();
+      const lib = libelleDe(cb);
+      if (NOM_BOOST_VC.test(nom) || NOM_BOOST_VC.test(lib)) return true;
+      // Un choix qui porte un PRIX est payant — sauf « 0 € / gratuit », et sauf
+      // un mode de LIVRAISON (on n'y touche jamais : il peut porter un prix).
+      if (/livr|exp[ée]di|shipping|delivery|colis/i.test(nom + ' ' + lib)) return false;
+      return /€|\beuros?\b/i.test(lib) && !/\b0(?:[.,]00)?\s*€|gratuit|free/i.test(lib);
+    });
+    return tous.filter((cb) => !(cb.tagName === 'INPUT' && tous.some((o) => o !== cb && o.tagName !== 'INPUT' && o.contains(cb))));
+  }
+  const estCoche = (cb) => {
+    if (cb.tagName === 'INPUT') return !!cb.checked || cb.getAttribute('aria-checked') === 'true';
+    if (cb.getAttribute('aria-checked') === 'true' || cb.getAttribute('aria-pressed') === 'true') return true;
+    const inp = cb.querySelector && cb.querySelector('input[type="checkbox"],input[type="radio"]');
+    return !!(inp && inp.checked);
+  };
+  // Les champs obligatoires restés vides : VRM ne les devine pas, il les NOMME.
+  function obligatoiresVides() {
+    const out = [];
+    document.querySelectorAll('input,select,textarea,[role="combobox"]').forEach((el) => {
+      try {
+        if (DANS_ENTETE(el) || NOTRE_UI_VC(el) || el.type === 'hidden' || el.disabled) return;
+        const req = el.required || el.getAttribute('aria-required') === 'true';
+        if (!req) return;
+        if (el.type === 'file') return;   // les photos ont leur propre suivi
+        if (el.type === 'checkbox' || el.type === 'radio') return;
+        const v = String(el.value || el.getAttribute('data-choisi') || (el.getAttribute('role') === 'combobox' ? (el.getAttribute('aria-valuetext') || '') : '') || '').trim();
+        if (!v) out.push((libelleDe(el) || el.name || el.id || 'un champ').slice(0, 40));
+      } catch (_) {}
+    });
+    return out;
+  }
+  const enErreur = () => Array.from(document.querySelectorAll('[aria-invalid="true"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI_VC(el)).map((el) => (libelleDe(el) || el.name || '').slice(0, 40));
+  // Le prix AFFICHÉ doit être celui de VRM (un champ prérempli ailleurs part tel quel sinon).
+  function prixRefusVc(ad) {
+    const el = champ([/prix|price|montant/]);
+    if (!el) return 'je ne vois pas le champ du prix — rien n\'est publié';
+    const lu = Number(String(el.value || '').replace(/\s/g, '').replace(',', '.').replace(/[^\d.]/g, ''));
+    const voulu = Number(String(ad.price || '').replace(',', '.'));
+    if (!isFinite(voulu) || voulu <= 0) return 'le prix de VRM est illisible — rien n\'est publié';
+    if (!isFinite(lu) || Math.abs(lu - voulu) > 0.005) return `le prix sur la page (${esc(el.value)}) n'est pas celui de VRM (${voulu} €) — rien n'est publié`;
+    return '';
+  }
+  const PAGE_CONFIRMEE = /merci|f[ée]licitations|a bien [ée]t[ée]|soumis|en cours de (v[ée]rification|validation|mod[ée]ration)|submitted|under review|bient[ôo]t en ligne/i;
+  let publication = { etat: '', raison: '', essais: 0, bouton: '', urlClic: '' };
+  async function publierSansBooster(ad) {
+    if (!ad || ad.publier !== true) return { ok: false, raison: '' };
+    const cle = 'vrmVcPublieClique:' + String(ad.id);
+    let deja = true;
+    try { deja = !!sessionStorage.getItem(cle); } catch (_) { deja = true; }
+    if (deja) return { ok: false, raison: 'j\'ai déjà cliqué « Publier » pour cette paire dans cet onglet — je ne reclique jamais (une seconde publication est pire)' };
+    const vides = obligatoiresVides();
+    if (vides.length) return { ok: false, attente: true, raison: 'il reste à choisir : ' + vides.slice(0, 3).join(', ') + ' — VRM ne le devine pas, choisis-le et je publie' };
+    const pk = prixRefusVc(ad); if (pk) return { ok: false, raison: pk };
+    for (const cb of optionsPayantes()) {
+      if (!estCoche(cb)) continue;
+      if (cb.getAttribute('role') === 'radio' || cb.type === 'radio') continue;   // un radio ne se décoche pas
+      try { cb.click(); } catch (_) {}
+      await attendreVc(120);
+    }
+    await attendreVc(450);
+    if (optionsPayantes().some(estCoche)) return { ok: false, raison: 'une option payante est encore active — rien n\'est publié : publie toi-même, sans booster' };
+    await attendreVc(300);
+    const opts = optionsPayantes();
+    if (opts.some(estCoche)) return { ok: false, raison: 'une option payante est encore active — rien n\'est publié : publie toi-même, sans booster' };
+    const PUBLIER = /publier|mettre en vente|mettre en ligne|soumettre|envoyer (?:mon|l['’])\s*article|publish|submit|list (?:my )?item/i;
+    const NEG = /annuler|retour|pr[ée]c[ée]dent|revenir|\bback\b|supprim|brouillon|draft|plus tard|aper[çc]u|pr[ée]visualis|ajouter|s[ée]lectionner|choisir|enregistrer/i;
+    const lib = (b) => (((b.innerText || b.value || '') + ' ' + (b.getAttribute('aria-label') || '')) || '').replace(/\s+/g, ' ').trim();
+    const actif = (b) => !b.disabled && b.getAttribute('aria-disabled') !== 'true' && !!lib(b);
+    // Le bouton est-il celui d'une OPTION (dans sa carte) ? Le plus petit bloc qui
+    // le contient et contient une option payante — mais pas le FORMULAIRE entier
+    // (un bloc qui porte la description, le prix ou les photos n'est pas une carte).
+    const dansCarte = (b) => { let el = b.parentElement; for (let i = 0; el && i < 6; i++, el = el.parentElement) { const n = opts.filter((o) => el.contains(o)).length; if (n > 1) return false; if (n === 1) return !el.querySelector('textarea,input[type="file"]') && !el.matches('form'); } return false; };
+    const sur = (b) => actif(b) && !PRIX_ARGENT_VC.test(lib(b)) && !NOM_BOOST_VC.test(lib(b)) && !NEG.test(lib(b)) && !dansCarte(b);
+    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((el) => !DANS_ENTETE(el) && !NOTRE_UI_VC(el));
+    const b = btns.find((x) => sur(x) && PUBLIER.test(lib(x)));
+    if (!b) return { ok: false, attente: true, raison: 'je ne vois pas encore de bouton de publication gratuite — rien n\'est cliqué' };
+    if (optionsPayantes().some(estCoche)) return { ok: false, raison: 'une option payante s\'est activée — rien n\'est publié' };
+    publication.urlClic = location.href; publication.bouton = lib(b).slice(0, 40);
+    try { sessionStorage.setItem(cle, JSON.stringify({ at: Date.now(), url: publication.urlClic, bouton: publication.bouton })); } catch (_) { return { ok: false, raison: 'je ne peux pas retenir le clic dans cet onglet — rien n\'est publié' }; }
+    try { b.click(); } catch (_) {}
+    return { ok: true, bouton: publication.bouton, cle };
+  }
+  // Après le clic : confirmation vue ⇒ notée « publiée » ; formulaire refusé
+  // (un champ en erreur, le même bouton toujours là) ⇒ le clic est rendu.
+  async function suivreApresClic(ad, cle) {
+    for (let i = 0; i < 60; i++) {
+      await attendreVc(500);
+      const texte = String((document.body && document.body.innerText) || '').slice(0, 20000);
+      const quitte = location.href !== publication.urlClic && !formulaireVisible();
+      if (quitte || (PAGE_CONFIRMEE.test(texte) && !formulaireVisible())) {
+        publication.etat = 'publiee'; publication.raison = '';
+        const r = await send({ action: 'publiee', url: location.href });
+        if (!(r && r.ok)) publication.raison = 'publiée, mais VRM n\'a pas pu la noter — clique « Déjà publiée » dans VRM';
+        return;
+      }
+      const err = enErreur();
+      if (i >= 3 && err.length && formulaireVisible()) {
+        try { sessionStorage.removeItem(cle); } catch (_) {}
+        publication.etat = 'refusee'; publication.raison = 'Vestiaire demande encore : ' + err.slice(0, 3).join(', ') + ' — complète et je republie';
+        return;
+      }
+    }
+    publication.etat = 'pas-su'; publication.raison = 'j\'ai cliqué « ' + publication.bouton + ' » mais je n\'ai vu aucune confirmation — vérifie dans tes articles, je ne reclique pas';
+  }
+  let _pubEnCours = false;
+  async function tenterPublication(ad) {
+    if (_pubEnCours || !ad || ad.publier !== true) return;
+    if (publication.etat === 'publiee' || publication.etat === 'clic' || publication.etat === 'pas-su' || publication.etat === 'stop') return;
+    // Les photos d'abord : sans elles Vestiaire refuse (ou publie sans).
+    if (!(photosEtat && photosEtat.n > 0)) { publication.raison = 'j\'attends que les photos soient attachées avant de publier'; return; }
+    if (publication.essais >= 3) { publication.etat = 'stop'; publication.raison = 'Vestiaire a refusé 3 fois — publie toi-même, sans booster'; return; }
+    _pubEnCours = true;
+    try {
+      const r = await publierSansBooster(ad);
+      if (r.ok) { publication.essais++; publication.etat = 'clic'; publication.raison = ''; bandeau(faits, ad); await suivreApresClic(ad, r.cle); }
+      else { publication.raison = r.raison || ''; if (!r.attente && r.raison) publication.etat = 'stop'; }
+    } finally { _pubEnCours = false; bandeau(faits, ad); }
+  }
   function bandeau(n, ad) {
     let el = document.getElementById('vrm-vc-b');
     if (!el) {
@@ -300,18 +456,23 @@
     const fini = arrete
       ? `<div style="color:#F5A524;margin-top:6px">Je ne remplis plus tout seul (c'est fini après 10 min). Le dépôt se fait peut-être en plusieurs étapes : à chaque nouvelle étape, clique <b>Re-remplir</b>.</div>`
       : '';
+    const pub = ad.publier !== true ? ''
+      : publication.etat === 'publiee' ? `<div data-vc-pub="publiee" style="margin-top:6px"><b>✓ Publiée sans booster.</b> ${publication.raison ? esc(publication.raison) : 'VRM l\'a notée publiée.'}</div>`
+      : publication.etat === 'clic' ? `<div data-vc-pub="clic" style="margin-top:6px">J'ai cliqué « ${esc(publication.bouton)} » (sans booster) — j'attends la confirmation de Vestiaire…</div>`
+      : publication.raison ? `<div data-vc-pub="${esc(publication.etat || 'attente')}" style="color:#F5A524;margin-top:6px">${esc(publication.raison)}</div>`
+      : `<div data-vc-pub="attente" style="margin-top:6px">Je publie tout seul, sans booster, dès que tout est rempli.</div>`;
     poserHtml(el, (n > 0
-      ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos} Relis tout, choisis la catégorie et le modèle, puis publie.`
+      ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos}${ad.publier === true ? '' : ' Relis tout, choisis la catégorie et le modèle, puis publie.'}`
       : (formulaireVisible()
         ? `<b>N°${esc(ad.numero)}</b> — je n'ai reconnu aucun champ sur cette page. ${photos} Copie la description ci-dessous et colle-la.`
         : `<b>N°${esc(ad.numero)}</b> — clique <b>« Vendre un article »</b> sur Vestiaire : je remplis dès que le formulaire s'affiche.`))
-      + fini
+      + pub + fini
       + `<div style="display:flex;gap:6px;margin-top:9px">
            <button id="vrm-vc-refill" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Re-remplir</button>
            <button id="vrm-vc-cdesc" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Copier la description</button>
            <button id="vrm-vc-close" title="Fermer" style="border:1px solid #1E2530;background:transparent;color:#8A93A3;border-radius:9px;padding:7px 9px;font:11.5px system-ui,sans-serif;cursor:pointer">✕</button>
          </div>
-         <div style="color:#8A93A3;font-size:10px;margin-top:7px">VRM ne publie jamais à ta place sur Vestiaire : relis et clique toi-même. Une fois publiée, note-la « Déjà publiée » dans VRM.</div>`);
+         <div style="color:#8A93A3;font-size:10px;margin-top:7px">${ad.publier === true ? 'VRM ne coche jamais d\'option payante (boost, mise en avant) et ne clique jamais un bouton qui porte un prix. La catégorie et le modèle, VRM ne les devine pas.' : 'VRM ne publie pas à ta place ici : relis et clique toi-même. Une fois publiée, note-la « Déjà publiée » dans VRM.'}</div>`);
     el.querySelector('#vrm-vc-refill').onclick = () => { relancer(ad); };
     el.querySelector('#vrm-vc-cdesc').onclick = () => { copyDire(ad.description || '', 'Description'); };
     el.querySelector('#vrm-vc-close').onclick = () => { clearInterval(minuteur); el.remove(); send({ action: 'fini' }); };
@@ -335,13 +496,14 @@
         photosFaites = true;
         attacherPhotos(ad).then((r2) => { photosEtat = r2; bandeau(faits, ad); });
       }
-      if (formulaireVisible()) rapporterEtape();
+      if (formulaireVisible()) { rapporterEtape(); if (essais % 2 === 0) tenterPublication(ad); }
       if (essais > 600) { clearInterval(minuteur); arrete = true; bandeau(faits, ad); }
     }, 1000);
   }
   function relancer(ad) {
     arrete = false; essais = 0;
     _composFaits = new Set(); composFaits = 0;   // « Re-remplir » rouvre les menus
+    if (publication.etat === 'stop' || publication.etat === 'refusee') publication = { etat: '', raison: '', essais: 0, bouton: '', urlClic: '' };
     faits = remplir(ad);
     if (!photosFaites && champsFichier().length) {
       photosFaites = true;
@@ -357,6 +519,13 @@
     if (!ad) return;
     bandeau(0, ad);
     surveiller(ad);
+    // Un clic « Publier » déjà fait dans cet onglet (la page a rechargé après) :
+    // on ne reclique pas, on regarde si la confirmation est là.
+    if (ad.publier === true && publication.etat === '') {
+      let note = null; const cle = 'vrmVcPublieClique:' + String(ad.id);
+      try { note = JSON.parse(sessionStorage.getItem(cle) || 'null'); } catch (_) { note = null; }
+      if (note && note.url) { publication.etat = 'clic'; publication.urlClic = note.url; publication.bouton = String(note.bouton || '').slice(0, 40); bandeau(0, ad); suivreApresClic(ad, cle).then(() => bandeau(faits, ad)); }
+    }
   }
   // La STRUCTURE du formulaire me revient — noms de champs, libellés d'options,
   // présence d'un champ fichier ; AUCUN contenu saisi. C'est ce qui permettra de

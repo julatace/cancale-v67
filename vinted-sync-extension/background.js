@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.235.0';
+const CODE_VERSION = '5.236.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2555,6 +2555,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const ph = await photosPourVestiaire(urls, 12);
             sendResponse({ ok: true, photos: ph }); return;
           }
+          // 5.236 : l'identifiant de l'annonce que Vestiaire vient de CRÉER, dans
+          // l'onglet du dépôt seulement : il relie l'annonce à la paire (§5).
+          if (msg.action === 'vcPublie') {
+            const pid = String(msg.productId || '');
+            if (!/^[\w-]{1,40}$/.test(pid)) { sendResponse({ ok: false }); return; }
+            await chrome.storage.local.set({ vrmPendingVc: { ...p, productId: pid } });
+            const ok = await rangerVcAnnonces({ liens: { [pid]: String(p.ad.numero || '') } });
+            sendResponse({ ok: ok === true }); return;
+          }
+          // 5.236 : la CONFIRMATION vue par vc-depot.js après son clic « Publier »
+          // (sans booster). Seulement là : la paire est notée publiée.
+          if (msg.action === 'publiee') {
+            const note = (await markVcPosted(p.ad.id, true)) === true;
+            if (!note) { sendResponse({ ok: false, error: 'lecture' }); return; }
+            const g2 = await chrome.storage.local.get('vrmPendingVc');
+            const pid = g2 && g2.vrmPendingVc && g2.vrmPendingVc.productId;
+            if (pid) await rangerVcAnnonces({ liens: { [pid]: String(p.ad.numero || '') } });
+            await chrome.storage.local.set({ vrmPendingVc: null });
+            await majCmd('vc:' + p.ad.id, { etape: 'fait', tabId: null, raison: null });
+            notifierApp({ type: 'maj', quoi: 'vestiaire' });
+            sendResponse({ ok: true }); return;
+          }
           if (msg.action === 'fini') { await chrome.storage.local.set({ vrmPendingVc: null }); await majCmd('vc:' + p.ad.id, { etape: 'abandonne', raison: 'ferme', tabId: null }); sendResponse({ ok: true }); return; }
           if (msg.action === 'vcForm' && Array.isArray(msg.fields)) {
             const prev = await sbGet('app_data?id=eq.panel_vc_form&select=data');
@@ -2576,6 +2598,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // ── VESTIAIRE COLLECTIVE : LA MESURE DU SITE (5.154) ─────────────────────
     // Des chemins, des noms de champs, des types — jamais une valeur (voir
     // vc-inject.js). On n'accepte que d'un onglet vestiairecollective.com.
+    // 5.236 : tes annonces Vestiaire et leur boost (vc-inject.js, la réponse
+    // `users/me/product-listings` que la page charge déjà — aucune requête de plus).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAnnonces') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcAnnonces({ items: msg.items, offset: msg.offset, total: msg.total, lus: msg.lus });
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcRecon') {
       (async () => {
         try {
@@ -11283,6 +11318,9 @@ async function publierVestiaire(msg) {
     if (!r.ad) return { accepte: false, code: r.code || 'absente', raison: r.raison || 'annonce introuvable' };
     let tab = null;
     try { tab = await chrome.tabs.create({ url: VC_PAGE_VENDRE, active: true }); } catch (_) { tab = null; }
+    // 5.236 : Julien veut que ça PUBLIE tout seul, sans booster (vc-depot.js,
+    // `publierSansBooster`). Une app d'avant (sans `publier`) le veut aussi.
+    r.ad.publier = msg.publier !== false;
     await chrome.storage.local.set({ vrmPendingVc: { ad: r.ad, at: Date.now(), tabId: tab && tab.id != null ? tab.id : null } });
     await majCmd(cleJob, { etape: 'depot', id, numero: r.ad.numero || '', tabId: tab && tab.id != null ? tab.id : null, raison: null });
     return { accepte: true, jobId: cleJob, etape: 'depot' };
@@ -11293,6 +11331,49 @@ async function publierVestiaire(msg) {
 //    « Vendre un article » ; vc-depot.js attend le formulaire quel que soit
 //    son chemin, seulement dans CET onglet.
 const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/sell-clothes-online/';
+
+// ── VESTIAIRE : TES ANNONCES ET LEUR BOOST (5.236) ─────────────────────────
+// `vc_listings` = { items: { [id Vestiaire]: { boost: true|false|null, cles, ref,
+// vuAt } }, liens: { [id Vestiaire]: N° }, capturedAt, complet, total }.
+// Lire-fusionner-réécrire, UNE écriture à la fois ; lecture ratée ⇒ rien n'est
+// écrit (« rien lu » ne vaut pas « rien »). Une liste lue EN ENTIER (page 0,
+// autant d'annonces que le total annoncé) remplace les annonces ; une page
+// partielle ne fait que compléter. `boost: null` = la réponse n'a aucune clé
+// qui dise le boost : « pas su », jamais « non boostée ».
+let _vcAnnoncesChaine = Promise.resolve();
+function rangerVcAnnonces(patch) {
+  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(patch)).catch(() => false);
+  _vcAnnoncesChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function rangerVcAnnoncesMaintenant(patch) {
+  const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
+  if (rows === null) return false;
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const maintenant = new Date().toISOString();
+  const data = { items: Object.assign({}, cur.items || {}), liens: Object.assign({}, cur.liens || {}), capturedAt: cur.capturedAt || null, complet: !!cur.complet, total: cur.total == null ? null : cur.total };
+  let change = false;
+  if (patch.liens) for (const [k, v] of Object.entries(patch.liens)) {
+    if (!/^[\w-]{1,40}$/.test(k) || !v) continue;
+    if (data.liens[k] !== String(v)) { data.liens[k] = String(v); change = true; }
+  }
+  if (Array.isArray(patch.items)) {
+    const lus = {};
+    for (const x of patch.items.slice(0, 200)) {
+      const id = String((x && x.id) || '');
+      if (!/^[\w-]{1,40}$/.test(id)) continue;
+      lus[id] = { boost: x.boost === true || x.boost === false ? x.boost : null, cles: (x.cles || []).slice(0, 6).map(String), ref: String(x.ref || '').slice(0, 12), vuAt: maintenant };
+    }
+    const offset = Number(patch.offset) || 0; const total = typeof patch.total === 'number' ? patch.total : null;
+    const entier = offset === 0 && total != null && Object.keys(lus).length >= total && Number(patch.lus || 0) >= total;
+    data.items = entier ? lus : Object.assign(data.items, lus);
+    data.complet = entier; data.total = total; data.capturedAt = maintenant; change = true;
+  }
+  if (!change) return true;
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
+  if (ok === true && Array.isArray(patch.items)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
 
 async function buildLbcData() {
   const main = (await lireMain(MAIN_FILE)) || {};
