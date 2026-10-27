@@ -41,6 +41,9 @@ let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panne
 // Essai gratuit : les comptes Vinted du vendeur, les « clés » déjà consommées,
 // ce qui est écrit dans le registre, et une panne de lecture du registre.
 let vintedIds, essaiConsomme, essaisEcrits, panneEssais;
+// « 1 compte Vinted = 1 compte VRM » (mode vinted-pris) : qui possède quel
+// compte Vinted (vinted_user_id → [owners]), et une panne de lecture.
+let vintedParId, panneVintedPris;
 // Le prix rangé chez Stripe sous `vrm_mensuel`, tel que Stripe le rend (centimes
 // entiers). Par défaut : celui des CGV (12,99 € par mois).
 const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1499, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
@@ -49,6 +52,7 @@ const reset = () => {
   subsStripe = {}; facturesStripe = []; panneFactures = false;
   obligatoire = false; panneRpc = false; appData = {}; lecturesSubs = []; ecrituresData = []; mains = [];
   vintedIds = []; essaiConsomme = []; essaisEcrits = []; panneEssais = false;
+  vintedParId = {}; panneVintedPris = false;
   if (oublierAcces) oublierAcces();
 };
 let oublierAcces = null;
@@ -146,7 +150,14 @@ global.fetch = async (url, opts = {}) => {
     return rep({ error: { message: 'inconnu' } }, 404);
   }
   // Les comptes Vinted du vendeur (clé de service), et le registre des essais.
-  if (u.includes('/rest/v1/vinted_accounts')) return rep(vintedIds.map((v) => ({ vinted_user_id: v })));
+  if (u.includes('/rest/v1/vinted_accounts')) {
+    const vid = /vinted_user_id=eq\.([^&]+)/.exec(u);
+    if (vid && /select=owner/.test(u)) {                 // mode vinted-pris (clé de service)
+      if (panneVintedPris) return rep('<html>522</html>', 522);
+      return rep((vintedParId[decodeURIComponent(vid[1])] || []).map((o) => ({ owner: o })));
+    }
+    return rep(vintedIds.map((v) => ({ vinted_user_id: v })));   // lireVintedIds (owner=eq.)
+  }
   if (u.includes('/rest/v1/essais_gratuits')) {
     if (m === 'POST') { try { for (const l of JSON.parse(opts.body)) essaisEcrits.push(l); } catch (_) {} return rep('', 201); }
     if (panneEssais) return rep('<html>522</html>', 522);
@@ -158,9 +169,9 @@ global.fetch = async (url, opts = {}) => {
 
 const faireRes = () => { const r = { code: null, corps: null, entetes: {} }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = (k, v) => { r.entetes[k] = v; }; r.end = () => r; return r; };
 // Une requête comme Vercel la donne : un flux qu'on peut lire, plus query/headers.
-const req = ({ method = 'GET', mode, headers = {}, corps = null }) => {
+const req = ({ method = 'GET', mode, headers = {}, corps = null, query = {} }) => {
   const buf = corps == null ? null : Buffer.from(corps, 'utf8');
-  return { method, query: mode ? { mode } : {}, headers, async *[Symbol.asyncIterator]() { if (buf) yield buf; } };
+  return { method, query: { ...(mode ? { mode } : {}), ...query }, headers, async *[Symbol.asyncIterator]() { if (buf) yield buf; } };
 };
 const signer = (corps, t = Math.floor(Date.now() / 1000), secret = SECRET) => `t=${t},v1=${crypto.createHmac('sha256', secret).update(`${t}.${corps}`).digest('hex')}`;
 const evenement = (type, objet, created = 1000) => JSON.stringify({ id: 'evt_' + created, type, created, livemode: false, data: { object: objet } });
@@ -365,6 +376,39 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     reset(); vintedIds = ['V1']; panneEssais = true;
     const { r, corps } = await checkoutDeA();
     dit(r.code === 200 && !/trial_period_days/.test(corps), 'lecture du registre impossible ⇒ pas d’essai, mais le paiement s’ouvre quand même');
+  });
+  console.log('\n── 1 compte Vinted = 1 compte VRM (mode vinted-pris)');
+  const estPris = async (jwt, id) => { const r = faireRes(); await compte(req({ mode: 'vinted-pris', query: { id }, headers: jwt ? { authorization: 'Bearer ' + jwt } : {} }), r); return r; };
+  await essaie('sans session ⇒ 401', async () => {
+    reset(); vintedParId = { '42': [B] };
+    const r = await estPris(null, '42');
+    dit(r.code === 401, 'aucun jeton ⇒ 401, rien n’est révélé', String(r.code));
+  });
+  await essaie('id non numérique ⇒ 400 (jamais passé à la base)', async () => {
+    reset();
+    const r = await estPris('aa.bb.A', 'abc; drop');
+    dit(r.code === 400 && r.corps && r.corps.raison === 'id', 'un id qui n’est pas un nombre est refusé net', JSON.stringify(r.corps));
+  });
+  await essaie('déjà pris par un AUTRE compte VRM ⇒ pris:true, sans dire QUI', async () => {
+    reset(); vintedParId = { '42': [B] };
+    const r = await estPris('aa.bb.A', '42');
+    dit(r.code === 200 && r.corps.pris === true, 'A voit que le compte Vinted 42 (à B) est déjà réservé', JSON.stringify(r.corps));
+    dit(r.corps && !('owner' in r.corps) && !JSON.stringify(r.corps).includes(B), '… et la réponse ne révèle AUCUN propriétaire (juste oui/non)', JSON.stringify(r.corps));
+  });
+  await essaie('à MOI ⇒ pris:false', async () => {
+    reset(); vintedParId = { '42': [A] };
+    const r = await estPris('aa.bb.A', '42');
+    dit(r.code === 200 && r.corps.pris === false, 'un compte déjà à moi n’est pas « pris ailleurs »', JSON.stringify(r.corps));
+  });
+  await essaie('libre ⇒ pris:false', async () => {
+    reset();
+    const r = await estPris('aa.bb.A', '77');
+    dit(r.code === 200 && r.corps.pris === false, 'un compte que personne n’a ⇒ libre', JSON.stringify(r.corps));
+  });
+  await essaie('lecture ratée ⇒ pris:false (jamais de fausse alerte)', async () => {
+    reset(); vintedParId = { '42': [B] }; panneVintedPris = true;
+    const r = await estPris('aa.bb.A', '42');
+    dit(r.code === 200 && r.corps.pris === false, 'la base ne répond pas ⇒ on n’invente pas d’alerte (la base bloque la capture de toute façon)', JSON.stringify(r.corps));
   });
   await essaie('carte : prix relayé seulement s’il est celui des CGV', async () => {
     reset(); prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };

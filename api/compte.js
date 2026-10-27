@@ -330,6 +330,29 @@ async function enregistrerEssai(owner, email, ids, subId) {
   } catch (_) { return false; }
 }
 
+// ── 1 compte Vinted = 1 compte VRM (index unique global sur vinted_user_id).
+// L'app demande, pour le compte Vinted ouvert dans le Chrome du vendeur : est-il
+// DÉJÀ pris par un AUTRE compte VRM ? Réponse = un simple oui/non, JAMAIS qui le
+// possède (aucun e-mail, aucun identifiant de propriétaire ne sort). Session
+// obligatoire. « Pas su » (pas de clé de service, lecture ratée) ⇒ `pris:false` :
+// on n'invente pas de fausse alerte — la base bloque de toute façon la capture
+// en double, c'est seulement le message qui manquerait.
+async function vintedPris(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  const id = String((req.query && req.query.id) || '').trim();
+  if (!/^[0-9]{1,20}$/.test(id)) return repondre(res, 400, { ok: false, raison: 'id' });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return repondre(res, 200, { ok: true, pris: false });
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
+    if (!r.ok) return repondre(res, 200, { ok: true, pris: false });
+    const j = await r.json();
+    const pris = Array.isArray(j) && j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
+    return repondre(res, 200, { ok: true, pris });
+  } catch (_) { return repondre(res, 200, { ok: true, pris: false }); }
+}
+
 const ligneDeLAbonnement = (sub, livemode) => ({
   statut: String(sub.status || 'incomplete'),
   client_stripe: typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || null,
@@ -1101,6 +1124,7 @@ export default async function handler(req, res) {
   }
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
+  if (mode === 'vinted-pris') return m === 'GET' ? vintedPris(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'webhook') return m === 'POST' ? webhook(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'checkout') return m === 'POST' ? checkout(req, res) : repondre(res, 405, { erreur: 'POST seulement' });

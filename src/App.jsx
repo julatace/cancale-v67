@@ -27885,6 +27885,32 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     window.addEventListener('vrm:ext', f);
     return () => { mort = true; clearTimeout(t); window.removeEventListener('vrm:ext', f); };
   }, []);
+  // ⚠️ 1 compte Vinted = 1 compte VRM (verrou en base, index unique global).
+  // Si le compte Vinted ouvert dans TON Chrome n'est pas dans tes comptes liés
+  // ET appartient déjà à un AUTRE compte VRM, VRM ne captera rien pour lui :
+  // on le DIT clairement (sinon l'écran reste vide, sans explication). Le
+  // serveur ne répond qu'un oui/non — jamais QUI le possède. « Pas su » (pas de
+  // clé de service, lecture ratée, compte à soi, compte libre) ⇒ pas d'alerte.
+  const [vintedPris, setVintedPris] = useState(false);
+  const prisRef = React.useRef('');
+  useEffect(() => {
+    let mort = false;
+    const verifier = () => {
+      const v = vintedDeChrome();
+      const uid = v && v.uid ? String(v.uid) : '';
+      if (!uid || accounts.some(a => String(a.vinted_user_id) === uid)) { prisRef.current = ''; setVintedPris(false); return; }
+      if (prisRef.current === uid) return; // déjà vérifié ce compte
+      prisRef.current = uid;
+      fetch(`/api/compte?mode=vinted-pris&id=${encodeURIComponent(uid)}`, { headers: enTeteSession() })
+        .then(r => (r.ok ? r.json() : null))
+        .then(j => { if (!mort) setVintedPris(j && j.pris ? { login: (v.login || ''), uid } : false); })
+        .catch(() => { if (!mort) setVintedPris(false); });
+    };
+    verifier();
+    const f = () => verifier();
+    window.addEventListener('vrm:ext', f);
+    return () => { mort = true; window.removeEventListener('vrm:ext', f); };
+  }, [accounts]);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
     const ev = etatExt && etatExt[uid];
@@ -28142,6 +28168,16 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
+      {vintedPris && (
+        <div data-vinted-pris={vintedPris.uid} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
+            Ce compte Vinted est déjà rattaché à un autre compte VRM
+          </div>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>
+            Le compte {vintedPris.login ? <b style={{color:C.text}}>{vintedPris.login}</b> : 'Vinted'} ouvert dans ton navigateur appartient déjà à un autre compte VRM. Un compte Vinted ne peut servir que sur <b style={{color:C.text}}>un seul</b> compte VRM : VRM ne captera donc rien pour lui ici. Pour l'utiliser, connecte-toi sur Vinted avec un autre compte, ou ouvre VRM avec le compte qui le possède déjà.
+          </div>
+        </div>
+      )}
       {nbExclus > 0 && (
         <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
