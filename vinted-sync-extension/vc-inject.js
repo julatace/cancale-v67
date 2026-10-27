@@ -205,6 +205,89 @@
     } catch (_) {}
   }
 
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TES VENTES (27 octobre, 5.237)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien : « fais pareil pour capter les ventes Vestiaire ». Même méthode que
+  // le boost : on lit ce que la page charge DÉJÀ (aucune requête de plus, §3),
+  // sur deux familles de réponses seulement :
+  //   · `users/me/awaiting-shipping-items` (vue chez lui, vide le 26 oct.) :
+  //     les ventes À EXPÉDIER ;
+  //   · une liste de VENTES du vendeur (`users/me/…sales|sold|transactions`,
+  //     `/sales`) — jamais vue d'ici : reconnue à son chemin.
+  //   Jamais le panier ni les achats (`orders/current…`, `cart`, `basket`).
+  // De chaque vente, des SCALAIRES seulement : son identifiant, celui de
+  // l'article, la référence `VRM-{n°}` (la seule chose lue dans un texte), un
+  // état (un mot court sous status/state), une date, un montant AVEC le nom de
+  // sa clé (on ne sait pas encore si c'est le prix ou ce qui t'est versé).
+  // ⚠️ JAMAIS le nom, l'adresse, l'email ni le message de l'acheteur.
+  const CLE_ETAT = /^(status|state|orderStatus|order_status|shippingStatus|shipping_status|step|statusLabel|transactionStatus)$/i;
+  const CLE_DATE = /date|created|sold|paid|ordered|At$/i;
+  const CLE_MONTANT = /^(price|amount|total|sellerPrice|seller_price|earning|earnings|payout|netAmount|net_amount|sellingPrice|selling_price)$/i;
+  const PAS_ACHETEUR = /buyer|customer|address|recipient|shipping_?address|email|phone|message|user|member/i;
+  function scalairesVente(e) {
+    const out = { etat: '', date: '', montant: null };
+    const visite = (x, prof, chemin) => {
+      if (!x || typeof x !== 'object' || prof > 2) return;
+      for (const k of Object.keys(x).slice(0, 80)) {
+        const v = x[k];
+        if (PAS_ACHETEUR.test(k)) continue;
+        if (!out.etat && CLE_ETAT.test(k) && (typeof v === 'string' || typeof v === 'number')) { const t = String(v); if (/^[\w .:-]{1,40}$/.test(t)) out.etat = t; }
+        if (!out.date && CLE_DATE.test(k) && typeof v === 'string' && isFinite(Date.parse(v)) && /\d{4}-\d{2}-\d{2}/.test(v)) out.date = v.slice(0, 30);
+        if (!out.montant && CLE_MONTANT.test(k)) {
+          if (typeof v === 'number') out.montant = { valeur: v, devise: '', cle: chemin + k };
+          else if (v && typeof v === 'object') {
+            const n = typeof v.amount === 'number' ? v.amount : (typeof v.value === 'number' ? v.value : (typeof v.cents === 'number' ? v.cents / 100 : (typeof v.amount === 'string' && /^\d+([.,]\d+)?$/.test(v.amount) ? Number(v.amount.replace(',', '.')) : null)));
+            const d = typeof v.currency === 'string' ? v.currency : (typeof v.currencyCode === 'string' ? v.currencyCode : '');
+            if (n != null && isFinite(n)) out.montant = { valeur: n, devise: /^[A-Z]{3}$/.test(d) ? d : '', cle: chemin + k + (typeof v.cents === 'number' ? '.cents' : '') };
+          }
+        }
+        if (v && typeof v === 'object' && !Array.isArray(v)) visite(v, prof + 1, chemin + k + '.');
+      }
+    };
+    visite(e, 0, '');
+    return out;
+  }
+  function refVente(e) {
+    // La référence se lit sur l'ARTICLE (sa description), jamais dans un champ
+    // de l'acheteur ou un message.
+    let ref = '';
+    const visite = (x, prof) => {
+      if (ref || !x || prof > 3) return;
+      if (typeof x === 'string') { const m = x.match(RE_REF); if (m) ref = m[1].toUpperCase(); return; }
+      if (typeof x !== 'object') return;
+      for (const k of Object.keys(x).slice(0, 80)) { if (PAS_ACHETEUR.test(k)) continue; visite(x[k], prof + 1); }
+    };
+    visite(e, 0);
+    return ref;
+  }
+  function noteVentes(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url)) return;
+      const ch = u.pathname;
+      if (/current|cart|basket|purchase|bought|achat/i.test(ch)) return;
+      const source = /\/users\/me\/awaiting-shipping-items\/?$/i.test(ch) ? 'a-expedier'
+        : (/\/users\/me\/[\w-]*(sales|sold|transactions)[\w-]*\/?$/i.test(ch) || /\/sales\/?$/i.test(ch)) ? 'ventes' : '';
+      if (!source) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const arr = tableauAnnonces(obj) || [];
+      const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
+      const total = obj.meta && typeof obj.meta.count === 'number' ? obj.meta.count : null;
+      const ventes = arr.slice(0, 200).map((e) => {
+        const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
+        const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
+        const sc = scalairesVente(e);
+        return { id: idDe(e), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), etat: sc.etat, date: sc.date, montant: sc.montant };
+      }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      // La FORME d'une vente (noms de clés et types, jamais une valeur) : pour viser juste ensuite.
+      const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
+      post({ kind: 'vcventes', source, ventes, offset, total, lus: arr.length, forme });
+    } catch (_) {}
+  }
+
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = function (input, init) {
@@ -216,7 +299,7 @@
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -235,7 +318,7 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteVu(url, this.__vcMeth, this.status, ct);
             const t = (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
-            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && /json/i.test(String(ct || ''))) { noteSchema(url, t); noteAnnonces(url, t); noteVentes(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

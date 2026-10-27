@@ -61,11 +61,11 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
   ctx.readVcPosted = async () => ({ echec: postedKO, ids: posted.map(String) });
   const marques = [];
   ctx.markVcPosted = async (id) => { if (marque) marques.push(String(id)); return marque; };
-  const ecrits = []; let vcl = null; const etat = { lectureKO: false };
-  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; } return true; };
+  const ecrits = []; let vcl = null; let vcv = null; const etat = { lectureKO: false };
+  ctx.supabaseUpsert = async (t, rows) => { for (const r of rows) { ecrits.push(JSON.parse(JSON.stringify(r))); if (r.id === 'vc_listings') vcl = r.data; if (r.id === 'vc_ventes') vcv = r.data; } return true; };
   ctx.notifierApp = async () => {};
   ctx.majCmd = async () => {};
-  ctx.sbGet = async (q) => /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
+  ctx.sbGet = async (q) => /vc_ventes/.test(q) ? (etat.lectureKO ? null : (vcv ? [{ data: JSON.parse(JSON.stringify(vcv)) }] : [])) : /vc_listings/.test(q) ? (etat.lectureKO ? null : (vcl ? [{ data: JSON.parse(JSON.stringify(vcl)) }] : [])) : (/vinted_item_details/.test(q) ? [{ data: { '1001': { description: 'Paire propre, semelle nette.', photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } } }] : []);
   ctx.compteConnecte = async () => null;
   ctx.viderFiches = async () => {};
   const vus = [];
@@ -127,6 +127,20 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     b.lectureKO = false;
     const r5 = await new Promise((res) => b.ecouteur({ from: 'cancale-vc', action: 'vcAnnonces', items: [{ id: 'x', boost: true }], offset: 0, total: 1, lus: 1 }, { tab: { id: 5, url: 'https://www.leboncoin.fr/' } }, res));
     dit(r5.ok === false, 'une page qui n\'est pas Vestiaire ne range rien');
+  });
+  await essaie('ventes', async () => {
+    const b = faire();
+    const vv = (m) => new Promise((res) => b.ecouteur(Object.assign({ from: 'cancale-vc', action: 'vcVentes' }, m), { tab: { id: 5, url: 'https://fr.vestiairecollective.com/members/' } }, res));
+    const dern = () => ((b.ecrits.filter((e) => e.id === 'vc_ventes').pop() || {}).data || {});
+    const r1 = await vv({ source: 'a-expedier', ventes: [{ id: 'T1', ref: '401', etat: 'awaiting' }, { id: 'T2', ref: '402' }], offset: 0, total: 2, lus: 2 });
+    dit(r1.ok && dern().ventes.T1.aExpedier === true && dern().ventes.T2.aExpedier === true, 'les ventes à expédier sont rangées « à expédier »', JSON.stringify(dern().ventes));
+    await vv({ source: 'a-expedier', ventes: [{ id: 'T2', ref: '402' }], offset: 0, total: 1, lus: 1 });
+    dit(dern().ventes.T1 && dern().ventes.T1.aExpedier === false && dern().ventes.T2.aExpedier === true, 'liste « à expédier » lue EN ENTIER sans T1 : T1 n\'est plus à expédier, mais n\'est jamais effacée', JSON.stringify(dern().ventes));
+    await vv({ source: 'a-expedier', ventes: [], offset: 20, total: 40, lus: 0 });
+    dit(dern().ventes.T2.aExpedier === true, 'une page PARTIELLE ne retire rien de « à expédier »', JSON.stringify(dern().ventes.T2));
+    const n0 = b.ecrits.length; b.lectureKO = true;
+    const r4 = await vv({ source: 'ventes', ventes: [{ id: 'T9' }], offset: 0, total: 1, lus: 1 });
+    dit(r4.ok === false && b.ecrits.length === n0, 'base illisible : rien n\'est écrit');
   });
   const refus = async (quoi, opts, code) => essaie(quoi, async () => {
     const b = faire(opts);
@@ -245,6 +259,30 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(!JSON.stringify(msgs).includes('secret@') && !JSON.stringify(msgs).includes('Paire propre'), 'aucun texte ni email de l\'annonce ne sort (seulement la référence)', JSON.stringify(msgs).slice(0, 200));
     dit(msgs[0] && msgs[0].total === 3 && msgs[0].lus === 3, 'le total annoncé part avec (liste entière ou non)', JSON.stringify(msgs[0] && { t: msgs[0].total, l: msgs[0].lus }));
     await cI.close();
+
+    // ── D. vc-inject.js : tes VENTES, lues dans la réponse (5.237) ──────────
+    const cD = await nav.newContext(); const pd = await cD.newPage();
+    await cD.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
+    await cD.route('https://apiv2.vestiairecollective.com/**', (r) => {
+      const u = r.request().url();
+      const body = /awaiting-shipping/.test(u) ? { meta: { limit: 20, offset: 0, count: 1 }, data: [{ id: 'T555', status: 'awaiting_shipping', createdAt: '2026-10-27T09:00:00Z', price: { amount: 120, currency: 'EUR' },
+          product: { id: 900001, description: 'Paire propre. Réf. VRM-401' }, buyer: { firstName: 'Jeanne', lastName: 'Secret', address: { street: '12 rue Cachée' }, email: 'jeanne@exemple.fr' } }] }
+        : /current-light/.test(u) ? { data: [{ id: 'PANIER1', status: 'cart' }] } : { data: [] };
+      return r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    });
+    await pd.goto('https://fr.vestiairecollective.com/members/');
+    await pd.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
+    await pd.addScriptTag({ content: inj });
+    await pd.evaluate(() => Promise.all([fetch('https://apiv2.vestiairecollective.com/users/me/awaiting-shipping-items?offset=0').then((r) => r.text()), fetch('https://apiv2.vestiairecollective.com/orders/current-light').then((r) => r.text())]));
+    await pd.waitForTimeout(800);
+    const mv = await pd.evaluate(() => window.__msgs.filter((m) => m.kind === 'vcventes'));
+    const v0 = mv[0] && mv[0].ventes && mv[0].ventes[0];
+    dit(mv.length === 1 && mv[0].source === 'a-expedier', 'les ventes À EXPÉDIER sont lues (et jamais le panier ni les achats)', JSON.stringify(mv.map((m) => m.source)));
+    dit(v0 && v0.id === 'T555' && v0.productId === '900001' && v0.ref === '401' && v0.etat === 'awaiting_shipping' && /2026-10-27/.test(v0.date), 'une vente : son id, son article, sa référence VRM-401, son état, sa date', JSON.stringify(v0));
+    dit(v0 && v0.montant && v0.montant.valeur === 120 && v0.montant.devise === 'EUR' && v0.montant.cle === 'price', 'le montant part AVEC le nom de sa clé (on ne devine pas prix ou versement)', JSON.stringify(v0 && v0.montant));
+    const tout = JSON.stringify(mv);
+    dit(!/Jeanne|Secret|Cach|jeanne@/.test(tout), 'rien de l\'acheteur ne sort (nom, adresse, email) — ni dans la vente, ni dans sa forme', tout.slice(0, 300));
+    await cD.close();
     await nav.close();
   });
   console.log(`\n${ok} ✅ · ${ko} ❌`);
