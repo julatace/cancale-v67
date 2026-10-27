@@ -17,7 +17,7 @@
 /* eslint-disable */
 const tauxUrssaf = () => tauxDe(undefined);
 
-export const TAUX_URSSAF_DEFAUT = 13.5;
+export const TAUX_URSSAF_DEFAUT = 12.4;
 
 export const tauxDe = (brut) => {
   const v = parseFloat(String(brut == null ? TAUX_URSSAF_DEFAUT : brut).replace(',', '.'));

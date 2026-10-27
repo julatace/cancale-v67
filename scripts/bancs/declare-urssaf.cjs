@@ -39,7 +39,7 @@ const ROWS = [
   { id: 'lbc_ventes', data: { ventes: {} } },
   { id: 'ebay_orders', data: { orders: [] } },
 ];
-const mainDe = (extra = {}) => ({ vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: LIGNE, vrm_journee_benefice: true,
+const mainDe = (extra = {}) => ({ vinted_regime: 'micro', vinted_urssaf_taux: 13.5, vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: LIGNE, vrm_journee_benefice: true,
   vinted_sale_overrides: { 9301: { buyPrice: '40' }, 9302: { buyPrice: '30' }, 9303: { buyPrice: '50' }, 9304: { buyPrice: '30' } }, ...extra });
 
 let ko = 0;
