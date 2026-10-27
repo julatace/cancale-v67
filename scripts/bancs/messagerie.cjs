@@ -178,7 +178,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const execs = [];
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '444': { numero: '7' }, '555': { numero: '12' } })); } catch (_) {} });
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '444': { numero: '7', min: '40' }, '555': { numero: '12' } })); } catch (_) {} });
   await pg.addInitScript(PONT, { version, filExt: FIL_EXT, fils: { 301: FIL_OFFRE, 303: FIL_VENTE, 402: FIL_EXT } });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
@@ -267,13 +267,18 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       await r.pg.waitForTimeout(1200);
       const off = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre]'); return e ? { etat: e.getAttribute('data-offre'), txt: e.innerText } : null; });
       dit(off && off.etat === 'attente' && /45,00/.test(off.txt), 'l’offre de l’acheteur (45 €) est lue dans le fil', JSON.stringify(off));
+      // (27 oct.) Prix mini 40 € posé sur l'annonce 444 ; l'offre 45 € est AU-DESSUS :
+      // l'Accepter est mis en avant (« ✓ Accepter 45,00 € · ≥ ton mini »). Rien n'est
+      // accepté tout seul — c'est le clic qui suit (ci-dessous) qui vend.
+      const cue = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre-au-dessus-mini]'); return e ? { min: e.getAttribute('data-offre-au-dessus-mini'), txt: e.innerText } : null; });
+      dit(cue && cue.min === '40' && /✓\s*Accepter/.test(cue.txt) && /ton mini/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
       // 7 bis. Le fil commence par la carte de la paire, et se groupe par jour.
       const fil = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); const seps = [...document.querySelectorAll('[data-jour-sep]')].map((x) => x.getAttribute('data-jour-sep'));
         return { carte: c ? { item: c.getAttribute('data-fil-paire'), num: c.getAttribute('data-fil-num'), prix: c.getAttribute('data-fil-prix'), etat: c.getAttribute('data-fil-etat'), txt: c.innerText } : null, seps }; });
       dit(fil.carte && fil.carte.item === '444' && fil.carte.num === '7' && fil.carte.prix === '59' && fil.carte.etat === 'question' && /Air Max 1/.test(fil.carte.txt), 'en tête du fil : la carte de la paire (titre, N°7, 59 €, état)', JSON.stringify(fil.carte));
       dit(fil.seps.length === 2 && new Set(fil.seps).size === 2, 'les messages sont groupés par jour (deux jours, deux séparateurs)', JSON.stringify(fil.seps));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-fil-' + (tel ? 390 : 1512) + '.png') });
-      await r.pg.getByRole('button', { name: 'Accepter', exact: true }).first().click();
+      await r.pg.getByRole('button', { name: /Accepter/ }).first().click();
       await r.pg.waitForTimeout(500);
       // Ouvrir un fil le relit par l'extension (une LECTURE, `GET`) : seul un
       // GESTE compte ici.
