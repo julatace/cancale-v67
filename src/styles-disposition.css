@@ -1,0 +1,63 @@
+/* ══ Disposition et boutons — 27 octobre ════════════════════════════════════
+   Julien : « je veux juste que les boutons, les dispositions soient modifiés »
+   — les COULEURS restent celles de la palette Perle (pétrole et sauge, il les
+   aime) : cette feuille ne pose AUCUNE teinte nouvelle, elle ne lit que les
+   variables de la coque (--vrm-accent, --vrm-surface, --vrm-line…). Chargée en
+   dernier ; aucun JSX, aucun data-*, aucune règle métier touchés. */
+
+/* Titres d'écran : plus grands, plus serrés. */
+:root { --vrm-t-title: 30px; }
+@media (min-width: 1024px) { :root { --vrm-t-title: 36px; } }
+.vrm-screen-head h2 { font-weight: 800; letter-spacing: -.045em; line-height: 1.04; }
+.vrm-market-space .vrm-screen-head h2 { font-weight: 750; letter-spacing: -.03em; }
+.vrm-day-hello { font-size: clamp(26px, 3vw, 40px) !important; font-weight: 800 !important; letter-spacing: -.045em !important; line-height: 1.05; }
+
+/* Cartes : plus rondes, posées. */
+.vrm-surface { border-radius: 18px !important; }
+.vrm-day-layout .vrm-day-card, .vrm-day-layout .vrm-day-week, .vrm-day-layout .vrm-day-money { border-radius: 18px !important; }
+
+/* Boutons : une seule forme, plus ronde, qui répond au doigt. */
+.vrm-button { border-radius: 12px; letter-spacing: -.015em; font-weight: 650; }
+.vrm-main button { -webkit-tap-highlight-color: transparent; }
+.vrm-main button:not(:disabled):active { transform: scale(.97); }
+.vrm-main button { transition: transform .12s cubic-bezier(.23,1,.32,1), background-color .14s ease, box-shadow .14s ease; }
+
+/* Ma journée : les quatre compteurs deviennent quatre tuiles séparées (au lieu
+   d'une barre découpée), le chiffre en grand. */
+.vrm-app-shell .vrm-day-layout .vrm-day-bar,
+.vrm-day-layout .vrm-day-bar {
+  gap: 10px; overflow: visible; background: transparent !important; background-image: none !important;
+  border: 0 !important; box-shadow: none !important;
+}
+.vrm-app-shell .vrm-day-layout .vrm-day-bar > button,
+.vrm-day-layout .vrm-day-bar > button {
+  background: var(--vrm-surface) !important; border: 1px solid var(--vrm-line) !important;
+  border-radius: 16px !important; box-shadow: 0 1px 2px rgba(25,59,67,.03), 0 6px 18px rgba(25,59,67,.05);
+}
+:root[data-theme="dark"] .vrm-day-layout .vrm-day-bar > button { box-shadow: none; }
+.vrm-day-layout .vrm-day-bar-n { font-weight: 800; letter-spacing: -.03em; }
+.vrm-day-layout .vrm-day-bar-ic { color: var(--vrm-accent) !important; }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-day-layout .vrm-day-bar > button:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(25,59,67,.05), 0 12px 28px rgba(25,59,67,.09); }
+}
+
+/* Rail (ordinateur) : l'écran actif porte un trait à gauche. */
+.vrm-sidebar-link[aria-current="page"] { position: relative; }
+.vrm-sidebar-link[aria-current="page"]::before {
+  content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 3px; background: currentColor; opacity: .85;
+}
+
+/* Téléphone, carte « Vendu » : quand les ventes n'ont pas pu être lues, la
+   phrase tombait dans la colonne étroite et « 0 vente » s'écrivait une lettre
+   par ligne. Elle a sa propre ligne, sur toute la largeur. */
+@media (max-width: 767px) {
+  .vrm-day-money [data-vendu-manque] { grid-column: 1 / -1; grid-row: 3; }
+  .vrm-day-money:has([data-vendu-manque]) .vrm-day-meta { grid-row: 4; }
+  .vrm-day-money:has([data-vendu-manque]) .vrm-day-recu { grid-row: 5; grid-column: 1 / -1; max-width: none; border-left: 0 !important; padding: 10px 0 0 !important; border-top: 1px solid var(--vrm-line) !important; flex-direction: row; justify-content: space-between; align-items: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-main button, .vrm-day-layout .vrm-day-bar > button { transition: none; }
+  .vrm-main button:not(:disabled):active, .vrm-day-layout .vrm-day-bar > button:hover { transform: none; }
+}

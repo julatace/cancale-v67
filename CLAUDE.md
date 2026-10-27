@@ -1,5 +1,17 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — boutons et disposition revus, couleurs GARDÉES, animation de connexion :**
+> Julien : « je veux juste que les boutons, les dispositions soient modifiés… j'aimais bien
+> celle d'avant un peu vert » — une palette violette essayée puis REFUSÉE : ne pas la
+> reproposer, la palette Perle (pétrole et sauge, `src/themeMineral.js`) reste. 
+> `src/styles-disposition.css` (chargé en dernier, aucune teinte neuve, que des variables) :
+> grands titres serrés, cartes à 18 px, boutons à 12 px qui s'enfoncent, les 4 compteurs de
+> Ma journée en tuiles séparées, trait sur l'écran actif du rail ; et corrige « 0 vente »
+> écrit une lettre par ligne sur téléphone quand les ventes sont illisibles. Connexion
+> (`AuthScreen`) : aurore de trois halos qui dérivent, étiquettes flottantes décoratives
+> (≥ 1200 px, aucun chiffre), entrée en cascade ; rien si « réduire les animations ».
+> Verts : journee-widgets, journee-premium, coque-mobile, formes-communes, tdz, csp.
+
 > **27 octobre (soir) — l'ARRIVÉE guidée et le MOUVEMENT :** Julien : « univers personnalisable en un clic,
 > avec une voix, une démonstration » et « des effets entre les pages ». `src/Bienvenue.jsx` : pour un compte
 > neuf (`premierJour`, après le nuage), une fois — univers Clair/Nuit en un clic (`vinted_dark`), cinq écrans

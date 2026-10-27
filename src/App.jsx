@@ -13105,9 +13105,46 @@ function AuthScreen() {
  .vrm-cx-main{align-items:center;padding:40px}
  .vrm-cx-boite{margin-top:0}
 }
-@media (prefers-reduced-motion:reduce){.vrm-cx-form button[type=submit]{transition:none}}
+/* 27 oct. — Julien : « une animation sur l'onglet de connexion ». Une aurore lente
+   derrière la marque (trois halos sauge et pétrole qui dérivent, transform seul),
+   des étiquettes qui flottent (décor, aria-hidden, aucun chiffre : rien
+   d'inventé), puis l'entrée : titre, points et formulaire arrivent en cascade.
+   Rien si « réduire les animations ». */
+.vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#4E8A80;opacity:.45;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#8FB8A6;opacity:.22;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2F6670;opacity:.5;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
+@keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
+@keyframes vrmCxDerive2{to{transform:translate3d(-22%,10%,0) scale(.9)}}
+@keyframes vrmCxDerive3{to{transform:translate3d(-12%,-18%,0) scale(1.15)}}
+.vrm-cx-etiquettes{display:none}
+.vrm-cx-titre,.vrm-cx-titre span,.vrm-cx-points li,.vrm-cx-boite{animation:vrmCxEntre .62s cubic-bezier(.23,1,.32,1) both}
+.vrm-cx-titre span{animation-delay:.09s}
+.vrm-cx-points li:nth-child(1){animation-delay:.18s}
+.vrm-cx-points li:nth-child(2){animation-delay:.26s}
+.vrm-cx-points li:nth-child(3){animation-delay:.34s}
+.vrm-cx-boite{animation-name:vrmCxMonte;animation-delay:.12s}
+@keyframes vrmCxEntre{from{opacity:0;transform:translate3d(0,14px,0)}to{opacity:1;transform:none}}
+@keyframes vrmCxMonte{from{opacity:0;transform:translate3d(0,18px,0) scale(.98)}to{opacity:1;transform:none}}
+@media (min-width:1200px){
+ .vrm-cx-etiquettes{display:block;position:absolute;inset:0;pointer-events:none}
+ .vrm-cx-etiquettes span{position:absolute;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:#F0F5F2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:vrmCxFlotte 7s ease-in-out infinite alternate,vrmCxEntre .7s cubic-bezier(.23,1,.32,1) both}
+ .vrm-cx-etiquettes span:before{content:"";width:7px;height:7px;border-radius:50%;background:#B7D6C8;box-shadow:0 0 0 4px rgba(183,214,200,.18)}
+ .vrm-cx-etiquettes span:nth-child(1){right:8%;top:13%;animation-delay:0s,.45s}
+ .vrm-cx-etiquettes span:nth-child(2){right:36%;top:17%;animation-duration:8.5s,.7s;animation-delay:-2s,.55s}
+ .vrm-cx-etiquettes span:nth-child(3){right:8%;bottom:22%;animation-duration:9s,.7s;animation-delay:-4s,.65s}
+ .vrm-cx-etiquettes span:nth-child(4){right:32%;bottom:12%;animation-duration:7.8s,.7s;animation-delay:-1s,.75s}
+}
+@keyframes vrmCxFlotte{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,-12px,0)}}
+@media (prefers-reduced-motion:reduce){
+ .vrm-cx-form button[type=submit]{transition:none}
+ .vrm-cx-aurore i,.vrm-cx-etiquettes span,.vrm-cx-titre,.vrm-cx-titre span,.vrm-cx-points li,.vrm-cx-boite{animation:none}
+}
 `}</style>
       <aside className="vrm-cx-marque">
+        <div className="vrm-cx-aurore" aria-hidden="true" data-cx-aurore=""><i/><i/><i/></div>
+        <div className="vrm-cx-etiquettes" aria-hidden="true"><span>Colis prêt</span><span>Bordereau imprimé</span><span>Vendu sur Vinted</span><span>Retirée de Leboncoin</span></div>
         <div className="vrm-cx-haut">
           <a href="/" className="vrm-cx-logo" aria-label="VRM — page d'accueil">
             <img src="/vrm-logo-v4-192.png" alt="" width="36" height="36"/><b>VRM</b>
