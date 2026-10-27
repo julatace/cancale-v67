@@ -10922,6 +10922,194 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
     </div>
   );
 }
+// ══ ATELIER DE REPUBLICATION — TRANCHE 3 : lots titres + prix (non destructif) ══
+// Modifier le TITRE et le PRIX d'une SÉLECTION d'annonces d'un coup, avec un
+// aperçu avant→après par article, et écrire le résultat dans les BROUILLONS
+// (`vinted_annonce_drafts`) — rien n'est envoyé à Vinted (la publication réelle
+// est la tranche 5). Deux règles du dossier tiennent la logique :
+//   · le titre n'est jamais COUPÉ en silence (§ « limite signalée, jamais coupée ») :
+//     on signale quand il dépasse la limite Vinted, on ne tronque pas ;
+//   · le prix n'est jamais CUMULATIF : chaque aperçu se calcule depuis le prix de
+//     BASE (le brouillon s'il existe, sinon l'annonce), dans un ORDRE explicite —
+//     (1) ajustement ou prix commun → (2) arrondi → (3) terminaison → (4) plancher.
+//   · le plancher (§19) : jamais sous le prix d'achat. Sous lui ⇒ ramené au
+//     plancher ET signalé — mieux vaut un prix qui tient qu'un prix qui perd.
+const TITRE_VINTED_MAX = 100; // limite d'un titre d'article Vinted — on SIGNALE au-delà, on ne coupe JAMAIS
+function lotAppliqueTitre(base, op) {
+  let t = String(base == null ? '' : base);
+  const v = String(op.valeur == null ? '' : op.valeur);
+  if (op.mode === 'prefixe') { if (v && !t.startsWith(v)) t = v + t; }          // pas de doublon
+  else if (op.mode === 'suffixe') { if (v && !t.endsWith(v)) t = t + v; }       // pas de doublon
+  else if (op.mode === 'remplacer') { const c = String(op.chercher == null ? '' : op.chercher); if (c) t = t.split(c).join(v); }
+  else if (op.mode === 'supprimer') { const c = String(op.chercher == null ? '' : op.chercher); if (c) t = t.split(c).join(''); }
+  else if (op.mode === 'inserer') { const pos = Math.max(0, Math.min(t.length, Math.round(Number(op.pos)) || 0)); t = t.slice(0, pos) + v + t.slice(pos); }
+  return t.replace(/\s{2,}/g, ' ').trim();     // on nettoie les espaces doublés (ex. un mot supprimé) — jamais on ne coupe
+}
+function lotAppliquePrix(base, op, floor) {
+  const flags = [];
+  let p = Number(base);
+  if (!isFinite(p)) p = 0;
+  // 1. ajustement OU prix commun
+  if (op.base === 'commun') { const c = Number(String(op.commun).replace(',', '.')); if (isFinite(c)) p = c; }
+  else if (op.base === 'pct') { const d = Number(String(op.delta).replace(',', '.')); if (isFinite(d)) p = p * (1 + d / 100); }
+  else if (op.base === 'fixe') { const d = Number(String(op.delta).replace(',', '.')); if (isFinite(d)) p = p + d; }
+  // 2. arrondi
+  if (op.arrondi && op.arrondi !== 'aucun') {
+    const pas = op.arrondi === 'euro' ? 1 : op.arrondi === '5' ? 5 : 10;
+    const f = op.sens === 'sup' ? Math.ceil : op.sens === 'inf' ? Math.floor : Math.round;
+    p = f(p / pas) * pas;
+  }
+  // 3. terminaison
+  if (op.fin && op.fin !== 'aucune') {
+    const dec = op.fin === '00' ? 0 : op.fin === '50' ? 0.5 : op.fin === '90' ? 0.9 : 0.99;
+    p = Math.floor(p) + dec;
+  }
+  // 4. plancher (§19) — jamais sous le prix d'achat
+  let sousPlancher = false;
+  if (floor != null && isFinite(floor) && p < floor) { p = floor; sousPlancher = true; flags.push('plancher'); }
+  p = Math.round(p * 100) / 100;     // devise : deux décimales
+  if (p <= 0) flags.push('invalide');
+  return { prix: p, sousPlancher, flags };
+}
+function AtelierLots({ candidats, onSave, onClose }) {
+  const [sel, setSel] = useState(() => new Set());
+  const [q, setQ] = useState('');
+  const [tMode, setTMode] = useState('aucun');   // aucun|prefixe|suffixe|remplacer|supprimer|inserer
+  const [tVal, setTVal] = useState('');
+  const [tChe, setTChe] = useState('');
+  const [tPos, setTPos] = useState('0');
+  const [pBase, setPBase] = useState('aucun');   // aucun|fixe|pct|commun
+  const [pDelta, setPDelta] = useState('');
+  const [pCommun, setPCommun] = useState('');
+  const [pArr, setPArr] = useState('aucun');     // aucun|euro|5|10
+  const [pSens, setPSens] = useState('proche');  // proche|sup|inf
+  const [pFin, setPFin] = useState('aucune');    // aucune|00|50|90|99
+  const [done, setDone] = useState(false);
+  const liste = candidats.filter(c => !q.trim() || (c.titre || '').toLowerCase().includes(q.trim().toLowerCase()) || String(c.key).includes(q.trim()));
+  const toggle = (k) => setSel(s => { const u = new Set(s); u.has(k) ? u.delete(k) : u.add(k); return u; });
+  const tout = () => setSel(new Set(liste.map(c => c.key)));
+  const rien = () => setSel(new Set());
+  const opT = { mode: tMode, valeur: tVal, chercher: tChe, pos: tPos };
+  const opP = { base: pBase, delta: pDelta, commun: pCommun, arrondi: pArr, sens: pSens, fin: pFin };
+  const changeT = tMode !== 'aucun';
+  const changeP = pBase !== 'aucun' || pArr !== 'aucun' || pFin !== 'aucune';
+  const apercu = (c) => {
+    const nt = changeT ? lotAppliqueTitre(c.titre, opT) : null;
+    const np = changeP ? lotAppliquePrix(c.prix, opP, c.floor) : null;
+    return { nt, np, tropLong: nt != null && nt.length > TITRE_VINTED_MAX };
+  };
+  const selArr = candidats.filter(c => sel.has(c.key));
+  const nAppliquables = selArr.filter(c => { const a = apercu(c); return (a.nt != null && a.nt !== c.titre) || (a.np != null && a.np.prix !== c.prix); }).length;
+  const enregistrer = () => {
+    if (!sel.size || (!changeT && !changeP) || done) return;
+    for (const c of selArr) {
+      const a = apercu(c);
+      const patch = { id: c.id };
+      if (a.nt != null && a.nt !== c.titre) patch.title = a.nt;
+      if (a.np != null && a.np.prix !== c.prix && a.np.prix > 0) patch.price = a.np.prix;
+      if (patch.title != null || patch.price != null) onSave(c.key, patch);
+    }
+    setDone(true); setTimeout(onClose, 800);
+  };
+  const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 5 };
+  const selStyle = { ...champ, padding: '6px 8px' };
+  return (
+    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={ev => ev.stopPropagation()} data-lots-modal style={{ background: C.bg, width: '100%', maxWidth: 620, maxHeight: '94vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Lots — titres &amp; prix</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Prépare une sélection d'un coup — <b>rien n'est envoyé à Vinted</b>, c'est gardé en brouillon. Les numéros ne changent pas.</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* ── sélection ─────────────────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ ...maj, margin: 0, flex: 1 }}>Articles ({sel.size} choisi{sel.size > 1 ? 's' : ''})</span>
+              <button type="button" data-lot-tout onClick={tout} style={{ ...champ, cursor: 'pointer', padding: '5px 9px', fontSize: 12 }}>Tout</button>
+              <button type="button" data-lot-rien onClick={rien} style={{ ...champ, cursor: 'pointer', padding: '5px 9px', fontSize: 12 }}>Rien</button>
+            </div>
+            <input value={q} onChange={ev => setQ(ev.target.value)} placeholder="Filtrer par titre ou numéro" style={{ ...champ, width: '100%' }} />
+            <div style={{ maxHeight: 180, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8 }}>
+              {liste.length === 0 && <div style={{ padding: 12, fontSize: 12, color: C.muted }}>Aucune annonce.</div>}
+              {liste.map(c => { const a = apercu(c); const chg = (a.nt != null && a.nt !== c.titre) || (a.np != null && a.np.prix !== c.prix); return (
+                <label key={c.key} data-lot-ligne={c.key} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', padding: '7px 10px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
+                  <input type="checkbox" data-lot-item={c.key} checked={sel.has(c.key)} onChange={() => toggle(c.key)} style={{ marginTop: 2, accentColor: C.accent, flexShrink: 0 }} />
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, flexShrink: 0 }}>N°{c.key}</span>
+                      <span style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.titre || '—'}</span>
+                    </span>
+                    {sel.has(c.key) && chg && (
+                      <span style={{ display: 'block', fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4 }}>
+                        {a.nt != null && a.nt !== c.titre && <span data-apercu-titre={c.key} style={{ display: 'block', color: a.tropLong ? C.warn : C.muted }}>→ {a.nt}{a.tropLong && <b data-lot-trop-long={c.key} style={{ color: C.warn }}> · {a.nt.length}/{TITRE_VINTED_MAX}, trop long pour Vinted</b>}</span>}
+                        {a.np != null && a.np.prix !== c.prix && <span data-apercu-prix={c.key} style={{ display: 'block' }}>{prixCourt(c.prix)} → <b style={{ color: C.text }}>{prixCourt(a.np.prix)}</b>{a.np.sousPlancher && <span data-lot-plancher={c.key} style={{ color: C.warn }}> · ramené au plancher (prix d'achat)</span>}</span>}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ); })}
+            </div>
+          </div>
+          {/* ── titres ────────────────────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <span style={maj}>Titre</span>
+            <select data-lot-titre-mode value={tMode} onChange={ev => setTMode(ev.target.value)} style={selStyle}>
+              <option value="aucun">Ne pas toucher au titre</option>
+              <option value="prefixe">Ajouter au début</option>
+              <option value="suffixe">Ajouter à la fin</option>
+              <option value="remplacer">Remplacer un texte</option>
+              <option value="supprimer">Supprimer un texte</option>
+              <option value="inserer">Insérer à une position</option>
+            </select>
+            {(tMode === 'remplacer' || tMode === 'supprimer') && <input data-lot-titre-chercher value={tChe} onChange={ev => setTChe(ev.target.value)} placeholder="Texte à trouver" style={champ} />}
+            {tMode === 'inserer' && <input data-lot-titre-pos value={tPos} onChange={ev => setTPos(ev.target.value)} inputMode="numeric" placeholder="Position (0 = début)" style={{ ...champ, maxWidth: 200 }} />}
+            {tMode !== 'aucun' && tMode !== 'supprimer' && <input data-lot-titre-valeur value={tVal} onChange={ev => setTVal(ev.target.value)} placeholder={tMode === 'remplacer' ? 'Par (vide = supprimer)' : 'Texte à ajouter'} style={champ} />}
+          </div>
+          {/* ── prix ──────────────────────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <span style={maj}>Prix <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>— ordre : ajustement → arrondi → terminaison → plancher</span></span>
+            <select data-lot-prix-base value={pBase} onChange={ev => setPBase(ev.target.value)} style={selStyle}>
+              <option value="aucun">Ne pas toucher au prix</option>
+              <option value="fixe">Ajouter / retirer un montant (€)</option>
+              <option value="pct">Ajouter / retirer un pourcentage (%)</option>
+              <option value="commun">Mettre tout le monde au même prix</option>
+            </select>
+            {(pBase === 'fixe' || pBase === 'pct') && <input data-lot-prix-delta value={pDelta} onChange={ev => setPDelta(ev.target.value)} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. -10 (= −10 %)' : 'ex. -5 (= −5 €)'} style={{ ...champ, maxWidth: 220 }} />}
+            {pBase === 'commun' && <input data-lot-prix-commun value={pCommun} onChange={ev => setPCommun(ev.target.value)} inputMode="decimal" placeholder="Prix commun (€)" style={{ ...champ, maxWidth: 200 }} />}
+            {pBase !== 'aucun' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select data-lot-arrondi value={pArr} onChange={ev => setPArr(ev.target.value)} style={{ ...selStyle, flex: '1 1 120px' }}>
+                <option value="aucun">Sans arrondi</option>
+                <option value="euro">À l'euro</option>
+                <option value="5">Au multiple de 5</option>
+                <option value="10">Au multiple de 10</option>
+              </select>
+              {pArr !== 'aucun' && <select data-lot-sens value={pSens} onChange={ev => setPSens(ev.target.value)} style={{ ...selStyle, flex: '1 1 110px' }}>
+                <option value="proche">au plus proche</option>
+                <option value="sup">au-dessus</option>
+                <option value="inf">en-dessous</option>
+              </select>}
+              <select data-lot-fin value={pFin} onChange={ev => setPFin(ev.target.value)} style={{ ...selStyle, flex: '1 1 130px' }}>
+                <option value="aucune">Sans terminaison</option>
+                <option value="00">finir en ,00</option>
+                <option value="50">finir en ,50</option>
+                <option value="90">finir en ,90</option>
+                <option value="99">finir en ,99</option>
+              </select>
+            </div>}
+            <div style={{ fontSize: 11, color: C.muted }}>Le prix ne descend jamais sous le prix d'achat (plancher). Chaque calcul part du prix actuel, sans s'empiler.</div>
+          </div>
+          <button type="button" data-lots-enregistrer onClick={enregistrer} disabled={!sel.size || (!changeT && !changeP) || done}
+            style={{ border: `1px solid ${C.accent}`, background: done ? C.accent : `${C.accent}12`, color: done ? '#fff' : C.accent, borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: (sel.size && (changeT || changeP) && !done) ? 'pointer' : 'default', fontFamily: 'inherit', opacity: (!sel.size || (!changeT && !changeP)) ? 0.5 : 1 }}>
+            {done ? '✓ Brouillons enregistrés' : `💾 Enregistrer dans les brouillons (${nAppliquables})`}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
   const [img, setImg] = useState(null);          // HTMLImageElement chargée
   const [zoom, setZoom] = useState(1);
@@ -32069,6 +32257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_drafts', next); return next;
     });
   };
+  const [lotsOpen, setLotsOpen] = useState(false); // modale « Lots — titres & prix » (tranche 3)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -42138,6 +42327,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     passé à la ligne, est trop près du bord gauche pour cela. */}
                 <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
+                    {k:'lots', icon:'✨', lab:'Lots — titres & prix', desc:'Préparer une sélection en brouillon, sans toucher à Vinted', on:()=>{ setAnnToolsOpen(false); setLotsOpen(true); }},
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
@@ -45539,6 +45729,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {photoEdit && <PhotoEditor refPhoto={photoEdit.refPhoto} refTitle={photoEdit.refTitle} onClose={()=>setPhotoEdit(null)} toast={toast} />}
       {atelier!=null && (()=>{ const it=(listings.items||[]).find(x=>String(x.id)===String(atelier)); if(!it) return null; const e=numeros[atelier]||{}; const k=String((e&&e.numero)||atelier); return (
         <AtelierBrouillon it={it} e={e} k={k} draft={drafts[k]} onSave={(p)=>saveDraft(k,p)} onClose={()=>setAtelier(null)} />
+      ); })()}
+      {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
+        <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}

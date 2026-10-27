@@ -324,6 +324,49 @@ const projette = (row, sel) => {
           }
         }
       } catch (e) { dit(false, 'scénario « atelier — brouillon VRM »', String(e.message).slice(0, 140)); }
+      // ── ATELIER tranche 3 : lots titres + prix (§36) ─────────────────────────
+      // Non destructif : ouvrir « Lots », choisir N°42/43/41, poser un préfixe de
+      // titre et une baisse de prix, vérifier l'aperçu avant→après, le PLANCHER
+      // (§19 : 41 a un prix d'achat 25, une baisse de 60 % tombe dessous), la
+      // LIMITE de titre (signalée, jamais coupée), puis enregistrer dans les
+      // brouillons et relire le localStorage.
+      try {
+        await pg.locator('[aria-label="Outils"]').first().click();
+        const lotsBtn = pg.locator('button:has-text("Lots — titres")').first();
+        await lotsBtn.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+        dit(await lotsBtn.count() > 0, 'menu Outils : l’entrée « Lots — titres & prix » est présente');
+        if (await lotsBtn.count() > 0) {
+          await lotsBtn.click();
+          const modal = pg.locator('[data-lots-modal]');
+          await modal.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+          dit(await modal.count() > 0, 'clic « Lots » ⇒ la modale des lots s’ouvre');
+          if (await modal.count() > 0) {
+            for (const k of ['42', '43', '41']) await pg.locator(`[data-lot-item="${k}"]`).check();
+            // Titre : d'abord un préfixe TROP LONG pour prouver la limite signalée.
+            await pg.locator('[data-lot-titre-mode]').selectOption('prefixe');
+            await pg.locator('[data-lot-titre-valeur]').fill('X'.repeat(110));
+            await pg.waitForTimeout(120);
+            dit(await pg.locator('[data-lot-trop-long="42"]').count() > 0, 'titre trop long : SIGNALÉ (jamais coupé en silence, § limite)');
+            // puis un préfixe court et réaliste
+            await pg.locator('[data-lot-titre-valeur]').fill('★ ');
+            // Prix : −60 % → sur 41 (achat 25) ça tombe sous le plancher.
+            await pg.locator('[data-lot-prix-base]').selectOption('pct');
+            await pg.locator('[data-lot-prix-delta]').fill('-60');
+            await pg.waitForTimeout(150);
+            const ap42 = await pg.locator('[data-apercu-titre="42"]').first().innerText().catch(() => '');
+            dit(/★\s*Salomon/.test(ap42), 'aperçu titre avant→après sur 42 (préfixe appliqué)', ap42.slice(0, 60));
+            dit(await pg.locator('[data-apercu-prix="41"]').count() > 0, 'aperçu prix présent sur 41');
+            dit(await pg.locator('[data-lot-plancher="41"]').count() > 0, 'plancher (§19) : la baisse de 41 est ramenée au prix d’achat et SIGNALÉE');
+            await pg.locator('[data-lots-enregistrer]').click();
+            await pg.waitForTimeout(900);   // anti-rebond `save` 500 ms
+            const d = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_drafts') || '{}'); } catch (_) { return {}; } });
+            dit((d['42'] || {}).title && d['42'].title.startsWith('★ '), 'brouillon 42 : le préfixe de titre est enregistré', (d['42'] || {}).title);
+            dit(Math.abs(Number((d['43'] || {}).price) - 19.6) < 0.01, 'brouillon 43 : prix −60 % enregistré (49 → 19,60)', String((d['43'] || {}).price));
+            dit(Number((d['41'] || {}).price) === 25, 'brouillon 41 : prix ramené au PLANCHER 25 (jamais sous le prix d’achat)', String((d['41'] || {}).price));
+            dit((d['41'] || {}).numero === '41', 'lots : le N° VRM de 41 est conservé (jamais recréé)', String((d['41'] || {}).numero));
+          }
+        }
+      } catch (e) { dit(false, 'scénario « atelier — lots titres + prix »', String(e.message).slice(0, 140)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-' + vp.width + '.png') });
       await ctx.close();
     }
