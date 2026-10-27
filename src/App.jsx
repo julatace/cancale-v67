@@ -41883,6 +41883,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title||'Annonce'}</div>
                           <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{why.join(' · ')}</div>
+                          {/* (27 oct., demande de Julien) Toucher ses favoris SANS robot :
+                              Vinted prévient tout seul les personnes qui ont mis en favori
+                              dès que le prix baisse. On le DIT ici — c'est SA baisse (le
+                              bouton « Baisser » à droite), aucun message programmé (§3). */}
+                          {rp.favs>0 && <div data-reprice-favs={rp.favs} style={{fontSize:11,color:C.muted,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><Icon name="heart" size={11} style={{color:C.muted}}/><span>{rp.favs} en favori — ta baisse les prévient</span></div>}
                         </div>
                         <div style={{flexShrink:0,textAlign:'right'}}>
                           <div style={{fontSize:12,fontWeight:600,color:C.text,lineHeight:1.15}}><span style={{textDecoration:'line-through',color:C.muted,fontWeight:600}}>{price}</span> → {sugg} {cur(it.currency)}</div>
