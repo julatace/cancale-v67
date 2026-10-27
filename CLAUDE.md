@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> **27 octobre — même chose pour Leboncoin et eBay :** une vente Leboncoin reliée PAR IDENTITÉ
+> (`numeroLbcIdentite` : lien posé à la main ou référence VRM) et dite partie (`lbcExpediee` ou
+> `lbcFinalisee`, jamais annulée), ou une commande eBay « Expédiée » (`etatCommandeEbay`, SKU
+> `numLigneEbay`, engagée) libèrent aussi leur place. Un N° encore à poster sur N'IMPORTE quelle
+> plateforme reste ; Leboncoin ou eBay pas lus ⇒ cette plateforme ne retire rien. La liste dit la
+> plateforme (« eBay : Expédiée »). Corrigé au passage : `save` écrit 500 ms plus tard, deux
+> passages rapprochés s'effaçaient le journal ⇒ `saveTout` écrit tout de suite. Banc
+> `stock-partis.cjs` : 8 rouges sur main, 4 sous mutation (« parti » ignoré sur Leboncoin et eBay).
+
 > **27 octobre — un article parti sort tout seul du Stock :** Julien : « enlever le numéro si
 > l'article est expédié ». Tranché avec lui : la PLACE (case ou pile) se libère, le NUMÉRO reste
 > (bordereau, achat, bénéfice, retour ; jamais redonné). Seulement quand VINTED dit le colis parti
