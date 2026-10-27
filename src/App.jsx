@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.237.0';
+const EXT_ATTENDUE = '5.238.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -21951,6 +21951,75 @@ function VentesVestiaire({ comptes }) {
     </Card>
   );
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE COLLECTIVE : TES MESSAGES (27 octobre, 5.238)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « fais pareil pour les messages Vestiaire ». L'extension relève ce
+// que la page charge déjà (`vc_messages`) : le NOMBRE de non-lus (compteur de
+// Vestiaire, mesuré) et, le jour où il ouvre sa messagerie, les conversations —
+// sans aucun texte ni nom. La paire se relie par IDENTITÉ seulement (référence
+// VRM-{n°} de l'article ou annonce créée par VRM), jamais le titre (§5). On y
+// répond sur Vestiaire : VRM n'écrit rien. Trois états, jamais « 0 » sur un « pas su ».
+function MessagesVestiaire() {
+  const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const relire = React.useCallback(async () => {
+    try {
+      const [rm, rl] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,conversations:data->conversations,lecture:data->lecture`, { headers: sbAuth() }),
+        fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens`, { headers: sbAuth() }),
+      ]);
+      if (!rm.ok || !rl.ok) throw new Error('lecture');
+      const [jm, jl] = await Promise.all([rm.json(), rl.json()]);
+      const r = (jm && jm[0]) || {};
+      setD({ compteur: r.compteur || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {} });
+    } catch (_) { setD(null); }
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => {
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const style = { fontSize: 12.5, color: C.muted, lineHeight: 1.55 };
+  const age = (iso) => { const t = Date.parse(iso || ''); if (!isFinite(t)) return ''; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 60 ? `il y a ${m} min` : m < 48 * 60 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
+  // La page où la liste a été VUE (sans identifiant) ; sinon l'accueil — jamais une adresse devinée.
+  const page = d && d.lecture && /^\/[\w/.-]*$/.test(d.lecture.page || '') ? d.lecture.page : '';
+  const lien = `https://fr.vestiairecollective.com${page || '/'}`;
+  let corps;
+  if (d === undefined) corps = <div data-vc-messages="charge" style={style}>Lecture de tes messages Vestiaire…</div>;
+  else if (d === null) corps = <div data-vc-messages="pas-su" style={style}>Je n'ai pas pu lire tes messages Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
+  else if (!d.compteur && !d.conversations) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le Chrome où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
+  else {
+    const n = d.compteur && typeof d.compteur.messages === 'number' ? d.compteur.messages : null;
+    const liste = Object.entries(d.conversations || {}).map(([id, v]) => ({ id, ...v, num: cleNum((v.productId && d.liens[v.productId]) || v.ref || '') }))
+      .sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || z.vuAt || '').localeCompare(String(a.date || a.vuAt || '')));
+    corps = (
+      <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
+          {n == null ? <>Nombre de non-lus pas encore relevé.</>
+            : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b> sur Vestiaire, au dernier relevé ({age(d.compteur.at)}).</>}
+          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600 }}>{page ? 'Ouvrir ta messagerie Vestiaire ↗' : 'Ouvrir Vestiaire ↗'}</a>
+          {!page ? <> (la messagerie est dans le menu de ton compte)</> : null}
+        </div>
+        {d.conversations ? (liste.length ? <>
+          <div style={style}>{liste.length} conversation{liste.length > 1 ? 's' : ''} vue{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''} — VRM n'en garde ni le texte ni le nom de la personne ; on y répond sur Vestiaire.</div>
+          {liste.slice(0, 30).map((v) => (
+            <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+              <div style={{ fontSize: 13, color: C.text, fontWeight: v.nonLu === true ? 700 : 600 }}>{v.num ? `N°${v.num}` : 'Pas reliée à une paire'}{v.nonLu === true ? <span style={{ marginLeft: 8, color: C.accent }}>· non lue</span> : null}</div>
+              <div style={{ fontSize: 11.5, color: C.muted }}>{v.date ? new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'date non dite'}{v.nonLu == null ? ' · Vestiaire ne dit pas si elle est lue' : ''}</div>
+            </div>
+          ))}
+        </> : <div data-vc-conv-vide="" style={style}>Aucune conversation à la dernière lecture.</div>)
+          : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>}
+      </div>
+    );
+  }
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes messages Vestiaire</div>
+      {corps}
+    </Card>
+  );
+}
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
   useEffect(() => { let stop = false; (async () => {
@@ -22071,6 +22140,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
         </Card>
         {plat==='Vestiaire Collective' && <PublierVestiaire comptes={comptes}/>}
         {plat==='Vestiaire Collective' && <VentesVestiaire comptes={comptes}/>}
+        {plat==='Vestiaire Collective' && <MessagesVestiaire/>}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'

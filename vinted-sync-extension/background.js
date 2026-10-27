@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.237.0';
+const CODE_VERSION = '5.238.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2618,6 +2618,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcVentes(msg);
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.238 : tes MESSAGES Vestiaire (le nombre de non-lus et les conversations, sans texte).
+    if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcCompteur' || msg.action === 'vcMessages')) {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages } : msg);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -11395,6 +11407,71 @@ async function rangerVcVentesMaintenant(m) {
   if (Array.isArray(m.forme) && m.forme.length) forme[source] = m.forme.slice(0, 120);
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: { ventes, lectures, forme, capturedAt: now } }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+// ── VESTIAIRE : TES MESSAGES (5.238) ────────────────────────────────────────
+// `vc_messages` = { compteur: { messages, at }, conversations: { [id]: { productId,
+// ref, nonLu, date, vuAt } }, lecture: { at, total, complet, page }, forme }.
+// AUCUN texte de message, aucun nom. Une écriture à la fois ; lecture ratée ⇒
+// rien n'est écrit (« rien lu » ne vaut pas « rien »). Le compteur, relu par la
+// page toutes les quelques secondes, ne s'écrit que s'il CHANGE, ou toutes les
+// 6 h (pour dater « relevé il y a… »). Une conversation n'est jamais effacée ;
+// une liste lue EN ENTIER fait foi pour « non lu ».
+let _vcMessagesChaine = Promise.resolve();
+let _vcCompteurEcrit = null;   // { n, at } — un mémo : perdu, il coûte une lecture
+const VC_COMPTEUR_REECRIRE_MS = 6 * 3600 * 1000;
+function rangerVcMessages(m) {
+  const run = _vcMessagesChaine.then(() => rangerVcMessagesMaintenant(m)).catch(() => false);
+  _vcMessagesChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function rangerVcMessagesMaintenant(m) {
+  const now = new Date();
+  const seulCompteur = m && typeof m.compteur === 'number' && !Array.isArray(m.conversations);
+  if (seulCompteur) {
+    const n = Math.floor(m.compteur);
+    if (!isFinite(n) || n < 0) return false;
+    if (_vcCompteurEcrit && _vcCompteurEcrit.n === n && now - _vcCompteurEcrit.at < VC_COMPTEUR_REECRIRE_MS) return true;
+  }
+  const rows = await sbGet('app_data?id=eq.vc_messages&select=data');
+  if (rows === null) return false;
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const iso = now.toISOString();
+  const data = Object.assign({}, cur);
+  if (seulCompteur) {
+    const n = Math.floor(m.compteur);
+    const prec = cur.compteur || {};
+    if (prec.messages === n && prec.at && now - Date.parse(prec.at) < VC_COMPTEUR_REECRIRE_MS) { _vcCompteurEcrit = { n, at: Date.parse(prec.at) }; return true; }
+    data.compteur = { messages: n, at: iso };
+  } else {
+    const conv = Object.assign({}, cur.conversations || {});
+    const lus = new Set();
+    for (const x of (Array.isArray(m.conversations) ? m.conversations : []).slice(0, 200)) {
+      const id = String((x && x.id) || '');
+      if (!/^[\w-]{1,40}$/.test(id)) continue;
+      lus.add(id);
+      const prev = conv[id] || {};
+      conv[id] = {
+        productId: x.productId || prev.productId || '', ref: x.ref || prev.ref || '',
+        nonLu: x.nonLu === true || x.nonLu === false ? x.nonLu : (prev.nonLu === true || prev.nonLu === false ? prev.nonLu : null),
+        date: x.date || prev.date || '', vuAt: iso, premiereVue: prev.premiereVue || iso,
+      };
+    }
+    const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
+    const entier = offset === 0 && total != null && lus.size >= total && Number(m.lus || 0) >= total;
+    // Lue en entier : une conversation qui n'y est plus n'est plus « non lue » (rien n'est effacé).
+    if (entier) for (const [id, v] of Object.entries(conv)) if (!lus.has(id) && v.nonLu === true) conv[id] = { ...v, nonLu: null };
+    data.conversations = conv;
+    const page = /^[\w/{}.-]{1,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur.lecture && cur.lecture.page) || '');
+    data.lecture = { at: iso, total, complet: entier, page };
+    if (Array.isArray(m.forme) && m.forme.length) data.forme = m.forme.slice(0, 120);
+  }
+  data.capturedAt = iso;
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_messages', data }], 'id');
+  if (ok === true) {
+    if (seulCompteur) _vcCompteurEcrit = { n: data.compteur.messages, at: now.getTime() };
+    notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  }
   return ok === true;
 }
 let _vcAnnoncesChaine = Promise.resolve();
