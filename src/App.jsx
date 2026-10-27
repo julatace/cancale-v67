@@ -24096,6 +24096,10 @@ const retirerPileDuPlan = (plan, itemId, idx) => {
   return fait ? { ...plan, rooms } : null;
 };
 const STOCK_SORTIS_JOURS = 60;
+// `save` écrit dans le navigateur 500 ms plus tard : deux passages rapprochés
+// (Vinted, puis Leboncoin, puis eBay qui arrivent) relisaient l'ancien journal
+// et s'effaçaient l'un l'autre. On écrit tout de suite, puis `save` synchronise.
+const saveTout = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} save(k, v); };
 let _sortieStock = { enCours: false, derniere: '' };
 const sortirPartisDuStock = async (candidats) => {
   if (_sortieStock.enCours || !isCloudReady()) return;
@@ -24121,12 +24125,12 @@ const sortirPartisDuStock = async (candidats) => {
     }
     if (!sortis.length) return;
     if (!(await saveRoomPlan(plan))) { _sortieStock.derniere = ''; return; }   // refusé : rien n'est dit retiré
-    save('vrm_room_plan', plan);
+    saveTout('vrm_room_plan', plan);
     const lim = Date.now() - STOCK_SORTIS_JOURS * 86400000;
     const j = {}; const ancien = load('vrm_stock_sortis', {}) || {};
     for (const k in ancien) if (ancien[k] && ancien[k].at > lim) j[k] = ancien[k];
     for (const x of sortis) j[x.cle] = x;
-    save('vrm_stock_sortis', j);
+    saveTout('vrm_stock_sortis', j);
     try { window.dispatchEvent(new CustomEvent('vrm:stock-plan', { detail: plan })); } catch (_) {}
     toast(sortis.length === 1 ? `N°${sortis[0].num} est partie : sa place dans « ${sortis[0].itemName} » est libérée (le numéro reste).` : `${sortis.length} articles partis : leurs places dans le stock sont libérées (les numéros restent).`);
   } catch (_) { _sortieStock.derniere = ''; } finally { _sortieStock.enCours = false; }
@@ -24155,19 +24159,19 @@ function SortisDuStock({ plan, planLu, ecrire }) {
       next = { ...plan, rooms };
     }
     if (next !== plan) ecrire(next);
-    const g = { ...(load('vrm_stock_garder', {}) || {}) }; g[x.cle] = Date.now(); save('vrm_stock_garder', g);
-    const nj = { ...j }; delete nj[x.cle]; save('vrm_stock_sortis', nj); setJ(nj);
+    const g = { ...(load('vrm_stock_garder', {}) || {}) }; g[x.cle] = Date.now(); saveTout('vrm_stock_garder', g);
+    const nj = { ...j }; delete nj[x.cle]; saveTout('vrm_stock_sortis', nj); setJ(nj);
     toast(`N°${x.num} remise dans « ${x.itemName} ». Elle ne sera plus retirée toute seule.`);
   };
   return (
     <div data-stock-sortis={liste.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Sortis du stock car partis · {liste.length}</div>
-      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Vinted dit que leur colis est parti : leur place est libérée, leur numéro reste. Si l'un d'eux est encore chez toi, remets-le.</div>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Vinted, Leboncoin ou eBay dit que leur colis est parti : leur place est libérée, leur numéro reste. Si l'un d'eux est encore chez toi, remets-le.</div>
       {liste.map(x => (
         <div key={x.cle} data-stock-sorti={x.num} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
           <span style={{ flex: '1 1 260px', minWidth: 0, fontSize: 12.5, color: C.text, lineHeight: 1.4 }}>
             <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
-            <span style={{ display: 'block', color: C.muted, fontSize: 11.5 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — Vinted : {x.statut || 'colis parti'}</span>
+            <span style={{ display: 'block', color: C.muted, fontSize: 11.5 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
           </span>
           <button type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, fontSize: 12.5, fontWeight: 600, padding: '0 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Remettre</button>
         </div>
@@ -38318,11 +38322,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const num = effEntry(o)?.numero; const cle = cleNum(num || ''); if (!cle) continue;
       // Encore porté par une annonce présente ou une autre vente à envoyer : on ne touche à rien.
       if ((porteursNum[cle] || []).some(p => p.type !== 'garage')) continue;
-      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: o.status || '' });
+      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: o.status || '', plateforme: 'Vinted' });
     }
+    // (27 oct., « pareil pour Leboncoin et eBay ») Même règle, par IDENTITÉ :
+    // Leboncoin = lien posé à la main ou référence VRM (`numeroLbcIdentite`),
+    // eBay = SKU de la ligne (`numLigneEbay`) — jamais le titre (§5). Parti =
+    // ce que dit la plateforme (`lbcExpediee`/`lbcFinalisee` ; eBay « Expédiée »),
+    // jamais une vente annulée ou remboursée. Une plateforme pas lue ne retire
+    // rien ; un N° encore à poster ailleurs (Vinted, Leboncoin, eBay) non plus.
+    const aPoster = new Set();
+    const lbcOk = lbcLu === true && lbcItemsBenef && typeof lbcItemsBenef === 'object';
+    const liensLbc = load('vrm_lbc_liens', {}) || {};
+    const numLbcDe = (v) => { try { return numeroLbcIdentite(v, lbcItemsBenef || {}, liensLbc); } catch (_) { return null; } };
+    const lbcSorties = [], ebaySorties = [];
+    if (lbcOk) for (const v of (lbcVentes.ventes || [])) {
+      if (!v || v.isSeller !== true) continue;
+      const num = numLbcDe(v); const cle = cleNum(num || ''); if (!cle) continue;
+      if (lbcAnnulee(v)) continue;
+      if (lbcExpediee(v) || lbcFinalisee(v)) lbcSorties.push({ v, num, cle }); else aPoster.add(cle);
+    }
+    const ebayOk = Array.isArray(ebayCmd);
+    if (ebayOk) for (const o of ebayCmd) {
+      const e = etatCommandeEbay(o);
+      for (const li of (Array.isArray(o && o.lineItems) ? o.lineItems : [])) {
+        const num = numLigneEbay(o, li); const cle = cleNum(num || ''); if (!cle) continue;
+        if (e.kind === 'shipped' && commandeEbayEngagee(o)) ebaySorties.push({ o, li, num, cle, e });
+        else if (e.peutExpedier || e.kind === 'review' || e.kind === 'payment') aPoster.add(cle);
+      }
+    }
+    for (const c of [...parCle.keys()]) if (aPoster.has(c)) parCle.delete(c);
+    const ajouter = (cle, x) => { if (parCle.has(cle) || aPoster.has(cle)) return; if ((porteursNum[cle] || []).some(p => p.type !== 'garage')) return; parCle.set(cle, x); };
+    for (const { v, num, cle } of lbcSorties) ajouter(cle, { cle, num: String(num), tx: 'lbc:' + String(v.id || v.itemId || ''), titre: v.title || '', statut: v.stepLabel || v.parcelStatus || 'colis parti', plateforme: 'Leboncoin' });
+    for (const { o, li, num, cle, e } of ebaySorties) ajouter(cle, { cle, num: String(num), tx: 'ebay:' + String(o.orderId || ''), titre: (li && li.title) || '', statut: e.label, plateforme: 'eBay' });
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, porteursNum, baseKO]);
+  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef]);
   const chercherNumVente = async (cle) => {
     if (!Array.isArray(sales.items)) return null;   // pas encore lu : « pas su »
     const tous = sales.items.filter(o => o && o.transaction_id != null && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc);
