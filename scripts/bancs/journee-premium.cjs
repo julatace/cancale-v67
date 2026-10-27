@@ -163,7 +163,9 @@ const lire = (pg) => pg.evaluate(() => {
         dit(!!lu.bonjour && !lu.bonjour.includes('@'), 'le bonjour ne montre jamais un email', `« ${lu.bonjour} »`);
         // (20 oct.) Depuis la coque iPhone (#596), le titre de l'écran vit dans l'en-tête
         // et le bonjour ne prend plus de place sur téléphone : 0 px est « compact ».
-        if (vp.width < 600) dit(lu.hBonjour >= 0 && lu.hBonjour <= 56, 'le bonjour reste compact sur téléphone (≤ 56 px, comme compact.cjs)', `${lu.hBonjour} px`);
+        // (27 oct.) Julien garde le bandeau pétrole du bonjour sur téléphone (« celui qui est là ») :
+        // un bandeau d'au plus 130 px, jamais plus haut (sinon les gestes passent sous la ligne de flottaison).
+        if (vp.width < 600) dit(lu.hBonjour >= 0 && lu.hBonjour <= 130, 'le bandeau du bonjour reste court sur téléphone (≤ 130 px)', `${lu.hBonjour} px`);
         dit(lu.courbeVisible, 'le graphique de la semaine est visible sans clic');
         dit(lu.tuiles.length === 4, 'la barre des 4 gestes est là', JSON.stringify(lu.tuiles));
         dit(lu.tuiles.some(([id, n]) => id === 'envoyer' && n === '2'), '« À envoyer » compte les 2 ventes à expédier', JSON.stringify(lu.tuiles));

@@ -1,0 +1,140 @@
+/* ══ Téléphone « sans cadres », 27 octobre (nuit) ═══════════════════════════
+   Julien : « des boutons dégueulasses et des cases pourries, tu en fous
+   partout ». Sur téléphone seulement : la page prend la couleur des cartes, les
+   contours disparaissent (une carte n'est plus une case, c'est un groupe posé
+   sur la page), et TOUS les boutons secondaires prennent une seule forme : une
+   pastille teintée, sans contour. Le bouton principal reste plein. Les
+   couleurs restent celles de la palette Perle. Rien ne change sur ordinateur. */
+@media (max-width: 767px) {
+  .vrm-app-shell { --ep-fond: #FBFCFA; --ep-teinte: rgba(36, 78, 84, .075); --ep-teinte-f: rgba(36, 78, 84, .13); --ep-encre: #244E54; --ep-trait: rgba(33, 59, 65, .08); }
+  html[data-theme="dark"] .vrm-app-shell { --ep-fond: #16292F; --ep-teinte: rgba(183, 214, 200, .09); --ep-teinte-f: rgba(183, 214, 200, .16); --ep-encre: #B7D6C8; --ep-trait: rgba(237, 245, 241, .08); }
+
+  .vrm-app-shell .vrm-main { background: var(--ep-fond) !important; }
+
+  /* Les cases : plus de contour, plus d'ombre, plus de fond blanc sur blanc. */
+  .vrm-app-shell .vrm-main [style*="solid rgb(220, 228, 223)"],
+  .vrm-app-shell .vrm-main [style*="solid rgb(56, 82, 88)"],
+  .vrm-app-shell .vrm-main .vrm-surface,
+  .vrm-app-shell .vrm-main .vrm-day-card,
+  .vrm-app-shell .vrm-main .vrm-day-week,
+  .vrm-app-shell .vrm-main .vrm-day-money,
+  .vrm-app-shell .vrm-main .vrm-day-task,
+  .vrm-app-shell .vrm-main details {
+    border-color: transparent !important; box-shadow: none !important;
+  }
+  .vrm-app-shell .vrm-main [style*="background: rgb(253, 254, 252)"],
+  .vrm-app-shell .vrm-main [style*="background: rgb(28, 51, 57)"],
+  .vrm-app-shell .vrm-main .vrm-surface,
+  .vrm-app-shell .vrm-main .vrm-day-card,
+  .vrm-app-shell .vrm-main .vrm-day-week,
+  .vrm-app-shell .vrm-main .vrm-day-money,
+  .vrm-app-shell .vrm-main details {
+    background: transparent !important; background-image: none !important;
+  }
+  /* Les blocs de Ma journée et les groupes : séparés par un trait fin, pas encadrés. */
+  .vrm-app-shell .vrm-main .vrm-day-money,
+  .vrm-app-shell .vrm-main .vrm-day-week,
+  .vrm-app-shell .vrm-main .vrm-day-card,
+  .vrm-app-shell .vrm-main .vrm-surface {
+    border-radius: 0 !important; border-top: 1px solid var(--ep-trait) !important;
+    padding-left: 2px !important; padding-right: 2px !important;
+  }
+  /* Une alerte : une ligne teintée, pas une boîte avec une barre de couleur. */
+  .vrm-app-shell .vrm-main .vrm-day-task {
+    background: var(--ep-teinte) !important; border-left-width: 0 !important; border-radius: 16px !important;
+  }
+  .vrm-app-shell .vrm-main .vrm-day-task .vrm-day-task-ic,
+  .vrm-app-shell .vrm-main .vrm-day-task > span:first-child { background: transparent !important; border: 0 !important; }
+  /* Les quatre compteurs : des chiffres, pas des cases. */
+  .vrm-app-shell .vrm-main .vrm-day-bar > button {
+    background: var(--ep-teinte) !important; border: 0 !important; box-shadow: none !important; border-radius: 18px !important;
+  }
+
+  /* UNE forme de bouton secondaire : la pastille teintée, sans contour. */
+  .vrm-app-shell .vrm-main button[style*="solid rgb(220, 228, 223)"],
+  .vrm-app-shell .vrm-main a[style*="solid rgb(220, 228, 223)"],
+  .vrm-app-shell .vrm-main button[style*="solid rgb(56, 82, 88)"],
+  .vrm-app-shell .vrm-main a[style*="solid rgb(56, 82, 88)"],
+  .vrm-app-shell .vrm-main button[style*="solid rgb(36, 78, 84)"]:not([style*="background: rgb(36, 78, 84)"]),
+  .vrm-app-shell .vrm-main a[style*="solid rgb(36, 78, 84)"]:not([style*="background: rgb(36, 78, 84)"]),
+  .vrm-app-shell .vrm-main button[style*="solid rgb(217, 226, 208)"] {
+    background: var(--ep-teinte) !important; border-color: transparent !important; box-shadow: none !important;
+    border-radius: 22px !important; color: var(--ep-encre) !important; font-weight: 600 !important;
+  }
+  .vrm-app-shell .vrm-main button[style*="solid rgb(220, 228, 223)"]:active,
+  .vrm-app-shell .vrm-main a[style*="solid rgb(220, 228, 223)"]:active { background: var(--ep-teinte-f) !important; }
+  /* Le bouton principal (plein) : pastille aussi, même famille. */
+  .vrm-app-shell .vrm-main button[style*="background: rgb(36, 78, 84)"],
+  .vrm-app-shell .vrm-main a[style*="background: rgb(36, 78, 84)"] { border-radius: 22px !important; box-shadow: none !important; }
+
+  /* Les filtres, segments et étiquettes : même pastille, l'actif en encre. */
+  .vrm-app-shell .vrm-main .vrm-seg { background: var(--ep-teinte) !important; border: 0 !important; border-radius: 999px !important; box-shadow: none !important; }
+  .vrm-app-shell .vrm-main .vrm-seg-btn { border-radius: 999px !important; box-shadow: none !important; }
+  .vrm-app-shell .vrm-main .vrm-filtres button { border: 0 !important; background: var(--ep-teinte) !important; box-shadow: none !important; border-radius: 999px !important; }
+  .vrm-app-shell .vrm-main .vrm-filtres button[aria-pressed="true"] { background: var(--ep-encre) !important; color: var(--ep-fond) !important; }
+
+  /* Les champs : une surface teintée sans contour. */
+  .vrm-app-shell .vrm-main input:not([type="checkbox"]):not([type="radio"]),
+  .vrm-app-shell .vrm-main select {
+    border-color: transparent !important; background: var(--ep-teinte) !important; box-shadow: none !important; border-radius: 14px !important;
+  }
+}
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-main .vrm-day-task-list,
+  .vrm-app-shell .vrm-main .vrm-day-stock-links { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+  .vrm-app-shell .vrm-main .vrm-day-card { border-left: 0 !important; border-right: 0 !important; border-bottom: 0 !important; }
+  /* Un colis : une rangée séparée par un trait, pas une boîte. */
+  .vrm-app-shell .vrm-main .vrm-colis-carte {
+    border: 0 !important; border-bottom: 1px solid var(--ep-trait) !important; border-radius: 0 !important;
+    background: transparent !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important;
+  }
+  .vrm-app-shell .vrm-main .vrm-colis-primaire {
+    background: var(--ep-encre) !important; color: var(--ep-fond) !important; border-color: transparent !important; border-radius: 999px !important;
+  }
+  /* L'ambre (urgent) : une teinte, pas un cadre. */
+  .vrm-app-shell .vrm-main [style*="solid rgba(150, 89, 0"] { border-color: transparent !important; border-radius: 16px !important; }
+  .vrm-app-shell .vrm-main [data-raison-bord] { border: 0 !important; border-radius: 16px !important; background: rgba(150, 89, 0, .07) !important; }
+}
+@media (max-width: 767px) {
+  /* Les contours teintés (ambre, accent à demi-transparence), clair comme sombre. */
+  .vrm-app-shell .vrm-main [style*="solid rgba("]:not(input):not(select) { border-color: transparent !important; }
+  .vrm-app-shell .vrm-main [data-colis-urgence] { border-radius: 16px !important; }
+}
+@media (max-width: 767px) {
+  /* Ma journée : les chiffres, sans les phrases dessous (Julien, 27 oct. :
+     « beaucoup trop d'explications, ça gâche l'utilisation »). Le détail vit
+     dans Comptabilité et dans Ventes ; un total partiel garde son « au moins ». */
+  .vrm-app-shell .vrm-day-layout .vrm-day-note,
+  .vrm-app-shell .vrm-day-layout [data-vendu-manque],
+  .vrm-app-shell .vrm-day-layout [data-depenses-choix],
+  .vrm-app-shell .vrm-day-layout [data-journee-benef-masquer] { display: none !important; }
+}
+@media (max-width: 767px) {
+  /* … sauf quand le bénéfice ne se calcule pas : la note dit où il se calcule. */
+  .vrm-app-shell .vrm-day-layout [data-journee-benef-etat]:not([data-journee-benef-etat="lu"]) .vrm-day-note { display: block !important; }
+  /* Dernières ventes (Julien, 27 oct. : « les dernières ventes coupent la photo ») :
+     la photo ENTIÈRE en haut de la carte, le titre et le prix dessous. */
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button { display: block !important; border-radius: 18px !important; overflow: hidden !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child {
+    min-height: 0 !important; aspect-ratio: 1 / 1 !important; width: 100% !important; background: #F1F3EF !important;
+  }
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child img {
+    object-fit: contain !important; padding: 6px; box-sizing: border-box;
+  }
+  .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div + div { padding: 9px 11px 11px !important; }
+}
+@media (max-width: 767px) {
+  :root[data-theme="dark"] .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child { background: #1C3339 !important; }
+}
+@media (max-width: 767px) {
+  /* Le défilement vit dans <main>, jamais dans la page (Julien, 27 oct. : « quand
+     je défile, ça descend tout en bas »). Un titre caché en position absolue
+     (« Vinted », espace des plateformes) avait pour repère la PAGE : il la
+     rallongeait de 1 000 px, et en bout de liste iOS faisait défiler la page
+     entière, barre du bas comprise. <main> devient son repère. */
+  .vrm-app-shell .vrm-main { position: relative; }
+  html:has(.vrm-app-shell), html:has(.vrm-app-shell) body { overflow: hidden; overscroll-behavior: none; }
+  /* « au moins » écrit en mot sous le titre : un « ≥ » suffit, comme le CA. */
+  .vrm-app-shell .vrm-day-layout [data-vendu-partiel="1"] > span:first-child { display: none !important; }
+  .vrm-app-shell .vrm-day-layout [data-vendu-partiel="1"]::before { content: "≥ "; }
+}

@@ -1,0 +1,146 @@
+/* ── Annonces en FICHES PRODUIT (27 oct., Julien : « les annonces sont beaucoup
+   trop petites, on ne voit même pas la première photo… on ne voit aucune
+   information, on est obligé d'appuyer dessus — fais ça comme les pros »).
+   Une carte = la PREMIÈRE PHOTO en grand, puis titre, prix et N°, état et
+   plateformes, chiffres et stats — tout visible sans toucher. « Gérer
+   l'annonce » reste replié en bas de la carte.
+   Chargé EN DERNIER : il prend le pas sur les règles « liste » empilées depuis
+   le 26 oct. (styles-mineral, -gestion, -mobile-studio, -annonces-ventes).
+   §7 : aucune couleur de plus — l'accent reste rare. */
+
+:root body .vrm-main .vrm-ann-grid.vrm-ann-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)) !important;
+  gap: 18px !important;
+  border: 0 !important; border-radius: 0 !important; overflow: visible !important;
+  background: transparent !important;
+}
+:root body .vrm-main .vrm-ann-ledger-heading.vrm-ann-ledger-heading { display: none !important; }
+
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-ann-card {
+  display: flex !important; flex-direction: column !important;
+  border: 1px solid var(--vrm-line) !important; border-radius: 14px !important;
+  background: var(--vrm-surface) !important; overflow: hidden !important;
+  box-shadow: 0 1px 2px rgba(10, 14, 20, .04), 0 8px 24px -16px rgba(10, 14, 20, .18) !important;
+  transition: transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s ease, border-color .22s ease;
+  animation: vrm-fiche-entree .38s cubic-bezier(.2,.7,.2,1) both;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card:nth-child(2) { animation-delay: 30ms; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card:nth-child(3) { animation-delay: 60ms; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card:nth-child(4) { animation-delay: 90ms; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card:nth-child(n+5) { animation-delay: 120ms; }
+@keyframes vrm-fiche-entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* La photo d'abord, en grand. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-overview {
+  display: flex !important; flex-direction: column !important; gap: 0 !important; padding: 0 !important;
+  position: relative;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > a {
+  position: relative; width: 100% !important; height: auto !important; aspect-ratio: 4 / 5;
+  border: 0 !important; border-radius: 0 !important; margin: 0 !important;
+  background: var(--vrm-bg) !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > a img {
+  width: 100%; height: 100%; object-fit: cover; transition: transform .45s cubic-bezier(.2,.7,.2,1);
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-boostee] {
+  left: 10px !important; right: auto !important; bottom: auto !important; top: 10px !important;
+  padding: 4px 9px !important; border-radius: 999px !important; font-size: 11px !important;
+}
+
+/* Les informations, sous la photo, lisibles. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-ledger-info {
+  display: flex !important; flex-direction: column !important; gap: 6px !important;
+  padding: 12px 14px 4px !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-ledger-info > * { grid-column: auto !important; grid-row: auto !important; padding-right: 0 !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-titre] {
+  font-size: 14.5px !important; line-height: 1.35 !important; font-weight: 600 !important;
+  color: var(--vrm-ink) !important; min-height: 2.7em;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line {
+  position: static !important; display: flex !important; flex-direction: row !important;
+  align-items: center !important; justify-content: space-between; gap: 10px !important; margin: 0 !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-prix] {
+  font-size: 22px !important; line-height: 1.1 !important; font-weight: 750 !important; letter-spacing: -.03em !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line > span:last-child {
+  margin: 0 !important; padding: 4px 10px !important; border: 1px solid var(--vrm-line) !important;
+  background: var(--vrm-bg) !important; border-radius: 999px !important; font-size: 13px !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line [data-edition="numero"] { min-height: 44px !important; margin: -12px -10px !important; padding: 0 10px !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-etat-ligne] { font-size: 12.5px !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] {
+  display: flex !important; flex-wrap: wrap !important; gap: 6px !important;
+  margin: 4px 0 0 !important; padding: 8px 0 0 !important; border-top: 1px solid var(--vrm-line) !important;
+  font-size: 12px !important;
+}
+/* Au doigt, chaque chose à toucher fait 44 px de haut (la pastille ET le texte cliquable). */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > span:has([data-edition]),
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > button { min-height: 44px !important; padding-block: 0 !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] [data-edition] { min-height: 44px !important; margin: 0 !important; align-self: stretch; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-stats-annonce] {
+  flex-basis: 100%; gap: 4px 12px !important; padding-top: 2px; font-size: 12px !important;
+}
+
+/* « Gérer l'annonce » : une rangée en bas de la fiche, jamais par-dessus. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions.vrm-ann-actions {
+  position: static !important; display: block !important; margin-top: auto !important;
+  align-self: stretch !important; width: auto !important;
+  padding: 0 14px !important; border: 0 !important; border-top: 1px solid var(--vrm-line) !important;
+  background: transparent !important; right: auto !important; bottom: auto !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions > summary {
+  position: static !important; width: auto !important; height: auto !important; min-height: 44px !important;
+  margin: 0 !important; padding: 0 !important; border-radius: 0 !important; background: transparent !important;
+  display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 6px !important;
+  font-size: 13px !important; font-weight: 600 !important; color: var(--vrm-muted) !important;
+  white-space: nowrap; border: 0 !important;
+}
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions > summary::after { content: none !important; display: none !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions > summary > * { display: inline-flex !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions > summary::before { content: none !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open] > summary { color: var(--vrm-ink) !important; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open] > div { padding: 0 0 14px !important; margin: 0 !important; }
+
+/* Au survol (souris seulement) : la fiche se soulève, la photo respire. */
+@media (hover: hover) and (pointer: fine) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(10, 14, 20, .05), 0 18px 36px -18px rgba(10, 14, 20, .28) !important;
+    background: var(--vrm-surface) !important;
+  }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > a:hover img { transform: scale(1.035); }
+}
+
+/* Téléphone : deux fiches par rangée, comme les vitrines des plateformes. */
+@media (max-width: 600px) {
+  :root body .vrm-main .vrm-ann-grid.vrm-ann-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-ann-card { border-radius: 12px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-ledger-info { padding: 9px 10px 2px !important; gap: 5px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-titre] { font-size: 13px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-prix] { font-size: 18px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line { gap: 6px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-price-line > span:last-child { padding: 3px 8px !important; font-size: 12px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-etat-ligne] { font-size: 11.5px !important; flex-wrap: wrap; }
+  /* Les cases à taper (achat, mini, refus, Préparer) en grille 2 × 2 : compactes, alignées. */
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] {
+    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px !important; font-size: 11.5px !important;
+  }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > * { min-width: 0; min-height: 44px !important; padding: 0 7px !important; gap: 3px !important; justify-content: flex-start !important; overflow: hidden; white-space: nowrap; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > button { font-size: 11.5px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card [data-chiffres] > [data-stats-annonce] { grid-column: 1 / -1; min-height: 0 !important; justify-content: flex-start; padding: 2px 0 0 !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions.vrm-ann-actions { padding: 0 10px !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-actions[open] { grid-column: auto; }
+}
+/* Une fiche dépliée sur téléphone prend toute la largeur (ses gestes ont besoin de place). */
+@media (max-width: 600px) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card:has(.vrm-ann-actions[open]) { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-ann-card { animation: none !important; transition: none !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card .vrm-ann-overview > a img { transition: none !important; }
+}

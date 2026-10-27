@@ -1,5 +1,40 @@
 # VRM — dossier de passation
 
+> **27 octobre (soir) — boutons et disposition revus, couleurs GARDÉES, animation de connexion :**
+> Julien : « je veux juste que les boutons, les dispositions soient modifiés… j'aimais bien
+> celle d'avant un peu vert » — une palette violette essayée puis REFUSÉE : ne pas la
+> reproposer, la palette Perle (pétrole et sauge, `src/themeMineral.js`) reste. 
+> `src/styles-disposition.css` (chargé en dernier, aucune teinte neuve, que des variables) :
+> grands titres serrés, cartes à 18 px, boutons à 12 px qui s'enfoncent, les 4 compteurs de
+> Ma journée en tuiles séparées, trait sur l'écran actif du rail ; et corrige « 0 vente »
+> écrit une lettre par ligne sur téléphone quand les ventes sont illisibles. Connexion
+> (`AuthScreen`) : aurore de trois halos qui dérivent, étiquettes flottantes décoratives
+> (≥ 1200 px, aucun chiffre), entrée en cascade ; rien si « réduire les animations ».
+> Verts : journee-widgets, journee-premium, coque-mobile, formes-communes, tdz, csp.
+
+> **27 octobre (soir) — l'ARRIVÉE guidée et le MOUVEMENT :** Julien : « univers personnalisable en un clic,
+> avec une voix, une démonstration » et « des effets entre les pages ». `src/Bienvenue.jsx` : pour un compte
+> neuf (`premierJour`, après le nuage), une fois — univers Clair/Nuit en un clic (`vinted_dark`), cinq écrans
+> de démonstration marqués « exemple », lus à voix haute sur demande (`speechSynthesis` du navigateur, fr-FR,
+> gratuit ; la fin de la lecture passe à l'écran suivant ; pas de voix ⇒ pas de bouton), puis « Commencer »
+> (Ma journée et ses premiers pas). Jamais le statut fiscal ni une plateforme imposés. Vue ⇒ `vrm_bienvenue_vue`
+> (SYNC_KEYS) ; Réglages → Affichage → « Présentation de VRM · Revoir » (`vrm:bienvenue`). `_porte-banc.cjs`
+> la marque vue pour les autres bancs (sauf `vrm_banc_bienvenue`). Mouvement (`styles-mouvement.css`) : entrée
+> en fondu de 220 ms à chaque écran (classe rejouée sur `<main>`, rien remonté, animation sans remplissage),
+> boutons qui s'enfoncent, rien avec « réduire les animations ». Banc `bienvenue.cjs` (22 contrôles, 390/1512 ;
+> rouge sur main ; mutation « sans styles-mouvement » ⇒ 2 rouges). ⚠️ Non mesuré : la voix réelle d'un iPhone.
+
+> **27 octobre (soir) — les ANNONCES en fiches produit, la photo en grand :** Julien : « les annonces sont
+> beaucoup trop petites, on ne voit même pas la première photo… on est obligé d'appuyer dessus — fais ça
+> comme les pros ». Décision du 26 (« compacte ») RENVERSÉE : chaque annonce est une fiche (première photo
+> 4:5 sur toute la largeur, « Boostée » posé dessus, titre, prix + N°, état + logos, achat · mini · refus ·
+> Préparer, vues/favoris/âge, « Gérer l'annonce » en bas) ; grille de fiches sur ordinateur, deux par rangée
+> au téléphone ; une fiche dépliée prend toute la largeur. `src/styles-annonces-pro.css` chargé EN DERNIER
+> (aucun JSX touché, tous les `data-*` gardés) ; entrée en fondu décalé, soulèvement au survol (souris
+> seule), rien si « réduire les animations ». Cibles 44 px gardées. Bancs : `annonces-carte` (fiches côte à
+> côte, photo pleine largeur), `annonces-ventes-brouillon` (photo ≥ 180 px, 1ʳᵉ annonce ≤ 680 px : 4 rouges
+> sur main — 84 px, 685/707 —, vert après), `plateformes-premium` vert.
+
 > **27 octobre (soir) — le STATUT FISCAL s'adapte à la personne, et les vrais taux :** Julien : « des gens
 > sont en société, d'autres pas revendeurs ; ils n'ont pas besoin du taux URSSAF » et « base-toi sur de
 > vrais taux ». Mesuré : 4 vendeurs sur 6 n'avaient JAMAIS choisi de régime et recevaient le rappel
