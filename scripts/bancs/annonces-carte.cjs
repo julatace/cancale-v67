@@ -212,6 +212,10 @@ const projette = (row, sel) => {
         dit(/Aussi sur eBay à 60 €/.test(av.a) && /Baisser sur eBay à 53 €/.test(av.btn),
           'la paire qui dort est aussi sur eBay (SKU VRM-41) : même baisse en proportion (49 → 43 ⇒ 60 → 53 €)', `${av.a.slice(0, 120)} | ${av.btn}`);
         dit(av.autres.length === 1 && !av.autres.includes('5550002'), 'une annonce eBay sans SKU de paire, même au même titre, ne déclenche rien (§5)', JSON.stringify(av.autres));
+        // (27 oct.) La paire qui dort a 2 favoris : on DIT que la baisse les prévient
+        // (toucher ses favoris sans robot — Vinted le fait tout seul au prix baissé).
+        const favN = await pg.evaluate(() => { const e = document.querySelector('[data-reprice-favs]'); return e ? { n: e.getAttribute('data-reprice-favs'), txt: e.innerText } : null; });
+        dit(favN && favN.n === '2' && /favori/i.test(favN.txt) && /pr[ée]vient/i.test(favN.txt), 'la paire qui dort dit « 2 en favori — ta baisse les prévient »', JSON.stringify(favN));
         await pg.click('[data-reprice-ebay="5550001"]');
         await pg.waitForTimeout(300);
         dit(envoisEbay.length === 0, 'rien ne part avant la confirmation', `${envoisEbay.length} envoi(s)`);
