@@ -163,7 +163,7 @@ async function prixDeLAbonnement(ligne) {
 //    plus (`lirePrix` rend null ⇒ refus existant).
 //    audit-lancement.cjs exige que cette valeur soit celle écrite dans les CGV
 //    (et dans le repli de l'app) : une seule valeur (§11).
-export const PRIX_CGV = { centimes: 1299, devise: 'eur', intervalle: 'month' };
+export const PRIX_CGV = { centimes: 1499, devise: 'eur', intervalle: 'month' };
 export const prixConforme = (p) => !!(p
   && p.centimes === PRIX_CGV.centimes
   && String(p.devise || '').toLowerCase() === PRIX_CGV.devise
@@ -272,6 +272,87 @@ async function proprietaireDe(sub, client) {
   } catch (_) { return ''; }
 }
 
+// ── Essai gratuit : UNE seule fois par e-mail ET par compte Vinted ──────────
+// Un registre de « clés consommées » — une ligne par e-mail et une par id de
+// compte Vinted — lu et écrit par la SEULE clé de service (RLS ferme la table
+// aux vendeurs : on ne doit pas pouvoir savoir qui a déjà essayé).
+// `supabase/migrations/022-essais-gratuits.sql`. Tant que la table n'existe pas
+// (migration non passée), la lecture échoue ⇒ `null` ⇒ AUCUN essai accordé : on
+// n'offre pas un cadeau qu'on ne peut pas borner. L'essai s'active le jour où
+// Julien passe la migration — jamais un faux « gratuit » entre-temps.
+const normEmail = (e) => String(e || '').trim().toLowerCase();
+const clesEssai = (email, ids) => (normEmail(email) ? ['email:' + normEmail(email)] : [])
+  .concat((ids || []).map((v) => 'vinted:' + String(v)));
+const enListe = (vals) => vals.map((v) => '%22' + encodeURIComponent(String(v)) + '%22').join(',');
+
+async function lireVintedIds(owner) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE || !owner) return [];
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?owner=eq.${encodeURIComponent(owner)}&select=vinted_user_id`, { headers: sbCle(SERVICE) });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j) ? j.map((x) => x && x.vinted_user_id).filter(Boolean).map(String) : [];
+  } catch (_) { return []; }
+}
+
+// true = un essai a DÉJÀ été consommé (par cet e-mail OU un de ces comptes
+// Vinted) · false = aucun (éligible) · null = pas su (lecture impossible : on
+// n'accorde alors AUCUN essai).
+async function essaiDejaUtilise(email, ids) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return null;
+  const cles = clesEssai(email, ids);
+  if (!cles.length) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?cle=in.(${enListe(cles)})&select=cle&limit=1`, { headers: sbCle(SERVICE) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return j.length > 0;
+  } catch (_) { return null; }
+}
+
+// Marque l'essai comme consommé (idempotent : la clé est la clé primaire).
+async function enregistrerEssai(owner, email, ids, subId) {
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return false;
+  const cles = clesEssai(email, ids);
+  if (!cles.length) return false;
+  const lignes = cles.map((cle) => ({ cle, owner: owner || null, abonnement_stripe: subId || null, cree: new Date().toISOString() }));
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/essais_gratuits?on_conflict=cle`, {
+      method: 'POST',
+      headers: { ...sbCle(SERVICE), 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify(lignes),
+    });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
+// ── 1 compte Vinted = 1 compte VRM (index unique global sur vinted_user_id).
+// L'app demande, pour le compte Vinted ouvert dans le Chrome du vendeur : est-il
+// DÉJÀ pris par un AUTRE compte VRM ? Réponse = un simple oui/non, JAMAIS qui le
+// possède (aucun e-mail, aucun identifiant de propriétaire ne sort). Session
+// obligatoire. « Pas su » (pas de clé de service, lecture ratée) ⇒ `pris:false` :
+// on n'invente pas de fausse alerte — la base bloque de toute façon la capture
+// en double, c'est seulement le message qui manquerait.
+async function vintedPris(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  const id = String((req.query && req.query.id) || '').trim();
+  if (!/^[0-9]{1,20}$/.test(id)) return repondre(res, 400, { ok: false, raison: 'id' });
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  if (!SERVICE) return repondre(res, 200, { ok: true, pris: false });
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(id)}&select=owner`, { headers: sbCle(SERVICE) });
+    if (!r.ok) return repondre(res, 200, { ok: true, pris: false });
+    const j = await r.json();
+    const pris = Array.isArray(j) && j.some((row) => row && row.owner && String(row.owner) !== String(u.id));
+    return repondre(res, 200, { ok: true, pris });
+  } catch (_) { return repondre(res, 200, { ok: true, pris: false }); }
+}
+
 const ligneDeLAbonnement = (sub, livemode) => ({
   statut: String(sub.status || 'incomplete'),
   client_stripe: typeof sub.customer === 'string' ? sub.customer : (sub.customer && sub.customer.id) || null,
@@ -314,6 +395,12 @@ async function webhook(req, res) {
   //    réessayer Stripe (la leçon d'api/email-inbound, §5).
   if (!ecrit.ok) return repondre(res, 503, { erreur: 'statut non enregistré', detail: ecrit.code, reessayer: true });
   if (ecrit.ignore) console.warn('[stripe] événement acquitté sans écriture :', ecrit.ignore, sub.id);
+  // Marque l'essai comme consommé quand il a réellement DÉMARRÉ (statut
+  // « trialing » ou une date de fin d'essai), d'après ce qu'on a posé au
+  // paiement. Idempotent (clé primaire) : un rejeu de webhook ne double rien.
+  if (sub.metadata && sub.metadata.essai && (sub.status === 'trialing' || sub.trial_end)) {
+    await enregistrerEssai(owner, sub.metadata.essai_email, String(sub.metadata.essai_vinted || '').split(',').filter(Boolean), sub.id);
+  }
   return repondre(res, 200, { recu: true });
 }
 
@@ -333,8 +420,17 @@ async function abonnement(req, res) {
   // manque ne part qu'au propriétaire, le seul qui peut la remplir.
   const lues = await lireMentions();
   const manque = mentionsManquantes(lues);
+  // Essai gratuit encore disponible ? Jamais si propriétaire ou déjà abonné ;
+  // `null` d'éligibilité ⇒ false (on n'annonce pas un essai qu'on ne pourrait
+  // pas honorer). Une seule fois par e-mail ET par compte Vinted.
+  const dejaAbo = !!(ligne && abonnementActif(ligne.statut));
+  const essaiDispo = (!acc.proprietaire && !dejaAbo && stripePret())
+    ? (await essaiDejaUtilise(u.email, await lireVintedIds(u.id))) === false
+    : false;
   return repondre(res, 200, {
     ok: true,
+    essaiDispo,
+    essaiJours: 7,
     mentionsCompletes: manque === null ? null : manque.length === 0,
     mentionsManquantes: acc.proprietaire ? (manque === null ? null : manque.map((x) => x.libelle)) : undefined,
     // 23 oct. (revue) : pourquoi « pas su » (l'erreur de lecture du fichier) —
@@ -374,7 +470,9 @@ async function abonnement(req, res) {
 // public/legal/cgv.html (audit-lancement vérifie qu'elles concordent).
 // 11 octobre : prix passé à 12,99 € (version précédente : 2026-10-04, 9,99 €).
 // 22 octobre : case « accès immédiat » et formulaire de rétractation (art. 5).
-const CGV_VERSION = '2026-10-22';
+// 27 octobre : prix 14,99 €, et essai gratuit de 7 jours (une seule fois par
+//   adresse e-mail ET par compte Vinted).
+const CGV_VERSION = '2026-10-27';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -430,6 +528,10 @@ async function checkout(req, res) {
     //    journaux ci-dessus et sur la carte « Mon compte » du propriétaire.
     return repondre(res, 503, { erreur: 'prix-cgv', message: "Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie plus tard." });
   }
+  // Essai gratuit 7 jours — UNE seule fois par e-mail ET par compte Vinted.
+  // `false` = éligible ; `true` = déjà utilisé ; `null` = pas su ⇒ pas d'essai.
+  const idsVinted = await lireVintedIds(u.id);
+  const avecEssai = (await essaiDejaUtilise(u.email, idsVinted)) === false;
   const params = {
     mode: 'subscription',
     line_items: [{ price: prix.id, quantity: 1 }],
@@ -437,7 +539,11 @@ async function checkout(req, res) {
     cancel_url: `${APP_URL}/?tab=settings&vue=abonnement&abonnement=annule`,
     client_reference_id: u.id,
     metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe },
-    subscription_data: { metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe } },
+    subscription_data: {
+      metadata: { owner: u.id, app: 'vrm', cgv_version: CGV_VERSION, cgv_acceptees_le: accepteLe, acces_immediat_demande_le: accepteLe,
+        ...(avecEssai ? { essai: '7j', essai_email: normEmail(u.email), essai_vinted: idsVinted.join(',') } : {}) },
+      ...(avecEssai ? { trial_period_days: 7 } : {}),
+    },
     locale: 'fr',
     // ⚠️ LES CGV SE FONT ACCEPTER AVANT DE PAYER (5 octobre). Un abonnement
     //    vendu en ligne sans case « j'accepte les conditions de vente » n'a pas
@@ -1018,6 +1124,7 @@ export default async function handler(req, res) {
   }
   if (mode === 'photo') return m === 'POST' ? photo(req,res) : repondre(res,405,{erreur:'POST seulement'});
   if (mode === 'sante') return m === 'GET' ? sante(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
+  if (mode === 'vinted-pris') return m === 'GET' ? vintedPris(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'webhook') return m === 'POST' ? webhook(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'checkout') return m === 'POST' ? checkout(req, res) : repondre(res, 405, { erreur: 'POST seulement' });

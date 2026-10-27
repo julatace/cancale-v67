@@ -27941,6 +27941,32 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
     window.addEventListener('vrm:ext', f);
     return () => { mort = true; clearTimeout(t); window.removeEventListener('vrm:ext', f); };
   }, []);
+  // ⚠️ 1 compte Vinted = 1 compte VRM (verrou en base, index unique global).
+  // Si le compte Vinted ouvert dans TON Chrome n'est pas dans tes comptes liés
+  // ET appartient déjà à un AUTRE compte VRM, VRM ne captera rien pour lui :
+  // on le DIT clairement (sinon l'écran reste vide, sans explication). Le
+  // serveur ne répond qu'un oui/non — jamais QUI le possède. « Pas su » (pas de
+  // clé de service, lecture ratée, compte à soi, compte libre) ⇒ pas d'alerte.
+  const [vintedPris, setVintedPris] = useState(false);
+  const prisRef = React.useRef('');
+  useEffect(() => {
+    let mort = false;
+    const verifier = () => {
+      const v = vintedDeChrome();
+      const uid = v && v.uid ? String(v.uid) : '';
+      if (!uid || accounts.some(a => String(a.vinted_user_id) === uid)) { prisRef.current = ''; setVintedPris(false); return; }
+      if (prisRef.current === uid) return; // déjà vérifié ce compte
+      prisRef.current = uid;
+      fetch(`/api/compte?mode=vinted-pris&id=${encodeURIComponent(uid)}`, { headers: enTeteSession() })
+        .then(r => (r.ok ? r.json() : null))
+        .then(j => { if (!mort) setVintedPris(j && j.pris ? { login: (v.login || ''), uid } : false); })
+        .catch(() => { if (!mort) setVintedPris(false); });
+    };
+    verifier();
+    const f = () => verifier();
+    window.addEventListener('vrm:ext', f);
+    return () => { mort = true; window.removeEventListener('vrm:ext', f); };
+  }, [accounts]);
   const acctHealth = (acc) => {
     const uid = String(acc.vinted_user_id);
     const ev = etatExt && etatExt[uid];
@@ -28198,6 +28224,16 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
+      {vintedPris && (
+        <div data-vinted-pris={vintedPris.uid} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
+            Ce compte Vinted est déjà rattaché à un autre compte VRM
+          </div>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>
+            Le compte {vintedPris.login ? <b style={{color:C.text}}>{vintedPris.login}</b> : 'Vinted'} ouvert dans ton navigateur appartient déjà à un autre compte VRM. Un compte Vinted ne peut servir que sur <b style={{color:C.text}}>un seul</b> compte VRM : VRM ne captera donc rien pour lui ici. Pour l'utiliser, connecte-toi sur Vinted avec un autre compte, ou ouvre VRM avec le compte qui le possède déjà.
+          </div>
+        </div>
+      )}
       {nbExclus > 0 && (
         <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
@@ -42864,7 +42900,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>{offresAuto ? "Une offre qui atteint le « mini » d'une annonce est acceptée toute seule — une à la fois, un court délai entre chaque, le compte ouvert dans Chrome seulement. Sous ton « refuse », elle est refusée ; entre les deux, à toi de négocier." : "Pose un « mini » sur une annonce, et VRM accepte les offres au-dessus à ta place."}</div>
               </div>
               <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
-                style={{flexShrink:0,width:46,height:26,borderRadius:13,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
+                style={{flexShrink:0,width:46,height:26,borderRadius:999,border:'none',cursor:'pointer',background:offresAuto?C.accent:C.border,position:'relative',transition:'background .15s'}} aria-label="Acceptation automatique des offres">
                 <span style={{position:'absolute',top:3,left:offresAuto?23:3,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s',boxShadow:'0 1px 3px rgba(0,0,0,.3)'}}/>
               </button>
             </div>
@@ -43578,7 +43614,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
-                      <span style={{marginLeft:'auto',flexShrink:0,display:'inline-block',verticalAlign:'middle',fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:'3px 9px'}}>
+                      <span style={{marginLeft:'auto',flexShrink:0,display:'inline-block',verticalAlign:'middle',fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:'3px 9px'}}>
                         <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
@@ -49201,7 +49237,7 @@ async function ouvrirStripe(mode, extra) {
 // des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
 // audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
 // serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
-const PRIX_CGV_LISIBLE = '12,99 € / mois';
+const PRIX_CGV_LISIBLE = '14,99 € / mois';
 const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
@@ -49770,14 +49806,17 @@ function MonAbonnement() {
   return (<>
     <div style={carte} data-abonnement="sans">
       {titre}
-      <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
-        {prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.
+      <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5 }} data-essai-dispo={e.essaiDispo ? '' : undefined}>
+        {e.essaiDispo
+          ? <><b>{e.essaiJours || 7} jours gratuits</b>, puis {prixLisible(e.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment.</>
+          : <>{prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.</>}
         {!e.obligatoire && <span style={{ color: C.muted }}> Pour l'instant VRM reste gratuit pour toi.</span>}
       </div>
       {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
       {test}
       <CaseCgv cases={cases} onChange={setCases}/>
-      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} style={{ ...bouton(true), opacity: cgv ? 1 : 0.5 }}>{occupe ? 'Ouverture…' : "S'abonner"}</button>
+      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} style={{ ...bouton(true), opacity: cgv ? 1 : 0.5 }}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
+      {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
       <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>
       {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
     </div>

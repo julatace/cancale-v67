@@ -38,13 +38,21 @@ const JETONS = { 'aa.bb.A': { id: A, email: 'a@exemple.test' }, 'aa.bb.B': { id:
 
 // ── Fausse base + faux Stripe ───────────────────────────────────────────────
 let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panneRpc, appData, lecturesSubs, ecrituresData, mains, subsStripe, facturesStripe, panneFactures, prixStripe;
+// Essai gratuit : les comptes Vinted du vendeur, les « clés » déjà consommées,
+// ce qui est écrit dans le registre, et une panne de lecture du registre.
+let vintedIds, essaiConsomme, essaisEcrits, panneEssais;
+// « 1 compte Vinted = 1 compte VRM » (mode vinted-pris) : qui possède quel
+// compte Vinted (vinted_user_id → [owners]), et une panne de lecture.
+let vintedParId, panneVintedPris;
 // Le prix rangé chez Stripe sous `vrm_mensuel`, tel que Stripe le rend (centimes
 // entiers). Par défaut : celui des CGV (12,99 € par mois).
-const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1299, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
+const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1499, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
 const reset = () => {
   base = {}; ecritures = []; appelsStripe = []; panneEcriture = false; fkInconnue = false; prixStripe = PRIX_STRIPE_CGV;
   subsStripe = {}; facturesStripe = []; panneFactures = false;
   obligatoire = false; panneRpc = false; appData = {}; lecturesSubs = []; ecrituresData = []; mains = [];
+  vintedIds = []; essaiConsomme = []; essaisEcrits = []; panneEssais = false;
+  vintedParId = {}; panneVintedPris = false;
   if (oublierAcces) oublierAcces();
 };
 let oublierAcces = null;
@@ -141,14 +149,29 @@ global.fetch = async (url, opts = {}) => {
     }
     return rep({ error: { message: 'inconnu' } }, 404);
   }
+  // Les comptes Vinted du vendeur (clé de service), et le registre des essais.
+  if (u.includes('/rest/v1/vinted_accounts')) {
+    const vid = /vinted_user_id=eq\.([^&]+)/.exec(u);
+    if (vid && /select=owner/.test(u)) {                 // mode vinted-pris (clé de service)
+      if (panneVintedPris) return rep('<html>522</html>', 522);
+      return rep((vintedParId[decodeURIComponent(vid[1])] || []).map((o) => ({ owner: o })));
+    }
+    return rep(vintedIds.map((v) => ({ vinted_user_id: v })));   // lireVintedIds (owner=eq.)
+  }
+  if (u.includes('/rest/v1/essais_gratuits')) {
+    if (m === 'POST') { try { for (const l of JSON.parse(opts.body)) essaisEcrits.push(l); } catch (_) {} return rep('', 201); }
+    if (panneEssais) return rep('<html>522</html>', 522);
+    const dejaPris = essaiConsomme.some((c) => u.includes('%22' + encodeURIComponent(c) + '%22'));
+    return rep(dejaPris ? [{ cle: 'x' }] : []);
+  }
   return rep({}, 404);
 };
 
 const faireRes = () => { const r = { code: null, corps: null, entetes: {} }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = (k, v) => { r.entetes[k] = v; }; r.end = () => r; return r; };
 // Une requête comme Vercel la donne : un flux qu'on peut lire, plus query/headers.
-const req = ({ method = 'GET', mode, headers = {}, corps = null }) => {
+const req = ({ method = 'GET', mode, headers = {}, corps = null, query = {} }) => {
   const buf = corps == null ? null : Buffer.from(corps, 'utf8');
-  return { method, query: mode ? { mode } : {}, headers, async *[Symbol.asyncIterator]() { if (buf) yield buf; } };
+  return { method, query: { ...(mode ? { mode } : {}), ...query }, headers, async *[Symbol.asyncIterator]() { if (buf) yield buf; } };
 };
 const signer = (corps, t = Math.floor(Date.now() / 1000), secret = SECRET) => `t=${t},v1=${crypto.createHmac('sha256', secret).update(`${t}.${corps}`).digest('hex')}`;
 const evenement = (type, objet, created = 1000) => JSON.stringify({ id: 'evt_' + created, type, created, livemode: false, data: { object: objet } });
@@ -309,18 +332,83 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     ['par an', { ...PRIX_STRIPE_CGV, recurring: { interval: 'year', interval_count: 1 } }],
     ['tous les 3 mois', { ...PRIX_STRIPE_CGV, recurring: { interval: 'month', interval_count: 3 } }],
     ['sans montant unitaire (prix par paliers)', { ...PRIX_STRIPE_CGV, unit_amount: null, billing_scheme: 'tiered' }],
-    ['ponctuel (pas un abonnement)', { id: 'price_banc', unit_amount: 1299, currency: 'eur', type: 'one_time' }],
+    ['ponctuel (pas un abonnement)', { id: 'price_banc', unit_amount: 1499, currency: 'eur', type: 'one_time' }],
   ]) {
     await essaie('prix ' + nom, async () => {
       reset(); prixStripe = prix;
       const { r, session } = await payer();
-      dit(r.code === 503 && r.corps && r.corps.erreur === 'prix-cgv' && !session, `12,99 ${nom} : pas le prix des CGV → paiement fermé`, `HTTP ${r.code} · session ${session}`);
+      dit(r.code === 503 && r.corps && r.corps.erreur === 'prix-cgv' && !session, `14,99 ${nom} : pas le prix des CGV → paiement fermé`, `HTTP ${r.code} · session ${session}`);
     });
   }
   await essaie('prix conforme', async () => {
     reset();
     const { r, session } = await payer();
-    dit(r.code === 200 && session && /checkout\.stripe\.com/.test((r.corps && r.corps.url) || ''), 'l’autre sens : 12,99 € par mois en euros → le paiement s’ouvre', `HTTP ${r.code}`);
+    dit(r.code === 200 && session && /checkout\.stripe\.com/.test((r.corps && r.corps.url) || ''), 'l’autre sens : 14,99 € par mois en euros → le paiement s’ouvre', `HTTP ${r.code}`);
+  });
+
+  // ── Essai gratuit : 7 jours, UNE seule fois par e-mail ET par compte Vinted ─
+  console.log('\n── Essai gratuit (une fois par e-mail ET par compte Vinted)');
+  const checkoutDeA = async () => {
+    const r = faireRes();
+    const q = req({ method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer aa.bb.A' }, corps: JSON.stringify({ cgv: true, accesImmediat: true }) });
+    q.body = { cgv: true, accesImmediat: true };
+    await compte(q, r);
+    const s = appelsStripe.find((x) => x.chemin === 'checkout/sessions');
+    return { r, corps: decodeURIComponent((s && s.corps) || '') };
+  };
+  await essaie('éligible : 7 jours d’essai demandés à Stripe', async () => {
+    reset(); vintedIds = ['V1', 'V2'];
+    const { r, corps } = await checkoutDeA();
+    dit(r.code === 200 && /subscription_data\[trial_period_days\]=7/.test(corps), 'aucune clé consommée ⇒ la session Stripe demande 7 jours d’essai', (corps.match(/trial_period_days\]=\d+/) || ['absent'])[0]);
+    dit(/subscription_data\[metadata\]\[essai\]=7j/.test(corps), '… et l’essai est marqué dans les métadonnées (le webhook le consommera)');
+  });
+  await essaie('même e-mail déjà essayé ⇒ pas de 2e essai', async () => {
+    reset(); vintedIds = ['V9']; essaiConsomme = ['email:a@exemple.test'];
+    const { r, corps } = await checkoutDeA();
+    dit(r.code === 200 && !/trial_period_days/.test(corps), 'e-mail déjà consommé ⇒ aucun essai, l’abonnement démarre payant', (corps.match(/trial_period_days\]=\d+/) || ['aucun (ok)'])[0]);
+  });
+  await essaie('même compte Vinted déjà essayé ⇒ pas de 2e essai', async () => {
+    reset(); vintedIds = ['V1']; essaiConsomme = ['vinted:V1'];
+    const { r, corps } = await checkoutDeA();
+    dit(r.code === 200 && !/trial_period_days/.test(corps), 'un compte Vinted déjà consommé (même sous un autre e-mail) ⇒ aucun essai');
+  });
+  await essaie('registre illisible ⇒ aucun essai (jamais un faux cadeau)', async () => {
+    reset(); vintedIds = ['V1']; panneEssais = true;
+    const { r, corps } = await checkoutDeA();
+    dit(r.code === 200 && !/trial_period_days/.test(corps), 'lecture du registre impossible ⇒ pas d’essai, mais le paiement s’ouvre quand même');
+  });
+  console.log('\n── 1 compte Vinted = 1 compte VRM (mode vinted-pris)');
+  const estPris = async (jwt, id) => { const r = faireRes(); await compte(req({ mode: 'vinted-pris', query: { id }, headers: jwt ? { authorization: 'Bearer ' + jwt } : {} }), r); return r; };
+  await essaie('sans session ⇒ 401', async () => {
+    reset(); vintedParId = { '42': [B] };
+    const r = await estPris(null, '42');
+    dit(r.code === 401, 'aucun jeton ⇒ 401, rien n’est révélé', String(r.code));
+  });
+  await essaie('id non numérique ⇒ 400 (jamais passé à la base)', async () => {
+    reset();
+    const r = await estPris('aa.bb.A', 'abc; drop');
+    dit(r.code === 400 && r.corps && r.corps.raison === 'id', 'un id qui n’est pas un nombre est refusé net', JSON.stringify(r.corps));
+  });
+  await essaie('déjà pris par un AUTRE compte VRM ⇒ pris:true, sans dire QUI', async () => {
+    reset(); vintedParId = { '42': [B] };
+    const r = await estPris('aa.bb.A', '42');
+    dit(r.code === 200 && r.corps.pris === true, 'A voit que le compte Vinted 42 (à B) est déjà réservé', JSON.stringify(r.corps));
+    dit(r.corps && !('owner' in r.corps) && !JSON.stringify(r.corps).includes(B), '… et la réponse ne révèle AUCUN propriétaire (juste oui/non)', JSON.stringify(r.corps));
+  });
+  await essaie('à MOI ⇒ pris:false', async () => {
+    reset(); vintedParId = { '42': [A] };
+    const r = await estPris('aa.bb.A', '42');
+    dit(r.code === 200 && r.corps.pris === false, 'un compte déjà à moi n’est pas « pris ailleurs »', JSON.stringify(r.corps));
+  });
+  await essaie('libre ⇒ pris:false', async () => {
+    reset();
+    const r = await estPris('aa.bb.A', '77');
+    dit(r.code === 200 && r.corps.pris === false, 'un compte que personne n’a ⇒ libre', JSON.stringify(r.corps));
+  });
+  await essaie('lecture ratée ⇒ pris:false (jamais de fausse alerte)', async () => {
+    reset(); vintedParId = { '42': [B] }; panneVintedPris = true;
+    const r = await estPris('aa.bb.A', '42');
+    dit(r.code === 200 && r.corps.pris === false, 'la base ne répond pas ⇒ on n’invente pas d’alerte (la base bloque la capture de toute façon)', JSON.stringify(r.corps));
   });
   await essaie('carte : prix relayé seulement s’il est celui des CGV', async () => {
     reset(); prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };
@@ -332,8 +420,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
       '  le propriétaire, lui, reçoit le montant réglé chez Stripe (c’est lui qui le corrige)', JSON.stringify(rp.corps.prixStripe));
     reset();
     const rb = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.A' } }), rb);
-    dit(rb.code === 200 && rb.corps.prix && rb.corps.prix.montant === 12.99 && rb.corps.prixConforme === true && rb.corps.prixStripe === null,
-      '  Stripe à 12,99 € : le prix est relayé, « conforme »', JSON.stringify({ prix: rb.corps.prix, prixConforme: rb.corps.prixConforme }));
+    dit(rb.code === 200 && rb.corps.prix && rb.corps.prix.montant === 14.99 && rb.corps.prixConforme === true && rb.corps.prixStripe === null,
+      '  Stripe à 14,99 € : le prix est relayé, « conforme »', JSON.stringify({ prix: rb.corps.prix, prixConforme: rb.corps.prixConforme }));
     reset(); prixStripe = 'panne';
     const rn = faireRes(); await compte(req({ mode: 'abonnement', headers: { authorization: 'Bearer aa.bb.P' } }), rn);
     dit(rn.code === 200 && rn.corps.prix === null && rn.corps.prixConforme === null && rn.corps.prixStripe === null,
@@ -384,8 +472,8 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
     reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
     subsStripe.sub_A = SUB_A({ id: 'price_ancien', unit_amount: 999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } });
     const r = await aboDe('aa.bb.A');
-    dit(r.code === 200 && r.corps.prixAbonnement && r.corps.prixAbonnement.texte === '9,99 € / mois' && r.corps.prix && r.corps.prix.montant === 12.99,
-      'abonné à 9,99 € quand l’offre est à 12,99 € : `prixAbonnement` dit 9,99 € (le prix qu’il paie), `prix` reste celui de l’offre', JSON.stringify({ prixAbonnement: r.corps.prixAbonnement, prix: r.corps.prix }));
+    dit(r.code === 200 && r.corps.prixAbonnement && r.corps.prixAbonnement.texte === '9,99 € / mois' && r.corps.prix && r.corps.prix.montant === 14.99,
+      'abonné à 9,99 € quand l’offre est à 14,99 € : `prixAbonnement` dit 9,99 € (le prix qu’il paie), `prix` reste celui de l’offre', JSON.stringify({ prixAbonnement: r.corps.prixAbonnement, prix: r.corps.prix }));
     reset(); base[A] = { owner: A, statut: 'active', client_stripe: 'cus_A', abonnement_stripe: 'sub_A' };
     subsStripe.sub_A = SUB_A({ id: 'price_ancien', unit_amount: 999, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } });
     prixStripe = { ...PRIX_STRIPE_CGV, unit_amount: 999 };

@@ -68,7 +68,7 @@ global.fetch = async (url, o = {}) => {
   if (u.startsWith('https://api.stripe.com/v1/')) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
     appelsStripe.push({ chemin, corps: decodeURIComponent(String(o.body || '')) });
-    if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1299, currency: 'eur', recurring: { interval: 'month' } }] });
+    if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1499, currency: 'eur', recurring: { interval: 'month' } }] });
     if (chemin === 'checkout/sessions') return rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });
   }
   return rep({}, 404);

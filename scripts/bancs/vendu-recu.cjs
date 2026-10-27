@@ -102,6 +102,11 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
   if (opts.horloge) await pg.clock.install({ time: opts.horloge });
   if (opts.declare) await pg.addInitScript((d) => { try { localStorage.setItem('vrm_urssaf_declare', JSON.stringify(d)); } catch (_) {} }, opts.declare);
   if (opts.publie) await pg.addInitScript((d) => { try { localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d)); } catch (_) {} }, opts.publie);
+  // La carte URSSAF ne s'affiche QUE pour un micro-entrepreneur (depuis le
+  // « Statut fiscal adapté à la personne » : particulier/micro/société) — sinon
+  // l'écran Comptabilité montre d'abord « Quel est ton statut ? ». Les tests de
+  // cette carte posent donc le régime, comme un vrai micro-entrepreneur.
+  if (opts.regime) await pg.addInitScript((r) => { try { localStorage.setItem('vinted_regime', JSON.stringify(r)); } catch (_) {} }, opts.regime);
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(versementsLisibles).map((r) => (opts.declare && r.id === 'harvest_111_orders_sold')
@@ -235,7 +240,7 @@ const lire = (pg) => pg.evaluate(() => {
     });
     console.log('\n── Déclarée le mois dernier, versée aujourd’hui');
     await essaie('declaree ailleurs', async () => {
-      const { ctx, pg, lu, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'journee', { declare: DECLARE });
+      const { ctx, pg, lu, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'journee', { declare: DECLARE, regime: 'micro' });
       dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche', errs.join(' | ').slice(0, 160));
       const rj = lu.jours[cle(il(0))] || {};
       dit(rj.recu === String(attendu.jour(0).recu + 5500), 'la barre REÇU du jour compte la vente versée aujourd’hui', `${rj.recu} · attendu ${attendu.jour(0).recu + 5500}`);
@@ -254,7 +259,7 @@ const lire = (pg) => pg.evaluate(() => {
       const ym = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}`;
       const publie = { mois: [{ ym, n: 1, ca: 50, nMasq: 0, caMasq: 0, par: { Vinted: { n: 1, ca: 50 } }, nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, declare: null }],
         aDater: { n: 0, ca: 0, par: {} }, ecartees: 0, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'nonRelie' }, declare: 'pasSu', at: Date.now() };
-      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'compta', { publie });
+      const { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, true, 'compta', { publie, regime: 'micro' });
       await pg.waitForFunction(() => document.querySelector('[data-urssaf-declare]'), null, { timeout: 15000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-urssaf-declare]'); return e ? e.getAttribute('data-urssaf-declare') : null; });
       dit(v === 'pasSu', 'la carte URSSAF lit « registre pas encore lu » et le dit (le chiffre peut encore compter une vente déclarée ailleurs)', `declare=${v}`);

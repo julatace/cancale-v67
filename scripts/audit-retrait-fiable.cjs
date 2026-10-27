@@ -225,21 +225,27 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
 
   await essaie('règles de l\'app', async () => {
     const AR = await importer('api/_lib/arrivee-colis.js');
-    const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'etatColisEmail', 'isColisEnAttente', 'isColisActive'],
-      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait });
     const NOW = Date.parse('2026-10-23T08:00:00Z');
+    // ⚠️ `chargeApp` exécute le code dans un AUTRE realm (vm) : figer `Date.now`
+    //    dans CE realm-ci ne l'y atteint pas (et le `Date` du vm n'est pas
+    //    accessible de l'extérieur). Sans ça, `etatColisEmail` (défaut
+    //    `maintenant = Date.now()`) lit l'horloge RÉELLE, et la fixture `ok`
+    //    (limite 2026-10-26) devenait « délai dépassé » dès le 27/10 — un rouge
+    //    DATÉ, pas un défaut de l'app. On injecte donc une Date figée dans le vm
+    //    (un banc ne dépend jamais de l'horloge de la machine).
+    const RealDate = Date;
+    const DateFige = new Proxy(RealDate, { get: (t, p) => (p === 'now' ? () => NOW : t[p]), construct: (t, a) => new t(...a), apply: (t, th, a) => RealDate(...a) });
+    const app = chargeApp(['SUJET_SORTANT', 'SUJET_ENTRANT', 'colisKey', 'sensColis', 'etatColisEmail', 'isColisEnAttente', 'isColisActive'],
+      { arriveeColisEmail: AR.arriveeColisEmail, etatRetrait: M.etatRetrait, Date: DateFige });
     const t = (o) => ({ status: 'available', subject: 'Votre colis 1 est disponible', ...o });
     const passe = t({ suivi: '1', limite: '2026-10-22', receivedAt: '2026-10-19T08:00:00Z' });
     const ok = t({ suivi: '2', limite: '2026-10-26', receivedAt: '2026-10-21T13:00:00Z' });
     const vieux = t({ suivi: '3', limite: null, receivedAt: '2026-10-12T08:00:00Z' });
     dit(typeof app.etatColisEmail === 'function' && app.etatColisEmail(passe, NOW).etat === 'delai_depasse', 'app : un colis dont la limite écrite est passée est « délai dépassé »', app.__err_etatColisEmail || '');
     dit(typeof app.isColisEnAttente === 'function' && app.isColisEnAttente(passe, new Set(), new Set()) && app.isColisEnAttente(vieux, new Set(), new Set()), 'app : il reste VISIBLE (en attente, à vérifier) — un colis caché est un colis perdu');
-    // ⚠️ `isColisActive` lit l'horloge : on la fige au 23 oct.
-    const vraiNow = Date.now; Date.now = () => NOW;
-    try {
-      dit(!app.isColisActive(passe, new Set(), new Set()) && !app.isColisActive(vieux, new Set(), new Set()) && app.isColisActive(ok, new Set(), new Set()),
-        'app : seuls les colis dans leur délai comptent « à retirer » (pas la limite passée, pas 11 jours sans limite)');
-    } finally { Date.now = vraiNow; }
+    // L'horloge du vm est figée au 23 oct. par `DateFige` (voir ci-dessus).
+    dit(!app.isColisActive(passe, new Set(), new Set()) && !app.isColisActive(vieux, new Set(), new Set()) && app.isColisActive(ok, new Set(), new Set()),
+      'app : seuls les colis dans leur délai comptent « à retirer » (pas la limite passée, pas 11 jours sans limite)');
   });
 
   await essaie('reclassifyTrack (lignes déjà rangées)', async () => {

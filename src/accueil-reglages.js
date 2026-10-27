@@ -22,7 +22,7 @@ export const DETOURAGE_POUR_TOUS = false;
 // vaut `false`, Vestiaire n'apparaît que dans la FAQ (« pas encore »).
 export const VESTIAIRE_BRANCHE = false;
 
-// Le prix des CGV (public/legal/cgv.html : « abonnement à 12,99 € par mois »,
-// depuis le 11 octobre — 9,99 € avant). Le banc compare les deux : la page ne
-// peut pas dire un autre prix.
-export const PRIX_MOIS = '12,99';
+// Le prix des CGV (public/legal/cgv.html : « abonnement à 14,99 € par mois »,
+// depuis le 27 octobre — 12,99 € avant, 9,99 € avant le 11 octobre). Le banc
+// compare les deux : la page ne peut pas dire un autre prix.
+export const PRIX_MOIS = '14,99';

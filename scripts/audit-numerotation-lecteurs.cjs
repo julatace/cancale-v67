@@ -407,7 +407,11 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     const ventes = corps('const broadKey = identiteAnnonce(o);', 'if (reuse) {');
     dit(/const parIdentite = o\.transaction_id != null && txnItem\[String\(o\.transaction_id\)\] != null;/.test(ventes) && /if \(reuse && !parIdentite && venteApresCoupure\(o\)/.test(ventes),
       'une ANCIENNE annonce vendue après la coupure garde son N° d\'identité (B7) : seule la PHOTO est écartée, jamais ce que dit Vinted');
-    dit(/if \(emptyNum && emptyBuy && emptyMp && !\(etaitNumerotee && archiveNumeros\(\)\)\) delete u\[item\.id\];/.test(A), 'effacer un N° à la main GARDE la fiche (la base refuse qu\'une fiche numérotée disparaisse)');
+    // On suit la RÈGLE, pas l'orthographe : la garde `!(etaitNumerotee &&
+    // archiveNumeros())` doit protéger le `delete`, quels que soient les autres
+    // `empty*` qui s'ajoutent devant (min, refuse… sont devenus porteurs de
+    // valeur). Reste ROUGE si quelqu'un retire la garde — le vrai défaut.
+    dit(/if \(emptyNum && emptyBuy && emptyMp(?: && empty\w+)* && !\(etaitNumerotee && archiveNumeros\(\)\)\) delete u\[item\.id\];/.test(A), 'effacer un N° à la main GARDE la fiche (la base refuse qu\'une fiche numérotée disparaisse)');
     dit(/const arch = !numeroReprenable\(num\);/.test(A) && /↩️ revient → numéro neuf/.test(A) && /🔁 renvoi → numéro neuf/.test(A), 'une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »');
     // (21 octobre) Les retours se suivent dans Colis (« Retours en cours ») : la remise en
     // stock dit « retape-le » pour un N° qui se redonne, « numéro NEUF » pour un ancien.
