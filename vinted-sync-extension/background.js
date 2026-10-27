@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.233.0';
+const CODE_VERSION = '5.234.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7049,13 +7049,18 @@ function espaceAcceptMs() { return ESPACE_ACCEPT_MIN_MS + Math.floor(Math.random
 // est propriétaire de `vinted_offres_auto` et des `min` (vinted_annonce_numeros) ;
 // l'extension les LIT (§11).
 async function offreAutoReglages() {
-  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros']);
+  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
   const actif = m.vinted_offres_auto === true;
   const nums = m.vinted_annonce_numeros || {};
-  const mins = {};
-  for (const k in nums) { const n = Number(nums[k] && nums[k].min); if (isFinite(n) && n > 0) mins[String(k)] = n; }
-  return { actif, mins };
+  const mins = {}, refuses = {};
+  for (const k in nums) {
+    const n = Number(nums[k] && nums[k].min); if (isFinite(n) && n > 0) mins[String(k)] = n;
+    const rf = Number(nums[k] && nums[k].refuse); if (isFinite(rf) && rf > 0) refuses[String(k)] = rf;   // seuil de refus posé par LUI
+  }
+  // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
+  const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
+  return { actif, mins, refuses, msgRefus };
 }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
 // conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
@@ -7089,7 +7094,7 @@ async function offresEnAttente(uid) {
   } catch (_) { /* forme inattendue ⇒ aucune offre plutôt qu'une fausse */ }
   return out;
 }
-async function repondreOffre({ uid, tx, oid, quoi, prix }) {
+async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg }) {
   if (!uid || !tx || !oid) return { ok: false, error: 'offre incomplète' };
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
@@ -7100,6 +7105,14 @@ async function repondreOffre({ uid, tx, oid, quoi, prix }) {
   else if (quoi === 'reject') r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, null);
   else return { ok: false, error: 'action inconnue' };
   noterDiag(r.ok ? `offre_auto_${quoi}` : `offre_auto_${quoi}_refuse_${r.status}`);
+  // Refus : si LE VENDEUR a écrit un message (jamais inventé), on l'envoie APRÈS
+  // le refus réussi — même file « une requête à la fois », vide ⇒ rien n'est écrit.
+  if (quoi === 'reject' && r && r.ok && conv && msg) {
+    try {
+      const rm = await vintedSend(acc, 'POST', `/api/v2/conversations/${conv}/replies`, { message: String(msg) });
+      noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
+    } catch (_) {}
+  }
   return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 // Le moteur. Appelé à CHAQUE visite sur Vinted, APRÈS la moisson (offres fraîches).
@@ -7118,22 +7131,29 @@ async function autoAccepterOffres(uid) {
     for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
     let faites = 0;
     for (const o of offres) {
-      if (faites >= OFFRES_MAX_PAR_VISITE) break;       // volume borné
+      if (faites >= OFFRES_MAX_PAR_VISITE) break;       // volume borné (accepts + refus confondus)
       if (st[o.oid]) continue;                          // déjà traitée : jamais deux fois
       const min = o.item ? reg.mins[o.item] : null;
-      if (!(isFinite(min) && min > 0)) continue;        // pas de prix mini posé ⇒ on ne touche à rien
-      if (o.prix < min) continue;                       // sous le mini : c'est à toi de contrer (le refus auto arrive — PR suivante)
-      if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux acceptations
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi: 'accept' });
+      const refuse = o.item ? reg.refuses[o.item] : null;
+      // La RÈGLE que le vendeur a posée sur SON annonce : ≥ mini ⇒ accepte ;
+      // < seuil de refus ⇒ refuse. Entre les deux (ou aucune règle) ⇒ on ne
+      // touche à rien, c'est à lui de négocier. L'acceptation est prioritaire.
+      let quoi = null;
+      if (isFinite(min) && min > 0 && o.prix >= min) quoi = 'accept';
+      else if (isFinite(refuse) && refuse > 0 && o.prix < refuse) quoi = 'reject';
+      if (!quoi) continue;
+      if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs()));   // étalement aléatoire entre deux gestes
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, msg: quoi === 'reject' ? reg.msgRefus : null });
       st[o.oid] = Date.now();
-      await chrome.storage.local.set({ vrmOffresFaites: st });   // écrit AVANT de boucler : un worker tué ne ré-accepte pas
+      await chrome.storage.local.set({ vrmOffresFaites: st });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
         faites += 1;
-        logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
+        if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
+        else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${reg.msgRefus ? ' + ton message' : ''}`);
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
       } else if (r && r.code) { break; }                // garde-fou atteint (pause/plafond/autre compte) : on arrête le lot
     }
-    if (faites) noterDiag(`offres_auto_acceptees_${faites}`);
+    if (faites) noterDiag(`offres_auto_traitees_${faites}`);
     return faites;
   } catch (_) { return 0; }
 }
