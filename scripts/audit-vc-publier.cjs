@@ -132,7 +132,8 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const b = faire();
     const vv = (m) => new Promise((res) => b.ecouteur(Object.assign({ from: 'cancale-vc', action: 'vcVentes' }, m), { tab: { id: 5, url: 'https://fr.vestiairecollective.com/members/' } }, res));
     const dern = () => ((b.ecrits.filter((e) => e.id === 'vc_ventes').pop() || {}).data || {});
-    const r1 = await vv({ source: 'a-expedier', ventes: [{ id: 'T1', ref: '401', etat: 'awaiting' }, { id: 'T2', ref: '402' }], offset: 0, total: 2, lus: 2 });
+    const r1 = await vv({ source: 'a-expedier', ventes: [{ id: 'T1', ref: '401', etat: 'awaiting', limite: '2026-10-30T00:00:00Z', suivi: 'MR1', etiquette: true }, { id: 'T2', ref: '402' }], offset: 0, total: 2, lus: 2 });
+    dit(dern().ventes.T1.limite === '2026-10-30T00:00:00Z' && dern().ventes.T1.etiquette === true && dern().ventes.T2.etiquette === null, 'la date limite et le bordereau sont rangés (« pas su » reste null)', JSON.stringify(dern().ventes));
     dit(r1.ok && dern().ventes.T1.aExpedier === true && dern().ventes.T2.aExpedier === true, 'les ventes à expédier sont rangées « à expédier »', JSON.stringify(dern().ventes));
     await vv({ source: 'a-expedier', ventes: [{ id: 'T2', ref: '402' }], offset: 0, total: 1, lus: 1 });
     dit(dern().ventes.T1 && dern().ventes.T1.aExpedier === false && dern().ventes.T2.aExpedier === true, 'liste « à expédier » lue EN ENTIER sans T1 : T1 n\'est plus à expédier, mais n\'est jamais effacée', JSON.stringify(dern().ventes));
@@ -304,7 +305,7 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     await cD.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
     await cD.route('https://apiv2.vestiairecollective.com/**', (r) => {
       const u = r.request().url();
-      const body = /awaiting-shipping/.test(u) ? { meta: { limit: 20, offset: 0, count: 1 }, data: [{ id: 'T555', status: 'awaiting_shipping', createdAt: '2026-10-27T09:00:00Z', price: { amount: 120, currency: 'EUR' },
+      const body = /awaiting-shipping/.test(u) ? { meta: { limit: 20, offset: 0, count: 1 }, data: [{ id: 'T555', status: 'awaiting_shipping', createdAt: '2026-10-27T09:00:00Z', price: { amount: 120, currency: 'EUR' }, shipBy: '2026-10-30T23:59:00Z', shipment: { trackingNumber: 'MR12345678', carrier: 'Mondial Relay', label: { url: 'https://labels.vestiairecollective.com/secret-token-xyz.pdf' } },
           product: { id: 900001, description: 'Paire propre. Réf. VRM-401' }, buyer: { firstName: 'Jeanne', lastName: 'Secret', address: { street: '12 rue Cachée' }, email: 'jeanne@exemple.fr' } }] }
         : /current-light/.test(u) ? { data: [{ id: 'PANIER1', status: 'cart' }] } : { data: [] };
       return r.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
@@ -319,6 +320,8 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(mv.length === 1 && mv[0].source === 'a-expedier', 'les ventes À EXPÉDIER sont lues (et jamais le panier ni les achats)', JSON.stringify(mv.map((m) => m.source)));
     dit(v0 && v0.id === 'T555' && v0.productId === '900001' && v0.ref === '401' && v0.etat === 'awaiting_shipping' && /2026-10-27/.test(v0.date), 'une vente : son id, son article, sa référence VRM-401, son état, sa date', JSON.stringify(v0));
     dit(v0 && v0.montant && v0.montant.valeur === 120 && v0.montant.devise === 'EUR' && v0.montant.cle === 'price', 'le montant part AVEC le nom de sa clé (on ne devine pas prix ou versement)', JSON.stringify(v0 && v0.montant));
+    dit(v0 && /2026-10-30/.test(v0.limite) && v0.suivi === 'MR12345678' && v0.transporteur === 'Mondial Relay' && v0.etiquette === true, 'le colis de la vente : date limite, n° de suivi, transporteur, « bordereau disponible »', JSON.stringify(v0 && { l: v0.limite, s: v0.suivi, t: v0.transporteur, e: v0.etiquette }));
+    dit(!/secret-token|labels\.vestiaire/.test(JSON.stringify(mv)), 'l\'adresse du bordereau ne sort jamais (seulement « il existe »)', JSON.stringify(mv).slice(0, 200));
     const tout = JSON.stringify(mv);
     dit(!/Jeanne|Secret|Cach|jeanne@/.test(tout), 'rien de l\'acheteur ne sort (nom, adresse, email) — ni dans la vente, ni dans sa forme', tout.slice(0, 300));
     await cD.close();
