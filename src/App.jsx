@@ -10886,10 +10886,15 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
                 ))}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ width: 86, flexShrink: 0, fontSize: 12, color: C.muted }}>Rotation</span>
-                  <button type="button" data-reglage-rot onClick={() => majActif({ rot: ((rActif.rot || 0) + 90) % 360 })} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↻ {rActif.rot || 0}°</button>
-                </div>
+                {/* Rotation FINE : juste de quoi redresser une photo un peu de
+                    travers (±15°, par pas de 0,5°) — plus de saut à 90°, trop
+                    brutal (demande de Julien, 27 oct.). Un bouton remet droit. */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                  <span style={{ width: 86, flexShrink: 0, color: C.muted }}>Redresser</span>
+                  <input type="range" min={-15} max={15} step={0.5} value={rActif.rot || 0} data-reglage="rot"
+                    onChange={ev => majActif({ rot: Number(ev.target.value) })} style={{ flex: 1, accentColor: C.accent }} />
+                  <button type="button" data-reglage-rot-zero onClick={() => majActif({ rot: 0 })} title="Remettre droit" style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>{(rActif.rot || 0) === 0 ? '0°' : `${rActif.rot > 0 ? '+' : ''}${rActif.rot}°`}</button>
+                </label>
                 {slider('Luminosité', 'bright', 0.5, 1.5, 0.01)}
                 {slider('Contraste', 'contrast', 0.5, 1.5, 0.01)}
                 {slider('Saturation', 'sat', 0, 2, 0.01)}
@@ -11105,6 +11110,167 @@ function AtelierLots({ candidats, onSave, onClose }) {
           <button type="button" data-lots-enregistrer onClick={enregistrer} disabled={!sel.size || (!changeT && !changeP) || done}
             style={{ border: `1px solid ${C.accent}`, background: done ? C.accent : `${C.accent}12`, color: done ? '#fff' : C.accent, borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: (sel.size && (changeT || changeP) && !done) ? 'pointer' : 'default', fontFamily: 'inherit', opacity: (!sel.size || (!changeT && !changeP)) ? 0.5 : 1 }}>
             {done ? '✓ Brouillons enregistrés' : `💾 Enregistrer dans les brouillons (${nAppliquables})`}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ══ ATELIER DE REPUBLICATION — TRANCHE 4 : file de publication (non destructif) ══
+// Ordonner une SÉLECTION de brouillons et les faire passer un par un, avec un
+// espacement, pause/reprise/arrêt, et une reprise après rechargement. ⚠️ Cette
+// tranche NE PUBLIE PAS : l'exécuteur est un ESSAI À BLANC qui revérifie
+// l'éligibilité et marque « prête » — la publication réelle (retrait +
+// recréation sur Vinted) est la tranche 5, et chaque geste destructif y restera
+// sur ta confirmation (§3 : on ne republie jamais en file à l'aveugle). Ce qui
+// est réel ici et sera réutilisé tel quel par la 5 :
+//   · l'ORDRE (monter/descendre, mélanger, trier par N°/prix) ;
+//   · l'ESPACEMENT fixe ou variable, BORNÉ (jamais une rafale) ;
+//   · PAUSE/REPRISE/ARRÊT — une pause pendant l'attente n'engage rien ;
+//   · la REPRISE après interruption : l'état est gardé (`vrm_atelier_file`) et
+//     restauré EN PAUSE (jamais relancé tout seul — ce serait un robot) ;
+//   · l'ÉLIGIBILITÉ revérifiée JUSTE AVANT chaque article (un article devenu
+//     vendu/incomplet est SAUTÉ, avec sa raison, jamais publié par erreur) ;
+//   · le VERROU par article : un seul « en cours » à la fois, jamais deux fois.
+const FILE_ESP_MIN = 0;        // secondes — borne basse (0 = aussi vite que possible, pour l'essai à blanc)
+const FILE_ESP_MAX = 3600;     // secondes — borne haute (1 h) : au-delà ce n'est plus une file
+const fileClamp = (s) => Math.max(FILE_ESP_MIN, Math.min(FILE_ESP_MAX, Math.round(Number(s) || 0)));
+function AtelierFile({ candidats, verifier, onClose }) {
+  const CAND = React.useMemo(() => { const m = {}; for (const c of candidats) m[c.key] = c; return m; }, [candidats]);
+  const [q, setQ] = useState(() => {
+    const raw = load('vrm_atelier_file', null);
+    if (raw && typeof raw === 'object' && Array.isArray(raw.ordre)) {
+      return { ordre: raw.ordre.map(String), statuts: raw.statuts || {}, raisons: raw.raisons || {},
+        mode: raw.mode === 'run' ? 'pause' : (raw.mode || 'idle'),   // jamais relancé tout seul
+        esp: { type: (raw.esp && raw.esp.type) || 'fixe', min: fileClamp(raw.esp && raw.esp.min), max: fileClamp(raw.esp && raw.esp.max) } };
+    }
+    return { ordre: [], statuts: {}, raisons: {}, titres: {}, mode: 'idle', esp: { type: 'fixe', min: 30, max: 120 } };
+  });
+  const titreDe = (k) => (CAND[k] && CAND[k].titre) || (q.titres && q.titres[k]) || '—';
+  const [sel, setSel] = useState(() => new Set());
+  // ⚠️ Persistance SYNCHRONE (pas `save`, qui est anti-rebondé 500 ms) : une file
+  //    interrompue dans la demi-seconde qui suit sa dernière action perdrait son
+  //    état, et « reprise après interruption » ne tiendrait pas. L'état de la
+  //    file est LOCAL à l'appareil (un process en cours), pas synchronisé.
+  React.useEffect(() => { try { localStorage.setItem('vrm_atelier_file', JSON.stringify(q)); } catch (_) {} }, [q]);
+  // Le moteur : en marche, programme le PROCHAIN article « attente » après le
+  // délai d'espacement, puis le traite (essai à blanc). Une pause ou un arrêt
+  // annule le minuteur AVANT tout traitement — l'étape critique n'est jamais
+  // coupée en deux parce qu'elle ne commence qu'à la fin du délai.
+  React.useEffect(() => {
+    if (q.mode !== 'run') return;
+    const k = q.ordre.find(x => (q.statuts[x] || 'attente') === 'attente');
+    if (k == null) { setQ(p => (p.mode === 'run' ? { ...p, mode: 'idle' } : p)); return; }
+    const delay = q.esp.type === 'variable'
+      ? (fileClamp(q.esp.min) + Math.random() * Math.max(0, fileClamp(q.esp.max) - fileClamp(q.esp.min))) * 1000
+      : fileClamp(q.esp.min) * 1000;
+    const t = setTimeout(() => {
+      setQ(p => {
+        if (p.mode !== 'run') return p;                 // pausé pendant l'attente : on ne traite pas
+        if ((p.statuts[k] || 'attente') !== 'attente') return p;
+        const v = (() => { try { return verifier(k); } catch (_) { return { ok: false, raison: 'vérification impossible' }; } })();
+        return { ...p, statuts: { ...p.statuts, [k]: v.ok ? 'fait' : 'saute' }, raisons: v.ok ? p.raisons : { ...p.raisons, [k]: v.raison || 'inéligible' } };
+      });
+    }, delay);
+    return () => clearTimeout(t);
+  }, [q.mode, q.statuts, q.ordre, q.esp, verifier]);
+  // La file traite PAR CLÉ : un article reste dans la file même si l'annonce
+  // n'est plus proposée (devenue inéligible) — il y sera SAUTÉ, pas effacé en
+  // silence (un article qui disparaît sans un mot se lit comme une perte).
+  const enFile = q.ordre;
+  const reste = enFile.filter(k => (q.statuts[k] || 'attente') === 'attente').length;
+  const faits = enFile.filter(k => q.statuts[k] === 'fait').length;
+  const sautes = enFile.filter(k => q.statuts[k] === 'saute').length;
+  const dispo = candidats.filter(c => !q.ordre.includes(c.key));
+  const ajouter = () => { const add = [...sel].filter(k => !q.ordre.includes(k)); if (!add.length) return; setQ(p => ({ ...p, ordre: [...p.ordre, ...add], statuts: { ...p.statuts, ...Object.fromEntries(add.map(k => [k, 'attente'])) }, titres: { ...p.titres, ...Object.fromEntries(add.map(k => [k, (CAND[k] && CAND[k].titre) || k])) } })); setSel(new Set()); };
+  const retirer = (k) => setQ(p => ({ ...p, ordre: p.ordre.filter(x => x !== k) }));
+  const bouge = (k, d) => setQ(p => { const o = [...p.ordre]; const i = o.indexOf(k); const j = i + d; if (i < 0 || j < 0 || j >= o.length) return p; [o[i], o[j]] = [o[j], o[i]]; return { ...p, ordre: o }; });
+  const melanger = () => setQ(p => { const o = [...p.ordre]; for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } return { ...p, ordre: o }; });
+  const trier = (cle) => setQ(p => { const o = [...p.ordre].sort((a, b) => { const A = CAND[a] || {}, B = CAND[b] || {}; if (cle === 'num') return (Number(a) || 1e9) - (Number(b) || 1e9); if (cle === 'prix') return (A.prix ?? 1e9) - (B.prix ?? 1e9); return 0; }); return { ...p, ordre: o }; });
+  const demarrer = () => { if (!reste) return; setQ(p => ({ ...p, mode: 'run' })); };
+  const pause = () => setQ(p => ({ ...p, mode: 'pause' }));
+  const reprendre = () => setQ(p => ({ ...p, mode: reste ? 'run' : 'idle' }));
+  const arreter = () => setQ(p => ({ ...p, mode: 'idle' }));
+  const vider = () => setQ(p => ({ ordre: [], statuts: {}, raisons: {}, titres: {}, mode: 'idle', esp: p.esp }));
+  const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 9px', fontSize: 12.5, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 5 };
+  const btn = (extra) => ({ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...extra });
+  const stLabel = { attente: 'en attente', fait: 'prête ✓', saute: 'sautée', echec: 'échec' };
+  return (
+    <div onClick={onClose} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={ev => ev.stopPropagation()} data-file-modal data-file-mode={q.mode} style={{ background: C.bg, width: '100%', maxWidth: 620, maxHeight: '94vh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ File de publication</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ordonne et cadence tes brouillons. <b>Essai à blanc</b> — rien n'est publié : la publication réelle, sur ta confirmation, arrive en tranche 5.</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 22, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* ── à ajouter ─────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={maj}>Brouillons prêts ({dispo.length})</span>
+            <div style={{ maxHeight: 130, overflowY: 'auto', border: `1px solid ${C.border}`, borderRadius: 8 }}>
+              {dispo.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.muted }}>Aucun brouillon à ajouter. Prépare d'abord des annonces (✨ Préparer, ou Lots).</div>}
+              {dispo.map(c => (
+                <label key={c.key} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
+                  <input type="checkbox" data-file-cand={c.key} checked={sel.has(c.key)} onChange={() => setSel(s => { const u = new Set(s); u.has(c.key) ? u.delete(c.key) : u.add(c.key); return u; })} style={{ accentColor: C.accent, flexShrink: 0 }} />
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, flexShrink: 0 }}>N°{c.key}</span>
+                  <span style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.titre || '—'}</span>
+                </label>
+              ))}
+            </div>
+            <button type="button" data-file-ajouter onClick={ajouter} disabled={!sel.size} style={btn({ alignSelf: 'flex-start', opacity: sel.size ? 1 : 0.5, cursor: sel.size ? 'pointer' : 'default' })}>Ajouter à la file ({sel.size})</button>
+          </div>
+          {/* ── la file ───────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ ...maj, margin: 0, flex: 1 }}>File — {enFile.length} article{enFile.length > 1 ? 's' : ''} · {reste} à faire · {faits} prête{faits > 1 ? 's' : ''}{sautes ? ` · ${sautes} sautée${sautes > 1 ? 's' : ''}` : ''}</span>
+              <button type="button" data-file-melanger onClick={melanger} style={btn({ padding: '5px 8px', fontSize: 11.5 })}>Mélanger</button>
+              <select data-file-trier onChange={ev => { if (ev.target.value) trier(ev.target.value); ev.target.value = ''; }} defaultValue="" style={{ ...champ, padding: '5px 7px', fontSize: 11.5 }}>
+                <option value="">Trier…</option>
+                <option value="num">par numéro</option>
+                <option value="prix">par prix</option>
+              </select>
+            </div>
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 8 }}>
+              {enFile.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.muted }}>File vide.</div>}
+              {enFile.map((k, idx) => { const st = q.statuts[k] || 'attente'; return (
+                <div key={k} data-file-item={k} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 10px', borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: 11, color: C.muted, width: 18, flexShrink: 0 }}>{idx + 1}.</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, flexShrink: 0 }}>N°{k}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titreDe(k)}</span>
+                  <span data-file-statut={k} style={{ fontSize: 11, fontWeight: 600, flexShrink: 0, color: st === 'fait' ? C.accent : st === 'saute' || st === 'echec' ? C.warn : C.muted }}>{stLabel[st]}{(st === 'saute' || st === 'echec') && q.raisons[k] ? ` · ${q.raisons[k]}` : ''}</span>
+                  {q.mode === 'idle' && st === 'attente' && <span style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    <button type="button" data-file-monter={k} onClick={() => bouge(k, -1)} aria-label="Monter" style={btn({ padding: '3px 7px' })}>↑</button>
+                    <button type="button" data-file-descendre={k} onClick={() => bouge(k, 1)} aria-label="Descendre" style={btn({ padding: '3px 7px' })}>↓</button>
+                    <button type="button" data-file-retirer={k} onClick={() => retirer(k)} aria-label="Retirer" style={btn({ padding: '3px 7px', color: C.muted })}>×</button>
+                  </span>}
+                </div>
+              ); })}
+            </div>
+          </div>
+          {/* ── espacement ────────────────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={maj}>Espacement entre deux publications</span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select data-file-esp-type value={q.esp.type} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, type: ev.target.value } }))} style={{ ...champ, flex: '1 1 120px' }}>
+                <option value="fixe">Fixe</option>
+                <option value="variable">Variable (entre deux bornes)</option>
+              </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted }}>{q.esp.type === 'variable' ? 'de' : ''}<input data-file-esp-min value={q.esp.min} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, min: fileClamp(ev.target.value) } }))} inputMode="numeric" style={{ ...champ, width: 70 }} />s</label>
+              {q.esp.type === 'variable' && <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.muted }}>à<input data-file-esp-max value={q.esp.max} onChange={ev => setQ(p => ({ ...p, esp: { ...p.esp, max: fileClamp(ev.target.value) } }))} inputMode="numeric" style={{ ...champ, width: 70 }} />s</label>}
+            </div>
+            <div style={{ fontSize: 11, color: C.muted }}>Borné à {FILE_ESP_MAX / 60} min. L'éligibilité de chaque article est revérifiée juste avant — une paire devenue vendue ou incomplète est sautée, jamais publiée.</div>
+          </div>
+          {/* ── commandes ─────────────────────────────── */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {q.mode === 'idle' && <button type="button" data-file-demarrer onClick={demarrer} disabled={!reste} style={btn({ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700, opacity: reste ? 1 : 0.5, cursor: reste ? 'pointer' : 'default' })}>▶ Démarrer l'essai</button>}
+            {q.mode === 'run' && <button type="button" data-file-pause onClick={pause} style={btn({ border: `1px solid ${C.accent}`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>⏸ Pause</button>}
+            {q.mode === 'pause' && <button type="button" data-file-reprendre onClick={reprendre} style={btn({ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>▶ Reprendre</button>}
+            {q.mode !== 'idle' && <button type="button" data-file-arreter onClick={arreter} style={btn({ padding: '10px 16px', fontSize: 13, color: C.warn })}>■ Arrêter</button>}
+            {q.mode === 'idle' && enFile.length > 0 && <button type="button" data-file-vider onClick={vider} style={btn({ marginLeft: 'auto', color: C.muted })}>Vider la file</button>}
+          </div>
+          {q.mode === 'pause' && <div style={{ fontSize: 11.5, color: C.muted }}>En pause — reprise manuelle. Après un rechargement, la file revient toujours EN PAUSE (jamais relancée toute seule).</div>}
         </div>
       </div>
     </div>
@@ -32328,6 +32494,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
   const [lotsOpen, setLotsOpen] = useState(false); // modale « Lots — titres & prix » (tranche 3)
+  const [fileOpen, setFileOpen] = useState(false); // modale « File de publication » (tranche 4)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -42398,6 +42565,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
                     {k:'lots', icon:'✨', lab:'Lots — titres & prix', desc:'Préparer une sélection en brouillon, sans toucher à Vinted', on:()=>{ setAnnToolsOpen(false); setLotsOpen(true); }},
+                    {k:'file', icon:'🗂️', lab:'File de publication', desc:'Ordonner et cadencer tes brouillons (essai à blanc)', on:()=>{ setAnnToolsOpen(false); setFileOpen(true); }},
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
@@ -45803,6 +45971,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
+      {fileOpen && (()=>{
+        // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont
+        // l'annonce est encore en ligne. Un seul propriétaire de la règle « prêt » :
+        // `pretDraft`, réutilisé par `verifier` au moment du passage (éligibilité
+        // revérifiée juste avant — § T4). Rien n'est publié ici.
+        const onlineById = {}; for (const it of (listings.items||[])) onlineById[String(it.id)] = it;
+        const titreDe = (d) => String((d&&d.title)||'').trim();
+        const prixDe = (d) => { const p = d&&d.price; const n = (p==null||p==='')?NaN:Number(p); return isFinite(n)?n:NaN; };
+        const pretDraft = (key) => { const d=drafts[key]; if(!d) return {ok:false,raison:'pas de brouillon'}; if(!titreDe(d)) return {ok:false,raison:'titre manquant'}; if(!(prixDe(d)>0)) return {ok:false,raison:'prix manquant'}; if(!(Array.isArray(d.photos)&&d.photos.length)) return {ok:false,raison:'aucune photo'}; if(!onlineById[String(d.id)]) return {ok:false,raison:'plus en ligne'}; return {ok:true}; };
+        const cands = Object.keys(drafts).filter(key=>pretDraft(key).ok).map(key=>{ const d=drafts[key]; return { key, id:d.id, titre:titreDe(d), prix:prixDe(d) }; });
+        return <AtelierFile candidats={cands} verifier={pretDraft} onClose={()=>setFileOpen(false)} />;
+      })()}
 
       {/* ── Note interne d'un achat (Actions rapides) — privée, synchronisée ── */}
       {noteEdit && (
