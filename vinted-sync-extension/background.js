@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.238.0';
+const CODE_VERSION = '5.239.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2630,6 +2630,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const ok = await rangerVcMessages(msg.action === 'vcCompteur' ? { compteur: msg.messages } : msg);
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
+    // 5.239 : tes ACHATS Vestiaire (vc-inject.js, réponses que la page charge déjà).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAchats') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcAchats(msg);
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -11472,6 +11484,45 @@ async function rangerVcMessagesMaintenant(m) {
     if (seulCompteur) _vcCompteurEcrit = { n: data.compteur.messages, at: now.getTime() };
     notifierApp({ type: 'maj', quoi: 'vestiaire' });
   }
+  return ok === true;
+}
+// ── VESTIAIRE : TES ACHATS (5.239) ──────────────────────────────────────────
+// `vc_achats` = { achats: { [id]: { productId, nom, etat, date, montant, suivi,
+// transporteur, vuAt, premiereVue } }, lecture: { at, total, complet, page },
+// forme }. Une écriture à la fois ; lecture ratée ⇒ rien n'est écrit. Un achat
+// n'est jamais effacé ; une valeur vide ne remplace jamais une pleine. ⚠️ Le
+// montant n'est JAMAIS un prix d'achat de paire : Julien les saisit (§2.5).
+let _vcAchatsChaine = Promise.resolve();
+function rangerVcAchats(m) {
+  const run = _vcAchatsChaine.then(() => rangerVcAchatsMaintenant(m)).catch(() => false);
+  _vcAchatsChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function rangerVcAchatsMaintenant(m) {
+  const rows = await sbGet('app_data?id=eq.vc_achats&select=data');
+  if (rows === null) return false;
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const now = new Date().toISOString();
+  const achats = Object.assign({}, cur.achats || {});
+  let n = 0;
+  for (const x of (Array.isArray(m.achats) ? m.achats : []).slice(0, 200)) {
+    const id = String((x && x.id) || '');
+    if (!/^[\w-]{1,40}$/.test(id)) continue;
+    n++;
+    const p = achats[id] || {};
+    achats[id] = {
+      productId: x.productId || p.productId || '', nom: x.nom || p.nom || '',
+      etat: x.etat || p.etat || '', date: x.date || p.date || '', montant: x.montant || p.montant || null,
+      suivi: x.suivi || p.suivi || '', transporteur: x.transporteur || p.transporteur || '',
+      vuAt: now, premiereVue: p.premiereVue || now,
+    };
+  }
+  const offset = Number(m.offset) || 0; const total = typeof m.total === 'number' ? m.total : null;
+  const entier = offset === 0 && total != null && n >= total && Number(m.lus || 0) >= total;
+  const page = /^[\w/{}.-]{1,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur.lecture && cur.lecture.page) || '');
+  const data = { achats, lecture: { at: now, total, complet: entier, page }, forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 120) : (cur.forme || []), capturedAt: now };
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_achats', data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
 }
 let _vcAnnoncesChaine = Promise.resolve();
