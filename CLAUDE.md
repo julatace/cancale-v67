@@ -1,5 +1,16 @@
 # VRM — dossier de passation
 
+> **27 octobre — un article parti sort tout seul du Stock :** Julien : « enlever le numéro si
+> l'article est expédié ». Tranché avec lui : la PLACE (case ou pile) se libère, le NUMÉRO reste
+> (bordereau, achat, bénéfice, retour ; jamais redonné). Seulement quand VINTED dit le colis parti
+> (`venteSortieDuStock` : acheminement, déposé, livré, finalisé — jamais « Colis fait » ni un
+> bordereau reçu ; annulée ou retour ⇒ non), et si plus rien de présent ne porte le N°
+> (`porteursNum`). Ventes, annonces ou plan pas lus ⇒ rien ne bouge ; écriture au nuage ratée ⇒ rien
+> n'est dit retiré. Le Stock dit « Sortis du stock car partis » (`vrm_stock_sortis`, synchronisé)
+> avec « Remettre » ; une paire remise n'est plus retirée (`vrm_stock_garder`). Une « boîte seule »
+> reste à la main. Banc `stock-partis.cjs` : 10 rouges sur main, 4 sous mutation (les deux gardes
+> « à poster » retirées).
+
 > **27 octobre — le pavé numérique sur Achats et Annonces (Vinted) :** même saisie. Achats : un
 > achat n'a un N° que s'il a été RELIÉ à une paire sur son clic (`buyFromId` d'une fiche ou d'une
 > vente) — jamais deviné ; N° + Entrée montre cet achat (onglet « Tous », filtres et « Voir plus »
