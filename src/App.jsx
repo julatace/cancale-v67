@@ -98,7 +98,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.234.0';
+const EXT_ATTENDUE = '5.235.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -390,7 +390,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -7671,6 +7671,7 @@ function raisonExtGlobale(sansSouris, opt) {
     // Trois états, jamais deux : vivant · éteint · pas su.
     const rl = etatRelais();
     if (rl.niveau === 'vivant') {
+      if (cap === 'vcpublier') return { code: 'telephone', relais: 'vestiaire', texte: "Préparer sur Vestiaire Collective se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis et que tu publies." };
       if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis." };
       if (cap !== 'publication' && rl.pauseMs > 0) return { code: 'pause', relais: 'vivant', texte: `Vinted a demandé de ralentir : l'extension de ton ordinateur n'envoie rien chez Vinted pendant encore ${Math.max(1, Math.ceil(rl.pauseMs / 60000))} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
       return null;
@@ -21415,6 +21416,102 @@ function PhotoroomCle() {
     </div>
   );
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// VESTIAIRE COLLECTIVE : PRÉPARER UNE PAIRE DEPUIS VRM (27 octobre, 5.235)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux pouvoir le faire sur VRM directement, pouvoir publier ».
+// Les paires en ligne et numérotées (la même source que l'écran eBay,
+// `useEbayPaires`, §11) ; un clic ⇒ l'extension ouvre Vestiaire, remplit ce
+// qu'elle RECONNAÎT et attache les photos ; IL relit et publie (le formulaire
+// n'a jamais été vu : VRM ne clique jamais « Publier » à sa place). « Déjà
+// publiée » note la paire (`vinted_vc_posted`) : elle sort de la liste.
+function PublierVestiaire({ comptes }) {
+  const { paires, enLigne } = useEbayPaires(comptes);
+  const { jobs } = useExtVivante();
+  const sansSouris = useSansSouris();
+  const [publiees, setPubliees] = React.useState(undefined);   // undefined en cours · null pas su · Set
+  const [msg, setMsg] = React.useState({});
+  const [envoi, setEnvoi] = React.useState('');
+  const [tout, setTout] = React.useState(false);
+  const relire = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_vc_posted&select=ids:data->ids`, { headers: sbAuth() });
+      if (!r.ok) throw new Error('lecture');
+      const rows = await r.json();
+      setPubliees(new Set(((rows && rows[0] && rows[0].ids) || []).map(String)));
+    } catch (_) { setPubliees(null); }
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'vestiaire') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const glob = raisonExtGlobale(sansSouris, { cap: 'vcpublier', role: 'prépare tes annonces Vestiaire' });
+  const liste = (paires || []).filter((p) => !(publiees && publiees.has(String(p.id))));
+  const visibles = tout ? liste : liste.slice(0, 12);
+  const preparer = async (p) => {
+    if (envoi) return;
+    if (glob) { setMsg((m) => ({ ...m, [p.id]: glob.texte })); return; }
+    setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
+    const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id) }, 30000);
+    setEnvoi('');
+    if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
+    if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
+    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier();
+  };
+  const marquer = async (p) => {
+    if (envoi) return;
+    const ok = await askConfirm({ title: `N°${p.num} déjà publiée sur Vestiaire ?`, desc: "Elle sort de cette liste. Rien n'est envoyé à Vestiaire.", ok: 'Oui, elle est en ligne', cancel: 'Annuler' });
+    if (!ok) return;
+    setEnvoi(p.id);
+    const r = await vmrCmd({ cmd: 'vcMarque', id: String(p.id), etat: 'posted' }, 15000);
+    setEnvoi('');
+    if (!r || !r.accepte) { setMsg((m) => ({ ...m, [p.id]: (r && r.raison) || "L'extension n'a pas répondu — rien n'est noté." })); return; }
+    relire();
+  };
+  const btn = (accent) => ({ display: 'inline-flex', alignItems: 'center', minHeight: 36, borderRadius: 8, fontFamily: 'inherit', fontWeight: 600, fontSize: 12.5, padding: '7px 11px', cursor: 'pointer',
+    border: `1px solid ${accent && !glob ? C.accent : C.border}`, background: accent && !glob ? `${C.accent}14` : 'transparent', color: accent && !glob ? C.accent : C.muted });
+  let corps;
+  if (enLigne === undefined || publiees === undefined) corps = <div data-vc-publier="charge" style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes paires en ligne…</div>;
+  else if (enLigne === null) corps = <div data-vc-publier="pas-su" style={{ fontSize: 12.5, color: C.muted }}>Je n'ai pas pu lire tes annonces Vinted — rien n'est perdu, réessaie dans un moment.</div>;
+  else if (!liste.length) corps = <div data-vc-publier="vide" style={{ fontSize: 12.5, color: C.muted }}>{paires.length ? 'Toutes tes paires en ligne sont notées publiées sur Vestiaire.' : "Aucune paire en ligne et numérotée pour l'instant."}</div>;
+  else corps = (
+    <div data-vc-publier="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {publiees === null && <div style={{ fontSize: 11.5, color: C.muted }}>Je n'ai pas pu lire lesquelles sont déjà notées publiées sur Vestiaire — l'extension le revérifie au clic.</div>}
+      {visibles.map((p) => {
+        const job = jobs['vc:' + p.id] || null;
+        const ouvert = job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 30 * 60000);
+        return (
+          <div key={p.id} data-vc-paire={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8, flexWrap: 'wrap' }}>
+            {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 36, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}/> : null}
+            <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>N°{p.num} · {p.title || '—'}</div>
+              <div style={{ fontSize: 11.5, color: C.muted }}>{p.prix != null ? fmt(p.prix) : 'prix —'}{p.photos && p.photos.length ? ` · ${p.photos.length} photo${p.photos.length > 1 ? 's' : ''}` : ''}</div>
+              {msg[p.id] ? <div data-vc-refus="" style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg[p.id]}</div> : null}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" data-vc-preparer={p.id} aria-disabled={glob ? 'true' : undefined} title={glob ? glob.texte : "L'extension ouvre Vestiaire et remplit ce qu'elle reconnaît — tu relis et tu publies"} onClick={() => preparer(p)} style={btn(true)}>
+                {envoi === p.id ? 'Envoi…' : ouvert ? 'Ouvert sur Vestiaire' : 'Préparer sur Vestiaire'}
+              </button>
+              <button type="button" data-vc-marquer={p.id} onClick={() => marquer(p)} style={btn(false)}>Déjà publiée</button>
+            </div>
+          </div>
+        );
+      })}
+      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} paires</button>}
+    </div>
+  );
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
+      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
+        L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b> : VRM ne publie jamais à ta place sur Vestiaire.
+        {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
+      </div>
+      {corps}
+    </Card>
+  );
+}
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
   useEffect(() => { let stop = false; (async () => {
@@ -21475,7 +21572,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Bientôt disponible' : `Ce que VRM sait de ${court}`}/>
+      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Mets tes paires en vente sur Vestiaire depuis VRM' : `Ce que VRM sait de ${court}`}/>
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
@@ -21533,14 +21630,16 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
           <div className="vrm-display" style={{fontSize:30,fontWeight:700,color:p.ca!=null?C.text:C.muted}}>{p.ca!=null?fmt(p.ca):'—'}</div>
           <div style={{fontSize:11.5,color:C.muted,marginTop:2}}>{p.ca!=null?'ventes prouvées captées':'pas encore de vente captée'}</div>
         </Card>
+        {plat==='Vestiaire Collective' && <PublierVestiaire comptes={comptes}/>}
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
-              ? <>Vestiaire Collective n'est <b>pas encore reliée</b> à VRM : rien n'y est capté aujourd'hui. Le jour où une vente y remontera, elle apparaîtra ici et dans le total — jamais un chiffre inventé avant.<VestiaireMesure/><PhotoroomCle/></>
+              ? <>Tes ventes Vestiaire ne remontent pas encore dans VRM : le total ci-dessus ne compte rien d'inventé. Pour <b>mettre une paire en vente</b>, choisis-la ci-dessous : l'extension ouvre Vestiaire et remplit ce qu'elle reconnaît.<PhotoroomCle/></>
               : plat==='Leboncoin'
               ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
               : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}
           </div>
+          {plat==='Vestiaire Collective' && <VestiaireMesure/>}
           {plat!=='Vestiaire Collective' && plat!=='Leboncoin' && (
             <button type="button" onClick={()=>onGo&&onGo('cat_annonces')} style={{marginTop:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,color:C.text}}>
               Ouvrir l'écran Annonces →
@@ -53407,7 +53506,7 @@ function AppCoeur() {
           {platSub==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
           {platSub==='compte'&&<div data-ebay-compte-section="" style={{ padding: 16 }}>{baseKO?<div style={{ color: EBAY_SKIN.muted, fontSize: 13 }}>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</div>:<EbayConnexion onAnnonces={()=>setPlatSub('annonces')} vue={ebayVueEff} comptesEbay={comptesEbay}/>}</div>}
         </section>)}
-        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO}/>}
+        {tab==='plat_vestiaire'&&<Plateforme plat="Vestiaire Collective" liveStats={liveStatsVus} lbcVentes={lbcVentes} onGo={setTab} baseKO={baseKO} comptes={vintedAccounts}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();
