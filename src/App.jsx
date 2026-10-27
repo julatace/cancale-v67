@@ -41992,6 +41992,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const sugg = (it.price!=null && (sleeps || (it.views>=30 && it.favourites===0))) ? Math.max(1, Math.round(Number(it.price)*0.85)) : null;
             const lab = { fontSize:11, color:C.muted };
             const val = { fontSize:12, fontWeight:600, color:C.text };
+            // (27 oct., « boutons trop petits au doigt ») Les champs qu'on TAPE
+            // (N°, prix d'achat) sont des pastilles VISIBLES : la zone au doigt
+            // faisait 44 px de boîte mais le texte visé n'en faisait que 12
+            // (le tiret de « achat — ») à 23 (« N°2 »). Une pastille bordée avec
+            // du padding fait du tiret une cible qu'on VOIT, ~30 px de haut. §7 :
+            // pas de couleur — juste le fond et le filet neutres déjà en usage.
+            const pillEdit = { display:'inline-flex', alignItems:'center', gap:5, border:`1px solid ${C.border}`, borderRadius:8, padding:'5px 9px', background:C.bg, lineHeight:1 };
             return (
               <div className="vrm-ann-card" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} style={{borderRadius:10,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',gap:10,padding:10}}>
@@ -42003,7 +42010,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div data-titre style={{fontSize:12.5,fontWeight:500,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{it.title||it.brand||'—'}</div>
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'baseline',gap:8}}>
                       <span data-prix style={{fontSize:19,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{prix(it.price,it.currency)||'—'}</span>
-                      <span style={{marginLeft:'auto',flexShrink:0,fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:'1px 7px'}}>
+                      <span style={{marginLeft:'auto',flexShrink:0,display:'inline-block',verticalAlign:'middle',fontSize:12,fontWeight:700,color:num?C.text:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:'3px 9px'}}>
                         <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
                           titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
                       </span>
@@ -42028,7 +42035,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         (26 oct.) Vues, favoris, âge et compte sur la MÊME ligne : « achat — »
                         restait seul sur la sienne. */}
                     <div data-chiffres style={{display:'flex',flexWrap:'wrap',gap:'2px 10px',marginTop:2}}>
-                      <span><span style={lab}>achat </span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
+                      <span style={pillEdit}><span style={lab}>achat</span><EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={56}
                         titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={val}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/></span>
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
