@@ -30,6 +30,8 @@
 const SCRIPT = `(() => {
   if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
   const SESS_BANC = { access_token: 'jeton-de-banc-direct', refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
+  // La récupération autonome ne doit recevoir ni session ni stockage du banc.
+  if (location.pathname === '/recuperation.html') return;
   const ls = window.localStorage; const poserSess = () => {
     try { if (ls.getItem('vrm_acces_direct') === '1' && !ls.getItem('vrm_session') && ls.getItem('vrm_banc_sans_session') !== '1') { Storage.prototype.setItem.call(ls, 'vrm_session', JSON.stringify(SESS_BANC)); Storage.prototype.setItem.call(ls, 'vrm_local_owner', SESS_BANC.user.id); } } catch (_) {}
   };
@@ -101,7 +103,7 @@ function poser(pw) {
   // (26 oct.) Le Chromium installé change de version d'un conteneur à l'autre
   // (1194 puis 1243, sous chrome-linux64) : on prend celui qui EXISTE, jamais un chemin figé.
   const ICI = (() => {
-    const cands = ['/opt/pw-browsers/chromium'];
+    const cands = [process.env.VRM_CHROMIUM_PATH, '/usr/bin/chromium', '/opt/pw-browsers/chromium'].filter(Boolean);
     try { for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => /^chromium-\d+$/.test(n)).sort((a, b) => +b.split('-')[1] - +a.split('-')[1])) { cands.push('/opt/pw-browsers/' + d + '/chrome-linux64/chrome', '/opt/pw-browsers/' + d + '/chrome-linux/chrome'); } } catch (_) {}
     return cands.find((x) => { try { return fs.statSync(x).isFile(); } catch (_) { return false; } }) || '';
   })();

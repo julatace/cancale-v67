@@ -212,7 +212,7 @@ function sendQueuedInvoices() {
         try {
           opts.attachments = [Utilities.newBlob(Utilities.base64Decode(d.retourB64), 'application/pdf', d.retourNom || ('Formulaire-retour-commande-' + d.number + '.pdf'))];
           avecRetour = true;
-        } catch (e) {}
+        } catch (e) { throw new Error('Formulaire de retour illisible : facture conservée en attente, aucun email envoyé.'); }
       }
       GmailApp.sendEmail(
         d.buyerEmail,
