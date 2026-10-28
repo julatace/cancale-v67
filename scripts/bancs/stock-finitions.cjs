@@ -364,6 +364,10 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 't1');
       dit(pl0 && pl0.length === 1 && pl0[0].w > 1.5, t + ' : sans réglage, le plateau sous la table est plein', JSON.stringify(pl0));
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 't1', { cell: '1_1', num: '703' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 7; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-table-face-' + vp.width + '.png') }); }
+      const mt0 = await sonde(pg, 'maxCases', 't1');
+      dit(mt0 && Object.keys(mt0).length === 6 && mt0['0_0'] && mt0['0_0'].texte === 'max 8' && ['1_0', '1_1', '2_0', '2_1'].every((k) => mt0[k] && mt0[k].texte === 'max 2'), t + ' : chaque place de la table porte son nombre max (8 dessus, 2 par niveau dessous)', JSON.stringify(mt0));
+      dit(mt0 && mt0['0_0'] && mt0['1_0'] && mt0['0_0'].y > mt0['1_0'].y && mt0['1_0'].y > mt0['2_0'].y, t + ' : le nombre du dessus est au-dessus de la table, ceux du dessous dans leur niveau', JSON.stringify(mt0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 't1', { cell: '0_0', num: '701' });
@@ -380,6 +384,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.waitForTimeout(1200);
       const pl1 = await sonde(pg, 'plateaux', 't1');
       dit(pl1 && pl1.length === 1 && pl1[0].w < 1.0, t + ' : la 3D dessine un plateau de moitié sous la table', JSON.stringify(pl1));
+      const mt1 = await sonde(pg, 'maxCases', 't1');
+      dit(mt1 && !mt1['1_0'] && mt1['1_1'] && Object.keys(mt1).length === 5, t + ' : la place sans plateau sous la table n\'a plus de « max », sa voisine le garde', JSON.stringify(mt1 && Object.keys(mt1)));
       await pg.screenshot({ path: path.join(CAPT, 'stock-table-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
