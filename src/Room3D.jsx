@@ -539,6 +539,20 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       const cadrePileMat = new THREE.LineBasicMaterial({ color: '#2f3742', transparent: true, opacity: 0.8 });
       const capotPileMat = new THREE.MeshBasicMaterial({ color: '#2f3742', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
       const aretesCadre = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+      const plaqueMaxCache = new Map();
+      const plaqueMaxPile = (h) => {
+        let mat = plaqueMaxCache.get(h);
+        if (!mat) {
+          const c = document.createElement('canvas'); c.width = 128; c.height = 64; const x = c.getContext('2d');
+          x.fillStyle = '#1f252d'; rrect(x, 4, 8, 120, 48, 14); x.fill();
+          x.fillStyle = '#fff'; x.font = 'bold 30px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+          x.fillText('max ' + h, 64, 33);
+          mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, sizeAttenuation: false, toneMapped: false });
+          mat.map.colorSpace = THREE.SRGBColorSpace;
+          plaqueMaxCache.set(h, mat);
+        }
+        const sp = new THREE.Sprite(mat); sp.raycast = () => {}; sp.renderOrder = 9; return sp;
+      };
       const buildPile = (nums, rows, cell, hauteurs) => {
         const g = new THREE.Group(); const gap = cell * 0.04, s = cell - gap;
         const cols = Math.max(1, Math.ceil(nums.length / rows));
@@ -550,6 +564,10 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           const capot = new THREE.Mesh(new THREE.PlaneGeometry(s, s), capotPileMat);
           capot.rotation.x = -Math.PI / 2; capot.position.set(x, h * cell + 0.004, 0);
           capot.raycast = () => {}; capot.userData = { capotPile: c }; g.add(capot);
+          // Le NOMBRE max au-dessus (28 oct., « affiche le nombre max au-dessus de
+          // chaque pile ») : petite plaque neutre, décor seul, jamais touchée.
+          const nb = plaqueMaxPile(h); nb.scale.set(0.11, 0.055, 1); // taille FIXE à l'écran (sizeAttenuation coupé) : lisible de loin comme de près
+          nb.position.set(x, h * cell + cell * 0.3, 0); nb.userData = { maxPile: c, texte: 'max ' + h }; g.add(nb);
         }
         for (let i = 0; i < nums.length; i++) {
           const cc = Math.floor(i / rows), rr = i % rows; // cc = colonne, rr = niveau (0=bas)
@@ -712,7 +730,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       const reduitChute = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
       const buildFurniture = () => {
         const avant = notePositions();
-        colisCache.clear(); // textures des cartons régénérées à chaque reconstruction
+        colisCache.clear(); plaqueMaxCache.clear(); // textures des cartons régénérées à chaque reconstruction
         while (furnGroup.children.length) { const o = furnGroup.children.pop(); o.traverse && o.traverse(m => { if (m.geometry) m.geometry.dispose(); disposeMat(m.material); }); }
         (dataRef.current.items || []).forEach(it => {
           const shape = (FURN_TYPES[it.type] || {}).build || 'generic';
@@ -1445,8 +1463,8 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           // Le cadre de hauteur max de chaque pile : [{ c, h, haut }] (haut = sommet en mètres).
           hauteursMax: (itemId) => {
             const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
-            const out = []; g.traverse((o) => { if (o.userData && o.userData.hauteurMax != null) out.push({ c: o.userData.pileCol, h: o.userData.hauteurMax, haut: +(o.position.y + o.scale.y / 2).toFixed(3) }); });
-            return out.sort((a, b) => a.c - b.c);
+            const out = [], txt = {}; g.traverse((o) => { if (o.userData && o.userData.hauteurMax != null) out.push({ c: o.userData.pileCol, h: o.userData.hauteurMax, haut: +(o.position.y + o.scale.y / 2).toFixed(3) }); if (o.isSprite && o.userData && o.userData.maxPile != null) txt[o.userData.maxPile] = { texte: o.userData.texte, y: +o.position.y.toFixed(3) }; });
+            return out.sort((a, b) => a.c - b.c).map((x) => ({ ...x, texte: txt[x.c] ? txt[x.c].texte : null, texteY: txt[x.c] ? txt[x.c].y : null }));
           },
           // Les plateaux d'une étagère : [{ y, w }] (hauteur dans le meuble, largeur).
           plateaux: (itemId) => {
