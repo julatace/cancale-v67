@@ -23380,7 +23380,7 @@ function PublierVestiaire({ comptes }) {
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {(p.photos || []).filter((u) => clePhotoLbc(u)).map((u, j) => {
                       const c = clePhotoLbc(u); const on = etiquettes[String(p.id)] === c;
-                      return <button key={c} type="button" data-vc-etiq-photo={j + 1} aria-pressed={on ? 'true' : 'false'} onClick={() => poserEtiquette(p.id, c)} style={{ padding: 0, border: `2px solid ${on ? C.accent : C.border}`, borderRadius: 6, background: 'transparent', cursor: 'pointer', width: 48, height: 60, overflow: 'hidden' }}><PhotoVinted src={u} alt={`photo ${j + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/></button>;
+                      return <button key={c} type="button" data-vc-etiq-photo={j + 1} aria-label={`Photo ${j + 1} : c'est l'étiquette`} aria-pressed={on ? 'true' : 'false'} onClick={() => poserEtiquette(p.id, c)} style={{ padding: 0, border: `2px solid ${on ? C.accent : C.border}`, borderRadius: 6, background: 'transparent', cursor: 'pointer', width: 48, height: 60, overflow: 'hidden' }}><PhotoVinted src={u} alt={`photo ${j + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/></button>;
                     })}
                     {etiquettes[String(p.id)] ? <button type="button" data-vc-etiq-retirer={p.id} onClick={() => poserEtiquette(p.id, '')} style={btn(false)}>Aucune</button> : null}
                   </div>
