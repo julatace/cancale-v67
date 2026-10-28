@@ -64,3 +64,17 @@ test('un échec de réception signale une difficulté sans confirmer les emails'
 test('les messages à vérifier sont exclus de l’archivage même anciens et confirmés',()=>{const r=simulation([{id:'q',ancien:true,labels:['INBOX','vrm-traite','vrm-confirme-v2','vrm-a-verifier']}]);assert.ok(r.lettres[0].labels.includes('INBOX'));assert.equal(r.modifications.length,0);});
 
 test('le mode corbeille ne supprime rien sans certification documentaire',()=>{const r=simulation([{id:'ancien-confirme',ancien:true,labels:['INBOX','vrm-traite','vrm-confirme-v2']}],{corbeille:true});assert.ok(r.lettres[0].labels.includes('INBOX'));assert.ok(!r.lettres[0].labels.includes('TRASH'));assert.equal(r.modifications.length,0);assert.match(r.logs.join(' '),/suppression désactivée/);});
+
+function installation({refusCreation=false,refusDiagnostic=false}={}){
+ const anciens=[{id:'ancien',getHandlerFunction:()=> 'forwardVintedEmails'},{id:'autre',getHandlerFunction:()=> 'autreFonction'}],evenements=[];
+ const chaine={timeBased(){return this;},everyMinutes(n){evenements.push(['minutes',n]);return this;},create(){evenements.push(['creation']);if(refusCreation)throw Error('quota');return {};}};
+ const ctx=vm.createContext({Logger:{log(){}},verifierInstallationVRM:()=>{evenements.push(['diagnostic']);if(refusDiagnostic)throw Error('diagnostic');},ScriptApp:{getProjectTriggers:()=>anciens,newTrigger:nom=>{assert.equal(nom,'forwardVintedEmails');return chaine;},deleteTrigger:t=>evenements.push(['suppression',t.id])}});
+ vm.runInContext(source.slice(source.indexOf('function installerVRM('),source.indexOf('function preparerCleReceptionVRM(')),ctx);
+ let erreur;try{ctx.installerVRM();}catch(e){erreur=e.message;}return {evenements,erreur};
+}
+test('installation une minute : création avant retrait des anciens, autre fonction préservée',()=>{
+ const r=installation();assert.equal(r.erreur,undefined);assert.deepEqual(r.evenements,[['diagnostic'],['minutes',1],['creation'],['suppression','ancien']]);
+});
+test('installation refusée : le déclencheur existant ne disparaît pas',()=>{
+ for(const options of [{refusCreation:true},{refusDiagnostic:true}]){const r=installation(options);assert.ok(r.erreur);assert.equal(r.evenements.some(e=>e[0]==='suppression'),false);}
+});
