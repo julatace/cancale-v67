@@ -28,11 +28,13 @@ const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', descr
 const PHOTOS = ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'];
 const PHOTOS_D = ['https://images1.vinted.net/t/b/f800/1.jpeg', 'https://images1.vinted.net/t/b/f800/2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
   if (codes) lignes.vinted_item_details['9101'] = { codes, description: 'Nickel, boîte d’origine' };
+  if (descDetails != null) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), description: descDetails };
+  if (lettreCoffre && lignes['coffre_111_9101']) lignes['coffre_111_9101'].lettreVRM = lettreCoffre;
   if (cdn) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), photos: PHOTOS_D };
   let n = 500;
   return faireFond({ src, lignes, connecte, comptes, cdn: cdn || (() => ({ status: 200 })),
@@ -50,7 +52,7 @@ const suppressions = (j) => de(j, /\/items\/\d+\/delete$/);
 async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
-  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 const zero = (j) => j.vinted.length === 0;
@@ -127,6 +129,19 @@ const zero = (j) => j.vinted.length === 0;
   { const { f, r } = await run({ modele: false, codes: { catalog_id: 77, brand_id: 9, brand: 'Nike', color_ids: [3], item_attributes: [{ code: 'size', ids: [60] }], package_size_id: 2 } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
     dit(r.etape === 'fait' && it.catalog_id === 77 && it.package_size_id === 2 && it.description === 'Nickel, boîte d’origine', "sans modèle : la recette vient des codes de SA fiche, la description du coffre", JSON.stringify({ e: r.etape, c: it.catalog_id, d: it.description })); }
+  // J — (28 oct.) la description part MOT POUR MOT ; la lettre en option va
+  //     tout en bas, et la lettre d'une recréation précédente est retirée d'abord.
+  { const longue = 'Paire portée 2 fois.\n\n- Boîte d’origine\n- Envoi rapide 📦  #nike';
+    const { f, r } = await run({ descDetails: longue });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
+    dit(r.etape === 'fait' && it.description === longue, "sans lettre : la description part EXACTEMENT telle quelle (lignes, tirets, emoji)", JSON.stringify(it.description)); }
+  { const { f, r } = await run({ descDetails: 'Nickel.\n\nx', lettreCoffre: 'x', lettre: 'q' });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
+    dit(r.etape === 'fait' && it.description === 'Nickel.\n\nq', "avec la lettre : « q » tout en bas, l'ancienne lettre « x » retirée (pas d'empilement)", JSON.stringify(it.description));
+    dit(f.lignes['coffre_111_77001'] && f.lignes['coffre_111_77001'].lettreVRM === 'q', "la lettre posée est notée dans la sauvegarde de la nouvelle annonce", JSON.stringify(f.lignes['coffre_111_77001'] && f.lignes['coffre_111_77001'].lettreVRM)); }
+  { const { f } = await run({ descDetails: 'Taille x', lettre: 'abc' });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
+    dit(it.description === 'Taille x', "une « lettre » invalide (plusieurs caractères) n'ajoute rien, et un texte qui finit par x sans lettre notée n'est pas touché", JSON.stringify(it.description)); }
   // H — plancher.
   { const { f } = await run({ prix: 20, plancher: 35 });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}

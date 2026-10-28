@@ -7,6 +7,21 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (après-midi) — Republier : photos PAR annonce, temps montrés avant, lettre en bas (5.250) :**
+> Julien : « je sélectionne 3 annonces, je modifie toutes les photos des 3 pour qu'elles ne soient pas similaires,
+> avec un visuel ; je choisis le temps (aléatoire, 1,23 puis 1,56…) » puis « la même description, absolument tout ;
+> une lettre aléatoire tout en bas de chaque annonce ». Étape « 2. Modifier » : chaque annonce montre TOUTES ses
+> photos (`vinted_item_details`, sinon la couverture) avec SES réglages ; « Régler cette annonce » (réglages à part,
+> `regPar`), « Varier chaque annonce » (petits réglages différents tirés au hasard), « Mêmes réglages pour toutes ».
+> Étape 3 : les temps aléatoires sont TIRÉS avant de lancer et écrits sur chaque ligne (« tout de suite », « +1 min
+> 23 s »), « Tirer d'autres temps » ; le moteur suit le temps montré. Description : reprise mot pour mot ; option
+> « lettre au hasard tout en bas » (extension 5.250, `msg.lettre`, `EXT_CAPACITES.lettre`) : « \n\n<lettre> » en fin,
+> la lettre d'une recréation précédente (`coffre.lettreVRM`) retirée d'abord — jamais d'empilement. ⚠️ « Mettre en
+> BROUILLON sur Vinted puis publier » : PAS fait — aucune requête de brouillon n'a jamais été vue
+> (`seen_urls` : `item_upload/items` seul) ; la recréation crée directement. Geste pour l'apprendre : enregistrer
+> une annonce en brouillon à la main une fois. Preuves : `audit-recreer.cjs` J (2 rouges sur la 5.249), banc
+> `republier.cjs` (rouge sur le build de main).
+
 > **28 octobre (nuit) — audit de la recréation avant son premier essai, comparée au marché (5.249) :** Julien :
 > « refais des audits avant que je teste, inspire-toi de ce qui existe ». Outils regardés (Relister for Vinted,
 > Relisto, VintHelper, GEAR, VintedCRM, Fripio, Vintex, Dotb — pages d'éditeurs, non vérifiées) : republier en
