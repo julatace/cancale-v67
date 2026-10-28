@@ -41,9 +41,11 @@ const PONT = (o) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
-    if (d.__vmr === 'cmd' && d.cmd === 'republierVinted') {
-      window.__repub.push({ id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme });
-      const resp = d.id === '9106' ? { accepte: false, code: 'modele-absent', raison: 'format pas encore vu pour cette annonce' } : { accepte: true, etape: 'fait', ancien: 49, nouveau: d.prix };
+    if (d.__vmr === 'cmd' && (d.cmd === 'republierVinted' || d.cmd === 'recreerVinted')) {
+      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages });
+      const resp = d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
+        : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
+        : { accepte: true, etape: 'fait', nouvelId: '99102', ancien: 49, nouveau: d.prix };
       post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
     } else if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
   });
@@ -117,6 +119,7 @@ const projette = (row, sel) => {
         dit(paires.sort().join(',') === '9102,9103,9106', 'la liste = ses 3 paires en ligne', paires.join(','));
         dit(await pg.locator('[data-republier-suivant]').isDisabled(), 'sans paire choisie, « Continuer » est grisé');
         await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-paire="9106"]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-apercu="9102"]').waitFor({ timeout: 3000 });
@@ -124,6 +127,11 @@ const projette = (row, sel) => {
         const p2 = await pg.locator('[data-republier-apercu="9106"]').getAttribute('data-republier-nouveau-prix');
         dit(p1 === '4410', 'aperçu : −10 % sur 49 € ⇒ 44,10 €', p1);
         dit(p2 === '4700', 'aperçu : jamais sous le prix d’achat (47 €) ⇒ 47,00 €', p2);
+        // Réglages photo (« ce qu'on avait commencé dans Préparer ») : zoom 1,2.
+        await pg.locator('[data-republier-reglage="zoom"]').evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '1.2'); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
+        const tf = await pg.locator('[data-republier-photos]').getAttribute('data-republier-photos-css').catch(() => '');
+        dit(/scale\(1\.2\)/.test(tf || ''), 'les réglages photo se voient dans l’aperçu (zoom 1,2)', tf);
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-modif-' + vp.width + '.png') });
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-lancer]').waitFor({ timeout: 3000 });
         dit(await pg.locator('[data-republier-lancer]').isDisabled(), 'sans la case de confirmation, « Republier » est grisé');
@@ -134,13 +142,22 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-lancer]').click();
         for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini') break; await pg.waitForTimeout(250); }
         const envois = await pg.evaluate(() => window.__repub || []);
-        dit(envois.length === 2, 'UNE commande par paire choisie (2)', JSON.stringify(envois));
+        dit(envois.length === 3, 'UNE commande par paire choisie (3)', JSON.stringify(envois));
         const e1 = envois.find((x) => x.id === '9102'), e2 = envois.find((x) => x.id === '9106');
+        dit(envois.every((x) => x.cmd === 'recreerVinted'), 'chaque paire est SUPPRIMÉE ET RECRÉÉE (commande recreerVinted)', envois.map((x) => x.cmd).join(','));
         dit(e1 && e1.uid === '111' && Math.abs(e1.prix - 44.1) < 1e-9 && e1.confirme === true, 'la commande porte SON prix (44,10), son compte, et la confirmation', JSON.stringify(e1));
+        dit(e1 && e1.reglages && Math.abs(e1.reglages.zoom - 1.2) < 1e-9 && e1.reglages.rot === 0, 'les réglages photo partent avec la commande', JSON.stringify(e1 && e1.reglages));
         dit(e2 && Math.abs(e2.prix - 47) < 1e-9 && Number(e2.plancher) === 47, '… et le plancher (prix d’achat) part avec', JSON.stringify(e2));
-        dit(await pg.locator('[data-republier-ligne="9102"]').getAttribute('data-republier-statut') === 'fait', 'la paire acceptée dit « republiée »');
+        dit(await pg.locator('[data-republier-ligne="9102"]').getAttribute('data-republier-statut') === 'fait', 'la paire recréée dit « recréée »');
+        const l3 = pg.locator('[data-republier-ligne="9103"]');
+        dit(await l3.getAttribute('data-republier-statut') === 'double' && /refusé de supprimer/.test(await l3.innerText()), 'ancienne pas supprimée : dit en toutes lettres, jamais « recréée »', await l3.innerText());
+        await pg.waitForTimeout(1500);   // `save` écrit 500 ms plus tard
+        const nums = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); } catch (_) { return {}; } });
+        dit(nums['99102'] && nums['99102'].numero === '42' && nums['99102'].recreeDe === '9102', 'le N° 42 passe sur la NOUVELLE annonce (jamais un numéro neuf)', JSON.stringify(nums['99102']));
+        dit(nums['99103'] && nums['99103'].numero === '43', '… y compris quand l’ancienne reste en ligne (le N° suit la paire)', JSON.stringify(nums['99103']));
+        dit(nums['9102'] && nums['9102'].numero === '42', 'l’ancienne fiche garde son historique', JSON.stringify(nums['9102']));
         const l2 = pg.locator('[data-republier-ligne="9106"]');
-        dit(await l2.getAttribute('data-republier-statut') === 'echec' && /format pas encore vu/.test(await l2.innerText()), 'la paire refusée dit « pas faite » avec SA raison, jamais « republiée »', await l2.innerText());
+        dit(await l2.getAttribute('data-republier-statut') === 'echec' && /catégorie exacte/.test(await l2.innerText()), 'la paire refusée dit « pas faite » avec SA raison, jamais « recréée »', await l2.innerText());
         const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
         dit(!errs.length, 'aucune erreur d’app', errs[0]);

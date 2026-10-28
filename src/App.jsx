@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.247.0';
+const EXT_ATTENDUE = '5.248.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -493,7 +493,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11542,6 +11542,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
 // format appris) ; une annonce qu'elle ne sait pas faire ressort « pas faite »,
 // avec SA raison, jamais touchée.
 const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
+const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
 function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
   const [etape, setEtape] = useState('choix');
   const [sel, setSel] = useState(() => new Set());
@@ -11558,6 +11559,11 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
   const [ok, setOk] = useState(false);
   const [mode, setMode] = useState('idle');          // idle | run | pause | fini
   const [st, setSt] = useState({});                  // id → { etat, raison, ancien, nouveau }
+  // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
+  // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
+  const [reg, setReg] = useState(() => ({ ...REPUB_REG_DEF }));
+  const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
+  const regNeutre = Object.keys(REPUB_REG_DEF).every((k) => Number(reg[k]) === REPUB_REG_DEF[k]);
   const busy = React.useRef(false);
   const bas = (s) => String(s || '').toLowerCase();
   const liste = annonces.filter((a) => !q.trim() || bas(a.titre).includes(bas(q.trim())) || String(a.key).includes(q.trim()) || bas(a.compte).includes(bas(q.trim())));
@@ -11574,7 +11580,8 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
     return { titre, prix, plancher: !!(np && np.sousPlancher), tropLong: !!(titre && titre.length > TITRE_VINTED_MAX), invalide: !!(changeT && !nt) };
   };
   const choisies = annonces.filter((a) => sel.has(a.id));
-  const aFaire = choisies.filter((a) => { const x = apercu(a); return (x.titre || x.prix) && !x.tropLong && !x.invalide; });
+  // Recréer EST le geste : une paire sans changement part aussi (nouvelle annonce, mêmes infos).
+  const aFaire = choisies.filter((a) => { const x = apercu(a); return !x.tropLong && !x.invalide; });
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
   // Le moteur : une annonce à la fois, l'espacement AVANT chacune sauf la
   // première ; une pause ou un arrêt pendant l'attente n'engage rien, une
@@ -11590,14 +11597,24 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix, titre: x.titre }); } catch (_) { r = { ok: false, raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg } }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
-      setSt((p) => ({ ...p, [suiv.id]: r && r.ok ? { etat: 'fait', ancien: r.ancien, nouveau: r.nouveau } : { etat: 'echec', raison: (r && r.raison) || "l'extension n'a pas répondu" } }));
+      const etat = r && ['fait', 'double', 'incertain'].includes(r.etat) ? r.etat : 'echec';
+      setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau } }));
     }, premier ? 0 : fileClamp(esp) * 1000);
     return () => { annule = true; clearTimeout(t); };
   }, [mode, st, esp]);   // eslint-disable-line react-hooks/exhaustive-deps
   const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
   const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
+  const nDouble = Object.values(st).filter((s) => s.etat === 'double' || s.etat === 'incertain').length;
+  const cssReg = { filter: `brightness(${reg.bright}) contrast(${reg.contrast}) saturate(${reg.sat})`, transform: `rotate(${reg.rot}deg) scale(${reg.zoom})`, transformOrigin: 'center center' };
+  const curseur = (lab, cle, min, max, pas) => (
+    <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
+      <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
+      <input type="range" min={min} max={max} step={pas} value={reg[cle]} data-republier-reglage={cle} onChange={(ev) => setReg((r) => ({ ...r, [cle]: Number(ev.target.value) }))} style={{ flex: 1, accentColor: C.accent }} />
+      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)} %`}</span>
+    </label>
+  );
   const fermer = () => { if (mode === 'run') return; onClose(); };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 10px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', minHeight: 44 };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
@@ -11637,6 +11654,22 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
             </div>
           </>}
           {etape === 'modif' && <>
+            <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={maj}>Photos</span>
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+                {choisies.slice(0, 8).map((a) => <span key={a.id} style={{ width: 64, height: 80, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" data-republier-photo-apercu={a.id} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssReg }} /> : null}</span>)}
+              </div>
+              {curseur('Redresser', 'rot', -15, 15, 0.5)}
+              {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
+              {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
+              {curseur('Saturation', 'sat', 0, 2, 0.01)}
+              {curseur('Zoom', 'zoom', 1, 2, 0.01)}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })} style={btn(false)}>{p.nom}</button>)}
+                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })} style={btn(false)}>Photos d'origine</button>}
+              </div>
+              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Ces réglages s\u2019appliquent à toutes les photos des paires choisies, à partir de l\u2019original.'}</div>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
               <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} style={champ}>
@@ -11675,31 +11708,31 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
                   <div style={{ color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</div>
                   {x.prix != null && <div style={{ color: C.muted }}>{prixCourt(a.prix)} → <b style={{ color: C.text }}>{prixCourt(x.prix)}</b>{x.plancher && <span style={{ color: C.warn }}> · ramené au prix d'achat</span>}</div>}
                   {x.titre && <div style={{ color: x.tropLong ? C.warn : C.muted }}>→ {x.titre}{x.tropLong && ` · ${x.titre.length}/${TITRE_VINTED_MAX}, trop long : elle ne partira pas`}</div>}
-                  {rien && <div style={{ color: C.muted }}>rien ne change pour celle-ci — elle ne partira pas</div>}
+                  {rien && <div style={{ color: C.muted }}>mêmes titre et prix — recréée telle quelle</div>}
                 </div>
               ); })}
             </div>
           </>}
           {etape === 'envoi' && <>
-            <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une. Même annonce, même N° : rien n'est supprimé.</div>
+            <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée. Le N° VRM passe sur la nouvelle.</div>
             {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>L'extension VRM de ce navigateur doit être à jour ({EXT_ATTENDUE}) et connectée — sinon chaque annonce ressortira « pas faite », rien ne sera touché.</div>}
             {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sont sur un autre compte que celui ouvert dans Chrome : ouvre Vinted sur ce compte-là, sinon elles ressortiront « pas faites ».</div>}
             {mode === 'idle' && <>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
                 <input type="checkbox" data-republier-confirme checked={ok} onChange={(ev) => setOk(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0, marginTop: 1 }} />
-                <span>Je confirme : ces {aFaire.length} annonce{aFaire.length > 1 ? 's' : ''} seront modifiées sur mon compte Vinted, comme dans l'aperçu.</span>
+                <span>Je confirme : ces {aFaire.length} annonce{aFaire.length > 1 ? 's' : ''} seront supprimées et recréées sur mon compte Vinted, comme dans l'aperçu.</span>
               </label>
             </>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {aFaire.map((a) => { const s = st[a.id] || {}; return (
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: s.etat === 'echec' ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? '✓ republiée' : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : 'en attente'}</span>
+                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? '✓ recréée' : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : 'en attente'}</span>
                 </div>
               ); })}
             </div>
-            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} republiée{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}</div>}
+            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} recréée{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{nDouble ? ` · ${nDouble} à vérifier sur Vinted` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}</div>}
           </>}
         </div>
         <div style={{ display: 'flex', gap: 8, padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
@@ -47004,13 +47037,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'' };
         });
         const vc = vintedDeChrome(); const etatX = vc && vc.uid ? vc.uid : null;
+        // (28 oct.) Supprimer et RECRÉER (sa décision). Le N° VRM de l'ancienne
+        // annonce passe sur la nouvelle dès que l'extension a lu son identifiant
+        // (la nouvelle n'est donc jamais numérotée à neuf) ; l'ancienne fiche reste
+        // (elle porte l'historique, sa suppression est notée : plus présente).
+        const reporterNumero = (ancienId, nouvelId) => setNumeros(prev => {
+          const e = prev[ancienId]; if (!e || !nouvelId || prev[nouvelId]) return prev;
+          const u = { ...prev, [nouvelId]: { ...e, recreeDe: String(ancienId), recreeAt: new Date().toISOString() } };
+          save('vinted_annonce_numeros', u); return u;
+        });
         const publierR = async (a, v) => {
-          if(!a.uid) return { ok:false, raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 30000); } catch(_) { r=null; }
-          if (r && r.accepte && r.etape==='fait') return { ok:true, ancien:r.ancien, nouveau:r.nouveau };
-          return { ok:false, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
+          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, confirme:true }, 180000); } catch(_) { r=null; }
+          if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
+          if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
+          return { etat:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
-        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('republiermodif')!=='ok'} onClose={()=>setRepublierOpen(false)} />;
+        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} onClose={()=>setRepublierOpen(false)} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont
@@ -52648,11 +52691,11 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
         <div className="vrm-connexions-actions"><a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a><a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a></div>
-        <p>Chrome : remplace le dossier décompressé au même emplacement, puis clique sur Recharger dans <code>chrome://extensions</code>. Sur Edge, utilise <code>edge://extensions</code>.</p>
+        <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque Chrome où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, Chrome garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
       </details>
-      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Cette observation peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
+      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} C’est la version de la dernière capture enregistrée : elle peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
     </section>
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Dernière mise à jour enregistrée pour cette source. Pour actualiser un compte, ouvre-le sur sa plateforme avec l’extension active ; vérifie ensuite ses annonces, ventes et messages.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
