@@ -324,6 +324,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'm1');
       dit(pl0 && pl0.length === 6 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 6 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      const mc0 = await sonde(pg, 'maxCases', 'm1');
+      dit(mc0 && Object.keys(mc0).length === 10 && Object.values(mc0).every((x) => x.texte === 'max 2'), t + ' : chaque case de l\'étagère porte son nombre max (10 × « max 2 »)', JSON.stringify(mc0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'm1', { cell: '1_0', num: '601' });
@@ -341,6 +343,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.screenshot({ path: path.join(CAPT, 'stock-plateaux-reglage-' + vp.width + '.png') }).catch(() => {});
       const pl1 = await sonde(pg, 'plateaux', 'm1');
       dit(pl1 && pl1.filter((x) => x.w < 0.7).length === 1 && pl1.length === 6, t + ' : la 3D dessine un plateau de moitié', JSON.stringify(pl1));
+      const mc1 = await sonde(pg, 'maxCases', 'm1');
+      dit(mc1 && !mc1['1_0'] && mc1['1_1'] && Object.keys(mc1).length === 9, t + ' : la case sans plateau dessous n\'a plus de « max » (elle ne tient rien), sa voisine le garde', JSON.stringify(mc1 && Object.keys(mc1)));
       // « Aucun » : tout tombe en bas de sa colonne.
       await cliquerTexte(pg, '^Aucune$');
       q = await attendrePlan(pg, (x) => JSON.stringify(item(x, 'm1').planches) === '[]');
@@ -448,6 +452,9 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'w1');
       dit(pl0 && pl0.length === 5 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 5 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      const mcb = await sonde(pg, 'maxCases', 'w1');
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 'w1', { cell: '1_0', num: '611' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 10; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-bois-face-' + vp.width + '.png') }); }
+      dit(mcb && Object.keys(mcb).length === 8 && Object.values(mcb).every((x) => x.texte === 'max 2'), t + ' : l\'étagère en bois porte aussi son nombre max par case', JSON.stringify(mcb));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'w1', { cell: '1_0', num: '611' });
