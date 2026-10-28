@@ -874,10 +874,15 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
               // de la case. Pas sur une case sans plateau dessous (ses boîtes
               // tombent : elle ne tient rien), ni sur une table. Décor seul.
               const aPlateau = r === rows - 1 || !plx || plx.has((r + 1) + ':' + (c + 1));
-              if (!estTable && aPlateau) {
-                const pw = Math.min(0.2, cellW * 0.5), ph = pw / 2, haut = ht - r * cellH - 0.03;
+              // TABLE (28 oct., « fais pareil pour les tables ») : sur le dessus, la
+              // plaque flotte au-dessus de la plus haute pile possible (comme une
+              // pile au sol) ; sous la table, en façade en haut de son niveau.
+              if (aPlateau) {
+                const pw = Math.min(0.2, cellW * 0.5), ph = pw / 2;
+                const haut = estTable ? (r === 0 ? null : ht - (r - 1) * sousH - 0.06) : ht - r * cellH - 0.03;
                 const nb = plaqueMaxPile(cap, true); nb.scale.set(pw, ph, 1);
-                nb.position.set(cx, Math.max(cbY + ph / 2, haut - ph / 2), d / 2 + 0.03);
+                if (haut == null) nb.position.set(cx, cbY + cap * pas + ph / 2 + 0.04, z);
+                else nb.position.set(cx, Math.max(cbY + ph / 2, haut - ph / 2), d / 2 + 0.03);
                 nb.userData = { maxCase: key, texte: 'max ' + cap }; g.add(nb);
               }
             }

@@ -151,6 +151,11 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — le nombre max sur les TABLES aussi :** « fais pareil pour les tables ». Dessus : la plaque
+> flotte au-dessus de la plus haute pile possible (comme une pile au sol) ; sous la table : en façade, en haut de chaque
+> niveau. Même règle que les étagères (`cap`, pas de plaque sans plateau dessous). Banc `stock-finitions.cjs` X (+3 par
+> taille ; table exclue ⇒ 6 rouges).
+
 > **28 octobre (nuit, fin) — le nombre max dans chaque case des ÉTAGÈRES :** Julien : « fais pareil pour les étagères ».
 > Étagère métal et bois : une plaque « max N » en façade, en haut de chaque case (N = la capacité de la case, la règle du
 > rangement), à taille DANS la pièce (une plaque par case : à taille fixe à l'écran elles couvriraient le meuble vu de
