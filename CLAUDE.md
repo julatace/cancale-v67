@@ -7,6 +7,14 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — VESTIAIRE : on ouvre le FORMULAIRE, pas l'accueil (5.268) :** Julien : « ça m'amène
+> juste sur Vestiaire, sur Vendre un article, et ça ne fait rien après ». Cause : `VC_PAGE_VENDRE` ouvrait
+> `/sell-clothes-online/` (page d'accueil, aucun champ) ; à 22:50, `vc_recon` le voit passer, `panel_vc_form` rien.
+> Le formulaire est le smart listing `/smart-listing/` (MESURÉ : `vc_recon.pages`, `panel_vc_form` du 28 à 13 h 37).
+> On l'ouvre directement ; et `vc-depot.js`, sur une page « vendre » sans formulaire avec une paire en cours, y va UNE
+> fois par paire et par onglet (`vrmVcVersSmart:{id}`, pas de boucle). Preuve : `audit-vc-publier.cjs` (94 ; rouge sur
+> la 5.267). ⚠️ Toujours non mesuré : les écrans du smart listing après les photos.
+
 > **28 octobre (nuit, fin) — VESTIAIRE bloqué faute de clé Photoroom (5.267) :** Julien : « ça ne veut pas faire de smart
 > listing ni de Photoroom ». Mesuré : aucune clé Photoroom (ni `PHOTOROOM_API_KEY` sur Vercel, ni `vrm_photoroom_cle`), 24
 > `detourage_no_key` ; or `vc-depot.js` n'attache QUE des photos détourées (sa règle du 27 oct.) ⇒ 0 photo, et le smart

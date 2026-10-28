@@ -220,13 +220,28 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     const ctxN = await nav.newContext();
     const pg = await ctxN.newPage();
     await ctxN.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html; charset=utf-8', body: /sell-clothes/.test(r.request().url()) ? '<!doctype html><html><body><a href="#">Vendre un article</a></body></html>' : FORM }));
-    // Sans formulaire : rien n'est touché, le bandeau dit le geste.
+    // 28 oct. (5.268) — « ça m'amène juste sur Vendre un article et ça ne fait
+    // rien après » : la page d'ACCUEIL « vendre » n'a aucun champ. VRM va au
+    // smart listing (`/smart-listing/`, mesuré) UNE fois, puis remplit.
     await pg.addInitScript(fauxChrome(AD));
     await pg.goto('https://fr.vestiairecollective.com/sell-clothes-online/');
     await pg.addScriptTag({ content: code });
-    await pg.waitForTimeout(1500);
-    const b0 = await pg.evaluate(() => (document.getElementById('vrm-vc-b') || {}).innerText || '');
-    dit(/Vendre un article/.test(b0), 'sans formulaire : le bandeau dit de cliquer « Vendre un article »', b0);
+    let arrive = false;
+    try { await pg.waitForURL(/\/smart-listing\//, { timeout: 6000 }); arrive = true; } catch (_) {}
+    dit(arrive, 'page d\'accueil « vendre » : VRM ouvre tout seul le formulaire (/smart-listing/)', pg.url());
+    if (arrive) {
+      await pg.waitForLoadState('domcontentloaded');
+      await pg.addScriptTag({ content: code });
+      await pg.waitForTimeout(3500);
+      const d0 = await pg.evaluate(() => (document.getElementById('d') || {}).value || '');
+      dit(/VRM-401/.test(d0), 'et là, il remplit le formulaire', d0.slice(0, 60));
+      // L'autre sens : revenir sur l'accueil dans le même onglet ne boucle pas.
+      await pg.goto('https://fr.vestiairecollective.com/sell-clothes-online/');
+      await pg.addScriptTag({ content: code });
+      await pg.waitForTimeout(3000);
+      const b0 = await pg.evaluate(() => ({ u: location.pathname, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }));
+      dit(b0.u === '/sell-clothes-online/' && /Vendre un article/.test(b0.b), 'une seule redirection par paire : pas de boucle, le bandeau dit le geste', JSON.stringify(b0).slice(0, 160));
+    }
     const p2 = await ctxN.newPage();
     await p2.addInitScript(fauxChrome(AD));
     await p2.goto('https://fr.vestiairecollective.com/sell/');
