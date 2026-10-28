@@ -139,38 +139,6 @@ async function refreshTokens({ siteHost, token, refreshToken, anonId, csrfToken 
 }
 
 export default async function handler(req, res) {
-  // (28 oct.) MODE IMAGE — sert une photo d'annonce Vinted depuis NOTRE origine
-  // (vrm.center) pour qu'elle serve de TEXTURE WebGL dans le Stock 3D : une image
-  // chargée cross-site depuis le CDN de Vinted est refusée par WebGL ; servie en
-  // MÊME-ORIGINE, elle passe. Ce N'EST PAS un relais ouvert : seules les URL du
-  // CDN d'images PUBLIC de Vinted (déjà publiques — aucun jeton, aucune donnée
-  // privée), en GET, session exigée, hôte verrouillé, pas de redirection hors
-  // CDN, taille et délai bornés. Une image qui échoue ⇒ le Stock garde le carton
-  // numéroté d'aujourd'hui (aucune régression).
-  if (req.method === 'GET' && String((req.query && req.query.mode) || '') === 'image') {
-    const vu = await vendeurExige(req, res);
-    if (!vu) return;
-    let cible;
-    try { cible = new URL(String((req.query && req.query.u) || '')); } catch (_) { res.status(400).json({ erreur: 'url' }); return; }
-    const hostOk = cible.protocol === 'https:'
-      && /(^|\.)vinted\.(net|com|fr)$/i.test(cible.hostname)
-      && /\.(jpe?g|png|webp|gif|avif)$/i.test(cible.pathname);
-    if (!hostOk) { res.status(403).json({ erreur: 'hote' }); return; }
-    try {
-      const ctrl = new AbortController(); const minuteur = setTimeout(() => ctrl.abort(), 8000);
-      const rep = await fetch(cible.toString(), { redirect: 'error', signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'image/*' } });
-      clearTimeout(minuteur);
-      if (!rep.ok) { res.status(502).json({ erreur: 'cdn', statut: rep.status }); return; }
-      const ct = rep.headers.get('content-type') || '';
-      if (!/^image\//i.test(ct)) { res.status(502).json({ erreur: 'type' }); return; }
-      const buf = Buffer.from(await rep.arrayBuffer());
-      if (buf.length > 6 * 1024 * 1024) { res.status(502).json({ erreur: 'taille' }); return; }
-      res.setHeader('Content-Type', ct);
-      res.setHeader('Cache-Control', 'private, max-age=86400');
-      res.status(200).send(buf);
-    } catch (_) { res.status(502).json({ erreur: 'cdn' }); }
-    return;
-  }
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Méthode non supportée, utilise POST' });
