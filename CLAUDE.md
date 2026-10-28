@@ -7,6 +7,25 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — la paire REPUBLIÉE garde son numéro, et les N° revus sur Vinted (5.265) :** Julien :
+> « quand la paire est republiée elle ne conserve pas son numéro, sur Vinted il n'y a plus les numéros ». Mesuré :
+> Jordan 3 N°2→107, Air Max 1 N°53→108, zoom fly N°94→109 (toutes `auto`, données après la mise en ligne d'un brouillon :
+> seule la création directe reportait le N°). ⇒ `src/repriseNumero.js` : la table nouvelle → ancienne annonce vient des
+> lignes de l'extension (`vinted_brouillon_*.ancienId`, l'id du brouillon = l'annonce publiée ; `coffre_*.recreeDe`) —
+> une IDENTITÉ ; la numérotation automatique attend cette table (`recreesNum` pas lue ⇒ on attend, illisible ⇒ comme avant)
+> et donne à la republiée le N° de l'ancienne (plus en ligne, une seule remplaçante, N° sur aucune autre paire en ligne) ;
+> une republiée renumérotée AUTOMATIQUEMENT le retrouve (`numeroRendu`, l'autre reste brûlé) — jamais un N° posé à la
+> main ni porté par une vente. Sur Vinted, la pastille posée DANS un lien qui recouvre la photo passait SOUS la photo :
+> elle s'épingle sur la carte (`carteDe`, jamais la grille). Preuves : `audit-reprise-numero.cjs` (4 mutations rouges),
+> banc `numero-vinted.cjs` (2 rouges sur l'avant).
+
+> **28 octobre (nuit, fin) — « de brouillon à en ligne ça marche pas » (5.265) :** mesuré sur l'Air Max 1 refaite à 20:25 :
+> brouillon rangé, puis la mise en ligne refusée pour les PHOTOS (`refaire_mise_en_ligne_refusee_400`,
+> `vinted_refus_champs_photos`) — des photos neuves en JPEG, acceptées par le brouillon. Cause NON mesurée.
+> `completionSecoursPhotos` (Republier, Refaire, Brouillons → en ligne) : attente, nouvel essai avec la forme courte des photos
+> (`{id, orientation:0}`, celle des brouillons du navigateur) ; toujours refusé ⇒ photos renvoyées, dernier essai ; le texte exact
+> du refus est gardé (`rates.vinted_refus_photos`) pour la passe suivante. Preuve : `audit-recreer.cjs` (110 ; 9 rouges sur la 5.264).
+
 > **28 octobre (nuit, fin) — DESCRIPTION trop courte, et le COMPTE RENDU d'une opération coupée (5.264) :** Julien
 > (Air Max 1 Athletic Department, zoom fly 5) : « Vinted a refusé le brouillon (400 : … Le champ Description doit comprendre
 > au moins 5 caractères) » ; puis « si l'app recharge ou est éteinte je veux un compte rendu de là où l'opération s'était

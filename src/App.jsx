@@ -31,6 +31,7 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
+import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -111,7 +112,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.264.0';
+const EXT_ATTENDUE = '5.265.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11736,6 +11737,7 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.titre}{b.prix ? ` · ${prixCourt(b.prix)}` : ''}</div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>{fini ? (s.raison || 'Fait.') : s.etape && s.etape !== 'envoi' ? s.raison : TEXTE_REFAIRE[b.quoi](b)}</div>
+              {s.etape === 'envoi' && <SuiviGeste ids={[b.id, b.draftId]} liste={b.quoi === 'a-publier' ? ETAPES_REPUB.publier : ETAPES_REPUB.refaire} label={b.titre} />}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {geste && !fini && s.etape !== 'incertain' && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
                 {b.quoi === 'a-verifier' && <button type="button" onClick={onVoirBrouillons} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes brouillons</button>}
@@ -11792,7 +11794,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</div>
                 <div style={{ fontSize: 12.5, color: C.muted }}>{prixAff > 0 ? `${prixCourt(prixAff)} · ` : 'sans prix · '}{compte(it)}</div>
                 <div data-brouillon-vu style={{ fontSize: 12, color: C.muted }}>{it._source === 'extension' ? `enregistré il y a ${ilYaBr(it._enregistre)} — pas encore relu dans ton dressing` : Number.isFinite(it._vu) ? `vu sur Vinted il y a ${ilYaBr(it._vu)}` : 'vu sur Vinted (date de lecture inconnue)'}</div>
-                {e && e.etape === 'envoi' && <div style={{ fontSize: 12.5, color: C.muted }}>Mise en ligne…</div>}
+                {e && e.etape === 'envoi' && <SuiviGeste ids={[it.id]} liste={ETAPES_REPUB.publier} label={(it._info && it._info.titre) || it.title || 'ce brouillon'} />}
                 {e && e.etape === 'fait' && <div data-brouillon-fait style={{ fontSize: 12.5, color: C.text }}>✓ En ligne sur Vinted</div>}
                 {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
                 {!e && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
@@ -11876,10 +11878,56 @@ const ETAPES_REPUB = {
   brouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'ancienne annonce"], ['brouillon', 'Création du brouillon'], ['attente', 'Pause (au hasard) avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
   versBrouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'annonce"], ['brouillon', 'Création du brouillon']],
   direct: [['photos', 'Envoi des photos'], ['creation', 'Création de la nouvelle annonce'], ['suppression', "Retrait de l'ancienne annonce"]],
+  refaire: [['photos', 'Envoi des photos'], ['brouillon', 'Création du brouillon'], ['attente', 'Pause (au hasard) avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
+  publier: [['en-ligne', 'Mise en ligne']],
 };
-function progressionRepub(p, action, viaB) {
-  const liste = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
+// (28 oct., « c'est trop long et on ne suit pas vraiment l'avancée ») Les pauses
+// tirées au hasard (5.263) sont annoncées par l'extension avec leur durée (5.265) :
+// on affiche ce qu'il reste à attendre, à la seconde.
+const PAUSE_NOM = { photo: 'avant la photo suivante', brouillon: 'avant de créer le brouillon', enLigne: 'avant la mise en ligne', reessai: 'avant un nouvel essai' };
+function majProgRepub(p, d) {
+  const id = String(d.id); const cur = p[id] || {};
+  if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
+  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total: Number(d.total) || 0, renvoi: !!d.renvoi } };
+}
+function texteAttente(p, now) {
+  const pa = p && p.pause;
+  if (!pa || !(pa.jusqua > now)) return '';
+  const s = Math.ceil((pa.jusqua - now) / 1000);
+  return `pause au hasard ${PAUSE_NOM[pa.quoi] || ''} : encore ${s} s`.replace(/\s+:/, ' :');
+}
+function BarreGeste({ p, liste, attrs, label }) {
+  const [now, setNow] = useState(() => Date.now());
+  const enPause = !!(p && p.pause && p.pause.jusqua > now);
+  useEffect(() => { if (!enPause) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [enPause, p && p.pause && p.pause.jusqua]);
+  useEffect(() => { setNow(Date.now()); }, [p]);
+  const pe = progressionRepub(p, null, null, liste);
+  const att = texteAttente(p, now);
+  return (
+    <div {...(attrs || {})} data-geste-etape={pe.etape || 'attente'} data-geste-pause={att ? 'oui' : 'non'}>
+      <div role="progressbar" aria-label={`${label ? label + ' : ' : ''}${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+        <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
+      </div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{pe.texte}{att ? ` · ${att}` : ''}</div>
+    </div>
+  );
+}
+// Suit un geste lancé hors de la file Republier (Refaire, Mettre en ligne).
+function SuiviGeste({ ids, liste, label }) {
+  const [p, setP] = useState({});
+  const cles = (ids || []).filter(Boolean).map(String);
+  useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'repub' && d.id && cles.includes(String(d.id))) setP((x) => majProgRepub(x, d)); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [cles.join(',')]);
+  const actuel = cles.map((k) => p[k]).filter(Boolean).pop() || null;
+  const lst = actuel && actuel.etape === 'en-ligne' && !(p[cles[0]] && p[cles[0]].etape) ? ETAPES_REPUB.publier : liste;
+  return <BarreGeste p={actuel} liste={lst} label={label} attrs={{ 'data-suivi-geste': cles[0] || '' }} />;
+}
+function progressionRepub(p, action, viaB, listeImposee) {
+  const liste = listeImposee || (action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct));
   if (!p || !p.etape) return { etape: '', part: 0.03, texte: 'Préparation…' };
+  if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: p.renvoi ? 'Vinted refuse les photos : VRM les renvoie, puis un dernier essai…' : 'Vinted refuse les photos : nouvel essai…' }; }
   const i = liste.findIndex((x) => x[0] === p.etape);
   if (i < 0) return { etape: p.etape, part: 0.05, texte: 'En cours…' };
   const dedans = p.etape === 'photos' && p.total > 0 ? Math.min(1, p.fait / p.total) : 0;
@@ -11947,7 +11995,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // déduit : le résultat reste celui que rend l'extension à la fin.
   const [prog, setProg] = useState({});              // id → { etape, fait, total }
   useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'repub' && d.id) setProg((p) => ({ ...p, [String(d.id)]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total: Number(d.total) || 0 } })); };
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'repub' && d.id) setProg((p) => majProgRepub(p, d)); };
     window.addEventListener('vrm:ext', f);
     return () => window.removeEventListener('vrm:ext', f);
   }, []);
@@ -12275,12 +12323,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
                 </div>
-                {s.etat === 'encours' && recree && (() => { const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
+                {s.etat === 'encours' && recree && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
                   <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 10px 10px 36px', borderBottom: `1px solid ${C.border}` }}>
-                    <div role="progressbar" aria-label={`Paire ${i + 1} : ${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
-                    </div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{pe.texte}</div>
+                    <BarreGeste p={prog[String(a.id)]} liste={lst} label={`Paire ${i + 1}`} />
                   </div>
                 ); })()}
               </React.Fragment>); })}
@@ -36615,6 +36660,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { relireReservesNum(); }, [listings.items]);
+  // (28 oct.) Qui remplace qui après une republication : `vinted_brouillon_*`
+  // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
+  // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
+  const [recreesNum, setRecreesNum] = useState(undefined);
+  useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        const [rb, rc] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId`, { headers: sbAuth() }),
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe`, { headers: sbAuth() }),
+        ]);
+        if (!rb.ok || !rc.ok) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); return; }
+        const t = tableRecrees(await rb.json(), await rc.json());
+        if (vivant) setRecreesNum((v) => (v && JSON.stringify(v) === JSON.stringify(t) ? v : t));
+      } catch (_) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); }
+    })();
+    return () => { vivant = false; };
+  }, [listings.items]);
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});
@@ -39526,6 +39590,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Attendre deux secondes coûte moins cher qu'un numéro faux à vie.
     if (sales.items === null || !txnPret) return;
     if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
+    if (recreesNum === undefined) return; // qui remplace qui (republication) pas encore lu
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
     // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
@@ -39553,6 +39618,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
     const takenK = new Set(takenCles);
     let changed = false;
+    // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
+    // une annonce renumérotée automatiquement par erreur le retrouve).
+    if (recreesNum) {
+      const reprises = repriseNumerosRecreation({
+        enLigneIds: items.map((x) => x.id), numeros: nextNum, recrees: recreesNum, reprenable: numeroReprenable, cle: cleNum,
+        numeroVente: (nid) => { const n = nextNum[nid] && nextNum[nid].numero; return !!numVentesParIdentite.parItem[String(nid)] || (n != null && Object.values(saleOv).some((o) => o && cleNum(o.numero) === cleNum(n))); },
+      });
+      for (const nid of Object.keys(reprises)) { nextNum[nid] = reprises[nid]; changed = true; }
+    }
     // Dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il les reposte), par la même
     // date que celle qui décide si l'annonce se numérote.
     const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
@@ -39602,7 +39676,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesNum]);
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
