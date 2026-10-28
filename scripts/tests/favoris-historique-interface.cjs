@@ -9,7 +9,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  window.fetch=async(url,opts={})=>{const ok=x=>({ok:true,json:async()=>x});
  if(url.startsWith('/api/compte')&&opts.method==='POST'){if(window.retarderLancement)await new Promise(r=>window.finLancement=r);return{ok:false,json:async()=>({message:'Le destinataire n’est pas confirmé.',code:'favoris_preuve_absente',diagnostic:{notifications:4,liensExacts:0,selection:1,owner:'secret-prive',pairesNatives:987654321}})};}
  if(opts.method==='POST'&&url.includes('on_conflict=owner,id'))return ok([JSON.parse(opts.body)]);
- if(url.startsWith('/api/compte'))return ok({ok:true,serveur:Date.now(),vue:{active:false,jobs:[{notificationId:'n1',etat:'envoye',envoyeLe:Date.now()-10000},{notificationId:'n4',etat:'verifie'}]}});
+ if(url.startsWith('/api/compte'))return ok({ok:true,serveur:Date.now(),vue:{active:false,jobs:[{notificationId:'n1',etat:'envoye',envoyeLe:Date.now()-10000},{notificationId:'n4',etat:'verifie'},{notificationId:'n2',etat:'refuse',raison:'identite_non_confirmee'},{notificationId:'n3',etat:'annule'}]}});
  if(url.includes('_favoris_archive'))return ok(window.pages?[{owner:'owner-test',data:{archiveVersion:1,uid:'123',type:'notifications',domain:'www.vinted.fr',payload:{notifications:[note(1),...Array.from({length:window.pages+1},(_,i)=>note(i+2))]},sync:{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',pagesLues:window.pages,totalPages:2,complete:window.pages===2},limite:false}}]:[]);
  if(url.includes('vrm_favoris_reglages_'))return ok([]);
  return ok([{owner:'owner-test',data:{uid:'123',domain:'www.vinted.fr',type:'notifications',payload:{notifications:[note(1)]}}}]);};
@@ -46,6 +46,11 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  await p.evaluate(()=>window.dispatchEvent(new Event('focus')));await p.locator('.vrm-favoris-rows article').first().waitFor();
 
  check(await p.getByText('Message déjà envoyé',{exact:true}).count()===1,'is_read never counts as sent');
+ await p.getByRole('button',{name:'Interrompus (2)',exact:true}).click();
+ check(await p.locator('.vrm-favoris-rows article').count()===2,'interrupted and cancelled favorites can be found together');
+ check(await p.getByText('Envoi interrompu',{exact:true}).count()===1,'interrupted row is explicitly labelled');
+ check(await p.getByText('Annulé dans la file · non envoyé',{exact:true}).count()===1,'cancelled row does not claim a sent message');
+ check((await p.locator('.vrm-favoris-raison').innerText()).includes('destinataire du fil n’a pas été confirmé'),'known interruption reason is readable on mobile without hover');
  await p.getByRole('button',{name:'Clôturés (1)',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===1,'closed filter');check(await p.getByText('Clôturé manuellement · envoi non confirmé',{exact:true}).count()===1,'manual closure does not claim a confirmed send');
  await p.getByRole('button',{name:'Déjà envoyés (1)',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===1,'sent filter');
  await p.getByRole('button',{name:'À contacter (2)',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===2,'contact filter excludes confirmed sent and manually closed');

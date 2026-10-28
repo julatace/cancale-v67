@@ -85,13 +85,20 @@ export function ageFavori(date,maintenant=Date.now()){
   const s=Math.floor((maintenant-t)/1000);if(s< -120)return 'Heure à vérifier';if(s<60)return 'à l’instant';
   if(s<3600)return `il y a ${Math.floor(s/60)} min`;if(s<86400)return `il y a ${Math.floor(s/3600)} h`;return `il y a ${Math.floor(s/86400)} j`;
 }
-export function contactFavori(ligne,jobs){
-  if(!Array.isArray(jobs))return null;
-  const candidats=jobs.filter(j=>j.notificationId===ligne.id||ligne.identiteNotification&&j.id===ligne.identiteNotification);
-  const ordre=['envoye','incertain','ignore','reserve','attente','verifie','refuse','annule'];
-  const rang=j=>ordre.includes(j.etat)?ordre.indexOf(j.etat):999;
-  return candidats.sort((a,b)=>rang(a)-rang(b))[0]||null;
+const PRIORITE_CONTACT=['envoye','incertain','ignore','reserve','attente','verifie','refuse','annule'];
+export function indexerContactsFavoris(jobs){
+  const notifications=new Map(),identites=new Map();
+  const rang=j=>{const n=PRIORITE_CONTACT.indexOf(j.etat);return n<0?999:n;};
+  const meilleur=(a,b)=>!a?b:!b?a:rang(a.job)<rang(b.job)||rang(a.job)===rang(b.job)&&a.index<b.index?a:b;
+  if(Array.isArray(jobs))jobs.forEach((job,index)=>{
+    if(!job||typeof job!=='object')return;
+    const candidat={job,index};
+    if(job.notificationId!=null)notifications.set(job.notificationId,meilleur(notifications.get(job.notificationId),candidat));
+    if(job.id!=null)identites.set(job.id,meilleur(identites.get(job.id),candidat));
+  });
+  return ligne=>meilleur(notifications.get(ligne?.id),ligne?.identiteNotification?identites.get(ligne.identiteNotification):null)?.job||null;
 }
+export function contactFavori(ligne,jobs){return indexerContactsFavoris(jobs)(ligne);}
 export async function lireFavorisVinted({uid,owner,ownerActuel,base,headers,fetcher=fetch}) {
   if(!owner||ownerActuel()!==owner||!/^\d{1,20}$/.test(String(uid||'')))throw Error('Choisis un compte Vinted dans ta session VRM.');
   const r=await fetcher(`${base}/rest/v1/app_data?id=eq.harvest_${uid}_notifications&owner=eq.${encodeURIComponent(owner)}&select=owner,data`,{headers,cache:'no-store'});
