@@ -269,14 +269,59 @@ export const retirerDePile = (nums, idx, rows) => {
   if (fin < a.length) col.push('');
   return sansTrouFinal([...a.slice(0, deb), ...col, ...a.slice(fin)]);
 };
+// ── UNE HAUTEUR PAR PILE (28 oct.) ──────────────────────────────────────────
+// Julien : « une hauteur différente pour chaque pile ». `it.rows` reste le PAS
+// de `nums` (la plus haute pile) ; `it.hauteurs[c]` = combien de cartons la
+// pile c accepte (absent ⇒ `rows`, comme avant). Au-dessus de sa hauteur, une
+// pile n'a que des places vides : aucun carton ne s'y pose.
+export const hauteurPile = (rows, hauteurs, c) => {
+  const R = Math.max(1, Number(rows) || 1), h = Number(arr(hauteurs)[c]);
+  return Number.isInteger(h) && h >= 1 ? Math.min(R, h) : R;
+};
 // Ajouter un carton : il comble le premier TROU (le haut d'une colonne
-// entamée), sinon il se pose au-dessus de la dernière colonne.
-export const ajouterAPile = (nums, num) => {
+// entamée), sinon il se pose au-dessus de la dernière colonne. Avec `rows`, une
+// place au-dessus de la hauteur de SA pile n'est jamais un trou à combler ; si
+// toutes les piles sont pleines, une nouvelle pile commence.
+export const ajouterAPile = (nums, num, rows, hauteurs) => {
   const v = String(num == null ? '' : num).trim(); if (!v) return null;
   const a = arr(nums).map((x) => String(x == null ? '' : x));
-  const t = a.findIndex(estTrou);
-  if (t >= 0) { a[t] = v; return a; }
+  if (rows == null) {
+    const t = a.findIndex(estTrou);
+    if (t >= 0) { a[t] = v; return a; }
+    return [...a, v];
+  }
+  const R = Math.max(1, Number(rows) || 1), cols = Math.max(1, Math.ceil(a.length / R));
+  for (let c = 0; c < cols; c++) {
+    const h = hauteurPile(R, hauteurs, c);
+    for (let p = 0; p < h; p++) {
+      const i = c * R + p;
+      if (i >= a.length || estTrou(a[i])) { while (a.length < i) a.push(''); a[i] = v; return a; }
+    }
+  }
+  while (a.length < cols * R) a.push('');
   return [...a, v];
+};
+// Changer la hauteur de UNE pile : chaque carton garde sa pile et sa place
+// depuis le bas ; les autres piles ne bougent pas. Refusé si la pile porte un
+// carton plus haut que la nouvelle hauteur. Rend { nums, rows, hauteurs } —
+// `hauteurs` vaut null quand toutes les piles ont la même hauteur.
+export const changerHauteurPile = (nums, rows, hauteurs, c, h) => {
+  const a = arr(nums).map((x) => String(x == null ? '' : x));
+  const R = Math.max(1, Number(rows) || 1), cols = Math.max(1, Math.ceil(a.length / R));
+  const nh = Math.round(Number(h));
+  if (!(c >= 0 && c < cols)) return { erreur: 'Cette pile n\'existe pas.' };
+  if (!(nh >= 1 && nh <= 40)) return { erreur: 'Une pile fait entre 1 et 40 cartons.' };
+  const col = a.slice(c * R, c * R + R);
+  let haut = -1; col.forEach((x, p) => { if (!estTrou(x)) haut = p; });
+  if (haut + 1 > nh) return { erreur: `Cette pile porte ${haut + 1} carton${haut ? 's' : ''} : retire d'abord ceux du haut.` };
+  const hs = Array.from({ length: cols }, (_, k) => (k === c ? nh : hauteurPile(R, hauteurs, k)));
+  const R2 = Math.max(...hs);
+  const out = [];
+  for (let k = 0; k < cols; k++) {
+    const part = a.slice(k * R, k * R + R);
+    for (let p = 0; p < R2; p++) out.push(p < part.length ? part[p] : '');
+  }
+  return { nums: sansTrouFinal(out), rows: R2, hauteurs: hs.every((x) => x === R2) ? null : hs };
 };
 // Les cartons réellement là (sans les places vides).
 export const cartonsDePile = (nums) => arr(nums).map((v) => String(v == null ? '' : v).trim()).filter(Boolean);

@@ -469,6 +469,44 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await ctx.close();
     });
 
+    // ── XIV. BOÎTES AU SOL : UNE HAUTEUR PAR PILE (28 oct.) ─────────────────
+    // Julien : « une hauteur différente pour chaque pile ». 3 piles de 3 : on
+    // monte la pile 2 à 5 cartons ; chaque carton garde sa pile et sa place, les
+    // piles 1 et 3 ne bougent pas, et réduire la pile 1 sous ses cartons est refusé.
+    if (fait('XIV')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XIV. piles ' + vp.width, async () => {
+      const t = 'XIV. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_PILE);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(1200);
+      const avant = {}; for (const n of ['1', '4', '6', '7']) avant[n] = await sonde(pg, 'boite', 'p1', n);
+      const p = avant['5'] || await sonde(pg, 'boite', 'p1', '5');
+      if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
+      const vu = await pg.waitForSelector('[data-pile-hauteurs]', { timeout: 8000, state: 'attached' }).then(() => true).catch(() => false);
+      dit(vu, t + ' : la pile choisie montre « Hauteur de chaque pile »');
+      const hs = await pg.$$eval('[data-pile-col]', (l) => l.map((e) => e.dataset.pileH));
+      dit(JSON.stringify(hs) === '["3","3","3"]', t + ' : sans réglage, chaque pile fait 3 (comme avant)', JSON.stringify(hs));
+      for (let k = 0; k < 2; k++) { await cliquerSel(pg, '[aria-label="Agrandir la pile 2"]'); await pg.waitForTimeout(500); }
+      const q = await attendrePlan(pg, (x) => item(x, 'p1').rows === 5);
+      const m = item(q, 'p1');
+      dit(m.rows === 5 && JSON.stringify(m.hauteurs) === '[3,5,3]', t + ' : la pile 2 passe à 5, les autres restent à 3', JSON.stringify({ rows: m.rows, h: m.hauteurs }));
+      dit(JSON.stringify(m.nums) === '["1","2","3","","","4","5","6","","","7","8","9"]', t + ' : chaque carton garde sa pile et sa place', JSON.stringify(m.nums));
+      await pg.waitForTimeout(1200);
+      const apres = {}; for (const n of ['1', '4', '6', '7']) apres[n] = await sonde(pg, 'boite', 'p1', n);
+      const bouge = ['1', '4', '6', '7'].filter((n) => !apres[n] || !avant[n] || Math.abs(apres[n].yMonde - avant[n].yMonde) > 0.005);
+      dit(bouge.length === 0, t + ' : en 3D, aucun carton ne change de hauteur', bouge.join(','));
+      await cliquerSel(pg, '[aria-label="Réduire la pile 1"]'); await pg.waitForTimeout(700);
+      const m2 = item(await plan(pg), 'p1');
+      dit(JSON.stringify(m2.hauteurs) === '[3,5,3]' && m2.nums.length === 13, t + ' : réduire la pile 1 sous ses 3 cartons est refusé, rien ne bouge', JSON.stringify(m2.hauteurs));
+      const dit2 = await pg.evaluate(() => /retire d'abord ceux du haut/.test(document.body.innerText));
+      dit(dit2, t + ' : et c’est dit');
+      await pg.screenshot({ path: path.join(CAPT, 'stock-piles-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
     // ── VIII. RANGER EN MOINS DE GESTES ─────────────────────────────────────
     if (fait('VIII')) await essaie('VIII. ranger : un geste', async () => {
       let { ctx, pg, errs } = await ouvrir(b, { width: 1512, height: 950 }, PLAN_NICHES);
