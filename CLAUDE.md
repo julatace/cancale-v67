@@ -7,6 +7,20 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — DESCRIPTION trop courte, et le COMPTE RENDU d'une opération coupée (5.264) :** Julien
+> (Air Max 1 Athletic Department, zoom fly 5) : « Vinted a refusé le brouillon (400 : … Le champ Description doit comprendre
+> au moins 5 caractères) » ; puis « si l'app recharge ou est éteinte je veux un compte rendu de là où l'opération s'était
+> arrêtée ». Cause : la description de la fiche et du coffre était vide — seule la lettre ajoutée partait. `recreerVinted` :
+> une description de moins de 5 caractères (lettre retirée, `DESCRIPTION_MIN`) est reprise sur l'annonce Vinted
+> (`apprendreRecetteVinted`) AVANT de supprimer ; introuvable ⇒ `description-absente`, RIEN supprimé ni créé.
+> `refaireBrouillon` reprend la description de la fiche de l'annonce, la lettre gardée en bas (les deux paires se refont
+> par « Brouillons à refaire »). App : la file de Republier écrit son avancée sur l'appareil (`vrm_operation_repub`) ;
+> rouverte après un rechargement, Annonces montre `CompteRenduOperation` (faites, en cours = « à vérifier sur Vinted »,
+> ratées, pas commencées) avec « Reprendre ». Et une confirmation ouverte juste après en avoir fermé une (« Noir —
+> publier » après « Mettre en ligne ») était refermée par le retour d'historique de la première : un retour qui est le NÔTRE
+> ne ferme plus rien (`_installerRetourFeuilles`). Preuves : `audit-recreer.cjs` (107 ; 4 rouges sur la 5.263), banc
+> `republier.cjs` (journal, compte rendu, Reprendre).
+
 > **28 octobre (nuit, fin) — plus LENT et AU HASARD, et le brouillon disparu (5.263) :** Julien : « la création du
 > brouillon a l'air très très rapide, va beaucoup plus doucement pour pas que je me fasse bannir » puis « il doit être
 > aléatoire ton comportement ». C'est SA décision (atelier §3, il lance). `pauseRepub` : une pause TIRÉE AU HASARD

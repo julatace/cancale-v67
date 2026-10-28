@@ -344,6 +344,28 @@ const zero = (j) => j.vinted.length === 0;
     const nb = (q) => P.filter((x) => x[0] === q).length;
     dit(nb('photo') === PHOTOS.length - 1 && nb('brouillon') === 1 && nb('enLigne') === 1 && dans('photo', 3000, 9000) && dans('brouillon', 6000, 15000) && dans('enLigne', 15000, 40000), "republier : une pause au hasard entre chaque photo (3–9 s), avant le brouillon (6–15 s), avant la mise en ligne (15–40 s)", JSON.stringify(P));
     dit(JSON.stringify(tirages[0]) !== JSON.stringify(tirages[1]), "deux republications ne font jamais les mêmes pauses (tirées au hasard)", JSON.stringify(tirages)); }
+  // D — (28 oct., Air Max 1 et zoom fly) « Le champ Description doit comprendre
+  //     au moins 5 caractères » : la description vide (ou réduite à la lettre)
+  //     est reprise sur Vinted AVANT de supprimer ; introuvable ⇒ rien n'est touché.
+  { const sansDesc = { coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'q', photos: PHOTOS } };
+    const { f, r } = await run({ coffre: false, extra: sansDesc, viaBrouillon: true });
+    dit(suppressions(f.j).length === 0 && brouillonsP(f.j).length === 0 && r.code === 'description-absente', "description vide (la lettre seule) et introuvable : refusé AVANT de supprimer, rien créé", JSON.stringify({ s: suppressions(f.j).length, b: brouillonsP(f.j).length, code: r.code, e: r.etape }));
+    const g = await run({ coffre: false, extra: sansDesc, viaBrouillon: true, lettre: true, lecture: { status: 200, body: { item: { id: 9101, description: 'Très bon état, boîte d’origine', catalog_id: 88, brand_id: 9, color_ids: [1], item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
+    let b = {}; try { b = JSON.parse(brouillonsP(g.f.j)[0].corps); } catch (_) {}
+    const d = (b.draft && b.draft.description) || '';
+    dit(g.r.etape === 'fait' && /^Très bon état, boîte d’origine/.test(d) && !/^q\b/.test(d), "description vide : reprise sur l'annonce Vinted, le brouillon part avec elle (et la lettre en bas)", JSON.stringify({ e: g.r.etape, d, raison: g.r.raison || g.r.erreur })); }
+  // D2 — « Refaire le brouillon » d'un passage enregistré avec la lettre seule
+  //      comme description (les Air Max 1 et zoom fly du 28 oct.).
+  { const corps = JSON.stringify({ draft: { id: null, title: 'Nike Air Max 1', price: '54', catalog_id: 88, brand_id: 9, color_ids: [1], description: '\n\nq', item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2, assigned_photos: [] }, parcel: null, upload_session_id: 'x' });
+    const coffreVb = (extraDesc) => ({ coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: extraDesc, photos: PHOTOS, versBrouillon: { etat: 'a-refaire', supprime: true, corps, majAt: new Date(Date.now() - 3600e3).toISOString() } } });
+    const f1 = monter({ src: process.env.BG_SRC || undefined, coffre: false, extra: coffreVb('q') });
+    let r1 = {}; if (typeof f1.ctx.refaireBrouillon === 'function') { try { r1 = await f1.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true }); } catch (e) { r1 = { erreur: e.message }; } }
+    dit(r1.code === 'description-absente' && f1.j.vinted.length === 0, "Refaire, description vide et introuvable : refusé, aucune requête", JSON.stringify({ code: r1.code, n: f1.j.vinted.length, e: r1.etape }));
+    const f2 = monter({ src: process.env.BG_SRC || undefined, coffre: false, extra: coffreVb('q'), descDetails: 'Très bon état, boîte d’origine' });
+    let r2 = {}; if (typeof f2.ctx.refaireBrouillon === 'function') { try { r2 = await f2.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true }); } catch (e) { r2 = { erreur: e.message }; } }
+    let b2 = {}; try { b2 = JSON.parse(de(f2.j, /\/item_upload\/drafts\/?$/)[0].corps); } catch (_) {}
+    const d2 = (b2.draft && b2.draft.description) || '';
+    dit(r2.etape === 'fait' && d2 === 'Très bon état, boîte d’origine\n\nq', "Refaire, description vide : reprise sur la fiche de l'annonce, la lettre gardée en bas", JSON.stringify({ e: r2.etape, d: d2, raison: r2.raison || r2.erreur })); }
   // R — (28 oct., sa demande) « Refaire le brouillon » : depuis ce qui est
   //     enregistré dans VRM, sans JAMAIS retoucher l'annonce d'origine ; mise en
   //     ligne seulement si la suppression de l'ancienne est CERTAINE.
