@@ -8,7 +8,7 @@ const Picto=({nom,...props})=><svg viewBox="0 0 24 24" width="17" height="17" fi
 const libelles={integre:'Intégré','a-verifier':'À vérifier',erreur:'À réessayer'};
 export default function ReceptionEmails({owner,headers,quarantaine,onVerifier,theme={},version=0,onAdresses,onComptes,onDeclarer,preuves,onConfirmer}){
  const [donnees,setDonnees]=useState(),[erreur,setErreur]=useState(false),[lecture,setLecture]=useState(false),[filtre,setFiltre]=useState('tous'),[recherche,setRecherche]=useState(''),[adresse,setAdresse]=useState('toutes'),[max,setMax]=useState(10),[maintenant,setMaintenant]=useState(Date.now());
- const generation=useRef(0),enCours=useRef(null),zone=useRef(null),visible=useRef(true),versionLue=useRef(version),auth=useRef(headers);auth.current=headers;const retourAdresses=useRef(onAdresses);retourAdresses.current=onAdresses;
+ const generation=useRef(0),enCours=useRef(null),zone=useRef(null),visible=useRef(true),derniereLecture=useRef(0),versionLue=useRef(version),auth=useRef(headers);auth.current=headers;const retourAdresses=useRef(onAdresses);retourAdresses.current=onAdresses;
  const charger=useCallback((forcer=false)=>{
   if(enCours.current?.owner===owner&&forcer!==true)return enCours.current.promesse;
   enCours.current?.controle.abort();
@@ -17,7 +17,7 @@ export default function ReceptionEmails({owner,headers,quarantaine,onVerifier,th
   travail.promesse=(async()=>{
    try{const r=await requeteJsonBornee('/api/email-rattacher?mode=reception',{headers:auth.current(),cache:'no-store',signal:controle.signal});if(!r.ok)throw Error();const j=r.json;if(!j?.ok||!Array.isArray(j.emails))throw Error();if(g===generation.current){setDonnees({...j,owner});retourAdresses.current?.({owner,adresses:j.adresses||[]});return true;}return false;}
    catch(_){if(g===generation.current&&!controle.signal.aborted)setErreur(true);return false;}
-   finally{if(g===generation.current){setLecture(false);setMaintenant(Date.now());}if(enCours.current===travail)enCours.current=null;}
+   finally{if(g===generation.current){derniereLecture.current=Date.now();setLecture(false);setMaintenant(Date.now());}if(enCours.current===travail)enCours.current=null;}
   })();
   return travail.promesse;
  },[owner]);
@@ -31,7 +31,7 @@ export default function ReceptionEmails({owner,headers,quarantaine,onVerifier,th
  useEffect(()=>{if(versionLue.current!==version){versionLue.current=version;charger(true);}},[version,charger]);
  useEffect(()=>{
   if(typeof IntersectionObserver!=='function'||!zone.current)return;
-  const observateur=new IntersectionObserver(entries=>{const avant=visible.current;visible.current=entries.some(e=>e.isIntersecting);if(!avant&&visible.current&&document.visibilityState==='visible')charger();});
+  const observateur=new IntersectionObserver(entries=>{const avant=visible.current;visible.current=entries.some(e=>e.isIntersecting);if(!avant&&visible.current&&document.visibilityState==='visible'&&Date.now()-derniereLecture.current>=60000)charger();});
   observateur.observe(zone.current);return()=>observateur.disconnect();
  },[charger]);
  const d=donnees?.owner===owner?donnees:undefined;
