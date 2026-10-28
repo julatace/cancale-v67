@@ -5,7 +5,7 @@
 // PROPS (mesuré : les seuls identifiants de niveau module qu'il utilise) — pas
 // d'import circulaire avec App.jsx. Rendu derrière <Suspense> côté App.
 import React, { useState, useEffect, useRef } from 'react';
-import { plateauxMeuble } from './stockRegles.js';
+import { plateauxMeuble, hauteurPile } from './stockRegles.js';
 
 function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
   const mountRef = React.useRef(null);
@@ -531,9 +531,26 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       // colonne par colonne, de bas en haut, `rows` boîtes par colonne. Retirer une
       // boîte = retirer un élément de la liste → tout ce qui est au-dessus DESCEND.
       // Chaque boîte porte son index (userData.pileIdx) pour la retirer au toucher.
-      const buildPile = (nums, rows, cell) => {
+      // HAUTEUR MAX (28 oct., sa demande « montre la hauteur max de chaque pile
+      // en 3D ») : chaque pile porte un cadre fin jusqu'à SA hauteur
+      // (`hauteurPile`, la règle du réglage — §11) et un couvercle pâle au
+      // sommet. Décor seul : jamais touché (raycast vide), aucune couleur
+      // d'accent (§7). userData.hauteurMax = la hauteur dessinée (sonde du banc).
+      const cadrePileMat = new THREE.LineBasicMaterial({ color: '#2f3742', transparent: true, opacity: 0.8 });
+      const capotPileMat = new THREE.MeshBasicMaterial({ color: '#2f3742', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
+      const aretesCadre = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+      const buildPile = (nums, rows, cell, hauteurs) => {
         const g = new THREE.Group(); const gap = cell * 0.04, s = cell - gap;
         const cols = Math.max(1, Math.ceil(nums.length / rows));
+        for (let c = 0; c < cols; c++) {
+          const h = hauteurPile(rows, hauteurs, c), x = -((cols - 1) / 2) * cell + c * cell;
+          const cadre = new THREE.LineSegments(aretesCadre, cadrePileMat);
+          cadre.scale.set(s, h * cell, s); cadre.position.set(x, (h * cell) / 2, 0);
+          cadre.raycast = () => {}; cadre.userData = { hauteurMax: h, pileCol: c }; g.add(cadre);
+          const capot = new THREE.Mesh(new THREE.PlaneGeometry(s, s), capotPileMat);
+          capot.rotation.x = -Math.PI / 2; capot.position.set(x, h * cell + 0.004, 0);
+          capot.raycast = () => {}; capot.userData = { capotPile: c }; g.add(capot);
+        }
         for (let i = 0; i < nums.length; i++) {
           const cc = Math.floor(i / rows), rr = i % rows; // cc = colonne, rr = niveau (0=bas)
           if (!String(nums[i] == null ? '' : nums[i]).trim()) continue;   // place vide en haut d'une colonne
@@ -743,7 +760,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             case 'radiateur': g = buildRadiateur(w, d, ht, base); break;
             case 'velo': g = buildVelo(w, d, ht, base); break;
             case 'etabli': g = buildEtabli(w, d, ht, base); break;
-            case 'pile': g = buildPile(pileNumsArr, nr, cellSize); break;
+            case 'pile': g = buildPile(pileNumsArr, nr, cellSize, it.hauteurs); break;
             default: g = buildGeneric(w, d, ht, base);
           }
           // Une boîte à empiler se pose à la hauteur de son niveau (lvl) : posée
@@ -1424,6 +1441,12 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             if (!m) return null; m.updateWorldMatrix(true, false);
             const c = new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).project(camera), r = renderer.domElement.getBoundingClientRect();
             return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height, yMonde: new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).y };
+          },
+          // Le cadre de hauteur max de chaque pile : [{ c, h, haut }] (haut = sommet en mètres).
+          hauteursMax: (itemId) => {
+            const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
+            const out = []; g.traverse((o) => { if (o.userData && o.userData.hauteurMax != null) out.push({ c: o.userData.pileCol, h: o.userData.hauteurMax, haut: +(o.position.y + o.scale.y / 2).toFixed(3) }); });
+            return out.sort((a, b) => a.c - b.c);
           },
           // Les plateaux d'une étagère : [{ y, w }] (hauteur dans le meuble, largeur).
           plateaux: (itemId) => {

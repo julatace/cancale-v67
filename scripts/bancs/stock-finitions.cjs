@@ -480,6 +480,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(1200);
       const avant = {}; for (const n of ['1', '4', '6', '7']) avant[n] = await sonde(pg, 'boite', 'p1', n);
+      const hm0 = await sonde(pg, 'hauteursMax', 'p1');
+      dit(Array.isArray(hm0) && JSON.stringify(hm0.map((x) => x.h)) === '[3,3,3]', t + ' : en 3D, chaque pile montre sa hauteur max (3)', JSON.stringify(hm0));
       const p = avant['5'] || await sonde(pg, 'boite', 'p1', '5');
       if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
       const vu = await pg.waitForSelector('[data-pile-hauteurs]', { timeout: 8000, state: 'attached' }).then(() => true).catch(() => false);
@@ -495,6 +497,9 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const apres = {}; for (const n of ['1', '4', '6', '7']) apres[n] = await sonde(pg, 'boite', 'p1', n);
       const bouge = ['1', '4', '6', '7'].filter((n) => !apres[n] || !avant[n] || Math.abs(apres[n].yMonde - avant[n].yMonde) > 0.005);
       dit(bouge.length === 0, t + ' : en 3D, aucun carton ne change de hauteur', bouge.join(','));
+      const hm = await sonde(pg, 'hauteursMax', 'p1');
+      const hs3 = hm && hm.map((x) => x.h), ht3 = hm && hm.map((x) => x.haut);
+      dit(JSON.stringify(hs3) === '[3,5,3]' && ht3[1] > ht3[0] + 0.5 && Math.abs(ht3[0] - ht3[2]) < 0.005, t + ' : en 3D, le cadre de la pile 2 monte à 5, les autres restent à 3', JSON.stringify(hm));
       await cliquerSel(pg, '[aria-label="Réduire la pile 1"]'); await pg.waitForTimeout(700);
       const m2 = item(await plan(pg), 'p1');
       dit(JSON.stringify(m2.hauteurs) === '[3,5,3]' && m2.nums.length === 13, t + ' : réduire la pile 1 sous ses 3 cartons est refusé, rien ne bouge', JSON.stringify(m2.hauteurs));
