@@ -27266,6 +27266,67 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   );
 }
 
+// (28 oct.) STOCK EN PHOTOS — demande de Julien : retrouver une paire VENDUE
+// par sa PHOTO pour la sortir du stock. La vraie photo Vinted ne peut pas être
+// peinte en 3D (le CDN de Vinted bloque l'usage cross-site, le même mur qui
+// oblige l'extension à aller chercher les octets pour Leboncoin) ; en DOM, une
+// <img> l'affiche sans souci — c'est ici qu'elle vit.
+// Preuve de vente : §11, l'écran Annonces PUBLIE `vrm_stock_vendus`, on CONSOMME.
+// Rien ne sort du stock sans le clic ; une vente annulée/repostée n'est plus
+// publiée → halo éteint, la paire RESTE (jamais de retrait automatique).
+function StockPhotos() {
+  const [pairsLost, setPairsLost] = React.useState(() => load('vinted_pairs_lost', {}));
+  const [max, setMax] = React.useState(60);
+  const [q, setQ] = React.useState('');
+  const numeros = load('vinted_annonce_numeros', {}) || {};
+  const venduSig = load('vrm_stock_vendus', null);
+  const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
+  const venduSu = !!venduSig;                                   // a-t-on déjà une mesure de ventes ?
+  const estVendu = (f) => vendus.has(cleNum(f.numero));
+  // Paires EN STOCK : une fiche numérotée, pas déclarée partie (même règle que
+  // l'écran Annonces, `annonceDeclareePartie`).
+  const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost));
+  const filtre = q.trim().toLowerCase();
+  const liste = fiches
+    .filter((f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre))
+    .sort((a, b) => ((estVendu(b) ? 1 : 0) - (estVendu(a) ? 1 : 0)) || ((+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0)));
+  const nVendus = fiches.filter(estVendu).length;
+  const vus = liste.slice(0, max);
+  const sortir = (f) => {
+    const cle = cleDeclarationPartie(f.numero, f.id, numeros);
+    setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
+  };
+  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et leur photo apparaîtra ici.</Card>;
+  return (<>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher une paire" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
+    </div>
+    {nVendus > 0 && <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Les paires qui clignotent sont vendues : touche <b style={{ color: C.text }}>Sortie du stock</b> une fois sortie de ton carton. Une vente annulée qui repart en ligne s'éteint toute seule et reste.</div>}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(118px,1fr))', gap: 12 }}>
+      {vus.map((f) => {
+        const sold = estVendu(f);
+        return (
+          <div key={f.id} data-stock-tile="" data-sold={sold ? '1' : '0'} className={sold ? 'vrm-stock-vendu' : ''} style={{ ['--halo']: C.accent, borderRadius: 12, overflow: 'hidden', background: C.card, border: `1px solid ${sold ? C.accent : C.line}`, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', background: C.card2 }}>
+              {f.photo
+                ? <PhotoVinted src={f.photo} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 11 }}>pas de photo</div>}
+              <span style={{ position: 'absolute', left: 6, top: 6, background: C.accent, color: C.onAccent, fontWeight: 800, fontSize: 13, padding: '2px 8px', borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>N°{f.numero}</span>
+            </div>
+            <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 12, color: C.text, lineHeight: 1.3, minHeight: 31, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f.title || '—'}</div>
+              {sold && <button type="button" onClick={() => sortir(f)} style={{ background: C.accent, color: C.onAccent, border: 'none', borderRadius: 8, padding: '7px 8px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Sortie du stock</button>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+    {liste.length > max && <button type="button" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 8, color: C.text, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</button>}
+  </>);
+}
+
 function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
@@ -27487,7 +27548,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['plan','home','Ma pièce'],['ranger','grid','Liste des cases']].map(([v,ic,l])=>(
+        {[['plan','home','Ma pièce'],['ranger','grid','Liste des cases'],['photos','image','En photos']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
@@ -27496,6 +27557,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
 
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='ranger' && <RoomPlan mode="2d"/>}
+      {garageView==='photos' && <StockPhotos/>}
 
       {garageView==='grid' && (<>
       {placing && (
@@ -35757,6 +35819,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, txnItem, numeros]);
+  // (28 oct.) PUBLIÉ pour l'écran Stock (grille de photos) — §11, la preuve de
+  // vente a UN seul propriétaire : ici. On publie les NUMÉROS des paires
+  // prouvées vendues (par identité, jamais le titre — c'est `annoncesVendues`),
+  // le Stock CONSOMME pour allumer un halo sur la paire à sortir. Clé LOCALE,
+  // recalculable (comme `vinted_nums_physiques`). ⚠️ « pas su » (ventes
+  // illisibles) ⇒ on ne publie pas, on garde la dernière valeur connue ; une
+  // vente annulée/remboursée sort d'`annoncesVendues` ⇒ n'est plus publiée ⇒
+  // halo éteint et la paire RESTE (jamais de retrait automatique).
+  useEffect(() => {
+    if (!sales.items) return;                                   // pas su : on ne touche pas
+    const nums = new Set();
+    annoncesVendues.forEach((id) => { const n = cleNum((numeros[id] || {}).numero); if (n) nums.add(n); });
+    const liste = [...nums].sort();
+    try {
+      const avant = load('vrm_stock_vendus', null);
+      const meme = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x, i) => x === liste[i]);
+      if (!meme) save('vrm_stock_vendus', { nums: liste, at: Date.now() });
+    } catch (_) {}
+  }, [annoncesVendues, numeros, sales.items]);
   // Le tri des comptes et des ventes, le MÊME pour la grille et pour les annonces
   // « à confirmer » (5.167) : une annonce d'un compte exclu, ou prouvée vendue,
   // n'est ni dans l'une ni dans l'autre.
