@@ -107,3 +107,8 @@ test('écran quitté avant le dispatch : réservation close sans message ni faux
  const d=claim(lancer().data).data;const fin=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'refuse',raison:'ecran_inactif',maintenant:T+100});
  assert.equal(fin.valeur.active,false);assert.equal(fin.valeur.jobs[0].etat,'refuse');assert.equal(fin.valeur.jobs[0].raison,'ecran_inactif');assert.equal(fin.valeur.jobs[0].envoyeLe,undefined);assert.equal(fin.data.enCours,null);assert.match(fin.valeur.raison,/Écran des favoris quitté/);
 });
+
+test('article vendu avant dispatch : arrêt clair de la file, sans faux accusé d’envoi',()=>{
+ const d=claim(lancer().data).data,fin=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'refuse',raison:'article_vendu',maintenant:T+100});
+ assert.equal(fin.valeur.active,false);assert.equal(fin.valeur.jobs[0].raison,'article_vendu');assert.equal(fin.valeur.jobs[0].envoyeLe,undefined);assert.match(fin.valeur.raison,/Article vendu/);
+});

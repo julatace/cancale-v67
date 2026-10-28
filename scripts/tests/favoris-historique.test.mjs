@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {ageFavori,dateNotificationFavori,contactFavori,indexerContactsFavoris,lireFavorisVinted} from '../../src/favorisVinted.js';
+import {ageFavori,dateNotificationFavori,contactFavori,indexerContactsFavoris,articleFavoriVendu,executerFavoriDisponible,lireFavorisVinted} from '../../src/favorisVinted.js';
 import {appelerFavorisDirect} from '../../src/favorisTransport.js';
 const T=Date.parse('2026-10-24T18:00:00Z'),owner='owner-fixture';
 const n=(id,date='2026-10-24T11:00:00Z')=>({id,user_id:201,body:'Camille a ajouté ton article à ses favoris.',link:'/items/101/conversation/new',updated_at:date});
@@ -45,4 +45,14 @@ test('un long historique n’est indexé qu’une fois, sans rescanner les envoi
  const lire=indexerContactsFavoris(jobs),avant=lectures;
  for(let i=0;i<2000;i++)assert.equal(lire({id:'n'+i}),source[i]);
  assert.equal(lectures,avant);assert.equal(indexerContactsFavoris([{notificationId:'n0',etat:'incertain'}])({id:'n0'}).etat,'incertain');
+});
+
+test('article vendu : correspondance exacte dans le lien, jamais par texte ou identifiant de notification',()=>{
+ const vendus=new Set(['101']);assert.equal(articleFavoriVendu({lien:'https://www.vinted.fr/items/101/conversation/new?receiver_id=9'},vendus),true);
+ for(const ligne of [{id:'101',lien:'https://www.vinted.fr/items/102/conversation/new',body:'Même titre vendu'},{lien:'https://www.vinted.fr/member/101'},{lien:'https://site.invalid/items/101/conversation/new'},{lien:null}])assert.equal(articleFavoriVendu(ligne,vendus),false);
+});
+test('un article devenu vendu avant le dispatch ne sollicite pas l’extension',async()=>{
+ const vendus=new Set();let envois=0;const executer=()=>{envois++;return{ok:true};};
+ vendus.add('101');const r=await executerFavoriDisponible({itemId:'101'},vendus,executer);assert.equal(r.data.raison,'article_vendu');assert.equal(r.data.resultat,'refuse');assert.equal(envois,0);
+ await executerFavoriDisponible({itemId:'102'},vendus,executer);assert.equal(envois,1);
 });

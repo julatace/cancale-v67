@@ -324,6 +324,21 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       await r.pg.locator('div[style*="z-index: 2000"] button',{hasText:'Autoriser'}).click();
       dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===compteIncertain,'autoriser un renvoi n’envoie aucun message');
       await r.pg.evaluate(()=>window.__reponseMode='normal');
+      // Les brouillons appartiennent au fil exact, et ne partent jamais à l'ouverture.
+      await r.pg.getByRole('button',{name:'Fermer la conversation'}).click();
+      await r.pg.click('[data-conv="303"]');await r.pg.waitForTimeout(800);
+      dit(await champ.inputValue()==='', 'un autre fil ne reprend pas le brouillon précédent');
+      await champ.fill('Brouillon du second fil');await r.pg.getByRole('button',{name:'Fermer la conversation'}).click();
+      await r.pg.click('[data-conv="301"]');await r.pg.waitForTimeout(800);
+      dit(await champ.inputValue()==='Brouillon suivant conservé','fermer puis rouvrir restaure le brouillon du bon fil');
+      const avantRestauration=r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length;
+      await r.pg.locator('.vrm-chat-send').click();
+      await r.pg.getByRole('button',{name:'Fermer la conversation'}).click();
+      await r.pg.waitForTimeout(850);await r.pg.click('[data-conv="301"]');await r.pg.waitForTimeout(800);
+      dit(await champ.inputValue()==='', 'une réponse confirmée après fermeture ne ressuscite pas son brouillon');
+      dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===avantRestauration+1,'réouvrir ne renvoie aucun message');
+      await r.pg.getByRole('button',{name:'Fermer la conversation'}).click();await r.pg.click('[data-conv="303"]');await r.pg.waitForTimeout(800);
+      dit(await champ.inputValue()==='Brouillon du second fil', 'l’envoi dans un fil ne supprime pas le brouillon de l’autre');
       // 4. un fil pas encore capté : lu par l'extension
       await r.pg.keyboard.press('Escape');
       await r.pg.evaluate(() => { const o = [...document.querySelectorAll('div')].find((d) => d.style && d.style.position === 'fixed' && d.style.zIndex === '1000'); if (o) o.click(); });
