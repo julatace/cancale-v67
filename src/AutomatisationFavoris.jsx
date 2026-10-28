@@ -11,6 +11,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     if(!vue?.active&&!busy.current&&!mutation.current&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(controleErreur?.code)){setErreur('');setControleErreur(null);}
   },[revisionVerification]);
   const ecran=React.useRef(ecranActif);ecran.current=ecranActif;
+  const contexte=React.useRef('');contexte.current=JSON.stringify([owner,uid,selection,reglages?.message,reglages?.pourcentage,reglages?.intervalleMinutes]);
   const courant=()=>vivant.current&&ownerActuel()===owner;
   const adopter=j=>{if(!j.vue||!Array.isArray(j.vue.jobs)||typeof j.vue.active!=='boolean')throw Error('L’état de la file n’a pas été confirmé.');if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(onEtat)onEtat(j.vue);};
   const api=async(action,donnees={},h=headers())=>{
@@ -64,17 +65,21 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   const agir=async action=>{
     if(!courant()||mutation.current)return;mutation.current=true;++lecture.current;setOccupe(true);setErreur('');setControleErreur(null);
     try{
-      let configuration=reglages;
+      let configuration=reglages;const contexteAuDepart=contexte.current;
+      const verifierPreparation=()=>{if(!ecran.current||contexte.current!==contexteAuDepart)throw Error('Préparation interrompue : la sélection, le message ou l’écran a changé. Vérifie les destinataires avant de relancer. Aucun envoi lancé.');};
       if(action==='lancer'){
+        verifierPreparation();
         if(!selection.length)throw Error('Coche au moins un favori dans la liste avant de lancer.');
         setPhase('Vérification de l’extension');
         const etat=verifierExtension?await verifierExtension():{disponible,raison:raisonExtension};
         if(!courant())return;
+        verifierPreparation();
         if(!etat?.disponible||typeof executer!=='function')throw Error(etat?.raison||raisonExtension||'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page.');
         setPhase('Enregistrement des réglages');
         if(preparerReglages)configuration=await preparerReglages();
         else if(!reglagesPrets)throw Error('Enregistre ton message et ton intervalle avant de lancer.');
         if(!courant())return;
+        verifierPreparation();
       }
       setPhase(action==='lancer'?'Préparation de la sélection':'Mise à jour de la file');
       const j=await api(action,action==='lancer'?{selection,reglages:configuration}:{});
