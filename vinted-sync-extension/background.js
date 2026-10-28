@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.269.0';
+const CODE_VERSION = '5.270.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12702,7 +12702,27 @@ async function annonceVestiaire(id) {
   // (§ « familleArticle ») et vérifiée contre le catalogue de dépôt capté.
   const fam = familleArticle({ chemin: cheminDeLAnnonce(trouve.it, det), titre: firstDefined(det.title, trouve.it.title), description: det.description || '', taille: ad.taille, marque: ad.marque });
   ad.vcCategorie = categorieVcDe(fam, _catVc);
+  // (28 oct.) Vestiaire veut la photo de l'ÉTIQUETTE en 2ᵉ (case « Étiquette »,
+  // mesurée dans le smart listing). C'est Julien qui la désigne dans VRM
+  // (`vrm_vc_etiquettes[id]` = la clé de la photo, `clePhotoLbc` ; une clé à
+  // elle, synchronisée : jamais un champ de la fiche N°, que d'autres écrans
+  // réécrivent). Rien ne la devine. Pas choisie, illisible, ou plus dans les
+  // photos ⇒ l'ordre de Vinted, et le bandeau le dit.
+  const me = await lireMain(['vrm_vc_etiquettes']);
+  const etiq = me && me.vrm_vc_etiquettes ? me.vrm_vc_etiquettes[String(id)] : '';
+  const o = ordrePhotosVestiaire(ad.photos, etiq);
+  ad.photos = o.photos; ad.etiquette = o.etiquette;
   return { ad };
+}
+function ordrePhotosVestiaire(photos, etiq) {
+  const l = Array.isArray(photos) ? photos.slice() : [];
+  const k = String(etiq || '');
+  if (!k) return { photos: l, etiquette: 'pas-choisie' };
+  const i = l.findIndex((u) => clePhotoLbc(typeof u === 'string' ? u : (u && u.url)) === k);
+  if (i < 0) return { photos: l, etiquette: 'introuvable' };
+  if (i === 0) return { photos: l, etiquette: 'couverture' };
+  const [p] = l.splice(i, 1); l.splice(1, 0, p);
+  return { photos: l, etiquette: 'placee' };
 }
 async function publierVestiaire(msg) {
   const cmd = String(msg.cmd || ''); const id = String(msg.id || '');

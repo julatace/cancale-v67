@@ -112,7 +112,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.269.0';
+const EXT_ATTENDUE = '5.270.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1704,6 +1704,7 @@ const ENTREPRISE_VIDE = {
 // l'interrupteur local : aucune annonce en ligne n'a de plancher — mesuré —
 // donc elle n'accepte rien.)
 const SYNC_KEYS = [
+  'vrm_vc_etiquettes',
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
@@ -23239,6 +23240,16 @@ function PhotoroomCle() {
 // publiée » note la paire (`vinted_vc_posted`) : elle sort de la liste.
 function PublierVestiaire({ comptes }) {
   const { paires, enLigne } = useEbayPaires(comptes);
+  // (28 oct.) La photo de l'ÉTIQUETTE, choisie par lui : Vestiaire la veut en
+  // 2ᵉ (case « Étiquette » du smart listing). `vrm_vc_etiquettes[id]` = la clé
+  // de la photo (`clePhotoLbc`, la même règle que l'extension, §11).
+  const [etiquettes, setEtiquettes] = React.useState(() => load('vrm_vc_etiquettes', {}) || {});
+  React.useEffect(() => onCloudReady(() => setEtiquettes((v) => (v && Object.keys(v).length) ? v : (load('vrm_vc_etiquettes', {}) || {}))), []);
+  const [choixEtiq, setChoixEtiq] = React.useState('');
+  const poserEtiquette = (id, cle) => {
+    setEtiquettes((prev) => { const u = { ...(load('vrm_vc_etiquettes', {}) || {}), ...(prev || {}) }; if (cle) u[String(id)] = cle; else delete u[String(id)]; save('vrm_vc_etiquettes', u); return u; });
+    setChoixEtiq('');
+  };
   const { jobs } = useExtVivante();
   const sansSouris = useSansSouris();
   const [publiees, setPubliees] = React.useState(undefined);   // undefined en cours · null pas su · Set
@@ -23342,6 +23353,30 @@ function PublierVestiaire({ comptes }) {
               <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>N°{p.num} · {p.title || '—'}</div>
               <div style={{ fontSize: 11.5, color: C.muted }}>{p.prix != null ? fmt(p.prix) : 'prix —'}{p.photos && p.photos.length ? ` · ${p.photos.length} photo${p.photos.length > 1 ? 's' : ''}` : ''}{job && job.etape === 'fait' ? ' · publiée sur Vestiaire' : ''}</div>
               {boostParNum.has(cleNum(p.num)) ? <div data-vc-boost={String(boostParNum.get(cleNum(p.num)))} style={{ fontSize: 11.5, color: C.muted }}>Déjà sur Vestiaire{boostParNum.get(cleNum(p.num)) === true ? ' · boostée' : boostParNum.get(cleNum(p.num)) === false ? ' · pas boostée' : ''}</div> : null}
+              {(() => {
+                const ph = (p.photos || []).filter((u) => clePhotoLbc(u));
+                const k = etiquettes[String(p.id)] || '';
+                const i = k ? ph.findIndex((u) => clePhotoLbc(u) === k) : -1;
+                if (ph.length < 2) return null;
+                return (
+                  <div data-vc-etiq={k ? (i >= 0 ? 'choisie' : 'introuvable') : 'pas-choisie'} style={{ fontSize: 11.5, color: C.muted, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {i >= 0 ? <><PhotoVinted src={ph[i]} alt="" style={{ width: 22, height: 28, objectFit: 'cover', borderRadius: 4 }}/>Étiquette : photo {i + 1}</> : k ? 'Étiquette : la photo choisie n\'est plus là' : 'Étiquette : pas choisie'}
+                    <button type="button" className="vrm-lien-action" data-vc-etiq-ouvrir={p.id} onClick={() => setChoixEtiq(choixEtiq === p.id ? '' : p.id)} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{i >= 0 ? 'changer' : 'choisir'}</button>
+                  </div>
+                );
+              })()}
+              {choixEtiq === p.id ? (
+                <div data-vc-etiq-choix={p.id} style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 4 }}>Touche la photo de l'étiquette : l'extension la mettra en 2ᵉ sur Vestiaire (case « Étiquette »).</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {(p.photos || []).filter((u) => clePhotoLbc(u)).map((u, j) => {
+                      const c = clePhotoLbc(u); const on = etiquettes[String(p.id)] === c;
+                      return <button key={c} type="button" data-vc-etiq-photo={j + 1} aria-pressed={on ? 'true' : 'false'} onClick={() => poserEtiquette(p.id, c)} style={{ padding: 0, border: `2px solid ${on ? C.accent : C.border}`, borderRadius: 6, background: 'transparent', cursor: 'pointer', width: 48, height: 60, overflow: 'hidden' }}><PhotoVinted src={u} alt={`photo ${j + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/></button>;
+                    })}
+                    {etiquettes[String(p.id)] ? <button type="button" data-vc-etiq-retirer={p.id} onClick={() => poserEtiquette(p.id, '')} style={btn(false)}>Aucune</button> : null}
+                  </div>
+                </div>
+              ) : null}
               {msg[p.id] ? <div data-vc-refus="" style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg[p.id]}</div> : null}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>

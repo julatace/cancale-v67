@@ -7,6 +7,21 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28-29 octobre (nuit) — VESTIAIRE : étiquette en 2ᵉ, Taille/État/Prix remplis, description sans doublon (5.269-5.270) :**
+> MESURÉ (`panel_vc_form`, 28 oct. 23 h 06, 5.268) : après les photos, l'écran « Détails » est une liste de LIGNES-BOUTONS
+> (« Marque Nike », « Taille Ajouter », « État Ajouter », « Prix Ajouter », « Votre adresse Ajouter »…), chacune ouvre une
+> fiche (« Retourner en arrière »). `vc-depot.js` (`remplirFiches`) ouvre Taille, État, Prix une fois par paire et par onglet,
+> ne clique que l'option au texte EXACT (taille « 40 » = « 40 », « EU 40 », « FR 40 » ; état mot pour mot), tape le prix
+> dans le seul champ de la fiche, puis « Enregistrer/Valider » ; rien d'exact ⇒ fiche refermée et DIT. `obligatoiresVides`
+> compte toute ligne « Ajouter » (Catégorie, Modèle, Taille, État, Prix, Votre adresse) : « Mettre en vente » n'est jamais
+> cliqué avant (le prix se relit sur la ligne « Prix 99,00 € »). ⚠️ La forme des fiches n'a jamais été vue : écrite sur
+> l'écran mesuré, à confirmer à son prochain essai (`rapporterEtape` relève chaque fiche ouverte). Étiquette : Vestiaire
+> veut la photo de l'étiquette en 2ᵉ ; Julien la CHOISIT dans VRM → Vestiaire (`vrm_vc_etiquettes[id]` = `clePhotoLbc`,
+> synchronisé, clé à part — jamais un champ de la fiche N°), `ordrePhotosVestiaire` la met en 2ᵉ ; jamais devinée.
+> Description (`descriptionLbcDe`, app = extension) : une caractéristique que le texte Vinted dit déjà n'est plus répétée,
+> « Envoi rapide » non plus s'il parle d'envoi, la lettre de Republier retirée. Preuves : `audit-vc-publier.cjs` (110,
+> section smart listing) ; banc `vc-publier.cjs` (étiquette).
+
 > **28 octobre (nuit, fin) — VESTIAIRE : on ouvre le FORMULAIRE, pas l'accueil (5.268) :** Julien : « ça m'amène
 > juste sur Vestiaire, sur Vendre un article, et ça ne fait rien après ». Cause : `VC_PAGE_VENDRE` ouvrait
 > `/sell-clothes-online/` (page d'accueil, aucun champ) ; à 22:50, `vc_recon` le voit passer, `panel_vc_form` rien.
