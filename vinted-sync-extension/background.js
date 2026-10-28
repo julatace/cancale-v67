@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.246.0';
+const CODE_VERSION = '5.247.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7833,21 +7833,33 @@ async function lireModeleRepub(itemId) {
 // plancher s'il est fourni. On ne touche à AUCUN autre champ : c'est le corps
 // que Vinted a déjà accepté pour cette annonce. Rend null si on ne sait pas où
 // est le prix (on ne devine pas une structure — mieux vaut refuser).
-function corpsAvecPrixBaisse(corpsModele, pct, planation) {
+function corpsAvecPrixBaisse(corpsModele, pct, planation, voulu) {
   let obj = null; try { obj = JSON.parse(corpsModele); } catch (_) { return null; }
   const it = obj && (obj.item && typeof obj.item === 'object' ? obj.item : obj);
   if (!it || typeof it !== 'object') return null;
-  const p = Math.max(0, Math.min(90, Number(pct) || 0));
   // Vinted porte le prix soit en nombre/chaîne `price`, soit en objet `{amount}`.
   const lis = (v) => (v && typeof v === 'object') ? Number(v.amount) : Number(v);
   const base = isFinite(lis(it.price)) ? lis(it.price) : NaN;
   if (!isFinite(base) || base <= 0) return null;             // pas de prix lisible : on refuse
-  let np = Math.round(base * (1 - p / 100) * 100) / 100;
+  // (28 oct., « Republier » de l'app) Un PRIX précis et/ou un TITRE, calculés et
+  // montés à Julien dans l'aperçu ; sinon la baisse en % d'avant.
+  const v = voulu && typeof voulu === 'object' ? voulu : {};
+  const prixVoulu = v.prix != null ? Number(v.prix) : NaN;
+  let np;
+  if (v.prix != null) { if (!(isFinite(prixVoulu) && prixVoulu > 0 && prixVoulu < 100000)) return null; np = Math.round(prixVoulu * 100) / 100; }
+  else if (v.titre != null) np = base;
+  else { const p = Math.max(0, Math.min(90, Number(pct) || 0)); np = Math.round(base * (1 - p / 100) * 100) / 100; }
   if (planation != null && isFinite(planation) && np < planation) np = Math.round(planation * 100) / 100;
   if (!(np > 0)) return null;
   if (it.price && typeof it.price === 'object') it.price = { ...it.price, amount: String(np) };
   else it.price = String(np);
-  return { corps: JSON.stringify(obj), ancien: base, nouveau: np };
+  let ancienTitre = null, nouveauTitre = null;
+  if (v.titre != null) {
+    const t = String(v.titre).replace(/\s+/g, ' ').trim();
+    if (!t || t.length > 100 || typeof it.title !== 'string') return null;   // jamais un titre vide ou trop long, jamais un champ deviné
+    ancienTitre = it.title; it.title = t; nouveauTitre = t;
+  }
+  return { corps: JSON.stringify(obj), ancien: base, nouveau: np, ancienTitre, nouveauTitre };
 }
 // La republication (baisse de prix) d'UNE annonce, sur sa confirmation. Elle
 // MODIFIE l'annonce en place (`PUT …/item_upload/items/{id}`) — elle ne la
@@ -7872,15 +7884,15 @@ async function republierVinted(msg) {
   const modele = await lireModeleRepub(id);
   if (modele === null) return { accepte: false, code: 'modele-lecture', raison: "je n'ai pas pu lire le format — réessaie dans un moment" };
   if (!modele || !modele.corps) return { accepte: false, code: 'modele-absent', raison: "je n'ai pas encore vu le format de CETTE annonce sur Vinted. Modifie-la une fois à la main (change une virgule et enregistre) — l'extension apprend le format, puis la baisse de prix marchera." };
-  const built = corpsAvecPrixBaisse(modele.corps, msg.baissePct, msg.plancher);
+  const built = corpsAvecPrixBaisse(modele.corps, msg.baissePct, msg.plancher, (msg.prix != null || msg.titre != null) ? { prix: msg.prix, titre: msg.titre } : null);
   if (!built) return { accepte: false, code: 'modele-illisible', raison: "le format appris n'est pas exploitable — refais une modification manuelle" };
   // 3. PUT en place, dans la file Vinted (une requête à la fois). Jamais de
   //    suppression, jamais de création : le pire cas est un prix refusé.
   return await avecVinted(async () => {
     const r = await vintedSend(acc, 'PUT', `/api/v2/item_upload/items/${id}`, built.corps);
-    if (!r || !r.ok) return { accepte: true, etape: 'echec', raison: `Vinted a refusé la baisse de prix (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau };
+    if (!r || !r.ok) return { accepte: true, etape: 'echec', raison: `Vinted a refusé la modification (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau };
     noterDiag('republier_vinted_ok');
-    return { accepte: true, etape: 'fait', ancien: built.ancien, nouveau: built.nouveau };
+    return { accepte: true, etape: 'fait', ancien: built.ancien, nouveau: built.nouveau, ancienTitre: built.ancienTitre, nouveauTitre: built.nouveauTitre };
   });
 }
 

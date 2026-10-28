@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.246.0';
+const EXT_ATTENDUE = '5.247.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -493,7 +493,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11519,6 +11519,205 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
             {q.mode === 'idle' && enFile.length > 0 && <button type="button" data-file-vider onClick={vider} style={btn({ marginLeft: 'auto', color: C.muted })}>Vider la file</button>}
           </div>
           {q.mode === 'pause' && <div style={{ fontSize: 11.5, color: C.muted }}>En pause — reprise manuelle. Après un rechargement, la file revient toujours EN PAUSE (jamais relancée toute seule).</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+// ══ REPUBLIER (28 octobre) — UN parcours, demandé par Julien : « je veux un
+// bouton republier, une liste de toutes mes paires en ligne, je sélectionne
+// celles que je veux, je leur applique les modifications et l'annonce se
+// republie ». Il remplace, dans le menu d'Annonces, « Lots » et « File de
+// publication » (deux écrans, des brouillons que la file ignorait : « très
+// bizarre »). Trois étapes dans UNE feuille :
+//   1. Choisir : ses paires EN LIGNE sur Vinted (tous comptes), cochées ;
+//   2. Modifier : prix (montant, %, prix commun, arrondi, terminaison, jamais
+//      sous le prix d'achat) et titre — aperçu avant → après, paire par paire ;
+//   3. Republier : sur sa confirmation, l'extension applique chaque annonce SUR
+//      VINTED, une par une, à l'espacement choisi (`republierVinted`, PUT en
+//      place : jamais une suppression, jamais une création — le N° ne change
+//      pas, rien ne peut être perdu). Ce que Vinted ne fait pas en place, on ne
+//      le promet pas : l'annonce garde sa place dans le fil de Vinted.
+// L'extension revérifie TOUT (confirmation, compte ouvert dans Chrome, coffre,
+// format appris) ; une annonce qu'elle ne sait pas faire ressort « pas faite »,
+// avec SA raison, jamais touchée.
+const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
+function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
+  const [etape, setEtape] = useState('choix');
+  const [sel, setSel] = useState(() => new Set());
+  const [q, setQ] = useState('');
+  const [tMode, setTMode] = useState('aucun');
+  const [tVal, setTVal] = useState('');
+  const [tChe, setTChe] = useState('');
+  const [pBase, setPBase] = useState('pct');
+  const [pDelta, setPDelta] = useState('-10');
+  const [pCommun, setPCommun] = useState('');
+  const [pArr, setPArr] = useState('aucun');
+  const [pFin, setPFin] = useState('aucune');
+  const [esp, setEsp] = useState(REPUB_ESP_DEFAUT);
+  const [ok, setOk] = useState(false);
+  const [mode, setMode] = useState('idle');          // idle | run | pause | fini
+  const [st, setSt] = useState({});                  // id → { etat, raison, ancien, nouveau }
+  const busy = React.useRef(false);
+  const bas = (s) => String(s || '').toLowerCase();
+  const liste = annonces.filter((a) => !q.trim() || bas(a.titre).includes(bas(q.trim())) || String(a.key).includes(q.trim()) || bas(a.compte).includes(bas(q.trim())));
+  const toggle = (id) => setSel((s) => { const u = new Set(s); u.has(id) ? u.delete(id) : u.add(id); return u; });
+  const opT = { mode: tMode, valeur: tVal, chercher: tChe, pos: '0' };
+  const opP = { base: pBase, delta: pDelta, commun: pCommun, arrondi: pArr, sens: 'proche', fin: pFin };
+  const changeT = tMode !== 'aucun';
+  const changeP = pBase !== 'aucun' || pArr !== 'aucun' || pFin !== 'aucune';
+  const apercu = (a) => {
+    const nt = changeT ? lotAppliqueTitre(a.titre, opT) : a.titre;
+    const np = changeP && a.prix != null ? lotAppliquePrix(a.prix, opP, a.floor) : null;
+    const prix = np && np.prix > 0 && np.prix !== a.prix ? np.prix : null;
+    const titre = nt && nt !== a.titre ? nt : null;
+    return { titre, prix, plancher: !!(np && np.sousPlancher), tropLong: !!(titre && titre.length > TITRE_VINTED_MAX), invalide: !!(changeT && !nt) };
+  };
+  const choisies = annonces.filter((a) => sel.has(a.id));
+  const aFaire = choisies.filter((a) => { const x = apercu(a); return (x.titre || x.prix) && !x.tropLong && !x.invalide; });
+  const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
+  // Le moteur : une annonce à la fois, l'espacement AVANT chacune sauf la
+  // première ; une pause ou un arrêt pendant l'attente n'engage rien, une
+  // annonce commencée finit toujours (jamais coupée en deux).
+  React.useEffect(() => {
+    if (mode !== 'run' || busy.current) return;
+    const suiv = aFaire.find((a) => !st[a.id]);
+    if (!suiv) { setMode('fini'); return; }
+    const premier = !Object.keys(st).length;
+    let annule = false;
+    const t = setTimeout(async () => {
+      if (annule) return;
+      busy.current = true;
+      setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
+      const x = apercu(suiv);
+      let r; try { r = await publier(suiv, { prix: x.prix, titre: x.titre }); } catch (_) { r = { ok: false, raison: 'erreur' }; }
+      busy.current = false;
+      setSt((p) => ({ ...p, [suiv.id]: r && r.ok ? { etat: 'fait', ancien: r.ancien, nouveau: r.nouveau } : { etat: 'echec', raison: (r && r.raison) || "l'extension n'a pas répondu" } }));
+    }, premier ? 0 : fileClamp(esp) * 1000);
+    return () => { annule = true; clearTimeout(t); };
+  }, [mode, st, esp]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
+  const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
+  const fermer = () => { if (mode === 'run') return; onClose(); };
+  const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 10px', fontSize: 14, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', minHeight: 44 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
+  const btn = (plein, actif = true) => ({ border: `1px solid ${plein ? C.accent : C.border}`, background: plein ? C.accent : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, borderRadius: 10, padding: '0 16px', minHeight: 44, fontSize: 14, fontWeight: 700, cursor: actif ? 'pointer' : 'default', opacity: actif ? 1 : 0.45, fontFamily: 'inherit' });
+  const ETAPES = [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Republier']];
+  return (
+    <div onClick={fermer} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <FermeAuRetour fermer={fermer} />
+      <div onClick={(ev) => ev.stopPropagation()} data-republier data-republier-etape={etape} data-republier-mode={mode} style={{ background: C.bg, width: '100%', maxWidth: 640, maxHeight: '94dvh', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Republier sur Vinted</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12 }}>{ETAPES.map(([k, l]) => <span key={k} style={{ color: etape === k ? C.text : C.muted, fontWeight: etape === k ? 700 : 500 }}>{l}</span>)}</div>
+          </div>
+          <button type="button" onClick={fermer} aria-label="Fermer" disabled={mode === 'run'} style={{ border: 'none', background: 'transparent', fontSize: 24, color: C.muted, cursor: mode === 'run' ? 'default' : 'pointer', minWidth: 44, minHeight: 44 }}>×</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+          {etape === 'choix' && <>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Chercher un titre, un N°, un compte" style={{ ...champ, flex: 1, minWidth: 0 }} />
+              <button type="button" data-republier-tout onClick={() => setSel(new Set(liste.map((a) => a.id)))} style={btn(false)}>Tout</button>
+              <button type="button" data-republier-rien onClick={() => setSel(new Set())} style={btn(false)}>Aucune</button>
+            </div>
+            <div style={{ fontSize: 12.5, color: C.muted }}>{annonces.length} paire{annonces.length > 1 ? 's' : ''} en ligne sur Vinted · <b style={{ color: C.text }}>{sel.size} choisie{sel.size > 1 ? 's' : ''}</b></div>
+            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune paire ne correspond.' : "Aucune paire en ligne sur Vinted n'a été lue pour l'instant."}</div>}
+              {liste.map((a) => (
+                <label key={a.id} data-republier-paire={a.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: sel.has(a.id) ? `${C.accent}0d` : 'transparent' }}>
+                  <input type="checkbox" checked={sel.has(a.id)} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                  <span style={{ width: 40, height: 50, borderRadius: 6, background: C.border, overflow: 'hidden', flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.compte ? ` · ${a.compte}` : ''}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>}
+          {etape === 'modif' && <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <span style={maj}>Prix</span>
+              <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} style={champ}>
+                <option value="aucun">Ne pas changer le prix</option>
+                <option value="pct">Baisser / monter d'un pourcentage</option>
+                <option value="fixe">Baisser / monter d'un montant (€)</option>
+                <option value="commun">Mettre toutes au même prix</option>
+              </select>
+              {(pBase === 'pct' || pBase === 'fixe') && <input data-republier-delta value={pDelta} onChange={(ev) => setPDelta(ev.target.value)} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. -10 (= −10 %)' : 'ex. -5 (= −5 €)'} style={{ ...champ, maxWidth: 240 }} />}
+              {pBase === 'commun' && <input data-republier-commun value={pCommun} onChange={(ev) => setPCommun(ev.target.value)} inputMode="decimal" placeholder="Prix (€)" style={{ ...champ, maxWidth: 200 }} />}
+              {pBase !== 'aucun' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <select value={pArr} onChange={(ev) => setPArr(ev.target.value)} style={{ ...champ, flex: '1 1 150px' }}>
+                  <option value="aucun">Sans arrondi</option><option value="euro">Arrondi à l'euro</option><option value="5">Arrondi à 5 €</option><option value="10">Arrondi à 10 €</option>
+                </select>
+                <select value={pFin} onChange={(ev) => setPFin(ev.target.value)} style={{ ...champ, flex: '1 1 150px' }}>
+                  <option value="aucune">Sans terminaison</option><option value="00">finir en ,00</option><option value="50">finir en ,50</option><option value="90">finir en ,90</option><option value="99">finir en ,99</option>
+                </select>
+              </div>}
+              <div style={{ fontSize: 12, color: C.muted }}>Jamais sous le prix d'achat de la paire.</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <span style={maj}>Titre</span>
+              <select data-republier-titre value={tMode} onChange={(ev) => setTMode(ev.target.value)} style={champ}>
+                <option value="aucun">Ne pas changer le titre</option>
+                <option value="prefixe">Ajouter au début</option>
+                <option value="suffixe">Ajouter à la fin</option>
+                <option value="remplacer">Remplacer un texte</option>
+                <option value="supprimer">Supprimer un texte</option>
+              </select>
+              {(tMode === 'remplacer' || tMode === 'supprimer') && <input value={tChe} onChange={(ev) => setTChe(ev.target.value)} placeholder="Texte à trouver" style={champ} />}
+              {(tMode === 'prefixe' || tMode === 'suffixe' || tMode === 'remplacer') && <input value={tVal} onChange={(ev) => setTVal(ev.target.value)} placeholder={tMode === 'remplacer' ? 'Par' : 'Texte à ajouter'} style={champ} />}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              {choisies.map((a) => { const x = apercu(a); const rien = !x.titre && !x.prix; return (
+                <div key={a.id} data-republier-apercu={a.id} data-republier-nouveau-prix={x.prix != null ? Math.round(x.prix * 100) : ''} style={{ padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                  <div style={{ color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</div>
+                  {x.prix != null && <div style={{ color: C.muted }}>{prixCourt(a.prix)} → <b style={{ color: C.text }}>{prixCourt(x.prix)}</b>{x.plancher && <span style={{ color: C.warn }}> · ramené au prix d'achat</span>}</div>}
+                  {x.titre && <div style={{ color: x.tropLong ? C.warn : C.muted }}>→ {x.titre}{x.tropLong && ` · ${x.titre.length}/${TITRE_VINTED_MAX}, trop long : elle ne partira pas`}</div>}
+                  {rien && <div style={{ color: C.muted }}>rien ne change pour celle-ci — elle ne partira pas</div>}
+                </div>
+              ); })}
+            </div>
+          </>}
+          {etape === 'envoi' && <>
+            <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une. Même annonce, même N° : rien n'est supprimé.</div>
+            {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>L'extension VRM de ce navigateur doit être à jour ({EXT_ATTENDUE}) et connectée — sinon chaque annonce ressortira « pas faite », rien ne sera touché.</div>}
+            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sont sur un autre compte que celui ouvert dans Chrome : ouvre Vinted sur ce compte-là, sinon elles ressortiront « pas faites ».</div>}
+            {mode === 'idle' && <>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
+                <input type="checkbox" data-republier-confirme checked={ok} onChange={(ev) => setOk(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0, marginTop: 1 }} />
+                <span>Je confirme : ces {aFaire.length} annonce{aFaire.length > 1 ? 's' : ''} seront modifiées sur mon compte Vinted, comme dans l'aperçu.</span>
+              </label>
+            </>}
+            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+              {aFaire.map((a) => { const s = st[a.id] || {}; return (
+                <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                  <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: s.etat === 'echec' ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? '✓ republiée' : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : 'en attente'}</span>
+                </div>
+              ); })}
+            </div>
+            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} republiée{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}</div>}
+          </>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
+          {etape === 'choix' && <button type="button" data-republier-suivant disabled={!sel.size} onClick={() => setEtape('modif')} style={{ ...btn(true, !!sel.size), marginLeft: 'auto' }}>Continuer ({sel.size})</button>}
+          {etape === 'modif' && <>
+            <button type="button" onClick={() => setEtape('choix')} style={btn(false)}>Retour</button>
+            <button type="button" data-republier-suivant disabled={!aFaire.length} onClick={() => setEtape('envoi')} style={{ ...btn(true, !!aFaire.length), marginLeft: 'auto' }}>Continuer ({aFaire.length})</button>
+          </>}
+          {etape === 'envoi' && mode === 'idle' && <>
+            <button type="button" onClick={() => setEtape('modif')} style={btn(false)}>Retour</button>
+            <button type="button" data-republier-lancer disabled={!ok || !aFaire.length} onClick={() => setMode('run')} style={{ ...btn(true, ok && !!aFaire.length), marginLeft: 'auto' }}>Republier ({aFaire.length})</button>
+          </>}
+          {mode === 'run' && <button type="button" data-republier-pause onClick={() => setMode('pause')} style={{ ...btn(false), marginLeft: 'auto' }}>Pause</button>}
+          {mode === 'pause' && <>
+            <button type="button" onClick={() => setMode('fini')} style={btn(false)}>Arrêter</button>
+            <button type="button" onClick={() => setMode('run')} style={{ ...btn(true), marginLeft: 'auto' }}>Reprendre</button>
+          </>}
+          {mode === 'fini' && <button type="button" data-republier-fermer onClick={onClose} style={{ ...btn(true), marginLeft: 'auto' }}>Terminé</button>}
         </div>
       </div>
     </div>
@@ -33269,6 +33468,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [lotsOpen, setLotsOpen] = useState(false); // modale « Lots — titres & prix » (tranche 3)
   const [fileOpen, setFileOpen] = useState(false); // modale « File de publication » (tranche 4)
+  const [republierOpen, setRepublierOpen] = useState(false); // « Republier » (28 oct.) : choisir → modifier → republier
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -43362,6 +43562,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 toujours active (voir la déclaration de `autoNum`). */}
             {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
                 ne servent pas tous les jours et encombraient la barre. */}
+            {/* (28 oct.) « Republier » : UN bouton, demandé par Julien — il remplace
+                « Lots » et « File de publication » du menu (deux écrans qui ne se
+                parlaient pas). */}
+            <button type="button" data-republier-ouvrir onClick={()=>setRepublierOpen(true)}
+              style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Republier</button>
             <div className="vrm-ann-outils" style={{position:'relative'}}>
               <button type="button" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
                 style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯<span className="vrm-ann-outils-mot"> Outils</span></button>
@@ -43374,8 +43579,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     passé à la ligne, est trop près du bord gauche pour cela. */}
                 <div style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:10,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   {[
-                    {k:'lots', icon:'✨', lab:'Lots — titres & prix', desc:'Préparer une sélection en brouillon, sans toucher à Vinted', on:()=>{ setAnnToolsOpen(false); setLotsOpen(true); }},
-                    {k:'file', icon:'🗂️', lab:'File de publication', desc:'Ordonner et cadencer tes brouillons (essai à blanc)', on:()=>{ setAnnToolsOpen(false); setFileOpen(true); }},
                     {k:'lot', icon:'🧮', lab:'Répartir un lot', desc:"Ventiler le prix d'un achat groupé", on:()=>{ setAnnToolsOpen(false); setLotSel(new Set()); setLotTotal(''); setLotSearch(''); setLotMode('equal'); setLotOpen(true); }},
                     {k:'studio', icon:'📷', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'📋', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
@@ -44070,12 +44273,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {(()=>{ const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.')); return (
                       <span style={pillEdit} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)"><span style={lab}>{'refuse <'}</span><EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
                         titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={val}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/></span>); })()}
-                      {(()=>{ const kd=String((e&&e.numero)||item.id); const d=drafts[kd]; return (<>
-                        <button type="button" data-atelier-ouvrir={kd} onClick={()=>setAtelier(item.id)}
-                          style={{...pillEdit,cursor:'pointer',border:`1px solid ${d?C.accent:C.border}`,color:d?C.accent:C.text,fontWeight:600}}
-                          title="Préparer cette annonce dans VRM — un brouillon, sans rien toucher sur Vinted">✨ Préparer</button>
-                        {d && <span data-brouillon-vrm={kd} title={`Brouillon VRM enregistré${d.updatedAt?` le ${new Date(d.updatedAt).toLocaleDateString('fr-FR')}`:''}`} style={{...pillEdit,color:C.accent,border:`1px solid ${C.accent}`,fontWeight:700}}>Brouillon VRM</span>}
-                      </>); })()}
+                      {/* (28 oct.) « ✨ Préparer » retiré des cartes : la republication passe
+                          par UN parcours, le bouton « Republier » de la barre (Julien). */}
                       {boost>0 && <span><span style={lab}>boost </span><span style={val}>{prixCourt(boost)}</span></span>}
                       {marge!=null && <span title="Si elle part à ce prix : prix − achat − boost"><span style={lab}>marge </span><span style={{...val,color:marge<0?C.warn:C.text}}>{marge>=0?'+':''}{marge} €</span></span>}
                       <span data-stats-annonce style={{display:'inline-flex',flexWrap:'wrap',alignItems:'center',gap:'2px 10px',fontSize:11,color:C.muted}}>
@@ -46798,6 +46997,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
+      {republierOpen && (()=>{
+        // Ses paires EN LIGNE sur Vinted (la même liste que la grille, `listings.items`).
+        const annoncesR = (listings.items||[]).filter(it=>it && it.id!=null).map(it=>{
+          const e=numeros[it.id]||{}; const fl=prixAchatDe(e,buyByNum); const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
+          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'' };
+        });
+        const vc = vintedDeChrome(); const etatX = vc && vc.uid ? vc.uid : null;
+        const publierR = async (a, v) => {
+          if(!a.uid) return { ok:false, raison:'compte introuvable' };
+          let r=null; try { r=await vmrCmd({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 30000); } catch(_) { r=null; }
+          if (r && r.accepte && r.etape==='fait') return { ok:true, ancien:r.ancien, nouveau:r.nouveau };
+          return { ok:false, raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+        };
+        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('republiermodif')!=='ok'} onClose={()=>setRepublierOpen(false)} />;
+      })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont
         // l'annonce est encore en ligne. Un seul propriétaire de la règle « prêt » :
