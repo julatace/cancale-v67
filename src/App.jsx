@@ -26085,6 +26085,24 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const emojiOf = (it) => it.emoji || (FURN_TYPES[it.type] || FURN_TYPES.autre).emoji;
   const colorOf = (it) => it.color || (FURN_TYPES[it.type] || FURN_TYPES.autre).color;
   const h3dOf = (it) => it.h3d != null ? it.h3d : (FURN_TYPES[it.type] || FURN_TYPES.autre).h3d;
+  // (28 oct.) LA VRAIE PHOTO DE L'ANNONCE SUR LE CARTON EN 3D. Par numéro :
+  // `photoByNum` = clé numéro → URL CDN Vinted (depuis les fiches), `venduNums` =
+  // numéros prouvés vendus (halo), `chargerPhoto` ramène les octets par NOTRE
+  // proxy même-origine (sinon WebGL refuse l'image cross-site du CDN). Échec =
+  // le carton numéroté d'avant (aucune régression).
+  const photoByNum = React.useMemo(() => {
+    const m = {}; const f = load('vinted_annonce_numeros', {}) || {};
+    for (const id in f) { const n = cleNum((f[id] || {}).numero); const p = (f[id] || {}).photo; if (n && p) m[n] = p; }
+    return m;
+  }, []);
+  const venduNums = React.useMemo(() => {
+    const s = load('vrm_stock_vendus', null); const out = new Set();
+    if (s && Array.isArray(s.nums)) s.nums.forEach((x) => { const n = cleNum(x); if (n) out.add(n); });
+    return out;
+  }, []);
+  const chargerPhoto = React.useCallback((url) => fetch('/api/vinted-proxy?mode=image&u=' + encodeURIComponent(url), { headers: sbAuth() })
+    .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('img'))))
+    .then((b) => URL.createObjectURL(b)), []);
   const setRoom = (dw, dh) => {
     const w = Math.max(2, Math.min(30, room.w + dw)), h = Math.max(2, Math.min(30, room.h + dh));
     if (!estRectangle(room)) { toast('Ta pièce a une forme libre : tire ses coins dans le plan vu du dessus.'); return; }
@@ -26707,7 +26725,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       )}
 
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} photoByNum={photoByNum} venduNums={venduNums} chargerPhoto={chargerPhoto} cleNum={cleNum} />
       </React.Suspense>
       {chercheLoc && (
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
