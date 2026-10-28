@@ -25,3 +25,9 @@
 - `VRM_CHROMIUM_PATH=/usr/bin/chromium node scripts/bancs/ventes-colis-premium.cjs` : 31 contrôles, montants/compteurs, disposition, cibles et absence de débordement.
 
 Les évolutions des paramètres de la même branche sont documentées dans `2026-10-28-parametres-guides-bordereaux.md`.
+
+## Intégration et contrôle de publication
+
+Intégration de main b14989b5, en conservant les derniers statuts courts Leboncoin et les mises à jour récentes de l'extension (5.246.0). Le conflit de CarteLbc a été résolu en conservant les deux changements : état court de main, accès par numéro et libellé marge avant frais.
+
+Le banc de lot applique désormais les véritables en-têtes de vercel.json. La visionneuse PDF locale utilisait une iframe blob ; la directive frame-src de la politique Report-Only ne l'autorisait pas et émettait un incident. Ajout ciblé de blob: dans frame-src, sans retirer la politique ni ajouter de domaine externe. Le parcours est retesté avec ces en-têtes : 16 contrôles conformes. La validation finale inclut 30 tests unitaires ciblés, 31 contrôles Ventes/Colis et les tests d'aperçu/fiche à 390 et 1512 px.

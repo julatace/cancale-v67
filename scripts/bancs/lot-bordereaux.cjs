@@ -71,6 +71,7 @@ const projette = (row, sel) => {
   try {
     b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const ctx = await b.newContext({ viewport: { width: 1512, height: 950 }, acceptDownloads: true });
+    const securite=require('./_vercel.cjs');await securite.brancher(ctx,`http://localhost:${PORT}`);const violations=securite.observer(ctx);
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
@@ -137,6 +138,7 @@ const projette = (row, sel) => {
       dit(JSON.stringify(cochesRestantes) === JSON.stringify(['9002','9003']), 'le PDF réussi est décoché ; les deux échecs restent visibles et sélectionnés', JSON.stringify(cochesRestantes));
     }
     dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+    dit(violations.filter(v=>!v.texte.startsWith('[Report-Only]')).length===0,'le parcours PDF respecte la politique de sécurité de production',violations.map(v=>v.texte).join(' | ').slice(0,250));
     await ctx.close();
   } catch (e) { dit(false, 'le banc s’exécute', String(e.message || e).slice(0, 160)); }
   finally {
