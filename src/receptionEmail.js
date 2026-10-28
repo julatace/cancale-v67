@@ -16,3 +16,20 @@ export function conflitAdresseCompte(mapping,uid,adresse) {
  const a=normAdresse(adresse);if(!a)return null;
  return Object.keys(mapping||{}).find(id=>String(id)!==String(uid)&&normAdresse(mapping[id])===a)||null;
 }
+
+// Les étapes utilisent uniquement des preuves lues ; un transfert externe
+// n'est jamais déclaré actif simplement parce que l'adresse est enregistrée.
+export function etapesTransfert(adresse, preuves, maintenant=Date.now()) {
+ const unique=adresse?.comptes?.length===1;
+ const declaree=unique&&adresse?.declaree===true;
+ const preuve=preuves?.adresses?.[String(adresse?.adresse||'').trim().toLowerCase()];
+ const date=Date.parse(adresse?.derniereReception||'');
+ const observe=declaree&&Number.isFinite(date)&&date<=maintenant+300000;
+ return [
+  {id:'compte',titre:'Associer le compte',etat:unique?'fait':'a-faire'},
+  {id:'declaration',titre:'Déclarer l’adresse',etat:declaree?'fait':'a-faire'},
+  {id:'confirmation',titre:'Confirmer l’adresse',etat:typeof preuves?.cloisonnee!=='boolean'?'inconnu':preuves.cloisonnee===false?'non-requis':preuve?.etat==='prouvee'?'fait':preuve?.etat==='envoyee'?'attente':preuve?.etat==='envoi'?'preparation':'a-faire'},
+  {id:'transfert',titre:'Activer le transfert',etat:'externe'},
+  {id:'reception',titre:'Vérifier la réception',etat:observe?'fait':'attente'},
+ ];
+}

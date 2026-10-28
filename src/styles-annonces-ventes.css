@@ -163,3 +163,32 @@
 /* (27 oct.) Dans une barre d'outils (Annonces) : pas de marge, le N° à côté de la recherche ; l'invite se tait (le champ dit « + Entrée »), le résultat s'écrit à côté. */
 .vrm-app-shell .vrm-main .vrm-num-plat.vrm-num-plat-barre { padding: 0; }
 .vrm-app-shell .vrm-main .vrm-num-plat.vrm-num-plat-barre .vrm-num-plat-msg:empty { display: none; }
+.vrm-fiche-vente-acces{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border-bottom:1px solid #91a3a44d;font-size:12px;}
+.vrm-fiche-vente-acces span{flex:1 1 180px;opacity:.75;}
+.vrm-fiche-vente-acces button{min-height:44px;padding:7px 12px;border:1px solid #91a3a477;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.vrm-fiabilite-ventes{margin:10px 0 14px;border:1px solid #91a3a44d;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.6;color:inherit;}
+.vrm-fiabilite-ventes summary{cursor:pointer;font-weight:600;min-height:30px;}
+.vrm-fiabilite-ventes p{margin:7px 0;opacity:.8;}
+.vrm-fiabilite-ventes ul{margin:7px 0;padding-left:18px;}
+.vrm-suivi-comptes{margin:12px 0;font-size:12px;line-height:1.5;}
+.vrm-suivi-comptes summary{min-height:36px;font-weight:600;cursor:pointer;}
+.vrm-suivi-comptes section{border-top:1px solid #91a3a44d;padding-top:10px;margin-top:10px;}
+.vrm-suivi-comptes h4{margin:0 0 7px;}
+.vrm-suivi-comptes dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px;margin:0;}
+.vrm-suivi-comptes dl>div{min-width:0;}
+.vrm-suivi-comptes dd{margin:3px 0 0;opacity:.75;overflow-wrap:anywhere;}
+.vrm-suivi-comptes button{min-height:44px;padding:8px 12px;border:1px solid #91a3a477;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+@media(max-width:767px){.vrm-ledger-sale-toggle{min-height:58px!important;gap:8px!important;font-size:12px;}.vrm-ledger-photo-empty{width:30px!important;height:40px!important;flex-shrink:0;}.vrm-ledger-photo-empty img{width:30px!important;height:40px!important;object-fit:cover;}.vrm-ledger-sale-amount{font-size:13px!important;white-space:nowrap;}.vrm-suivi-comptes dl{grid-template-columns:1fr 1fr;}}
+.vrm-preparation-etapes{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;font-size:11px;font-weight:600;border-bottom:1px solid #91a3a44d;}
+.vrm-preparation-note{font-size:11.5px;line-height:1.5;margin:8px 18px;opacity:.8;}
+.vrm-preparation-controle{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;flex-shrink:0;min-width:44px;}
+.vrm-preparation-controle input{width:18px;height:18px;}
+.vrm-preparation-progression{margin:8px 18px;font-size:12px;}
+.vrm-preparation-progression progress{display:block;width:100%;margin-top:6px;}
+@media(max-width:420px){.vrm-preparation-etapes{gap:6px;font-size:10px;padding-inline:12px;}.vrm-preparation-note{margin-inline:12px;}}
+.vrm-ledger-photo-empty{width:34px;height:44px;overflow:hidden;display:grid;place-items:center;}
+.vrm-ledger-photo-empty img{width:34px!important;height:44px!important;object-fit:cover;}
+.vrm-ledger-photo-empty>div,.vrm-ledger-photo-empty>span{max-width:100%;max-height:100%;}
+.vrm-fiabilite-ventes summary,.vrm-suivi-comptes summary{min-height:44px;box-sizing:border-box;padding-block:8px;}
+.vrm-preparation-selection{min-width:36px;min-height:44px;display:grid;place-items:center;flex-shrink:0;cursor:pointer;}
+.vrm-preparation-controle{min-height:44px;justify-content:center;box-sizing:border-box;}

@@ -69,12 +69,17 @@ const projette = (row, sel) => {
 (async () => {
   let b;
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     const ctx = await b.newContext({ viewport: { width: 1512, height: 950 }, acceptDownloads: true });
+    const securite=require('./_vercel.cjs');await securite.brancher(ctx,`http://localhost:${PORT}`);const violations=securite.observer(ctx);
     const pg = await ctx.newPage();
     const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
     await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+    if(process.env.VRM_PDFJS_DIR) await pg.route('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/*',route=>{
+      const name=route.request().url().split('/').pop();
+      return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(process.env.VRM_PDFJS_DIR,name))});
+    });
     await pg.route('**/rest/v1/**', (route) => {
       const u = decodeURIComponent(metaVersData(route.request().url()));
       const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -111,7 +116,11 @@ const projette = (row, sel) => {
     const bouton = await pg.$('button[data-imprime="1"]');
     dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
+      await pg.locator('[data-lot-ligne="9001"] input').nth(1).check();
+      dit(await pg.getByText('2 · 1/3 article(s) contrôlé(s)',{exact:true}).isVisible(),'le contrôle physique est distinct de la sélection');
       await bouton.click();
+      const continuer=pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true});
+      await continuer.waitFor();dit(true,'les articles non contrôlés sont signalés avant le PDF');await continuer.click();
       // Le message du lot : celui qui dit « N sur M ».
       const msg = await pg.waitForFunction(() => {
         const t = document.body.innerText; const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(t); return m ? m[0] : null;
@@ -124,9 +133,12 @@ const projette = (row, sel) => {
       dit(/\b1\b/.test(illisible), 'et celui que la fusion a écarté — compté, jamais passé sous silence', msg || '');
       await pg.waitForTimeout(600);
       const reprise = await pg.evaluate(() => { const b = document.querySelector('button[data-lot-imprimer]'); return b ? { n: b.getAttribute('data-lot-imprimer'), t: b.innerText } : null; });
-      dit(reprise && /Réessayer/.test(reprise.t) && reprise.n === '1', 'il propose de relancer SEULEMENT l’échec (le bordereau sans PDF)', JSON.stringify(reprise));
+      dit(reprise && /Réessayer/.test(reprise.t) && reprise.n === '2', 'il propose de relancer les deux échecs : PDF absent et PDF illisible', JSON.stringify(reprise));
+      const cochesRestantes = await pg.locator('[data-lot-ligne][data-coche="1"]').evaluateAll(nodes => nodes.map(n=>n.getAttribute('data-lot-ligne')).sort());
+      dit(JSON.stringify(cochesRestantes) === JSON.stringify(['9002','9003']), 'le PDF réussi est décoché ; les deux échecs restent visibles et sélectionnés', JSON.stringify(cochesRestantes));
     }
     dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+    dit(violations.filter(v=>!v.texte.startsWith('[Report-Only]')).length===0,'le parcours PDF respecte la politique de sécurité de production',violations.map(v=>v.texte).join(' | ').slice(0,250));
     await ctx.close();
   } catch (e) { dit(false, 'le banc s’exécute', String(e.message || e).slice(0, 160)); }
   finally {

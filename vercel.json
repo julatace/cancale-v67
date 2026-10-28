@@ -86,7 +86,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://lgonxzrzjcqthjtbdpzo.supabase.co wss://lgonxzrzjcqthjtbdpzo.supabase.co https://tiles.openfreemap.org https://cdn.jsdelivr.net https://*.vinted.net https://api-adresse.data.gouv.fr https://nominatim.openstreetmap.org data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src https://challenges.cloudflare.com chrome-extension: moz-extension:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://lgonxzrzjcqthjtbdpzo.supabase.co wss://lgonxzrzjcqthjtbdpzo.supabase.co https://tiles.openfreemap.org https://cdn.jsdelivr.net https://*.vinted.net https://api-adresse.data.gouv.fr https://nominatim.openstreetmap.org data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src blob: https://challenges.cloudflare.com chrome-extension: moz-extension:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     },
