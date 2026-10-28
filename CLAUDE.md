@@ -7,6 +7,15 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — le coffre ne perd plus la sauvegarde d'un passage (5.256) :** l'archivage du dressing (à
+> chaque visite Vinted) et Republier / En ligne → brouillon lisent-fusionnent-réécrivent la MÊME ligne
+> `coffre_{uid}_{id}`. Reproduit : une lecture lente de l'archivage, rendue APRÈS l'écriture du passage, faisait
+> reculer l'état (`supprime` → `enregistre`) ou effaçait `versBrouillon` (« tout est enregistré dans VRM ») juste
+> avant la suppression de l'annonce. ⇒ `unCoffreALaFois` (chaîne, comme `unItemDetailsALaFois`) autour
+> d'`archiverAnnonce`, `archiverLot`, `majVersBrouillon` et de la sauvegarde de `recreerVinted`. Preuve :
+> `audit-recreer.cjs` R3 (80 ; 2 rouges sur la 5.255) — `_fond-vm.cjs` sait rendre une lecture en retard
+> (`retardLecture`). ⚠️ Jamais un appel chaîné depuis une fonction déjà dans la chaîne.
+
 > **28 octobre (nuit) — « pas de réponse » n'est plus « pas fait » (fiabilité) :** Republier, En ligne → brouillon,
 > Brouillons → en ligne, Modifier, et « Refaire le brouillon » attendaient l'extension 1 à 3 min puis disaient
 > « échec — l'extension n'a pas répondu » et ENCHAÎNAIENT la paire suivante — alors que l'extension (file Vinted

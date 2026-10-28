@@ -62,7 +62,7 @@ function filtreOk(row, u) {
 
 // `vinted(req)` → { status, body } (body : objet → JSON, chaîne → texte).
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
-function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false, ecritureKO = () => false,
+function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false, ecritureKO = () => false, retardLecture = () => 0,
   connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
@@ -166,7 +166,11 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       }
       // Pagination par `Range` (sbGetTout) : on sert tout d'un coup, c'est un banc.
       if (opts.headers && opts.headers.Range && !/^0-/.test(opts.headers.Range)) return rep(200, []);
-      return rep(200, sortie.filter((r) => filtreOk(r, u)).map((r) => projette(r, sel)));
+      // 28 oct. : `retardLecture(u)` → ms : la réponse est l'état de la base AU MOMENT
+      // de la lecture, rendue plus tard (une lecture lente pendant qu'un autre écrit).
+      const res = rep(200, sortie.filter((r) => filtreOk(r, u)).map((r) => projette(r, sel)));
+      const ms = retardLecture(u);
+      return ms > 0 ? new Promise((ok) => setTimeout(() => ok(res), ms)) : res;
     },
   };
   ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
