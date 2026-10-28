@@ -7713,7 +7713,7 @@ function raisonExtGlobale(sansSouris, opt) {
     // Trois états, jamais deux : vivant · éteint · pas su.
     const rl = etatRelais();
     if (rl.niveau === 'vivant') {
-      if (cap === 'vcpublier') return { code: 'telephone', relais: 'vestiaire', texte: "Préparer sur Vestiaire Collective se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis et que tu publies." };
+      if (cap === 'vcpublier') return { code: 'telephone', relais: 'vestiaire', texte: "Préparer sur Vestiaire Co se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis et que tu publies." };
       if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis." };
       if (cap !== 'publication' && rl.pauseMs > 0) return { code: 'pause', relais: 'vivant', texte: `Vinted a demandé de ralentir : l'extension de ton ordinateur n'envoie rien chez Vinted pendant encore ${Math.max(1, Math.ceil(rl.pauseMs / 60000))} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
       return null;
@@ -11757,7 +11757,7 @@ const BOTTOM_TABS=[
   {id:'journee',        icon:'sun',   emoji:'☀️',label:'Ma journée'},
   {id:'plat_vinted',    icon:'shop',  emoji:'🟢',label:'Vinted'},
   {id:'plat_leboncoin', icon:'tag',   emoji:'🟠',label:'Leboncoin'},
-  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire Collective', bientot:true},
+  {id:'plat_vestiaire', icon:'heart', emoji:'👗',label:'Vestiaire Co', bientot:true},
   {id:'plat_ebay',      icon:'grid',  emoji:'🔵',label:'eBay'},
 ];
 // Les écrans DÉTAILLÉS de Vinted. Ils ne sont plus des onglets de la barre
@@ -15327,6 +15327,10 @@ function caEbayPayees(orders) {
 // non annulées (prix en centimes), eBay des commandes payées (`caEbayPayees`).
 // Une plateforme sans vente captée rend `ca:null` (« pas encore de vente
 // captée »), jamais 0 € (§5/§7).
+// « Vestiaire Collective » reste la CLÉ interne (prop `plat`, comparaisons
+// `plat===`) ; à l'écran on écrit « Vestiaire Co » (Julien, 27 oct.). Un seul
+// endroit qui décide du nom AFFICHÉ — les clés ne bougent pas (§11).
+function nomAffichePlat(n) { return n === 'Vestiaire Collective' ? 'Vestiaire Co' : n; }
 function caParPlateforme(liveStats, lbcVentes, ebayCa) {
   const caVinted = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   // ⚠️ CA = VENTES FINALISÉES SEULEMENT (Julien, 1er oct.) : « le CA d'un mois est
@@ -16125,7 +16129,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
   const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
   return <div {...props} data-ligne-ouverte={ouvert}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
-      <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={28} portrait/>}</span>
+      <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount">{montant}</span>
@@ -21997,7 +22001,7 @@ function PhotoroomCle() {
     <div data-photoroom-cle={cle ? 'posee' : cle === null ? 'pas-su' : 'vide'} style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}` }}>
       <div style={{ fontSize:12.5, fontWeight:700, color:C.text }}>Détourage des photos (fond blanc)</div>
       <div style={{ fontSize:11.5, color:C.muted, lineHeight:1.5, margin:'3px 0 8px' }}>
-        Vestiaire Collective attend des photos sur fond net. VRM les détoure avec <b>Photoroom</b>, avec <b>ta</b> clé API (c'est ton compte Photoroom qui la facture — VRM ne s'en sert pas à ta place). {cle ? 'Ta clé est enregistrée.' : cle === null ? "Je n'ai pas pu lire si une clé est enregistrée — réessaie dans un moment." : "Colle ta clé Photoroom pour activer le détourage."}
+        Vestiaire Co attend des photos sur fond net. VRM les détoure avec <b>Photoroom</b>, avec <b>ta</b> clé API (c'est ton compte Photoroom qui la facture — VRM ne s'en sert pas à ta place). {cle ? 'Ta clé est enregistrée.' : cle === null ? "Je n'ai pas pu lire si une clé est enregistrée — réessaie dans un moment." : "Colle ta clé Photoroom pour activer le détourage."}
       </div>
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
         <input data-photoroom-champ value={val} onChange={(e) => { setEtat(''); setVal(e.target.value); }} type="password" autoComplete="off" spellCheck={false}
@@ -22447,7 +22451,7 @@ function VestiaireMesure() {
   );
   return (
     <div data-vc-mesure="jamais" style={style}>
-      {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Collective</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
+      {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
         : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
         : <>C'est l'extension, dans le Chrome de ton ordinateur, qui apprendra à lire Vestiaire quand tu y passes.</>}
     </div>
@@ -22471,8 +22475,9 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   const wAge     = liveStats && liveStats.walletAgeJours != null ? liveStats.walletAgeJours : null;
   // Âge de la capture la plus ancienne : explique un colis déjà parti qui traîne.
   const dAge     = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
-  // (16 oct.) Le nom entier, partout : « Vestiaire Collective », jamais « Vestiaire ».
-  const court = plat;
+  // Nom AFFICHÉ de la plateforme : « Vestiaire Collective » est la clé interne
+  // (comparaisons `plat===`), à l'écran on écrit « Vestiaire Co » (27 oct., §11).
+  const court = nomAffichePlat(plat);
   const carte = {textAlign:'left',border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'13px 15px',cursor:'pointer',fontFamily:'inherit'};
   const eti = {fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500};
   const gros = {fontSize:24,fontWeight:700,color:C.text};
@@ -22484,7 +22489,7 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
   // comme Vinted. Ce composant ne sert plus qu'aux plateformes non reliées.
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Mets tes paires en vente sur Vestiaire depuis VRM' : `Ce que VRM sait de ${court}`}/>
+      <ScreenHead icon="tag" title={court} desc={estVinted ? 'Tes annonces, ventes et achats sur Vinted' : plat === 'Vestiaire Collective' ? 'Mets tes paires en vente sur Vestiaire Co depuis VRM' : `Ce que VRM sait de ${court}`}/>
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes données — les totaux seraient faux, on ne les affiche pas. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
       ) : estVinted ? (<>
@@ -22763,7 +22768,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // Anneau par plateforme — CONSOMME caParPlateforme (§11), ne recalcule rien.
   const platParts=useMemo(()=>{
     const arr=caParPlateforme(liveStats,lbcVentes,ebayCa).filter(p=>p.ca!=null && p.ca>0)
-      .map(p=>({nom:p.nom, court:p.nom==='Vestiaire Collective'?'Vestiaire':p.nom, ca:p.ca}));
+      .map(p=>({nom:p.nom, court:nomAffichePlat(p.nom), ca:p.ca}));
     const total=arr.reduce((s,p)=>s+p.ca,0);
     return {arr,total};
   },[liveStats,lbcVentes,ebayCa]);
@@ -23071,7 +23076,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           affiche « — · pas encore de vente captée », jamais « 0 € »
           (§7, un zéro qui veut dire « on ne sait pas » s'écrit avec sa
           raison). Les ventes Leboncoin PROUVÉES (isSeller===true, §5) sont
-          les seules comptées ; eBay et Vestiaire Collective n'ont encore
+          les seules comptées ; eBay et Vestiaire Co n'ont encore
           aucune vente captée. */}
       {(()=>{
         // §11 : LE MÊME helper que l'onglet Collectif — un seul propriétaire du
@@ -23107,7 +23112,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>Finalisé par plateforme</div>
-              {plateformes.map(p => <Ligne key={p.nom} label={p.nom} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
+              {plateformes.map(p => <Ligne key={p.nom} label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
@@ -30617,7 +30622,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           if (pasSu.length) morceaux.push(<Puce key="p" warn>{pasSu.join(' et ')} : pas pu lire — {pasSu.length>1?'leurs':'ses'} ventes ne sont pas dans ce chiffre, rouvre l'écran dans un moment</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
           if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que leur date n'est pas captée{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
-          if (src.Vestiaire === 'nonRelie') morceaux.push(<Puce key="v">Vestiaire Collective : pas encore relié</Puce>);
+          if (src.Vestiaire === 'nonRelie') morceaux.push(<Puce key="v">Vestiaire Co : pas encore relié</Puce>);
         }
         const Chiffre = ({ lib, val, fort, couleur, sous, sousStyle }) => (
           <div style={{minWidth:0}}>
@@ -31236,7 +31241,7 @@ function ChoixDepenses({ onAucune, onAjouter, compact = false }) {
   const lien = { background: 'none', border: 0, padding: 0, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit', minHeight: 0 };
   return (
     <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 12.5 : 13, color: compact ? 'inherit' : C.muted, lineHeight: 1.45 }}>
-      <span style={{ flex: '1 1 100%' }}>Aucune dépense notée (cartons, scotch, essence pour le relais…) : ce net est <b style={{ color: compact ? 'inherit' : C.text, fontWeight: 600 }}>avant tes dépenses</b>.</span>
+      <span style={{ flex: '1 1 100%' }}>Aucune dépense notée : ce net est <b style={{ color: compact ? 'inherit' : C.text, fontWeight: 600 }}>avant tes dépenses</b>.</span>
       <button type="button" data-depenses-aucune="" onClick={onAucune} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: compact ? 'inherit' : C.text }}>Je n'ai pas de dépenses à noter</button>
       <button type="button" data-depenses-ajouter="" onClick={onAjouter} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
     </div>
@@ -31422,7 +31427,7 @@ function BeneficeJournee({ onNav, place }) {
         <div className="vrm-day-note" data-journee-benef-ligne="jour" style={{ color: C.muted, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
           {J && J.n > 0
             ? <>Aujourd'hui : <b style={{ color: C.text, fontWeight: 600 }}>{val(brutDe(J))}</b> brut{J.nCout > 0 ? <> · <b style={{ color: C.text, fontWeight: 600 }}>{val(J.net)}</b> net des ventes</> : null}{J.nCout < J.n ? ` (prix d'achat connus pour ${J.nCout} sur ${J.n})` : ''} — charges et cotisations se comptent au mois.</>
-            : "Aujourd'hui : aucune vente finalisée pour l'instant."}
+            : null}
         </div>
       </>)}
       <div style={{ marginTop: 6 }}>
@@ -45753,7 +45758,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 if ((report.sourcesKO||[]).length) bits.push(`${report.sourcesKO.join(' et ')} : pas pu lire — rouvre le rapport dans un moment`);
                 if (report.aDater && report.aDater.n) bits.push(`${report.aDater.n} vente${report.aDater.n>1?'s':''} finalisée${report.aDater.n>1?'s':''} sans date (${fmtE(report.aDater.ca)}, tous mois) : dans aucun mois tant que leur date n'est pas captée`);
                 bits.push('mois du versement de l\'argent (commande finalisée)');
-                bits.push('Vestiaire Collective : pas encore relié');
+                bits.push('Vestiaire Co : pas encore relié');
                 return <div data-registre-couverture style={{fontSize:11,color:C.muted,margin:'-4px 0 8px',lineHeight:1.5}}>{bits.join(' · ')}</div>;
               })()}
               {report.saleLines.length===0 && <div data-registre-vide={report.enCours ? 'encours' : report.vinted === 'passu' ? 'passu' : 'aucune'} style={{fontSize:12,color:report.vinted === 'passu' && !report.enCours ? C.warn : C.muted,padding:'6px 0 12px'}}>{report.enCours ? 'Lecture des ventes en cours…'
