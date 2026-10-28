@@ -42,8 +42,8 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
     vinted: (e) => {
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
-      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/?$/.test(e.chemin)) return { status: brouillon, body: brouillonSansId ? { code: 0 } : { draft: { id: 88001 } } };
-      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: completion, body: { code: 0 } };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/?$/.test(e.chemin)) return { status: typeof brouillon === 'function' ? brouillon() : brouillon, body: brouillonSansId ? { code: 0 } : { draft: { id: 88001 } } };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: typeof completion === 'function' ? completion() : completion, body: { code: 0 } };
       if (e.methode === 'POST' && /\/api\/v2\/items\/9101\/delete$/.test(e.chemin)) return { status: suppression, body: {} };
       return { status: 404, body: {} };
     } });
@@ -243,6 +243,66 @@ const zero = (j) => j.vinted.length === 0;
     const l = f.lignes.vinted_brouillon_10432342904;
     dit(ok1 && l && l.uid === '111' && l.titre === 'Nike Air Max 1 dark teal' && l.prix === 65 && l.nPhotos === 1 && l.etat === 'brouillon', "un brouillon enregistré sur Vinted est appris (compte du cookie, titre, prix, photos)", JSON.stringify(l && { uid: l.uid, t: l.titre, p: l.prix }));
     dit(!ok2 && !f.lignes.vinted_brouillon_10432342905, "un corps qui contredit l'identifiant n'est pas rangé"); }
+
+  // R — (28 oct., sa demande) « Refaire le brouillon » : depuis ce qui est
+  //     enregistré dans VRM, sans JAMAIS retoucher l'annonce d'origine ; mise en
+  //     ligne seulement si la suppression de l'ancienne est CERTAINE.
+  const sansDelai = (p, ms = 60000) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('bloqué (file Vinted ?)')), ms))]);
+  const refaire = (f, o = {}) => typeof f.ctx.refaireBrouillon === 'function' ? sansDelai(f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: o.confirme !== false })).catch((e) => ({ erreur: e.message })) : Promise.resolve({ absent: true });
+  const vb = (f) => (f.lignes['coffre_111_9101'] || {}).versBrouillon || {};
+  { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st });
+    const r1 = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', viaBrouillon: true, confirme: true });
+    dit(r1.etape === 'brouillon-a-refaire' && r1.refaire === true && vb(f).etat === 'a-refaire' && vb(f).supprime === true, "republier, brouillon refusé : l'état « à refaire » est noté (ancienne retirée à coup sûr)", JSON.stringify({ e: r1.etape, v: vb(f).etat, s: vb(f).supprime }));
+    st = 200; const n0 = f.j.vinted.length;
+    const r = await refaire(f); const seq = seqDe({ vinted: f.j.vinted.slice(n0) });
+    dit(seq === 'PPBM' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS mise en ligne — l'ancienne n'est pas retouchée", `seq=${seq} etape=${r.etape} ${r.raison || r.erreur || ''}`);
+    let b = {}; try { b = JSON.parse(brouillonsP({ vinted: f.j.vinted.slice(n0) })[0].corps); } catch (_) {}
+    dit(b.draft && b.draft.id === null && b.draft.title === 'Nike Air Max 1' && b.draft.price === '54' && b.draft.assigned_photos && b.draft.assigned_photos.length === 2 && b.upload_session_id === b.draft.temp_uuid, "le brouillon refait porte le titre, le prix et les photos NEUVES enregistrés", JSON.stringify(b.draft && { t: b.draft.title, p: b.draft.price }));
+    const n1 = f.j.vinted.length; const r2 = await refaire(f);
+    dit(r2.code === 'deja' && f.j.vinted.length === n1, "refaire une seconde fois : refusé, aucune requête (jamais deux brouillons)", `code=${r2.code}`); }
+  { const f = monter({ src: process.env.BG_SRC || undefined, brouillon: 502 });
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', versBrouillon: true, confirme: true });
+    dit(vb(f).etat === 'a-refaire' && vb(f).peutExister === true, "en ligne → brouillon sans réponse claire : « à refaire », et « il existe peut-être » noté", JSON.stringify(vb(f)).slice(0, 120)); }
+  { let st = 200; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st }); st = 422;
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', versBrouillon: true, confirme: true });
+    st = 200; const n0 = f.j.vinted.length; const r = await refaire(f);
+    dit(seqDe({ vinted: f.j.vinted.slice(n0) }) === 'PPB' && r.etape === 'fait' && r.brouillon === true, "en ligne → brouillon refait : un brouillon, jamais de mise en ligne", `seq=${seqDe({ vinted: f.j.vinted.slice(n0) })} ${r.raison || r.erreur || ''}`); }
+  { const f = monter({ src: process.env.BG_SRC || undefined, brouillon: 422 });
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
+    f.lignes['coffre_111_9101'].versBrouillon.supprime = false;   // suppression pas confirmée
+    f.lignes['coffre_111_9101'].versBrouillon.etat = 'a-refaire';
+    const n0 = f.j.vinted.length;
+    const brOk = monter({ src: process.env.BG_SRC || undefined }); // pour lire la séquence attendue
+    void brOk;
+    // Le même fond, brouillon accepté cette fois : on remplace la réponse.
+    f.lignes['coffre_111_9101'].versBrouillon.peutExister = false;
+    const r = await (async () => { const ff = monter({ src: process.env.BG_SRC || undefined, extra: { coffre_111_9101: f.lignes['coffre_111_9101'] } }); const rr = await refaire(ff); return { rr, seq: seqDe(ff.j) }; })();
+    dit(r.seq === 'PPB' && r.rr.etape === 'fait' && /PAS mis en ligne/.test(r.rr.raison || ''), "suppression de l'ancienne PAS confirmée : le brouillon est refait mais JAMAIS mis en ligne, et c'est dit", `seq=${r.seq} ${r.rr.raison || r.rr.erreur || ''}`); void n0; }
+  { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, completion: () => st });
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
+    dit(vb(f).etat === 'a-publier' && vb(f).draftId === '88001', "mise en ligne refusée : « à mettre en ligne », le brouillon rangé est noté", JSON.stringify({ e: vb(f).etat, d: vb(f).draftId }));
+    st = 200; const n0 = f.j.vinted.length; const r = await refaire(f);
+    dit(seqDe({ vinted: f.j.vinted.slice(n0) }) === 'M' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : le brouillon EXISTANT est mis en ligne — aucune photo, aucun second brouillon", `seq=${seqDe({ vinted: f.j.vinted.slice(n0) })} ${r.raison || r.erreur || ''}`); }
+  { for (const [etat, code, msg] of [['fait', 'deja', 'déjà fait'], ['mise-en-ligne-incertaine', 'incertaine', 'mise en ligne sans réponse claire'], ['enregistre', 'en-cours', 'passage commencé il y a moins de 10 min']]) {
+      const f = monter({ src: process.env.BG_SRC || undefined, extra: { coffre_111_9101: { id: '9101', title: 'Nike', price: 60, photos: PHOTOS, versBrouillon: { corps: JSON.stringify({ draft: { title: 'Nike', price: '60', catalog_id: 1, description: 'x' } }), etat, at: nowISO(), uid: '111', publier: true, supprime: true } } } });
+      const r = await refaire(f);
+      dit(zero(f.j) && r.code === code, `${msg} : refusé, aucune requête`, `n=${f.j.vinted.length} code=${r.code}`); } }
+  { const f = monter({ src: process.env.BG_SRC || undefined, brouillon: 422 });
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
+    const n0 = f.j.vinted.length; const r = await refaire(f, { confirme: false });
+    dit(r.code === 'confirmation' && f.j.vinted.length === n0, "refaire sans confirmation : aucune requête", `code=${r.code}`); }
+  // R2 — l'archivage du dressing ne fait plus disparaître ce que VRM a rangé
+  //      (la lettre ajoutée, l'état du brouillon) : sinon la lettre s'empilait.
+  { const f = monter({ src: process.env.BG_SRC || undefined, lettreCoffre: 'q', extra: {} });
+    f.lignes['coffre_111_9101'].versBrouillon = { corps: '{}', etat: 'a-refaire' };
+    let okA = false; try { okA = await f.ctx.archiverAnnonce('111', { id: '9101', title: 'Nike Air Max 1', price: { amount: '60' }, photos: [] }, null); } catch (_) {}
+    const c = f.lignes['coffre_111_9101'];
+    dit(okA && c.lettreVRM === 'q' && c.versBrouillon && c.versBrouillon.etat === 'a-refaire', "archiver une annonce garde la lettre ajoutée et l'état du brouillon", JSON.stringify({ ok: okA, l: c.lettreVRM, v: c.versBrouillon && c.versBrouillon.etat }));
+    let okL = false; try { okL = await f.ctx.archiverLot('111', [{ id: '9101', title: 'Nike Air Max 1 bis', price: { amount: '61' }, photos: [] }], []); } catch (_) {}
+    const c2 = f.lignes['coffre_111_9101'];
+    dit(okL && c2.title === 'Nike Air Max 1 bis' && c2.lettreVRM === 'q' && c2.versBrouillon && c2.versBrouillon.etat === 'a-refaire', "archiver le dressing (en lot) garde aussi la lettre et l'état", JSON.stringify({ ok: okL, t: c2.title, l: c2.lettreVRM })); }
+  { const { f } = await run({ viaBrouillon: true });
+    dit(f.lignes['coffre_111_88001'] && !f.lignes['coffre_111_88001'].versBrouillon && vb(f).etat === 'fait', "la nouvelle annonce ne reprend pas l'état du brouillon de l'ancienne ; l'ancienne est notée « fait »", JSON.stringify({ n: f.lignes['coffre_111_88001'] && Object.keys(f.lignes['coffre_111_88001']), v: vb(f).etat })); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique

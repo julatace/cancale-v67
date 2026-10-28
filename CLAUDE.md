@@ -7,6 +7,19 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — « REFAIRE LE BROUILLON » (5.255), sa demande :** « un bouton pour refaire un brouillon raté ».
+> Un passage par brouillon (Republier, En ligne → brouillon) note son avancée dans le coffre de l'annonce
+> (`coffre_{uid}_{id}.versBrouillon.etat` : enregistre → supprime | suppression-incertaine → a-refaire | brouillon-range |
+> a-publier | mise-en-ligne-incertaine | fait, `majVersBrouillon`, lecture ratée ⇒ rien écrit). `refaireBrouillon` (extension)
+> recrée le brouillon depuis le coffre (photos re-téléversées, corps enregistré), ne retouche JAMAIS l'annonce d'origine, ne le
+> met en ligne que si Vinted a CONFIRMÉ la suppression de l'ancienne (`supprime: true`) ; « a-publier » met en ligne le brouillon
+> EXISTANT (aucun second) ; « fait », « mise en ligne floue », un passage de moins de 10 min ⇒ refusé, 0 requête. App : ligne
+> « N brouillons à refaire » (Annonces), entrée du menu Actions, fenêtre `BrouillonsARefaire` (règle `etatARefaire` ; « C'est
+> réglé » ⇒ `vrm_brouillons_refaire_ecartes`, synchronisé), et bouton sur la ligne ratée de Republier. ⚠️ Trouvé au passage :
+> l'archivage du dressing réécrivait le coffre SANS `lettreVRM` ni `versBrouillon` (la lettre s'empilait à la republication
+> suivante) ⇒ `garderClesVrm`. Les photos d'une recréation passent par UNE boucle (`televerserPhotosRecreer`). Preuves :
+> `audit-recreer.cjs` (78 ; 16 rouges sur la 5.254), banc `republier.cjs` (mutation « refaire sur mise en ligne floue » rouge).
+
 > **28 octobre (nuit, fin) — REPUBLIER « comme les autres » (5.254), §3 renversé SUR SA DÉCISION :** Julien : « fais
 > comme eux : on supprime, on enregistre au cas où dans VRM toutes les infos si ça échoue, on met en brouillon puis on met
 > en ligne ». Republier par brouillon (`viaBrouillon`, défaut) = photos → ENREGISTRÉE dans le coffre (écriture ratée ⇒ rien
