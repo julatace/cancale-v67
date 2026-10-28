@@ -6889,6 +6889,20 @@ const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
 // 5.183 : sur le téléphone, une commande permise part par le RELAIS (l'extension
 // de l'ordinateur l'exécute) ; ailleurs, par le pont, comme avant.
 const vmrCmd = (p, timeoutMs = 9000) => (p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
+// (28 oct.) Les gestes LONGS sur Vinted (recréer, passer en brouillon, refaire,
+// mettre un brouillon en ligne, modifier) : « pas de réponse à temps » n'est PAS
+// « pas fait ». L'extension a pu supprimer, créer ou publier pendant que l'app
+// attendait (file Vinted occupée, photos lentes) — dire « échec » faisait
+// relancer une annonce peut-être déjà traitée. Trois issues, jamais deux :
+// la réponse · `{ envoye: false }` (aucune extension ici : rien n'est parti) ·
+// `{ sansReponse: true }` (envoyée, pas de réponse : PAS SU).
+const TEXTE_SANS_REPONSE = "l'extension n'a pas répondu à temps : elle a peut-être fini. Regarde l'annonce sur Vinted avant de relancer";
+const attenteGeste = (ms) => { const f = typeof window !== 'undefined' && window.__VRM_ATTENTE_GESTE; return Number.isFinite(f) && f > 0 ? f : ms; };
+async function vmrCmdSuivi(p, timeoutMs) {
+  if (!vmrExtPresent()) return { accepte: false, envoye: false, raison: "l'extension ne répond pas dans ce navigateur : rien n'est parti" };
+  let r = null; try { r = await vmrCmd(p, attenteGeste(timeoutMs)); } catch (_) { r = null; }
+  return r || { sansReponse: true };
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // LE RELAIS DU TÉLÉPHONE (extension 5.183) — « quand je suis sur mon téléphone
@@ -11724,7 +11738,7 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.titre}{b.prix ? ` · ${prixCourt(b.prix)}` : ''}</div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>{fini ? (s.raison || 'Fait.') : s.etape && s.etape !== 'envoi' ? s.raison : TEXTE_REFAIRE[b.quoi](b)}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {geste && !fini && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
+                {geste && !fini && s.etape !== 'incertain' && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
                 {b.quoi === 'a-verifier' && <button type="button" onClick={onVoirBrouillons} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes brouillons</button>}
                 {!fini && <button type="button" data-refaire-regle={b.id} onClick={() => ecarter(b.cle)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>C'est réglé</button>}
               </div>
@@ -11787,7 +11801,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {!e && it._etat === 'inconnu' && <div style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas encore son contenu : ouvre-le sur Vinted et enregistre-le une fois.</div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                {complet && brouillonOk && (!e || e.etape !== 'fait') && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
+                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
                 <a data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={lien}>Ouvrir sur Vinted ↗</a>
                 {!e && <button type="button" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste" style={{ ...lien, border: 'none', color: C.muted, fontWeight: 500 }}>Plus sur Vinted</button>}
               </div>
@@ -11943,6 +11957,10 @@ function RepublierVinted({ annonces, publier, refaire = null, compteChrome, majE
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
       if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
+      // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
+      // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
+      // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
+      else if (r && r.code === 'sans-reponse') { setArret(r.raison || ''); setMode('pause'); }
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
   }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -35956,8 +35974,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
   const refaireBrouillon = async (b) => {
     if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    let r=null; try { r=await vmrCmd({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true }, 180000); } catch(_) { r=null; }
+    const r=await vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true }, 180000);
     brRefaire.relire(); brVinted.relire();
+    if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
     if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };
     return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
   };
@@ -47928,7 +47947,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           publier={async (it) => {
             const uid = it._acc ? String(it._acc.vinted_user_id||'') : '';
             if (!uid) return { etape:'echec', raison:'compte introuvable' };
-            let r=null; try { r=await vmrCmd({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true }, 120000); } catch(_) { r=null; }
+            const r=await vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true }, 120000);
+            if (r.sansReponse) { brVinted.relire(); return { etape:'incertain', raison:TEXTE_SANS_REPONSE }; }
             if (r && r.accepte) return { etape:r.etape, raison:r.raison||'' };
             return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
           }} />
@@ -47956,7 +47976,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 180000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 180000);
+          if (r.sansReponse) { brRefaire.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
@@ -47966,7 +47987,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // prix et le titre EXACTS de l'aperçu ; jamais sous le prix d'achat.
         const publierModif = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000);
+          if (r.sansReponse) return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE };
           if (r && r.accepte && r.etape==='fait') return { etat:'fait', nouveau:r.nouveau };
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
@@ -47975,7 +47997,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // créé (sa décision du 28 oct. au soir). Le N° reste sur l'ancienne fiche.
         const publierVersB = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 180000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 180000);
+          if (r.sansReponse) { brRefaire.relire(); brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' }; }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) { if (r.etape==='fait') brVinted.relire(); return { etat:r.etape, raison:r.raison||'' }; }
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
@@ -47984,7 +48007,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // de « Voir mes brouillons », §11) ; seuls ceux PRÊTS se cochent.
         const publierEnLigne = async (a) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true }, 120000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true }, 120000);
+          if (r.sansReponse) { brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.etape==='fait') { brVinted.relire(); return { etat:'fait' }; }
           if (r && r.accepte && r.etape==='incertain') return { etat:'incertain', raison:r.raison||'' };
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };

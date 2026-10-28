@@ -7,6 +7,15 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — « pas de réponse » n'est plus « pas fait » (fiabilité) :** Republier, En ligne → brouillon,
+> Brouillons → en ligne, Modifier, et « Refaire le brouillon » attendaient l'extension 1 à 3 min puis disaient
+> « échec — l'extension n'a pas répondu » et ENCHAÎNAIENT la paire suivante — alors que l'extension (file Vinted
+> occupée, photos lentes) a pu supprimer, créer ou publier entre-temps. `vmrCmdSuivi` : trois issues (réponse ·
+> `envoye:false` aucune extension ici · `sansReponse` = PAS SU) ⇒ la ligne dit « incertain » (`TEXTE_SANS_REPONSE` :
+> regarde sur Vinted avant de relancer), la file S'ARRÊTE (`code:'sans-reponse'`), et ni « Réessayer » (Brouillons à
+> refaire) ni un second « Mettre en ligne » ne sont proposés. Banc `republier.cjs` « extension sans réponse »
+> (`window.__VRM_ATTENTE_GESTE` raccourcit l'attente). App seule, extension inchangée.
+
 > **28 octobre (nuit) — « REFAIRE LE BROUILLON » (5.255), sa demande :** « un bouton pour refaire un brouillon raté ».
 > Un passage par brouillon (Republier, En ligne → brouillon) note son avancée dans le coffre de l'annonce
 > (`coffre_{uid}_{id}.versBrouillon.etat` : enregistre → supprime | suppression-incertaine → a-refaire | brouillon-range |
