@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.253.0';
+const CODE_VERSION = '5.254.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8228,16 +8228,27 @@ async function recreerVinted(msg) {
     // 3. le brouillon est CRÉÉ. Un brouillon n'est jamais en ligne : supprimer
     //    d'abord ne peut pas faire vendre une paire deux fois ; et si le brouillon
     //    échoue, rien n'est perdu (tout est dans le coffre, réessayable).
-    if (versB) {
+    // (28 oct., nuit, sa décision : « fais comme eux : on supprime, on enregistre
+    // au cas où, on met en brouillon puis on met en ligne ».) REPUBLIER par
+    // brouillon suit le MÊME chemin, puis 4. le brouillon est MIS EN LIGNE.
+    // Renversé exprès : avant, la nouvelle était créée AVANT la suppression
+    // (§3). Ici une suppression sans réponse claire ARRÊTE tout (jamais deux en
+    // ligne) ; un échec après la suppression laisse le brouillon dans ses
+    // brouillons Vinted (« Actions → Brouillons → en ligne ») ou tout dans VRM.
+    if (viaB) {
       const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;
       const corpsBV = { draft: brouillonV, parcel: null, upload_session_id: temp };
-      const okCoffre = await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: titre, price: prix, desc: description, lettreVRM: lettreFin || null, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString() } } }], 'id');
+      const okCoffre = await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString(), titre, prix, publier: !versB } } }], 'id');
       if (okCoffre !== true) {
         noterDiag('versbrouillon_enregistrement_rate');
         return { accepte: true, etape: 'echec', raison: "VRM n'a pas pu enregistrer l'annonce avant de la retirer — rien n'a été supprimé, elle est toujours en ligne (réessaie dans un moment)" };
       }
       const rdV = await vintedSend(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
       const suppIncertaine = !rdV || rdV.status === 0 || rdV.status >= 500;
+      if (suppIncertaine && !versB) {
+        noterDiag(`republier_suppression_incertaine_${(rdV && rdV.status) || 0}`);
+        return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement à la suppression : l'annonce est PEUT-ÊTRE encore en ligne. VRM s'arrête là (rien n'est remis en ligne, jamais deux fois la même paire) — regarde ton dressing. Tout est enregistré dans VRM." };
+      }
       if (!suppIncertaine && !rdV.ok) {
         noterDiag(`versbrouillon_suppression_refusee_${rdV.status}`);
         return { accepte: true, etape: 'echec', raison: `Vinted a refusé de retirer l'annonce (${rdV.status}) — elle est toujours en ligne, aucun brouillon n'a été créé (elle est enregistrée dans VRM)` };
@@ -8266,35 +8277,37 @@ async function recreerVinted(msg) {
       await compterAction(uid, ACTIONS_MAX_HEURE);
       const corpsCV = { draft: { ...brouillonV, id: Number(draftId) }, push_up: false, parcel: null, upload_session_id: temp };
       await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsCV), titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
-      if (suppIncertaine) return { accepte: true, etape: 'double', draftId, raison: 'le brouillon est rangé sur Vinted.' + peutEtre };
-      noterDiag('versbrouillon_ok');
-      return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre };
+      if (versB) {
+        if (suppIncertaine) return { accepte: true, etape: 'double', draftId, raison: 'le brouillon est rangé sur Vinted.' + peutEtre };
+        noterDiag('versbrouillon_ok');
+        return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre };
+      }
+      // 4. Republier : le brouillon est MIS EN LIGNE (formes mesurées, 5.251).
+      await poserVerrouRecreer(id);
+      await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
+      const rcV = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
+      if (!rcV || rcV.status === 0 || rcV.status >= 500) {
+        noterDiag(`republier_mise_en_ligne_incertaine_${(rcV && rcV.status) || 0}`);
+        return { accepte: true, etape: 'incertain', draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted n'a pas répondu clairement à la mise en ligne : il est PEUT-ÊTRE en ligne — regarde ton dressing (sinon : Actions → Brouillons → en ligne)." };
+      }
+      await leverVerrouRecreer(id);
+      if (!rcV.ok) {
+        noterDiag(`republier_mise_en_ligne_refusee_${rcV.status}`);
+        const msgV = rcV.json && (rcV.json.message || (rcV.json.errors && rcV.json.errors[0] && (rcV.json.errors[0].value || rcV.json.errors[0].message)));
+        return { accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rcV.status}${msgV ? ' : ' + String(msgV).slice(0, 80) : ''}) — il est dans tes brouillons : Actions → Brouillons → en ligne.` };
+      }
+      const jV = rcV.json || {}; const itV = (jV.item && typeof jV.item === 'object') ? jV.item : (jV.draft && typeof jV.draft === 'object') ? jV.draft : jV;
+      const nouvelIdV = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
+      try { await rangerBrouillon(draftId, { uid, titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelIdV }); } catch (_) {}
+      try { await noterModeleRepub(nouvelIdV, JSON.stringify(corps), uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
+      try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelIdV}`, data: { ...(sauve || {}), id: nouvelIdV, uid, title: titre, price: prix, desc: description, lettreVRM: lettreFin || null, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
+      await compterAction(uid, ACTIONS_MAX_HEURE);
+      noterDiag('republier_ok');
+      return { accepte: true, etape: 'fait', nouvelId: nouvelIdV, draftId, ancien: sauve && Number(sauve.price), nouveau: prix, nouveauTitre: titre };
     }
     await poserVerrouRecreer(id);
     let rc;
-    if (viaB) {
-      const brouillon = { ...built.item, id: null }; delete brouillon.push_up;
-      const corpsB = { draft: brouillon, parcel: null, upload_session_id: temp };
-      const rb = await vintedSend(acc, 'POST', '/api/v2/item_upload/drafts', corpsB, { timeoutMs: 60000 });
-      if (!rb || rb.status === 0 || rb.status >= 500 || !rb.ok) {
-        await leverVerrouRecreer(id);
-        noterDiag(`recreer_brouillon_${rb && rb.ok ? 'ok' : 'refuse'}_${(rb && rb.status) || 0}`);
-        const certain = rb && rb.ok === false && rb.status > 0 && rb.status < 500;
-        return { accepte: true, etape: 'echec', raison: certain ? `Vinted a refusé le brouillon (${rb.status}) — rien n'est en ligne, ton annonce est intacte` : "Vinted n'a pas répondu clairement au brouillon : il a PEUT-ÊTRE été rangé dans tes brouillons Vinted, mais rien n'est en ligne et ton annonce est intacte" };
-      }
-      draftId = idDeBrouillon(rb.json);
-      if (!draftId) {
-        await leverVerrouRecreer(id);
-        noterDiag('recreer_brouillon_sans_id');
-        if (rb.json && typeof rb.json === 'object') { try { await noterDiag('recreer_brouillon_cles_' + Object.keys(rb.json).slice(0, 6).join('_').replace(/[^a-z0-9_]/gi, '').slice(0, 60)); } catch (_) {} }
-        return { accepte: true, etape: 'echec', raison: "le brouillon a été rangé sur Vinted mais VRM n'a pas pu lire son identifiant — rien n'est en ligne, ton annonce est intacte (le brouillon est dans tes brouillons Vinted)" };
-      }
-      await compterAction(uid, ACTIONS_MAX_HEURE);
-      const corpsC = { draft: { ...brouillon, id: Number(draftId) }, push_up: false, parcel: null, upload_session_id: temp };
-      await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsC), titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
-      await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
-      rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
-    } else {
+    {
       rc = await vintedSend(acc, 'POST', '/api/v2/item_upload/items', corps, { timeoutMs: 60000 });
     }
     if (!rc || rc.status === 0 || rc.status >= 500) {

@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.253.0';
+const EXT_ATTENDUE = '5.254.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -493,7 +493,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11699,7 +11699,9 @@ const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
 // mettre de brouillon à en ligne, de en ligne à brouillon, plein de choses »)
 // UN parcours (choisir → modifier → lancer, temps fixe ou aléatoire, une à la fois)
 // pour quatre gestes. `action` :
-//   · recreer      — supprimer et recréer (la nouvelle d'abord, l'ancienne ensuite) ;
+//   · recreer      — supprimer et recréer ; par brouillon (défaut, 28 oct. nuit, sa
+//                    décision « comme eux ») : enregistrée dans VRM, supprimée,
+//                    brouillon, puis mise en ligne. Création directe : la nouvelle d'abord ;
 //   · modifier     — prix / titre SUR PLACE (`republierVinted`, PUT : favoris gardés) ;
 //   · versBrouillon— l'annonce repasse en brouillon (enregistrée dans VRM,
 //                    retirée de Vinted, PUIS le brouillon créé — 28 oct. au soir) ;
@@ -11787,8 +11789,8 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, br
   // Recréer EST le geste : une paire sans changement part aussi (nouvelle annonce, mêmes infos).
   const aFaireSel = choisies.filter((a) => { if (a.bloque) return false; if (action === 'enLigne') return true; const x = apercu(a); if (action === 'modifier' && x.prix == null && !x.titre) return false; return !x.tropLong && !x.invalide; });
   // (28 oct., sa demande) L'ORDRE DE REMISE EN LIGNE : celui de sa sélection, ou
-  // mélangé, ou réglé à la main. Chaque paire reste « recréée PUIS supprimée »
-  // (jamais une paire disparue) : c'est l'ordre de PASSAGE qui change, donc
+  // mélangé, ou réglé à la main. (Par brouillon, depuis le 28 oct. nuit : enregistrée,
+  // supprimée, PUIS recréée — voir `recreerVinted`.) C'est l'ordre de PASSAGE qui change, donc
   // l'ordre dans lequel les nouvelles annonces apparaissent sur Vinted.
   const aFaire = ordre ? [...ordre.map((id) => aFaireSel.find((a) => a.id === id)).filter(Boolean), ...aFaireSel.filter((a) => !ordre.includes(a.id))] : aFaireSel;
   const melanger = () => {
@@ -11937,7 +11939,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, br
                 <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
               </label>
-              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? 'Chaque annonce est d’abord rangée en brouillon sur Vinted, puis mise en ligne quelques secondes après. Si la mise en ligne échoue, le brouillon reste dans tes brouillons et l’ancienne annonce n’est pas touchée.' : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.brouillon} ou plus récente dans ce navigateur.`}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? 'Comme les autres outils : chaque annonce est d’abord enregistrée dans VRM, puis supprimée, rangée en brouillon sur Vinted, et mise en ligne quelques secondes après. Si Vinted ne répond pas clairement à la suppression, VRM s’arrête (jamais deux fois en ligne). Si le brouillon ou sa mise en ligne échoue, rien n’est perdu : le brouillon est dans tes brouillons, ou tout est enregistré dans VRM.' : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
@@ -47695,7 +47697,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (repubAction==='enLigne') return <RepublierVinted key="enLigne" action="enLigne" annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
         if (repubAction==='modifier') return <RepublierVinted key="modifier" action="modifier" annonces={annoncesR} publier={publierModif} compteChrome={etatX} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
         if (repubAction==='versBrouillon') return <RepublierVinted key="versBrouillon" action="versBrouillon" annonces={annoncesR} publier={publierVersB} compteChrome={etatX} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
-        return <RepublierVinted key="recreer" annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
+        return <RepublierVinted key="recreer" annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont

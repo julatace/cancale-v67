@@ -160,19 +160,26 @@ const zero = (j) => j.vinted.length === 0;
   const completions = (j) => de(j, /\/item_upload\/drafts\/\d+\/completion$/);
   { const { f, r } = await run({ viaBrouillon: true });
     const seq = f.j.vinted.map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
-    dit(seq === 'PPBMS' && r.etape === 'fait' && r.nouvelId === '88001', "via brouillon : photos, PUIS brouillon, PUIS mise en ligne, PUIS seulement la suppression de l'ancienne (même identifiant que le brouillon)", `seq=${seq} etape=${r.etape} id=${r.nouvelId} ${r.raison || ''}`);
+    const cf = f.lignes['coffre_111_9101'];
+    dit(seq === 'PPSBM' && r.etape === 'fait' && r.nouvelId === '88001' && cf && cf.versBrouillon && cf.versBrouillon.publier === true, "republier (sa décision, « comme eux ») : photos, enregistrée dans VRM, PUIS suppression, PUIS brouillon, PUIS mise en ligne", `seq=${seq} etape=${r.etape} id=${r.nouvelId} ${r.raison || ''}`);
     let b = {}, c = {}; try { b = JSON.parse(brouillonsP(f.j)[0].corps); c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
     dit(b.draft && b.draft.id === null && !('push_up' in b) && !('push_up' in b.draft) && b.parcel === null && b.upload_session_id === b.draft.temp_uuid && b.draft.title === 'Nike Air Max 1 — remise en ligne' && b.draft.price === '54', "brouillon : forme mesurée {draft:{id:null,…}, parcel:null, upload_session_id}, sans push_up", JSON.stringify({ id: b.draft && b.draft.id, pu: 'push_up' in b }));
     dit(c.draft && c.draft.id === 88001 && c.push_up === false && c.parcel === null && /\/drafts\/88001\/completion$/.test(completions(f.j)[0].chemin) && c.draft.description === b.draft.description, "mise en ligne : POST …/drafts/88001/completion, même corps, draft.id posé, push_up false", JSON.stringify({ id: c.draft && c.draft.id, pu: c.push_up }));
     dit(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'publie' && f.lignes['vinted_brouillon_88001'].ancienId === '9101', "le brouillon est noté « publié » (avec l'annonce qu'il remplace)", JSON.stringify(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat)); }
   { const { f, r } = await run({ viaBrouillon: true, completion: 422 });
-    dit(suppressions(f.j).length === 0 && r.etape === 'echec' && /brouillons/.test(r.raison || '') && f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'brouillon', "mise en ligne refusée : l'ancienne n'est PAS supprimée, le brouillon reste (et c'est dit)", `s=${suppressions(f.j).length} ${r.raison || ''}`); }
+    dit(suppressions(f.j).length === 1 && r.etape === 'brouillon-a-refaire' && /Brouillons → en ligne/.test(r.raison || '') && f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'brouillon', "mise en ligne refusée : le brouillon reste rangé, et le geste pour le remettre en ligne est dit", `s=${suppressions(f.j).length} ${r.raison || ''}`); }
   { const { f, r } = await run({ viaBrouillon: true, completion: 502 });
-    dit(suppressions(f.j).length === 0 && r.etape === 'incertain', "mise en ligne sans réponse claire : « incertain », rien supprimé", `s=${suppressions(f.j).length} etape=${r.etape}`); }
+    dit(r.etape === 'incertain' && /PEUT-ÊTRE en ligne/.test(r.raison || ''), "mise en ligne sans réponse claire : « incertain », dit", `s=${suppressions(f.j).length} etape=${r.etape}`); }
   { const { f, r } = await run({ viaBrouillon: true, brouillon: 422 });
-    dit(completions(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "brouillon refusé : ni mise en ligne, ni suppression", `m=${completions(f.j).length} s=${suppressions(f.j).length}`); }
+    dit(completions(f.j).length === 0 && r.etape === 'brouillon-a-refaire' && /enregistrées dans VRM/.test(r.raison || ''), "brouillon refusé : aucune mise en ligne, tout est dit enregistré dans VRM", `m=${completions(f.j).length} s=${suppressions(f.j).length}`); }
   { const { f, r } = await run({ viaBrouillon: true, brouillonSansId: true });
-    dit(completions(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "brouillon sans identifiant lisible : on ne devine rien, ni mise en ligne ni suppression", `m=${completions(f.j).length}`); }
+    dit(completions(f.j).length === 0 && r.etape === 'brouillon-a-refaire', "brouillon sans identifiant lisible : on ne devine rien, aucune mise en ligne", `m=${completions(f.j).length}`); }
+  { const { f, r } = await run({ viaBrouillon: true, suppression: 502 });
+    dit(brouillonsP(f.j).length === 0 && completions(f.j).length === 0 && r.etape === 'incertain', "republier, suppression sans réponse claire : on s'arrête — jamais deux annonces en ligne", `b=${brouillonsP(f.j).length} m=${completions(f.j).length}`); }
+  { const { f, r } = await run({ viaBrouillon: true, suppression: 403 });
+    dit(brouillonsP(f.j).length === 0 && r.etape === 'echec' && /toujours en ligne/.test(r.raison || ''), "republier, suppression refusée : rien créé, elle est toujours en ligne", `b=${brouillonsP(f.j).length}`); }
+  { const { f, r } = await run({ viaBrouillon: true, coffreEcritureKO: true });
+    dit(suppressions(f.j).length === 0 && brouillonsP(f.j).length === 0 && r.etape === 'echec', "republier, enregistrement raté : rien supprimé", `s=${suppressions(f.j).length}`); }
   { const { f } = await run({});
     dit(brouillonsP(f.j).length === 0 && creations(f.j).length === 1, "sans l'option : création directe, comme avant", `b=${brouillonsP(f.j).length}`); }
 
@@ -250,6 +257,6 @@ const zero = (j) => j.vinted.length === 0;
     const sans = ctx.f ? ctx.f(conf, { '9101': { numero: '41', numberedAt: '2026-10-01' }, '77001': { numero: '41', numberedAt: '2026-10-02' } }) : null;
     dit(Array.isArray(lie) && lie.length === 0 && Array.isArray(sans) && sans.length === 1, "N° : une annonce et SA recréation ne sont jamais renumérotées ; deux paires sans lien le sont toujours", JSON.stringify({ lie, sans, err: ctx.err })); }
 
-  console.log(ko ? `\n❌ audit-recreer : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-recreer : ${ok} contrôles — l'ancienne annonce n'est supprimée qu'après la création confirmée`);
+  console.log(ko ? `\n❌ audit-recreer : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-recreer : ${ok} contrôles — republier par brouillon : enregistrée, supprimée, brouillon, mise en ligne ; création directe : l'ancienne supprimée après la nouvelle`);
   process.exit(ko ? 1 : 0);
 })();
