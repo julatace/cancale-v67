@@ -234,3 +234,4 @@
 .vrm-favoris-compte-rendu li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.vrm-favoris-compte-rendu li b{font-weight:600;text-align:right;}
 .vrm-favoris-compte-rendu li[data-favoris-envoi=envoye] b{color:var(--vrm-ink);}.vrm-favoris-compte-rendu li[data-favoris-envoi=refuse] b,.vrm-favoris-compte-rendu li[data-favoris-envoi=incertain] b{color:var(--vrm-warn,#a86a12);}
 .vrm-favoris-feuille .vrm-favoris-automatisation{margin-top:0;}
+.vrm-favoris-badge.is-vendu{background:var(--vrm-card2);color:var(--vrm-ink);font-weight:600;}.vrm-favoris-vendu-action{font-size:11px;color:var(--vrm-muted);}

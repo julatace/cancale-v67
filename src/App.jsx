@@ -1,4 +1,4 @@
-import {retourReponseVinted,cleReponseVinted} from './reponseVinted.js';
+import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees} from './offresVinted.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
@@ -36415,7 +36415,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyErr, setReplyErr] = useState(null);
-  const verrouReponse=useRef(false);
+  const verrouReponse=useRef(false),brouillonsReponse=useRef(null);
+  if(!brouillonsReponse.current)brouillonsReponse.current=creerBrouillonsReponses(()=>AUTH.user?.id||'');
   const [replyNotice,setReplyNotice]=useState(''),[reponsesIncertaines,setReponsesIncertaines]=useState({});
   // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
   const [convMax, setConvMax] = useState(40);
@@ -37441,6 +37442,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, txnItem, numeros]);
+  const articlesVendusFavoris=useMemo(()=>{
+    const ids=new Set([...soldManual,...venduesVinted].map(String));
+    for(const vente of sales.items||[]){
+      if(classifyOrderStatus(vente.status)==='cancelled')continue;
+      const id=txnItem[String(vente.transaction_id)];
+      if(id)ids.add(String(id));
+    }
+    return ids;
+  },[soldManual,venduesVinted,sales.items,txnItem]);
   // (28 oct.) PUBLIÉ pour l'écran Stock (grille de photos) — §11, la preuve de
   // vente a UN seul propriétaire : ici. On publie les NUMÉROS des paires
   // prouvées vendues (par identité, jamais le titre — c'est `annoncesVendues`),
@@ -39298,9 +39308,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       hiddenAt = 0;
       viderCacheLignes();                                          // vide le cache de lignes (relit la moisson fraîche)
       try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
-      if (curSub === 'ventes' || curSub === 'journee') loadOrders('sold', setSales, false, { silencieux: true });
+      if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
       if (curSub === 'achats' || curSub === 'journee') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
-      if (curSub === 'annonces' || curSub === 'journee') loadListings();
+      if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
       if (curSub === 'messages' || curSub === 'journee') loadConvs();
     };
     document.addEventListener('visibilitychange', onVis);
@@ -39319,7 +39329,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ Aucune requête Vinted ici : on relit NOTRE base (la moisson).
   useEffect(() => {
     if (!accounts.length) return;
-    const ecrans = ['ventes', 'journee', 'bordereaux'];
+    const ecrans = ['ventes', 'journee', 'bordereaux', 'messages'];
     let derniere = 0;
     const relire = (uid) => {
       if (uid) _rowCache.delete(`o:${uid}`); else viderCacheLignes();
@@ -39356,7 +39366,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       else if (ev.quoi === 'annonces') {
         oublierDressing(ev.uid);
         try { delete _acctCache.listings; _persistAcctCache(); } catch (_) {}
-        if (['annonces', 'journee', 'bordereaux'].includes(curSub)) signalAnnonces(ev.uid);
+        if (['annonces', 'journee', 'bordereaux', 'messages'].includes(curSub)) signalAnnonces(ev.uid);
       }
     };
     const signalAnnonces = regrouperSignaux((uids) => loadListings(false, true, uids));
@@ -39380,7 +39390,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     };
     // Et on demande à l'extension (si elle tourne ici) de relire les ventes du
     // compte connecté : à l'ouverture de l'écran et au retour sur l'onglet.
-    const demander = () => { if (vmrExtPresent() && ecrans.includes(curSub)) vmrCmd({ cmd: 'ventes' }, 3000); };
+    const demander = () => { if (curSub!=='messages' && vmrExtPresent() && ecrans.includes(curSub)) vmrCmd({ cmd: 'ventes' }, 3000); };
     const onVis = () => { if (!document.hidden) demander(); };
     document.addEventListener('visibilitychange', onVis);
     demander();
@@ -39675,8 +39685,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(!conv?._acc || conv.id==null)return;
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current;
-    setReplyText('');setReplyErr(null);setReplyNotice('');setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
-    setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
+    const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
+    setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
+    setOpenConv({request,owner,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
   };
@@ -39687,7 +39698,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
-  // risque). Requête réelle captée : POST /api/v2/conversations/{id}/replies.
+  // garantie de disponibilité). Requête réelle captée : POST /api/v2/conversations/{id}/replies.
   useEffect(() => {
     let arrete = false, timer;
     const captures = new Map();
@@ -39725,9 +39736,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ()=>{arrete=true;clearTimeout(timer);captures.clear();window.removeEventListener('vrm:ext',ecoute);};
   },[curSub,cleComptes,openConv?.request]);
 
+  const modifierReponse=texte=>{if(!openConv||openConv.owner!==(AUTH.user?.id||''))return;brouillonsReponse.current.ecrire(openConv.owner,openConv.acc.vinted_user_id,openConv.convId,texte);setReplyText(texte);setReplyNotice('');};
   const sendReply = async () => {
     const oc=openConv,text=replyText.trim();
-    if(!oc?.acc||!oc.convId||!text||replyBusy||verrouReponse.current||oc.conversation?.allow_reply===false)return;
+    if(!oc?.acc||!oc.owner||oc.owner!==(AUTH.user?.id||'')||!oc.convId||!text||replyBusy||verrouReponse.current||oc.conversation?.allow_reply===false)return;
     const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
     if(reponsesIncertaines[cle])return;
     if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
@@ -39738,6 +39750,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       retour=retourReponseVinted(r);
     }catch{retour=retourReponseVinted(null);}
     finally{verrouReponse.current=false;setReplyBusy(false);}
+    if(oc.owner!==(AUTH.user?.id||''))return;
+    if(retour.etat==='confirme'){
+      brouillonsReponse.current.confirmer(oc.owner,oc.acc.vinted_user_id,oc.convId,text);
+      const actuel=filOffreActuel.current;
+      if(actuel?.owner===oc.owner&&String(actuel.acc?.vinted_user_id)===String(oc.acc.vinted_user_id)&&String(actuel.convId)===String(oc.convId)){
+        setReplyText(v=>v.trim()===text?'':v);
+        if(actuel.request!==oc.request)setReplyNotice(retour.texte+' Actualise le fil pour le relire.');
+      }
+    }
     if(retour.etat==='incertain')setReponsesIncertaines(v=>({...v,[cle]:true}));
     if(conversationRequest.current!==oc.request)return;
     if(retour.etat==='confirme'){
@@ -42149,14 +42170,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* Réponses rapides : remplissent la zone (tu ajustes puis envoies) */}
                 <div className="vrm-chat-rapides" style={{opacity:ro?0.5:1}}>
                   {(quickReplies&&quickReplies.length?quickReplies.map(t=>({e:'',t})):QUICK_REPLIES).map((q,i)=>(
-                    <button key={i} type="button" disabled={ro} onClick={()=>setReplyText(q.t)} title={q.t}
+                    <button key={i} type="button" disabled={ro} onClick={()=>modifierReponse(q.t)} title={q.t}
                       style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
                       {q.e} {q.t.length>24?q.t.slice(0,24)+'…':q.t}
                     </button>
                   ))}
                 </div>
                 <div className="vrm-chat-compose">
-                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
+                  <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>modifierReponse(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
                   <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'Envoi…':'Envoyer'}</button>
                 </div>
                 </>)}
@@ -45774,7 +45795,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>
         </div>
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
-        <FavorisConnectes ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        <FavorisConnectes articlesVendus={articlesVendusFavoris} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>

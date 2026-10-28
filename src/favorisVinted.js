@@ -117,3 +117,14 @@ export async function lireFavorisVinted({uid,owner,ownerActuel,base,headers,fetc
   const notifications=[...(archive?.payload?.notifications||[]),...(d?.payload?.notifications||[])];
   return {reception:'recue',...favorisDepuisNotifications({...d?.payload,notifications},d?.domain||archive?.domain||null),archive:archive?{sync:archive.sync,limite:archive.limite,capturedAt:archive.capturedAt}:null};
 }
+
+// Seulement l’identifiant natif du lien : jamais le titre, la taille ou la photo.
+export function articleFavoriVendu(ligne,articlesVendus){
+ const lien=lienFavoriVinted(ligne?.lien),id=lien&&/^\/items\/([1-9]\d{0,19})(?:\/|$)/.exec(new URL(lien).pathname)?.[1];
+ return !!id&&articlesVendus instanceof Set&&articlesVendus.has(id);
+}
+
+export function executerFavoriDisponible(travail,articlesVendus,executer){
+ if(articlesVendus.has(String(travail?.itemId)))return Promise.resolve({ok:false,data:{resultat:'refuse',raison:'article_vendu'}});
+ return executer(travail);
+}
