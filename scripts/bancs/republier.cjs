@@ -31,7 +31,7 @@ const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { num
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
-  { id: 'vinted_item_details', data: {} },
+  { id: 'vinted_item_details', data: { '9102': { photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg', 'https://images1.vinted.net/t/a/f800/3.jpeg'] } } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const VERSION = (/EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '5.247.0';
@@ -43,7 +43,7 @@ const PONT = (o) => {
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && (d.cmd === 'republierVinted' || d.cmd === 'recreerVinted')) {
-      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages });
+      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages, lettre: d.lettre });
       const resp = d.id === '9107' ? { accepte: false, code: 'vinted-pause', raison: 'Vinted demande de ralentir — réessaie dans 15 min' }
         : d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
         : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
@@ -140,7 +140,13 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-reglage="zoom"]').evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '1.2'); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
         const tf = await pg.locator('[data-republier-photos]').getAttribute('data-republier-photos-css').catch(() => '');
         dit(/scale\(1\.2\)/.test(tf || ''), 'les réglages photo se voient dans l’aperçu (zoom 1,2)', tf);
-        await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-modif-' + vp.width + '.png') });
+        // (28 oct., sa demande) toutes les photos de chaque annonce, et des réglages PAR annonce.
+        { const nph = await pg.locator('[data-republier-photos-annonce="9102"]').getAttribute('data-republier-photos-n'); const nim = await pg.locator('[data-republier-photo-case="9102"]').count(); dit(nph === '3' && nim === 3, 'chaque annonce montre TOUTES ses photos (3 pour la 9102)', nph + ' / ' + nim); }
+        await pg.locator('[data-republier-regler="9103"]').click();
+        await pg.locator('[data-republier-reglage="rot"]').evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '5'); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
+        dit(await pg.locator('[data-republier-photos-annonce="9103"]').getAttribute('data-republier-photos-propres') === '1' && await pg.locator('[data-republier-photos-annonce="9102"]').getAttribute('data-republier-photos-propres') === '', 'régler UNE annonce ne touche que celle-là');
+        await pg.locator('[data-republier-regler="9103"]').click();
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-modif-' + vp.width + '.png'), fullPage: true });
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-lancer]').waitFor({ timeout: 3000 });
         dit(await pg.locator('[data-republier-lancer]').isDisabled(), 'sans la case de confirmation, « Republier » est grisé');
@@ -174,6 +180,8 @@ const projette = (row, sel) => {
         dit(envois.every((x) => x.cmd === 'recreerVinted'), 'chaque paire est SUPPRIMÉE ET RECRÉÉE (commande recreerVinted)', envois.map((x) => x.cmd).join(','));
         dit(e1 && e1.uid === '111' && Math.abs(e1.prix - 44.1) < 1e-9 && e1.confirme === true, 'la commande porte SON prix (44,10), son compte, et la confirmation', JSON.stringify(e1));
         dit(e1 && e1.reglages && Math.abs(e1.reglages.zoom - 1.2) < 1e-9 && e1.reglages.rot === 0, 'les réglages photo partent avec la commande', JSON.stringify(e1 && e1.reglages));
+        const e3 = envois.find((x) => x.id === '9103');
+        dit(e3 && e3.reglages && e3.reglages.rot === 5 && Math.abs(e3.reglages.zoom - 1.2) < 1e-9, 'l’annonce réglée à part part avec SES réglages (redressée 5°)', JSON.stringify(e3 && e3.reglages));
         dit(e2 && Math.abs(e2.prix - 47) < 1e-9 && Number(e2.plancher) === 47, '… et le plancher (prix d’achat) part avec', JSON.stringify(e2));
         dit(await pg.locator('[data-republier-ligne="9102"]').getAttribute('data-republier-statut') === 'fait', 'la paire recréée dit « recréée »');
         const l3 = pg.locator('[data-republier-ligne="9103"]');
@@ -220,6 +228,11 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-varier]').click();
+        const propres = await pg.$$eval('[data-republier-photos-annonce]', (els) => els.map((e) => e.getAttribute('data-republier-photos-propres')));
+        dit(propres.length === 2 && propres.every((x) => x === '1'), '« Varier chaque annonce » donne des réglages à chacune', propres.join(','));
+        await pg.locator('[data-republier-lettre]').check();
+        dit(await pg.locator('[data-republier-lettre-de]').count() === 2, 'option « lettre au hasard tout en bas » : la lettre de chaque annonce se voit dans l’aperçu');
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-esp-choix="aleatoire"]').click();
         await pg.locator('[data-republier-esp-min]').fill('1');
@@ -228,10 +241,17 @@ const projette = (row, sel) => {
         await pg.mouse.move(1, 1);
         await pg.setViewportSize({ width: 390, height: 844 }); await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-alea-390.png') }); await pg.setViewportSize({ width: 1512, height: 950 });
         dit(await pg.locator('[data-republier-esp="aleatoire"]').count() === 1, '« Aléatoire » se choisit, avec un minimum et un maximum en minutes');
+        await pg.locator('[data-republier-esp-max]').blur();
+        await pg.clock.runFor(300);
+        const att0 = await pg.locator('[data-republier-ligne="9102"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => '');
+        const att1 = Number(await pg.locator('[data-republier-ligne="9103"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => 'NaN'));
+        dit(att0 === '0' && att1 >= 60 && att1 <= 120 && /\+1 min/.test(await pg.locator('[data-republier-ligne="9103"]').innerText()), 'AVANT de lancer, chaque ligne montre son temps tiré (1re : tout de suite, 2e : +1 min …)', `${att0} / ${att1}`);
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').click();
         for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 1; i++) await pg.clock.runFor(100);
         await pg.clock.runFor(1000);
+        const prochaineVue = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
+        dit(prochaineVue === att1, 'le compte à rebours suit le temps MONTRÉ sur la ligne', `${prochaineVue} / ${att1}`);
         const prochaine = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
         dit(prochaine >= 60 && prochaine <= 120, 'le temps tiré est entre 1 et 2 min, et le compte à rebours s’affiche', String(prochaine));
         await pg.clock.runFor(57000);
@@ -243,6 +263,9 @@ const projette = (row, sel) => {
         dit(n2 === 2, 'la seconde paire est partie au plus tard au maximum (2 min)', String(n2));
         const memo = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_republier_esp') || 'null'); } catch (_) { return null; } });
         dit(memo && memo.mode === 'aleatoire', 'le choix est retenu pour la prochaine fois', JSON.stringify(memo));
+        const env = await pg.evaluate(() => window.__repub || []);
+        dit(env.length === 2 && env.every((x) => /^[a-z]$/.test(x.lettre || '')), 'chaque annonce part avec SA lettre (une seule lettre)', JSON.stringify(env.map((x) => x.lettre)));
+        dit(env.length === 2 && JSON.stringify(env[0].reglages) !== JSON.stringify(env[1].reglages), 'après « Varier », les deux annonces partent avec des réglages DIFFÉRENTS', JSON.stringify(env.map((x) => x.reglages)));
       } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, 160)); }
       await ctx.close(); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }

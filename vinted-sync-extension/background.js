@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.249.0';
+const CODE_VERSION = '5.250.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8038,7 +8038,15 @@ async function recreerVinted(msg) {
   const second = (photosD.length > photosC.length ? photosC : photosD).filter(okUrl);
   const urls = princ;
   if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo de cette annonce n'est sauvegardée — passe sur Vinted une fois pour la capturer, puis réessaie (rien n'a été touché)" };
-  const description = String((details.description || (sauve && sauve.desc) || '')).trim();
+  // La description est reprise TELLE QUELLE (sa demande : « absolument tout »).
+  // (28 oct.) Option : UNE lettre au hasard tout en bas (`msg.lettre`, choisie
+  // et montrée par l'app). La lettre d'une recréation précédente (notée dans le
+  // coffre, `lettreVRM`) est retirée d'abord : les lettres ne s'empilent jamais.
+  let descBase = String((details.description || (sauve && sauve.desc) || '')).trim();
+  const ancienneLettre = sauve && /^[a-z]$/i.test(String(sauve.lettreVRM || '')) ? String(sauve.lettreVRM) : '';
+  if (ancienneLettre && descBase.endsWith('\n\n' + ancienneLettre)) descBase = descBase.slice(0, -(ancienneLettre.length + 2)).trimEnd();
+  const lettreFin = /^[a-z]$/i.test(String(msg.lettre || '')) ? String(msg.lettre) : '';
+  const description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase;
   // 2. La recette de CETTE annonce.
   const modele = await lireModeleRepub(id);
   if (modele === null) return { accepte: false, code: 'modele-lecture', raison: "je n'ai pas pu lire le format — réessaie dans un moment" };
@@ -8108,7 +8116,7 @@ async function recreerVinted(msg) {
     }
     // La recette de la nouvelle annonce : le corps que Vinted vient d'accepter.
     try { await noterModeleRepub(nouvelId, JSON.stringify(corps), uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
-    try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelId}`, data: { ...(sauve || {}), id: nouvelId, uid, title: titre, price: prix, desc: description, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
+    try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelId}`, data: { ...(sauve || {}), id: nouvelId, uid, title: titre, price: prix, desc: description, lettreVRM: lettreFin || null, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
     await compterAction(uid, ACTIONS_MAX_HEURE);
     await leverVerrouRecreer(id);
     const rd = await vintedSend(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });

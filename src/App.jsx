@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.249.0';
+const EXT_ATTENDUE = '5.250.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -493,7 +493,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11543,7 +11543,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
 // avec SA raison, jamais touchée.
 const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
 const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
-function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
+function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, onClose }) {
   const [etape, setEtape] = useState('choix');
   const [sel, setSel] = useState(() => new Set());
   const [q, setQ] = useState('');
@@ -11577,8 +11577,24 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
   const [reg, setReg] = useState(() => ({ ...REPUB_REG_DEF }));
+  // (28 oct., sa demande) Chaque annonce peut avoir SES réglages : « modifier
+  // toutes les photos des annonces pour qu'elles ne soient pas similaires ».
+  // `regPar[id]` remplace les réglages communs pour CETTE annonce ; `cible` dit
+  // ce que les curseurs règlent (« tous » ou une annonce).
+  const [regPar, setRegPar] = useState({});
+  // (28 oct., sa demande) La description part TELLE QUELLE ; en option, UNE
+  // lettre au hasard tout en bas de chacune (tirée ici, montrée sur la ligne).
+  const [lettreOn, setLettreOn] = useState(false);
+  const [lettres, setLettres] = useState({});
+  const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }); setLettres(o); };
+  const [cible, setCible] = useState('tous');
+  const regDe = (a) => (a && regPar[a.id]) || reg;
+  const regCour = cible === 'tous' ? reg : (regPar[cible] || reg);
+  const poserReg = (k, v) => cible === 'tous' ? setReg((r) => ({ ...r, [k]: v })) : setRegPar((p) => ({ ...p, [cible]: { ...(p[cible] || reg), [k]: v } }));
+  const cssDe = (r) => ({ filter: `brightness(${r.bright}) contrast(${r.contrast}) saturate(${r.sat})`, transform: `rotate(${r.rot}deg) scale(${r.zoom})`, transformOrigin: 'center center' });
+  const neutre = (r) => Object.keys(REPUB_REG_DEF).every((k) => Number(r[k]) === REPUB_REG_DEF[k]);
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
-  const regNeutre = Object.keys(REPUB_REG_DEF).every((k) => Number(reg[k]) === REPUB_REG_DEF[k]);
+  const regNeutre = neutre(reg) && Object.values(regPar).every(neutre);
   const busy = React.useRef(false);
   const bas = (s) => String(s || '').toLowerCase();
   // (28 oct.) Comme les outils du marché : on republie d'abord les paires qui
@@ -11618,6 +11634,15 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
     setOrdre(t);
   };
   const bouger = (id, d) => { const ids = aFaire.map((a) => a.id); const i = ids.indexOf(id), j = i + d; if (i < 0 || j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; setOrdre(ids); };
+  // (28 oct.) Les temps d'attente sont TIRÉS AVANT de lancer et montrés sur
+  // chaque ligne (« +1 min 23 s ») : il voit ce qui va se passer. « Tirer
+  // d'autres temps » les refait. La première paire part tout de suite.
+  const tirerTemps = () => { const [a, b] = bornesAlea(); return a + Math.floor(Math.random() * (b - a + 1)); };
+  const [plan, setPlan] = useState({});
+  const clePlan = aFaire.map((a) => a.id).join(',') + '|' + espMode + '|' + espMin + '|' + espMax + '|' + esp;
+  const refaitPlan = () => { const o = {}; aFaire.forEach((a, i) => { o[a.id] = i === 0 ? 0 : (espMode === 'aleatoire' ? tirerTemps() : fileClamp(esp)); }); setPlan(o); };
+  React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
   // Le moteur : une annonce à la fois, l'espacement AVANT chacune sauf la
   // première ; une pause ou un arrêt pendant l'attente n'engage rien, une
@@ -11629,7 +11654,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
     const premier = !Object.keys(st).length;
     let annule = false;
     let delai = 0;
-    if (!premier) { if (espMode === 'aleatoire') { const [a, b] = bornesAlea(); delai = a + Math.floor(Math.random() * (b - a + 1)); } else delai = fileClamp(esp); }
+    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode === 'aleatoire' ? tirerTemps() : fileClamp(esp)); }
     setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
       if (annule) return;
@@ -11637,7 +11662,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg } }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...regDe(suiv) }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '' }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain'].includes(r.etat) ? r.etat : 'echec';
       setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau } }));
@@ -11646,16 +11671,24 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
       if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
-  }, [mode, st, esp, espMode, espMin, espMax]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
   const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
   const nDouble = Object.values(st).filter((s) => s.etat === 'double' || s.etat === 'incertain').length;
+  // « Varier chaque annonce » : de petits réglages DIFFÉRENTS par annonce
+  // (redresser, zoom, lumière), tirés au hasard — c'est lui qui les voit et
+  // peut les reprendre un par un.
+  const varier = () => {
+    const u = (a, b) => Math.round((a + Math.random() * (b - a)) * 100) / 100;
+    const o = {}; choisies.forEach((a) => { o[a.id] = { rot: (Math.random() < 0.5 ? -1 : 1) * (1 + Math.round(Math.random() * 4) / 2), bright: u(0.96, 1.06), contrast: u(0.97, 1.07), sat: u(0.95, 1.08), zoom: u(1.03, 1.1) }; });
+    setRegPar(o); setCible('tous');
+  };
   const cssReg = { filter: `brightness(${reg.bright}) contrast(${reg.contrast}) saturate(${reg.sat})`, transform: `rotate(${reg.rot}deg) scale(${reg.zoom})`, transformOrigin: 'center center' };
   const curseur = (lab, cle, min, max, pas) => (
     <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
       <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
-      <input type="range" min={min} max={max} step={pas} value={reg[cle]} data-republier-reglage={cle} onChange={(ev) => setReg((r) => ({ ...r, [cle]: Number(ev.target.value) }))} style={{ flex: 1, accentColor: C.accent }} />
-      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)} %`}</span>
+      <input type="range" min={min} max={max} step={pas} value={regCour[cle]} data-republier-reglage={cle} onChange={(ev) => poserReg(cle, Number(ev.target.value))} style={{ flex: 1, accentColor: C.accent }} />
+      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${regCour.rot}°` : `${Math.round(regCour[cle] * 100)} %`}</span>
     </label>
   );
   const fermer = () => { if (mode === 'run') return; onClose(); };
@@ -11705,21 +11738,53 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
             </div>
           </>}
           {etape === 'modif' && <>
-            <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} data-republier-cible={cible} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={maj}>Photos</span>
-              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-                {choisies.slice(0, 8).map((a) => <span key={a.id} style={{ width: 64, height: 80, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" data-republier-photo-apercu={a.id} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssReg }} /> : null}</span>)}
+              <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce montre toutes ses photos, telles qu'elles partiront. Règle toutes les annonces d'un coup, ou une seule pour qu'elle ne ressemble pas aux autres.</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button type="button" data-republier-varier onClick={varier} disabled={choisies.length < 1} style={btn(false, choisies.length >= 1)}>Varier chaque annonce</button>
+                {Object.keys(regPar).length > 0 && <button type="button" data-republier-communs onClick={() => { setRegPar({}); setCible('tous'); }} style={btn(false)}>Mêmes réglages pour toutes</button>}
               </div>
+              {choisies.map((a) => { const r = regDe(a); const sienne = !!regPar[a.id]; const cur = cible === a.id; const ph = (a.photos && a.photos.length ? a.photos : (a.photo ? [a.photo] : [])); return (
+                <div key={a.id} data-republier-photos-annonce={a.id} data-republier-photos-n={ph.length} data-republier-photos-propres={sienne ? '1' : ''} style={{ border: `1px solid ${cur ? C.accent : C.border}`, borderRadius: 10, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                    <span style={{ flexShrink: 0, fontSize: 12, color: C.muted }}>{ph.length} photo{ph.length > 1 ? 's' : ''}{sienne ? ' · réglages à part' : ''}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+                    {ph.length ? ph.map((u, i) => <span key={i} data-republier-photo-case={a.id} style={{ width: 64, height: 80, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}><PhotoVinted src={u} alt="" data-republier-photo-apercu={a.id} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssDe(r) }} /></span>)
+                      : <span style={{ fontSize: 12, color: C.muted }}>Aucune photo captée pour cette annonce.</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" data-republier-regler={a.id} aria-pressed={cur} onClick={() => setCible(cur ? 'tous' : a.id)} style={btn(cur)}>{cur ? 'Fini pour celle-ci' : 'Régler cette annonce'}</button>
+                    {sienne && <button type="button" data-republier-reset={a.id} onClick={() => { setRegPar((p) => { const u = { ...p }; delete u[a.id]; return u; }); if (cur) setCible('tous'); }} style={btn(false)}>Comme les autres</button>}
+                  </div>
+                </div>
+              ); })}
+              <div data-republier-curseurs={cible} style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>{cible === 'tous' ? 'Réglages communs (les annonces sans réglages à part)' : `Réglages de ${(() => { const a = choisies.find((x) => x.id === cible); return a ? (a.numero ? 'N°' + a.numero : a.titre) : 'cette annonce'; })()} seulement`}</div>
               {curseur('Redresser', 'rot', -15, 15, 0.5)}
               {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
               {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
               {curseur('Saturation', 'sat', 0, 2, 0.01)}
               {curseur('Zoom', 'zoom', 1, 2, 0.01)}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })} style={btn(false)}>{p.nom}</button>)}
-                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })} style={btn(false)}>Photos d'origine</button>}
+                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => Object.entries({ ...REPUB_REG_DEF, ...p.r }).forEach(([k, v]) => poserReg(k, v))} style={btn(false)}>{p.nom}</button>)}
+                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => { setReg({ ...REPUB_REG_DEF }); setRegPar({}); setCible('tous'); }} style={btn(false)}>Photos d'origine</button>}
               </div>
-              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Ces réglages s\u2019appliquent à toutes les photos des paires choisies, à partir de l\u2019original.'}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Les photos sont refaites à partir de l’original au moment de republier.'}</div>
+            </div>
+            <div data-republier-description={lettreOn ? 'lettre' : 'telle'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <span style={maj}>Description</span>
+              <div style={{ fontSize: 12.5, color: C.muted }}>La description de chaque annonce est reprise telle quelle, mot pour mot.</div>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: lettreOk ? C.text : C.muted, minHeight: 44, cursor: lettreOk ? 'pointer' : 'default' }}>
+                <input type="checkbox" data-republier-lettre disabled={!lettreOk} checked={lettreOn && lettreOk} onChange={(ev) => { setLettreOn(ev.target.checked); if (ev.target.checked) tirerLettres(choisies.map((a) => a.id)); }} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                <span>Ajouter une lettre au hasard tout en bas de chaque description</span>
+              </label>
+              {!lettreOk && <div data-republier-lettre-maj style={{ fontSize: 12, color: C.muted }}>Demande l'extension VRM {EXT_CAPACITES.lettre} ou plus récente dans ce navigateur.</div>}
+              {lettreOn && lettreOk && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
+                <span style={{ flex: '1 1 200px' }}>Une lettre différente pour chaque annonce, sur la dernière ligne (la lettre d'une recréation précédente est retirée d'abord).</span>
+                <button type="button" data-republier-lettres-retirer onClick={() => tirerLettres(choisies.map((a) => a.id))} style={btn(false)}>Tirer d'autres lettres</button>
+              </div>}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
@@ -11759,7 +11824,8 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
                   <div style={{ color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</div>
                   {x.prix != null && <div style={{ color: C.muted }}>{prixCourt(a.prix)} → <b style={{ color: C.text }}>{prixCourt(x.prix)}</b>{x.plancher && <span style={{ color: C.warn }}> · ramené au prix d'achat</span>}</div>}
                   {x.titre && <div style={{ color: x.tropLong ? C.warn : C.muted }}>→ {x.titre}{x.tropLong && ` · ${x.titre.length}/${TITRE_VINTED_MAX}, trop long : elle ne partira pas`}</div>}
-                  {rien && <div style={{ color: C.muted }}>mêmes titre et prix — recréée telle quelle</div>}
+                  {lettreOn && lettreOk && lettres[a.id] && <div data-republier-lettre-de={a.id} style={{ color: C.muted }}>description + « {lettres[a.id]} » tout en bas</div>}
+                  {rien && !(lettreOn && lettreOk) && <div style={{ color: C.muted }}>mêmes titre et prix — recréée telle quelle</div>}
                 </div>
               ); })}
             </div>
@@ -11783,7 +11849,8 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
                     <span>Entre</span><input data-republier-esp-min value={espMin} onChange={(ev) => setEspMin(ev.target.value)} onBlur={() => setEspMin(minutesOk(espMin))} inputMode="decimal" aria-label="Minimum en minutes" style={{ ...champ, width: 64 }} />
                     <span>et</span><input data-republier-esp-max value={espMax} onChange={(ev) => setEspMax(ev.target.value)} onBlur={() => setEspMax(minutesOk(espMax))} inputMode="decimal" aria-label="Maximum en minutes" style={{ ...champ, width: 64 }} /><span>minutes</span>
                   </div>
-                  <div style={{ fontSize: 12, color: C.muted }}>Un temps différent est tiré au hasard avant chaque paire, entre ces deux bornes (60 min au plus). La première part tout de suite.</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>Un temps différent est tiré au hasard pour chaque paire, entre ces deux bornes (60 min au plus) : tu le vois sur chaque ligne ci-dessous. La première part tout de suite.</div>
+                  <button type="button" data-republier-retirer onClick={refaitPlan} style={{ ...btn(false), alignSelf: 'flex-start' }}>Tirer d'autres temps</button>
                 </>}
               </div>
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
@@ -11801,6 +11868,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                   <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                  {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) ? `+${duree(plan[a.id])}` : ''}</span>}
                   {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
                     <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
                     <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
@@ -47117,7 +47185,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const annoncesR = (listings.items||[]).filter(it=>it && it.id!=null).map(it=>{
           const e=numeros[it.id]||{}; const fl=prixAchatDe(e,buyByNum); const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
           const rc=Date.parse((e&&e.recreeAt)||'');
-          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'', favoris:Number.isFinite(it.favourites)?it.favourites:null, vues:Number.isFinite(it.views)?it.views:null, age:listedAgeDays(it), recreeAt:isFinite(rc)?rc:null };
+          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', photos:(()=>{ const L=(Array.isArray(it.photosDetail)&&it.photosDetail.length?it.photosDetail:(Array.isArray(it.photos)&&it.photos.length?it.photos:[])).map(p=>typeof p==='string'?p:((p&&(p.full_size_url||p.url))||'')).filter(Boolean); const c=photoArticle(it); return L.length?L.slice(0,20):(c?[c]:[]); })(), uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'', favoris:Number.isFinite(it.favourites)?it.favourites:null, vues:Number.isFinite(it.views)?it.views:null, age:listedAgeDays(it), recreeAt:isFinite(rc)?rc:null };
         });
         const vc = vintedDeChrome(); const etatX = vc && vc.uid ? vc.uid : null;
         // (28 oct.) Supprimer et RECRÉER (sa décision). Le N° VRM de l'ancienne
@@ -47131,12 +47199,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, confirme:true }, 180000); } catch(_) { r=null; }
+          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, confirme:true }, 180000); } catch(_) { r=null; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
-        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} onClose={()=>setRepublierOpen(false)} />;
+        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} onClose={()=>setRepublierOpen(false)} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont
