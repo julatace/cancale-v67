@@ -22265,7 +22265,7 @@ function PhotoroomCle() {
         {cle ? <button type="button" data-photoroom-effacer disabled={etat === 'saving'} onClick={() => poser('')} style={{ border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:8, padding:'8px 12px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Retirer</button> : null}
       </div>
       {msg ? <div data-photoroom-msg={etat} style={{ fontSize:11.5, color: etat === 'err' ? C.warn : C.muted, marginTop:6 }}>{msg} <a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700 }}>Où trouver ma clé ↗</a></div>
-        : <div style={{ fontSize:11.5, color:C.muted, marginTop:6 }}><a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700 }}>Où trouver ma clé Photoroom ↗</a></div>}
+        : <div style={{ fontSize:11.5, color:C.muted, marginTop:6 }}><a href="https://app.photoroom.com/api-dashboard" target="_blank" rel="noreferrer" style={{ color:C.accentSoft, fontWeight:700, display:'inline-flex', alignItems:'center', minHeight:44 }}>Où trouver ma clé Photoroom ↗</a></div>}
     </div>
   );
 }
@@ -22701,14 +22701,17 @@ function VestiaireMesure() {
   if (m === null) return <div data-vc-mesure="pas-su" style={style}>Je n'ai pas pu lire où en est la mesure de Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
   if (vu) return (
     <div data-vc-mesure="lu" style={style}>
-      <b style={{ color: C.text }}>VRM apprend à lire Vestiaire.</b> Dernier relevé {age} : {Number(m.nPages) || 0} page{Number(m.nPages) > 1 ? 's' : ''}, {Number(m.nChemins) || 0} appel{Number(m.nChemins) > 1 ? 's' : ''}, {Number(m.nSchemas) || 0} forme{Number(m.nSchemas) > 1 ? 's' : ''} de réponse relevés — la forme des pages, jamais leur contenu. Passe sur <b>tes ventes</b>, <b>tes articles</b> et <b>tes paiements</b> pour compléter la carte.
+      {/* (28 oct.) « VRM apprend à lire Vestiaire · 5 pages, 26 appels, 20 formes
+          de réponse » : du vocabulaire d'informaticien (§2.7), et le geste est déjà
+          dit par chaque carte au-dessus. Les chiffres restent en attributs. */}
+      <span data-vc-mesure-pages={Number(m.nPages) || 0} data-vc-mesure-appels={Number(m.nChemins) || 0}>Dernier passage de l'extension sur Vestiaire : <b style={{ color: C.text }}>{age}</b>.</span>
     </div>
   );
   return (
     <div data-vc-mesure="jamais" style={style}>
       {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
         : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Réglages</b>.</>
-        : <>C'est l'extension, dans le Chrome de ton ordinateur, qui apprendra à lire Vestiaire quand tu y passes.</>}
+        : <>C'est l'extension, dans le Chrome de ton ordinateur, qui lit Vestiaire quand tu y passes.</>}
     </div>
   );
 }
@@ -22809,7 +22812,10 @@ function Plateforme({ plat, liveStats, lbcVentes = {ventes:[],inconnues:0}, ebay
         <Card style={{padding:16}}>
           <div style={{fontSize:13.5,color:C.text,lineHeight:1.55}}>
             {plat==='Vestiaire Collective'
-              ? <>Tes ventes Vestiaire ne remontent pas encore dans VRM : le total ci-dessus ne compte rien d'inventé. Pour <b>mettre une paire en vente</b>, choisis-la ci-dessous : l'extension ouvre Vestiaire et remplit ce qu'elle reconnaît.<PhotoroomCle/></>
+              // (28 oct.) « Tes ventes ne remontent pas encore… choisis-la ci-dessous »
+              // était faux depuis la 5.237 (les ventes sont lues) et la liste est
+              // AU-DESSUS ; chaque carte dit déjà ce qui est lu et le geste (§7).
+              ? <PhotoroomCle/>
               : plat==='Leboncoin'
               ? <>Ce que VRM sait de Leboncoin passe par l'extension (elle tourne sur leboncoin.fr). Prépare tes annonces depuis <b>À publier</b> ; une vente n'est comptée que si la <b>référence VRM</b> de l'annonce la relie à un article — jamais par ressemblance de titre. Rien n'est inventé tant qu'il n'y a pas de donnée.</>
               : <>Aucune vente n'a encore été captée sur {court}. Tu prépares tes articles depuis l'écran <b>Annonces</b> (coche « aussi sur {court} ») ; dès qu'une vente y sera reconnue, son chiffre s'ajoutera ici et au total. Rien n'est inventé tant qu'il n'y a pas de donnée.</>}

@@ -53,10 +53,16 @@ srv.listen(PORT);
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       await pg.goto(`http://localhost:${PORT}/?tab=plat_vestiaire`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-vc-mesure]', { timeout: 10000 }).catch(() => {});
-      const v = await pg.evaluate(() => { const e = document.querySelector('[data-vc-mesure]'); return e ? { etat: e.getAttribute('data-vc-mesure'), t: e.innerText } : null; });
+      const v = await pg.evaluate(() => { const e = document.querySelector('[data-vc-mesure]'); const n = e && e.querySelector('[data-vc-mesure-pages]'); return e ? { etat: e.getAttribute('data-vc-mesure'), t: e.innerText, pages: n ? n.getAttribute('data-vc-mesure-pages') : null, appels: n ? n.getAttribute('data-vc-mesure-appels') : null } : null; });
       // Le texte de la page SANS la carte des achats : un montant d'achat n'est pas un chiffre d'affaires.
       const page = await pg.evaluate(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-vc-achats]').forEach((e) => e.remove()); document.body.appendChild(c); c.style.position = 'absolute'; const t = c.innerText; c.remove(); return t; });
-      if (etat === 'lu') dit(v && v.etat === 'lu' && /6 pages/.test(v.t) && /23 appels/.test(v.t) && /il y a 2 h/.test(v.t), 'relevé : les chiffres de la MESURE et sa date', v && v.t.slice(0, 120));
+      // (28 oct.) Les chiffres de la mesure restent en ATTRIBUTS : à l'écran, la date
+      // du dernier passage seule — « 23 appels, 9 formes de réponse » est du
+      // vocabulaire d'informaticien (§2.7).
+      if (etat === 'lu') dit(v && v.etat === 'lu' && v.pages === '6' && v.appels === '23' && /il y a 2 h/.test(v.t) && !/appels|forme.? de réponse|apprend à lire/i.test(v.t), 'relevé : la date du dernier passage, les chiffres en attributs, aucun mot technique', v && v.t.slice(0, 160));
+      // Plus de « tes ventes ne remontent pas encore… choisis-la ci-dessous » : faux
+      // depuis la 5.237 (les ventes sont lues) et la liste est au-dessus.
+      dit(!/ne remontent pas encore|choisis-la ci-dessous/.test(page), 'aucune phrase périmée sur les ventes, ni de renvoi « ci-dessous » vers une liste qui est au-dessus');
       if (etat === 'jamais') dit(v && v.etat === 'jamais' && /Vestiaire/.test(v.t), 'jamais relevé : le geste qui fait avancer', v && v.t.slice(0, 120));
       if (etat === 'panne') dit(v && v.etat === 'pas-su' && !/pages,/.test(v.t), 'lecture ratée : ni chiffre, ni « jamais »', v && v.t.slice(0, 120));
       // 5.238 : les messages Vestiaire — trois états, jamais « 0 » sur un « pas su ».
