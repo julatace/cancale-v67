@@ -8100,10 +8100,16 @@ const DESCRIPTION_MIN = 5;   // mesuré : « Le champ Description doit comprendr
 // 6–15 s, avant la mise en ligne 15–40 s, avant de retenter 8–20 s. C'est lui qui
 // lance (atelier §3) ; les garde-fous (20 actions/h, file, pause Vinted) restent.
 const PAUSES_REPUB = { photo: [3000, 9000], brouillon: [6000, 15000], enLigne: [15000, 40000], reessai: [8000, 20000] };
+// (28 oct., « c'est trop long et on ne suit pas vraiment l'avancée ») Le geste en
+// cours (une annonce ou un brouillon) : chaque pause est annoncée à l'app avec sa
+// durée, pour qu'elle affiche le compte à rebours. Une seule à la fois (file Vinted).
+let _repubSuivi = '';
+function suiviRepub(id) { _repubSuivi = String(id || ''); }
 function pauseRepub(quoi) {
   const p = PAUSES_REPUB[quoi] || [3000, 9000];
   const ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push([quoi, ms]); } catch (_) {}
+  if (_repubSuivi) { try { Promise.resolve(notifierApp({ type: 'maj', quoi: 'repub', id: _repubSuivi, pause: quoi, ms, jusqua: Date.now() + ms })).catch(() => {}); } catch (_) {} }
   return new Promise((ok) => setTimeout(ok, ms));
 }
 function idDeBrouillon(j) {
@@ -8208,6 +8214,7 @@ async function publierBrouillon(msg) {
   return await avecVinted(async () => {
     const temp = (typeof r.d.temp_uuid === 'string' && r.d.temp_uuid) ? r.d.temp_uuid : uuidRecreer();
     const corpsC = { draft: { ...r.d, id: Number(id) }, push_up: false, parcel: null, upload_session_id: temp };
+    suiviRepub(id); etapeRepub(id, 'en-ligne');
     await poserVerrouRecreer('b' + id);
     let rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
     if (!rc || rc.status === 0 || rc.status >= 500) {
@@ -8345,12 +8352,14 @@ async function refaireBrouillon(msg) {
   const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
+    suiviRepub(id);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp);
+    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
     if (!tp.ids) return { accepte: true, etape: 'echec', refaire: true, raison: `${tp.erreur} — aucun brouillon n'a été créé, tout reste enregistré dans VRM` };
     const assigned = tp.ids.map((pid) => ({ id: pid, ai_detected: false, orientation: 0, c2pa_read_error: 'other', digital_source_type: [] }));
     const brouillon = { ...d, id: null, temp_uuid: temp, assigned_photos: assigned }; delete brouillon.push_up;
     const corpsB = { draft: brouillon, parcel: null, upload_session_id: temp };
+    etapeRepub(id, 'brouillon');
     await pauseRepub('brouillon');
     await poserVerrouRecreer('r' + id);
     let rb = null;
@@ -8390,7 +8399,9 @@ async function refaireBrouillon(msg) {
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId });
     // Mise en ligne DANS la même place de la file Vinted (publierBrouillon prend
     // sa propre place : l'appeler d'ici attendrait cette place pour toujours).
+    etapeRepub(id, 'attente');
     await pauseRepub('enLigne');
+    etapeRepub(id, 'en-ligne');
     const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
     if (stopC) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'a pas été mis en ligne (${stopC.error}) — « Refaire » le remet en ligne, sans en créer un autre.` }; }
     await poserVerrouRecreer('b' + draftId);
@@ -8467,6 +8478,7 @@ async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
     if (r && r.status > 0 && r.status < 500) await leverVerrouRecreer('b' + draftId);
     return r;
   };
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos');
   const court = (ids) => ids.map((pid) => ({ id: pid, orientation: 0 }));
   const ids0 = ((corpsC.draft && corpsC.draft.assigned_photos) || []).map((p) => p && p.id).filter(Boolean);
   await pauseRepub('reessai'); await pauseRepub('reessai');
@@ -8478,6 +8490,7 @@ async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
   if (!neuves || !neuves.ids) { noterDiag('completion_photos_non_renvoyees'); return r; }
   corpsC.draft.assigned_photos = court(neuves.ids);
   noterDiag('completion_photos_renvoyees');
+  if (_repubSuivi) etapeRepub(_repubSuivi, 'secours-photos', { renvoi: true });
   await pauseRepub('enLigne');
   r = await envoyer();
   if (r && r.ok) noterDiag('completion_photos_secours_ok');
@@ -8656,6 +8669,7 @@ async function recreerVinted(msg) {
   const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
+    suiviRepub(id);
     const temp = uuidRecreer();
     const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé, ton annonce est intacte` };

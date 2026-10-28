@@ -161,13 +161,13 @@ const zero = (j) => j.vinted.length === 0;
     dit(r.etape === 'fait' && JSON.stringify(it.color_ids) === '[7]', "modèle sans couleur : elle est lue chez Vinted, l'annonce part avec", JSON.stringify({ e: r.etape, code: r.code, c: it.color_ids })); }
   // C4 — la barre de progression : chaque étape est annoncée à l'app, dans l'ordre.
   { const { f, r } = await run({ viaBrouillon: true });
-    const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101').map((e) => e.etape);
+    const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape).map((e) => e.etape);
     const ordre = [...new Set(et)].join(',');
     dit(r.etape === 'fait' && ordre === 'photos,enregistrement,suppression,brouillon,attente,en-ligne', "les étapes (photos, enregistrement, suppression, brouillon, pause, mise en ligne) sont annoncées à l'app, dans l'ordre", ordre);
     const ph = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape === 'photos');
     dit(ph.length === 2 && ph[1].fait === 1 && ph[1].total === 2, "l'envoi des photos dit « photo n sur N »", JSON.stringify(ph)); }
   { const { f } = await run();
-    const ordre = [...new Set(f.j.evts.filter((e) => e && e.quoi === 'repub').map((e) => e.etape))].join(',');
+    const ordre = [...new Set(f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape).map((e) => e.etape))].join(',');
     dit(ordre === 'photos,creation,suppression', "chemin direct : photos, création, suppression", ordre); }
   // G — sans modèle, avec les codes rangés de sa fiche : la recette vient d'eux.
   { const { f, r } = await run({ modele: false, codes: { catalog_id: 77, brand_id: 9, brand: 'Nike', color_ids: [3], item_attributes: [{ code: 'size', ids: [60] }], package_size_id: 2 } });
@@ -380,6 +380,16 @@ const zero = (j) => j.vinted.length === 0;
     await g.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', viaBrouillon: true, confirme: true });
     st = 200; let r2 = {}; try { r2 = typeof g.ctx.refaireBrouillon === 'function' ? await g.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true }) : {}; } catch (e) { r2 = { erreur: e.message }; }
     dit(r2.etape === 'fait' && nR === 2, "Refaire, mise en ligne refusée pour les photos : réessayée, elle passe", JSON.stringify({ e: r2.etape, n: nR, raison: r2.raison || r2.erreur })); }
+  // S — (28 oct., « on ne suit pas vraiment l'avancée ») Chaque pause est annoncée
+  //     à l'app avec sa durée ; Refaire annonce ses étapes.
+  { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st });
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
+    const pauses = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.pause);
+    dit(pauses.length >= 2 && pauses.every((e) => e.id === '9101' && e.ms > 0 && e.jusqua > 0), "chaque pause est annoncée à l'app (quoi, durée) : elle peut afficher le compte à rebours", JSON.stringify(pauses.map((e) => [e.pause, e.ms])));
+    st = 200; const n0 = f.j.evts.length;
+    if (typeof f.ctx.refaireBrouillon === 'function') await f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true });
+    const et = [...new Set(f.j.evts.slice(n0).filter((e) => e && e.quoi === 'repub' && e.etape).map((e) => e.etape))].join(',');
+    dit(et === 'photos,brouillon,attente,en-ligne', "Refaire annonce ses étapes (photos, brouillon, pause, mise en ligne)", et); }
   // R — (28 oct., sa demande) « Refaire le brouillon » : depuis ce qui est
   //     enregistré dans VRM, sans JAMAIS retoucher l'annonce d'origine ; mise en
   //     ligne seulement si la suppression de l'ancienne est CERTAINE.

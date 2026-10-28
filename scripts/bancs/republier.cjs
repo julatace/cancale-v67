@@ -228,7 +228,11 @@ const projette = (row, sel) => {
         { const b = pg.locator('[data-republier-progression="9103"][data-republier-etape="brouillon"]');
           let vu = false; for (let i = 0; i < 30 && !vu; i++) { vu = await b.count() > 0; if (!vu) await pg.waitForTimeout(50); }
           const txt = vu ? await b.innerText() : '';
+          let txtPause = '';
+          if (vu) { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', pause: 'enLigne', ms: 25000, jusqua: Date.now() + 25000 } })));
+            txtPause = await pg.locator('[data-republier-progression="9103"]').innerText().catch(() => ''); }
           const tot = await pg.locator('[data-republier-total]').getAttribute('data-republier-total').catch(() => null);
+          dit(/pause au hasard avant la mise en ligne : encore 2\d s/.test(txtPause), 'une pause annoncée par l’extension : la barre dit ce qu’il reste à attendre (« encore 25 s »)', txtPause || 'absente');
           dit(vu && /Étape 4 sur 6/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 6 · Création du brouillon »)', txt || 'absente');
           dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot));
           // (28 oct., sa demande) Le compte rendu est écrit à chaque pas, pendant la file.
