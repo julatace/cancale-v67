@@ -1,6 +1,7 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false,onErreur,revisionVerification=0}){
+import {requeteJsonBornee} from './requeteJsonBornee.js';
+export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true}){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
   React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null);},[erreur,controleErreur]);
@@ -9,11 +10,12 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     if(revisionVue.current===revisionVerification)return;revisionVue.current=revisionVerification;
     if(!vue?.active&&!busy.current&&!mutation.current&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(controleErreur?.code)){setErreur('');setControleErreur(null);}
   },[revisionVerification]);
+  const ecran=React.useRef(ecranActif);ecran.current=ecranActif;
   const courant=()=>vivant.current&&ownerActuel()===owner;
-  const adopter=j=>{if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(Array.isArray(j.vue?.jobs)&&onEtat)onEtat(j.vue);};
+  const adopter=j=>{if(!j.vue||!Array.isArray(j.vue.jobs)||typeof j.vue.active!=='boolean')throw Error('L’état de la file n’a pas été confirmé.');if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(onEtat)onEtat(j.vue);};
   const api=async(action,donnees={},h=headers())=>{
-    const r=await fetch(`/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:action?'POST':'GET',headers:{...h,'Content-Type':'application/json'},cache:'no-store',signal:AbortSignal.timeout(15000),...(action?{body:JSON.stringify({action,...donnees})}:{})});
-    const j=await r.json();if(!r.ok||!j.ok){const e=Error(j.message||'La file n’a pas été confirmée.');e.code=j.code;e.diagnostic=j.diagnostic;throw e;}return j;
+    const r=await requeteJsonBornee(`/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:action?'POST':'GET',headers:{...h,'Content-Type':'application/json'},cache:'no-store',...(action?{body:JSON.stringify({action,...donnees})}:{})});
+    const j=r.json;if(!r.ok||!j?.ok){const e=Error(j?.message||'La file n’a pas été confirmée.');e.code=j?.code;e.diagnostic=j?.diagnostic;throw e;}return j;
   };
   const lire=async()=>{
     if(mutation.current||busy.current)return;const n=++lecture.current;
@@ -28,12 +30,13 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   React.useEffect(()=>{if(!vue?.active)return;const t=setInterval(()=>setHorloge(Date.now()),1000);return()=>clearInterval(t);},[vue?.active]);
   const avancer=async()=>{
     if(prochaine.current>Date.now()+decalage.current)return;
-    if(!courant()||busy.current||mutation.current||pauseLocale.current||!vue?.active||!disponible||document.visibilityState==='hidden'||typeof executer!=='function')return;
+    if(!courant()||busy.current||mutation.current||pauseLocale.current||!vue?.active||!ecran.current||!disponible||document.visibilityState==='hidden'||typeof executer!=='function')return;
     busy.current=true;++lecture.current;const h=headers();setPhase('Vérification du prochain envoi');
     try{
       const j=await api('suivant',{},h);if(!courant())return;adopter(j);
       if(j.travail){
         const t=j.travail;travail.current=t;
+        if(!ecran.current||document.visibilityState==='hidden'){const arret=await api('terminer',{jeton:t.jeton,resultat:'refuse',raison:'ecran_inactif'},h);if(courant())adopter(arret);return;}
         let resultat='incertain',raison='reponse_inconnue';
         try{
           const r=await executer(t);
@@ -56,7 +59,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     }catch(e){if(courant()){setErreur(e.message+' Aucun renvoi automatique.');pauseLocale.current=true;}}
     finally{busy.current=false;travail.current=null;if(courant())setPhase('');}
   };
-  React.useEffect(()=>{if(!vue?.active)return;avancer();const t=setInterval(avancer,15000);return()=>clearInterval(t);},[vue?.active,disponible]);
+  React.useEffect(()=>{if(!vue?.active||!ecranActif)return;avancer();const t=setInterval(avancer,15000);return()=>clearInterval(t);},[vue?.active,disponible,ecranActif]);
   const agir=async action=>{
     if(!courant()||mutation.current)return;mutation.current=true;++lecture.current;setOccupe(true);setErreur('');setControleErreur(null);
     try{
@@ -86,7 +89,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
     <summary>Envoi automatique aux favoris</summary>
     <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
-    <p>Garde cet écran ouvert et visible, avec l’extension 5.226 et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
+    <p>Garde cet écran ouvert et visible, avec l’extension à jour et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
     {!disponible&&<p>{raisonExtension||'La connexion à l’extension sera vérifiée au lancement.'}</p>}
     {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">
@@ -94,7 +97,8 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       <p role="status" aria-live={phase?'polite':'off'}>{phase|| (vue?.active?(p.secondes>0?`Prochaine vérification dans ${dureeFavoris(p.secondes)}`:'En attente du prochain passage'):p.incertains||p.refuses?'File interrompue : vérifie le résultat ci-dessous.':'Sélection traitée ou file arrêtée.')}</p>
       {!!p.ignores&&<small>Ignorés : la conversation contient déjà des messages. Aucun nouveau message envoyé à ces favoris.</small>}
       {vue?.active&&vue.intervalleMinutes&&<small>Intervalle minimum entre les messages : {vue.intervalleMinutes} min. Le plafond horaire peut prolonger l’attente.</small>}
-      {!!p.total&&<p>{p.attente} en attente · {p.encours} en cours{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu(s)`:''}{p.annules?` · ${p.annules} annulé(s)`:''}</p>}
+      {!!p.total&&<p>{p.attente} en attente · {p.encours} en cours{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu(s)`:''}{p.annules?` · ${p.annules} annulé(s)`:''}{p.verifies?` · ${p.verifies} clôturé(s) après vérification manuelle`:''}</p>}
+      {vue?.active&&!phase&&(!ecranActif||typeof document!=='undefined'&&document.visibilityState==='hidden'||!disponible)&&<p role="status">Envois suspendus : {disponible?'reviens sur cet écran pour reprendre.':'vérifie la connexion de l’extension au bon compte.'}</p>}
     </div>}
     {vue?.raison&&<p>{vue.raison}</p>}{raisons.map(x=><p role="alert" key={x}>{x}</p>)}
     {!!p.incertains&&!vue?.active&&<button type="button" disabled={occupe} onClick={()=>agir('clore')}>J’ai vérifié sur Vinted · ne pas renvoyer</button>}

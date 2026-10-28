@@ -25,3 +25,11 @@
 .vrm-transfert-etapes button,.vrm-transfert-navigation button{min-height:44px;}
 .vrm-transfert-etapes button[data-etat=fait] small{color:var(--reception-vert,#31675d);}
 .vrm-transfert-etapes button:focus-visible,.vrm-transfert-navigation button:focus-visible{outline:2px solid currentColor;outline-offset:3px;}
+.vrm-reception-synthese{margin:14px 18px;border:1px solid var(--border,#d6e0dd);border-radius:12px;padding:12px;}
+.vrm-reception-synthese>summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center;}
+.vrm-reception-synthese>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px;}
+.vrm-reception-synthese article{display:flex;flex-direction:column;gap:7px;min-width:0;padding:12px;border:1px solid var(--border,#d6e0dd);border-radius:10px;overflow-wrap:anywhere;}
+.vrm-reception .vrm-reception-synthese article header{display:flex;flex-direction:column;align-items:flex-start;padding:0;border:0;gap:3px;}
+.vrm-reception-synthese article p{display:flex;flex-direction:column;gap:4px;margin:0;}
+.vrm-reception-synthese small{font-size:11px;color:var(--muted,#536b69);}
+.vrm-reception-synthese button{align-self:flex-start;min-height:44px;}
