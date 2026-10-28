@@ -385,6 +385,128 @@
     return false;
   }
   // ══════════════════════════════════════════════════════════════════════════
+  // LES FICHES DU SMART LISTING : TAILLE, ÉTAT, PRIX (28 oct., 5.269)
+  // ══════════════════════════════════════════════════════════════════════════
+  // MESURÉ (panel_vc_form, 28 oct. 23 h 06) : l'écran « Détails » est une liste
+  // de lignes-boutons « Marque Nike », « Taille Ajouter », « État Ajouter »,
+  // « Prix Ajouter »… Chaque « Ajouter » ouvre une fiche (« Retourner en
+  // arrière » pour fermer). Julien : « que l'extension fasse tout elle-même ».
+  // La FORME d'une fiche n'a jamais été vue : on l'ouvre, on la relève
+  // (`rapporterEtape`), et on ne clique QUE l'option au texte EXACT de la donnée
+  // de Vinted (la taille « 40 » = « 40 », « EU 40 », « FR 40 » ; l'état mot pour
+  // mot ; le prix tapé dans le seul champ de la fiche). Rien d'exact ⇒ on
+  // referme la fiche et on le DIT ; un seul essai par champ et par onglet.
+  // Jamais « Mettre en vente » ici (JAMAIS_AVANCER), jamais un bouton à prix.
+  // Le texte d'une ligne, ses morceaux séparés par une espace (« Taille » et
+  // « Ajouter » sont deux éléments : `innerText` les colle parfois).
+  const texteLigne = (b) => { try { const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); const p = []; let n; while ((n = w.nextNode())) { const t = n.nodeValue.trim(); if (t) p.push(t); } return normTxt(p.join(' ')); } catch (_) { return normTxt(b.innerText || b.textContent); } };
+  const ligneDetail = (libelle) => {
+    const re = new RegExp('^' + libelle + '\\s+(.+)$', 'i');
+    const c = Array.from(document.querySelectorAll('button,[role="button"]'))
+      .filter((b) => !DANS_ENTETE(b) && !NOTRE_UI_VC(b) && visible(b) && re.test(texteLigne(b)));
+    const u = c.filter((b) => !c.some((o) => o !== b && b.contains(o)));
+    return u.length === 1 ? u[0] : null;
+  };
+  const valeurLigne = (b, libelle) => b ? texteLigne(b).replace(new RegExp('^' + libelle + '\\s+', 'i'), '') : '';
+  const boutonRetour = () => Array.from(document.querySelectorAll('button,[role="button"]')).find((b) => visible(b) && !NOTRE_UI_VC(b) && /^retourner en arri[èe]re$|^retour$|^fermer$/i.test(String(b.getAttribute('aria-label') || b.innerText || '').replace(/\s+/g, ' ').trim())) || null;
+  const conteneurFiche = (retour) => {
+    if (!retour) return null;
+    const d = retour.closest('[role="dialog"],[aria-modal="true"]');
+    if (d) return d;
+    let el = retour.parentElement;
+    for (let i = 0; el && i < 8; i++, el = el.parentElement) if (el.querySelectorAll('button,[role="option"],[role="radio"],li,label,input').length >= 3) return el;
+    return null;
+  };
+  const sansSysteme = (t) => normTxt(t).replace(/^(eu|fr|taille|pointure)\s*:?\s*/, '').replace(/\s*(eu|fr)$/, '').replace(',', '.');
+  async function ouvrirFiche(libelle) {
+    const ligne = ligneDetail(libelle);
+    if (!ligne) return null;
+    try { ligne.click(); } catch (_) { return null; }
+    for (let i = 0; i < 15; i++) { await attendreVc(200); const r = boutonRetour(); const c = conteneurFiche(r); if (c) { try { rapporterEtape(); } catch (_) {} return { retour: r, c }; } }
+    return null;
+  }
+  async function fermerFiche(f) { try { const r = boutonRetour() || (f && f.retour); if (r) r.click(); } catch (_) {} await attendreVc(400); }
+  async function confirmerFiche(f) {
+    await attendreVc(500);
+    const r = boutonRetour(); const c = r ? conteneurFiche(r) : null;
+    if (!c) return;   // la fiche s'est refermée d'elle-même
+    const ok = Array.from(c.querySelectorAll('button,[role="button"]')).find((b) => { const t = String(b.innerText || '').replace(/\s+/g, ' ').trim(); return visible(b) && /^(enregistrer|valider|confirmer|appliquer|ok|termin[ée])$/i.test(t) && !JAMAIS_AVANCER.test(t) && !PRIX_ARGENT_VC.test(t) && !b.disabled; });
+    if (ok) { try { ok.click(); } catch (_) {} await attendreVc(500); }
+    if (boutonRetour() && conteneurFiche(boutonRetour())) await fermerFiche(f);
+  }
+  function optionExacte(c, egal) {
+    const cands = Array.from(c.querySelectorAll('button,[role="option"],[role="radio"],[role="menuitem"],label,li'))
+      .filter((el) => visible(el) && !el.closest('a[href]') && egal(el.innerText || el.textContent || ''));
+    const u = cands.filter((el) => !cands.some((o) => o !== el && el.contains(o)));
+    return u.length === 1 ? u[0] : null;
+  }
+  async function choisirDansFiche(libelle, egal, systeme) {
+    const f = await ouvrirFiche(libelle);
+    if (!f) return 'pas-de-fiche';
+    let el = optionExacte(f.c, egal);
+    if (!el && systeme) {    // un onglet de système de tailles (EU / FR), unique : on l'essaie une fois
+      const sys = optionExacte(f.c, (t) => /^(eu|fr)$/i.test(normTxt(t)));
+      if (sys) { try { sys.click(); } catch (_) {} await attendreVc(600); el = optionExacte(f.c, egal); }
+    }
+    if (!el) { await fermerFiche(f); return 'pas-trouve'; }
+    try { el.click(); } catch (_) {}
+    await confirmerFiche(f);
+    return 'fait';
+  }
+  async function prixDansFiche(prix) {
+    const f = await ouvrirFiche('prix');
+    if (!f) return 'pas-de-fiche';
+    const ins = Array.from(f.c.querySelectorAll('input')).filter((i) => visible(i) && !i.disabled && /^(text|number|tel|)$/i.test(i.type || ''));
+    if (ins.length !== 1) { await fermerFiche(f); return 'pas-trouve'; }
+    const el = ins[0];
+    if (!String(el.value || '').trim()) {
+      try {
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, String(prix));
+        el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (_) { await fermerFiche(f); return 'pas-trouve'; }
+    }
+    await confirmerFiche(f);
+    return 'fait';
+  }
+  let fiches = { taille: '', etat: '', prix: '' }; let _fichesEnCours = false;
+  const FICHE_NOMS = { taille: 'Taille', etat: 'État', prix: 'Prix' };
+  async function remplirFiches(ad) {
+    if (_fichesEnCours || !['taille', '[ée]tat', 'prix'].some((l) => ligneDetail(l))) return 0;
+    if (boutonRetour() && conteneurFiche(boutonRetour())) return 0;   // une fiche est déjà ouverte (lui, ou nous)
+    _fichesEnCours = true; let k = 0;
+    try {
+      const essai = async (cle, libelle, faire) => {
+        if (fiches[cle]) return;
+        const l = ligneDetail(libelle);
+        if (!l) return;
+        if (!/^ajouter$/.test(valeurLigne(l, libelle))) { fiches[cle] = 'deja'; return; }
+        let deja = false; const sk = 'vrmVcFiche:' + String(ad.id) + ':' + cle;
+        try { deja = !!sessionStorage.getItem(sk); sessionStorage.setItem(sk, '1'); } catch (_) { deja = true; }
+        if (deja) { fiches[cle] = 'pas-trouve'; return; }
+        const r = await faire();
+        const apres = ligneDetail(libelle);
+        fiches[cle] = r === 'fait' && apres && !/^ajouter$/.test(valeurLigne(apres, libelle)) ? 'fait' : (r === 'fait' ? 'pas-su' : r);
+        if (fiches[cle] === 'fait') k++;
+        await attendreVc(400);
+      };
+      const taille = String(ad.taille || '').trim();
+      if (taille) await essai('taille', 'taille', () => choisirDansFiche('taille', (t) => sansSysteme(t) === sansSysteme(taille), true));
+      const etat = String(ad.etat || '').trim();
+      if (etat) await essai('etat', '[ée]tat', () => choisirDansFiche('[ée]tat', (t) => normTxt(t) === normTxt(etat), false));
+      const prix = Number(String(ad.price || '').replace(',', '.'));
+      if (isFinite(prix) && prix > 0) await essai('prix', 'prix', () => prixDansFiche(String(ad.price).replace('.', ',')));
+    } catch (_) {}
+    _fichesEnCours = false; return k;
+  }
+  const lignesAChoisir = () => {
+    const out = [];
+    for (const [re, nom] of [['cat[ée]gorie', 'Catégorie'], ['mod[èe]le', 'Modèle'], ['taille', 'Taille'], ['[ée]tat', 'État'], ['prix', 'Prix'], ['votre adresse', 'Votre adresse']]) {
+      const l = ligneDetail(re);
+      if (l && /^ajouter$/.test(valeurLigne(l, re))) out.push(nom);
+    }
+    return out;
+  };
+  // ══════════════════════════════════════════════════════════════════════════
   // PUBLIER SANS BOOSTER (27 octobre, 5.236)
   // ══════════════════════════════════════════════════════════════════════════
   // Julien : « je veux que ça publie tout seul sans booster ». Même garde que
@@ -438,7 +560,7 @@
   };
   // Les champs obligatoires restés vides : VRM ne les devine pas, il les NOMME.
   function obligatoiresVides() {
-    const out = [];
+    const out = lignesAChoisir();
     document.querySelectorAll('input,select,textarea,[role="combobox"]').forEach((el) => {
       try {
         if (DANS_ENTETE(el) || NOTRE_UI_VC(el) || el.type === 'hidden' || el.disabled) return;
@@ -456,11 +578,14 @@
   // Le prix AFFICHÉ doit être celui de VRM (un champ prérempli ailleurs part tel quel sinon).
   function prixRefusVc(ad) {
     const el = champ([/prix|price|montant/]);
-    if (!el) return 'je ne vois pas le champ du prix — rien n\'est publié';
-    const lu = Number(String(el.value || '').replace(/\s/g, '').replace(',', '.').replace(/[^\d.]/g, ''));
+    // Smart listing : le prix vit dans la LIGNE « Prix 89 € » (fiche), pas un champ.
+    const lp = el ? null : ligneDetail('prix');
+    if (!el && !lp) return 'je ne vois pas le champ du prix — rien n\'est publié';
+    const brut = el ? String(el.value || '') : valeurLigne(lp, 'prix');
+    const lu = Number(brut.replace(/\s/g, '').replace(',', '.').replace(/[^\d.]/g, ''));
     const voulu = Number(String(ad.price || '').replace(',', '.'));
     if (!isFinite(voulu) || voulu <= 0) return 'le prix de VRM est illisible — rien n\'est publié';
-    if (!isFinite(lu) || Math.abs(lu - voulu) > 0.005) return `le prix sur la page (${esc(el.value)}) n'est pas celui de VRM (${voulu} €) — rien n'est publié`;
+    if (!isFinite(lu) || Math.abs(lu - voulu) > 0.005) return `le prix sur la page (${esc(brut)}) n'est pas celui de VRM (${voulu} €) — rien n'est publié`;
     return '';
   }
   const PAGE_CONFIRMEE = /merci|f[ée]licitations|a bien [ée]t[ée]|soumis|en cours de (v[ée]rification|validation|mod[ée]ration)|submitted|under review|bient[ôo]t en ligne/i;
@@ -573,6 +698,11 @@
     const manqueCat = vcCat && Array.isArray(vcCat.manque) ? vcCat.manque : [];
     const ligneCat = !vcCat ? ''
       : `<div data-vc-categorie="${catChoisis ? 'choisie' : (cheminCat ? 'attente' : 'inconnue')}" style="margin-top:6px">🏷️ ${cheminCat ? `Catégorie (d'après Vinted) : <b>${esc(cheminCat)}</b>${catChoisis ? ` — ${catChoisis} niveau${catChoisis > 1 ? 'x' : ''} choisi${catChoisis > 1 ? 's' : ''}.` : ' — je la choisis dès qu\'elle s\'affiche.'}` : 'Catégorie : je n\'ai pas pu la déduire de Vinted.'}${manqueCat.length ? ` <span style="color:#F5A524">À choisir toi-même : ${esc(manqueCat.join(', '))}.</span>` : ''}</div>`;
+    const fl = Object.entries(fiches).filter(([, v]) => v);
+    const ligneFiches = !fl.length ? '' : `<div data-vc-fiches style="margin-top:6px">${fl.map(([c, v]) => v === 'fait' || v === 'deja' ? `${FICHE_NOMS[c]} ✓` : `<span style="color:#F5A524">${FICHE_NOMS[c]} : à choisir toi-même${v === 'pas-trouve' ? ' (pas d\'option identique à Vinted)' : ''}</span>`).join(' · ')}</div>`;
+    const ligneEtiq = ad.etiquette === 'placee' ? `<div data-vc-etiq="placee" style="margin-top:6px">🏷️ Photo de l'étiquette mise en 2ᵉ (case « Étiquette »).</div>`
+      : ad.etiquette === 'pas-choisie' ? `<div data-vc-etiq="pas-choisie" style="margin-top:6px;color:#F5A524">Photo de l'étiquette pas choisie dans VRM : glisse-la sur la case « Étiquette » (ou choisis-la dans VRM → Vestiaire).</div>`
+      : ad.etiquette === 'introuvable' ? `<div data-vc-etiq="introuvable" style="margin-top:6px;color:#F5A524">La photo d'étiquette choisie dans VRM n'est plus dans l'annonce : choisis-en une autre.</div>` : '';
     poserHtml(el, (n > 0
       ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos}${ad.publier === true ? '' : ' Relis tout, vérifie la catégorie et choisis le modèle, puis publie.'}`
       : (formulaireVisible()
@@ -580,7 +710,7 @@
         : (/smart-listing/i.test(location.pathname)
           ? `<b>N°${esc(ad.numero)}</b> — j'attends l'étape des photos du dépôt Vestiaire. Si tu vois une page de connexion, connecte-toi : je reprends ensuite.`
           : `<b>N°${esc(ad.numero)}</b> — clique <b>« Vendre un article »</b> sur Vestiaire : je remplis dès que le formulaire s'affiche.`)))
-      + ligneCat + pub + fini
+      + ligneCat + ligneFiches + ligneEtiq + pub + fini
       + (photosEtat && photosEtat.n === 0 && photosEtat.pasDetourees > 0
         ? `<button id="vrm-vc-orig" data-vc-photos-origine style="display:block;width:100%;min-height:44px;margin-top:9px;border:0;background:#3D7BFF;color:#fff;border-radius:9px;padding:8px;font:700 12px system-ui,sans-serif;cursor:pointer">Attacher mes photos sans détourage</button>`
         : '')
@@ -609,6 +739,7 @@
       remplirComposants(ad).then((k) => { if (k) { const nn = remplir(ad); if (nn > faits) { faits = nn; bandeau(faits, ad); } } });
       choisirCategorieVc(ad).then((k) => { if (k) { catChoisis += k; faits += k; bandeau(faits, ad); } });
       if (essais % 3 === 0 && avancerVc()) bandeau(faits, ad);
+      if (essais % 2 === 1 && photosEtat && photosEtat.n > 0) remplirFiches(ad).then((k) => { if (k) faits += k; bandeau(faits, ad); });
       const n = remplir(ad);
       if (n > faits) { faits = n; bandeau(faits, ad); }
       // Les photos : dès qu'une étape porte un champ fichier, on attache. UNE
@@ -626,6 +757,8 @@
     arrete = false; essais = 0;
     _composFaits = new Set(); composFaits = 0;   // « Re-remplir » rouvre les menus
     _catFaits = new Set(); catChoisis = 0;
+    fiches = { taille: '', etat: '', prix: '' };
+    try { ['taille', 'etat', 'prix'].forEach((c) => sessionStorage.removeItem('vrmVcFiche:' + String(ad.id) + ':' + c)); } catch (_) {}
     if (publication.etat === 'stop' || publication.etat === 'refusee') publication = { etat: '', raison: '', essais: 0, bouton: '', urlClic: '' };
     faits = remplir(ad);
     if (!photosFaites && champsFichier().length) {

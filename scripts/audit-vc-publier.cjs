@@ -242,6 +242,58 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
       const b0 = await pg.evaluate(() => ({ u: location.pathname, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }));
       dit(b0.u === '/sell-clothes-online/' && /Vendre un article/.test(b0.b), 'une seule redirection par paire : pas de boucle, le bandeau dit le geste', JSON.stringify(b0).slice(0, 160));
     }
+    // ── B1bis. 28 oct. (5.269) : l'écran « Détails » du smart listing, à la
+    // forme MESURÉE (lignes-boutons « Taille Ajouter »… qui ouvrent une fiche
+    // avec « Retourner en arrière »). L'extension choisit la taille et l'état au
+    // texte EXACT, tape le prix, et ne clique JAMAIS « Mettre en vente » tant
+    // qu'une ligne obligatoire dit encore « Ajouter ».
+    {
+      const SMART = (opts) => `<!doctype html><html><body><header><input name="q"></header><main>
+        <input type="file" multiple accept="image/jpeg,image/png" id="f">
+        <h2>Détails</h2>
+        <button type="button" class="row" data-k="marque"><span>Marque</span><span>Nike</span></button>
+        <button type="button" class="row" data-k="taille"><span>Taille</span><span>Ajouter</span></button>
+        <button type="button" class="row" data-k="etat"><span>État</span><span>Ajouter</span></button>
+        <button type="button" class="row" data-k="prix"><span>Prix</span><span>Ajouter</span></button>
+        <button type="button" class="row" data-k="adresse"><span>Votre adresse</span><span>${opts.adresse ? 'Rue X' : 'Ajouter'}</span></button>
+        <textarea id="description" placeholder="Incluez des informations"></textarea>
+        <button type="button" id="pub" onclick="window.__pub=(window.__pub||0)+1">Mettre en vente</button>
+        <div id="sheet"></div></main>
+        <script>
+          const OPTS = { taille: ${JSON.stringify(opts.tailles)}, etat: ['Neuf avec étiquette', 'Très bon état', 'Bon état'] };
+          document.querySelectorAll('.row').forEach((r) => r.onclick = () => {
+            const k = r.dataset.k; if (k === 'marque' || k === 'adresse') return;
+            const sh = document.getElementById('sheet');
+            sh.innerHTML = '<div role="dialog"><button type="button" aria-label="Retourner en arrière" id="back">‹</button><h3>' + k + '</h3>' +
+              (k === 'prix' ? '<input id="px" inputmode="decimal"><button type="button" id="ok">Enregistrer</button>'
+                : OPTS[k].map((o) => '<button type="button" class="opt">' + o + '</button>').join('')) + '</div>';
+            sh.querySelector('#back').onclick = () => { sh.innerHTML = ''; };
+            sh.querySelectorAll('.opt').forEach((b) => b.onclick = () => { window.__clics = (window.__clics || []).concat(b.textContent); r.lastElementChild.textContent = b.textContent; sh.innerHTML = ''; });
+            const ok = sh.querySelector('#ok'); if (ok) ok.onclick = () => { r.lastElementChild.textContent = sh.querySelector('#px').value + ' €'; sh.innerHTML = ''; };
+          });
+        </script></body></html>`;
+      for (const [quoi, opts, attendu] of [
+        ['taille et état présents, adresse manquante', { tailles: ['39', 'EU 40', '40,5', '41'], adresse: false }, { taille: 'EU 40', etat: 'Très bon état', prix: '99,00 €', pub: 0 }],
+        ['taille absente des options', { tailles: ['39', '41'], adresse: true }, { taille: 'Ajouter', etat: 'Très bon état', prix: '99,00 €', pub: 0 }],
+        ['tout présent', { tailles: ['40', '41'], adresse: true }, { taille: '40', etat: 'Très bon état', prix: '99,00 €', pub: 1 }],
+      ]) {
+        const cx = await nav.newContext();
+        await cx.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ contentType: 'text/html; charset=utf-8', body: SMART(opts) }));
+        const ps = await cx.newPage();
+        await ps.addInitScript(fauxChrome(Object.assign({}, AD, { publier: true, etiquette: 'placee' })));
+        await ps.goto('https://fr.vestiairecollective.com/smart-listing/9999');
+        await ps.addScriptTag({ content: code });
+        await ps.waitForTimeout(11000);
+        const r = await ps.evaluate(() => { const v = (k) => document.querySelector('.row[data-k="' + k + '"]').lastElementChild.textContent; return { taille: v('taille'), etat: v('etat'), prix: v('prix'), pub: window.__pub || 0, clics: window.__clics || [], sheet: document.getElementById('sheet').innerHTML, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }; });
+        dit(r.taille === attendu.taille, `smart listing (${quoi}) : la taille`, r.taille + ' · clics ' + JSON.stringify(r.clics));
+        dit(r.etat === attendu.etat, `smart listing (${quoi}) : l'état au libellé EXACT`, r.etat);
+        dit(r.prix === attendu.prix, `smart listing (${quoi}) : le prix tapé dans sa fiche`, r.prix);
+        dit(r.sheet === '', `smart listing (${quoi}) : aucune fiche laissée ouverte`, r.sheet.slice(0, 80));
+        dit(r.pub === attendu.pub, `smart listing (${quoi}) : « Mettre en vente » cliqué ${attendu.pub} fois`, String(r.pub) + ' · ' + r.b.slice(0, 200));
+        if (attendu.taille === 'Ajouter') dit(/Taille : à choisir/.test(r.b), `smart listing (${quoi}) : le bandeau le dit`, r.b.slice(0, 200));
+        await cx.close();
+      }
+    }
     const p2 = await ctxN.newPage();
     await p2.addInitScript(fauxChrome(AD));
     await p2.goto('https://fr.vestiairecollective.com/sell/');
