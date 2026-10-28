@@ -7,6 +7,19 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — « Republier » sur Vinted, un seul parcours (5.247) :** Julien : « les republications sont
+> très bizarres… je veux un bouton républier, la liste de toutes mes paires en ligne, je sélectionne, j'applique
+> les modifications et l'annonce se republie ». Cause : « Lots » rangeait des brouillons que la « File » ignorait
+> (elle ne faisait qu'une baisse en %). Désormais Annonces → **Republier** (`RepublierVinted`) : choisir les
+> paires en ligne → prix (%, fixe, commun, arrondi, terminaison, jamais sous le prix d'achat) et titre
+> (préfixe/suffixe/remplacer/supprimer) avec aperçu par paire → case de confirmation → envoi une par une
+> (espacement, pause, arrêt), chaque paire dit « republiée » ou « pas faite » + la raison de l'extension. Le prix
+> et le titre EXACTS partent (`republierVinted` + `corpsAvecPrixBaisse(…, voulu)`), toujours un `PUT` EN PLACE
+> (même annonce, même N°, rien supprimé — §3). « ✨ Préparer », « Lots », « File » ne sont plus proposés
+> (composants gardés, injoignables). `EXT_CAPACITES.republiermodif = '5.247.0'`. Preuve : banc `republier.cjs`
+> (8 rouges sur l'avant). ⚠️ Exige Chrome sur le bon compte, une sauvegarde coffre et le format de CETTE annonce
+> appris (une modification à la main sur Vinted d'abord) ; sinon « pas faite » et la raison.
+
 > **28 octobre — le tour de Ma journée et de Colis sur ses vraies données :** Julien : « fais pareil pour
 > Ma journée et Colis ». Croisé (lecture seule) : 9 à envoyer (11 ventes `needs_action` moins 2 « colis
 > déposé » = litiges), N°30 tomj683 vraiment 5 j de retard (limite 23/10 10 h, ventes relues ce matin).
@@ -10355,7 +10368,7 @@ prix en place.** Ouvre depuis **Annonces → ⋯ Outils**.
   réelle ressort « échec : format pas encore vu » (dit à l'écran), rien n'est
   touché. Premier geste : modifier une annonce à la main une fois.
 - Preuves : `audit-republier.cjs` (vm, 13 contrôles, §6.1 `--prouve`),
-  `bancs/atelier-file.cjs` (rendu, 390+1512 px, dont le double opt-in),
+  `bancs/atelier-file.cjs` (retiré le 28 oct., remplacé par `bancs/republier.cjs`),
   `bancs/annonces-carte.cjs` (T1/T2/T3). Extension **5.240.0**, zip régénéré.
 
 ### Ce que sait faire l'extension dépend de SA version — `EXT_CAPACITES`
