@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.248.0';
+const EXT_ATTENDUE = '5.249.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11559,6 +11559,9 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
   const [ok, setOk] = useState(false);
   const [mode, setMode] = useState('idle');          // idle | run | pause | fini
   const [st, setSt] = useState({});                  // id → { etat, raison, ancien, nouveau }
+  const [tri, setTri] = useState('anciennes');       // anciennes | vues | favoris
+  const [arret, setArret] = useState('');            // un refus qui vaut pour toute la file
+  const [ordre, setOrdre] = useState(null);          // null = l'ordre de sa sélection
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
   const [reg, setReg] = useState(() => ({ ...REPUB_REG_DEF }));
@@ -11566,7 +11569,16 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
   const regNeutre = Object.keys(REPUB_REG_DEF).every((k) => Number(reg[k]) === REPUB_REG_DEF[k]);
   const busy = React.useRef(false);
   const bas = (s) => String(s || '').toLowerCase();
-  const liste = annonces.filter((a) => !q.trim() || bas(a.titre).includes(bas(q.trim())) || String(a.key).includes(q.trim()) || bas(a.compte).includes(bas(q.trim())));
+  // (28 oct.) Comme les outils du marché : on republie d'abord les paires qui
+  // DORMENT (les plus anciennes, les moins vues), pas celles qui plaisent.
+  const triVal = (a) => tri === 'vues' ? (a.vues == null ? 1e9 : a.vues) : tri === 'favoris' ? (a.favoris == null ? 1e9 : a.favoris) : -(a.age == null ? -1 : a.age);
+  const liste = annonces.filter((a) => !q.trim() || bas(a.titre).includes(bas(q.trim())) || String(a.key).includes(q.trim()) || bas(a.compte).includes(bas(q.trim())))
+    .slice().sort((x, y) => triVal(x) - triVal(y));
+  // Une annonce déjà recréée il y a moins de 2 jours : la recréer encore ressemble
+  // à un doublon pour Vinted (les vendeurs conseillent 2-3 jours d'écart).
+  const RECREE_RECENT_MS = 48 * 3600e3;
+  const recente = (a) => a.recreeAt != null && Date.now() - a.recreeAt < RECREE_RECENT_MS;
+  const ilYa = (t) => { const h = Math.max(1, Math.round((Date.now() - t) / 3600e3)); return h < 48 ? `${h} h` : `${Math.round(h / 24)} j`; };
   const toggle = (id) => setSel((s) => { const u = new Set(s); u.has(id) ? u.delete(id) : u.add(id); return u; });
   const opT = { mode: tMode, valeur: tVal, chercher: tChe, pos: '0' };
   const opP = { base: pBase, delta: pDelta, commun: pCommun, arrondi: pArr, sens: 'proche', fin: pFin };
@@ -11579,9 +11591,21 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
     const titre = nt && nt !== a.titre ? nt : null;
     return { titre, prix, plancher: !!(np && np.sousPlancher), tropLong: !!(titre && titre.length > TITRE_VINTED_MAX), invalide: !!(changeT && !nt) };
   };
-  const choisies = annonces.filter((a) => sel.has(a.id));
+  // L'ordre de SA sélection (un Set garde l'ordre des clics).
+  const choisies = [...sel].map((id) => annonces.find((a) => a.id === id)).filter(Boolean);
   // Recréer EST le geste : une paire sans changement part aussi (nouvelle annonce, mêmes infos).
-  const aFaire = choisies.filter((a) => { const x = apercu(a); return !x.tropLong && !x.invalide; });
+  const aFaireSel = choisies.filter((a) => { const x = apercu(a); return !x.tropLong && !x.invalide; });
+  // (28 oct., sa demande) L'ORDRE DE REMISE EN LIGNE : celui de sa sélection, ou
+  // mélangé, ou réglé à la main. Chaque paire reste « recréée PUIS supprimée »
+  // (jamais une paire disparue) : c'est l'ordre de PASSAGE qui change, donc
+  // l'ordre dans lequel les nouvelles annonces apparaissent sur Vinted.
+  const aFaire = ordre ? [...ordre.map((id) => aFaireSel.find((a) => a.id === id)).filter(Boolean), ...aFaireSel.filter((a) => !ordre.includes(a.id))] : aFaireSel;
+  const melanger = () => {
+    const ids = aFaireSel.map((a) => a.id); if (ids.length < 2) return;
+    let t; for (let k = 0; k < 8; k++) { t = ids.slice(); for (let i = t.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [t[i], t[j]] = [t[j], t[i]]; } if (t.join() !== aFaire.map((a) => a.id).join()) break; }
+    setOrdre(t);
+  };
+  const bouger = (id, d) => { const ids = aFaire.map((a) => a.id); const i = ids.indexOf(id), j = i + d; if (i < 0 || j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; setOrdre(ids); };
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
   // Le moteur : une annonce à la fois, l'espacement AVANT chacune sauf la
   // première ; une pause ou un arrêt pendant l'attente n'engage rien, une
@@ -11601,6 +11625,9 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain'].includes(r.etat) ? r.etat : 'echec';
       setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau } }));
+      // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
+      // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
+      if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
     }, premier ? 0 : fileClamp(esp) * 1000);
     return () => { annule = true; clearTimeout(t); };
   }, [mode, st, esp]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -11638,6 +11665,13 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
               <button type="button" data-republier-tout onClick={() => setSel(new Set(liste.map((a) => a.id)))} style={btn(false)}>Tout</button>
               <button type="button" data-republier-rien onClick={() => setSel(new Set())} style={btn(false)}>Aucune</button>
             </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select data-republier-tri value={tri} onChange={(ev) => setTri(ev.target.value)} style={{ ...champ, flex: '1 1 180px' }}>
+                <option value="anciennes">Les plus anciennes d'abord</option>
+                <option value="vues">Les moins vues d'abord</option>
+                <option value="favoris">Les moins de favoris d'abord</option>
+              </select>
+            </div>
             <div style={{ fontSize: 12.5, color: C.muted }}>{annonces.length} paire{annonces.length > 1 ? 's' : ''} en ligne sur Vinted · <b style={{ color: C.text }}>{sel.size} choisie{sel.size > 1 ? 's' : ''}</b></div>
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune paire ne correspond.' : "Aucune paire en ligne sur Vinted n'a été lue pour l'instant."}</div>}
@@ -11647,7 +11681,8 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
                   <span style={{ width: 40, height: 50, borderRadius: 6, background: C.border, overflow: 'hidden', flexShrink: 0 }}>{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 13.5, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.compte ? ` · ${a.compte}` : ''}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{prixCourt(a.prix)}{a.age != null ? ` · en ligne depuis ${a.age} j` : ''}{a.vues != null ? ` · ${a.vues} vue${a.vues > 1 ? 's' : ''}` : ''}{a.favoris != null ? ` · ${a.favoris} favori${a.favoris > 1 ? 's' : ''}` : ''}{a.compte ? ` · ${a.compte}` : ''}</span>
+                    {recente(a) && <span data-republier-recente={a.id} style={{ display: 'block', fontSize: 12, color: C.warn }}>déjà recréée il y a {ilYa(a.recreeAt)} — attends 2 jours</span>}
                   </span>
                 </label>
               ))}
@@ -11715,6 +11750,11 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
           </>}
           {etape === 'envoi' && <>
             <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée. Le N° VRM passe sur la nouvelle.</div>
+            {(() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
+              {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{fav} favori{fav > 1 ? 's' : ''} sur {nFav} de ces paires {fav > 1 ? 'seront perdus' : 'sera perdu'} : une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</div>}
+              {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 12.5, color: C.warn }}>{nRec} de ces paires {nRec > 1 ? 'ont déjà été recréées' : 'a déjà été recréée'} il y a moins de 2 jours : Vinted peut la traiter comme un doublon. Mieux vaut la retirer de la sélection.</div>}
+            </>; })()}
+            {arret && mode === 'pause' && <div data-republier-arret style={{ fontSize: 12.5, color: C.warn }}>File arrêtée (la raison est sur la ligne de la paire) : rien d'autre n'est parti. Reprends plus tard.</div>}
             {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>L'extension VRM de ce navigateur doit être à jour ({EXT_ATTENDUE}) et connectée — sinon chaque annonce ressortira « pas faite », rien ne sera touché.</div>}
             {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sont sur un autre compte que celui ouvert dans Chrome : ouvre Vinted sur ce compte-là, sinon elles ressortiront « pas faites ».</div>}
             {mode === 'idle' && <>
@@ -11725,10 +11765,20 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
               </label>
             </>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-              {aFaire.map((a) => { const s = st[a.id] || {}; return (
-                <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+              {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
+                <span style={{ flex: '1 1 200px' }}>Ordre de remise en ligne{ordre ? ' (réglé)' : ' : celui de ta sélection'}. Chaque paire est recréée puis supprimée, dans cet ordre.</span>
+                <button type="button" data-republier-melanger onClick={melanger} style={btn(false)}>Mélanger</button>
+                {ordre && <button type="button" data-republier-ordre-selection onClick={() => setOrdre(null)} style={btn(false)}>Ordre de ma sélection</button>}
+              </div>}
+              {aFaire.map((a, i) => { const s = st[a.id] || {}; return (
+                <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                  <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                   <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? '✓ recréée' : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : 'en attente'}</span>
+                  {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
+                    <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
+                    <button type="button" aria-label="Descendre" data-republier-descendre={a.id} disabled={i === aFaire.length - 1} onClick={() => bouger(a.id, 1)} style={{ border: 'none', background: 'transparent', color: i === aFaire.length - 1 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 16, cursor: i === aFaire.length - 1 ? 'default' : 'pointer' }}>↓</button>
+                  </span>}
+                  <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? '✓ recréée' : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
                 </div>
               ); })}
             </div>
@@ -29219,6 +29269,11 @@ function doublonsAReattribuer(conflits, fiches) {
     const p = c.porteurs || [];
     const annonces = p.filter((x) => x.type === 'annonce' && fiches && fiches[x.id] && cleNum(fiches[x.id].numero) === cleNum(c.numero));
     if (!annonces.length) continue;
+    // (28 oct.) Une annonce et SA recréation (`recreeDe`, posé par VRM au moment où
+    // il l'a créée — une identité, §5) sont la MÊME paire : quand la suppression de
+    // l'ancienne a échoué, les deux sont en ligne quelques minutes. On ne renumérote
+    // RIEN (le carton porte ce N°) ; le bloc rouge reste et dit d'en supprimer une.
+    if (annonces.length === 2 && annonces.some((x) => { const f = fiches[x.id] || {}; return f.recreeDe && annonces.some((y) => String(y.id) === String(f.recreeDe)); })) continue;
     const ventes = p.filter((x) => x.type === 'vente');
     const autres = p.filter((x) => x.type !== 'annonce' && x.type !== 'vente');
     if (autres.length) continue;                       // garage / annulée : pas deviné
@@ -47034,7 +47089,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Ses paires EN LIGNE sur Vinted (la même liste que la grille, `listings.items`).
         const annoncesR = (listings.items||[]).filter(it=>it && it.id!=null).map(it=>{
           const e=numeros[it.id]||{}; const fl=prixAchatDe(e,buyByNum); const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
-          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'' };
+          const rc=Date.parse((e&&e.recreeAt)||'');
+          return { id:String(it.id), numero:(e&&e.numero)?String(e.numero):'', key:String((e&&e.numero)||it.id), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, floor:(fl!=null&&!isNaN(fl))?Number(fl):null, photo:photoArticle(it)||'', uid:it._acc?String(it._acc.vinted_user_id||''):'', compte:it._acc?(it._acc.login||it._acc.username||''):'', favoris:Number.isFinite(it.favourites)?it.favourites:null, vues:Number.isFinite(it.views)?it.views:null, age:listedAgeDays(it), recreeAt:isFinite(rc)?rc:null };
         });
         const vc = vintedDeChrome(); const etatX = vc && vc.uid ? vc.uid : null;
         // (28 oct.) Supprimer et RECRÉER (sa décision). Le N° VRM de l'ancienne
@@ -47051,7 +47107,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, confirme:true }, 180000); } catch(_) { r=null; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
-          return { etat:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
         return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} onClose={()=>setRepublierOpen(false)} />;
       })()}

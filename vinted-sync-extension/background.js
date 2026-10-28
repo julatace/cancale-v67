@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.248.0';
+const CODE_VERSION = '5.249.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7975,6 +7975,18 @@ function idPhotoReponse(j) {
   if (!j || typeof j !== 'object') return null;
   return n(j.id) ?? n(j.photo && j.photo.id) ?? n(j.item_photo && j.item_photo.id) ?? null;
 }
+const RECREER_VERROU_MS = 30 * 60000;
+async function lireVerrouRecreer(id) {
+  try { const v = ((await chrome.storage.local.get('vrmRecreerEnCours')).vrmRecreerEnCours || {})[id]; return (typeof v === 'number' && Date.now() - v < RECREER_VERROU_MS) ? v : 0; } catch (_) { return 0; }
+}
+async function poserVerrouRecreer(id) {
+  try { const cur = (await chrome.storage.local.get('vrmRecreerEnCours')).vrmRecreerEnCours || {}; const t = Date.now();
+    for (const k of Object.keys(cur)) if (!(t - cur[k] < RECREER_VERROU_MS)) delete cur[k];
+    cur[id] = t; await chrome.storage.local.set({ vrmRecreerEnCours: cur }); } catch (_) {}
+}
+async function leverVerrouRecreer(id) {
+  try { const cur = (await chrome.storage.local.get('vrmRecreerEnCours')).vrmRecreerEnCours || {}; if (id in cur) { delete cur[id]; await chrome.storage.local.set({ vrmRecreerEnCours: cur }); } } catch (_) {}
+}
 function uuidRecreer() {
   try { if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (_) {}
   const b = new Uint8Array(16); crypto.getRandomValues(b); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
@@ -7986,7 +7998,7 @@ function uuidRecreer() {
 function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, photoIds, temp }) {
   const assigned = photoIds.map((id) => ({ id, ai_detected: false, orientation: 0, c2pa_read_error: 'other', digital_source_type: [] }));
   let base = null;
-  if (modeleCorps) { try { const o = JSON.parse(modeleCorps); const it = o && (o.item && typeof o.item === 'object' ? o.item : null); if (it && it.catalog_id != null) base = { ...it }; } catch (_) {} }
+  if (modeleCorps) { try { const o = JSON.parse(modeleCorps); const it = o && (o.item && typeof o.item === 'object' ? o.item : null); if (it && it.catalog_id != null) { base = { ...it }; for (const k of ['photos', 'upload_session_id', 'is_draft', 'is_hidden', 'is_closed', 'push_up']) delete base[k]; } } catch (_) {} }
   if (!base) {
     const c = codes || {};
     const manque = [];
@@ -8021,7 +8033,10 @@ async function recreerVinted(msg) {
   if (details === null) return { accepte: false, code: 'fiche-lecture', raison: "je n'ai pas pu lire la fiche de l'annonce — on ne touche à rien" };
   const photosC = (sauve && Array.isArray(sauve.photos)) ? sauve.photos.filter((u) => typeof u === 'string') : [];
   const photosD = Array.isArray(details.photos) ? details.photos.filter((u) => typeof u === 'string') : [];
-  const urls = (photosD.length > photosC.length ? photosD : photosC).filter((u) => /^https:\/\/images\d*\.vinted\.net\//i.test(u)).slice(0, 20);
+  const okUrl = (u) => /^https:\/\/images\d*\.vinted\.net\//i.test(u);
+  const princ = (photosD.length > photosC.length ? photosD : photosC).filter(okUrl).slice(0, 20);
+  const second = (photosD.length > photosC.length ? photosC : photosD).filter(okUrl);
+  const urls = princ;
   if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo de cette annonce n'est sauvegardée — passe sur Vinted une fois pour la capturer, puis réessaie (rien n'a été touché)" };
   const description = String((details.description || (sauve && sauve.desc) || '')).trim();
   // 2. La recette de CETTE annonce.
@@ -8036,6 +8051,10 @@ async function recreerVinted(msg) {
   const essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
   if (essai.manque) return { accepte: false, code: 'recette-absente', raison: `VRM ne connaît pas encore ${essai.manque.join(', ')} exact${essai.manque.length > 1 ? 's' : ''} de CETTE annonce. Ouvre-la sur Vinted → « Modifier » → « Enregistrer » (sans rien changer) une fois : l'extension l'apprend. Rien n'a été touché.` };
   const reglages = reglagesPhotoSurs(msg.reglages);
+  // Une recréation dont l'issue est INCONNUE (création partie sans réponse) bloque
+  // la suivante de la MÊME annonce : la relancer créerait une seconde copie.
+  const verrou = await lireVerrouRecreer(id);
+  if (verrou) return { accepte: false, code: 'recreer-incertaine', raison: `une recréation de cette annonce est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire de Vinted — regarde ton dressing avant de réessayer (rien n'a été touché cette fois)` };
   // 3. Le 1er geste (créer) entre dans le plafond horaire ; la suppression compte le second.
   const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
@@ -8044,7 +8063,11 @@ async function recreerVinted(msg) {
     const ids = [];
     for (let i = 0; i < urls.length; i++) {
       let blob = null;
-      try { const r = await fetch(urls[i]); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); } catch (e) {
+      // Un lien de photo périmé : l'autre copie (coffre ou fiche), même rang.
+      const essais = [urls[i], second[i]].filter((u, k, t) => u && t.indexOf(u) === k);
+      let err = null;
+      for (const u of essais) { try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); break; } catch (e) { err = e; blob = null; } }
+      try { if (!blob) throw err || new Error('photo absente'); } catch (e) {
         return { accepte: true, etape: 'echec', raison: `la photo ${i + 1} n'a pas pu être lue (${String(e && e.message || e).slice(0, 40)}) — rien n'a été créé, ton annonce est intacte` };
       }
       try { blob = await photoReglee(blob, reglages); } catch (e) {
@@ -8065,8 +8088,14 @@ async function recreerVinted(msg) {
     }
     const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp });
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
-    const rc = await vintedSend(acc, 'POST', '/api/v2/item_upload/items', corps);
-    if (!rc || !rc.ok) {
+    await poserVerrouRecreer(id);
+    const rc = await vintedSend(acc, 'POST', '/api/v2/item_upload/items', corps, { timeoutMs: 60000 });
+    if (!rc || rc.status === 0 || rc.status >= 500) {
+      noterDiag(`recreer_creation_incertaine_${(rc && rc.status) || 0}`);
+      return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement à la création : la nouvelle annonce a PEUT-ÊTRE été créée. L'ancienne n'a PAS été supprimée — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative sur cette annonce pendant 30 min)." };
+    }
+    if (!rc.ok) {
+      await leverVerrouRecreer(id);
       noterDiag(`recreer_creation_refusee_${(rc && rc.status) || 0}`);
       const msgV = rc && rc.json && (rc.json.message || (rc.json.errors && rc.json.errors[0] && (rc.json.errors[0].value || rc.json.errors[0].message)));
       return { accepte: true, etape: 'echec', raison: `Vinted a refusé la nouvelle annonce (${(rc && rc.status) || 0}${msgV ? ' : ' + String(msgV).slice(0, 80) : ''}) — ton annonce d'origine est intacte` };
@@ -8081,8 +8110,13 @@ async function recreerVinted(msg) {
     try { await noterModeleRepub(nouvelId, JSON.stringify(corps), uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
     try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelId}`, data: { ...(sauve || {}), id: nouvelId, uid, title: titre, price: prix, desc: description, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
     await compterAction(uid, ACTIONS_MAX_HEURE);
-    const rd = await vintedSend(acc, 'POST', `/api/v2/items/${id}/delete`, null);
-    if (!rd || !rd.ok) {
+    await leverVerrouRecreer(id);
+    const rd = await vintedSend(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
+    if (!rd || rd.status === 0 || rd.status >= 500) {
+      noterDiag(`recreer_suppression_incertaine_${(rd && rd.status) || 0}`);
+      return { accepte: true, etape: 'double', nouvelId, ancien: sauve && sauve.price, nouveau: prix, nouveauTitre: titre, raison: "la nouvelle annonce est en ligne, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne : elle est PEUT-ÊTRE encore en ligne — regarde ton dressing et supprime-la à la main si elle y est" };
+    }
+    if (!rd.ok) {
       noterDiag(`recreer_suppression_refusee_${(rd && rd.status) || 0}`);
       return { accepte: true, etape: 'double', nouvelId, ancien: sauve && sauve.price, nouveau: prix, nouveauTitre: titre, raison: `la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l'ancienne (${(rd && rd.status) || 0}) — la paire est en vente DEUX fois : supprime l'ancienne à la main tout de suite` };
     }

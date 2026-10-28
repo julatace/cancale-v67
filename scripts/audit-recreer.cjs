@@ -26,14 +26,16 @@ const dit = (c, msg, det) => { if (c) { ok++; console.log('✅ ' + msg); } else 
 const nowISO = () => new Date().toISOString();
 const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', description: 'nickel', price: '60.0', currency: 'EUR', catalog_id: 1234, brand_id: 53, color_ids: [1], item_attributes: [{ code: 'size', ids: [56] }, { code: 'condition', ids: [2] }], package_size_id: 1, assigned_photos: [{ id: 1 }] } });
 const PHOTOS = ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'];
+const PHOTOS_D = ['https://images1.vinted.net/t/b/f800/1.jpeg', 'https://images1.vinted.net/t/b/f800/2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
   if (codes) lignes.vinted_item_details['9101'] = { codes, description: 'Nickel, boîte d’origine' };
+  if (cdn) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), photos: PHOTOS_D };
   let n = 500;
-  return faireFond({ src, lignes, connecte, comptes, cdn: () => ({ status: 200 }),
+  return faireFond({ src, lignes, connecte, comptes, cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
@@ -92,8 +94,26 @@ const zero = (j) => j.vinted.length === 0;
   { const { f, r } = await run({ creationSansId: true });
     dit(suppressions(f.j).length === 0 && r.etape === 'incertain', "création sans identifiant lisible : RIEN n'est supprimé, « à vérifier »", `s=${suppressions(f.j).length} etape=${r.etape}`); }
   // E — suppression refusée : « double », jamais « fait ».
-  { const { r } = await run({ suppression: 500 });
+  { const { r } = await run({ suppression: 403 });
     dit(r.etape === 'double' && r.nouvelId === '77001' && /DEUX fois/.test(r.raison || ''), "suppression refusée : « en vente deux fois » dit en toutes lettres, jamais « fait »", `etape=${r.etape} ${r.raison || ''}`); }
+  // E2 — suppression sans réponse claire (5xx, coupure) : « peut-être encore en ligne », jamais « refusé ».
+  { const { r } = await run({ suppression: 500 });
+    dit(r.etape === 'double' && /PEUT-ÊTRE/.test(r.raison || '') && !/refusé/.test(r.raison || ''), "suppression sans réponse claire : « peut-être encore en ligne », jamais « refusé »", `etape=${r.etape} ${r.raison || ''}`); }
+  // J — création sans réponse claire (5xx) : « incertain », rien supprimé, et une
+  //     seconde tentative sur la MÊME annonce est refusée sans aucune requête.
+  { const f = monter({ src: process.env.BG_SRC || undefined, creation: 502 });
+    const appel = () => f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', confirme: true });
+    const r1 = await appel(); const n1 = f.j.vinted.length; const r2 = await appel();
+    dit(r1.etape === 'incertain' && suppressions(f.j).length === 0 && /PEUT-ÊTRE/.test(r1.raison || ''), "création sans réponse claire (5xx) : « peut-être créée », l'ancienne n'est PAS supprimée", `etape=${r1.etape} ${r1.raison || ''}`);
+    dit(r2.accepte === false && r2.code === 'recreer-incertaine' && f.j.vinted.length === n1, "une seconde tentative juste après est REFUSÉE sans rien envoyer (pas de seconde copie)", `code=${r2.code} requêtes=${f.j.vinted.length - n1}`); }
+  // J2 — une création REFUSÉE (4xx) ne bloque pas la tentative suivante.
+  { const f = monter({ src: process.env.BG_SRC || undefined, creation: 422 });
+    await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });
+    const r2 = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });
+    dit(r2.code !== 'recreer-incertaine', "une création refusée nette ne bloque pas la suivante", `code=${r2.code || r2.etape}`); }
+  // K — un lien de photo périmé : l'autre copie (fiche) prend le relais.
+  { const { f, r } = await run({ cdn: (u) => /\/t\/b\//.test(u) ? { status: 200 } : { status: 404 } });
+    dit(r.etape === 'fait' && photosP(f.j).length === 2, "un lien de photo périmé : l'autre copie de la même photo est prise", `etape=${r.etape} ${r.raison || ''}`); }
   // F — refus avant tout : 0 requête chez Vinted.
   { const { f, r } = await run({ confirme: false });
     dit(zero(f.j) && r.code === 'confirmation', "sans confirmation : aucune requête chez Vinted", `n=${f.j.vinted.length} code=${r.code}`); }
@@ -115,6 +135,19 @@ const zero = (j) => j.vinted.length === 0;
   //     OffscreenCanvas) : rien ne part, jamais l'original à la place.
   { const { f, r } = await run({ reglages: { rot: 0, bright: 1.2, contrast: 1, sat: 1, zoom: 1 } });
     dit(photosP(f.j).length === 0 && creations(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "réglages photo impossibles ici : rien ne part (jamais la photo d'origine en silence)", `p=${photosP(f.j).length} c=${creations(f.j).length} ${r.raison || ''}`); }
+
+  // L — côté app : une annonce et SA recréation au même N° (la suppression de
+  //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique
+  //     (le carton porte ce N°) ; deux paires sans lien, si.
+  { const fs = require('fs'), path = require('path'), vm = require('vm');
+    const APP = fs.readFileSync(process.env.APP_SRC || path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const iC = APP.indexOf('const cleNum = (v) => {'); const cle = iC < 0 ? '' : APP.slice(iC, APP.indexOf('\n};', iC) + 3);
+    const iD = APP.indexOf('function doublonsAReattribuer('); const dbl = iD < 0 ? '' : APP.slice(iD, APP.indexOf('\n}\n', iD) + 2);
+    const ctx = {}; try { vm.runInNewContext(cle + '\n' + dbl + '\nthis.f = doublonsAReattribuer;', ctx); } catch (e) { ctx.err = e.message; }
+    const conf = [{ numero: '41', porteurs: [{ type: 'annonce', id: '9101' }, { type: 'annonce', id: '77001' }] }];
+    const lie = ctx.f ? ctx.f(conf, { '9101': { numero: '41', numberedAt: '2026-10-01' }, '77001': { numero: '41', numberedAt: '2026-10-01', recreeDe: '9101' } }) : null;
+    const sans = ctx.f ? ctx.f(conf, { '9101': { numero: '41', numberedAt: '2026-10-01' }, '77001': { numero: '41', numberedAt: '2026-10-02' } }) : null;
+    dit(Array.isArray(lie) && lie.length === 0 && Array.isArray(sans) && sans.length === 1, "N° : une annonce et SA recréation ne sont jamais renumérotées ; deux paires sans lien le sont toujours", JSON.stringify({ lie, sans, err: ctx.err })); }
 
   console.log(ko ? `\n❌ audit-recreer : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-recreer : ${ok} contrôles — l'ancienne annonce n'est supprimée qu'après la création confirmée`);
   process.exit(ko ? 1 : 0);
