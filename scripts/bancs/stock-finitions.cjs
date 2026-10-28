@@ -72,6 +72,14 @@ const PLAN_ANCIENS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, w
   { id: 'g1', type: 'grille', name: 'Grille', x: 1, y: 0.1, w: 1, h: 0.5, rows: 3, cols: 2, cell: 0.5, slots: { '2_0': ['921'] } },
   { id: 'k1', type: 'commode', name: 'Commode', x: 3.5, y: 0.1, w: 1.2, h: 0.5, rows: 3, cols: 1, h3d: 1.0, slots: { '2_0': ['922'] } },
 ] }], active: 'r1' };
+// XVI. Les photos sur les cartons : N°931 a une photo sûre, N°932 est porté par deux
+// fiches aux photos DIFFÉRENTES (on ne choisit pas), N°933 n'a pas de photo.
+const PLAN_PHOTOS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'f1', type: 'metal', name: 'Étagère photos', x: 2, y: 0.1, w: 1.2, h: 0.5, rows: 3, cols: 2, h3d: 1.25, slots: { '2_0': ['931'], '2_1': ['932'], '1_0': ['933'] } },
+] }], active: 'r1' };
+const PHOTO_A = 'https://images1.vinted.net/t/01_aaa/f800/931.jpeg?s=x', PHOTO_B = 'https://images1.vinted.net/t/02_bbb/f800/932b.jpeg?s=x', PHOTO_C = 'https://images1.vinted.net/t/03_ccc/f800/932c.jpeg?s=x';
+const FICHES_PHOTOS = { a931: { numero: '931', title: 'Paire 931', photo: PHOTO_A, numberedAt: 1 }, a932: { numero: '932', title: 'Paire 932', photo: PHOTO_B, numberedAt: 2 }, b932: { numero: '932', title: 'Autre 932', photo: PHOTO_C, numberedAt: 3 }, a933: { numero: '933', title: 'Paire 933', numberedAt: 4 } };
+const PNG_ROUGE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
 const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703', '801', '802', '803', '901', '902', '903', '611', '612'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
@@ -104,15 +112,16 @@ const projette = (row, sel) => {
   return out;
 };
 
-async function ouvrir(b, vp, planObj) {
-  const ROWS = [{ id: 'vrm_room', data: planObj }, { id: 'main', data: { vinted_annonce_numeros: FICHES } }];
+async function ouvrir(b, vp, planObj, fichesObj) {
+  const FX = fichesObj || FICHES;
+  const ROWS = [{ id: 'vrm_room', data: planObj }, { id: 'main', data: { vinted_annonce_numeros: FX } }];
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(([f, pr]) => { try {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_garage_view', '"plan"');
     localStorage.setItem('vinted_annonce_numeros', JSON.stringify(f)); localStorage.setItem('vinted_nums_physiques', JSON.stringify(pr));
-  } catch (_) {} }, [FICHES, PRESENTS]);
+  } catch (_) {} }, [FX, PRESENTS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -128,9 +137,13 @@ async function ouvrir(b, vp, planObj) {
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(ROWS.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+  const photosDemandees = [];
+  await pg.route('**/api/**', (r) => {
+    if (/mode=photo/.test(r.request().url())) { let u = ''; try { u = JSON.parse(r.request().postData() || '{}').url; } catch (_) {} photosDemandees.push(u); return r.fulfill({ status: 200, contentType: 'image/png', body: PNG_ROUGE }); }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
+  });
   await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
-  return { ctx, pg, errs };
+  return { ctx, pg, errs, photosDemandees };
 }
 const plan = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_room_plan')); } catch (_) { return null; } });
 const attendrePlan = async (pg, cond, ms = 9000) => { const t0 = Date.now(); let p = null; while (Date.now() - t0 < ms) { p = await plan(pg); try { if (p && cond(p)) return p; } catch (_) {} await pg.waitForTimeout(250); } return p; };
@@ -507,6 +520,22 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(mk && Object.keys(mk).length === 3 && Object.values(mk).every((v) => v.texte === 'max 1'), t + ' : chaque tiroir de la commode porte « max 1 »', JSON.stringify(mk));
       dit(mk && mk['0_0'].y > mk['1_0'].y && mk['1_0'].y > mk['2_0'].y, t + ' : une plaque en haut de chaque case, de haut en bas', JSON.stringify(mk));
       await pg.screenshot({ path: path.join(CAPT, 'stock-anciens-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XVI. LES PHOTOS SUR LES CARTONS (28 oct.) ───────────────────────────
+    if (fait('XVI')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XVI. photos ' + vp.width, async () => {
+      const t = 'XVI. ' + vp.width + ' px';
+      const { ctx, pg, errs, photosDemandees } = await ouvrir(b, vp, PLAN_PHOTOS, FICHES_PHOTOS);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      let ph = null; for (let k = 0; k < 30; k++) { ph = await sonde(pg, 'photosBoites', 'f1'); if (ph && ph['931']) break; await pg.waitForTimeout(300); }
+      dit(ph && ph['931'] === true, t + ' : le carton N°931 porte la photo de sa paire', JSON.stringify(ph));
+      dit(ph && ph['932'] === false && !photosDemandees.some((u) => /932/.test(u)), t + ' : N°932 (deux fiches, deux photos) garde son numéro seul, aucune photo demandée', JSON.stringify({ ph, photosDemandees }));
+      dit(ph && ph['933'] === false, t + ' : N°933 (sans photo) garde son numéro seul', JSON.stringify(ph));
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 'f1', { cell: '2_0', num: '931' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 12; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-photos-face-' + vp.width + '.png') }); }
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
