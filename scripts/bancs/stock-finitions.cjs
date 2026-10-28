@@ -400,6 +400,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'p1');
       dit(pl0 && pl0.length === 2, t + ' : sans réglage, les deux barres sont entières', JSON.stringify(pl0));
+      const mp0 = await sonde(pg, 'maxCases', 'p1');
+      dit(mp0 && mp0.barre_0 && mp0.barre_0.texte === 'max 3' && mp0.barre_1 && mp0.barre_1.texte === 'max 3' && mp0.barre_0.y > mp0.barre_1.y, t + ' : chaque barre affiche « max 3 », au-dessus d\'elle', JSON.stringify(mp0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'p1', { cell: '0_0', num: '801' });
@@ -415,7 +417,10 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.waitForTimeout(1200);
       const pl1 = await sonde(pg, 'plateaux', 'p1');
       dit(pl1 && pl1.length === 2 && Math.min(...pl1.map(v => v.w)) < Math.max(...pl1.map(v => v.w)) * 0.8, t + ' : la 3D dessine une barre du haut raccourcie', JSON.stringify(pl1));
+      const mp1 = await sonde(pg, 'maxCases', 'p1');
+      dit(mp1 && mp1.barre_0 && mp1.barre_0.texte === 'max 2' && mp1.barre_1 && mp1.barre_1.texte === 'max 3', t + ' : barre du haut raccourcie ⇒ « max 2 », celle du bas reste « max 3 »', JSON.stringify(mp1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-portant-' + vp.width + '.png') });
+      if (process.env.CAPT_FACE) { await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(500); const pe = await sonde(pg, 'project', 'p1', { cell: '1_1', num: '803' }); await pg.mouse.move(pe.x, pe.y); for (let k = 0; k < 10; k++) { await pg.mouse.wheel(0, -300); await pg.waitForTimeout(200); } await pg.waitForTimeout(2000); await pg.screenshot({ path: path.join(CAPT, 'stock-portant-face-' + vp.width + '.png') }); }
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
