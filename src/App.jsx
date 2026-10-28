@@ -31,6 +31,7 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
+import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -36658,6 +36659,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { relireReservesNum(); }, [listings.items]);
+  // (28 oct.) Qui remplace qui après une republication : `vinted_brouillon_*`
+  // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
+  // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
+  const [recreesNum, setRecreesNum] = useState(undefined);
+  useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        const [rb, rc] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId`, { headers: sbAuth() }),
+          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe`, { headers: sbAuth() }),
+        ]);
+        if (!rb.ok || !rc.ok) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); return; }
+        const t = tableRecrees(await rb.json(), await rc.json());
+        if (vivant) setRecreesNum((v) => (v && JSON.stringify(v) === JSON.stringify(t) ? v : t));
+      } catch (_) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); }
+    })();
+    return () => { vivant = false; };
+  }, [listings.items]);
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});
@@ -39560,6 +39580,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Attendre deux secondes coûte moins cher qu'un numéro faux à vie.
     if (sales.items === null || !txnPret) return;
     if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
+    if (recreesNum === undefined) return; // qui remplace qui (republication) pas encore lu
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
     // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
@@ -39587,6 +39608,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nextUsed = new Set(usedNumeros.map(entreePool).filter(x => x != null));
     const takenK = new Set(takenCles);
     let changed = false;
+    // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
+    // une annonce renumérotée automatiquement par erreur le retrouve).
+    if (recreesNum) {
+      const reprises = repriseNumerosRecreation({
+        enLigneIds: items.map((x) => x.id), numeros: nextNum, recrees: recreesNum, reprenable: numeroReprenable, cle: cleNum,
+        numeroVente: (nid) => { const n = nextNum[nid] && nextNum[nid].numero; return !!numVentesParIdentite.parItem[String(nid)] || (n != null && Object.values(saleOv).some((o) => o && cleNum(o.numero) === cleNum(n))); },
+      });
+      for (const nid of Object.keys(reprises)) { nextNum[nid] = reprises[nid]; changed = true; }
+    }
     // Dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il les reposte), par la même
     // date que celle qui décide si l'annonce se numérote.
     const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
@@ -39636,7 +39666,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesNum]);
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;

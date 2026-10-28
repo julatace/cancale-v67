@@ -187,10 +187,30 @@
   // dedans) et sa mise en page étirait l'étiquette sur toute la largeur, en bas
   // de la photo. On la pose toujours en petite pastille, en haut à gauche, sans
   // que le style du site puisse la déformer (!important), et sans gêner le clic.
+  // (28 oct., « sur Vinted il n'y a plus les numéros ») Posée DANS le lien, la
+  // pastille passait SOUS la photo (la photo est une sœur du lien, peinte
+  // au-dessus) : invisible. On l'épingle sur la CARTE (le plus proche parent qui
+  // contient la photo), au-dessus de tout, sans gêner le clic.
+  // La carte : le lien lui-même s'il contient la photo ; sinon le plus proche
+  // parent qui contient une photo et AUCUN lien vers une autre annonce (jamais la
+  // grille entière).
+  const idLien = (x) => { const m = /\/(items|inbox|transactions)\/(\d{4,15})/.exec(x.getAttribute('href') || ''); return m ? m[1] + m[2] : ''; };
+  const carteDe = (a) => {
+    if (a.querySelector('img')) return a;
+    const moi = idLien(a);
+    let el = a.parentElement;
+    for (let i = 0; el && i < 5; i++, el = el.parentElement) {
+      if ([...el.querySelectorAll('a[href]')].some((x) => { const k = idLien(x); return k && k !== moi; })) break;
+      if (el.querySelector('img') && el.getBoundingClientRect().height > 80) return el;
+    }
+    return a;
+  };
   const epingler = (e, a) => {
-    if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
-    const P = { position: 'absolute', top: '8px', left: '8px', right: 'auto', bottom: 'auto', width: 'auto', height: 'auto', 'max-width': 'calc(100% - 16px)', margin: '0', 'align-self': 'flex-start', 'z-index': '3', 'pointer-events': 'none', transform: 'none' };
+    const c = carteDe(a);
+    if (getComputedStyle(c).position === 'static') c.style.position = 'relative';
+    const P = { position: 'absolute', top: '8px', left: '8px', right: 'auto', bottom: 'auto', width: 'auto', height: 'auto', 'max-width': 'calc(100% - 16px)', margin: '0', 'align-self': 'flex-start', 'z-index': '20', 'pointer-events': 'none', transform: 'none', visibility: 'visible', opacity: '1' };
     for (const k in P) e.style.setProperty(k, P[k], 'important');
+    return c;
   };
   const pilule = (texte, titre) => { const e = document.createElement('span'); e.setAttribute(NUM_ATTR, '1'); e.style.cssText = STYLE_PILULE; e.textContent = texte; if (titre) e.title = titre; return e; };
   const demander = (msg) => new Promise((res) => {
@@ -249,11 +269,19 @@
       if (!n) { m = /\/inbox\/(\d{4,15})/.exec(h); n = m && connus.convs[m[1]]; }
       if (!n) { m = /\/transactions\/(\d{4,15})/.exec(h); n = m && connus.txs[m[1]]; }
       if (!n) continue;
-      const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+      const cle = (m ? m[0] : h);
       const pa = getComputedStyle(a).position;
-      if (a.querySelector('img') || pa === 'absolute' || pa === 'fixed' || a.getBoundingClientRect().height > 80) epingler(e, a);
-      else { e.style.setProperty('margin-left', '6px', 'important'); e.style.setProperty('vertical-align', 'middle', 'important'); }
-      a.appendChild(e);
+      if (a.querySelector('img') || pa === 'absolute' || pa === 'fixed' || a.getBoundingClientRect().height > 80) {
+        const c = carteDe(a);
+        if (c !== a && c.querySelector('[data-vrm-num-pour="' + cle + '"]')) continue;   // déjà posée sur la carte
+        const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+        e.setAttribute('data-vrm-num-pour', cle);
+        epingler(e, a); c.appendChild(e);
+      } else {
+        const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
+        e.style.setProperty('margin-left', '6px', 'important'); e.style.setProperty('vertical-align', 'middle', 'important');
+        a.appendChild(e);
+      }
     }
   }
   function poserSurPage() {
