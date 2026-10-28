@@ -112,7 +112,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.265.0';
+const EXT_ATTENDUE = '5.266.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1838,6 +1838,14 @@ const askText = (opts) => new Promise((resolve)=>{
   _askListener({ ...o, kind: 'text', resolve });
 });
 
+// (28 oct.) Un choix parmi plusieurs (la couleur d'un brouillon) : une feuille,
+// un bouton par option. Rend la valeur choisie, ou null si on annule.
+const askChoix = (opts) => new Promise((resolve)=>{
+  const o = opts || {};
+  if (!_askListener) { resolve(null); return; }
+  _askListener({ ...o, kind: 'choix', resolve });
+});
+
 // Découpe le message en un titre et un corps. Les anciens messages étaient
 // écrits d'un bloc, avec des retours à la ligne : le premier paragraphe fait
 // le titre. Et une question d'un seul tenant est coupée à la fin de sa
@@ -2097,6 +2105,22 @@ function ConfirmHost() {
   const close = (val) => { try { q.resolve(val); } catch (_) {} setQ(null); };
   // Dans document.body, posée en dernier, au-dessus de toute feuille (Z_CONFIRMATION).
   if (q.kind === 'text') return createPortal(<AskTextSheet q={q} close={close}/>, document.body);
+  if (q.kind === 'choix') {
+    const { titre: tc, corps: cc } = sheetTexte(q, 'Choisis');
+    return createPortal(
+      <SheetShell onClose={() => close(null)} z={Z_CONFIRMATION}>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{tc}</div>
+        {cc.length > 0 && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
+        <div data-ask-choix style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginTop:14}}>
+          {(q.options || []).map(([val, lib]) => (
+            <button type="button" key={val} data-choix={val} onClick={() => close(val)}
+              style={{minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{lib}</button>
+          ))}
+        </div>
+        <button type="button" onClick={() => close(null)}
+          style={{width:'100%',minHeight:44,marginTop:12,border:'none',background:'transparent',color:C.muted,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{q.cancel || 'Annuler'}</button>
+      </SheetShell>, document.body);
+  }
   // Le premier paragraphe du message sert de titre : les anciens messages
   // étaient écrits d'un bloc avec des retours à la ligne.
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
@@ -11945,9 +11969,18 @@ async function avecCouleurBrouillon(envoyer, titre) {
   if (r && r.accepte === false && r.code === 'couleur-absente') {
     const cs = r.couleurs && typeof r.couleurs === 'object' ? Object.entries(r.couleurs).filter(([id, nom]) => /^\d+$/.test(id) && nom) : [];
     if (!cs.length) return r;
-    const [id, nom] = cs[0];
-    const ok = await askConfirm({ title: 'Ce brouillon n’a pas de couleur', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nVRM peut mettre la couleur ${nom} et la publier tout de suite. Si c'est une autre couleur, choisis-la sur Vinted (« Modifier »).`, ok: `${nom} — publier`, cancel: 'Autre couleur' });
-    if (!ok) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
+    let id = null;
+    if (cs.length === 1) {
+      const [i1, nom] = cs[0];
+      const ok = await askConfirm({ title: 'Ce brouillon n’a pas de couleur', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nVRM peut mettre la couleur ${nom} et la publier tout de suite. Si c'est une autre couleur, choisis-la sur Vinted (« Modifier »).`, ok: `${nom} — publier`, cancel: 'Autre couleur' });
+      if (ok) id = i1;
+    } else {
+      // 5.266 : la liste des couleurs de Vinted (lue par l'extension, id et nom
+      // de Vinted). Il choisit ; rien n'est deviné.
+      const options = cs.sort((a, b) => Number(a[0]) - Number(b[0])).map(([i, nom]) => [i, String(nom)]);
+      id = await askChoix({ title: 'Quelle est la couleur de cette paire ?', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nChoisis-la : VRM la met et publie le brouillon tout de suite.`, options, cancel: 'Pas maintenant' });
+    }
+    if (id == null) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
     r = await envoyer(Number(id));
   }
   return r;
@@ -28763,7 +28796,7 @@ function StockMeubles() {
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
@@ -50800,6 +50833,7 @@ const PUSH_CATS = [
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er du mois, si tu es micro-entrepreneur (ton statut se choisit dans Comptabilité).' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
+  { id:'favoris',  def:true,  titre:'❤️ Messages aux favoris', desc:"Quand la file d'envoi aux favoris est finie ou s'arrête, avec le bilan." },
   { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },

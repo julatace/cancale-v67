@@ -105,7 +105,8 @@ export const PUSH_DEFAUT = {
   urssaf:   true,   // rappel de déclaration, le 1er du mois
   bilan:    true,   // bilan de la semaine, le lundi matin (api/_lib/bilan-semaine.js)
   doublevente: true, // vendue sur Vinted, N° PROUVÉ encore en vente sur eBay/Leboncoin (api/_lib/double-vente.js)
-  action:   true,   // Vinted attend une réponse avant une échéance : annulation demandée, achat livré à vérifier
+  action:   true,
+  favoris:  true,   // la file des messages aux favoris est finie ou interrompue (api/_lib/favoris.js)   // Vinted attend une réponse avant une échéance : annulation demandée, achat livré à vérifier
   suivi:    false,  // « en transit », « livré » : rien à faire
   achat:    false,  // tu viens de l'acheter, tu le sais
   message:  false,  // le badge de l'app suffit

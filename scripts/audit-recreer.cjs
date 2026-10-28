@@ -28,7 +28,7 @@ const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', descr
 const PHOTOS = ['https://images1.vinted.net/t/01_0121e_hsUzFGeDP3Vk/f800/1.jpeg', 'https://images1.vinted.net/t/02_02248_Ka3jojtDMin8/f800/2.jpeg'];
 const PHOTOS_D = ['https://images1.vinted.net/tc/01_0121e_hsUzFGeDP3Vk/aa1.jpeg', 'https://images1.vinted.net/tc/02_02248_Ka3jojtDMin8/bb2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null, lecture = null, completionCorps = null } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null, lecture = null, completionCorps = null, couleursRep = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
@@ -40,6 +40,7 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
   let n = 500;
   return faireFond({ src, lignes, connecte, comptes, retardLecture: retardLecture || (() => 0), ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
+      if (e.methode === 'GET' && /\/api\/v2\/item_upload\/colors$/.test(e.chemin)) return couleursRep || { status: 404, body: {} };
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin) && lecture) return lecture;
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
@@ -59,7 +60,7 @@ async function run(opts = {}) {
   let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
-const zero = (j) => j.vinted.length === 0;
+const zero = (j) => j.vinted.filter((v) => !/\/item_upload\/colors$/.test(v.chemin)).length === 0;   // 5.266 : lire la liste des couleurs n'est pas un geste
 
 (async () => {
   if (process.argv.includes('--prouve')) {
@@ -253,7 +254,7 @@ const zero = (j) => j.vinted.length === 0;
   const dressing = (ids) => ({ harvest_111_listings: { capturedAt: nowISO(), payload: { items: ids.map((x) => ({ id: x, is_draft: true })) } } });
   const pubB = async (opts = {}) => {
     const extra = { ...(opts.dressing === false ? {} : dressing(['10432342904'])), ...(opts.ligne === false ? {} : { vinted_brouillon_10432342904: { id: '10432342904', uid: opts.uid || '111', corps: opts.corps || CORPS_B(), etat: 'brouillon' } }) };
-    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: opts.completion || 200, completionCorps: opts.completionCorps || null });
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: opts.completion || 200, completionCorps: opts.completionCorps || null, couleursRep: opts.couleursRep || null });
     if (typeof f.ctx.publierBrouillon !== 'function') return { f, r: { absent: true } };
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: opts.confirme !== false, couleur: opts.couleur }); } catch (e) { r = { erreur: e.message }; }
     return { f, r };
@@ -282,6 +283,21 @@ const zero = (j) => j.vinted.length === 0;
     dit(r.etape === 'fait' && JSON.stringify(c.draft && c.draft.color_ids) === '[1]', "couleur choisie dans VRM (Noir) : la mise en ligne part avec color_ids [1]", JSON.stringify({ e: r.etape, code: r.code, c: c.draft && c.draft.color_ids })); }
   { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }), couleur: 999 });
     dit(zero(f.j) && r.code === 'couleur-absente', "une couleur que VRM ne connaît pas n'est jamais envoyée", `n=${f.j.vinted.length} code=${r.code}`); }
+  // 5.266 — la liste des couleurs de VINTED (GET item_upload/colors) : id et nom
+  //  de Vinted, proposés au choix ; la couleur choisie part, aucune n'est devinée.
+  const COUL = { status: 200, body: { colors: [{ id: 1, title: 'Noir', hex: '000000' }, { id: 3, title: 'Gris' }, { id: 12, title: 'Blanc' }, { id: 27, title: 'Beige' }] } };
+  { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }), couleursRep: COUL });
+    dit(zero(f.j) && r.code === 'couleur-absente' && r.couleurs && r.couleurs[12] === 'Blanc' && r.couleurs[27] === 'Beige' && r.couleurs[1] === 'Noir', "liste des couleurs lue chez Vinted : toutes proposées avec LEUR nom, rien n'est envoyé avant le choix", JSON.stringify(r.couleurs)); }
+  { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }), couleursRep: COUL, couleur: 12 });
+    let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
+    dit(r.etape === 'fait' && JSON.stringify(c.draft && c.draft.color_ids) === '[12]', "couleur choisie dans la liste de Vinted (Blanc) : la mise en ligne part avec color_ids [12]", JSON.stringify({ e: r.etape, code: r.code, c: c.draft && c.draft.color_ids })); }
+  { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }), couleursRep: { status: 200, body: { colors: [{ id: 1, title: 'Blanc' }, { id: 2, title: 'Rouge' }, { id: 3, title: 'Vert' }] } }, couleur: 2 });
+    dit(zero(f.j) && r.code === 'couleur-absente' && !r.couleurs[2], "une liste dont le n°1 n'est pas « Noir » n'est pas la liste des couleurs : refusée, rien n'est posé", JSON.stringify(r.couleurs)); }
+  { const f = monter({ src: process.env.BG_SRC || undefined });
+    const okR = typeof f.ctx.rangerCouleursVinted === 'function' ? await f.ctx.rangerCouleursVinted('www.vinted.fr', [{ id: 1, title: 'Noir' }, { id: 5, title: 'Marron' }, { id: 9, title: 'Bleu marine' }, { id: 44, title: '<img src=x>' }]) : false;
+    const st = okR ? (await f.ctx.chrome.storage.local.get('vrmCouleursVinted')).vrmCouleursVinted : null;
+    const c = typeof f.ctx.couleursConnues === 'function' ? await f.ctx.couleursConnues('111', null) : {};
+    dit(okR && st && st.liste && st.liste[5] === 'Marron' && !st.liste[44] && c[9] === 'Bleu marine' && f.j.vinted.length === 0, "liste captée en passant par la page de dépôt : rangée (un libellé qui n'est pas un nom de couleur est écarté), sans aucune requête", JSON.stringify(st)); }
   { const { r } = await pubB({ completion: 400, completionCorps: { code: 99, message: 'Erreurs trouvées', message_code: 'validation_error', errors: [{ field: 'color_ids', value: 'Choisis une couleur' }] } });
     dit(r.etape === 'echec' && /couleur/.test(r.raison || '') && /Choisis une couleur/.test(r.raison || ''), "un refus de Vinted dit QUEL champ il réclame (plus seulement « Erreurs trouvées »)", r.raison || ''); }
   // (28 oct.) Un brouillon fait par VRM avec des photos EN DOUBLE (avant 5.261) :

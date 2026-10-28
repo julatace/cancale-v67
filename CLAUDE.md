@@ -7,6 +7,23 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — la file des FAVORIS prévient quand elle finit :** `terminerFile` rend `valeur.fin` (total,
+> envoyés, à vérifier, interrompus, interrompue) UNE fois, à la transition active → inactive ; `routeFavoris` envoie alors
+> « ✅ … file terminée » / « ⏸️ … file interrompue » (`texteFinFavoris`, catégorie `favoris`, activée par défaut, dans
+> `PUSH_CATS` et `PUSH_DEFAUT`), dans le contexte du vendeur. Un rejeu de l'accusé ne renotifie pas. Preuve :
+> `scripts/tests/favoris-fin-file.test.mjs` (rouge sur l'avant). ⚠️ Le moteur reste dans l'écran des favoris : quitter
+> l'écran arrête toujours la file (`ecran_inactif`) — la notification le dira.
+
+> **28 octobre (nuit, fin) — LES COULEURS DE VINTED, mesurées (5.266) :** « Republier sans blocage sur la couleur ».
+> Mesuré : aucune ligne de sa base ne porte le NOM d'une couleur (les corps acceptés n'ont que `color_ids`), mais sa page de
+> dépôt charge `GET /api/v2/item_upload/colors` (vu sur ses 7 comptes). `inject.js` la capte en passant
+> (`noteCouleursVinted`, id + nom seulement) ; sinon `couleursConnues` la lit UNE fois (lecture, budget « clic », 24 h
+> entre deux essais) quand un brouillon sans couleur demande le choix. Rangée dans `chrome.storage.local.vrmCouleursVinted`
+> (`nettoyerCouleurs` : un nom de couleur, ≥ 3 entrées, et si le n°1 existe il doit être « Noir » — le seul mesuré dans une
+> annonce acceptée — sinon refusée). `couleur-absente` rend toute la liste ; l'app (`askChoix`, une feuille, un bouton de
+> 44 px par couleur, « Pas maintenant ») le laisse choisir ; une couleur hors liste n'est jamais envoyée. Une seule connue ⇒
+> l'ancienne question « Noir — publier ». Preuves : `audit-recreer.cjs` (116 ; 3 rouges sur la 5.265), banc `republier.cjs`.
+
 > **28 octobre (nuit, fin) — MESSAGES AUX FAVORIS refaits comme Republier :** Julien : « fais comme pour les
 > republications, un onglet qui s'ouvre avec les paramètres, les réductions, le temps aléatoire… enlève ce qui existe et
 > restructure ». Messages → Favoris reçus ne garde qu'un résumé (`data-favoris-resume` : à contacter · déjà envoyés · en
