@@ -115,7 +115,11 @@ const projette = (row, sel) => {
     const bouton = await pg.$('button[data-imprime="1"]');
     dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
+      await pg.locator('[data-lot-ligne="9001"] input').nth(1).check();
+      dit(await pg.getByText('2 · 1/3 article(s) contrôlé(s)',{exact:true}).isVisible(),'le contrôle physique est distinct de la sélection');
       await bouton.click();
+      const continuer=pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true});
+      await continuer.waitFor();dit(true,'les articles non contrôlés sont signalés avant le PDF');await continuer.click();
       // Le message du lot : celui qui dit « N sur M ».
       const msg = await pg.waitForFunction(() => {
         const t = document.body.innerText; const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(t); return m ? m[0] : null;

@@ -1,3 +1,8 @@
+import {etatSourceMemoire} from './suiviComptes.js';
+import {empreinteColis,controlePreparation} from './preparationColis.js';
+import FiabiliteVentes from './FiabiliteVentes.jsx';
+import SuiviComptes from './SuiviComptes.jsx';
+import {bilanCommandeEbay} from './ebayParcours.js';
 import { etatExtensionAffichage, etatDerniereLecture } from './etatConnexions.js';
 import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.js';
 import { filtrerReglages } from './rechercheReglages.js';
@@ -9439,6 +9444,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   if (!count) throw new Error('Aucun bordereau exploitable.');
   posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
   const bytes = await out.save();
+  if(opts.avantOuverture)opts.avantOuverture();
   const blob = new Blob([bytes], { type:'application/pdf' });
   const url = URL.createObjectURL(blob);
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
@@ -16258,7 +16264,7 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // COMPTE (`sous`, une seconde ligne discrète), et l'état qui demande un geste
 // (`ton="action"` : à expédier) se distingue des autres — sans autre couleur
 // que l'ambre des choses à faire (§7).
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, initialOuvert = false, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -16275,7 +16281,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     fermer.current?.focus({preventScroll:true});
   },[ouvert,panneau]);
   const close=()=>{setOuvert(false);declencheur.current?.focus({preventScroll:true});};
-  return <div {...props} data-ligne-ouverte={ouvert}>
+  const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
+  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
@@ -16288,7 +16295,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     {createPortal(<div className="vrm-app-shell vrm-ledger-drawer-host" hidden={!ouvert}>
       <section className="vrm-ledger-drawer" role="dialog" aria-modal="false" aria-labelledby={panneau+'-titre'} id={panneau} onKeyDown={e=>{if(e.target.matches('input,textarea,select,[contenteditable=true]'))return;if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopPropagation();close();}}}>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE · DÉTAILS ET ACTIONS</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
-        <div className="vrm-main vrm-ledger-drawer-body"><div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
+        <div className="vrm-main vrm-ledger-drawer-body">
+          <div className="vrm-fiche-vente-acces"><span>{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'} · {sous||'Compte et date dans les détails'}</span>
+          {numerosFiche.length?numerosFiche.map(n=><button type="button" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche article N°{n} →</button>):<small>Pas de numéro VRM confirmé : aucune fiche n’est choisie au hasard.</small>}</div>
+          <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
       </section>
     </div>,document.body)}
   </div>;
@@ -16376,8 +16386,8 @@ function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, no
     </div>
   );
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null }) {
-  return <LigneVenteCompacte {...(data || {})} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '' }) {
+  return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -16619,8 +16629,8 @@ function CarteLbc({ o, num = '', benef = null }) {
   // finalisée, pas encore partie) — jamais une lecture du libellé (§11).
   const aLabel = !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
   const ton = lbcAnnulee(o) ? 'annule' : ((o.isSeller === true || (o.isSeller !== false && aLabel)) && !lbcFinalisee(o) && !lbcExpediee(o) && !((load('vrm_lbc_colis_done', {}) || {})[o.txId]) ? 'action' : '');
-  return <LigneVente data={{ 'data-lbc-vente': String(o.txId) }} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
-    meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · bénéfice {fmt(benef)}</span> : null}</>}/>;
+  return <LigneVente numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId) }} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
+    meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
 // celle d'un achat Vinted (`etapeAchat`) : Annulé · Reçu · En transit · Payé.
@@ -16735,11 +16745,12 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
     const fiche = num ? ficheUniqueDuNumero(numerosFiches, num) : null;
     const achat = fiche ? prixAchatDe({ numero: num }, buyByNum) : null;
     const benef = (prix != null && achat != null && !lbcAnnulee(o)) ? prix - achat : null;
-    return { num, benef };
+    return { num, benef, achat };
   };
   return <div>
     <ScreenHead icon="cash" title="Ventes"/>
     <FiltresVentes plateforme="leboncoin" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
+    <FiabiliteVentes perimetre="Leboncoin · ventes finalisées" lignes={visibles.map(o=>{const info=infoVente(o);return {incluse:lbcFinalisee(o)&&!lbcAnnulee(o),achatConnu:info.achat!=null,prixConnu:o.price!=null&&String(o.price).trim()!==''&&Number.isFinite(Number(o.price)),valide:info.benef!=null,fraisSuivis:false};})}/>
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>{visibles.map(o=><CarteLbc key={o.txId} o={o} {...infoVente(o)}/>)}</div>
     {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
     {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
@@ -19173,12 +19184,13 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
   React.useEffect(()=>onCloudReady(()=>{if(!touched.current)setCouts(load('vrm_ebay_couts',{}));}),[]);
   const sauverCouts=(compte,id,patch)=>{touched.current=true;setCouts(prev=>{const k=JSON.stringify([compte,String(id)]),next={...prev,[k]:{...(prev[k]||{}),...patch}};save('vrm_ebay_couts',next);return next;});};
   const [annonces, setAnnonces] = React.useState([]);
+  const [lectureAnnonces,setLectureAnnonces]=React.useState(undefined);
   const [lu,setLu]=React.useState(undefined);
   React.useEffect(()=>{if(comptesEbay===undefined)return;let stop=false;(async()=>{
     if(comptesEbay===null){if(!stop)setLu(null);return;}
     const r=await lireEbayTous('ebay_orders','orders:data->orders','orders',comptesEbay);
     const photos=await lireEbayTous('ebay_listings','items:data->items','items',comptesEbay);
-    if(!stop){setLu(r);setAnnonces(photos?.items || []);}
+    if(!stop){setLu(r);setAnnonces(photos?.items || []);setLectureAnnonces(photos);}
   })();return()=>{stop=true;};},[comptesEbay]);
   const illisibles=lu?lu.illisibles.filter(c=>dansVueEbay({_compte:c.ref},vue)):[];
   const orders=lu===undefined?undefined:lu===null?null:lu.items.filter(o=>dansVueEbay(o,vue));
@@ -19221,6 +19233,8 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
     {illisibles.length>0 && cible && <p role="status" style={{fontSize:12,color:E.muted}}>Lecture indisponible : {illisibles.map(nomCompteEbay).join(', ')}. Les autres comptes restent visibles.</p>}
     {cible && <div style={{fontSize:12,marginBottom:10}}>Commande {cible.id} <button type="button" onClick={onClearCible}>Voir toutes les commandes</button></div>}
     {cible && !orders.some(o=>String(o.orderId)===cible.id && (o._compte || 'principal')===cible.compte) && <div className="vrm-ebay-order" data-ebay-vente={cible.id} data-ebay-compte={cible.compte}><p style={{fontSize:12,color:E.muted}}>Lecture directe de la commande {cible.id}.</p><EbayCommande owner={AUTH.user?.id || 'installation'} key={cible.compte+':'+cible.id} order={{orderId:cible.id}} ouvrir compte={cible.compte} headers={enTeteSession} confirm={askConfirm} theme={C} costs={couts[JSON.stringify([cible.compte,cible.id])] || {}} onCosts={patch=>sauverCouts(cible.compte,cible.id,patch)}/></div>}
+    <FiabiliteVentes partiel={illisibles.length>0} perimetre="eBay · commandes payées" lignes={visibles.map(o=>{const b=bilanCommandeEbay(o,couts[JSON.stringify([o._compte||'principal',String(o.orderId)])]||{});return {incluse:String(o.orderPaymentStatus||'').toUpperCase()==='PAID',supporte:!!b.entry,achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
+    {lu?.lignes&&<details className="vrm-suivi-comptes"><summary>eBay · synchronisation par compte</summary><p>Une lecture de commandes ne confirme ni toutes les annonces, ni toutes les photos. Messages et offres se vérifient dans leurs rubriques.</p>{lu.lignes.filter(x=>dansVueEbay({_compte:x.compte.ref},vue)).map(x=>{const photos=lectureAnnonces?.lignes?.find(y=>y.compte.ref===x.compte.ref);return <section key={x.compte.ref}><h4>{nomCompteEbay(x.compte)}</h4><p>Ventes : {etatSourceMemoire(x.ligne,'orders')} · Annonces : {etatSourceMemoire(photos?.ligne,'items')}</p></section>;})}</details>}
     {!cible && <FiltresVentes plateforme="ebay" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} doneLabel="Expédiées"/>}
     {!cible && !visibles.length && <div className="vrm-ebay-empty"><b>Aucune commande dans cette sélection</b><p>Essaie un titre, un acheteur, une référence ou un numéro de commande.</p></div>}
     <div style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
@@ -19230,7 +19244,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const etat=etatCommandeEbay(o);
         const statut=etat.label;
 
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente photo={img} titre={li.title} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
           sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
@@ -40011,10 +40025,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     .map(e => { const cle = e.txn || e.key; const age = ageVenteJ(e.o); const imprime = (e.txn && bordsPrinted[e.txn]) || (e.b && isBordPrinted(e.b) ? bordsPrinted[bordKey(e.b)] : null) || null;
       return { cle, e, age, imprime, ancienne: age != null && age > VENTE_LOT_MAX_J }; })
     .sort((a, b) => (Date.parse(b.e.o && b.e.o.date) || 0) - (Date.parse(a.e.o && a.e.o.date) || 0));
+  const signatureColis = e => empreinteColis({owner:AUTH.user?.id||'',compte:e.o?._acc?.vinted_user_id||e.b?.uid||'',transaction:e.txn||e.key,numero:(e.b?numForBord(e.b):'')||(e.o?effEntry(e.o)?.numero:'')||''});
+  const [progressionLot,setProgressionLot]=useState(null);
+  const lotActuel=React.useRef(null);lotActuel.current={expeditions,signatureColis,pdf:e=>(e.b&&e.b.hasPdf)||(e.txn&&labelsCaptes[e.txn])};
   const ouvrirLot = () => {
     const L = lignesLot();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    setLot({ lignes: L, coches: new Set(L.filter(l => !l.ancienne && !l.imprime).map(l => l.cle)), echecs: [] });
+    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:new Set(L.filter(l=>!l.ancienne&&!l.imprime).map(l=>l.cle)),echecs:[] });
   };
   const batchBordereaux = async (cles) => {
     if (batchBusy) return;
@@ -40041,14 +40058,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const encoreDisponibles = new Set(aImprimer.map(e => e.txn || e.key));
     const disparus = choisis ? [...choisis].filter(cle => !encoreDisponibles.has(cle)) : [];
     if (disparus.length) { libererOngletPdf(); toast(`${disparus.length} bordereau(x) sélectionné(s) ne sont plus disponibles à l’expédition. Ferme puis rouvre la sélection pour vérifier la liste. Aucun lot lancé.`); return; }
-    const echecs = [], faits = [];
+    const proprietaire=AUTH.user?.id||null;
+    const empreintes=new Map(aImprimer.map(e=>[e.txn||e.key,signatureColis(e)]));
+    const verifierContexte=()=>{
+      if((AUTH.user?.id||null)!==proprietaire)throw Error('Le compte VRM a changé : aucun nouveau PDF ouvert.');
+      const actuelles=new Map(lotActuel.current.expeditions().filter(e=>lotActuel.current.pdf(e)&&!(e.o&&isShipDone(e.o))).map(e=>[e.txn||e.key,e]));
+      for(const [cle,empreinte] of empreintes){const e=actuelles.get(cle);if(!e||lotActuel.current.signatureColis(e)!==empreinte)throw Error('Un article, son numéro ou son état a changé. Vérifie la sélection avant de préparer les PDF.');}
+    };
     setBatchBusy(true);
+    const controle=controlePreparation(aImprimer.map(e=>({cle:e.txn||e.key,signature:signatureColis(e)})),new Set(aImprimer.map(e=>e.txn||e.key)),lot?.verifications||{});
+    if(controle.reste && !await askConfirm({title:'Vérifier les articles avant impression',desc:`${controle.verifies} sur ${controle.selection} article(s) contrôlé(s). Vérifie la photo, le numéro et le bon compte avant de préparer les PDF. Cette action ne marque aucun colis expédié.`,ok:'Préparer quand même les PDF',cancel:'Revenir aux articles'})){setBatchBusy(false);libererOngletPdf();return;}
+    const echecs = [], faits = [];
+    setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
     try {
+      verifierContexte();
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
       let pasLus = 0, sansPdf = 0;
-      for (const e of aImprimer) {
+      for (const [index,e] of aImprimer.entries()) {
+        verifierContexte();
+        setProgressionLot({etape:'lecture',fait:index+1,total:aImprimer.length});
         const o = e.o, b = e.b;
         // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
         //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
@@ -40071,8 +40101,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         items.push({ numero, title, pdfBuf: buf, invBytes, cle: e.txn || e.key });
       }
       if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
-      setBordResult({ ...r, batch: true });
+      setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
+      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte });
+      setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
       // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
       // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
       // un PDF qui commence par %PDF mais que pdf-lib refuse (chiffré, abîmé)
@@ -41274,6 +41305,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
+        <FiabiliteVentes partiel={nomsVentesKO.length>0} perimetre="Vinted · ventes finalisées, hors ventes masquées" lignes={ventesAffichees.map(o=>{const e=effEntry(o),b=beneficePaire(o.price?.amount,e);return {incluse:!isHidden(o)&&venteFinalisee(o),supporte:o.price?.currency_code==='EUR',achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
         <div className="vrm-ventes-liste" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
           {/* ⚠️ UNE FRAPPE NE RECRÉE PLUS LES 60 LIGNES AU RENDU URGENT (16 oct.).
@@ -41310,7 +41342,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
+              <LigneVenteCompacte numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:8,objectFit:'cover',flexShrink:0}}/>:null} titre={num?`N°${num} · ${o.title}`:o.title} sous={[o.date?new Date(o.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null)}}>
                {/* ── Haut : photo · titre + méta · prix ─────────────────────── */}
                <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                 <div className="vrm-sale-photo" style={{width:72,height:72,borderRadius:10,background:C.card2||C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -44376,7 +44408,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
                 {lot && (()=>{
                   const L = lot.lignes || lignesLot();
-                  const nb = L.filter(l=>lot.coches.has(l.cle)).length;
+                  const nb=L.filter(l=>lot.coches.has(l.cle)).length;
+                  const controle=controlePreparation(L.map(l=>({cle:l.cle,signature:signatureColis(l.e)})),lot.coches,lot.verifications||{});
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
                   return (
@@ -44389,6 +44422,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:16,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
                           <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginTop:3}}>Le plus récent en haut. Seuls les cochés partent à l'impression, chacun sur sa feuille.</div>
                         </div>
+                        <div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
+                        <p className="vrm-preparation-note">Compare le numéro et la photo avec l’article physique. Cocher « Article contrôlé » ne marque pas le colis expédié.</p>
+                        {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 18px',fontSize:12,color:C.muted}}>
                           <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
                           <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.map(l=>l.cle))}))}>Tout sélectionner</button>
@@ -44399,9 +44435,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {L.map(l => {
                             const o = l.e.o, coche = lot.coches.has(l.cle);
                             const num = (l.e.b ? numForBord(l.e.b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+                            const photo=o?orderPhoto(o):bordPhoto(l.e.b);
+                            let emplacement='Emplacement non vérifié';
+                            if(num){try{const plan=load('vrm_room_plan',null),place=plan?ouEstNumero(normalizePlan(plan),num):null;if(place)emplacement=[place.roomName,place.itemName,place.nom].filter(Boolean).join(' · ');}catch(_){}}
+                            const verifie=lot.verifications?.[l.cle]===signatureColis(l.e);
                             return (
-                              <label key={l.cle} data-lot-ligne={l.cle} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
-                                <input type="checkbox" checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/>
+                              <div key={l.cle} data-lot-ligne={l.cle} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
+                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={`Sélectionner ${(o&&o.title)||'ce bordereau'}`} disabled={batchBusy} checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/></label>
+                                <PhotoVente src={photo} size={32} portrait/>
                                 <span style={{flex:1,minWidth:0}}>
                                   <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{(o && o.title) || (l.e.b && (l.e.b.modele || l.e.b.article)) || 'Bordereau'}</span>
                                   <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>
@@ -44409,9 +44450,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
+                                    <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
                                   </span>
                                 </span>
-                              </label>
+                                <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${(o&&o.title)||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?signatureColis(l.e):null}}));}}/>Contrôlé</label>
+                              </div>
                             );
                           })}
                         </div>
@@ -49012,7 +49055,7 @@ function ActionsReglages({comptes,onOuvrir}) {
   </section>;
 }
 
-function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
+function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -49241,7 +49284,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const GROUPES_REGLAGES = [
     { id:'comptes', titre:'Comptes Vinted', items:[
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Vérifier les pseudos et les adresses email de tes comptes Vinted.', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Comprendre ce qui est connecté et ce qui demande une action.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'}/> },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Comprendre ce qui est connecté et ce qui demande une action.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={onPlateforme}/> },
       { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Configurer le transfert et suivre les emails reçus par VRM.', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Consulter les vérifications d’accès et les éventuels problèmes.', el:<SecuriteSetting/> },
     ]},
@@ -52138,7 +52181,7 @@ function EmailsSetting({onComptes}) {
   );
 }
 
-function ConnexionsSetting() {
+function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
   const [versionLecture,actualiser]=React.useReducer(n=>n+1,0);
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   const [mail, majMail] = useState(undefined);   // { ts, n } | 'vide' | null = en cours
@@ -52214,7 +52257,7 @@ function ConnexionsSetting() {
         const rows = await lireTout(`id=like.${motif}&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null`);
         if (!rows) return null;
         let ts = 0; rows.forEach(x => { const t = harvestTs(x) || 0; if (t > ts) ts = t; });
-        return { n: rows.length, ts };
+        return { n: rows.length, ts, lignes:rows };
       } catch (_) { return null; }
     };
     const [emails,captures]=await Promise.all([lire('email_*'),lire('harvest_*')]);setMail(emails);setCapt(captures);
@@ -52238,6 +52281,8 @@ function ConnexionsSetting() {
       <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Cette observation peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
     </section>
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Dernière mise à jour enregistrée pour cette source. Pour actualiser un compte, ouvre-le sur sa plateforme avec l’extension active ; vérifie ensuite ses annonces, ventes et messages.</p></section>
+    <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
+    {onPlateforme&&<div className="vrm-connexions-actions"><button type="button" onClick={()=>onPlateforme('plat_leboncoin')}>Leboncoin · comptes et diagnostic</button><button type="button" onClick={()=>onPlateforme('plat_ebay')}>eBay · comptes et synchronisation</button></div>}
     <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Cette date est celle des données enregistrées, pas une preuve que chaque transfert fonctionne. Le suivi détaillé est dans « Réception des emails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
@@ -52841,6 +52886,8 @@ function AppCoeur() {
   // « jamais servi ». Scalaires seulement pour les bordereaux et les
   // transactions (§4.4), pagination stricte (§4.5).
   const [numData,setNumData]=useState(null);
+  const [revisionFiche,relireFiche]=React.useReducer(n=>n+1,0);
+  useEffect(()=>{const ouvrir=e=>{if(typeof e.detail!=='string'||!e.detail.trim()||e.detail.length>64)return;setNumData(null);relireFiche();setGsQ(e.detail.trim());setGsOpen(true);};window.addEventListener('vrm:fiche-article',ouvrir);return()=>window.removeEventListener('vrm:fiche-article',ouvrir);},[]);
   useEffect(()=>{ if(!gsOpen){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
     // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
@@ -52876,7 +52923,7 @@ function AppCoeur() {
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders','orders:data->orders','orders'), tous('ebay_listings','items:data->items','items')]); }
     if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan});
-  })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen]);
+  })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[gsOpen,revisionFiche]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin au doigt ou avec les flèches du clavier.
   // La souris conserve ses gestes de sélection, sans changer de plateforme.
@@ -54580,7 +54627,7 @@ function AppCoeur() {
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
-        {tab==='settings'&&<SettingsScreen setTab={setTab} comptes={vintedAccounts}
+        {tab==='settings'&&<SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current='compte';setTab(plat);}} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
           onToggleNotif={async()=>{
@@ -54865,7 +54912,7 @@ function AppCoeur() {
           {platSub==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<LeboncoinScreen/>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
-          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
+          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireReceptionLeboncoin(`${SUPABASE_URL}/rest/v1/${q}`,sbAuth())} couleurs={C}/></div>
         </section>)}
         {tab==='plat_ebay'&&(<section className="vrm-market-space" aria-label="eBay"><EntetePlateforme nom="eBay" plateforme="ebay"/>
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
