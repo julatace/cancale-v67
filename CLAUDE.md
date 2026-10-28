@@ -27,6 +27,17 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre — RETROUVER N'IMPORTE QUEL ARTICLE dans Stock → Mes meubles :** Julien : « je veux pouvoir
+> retrouver facilement n'importe quel article ». Grande recherche collée en haut (`data-stock-recherche`) : plusieurs
+> mots, sans accent (« nike 42 noir ») ; un N° seul par IDENTITÉ (« 12 » ≠ N°128 ; un nombre peut aussi être une
+> taille, mot entier du titre) ; chaque résultat dit OÙ (« Étagère salon · rangée 2, colonne 3 », ou « pas encore
+> rangé ») ; le toucher referme la liste, défile jusqu'à SA case qui clignote, et la place reste écrite (« À aller
+> chercher »). Un N° hors stock est DIT. Ordinateur : un chiffre tapé n'importe où ouvre la recherche. La fiche dit
+> « rangée X (en partant du haut) · colonne Y (depuis la gauche) » au lieu de « case N ». Colis (« où sont ces
+> paires ») et la loupe globale (« Tout sur le N° ») mènent maintenant à « Mes meubles » (`ouDansMeubles`, avant la
+> pièce 3D). Meuble plafonné à 150 px par colonne sur ordinateur. Banc `stock-retrouver.cjs` (390/1512 ; mutation
+> « N° par sous-chaîne » ⇒ 2 rouges).
+
 > **28 octobre (nuit) — UN bouton « Actions », et seulement les brouillons qui sont sur Vinted (5.252) :** Julien :
 > « un bouton Actions dans lequel on a republier, mettre de brouillon à en ligne, de en ligne à brouillon… » puis
 > « l'extension capte un ancien brouillon, je veux les brouillons qui sont sur Vinted ». Annonces → **Actions** (un

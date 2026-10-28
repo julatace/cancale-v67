@@ -12944,10 +12944,14 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher }) {
     bordereaux: lu(nd.bordereaux),
     imprimes: load('vinted_bords_printed', {}) || {}, postes: shipDone,
     lbcVentes: lu(nd.lbcVentes), ebayCommandes: lu(nd.ebayCommandes), ebayAnnonces: lu(nd.ebayAnnonces),
-    plan: lu(nd.plan),
+    // « Mes meubles » d'abord (rangement que Julien tient à la main, synchronisé),
+    // puis la pièce 3D. Un N° rangé dans un meuble est TROUVÉ même si la pièce
+    // n'est pas lue.
+    plan: ((load('vrm_meubles', []) || []).length ? (lu(nd.plan) || {}) : lu(nd.plan)),
     archive: archiveNumeros(),
   }, {
-    cleNum, conflits: conflitsDeNumeros, ouStock: ouEstNumero,
+    cleNum, conflits: conflitsDeNumeros,
+    ouStock: (plan, k) => { const m = ouDansMeubles(k); if (m) return { itemId: 'meuble:' + m.meuble.id, key: String(m.i), itemName: m.meuble.name, nom: m.libelle, roomName: '' }; return ouEstNumero(plan, k); },
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
     numLbc: (v) => numeroLbcIdentite(v, nd.lbcItems || null, liensLbc),
@@ -27958,11 +27962,38 @@ function StockPhotos() {
 // (même règle que StockPhotos). Les MEUBLES et la CASE de chaque paire sont
 // synchronisés (`vrm_meubles`, `vrm_slots`) ; l'identité d'une place est le
 // NUMÉRO (`cleNum`), jamais le titre (§5).
+// Où est rangé un N° dans « Mes meubles » ? Par IDENTITÉ de numéro (`cleNum`,
+// §5), jamais par titre. Rend {meuble, i, rangee, colonne, libelle} ou null.
+// Lu aussi par la recherche globale (« Tout sur le N° »).
+function placeDansMeubles(i, m) {
+  const cols = Math.max(1, +m.cols || 1);
+  return { rangee: Math.floor(i / cols) + 1, colonne: (i % cols) + 1 };
+}
+function ouDansMeubles(num, meublesArg, slotsArg) {
+  const k = cleNum(num); if (!k) return null;
+  const slots = slotsArg || load('vrm_slots', {}) || {};
+  const meubles = Array.isArray(meublesArg) ? meublesArg : (Array.isArray(load('vrm_meubles', [])) ? load('vrm_meubles', []) : []);
+  const s = slots[k]; if (!s) return null;
+  const m = meubles.find((x) => x.id === s.m); if (!m || s.i >= m.cols * m.rows) return null;
+  const p = placeDansMeubles(s.i, m);
+  return { meuble: m, i: s.i, ...p, libelle: `rangée ${p.rangee}, colonne ${p.colonne}` };
+}
+
 function StockMeubles() {
   const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
   const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
   const [pairsLost, setPairsLost] = React.useState(() => load('vinted_pairs_lost', {}));
-  const [q, setQ] = React.useState('');
+  // Une demande venue d'ailleurs (Colis « où sont ces paires », la recherche
+  // globale « Tout sur le N° ») : un seul N° remplit la recherche.
+  const [demande] = React.useState(() => {
+    const d = DEMANDE_STOCK_CHERCHE;
+    if (Array.isArray(d.nums) && d.nums.length && Date.now() - d.at < 120000) { const n = d.nums.map(String); d.nums = null; return n; }
+    return null;
+  });
+  const [q, setQ] = React.useState(() => (demande && demande.length === 1 ? demande[0] : ''));
+  const [cibles, setCibles] = React.useState(() => (demande && demande.length > 1 ? demande.map((x) => cleNum(x)).filter(Boolean) : []));
+  const [flash, setFlash] = React.useState(null);           // cleNum de la case montrée
+  const chercheRef = React.useRef(null);
   const [place, setPlace] = React.useState(null);           // cleNum en cours de pose
   const [modal, setModal] = React.useState(null);           // {type:'meuble'|'placer'|'fiche', …}
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
@@ -27988,7 +28019,51 @@ function StockMeubles() {
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
   const aRanger = fiches.filter((f) => !posee(f)).sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0));
   const filtre = q.trim().toLowerCase();
-  const correspond = (f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre);
+  // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
+  // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
+  const sansAccent = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const motsQ = sansAccent(filtre).replace(/^(n°|n|#)\s*(?=\w*\d)/, '').split(/\s+/).filter(Boolean);
+  const qEstNum = motsQ.length === 1 && !!cleNum(motsQ[0]) && /\d/.test(motsQ[0]);
+  const correspond = (f) => {
+    if (!filtre) return true;
+    if (qEstNum) {
+      if (cleNum(f.numero) === cleNum(motsQ[0])) return true;
+      // un nombre seul peut être une taille (« 42 ») : un MOT entier du titre
+      return new RegExp('(^|[^0-9])' + motsQ[0].replace(/[^0-9a-z]/g, '') + '([^0-9]|$)').test(sansAccent(f.title));
+    }
+    const t = sansAccent(f.title) + ' n' + sansAccent(f.numero) + ' ' + sansAccent(f.numero);
+    return motsQ.every((w) => t.includes(w));
+  };
+  const exactNum = (f) => qEstNum && cleNum(f.numero) === cleNum(motsQ[0]);
+  const resultats = filtre ? fiches.filter(correspond).sort((a, b) => (exactNum(b) - exactNum(a)) || ((+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0))) : [];
+  const ouEst = (f) => ouDansMeubles(f.numero, meubles, slots);
+  // Montrer une paire : défiler jusqu'à SA case et la faire clignoter.
+  const montrer = (f) => {
+    const k = cleDeFiche(f); setFlash(k); setQ(''); setCibles([k]);   // la liste se referme, la case reste désignée
+    setTimeout(() => setFlash((x) => (x === k ? null : x)), 4000);
+  };
+  // Défiler APRÈS le rendu (la liste vient de se refermer, la page a bougé).
+  React.useEffect(() => {
+    if (!flash) return;
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      try { const el = document.querySelector(`[data-case-num="${CSS.escape(flash)}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+    }));
+    return () => cancelAnimationFrame(id);
+  }, [flash]);
+  // Ordinateur : un chiffre tapé n'importe où sur le Stock ouvre la recherche.
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target; if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
+      if (document.querySelector('[data-stock-modale]')) return;
+      const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code || '');
+      if (!m) return;
+      e.preventDefault(); setQ(m[1]); setCibles([]);
+      setTimeout(() => { try { chercheRef.current && chercheRef.current.focus(); } catch (_) {} }, 0);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   const nVendus = fiches.filter(estVendu).length;
 
   const poser = (cle, mid, i) => {
@@ -28035,12 +28110,16 @@ function StockMeubles() {
           <span style={{ flex: 1 }} />
           <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: 8, borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: 8, borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * 150 + 16}px)` }}>
           {Array.from({ length: total(m) }).map((_, i) => {
-            const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const dim = occ && filtre && !correspond(occ);
+            const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const kOcc = occ ? cleDeFiche(occ) : null;
+            const vise = kOcc && (flash === kOcc || cibles.includes(kOcc) || (filtre && correspond(occ)));
+            const dim = occ ? ((filtre || cibles.length) && !vise) : (filtre || cibles.length);
+            const pl = placeDansMeubles(i, m);
             return (
-              <button type="button" key={i} onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}` : 'Case vide'}
-                style={{ position: 'relative', aspectRatio: '1 / 1', border: occ && sold ? `2px solid ${C.accent}` : 'none', padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
+              <button type="button" key={i} onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
+                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} className={flash && flash === kOcc ? 'vrm-case-flash' : undefined}
+                style={{ position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
                 {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 300, opacity: place ? 0.8 : 0.35 }}>+</span>}
               </button>
             );
@@ -28093,7 +28172,8 @@ function StockMeubles() {
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? 'Va le chercher' : 'Rangé dans'}</div>
-          <div style={{ fontSize: 23, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : 'Pas rangé'}{m ? ` · case ${s.i + 1}` : ''}</div>
+          <div style={{ fontSize: 23, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : 'Pas rangé'}</div>
+          {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>Rangée {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>(en partant du haut)</span> · colonne {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>(depuis la gauche)</span></div>; })()}
         </div>
         <div style={{ display: 'flex', gap: 9 }}>
           <button type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
@@ -28103,7 +28183,7 @@ function StockMeubles() {
       </>);
     }
     return (
-      <div onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,10,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,10,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
         <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label="Fermer" style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
           {corps}
@@ -28117,7 +28197,54 @@ function StockMeubles() {
 
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et tu pourras les ranger dans tes meubles ici.</Card>;
 
+  // Ce que la recherche montre : chaque article trouvé, et OÙ il est.
+  const MAX_RES = 30;
+  const blocCherche = (
+    <div data-stock-recherche="" style={{ position: 'sticky', top: 6, zIndex: 25, background: C.bg, paddingBottom: 6 }}>
+      <div style={{ position: 'relative' }}>
+        <span aria-hidden="true" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: C.muted, display: 'flex' }}><Icon name="search" size={18} /></span>
+        <input ref={chercheRef} value={q} onChange={(e) => { setQ(e.target.value); setCibles([]); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); setCibles([]); } if (e.key === 'Enter' && resultats.length === 1) { e.preventDefault(); const f = resultats[0]; if (ouEst(f)) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); } }}
+          type="search" enterKeyHint="search" autoComplete="off"
+          placeholder="Retrouver un article : N°, marque, modèle, taille…" aria-label="Retrouver un article dans le stock"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '13px 40px 13px 40px', borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 16, outline: 'none', minHeight: 48 }} />
+        {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
+      </div>
+      {filtre && (
+        <div data-stock-resultats={resultats.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, maxHeight: '46vh', overflowY: 'auto' }}>
+          {resultats.length === 0
+            ? <div data-stock-rien="" style={{ padding: '14px 14px', fontSize: 14, color: C.muted, lineHeight: 1.45 }}>{qEstNum
+                ? <>Aucune paire N°{motsQ[0].toUpperCase()} en stock — elle est peut-être vendue et partie, ou retirée du stock. La loupe en haut de l'écran dit tout sur ce numéro.</>
+                : <>Aucune paire en stock ne correspond à « {q.trim()} ».</>}</div>
+            : resultats.slice(0, MAX_RES).map((f) => { const ou = ouEst(f); const sold = estVendu(f);
+              return (
+                <button type="button" key={f.id} data-stock-res={cleDeFiche(f)} onClick={() => { if (ou) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', width: '100%', minHeight: 64, border: 'none', borderBottom: `1px solid ${C.line}`, background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ position: 'relative', width: 48, height: 48, borderRadius: 9, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} /></span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>N°{f.numero}</b> · {f.title || '—'}</span>
+                    <span data-stock-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'} style={{ display: 'block', fontSize: 13, marginTop: 2, color: ou ? C.text : C.muted, fontWeight: ou ? 700 : 500 }}>
+                      {ou ? <>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</> : 'Pas encore rangé dans un meuble'}{sold ? <span style={{ color: C.accent, fontWeight: 700 }}> · vendue</span> : null}
+                    </span>
+                  </span>
+                  <span style={{ color: C.accent, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
+                </button>
+              ); })}
+          {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{resultats.length} trouvées — {MAX_RES} affichées, précise ta recherche.</div>}
+        </div>
+      )}
+      {cibles.length > 0 && !filtre && (
+        <div data-stock-cibles={cibles.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '10px 12px', fontSize: 14, color: C.text, lineHeight: 1.5 }}>
+          <b>À aller chercher :</b>{' '}
+          {cibles.map((k, j) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
+            return <span key={k}>{j ? ' · ' : ''}<b>N°{f ? f.numero : k}</b> {ou ? `${ou.meuble.name}, rangée ${ou.rangee}, colonne ${ou.colonne}` : (f ? 'pas rangé' : 'plus en stock')}</span>; })}
+        </div>
+      )}
+    </div>
+  );
+
   return (<>
+    {blocCherche}
     {/* à ranger */}
     {aRanger.length > 0 && (
       <Card style={{ padding: '12px 13px' }}>
@@ -28145,10 +28272,7 @@ function StockMeubles() {
       </div>
     )}
 
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher une paire" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
-    </div>
+    <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
 
     {meubles.map(cadreMeuble)}
 
