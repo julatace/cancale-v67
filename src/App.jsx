@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.250.0';
+const EXT_ATTENDUE = '5.251.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -493,7 +493,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -8077,6 +8077,8 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                // 22 oct. : masquées par Vinted — paires PRÉSENTES (numéros),
                // jamais « en ligne » (`<masquees-regle>`).
                masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null })),
+               // 28 oct. : ses BROUILLONS Vinted (`is_draft`), lus dans le même dressing.
+               brouillons: h.items.filter((x) => x && x.is_draft && !x.is_closed).map(mapWardrobeItem),
                lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null,
                pagination: h.pagination || null, source: 'harvest' };
     }
@@ -11547,9 +11549,94 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
 // L'extension revérifie TOUT (confirmation, compte ouvert dans Chrome, coffre,
 // format appris) ; une annonce qu'elle ne sait pas faire ressort « pas faite »,
 // avec SA raison, jamais touchée.
+// ── SES BROUILLONS VINTED (28 octobre) ──────────────────────────────────────
+// Julien : « voir ses brouillons, faire passer le statut de brouillon à en
+// ligne ». La liste vient de son dressing (`is_draft`, par compte). « Mettre en
+// ligne » n'est proposé que pour un brouillon dont l'extension a le CORPS que
+// Vinted a accepté (`vinted_brouillon_{id}`, capté quand il enregistre le
+// brouillon, ou créé par VRM) et complet — sinon le geste est « Ouvrir sur
+// Vinted » (le finir là-bas, l'enregistrer : l'extension l'apprend). Rien n'est
+// deviné ni complété ; la mise en ligne passe par sa confirmation.
+function BrouillonsVinted({ brouillons, publier, brouillonOk, onClose }) {
+  const [infos, setInfos] = useState(undefined);   // undefined = lecture · null = pas su · {} = lu
+  const [etat, setEtat] = useState({});            // { [id]: { etape, raison } }
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_%25&select=id,uid:meta->>uid,titre:meta->>titre,prix:meta->>prix,etat:meta->>etat,nph:meta->>nPhotos,vrm:meta->>parVRM`, { headers: sbAuth() });
+        if (!r.ok) throw new Error('lecture');
+        const rows = await r.json(); if (!Array.isArray(rows)) throw new Error('forme');
+        const o = {}; for (const x of rows) { const id = String(x.id || '').replace(/^vinted_brouillon_/, ''); if (/^\d{4,15}$/.test(id)) o[id] = x; }
+        if (vivant) setInfos(o);
+      } catch (_) { if (vivant) setInfos(null); }
+    })();
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'brouillons') setTick((t) => t + 1); };
+    window.addEventListener('vrm:ext', f);
+    return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
+  }, [tick]);
+  const liste = Array.isArray(brouillons) ? brouillons : null;
+  const domaine = (it) => (it && it._acc && it._acc.domain) || 'www.vinted.fr';
+  const mettre = async (it) => {
+    const i = infos && infos[it.id];
+    const titre = (i && i.titre) || it.title || 'ce brouillon';
+    const prix = i && i.prix != null && i.prix !== '' ? Number(i.prix) : null;
+    const ok = await askConfirm({ title: 'Mettre ce brouillon en ligne ?', desc: `« ${titre} »${prix > 0 ? ` à ${prix.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : ''} sera publié sur Vinted, sur le compte ${(it._acc && (it._acc.login || it._acc.username)) || 'de ce brouillon'}, tel que tu l'as enregistré.`, ok: 'Mettre en ligne' });
+    if (!ok) return;
+    setEtat((e) => ({ ...e, [it.id]: { etape: 'envoi' } }));
+    let r = null; try { r = await publier(it); } catch (_) { r = null; }
+    setEtat((e) => ({ ...e, [it.id]: r || { etape: 'echec', raison: "l'extension n'a pas répondu" } }));
+    if (r && r.etape === 'fait') setTick((t) => t + 1);
+  };
+  const lien = { minHeight: 44, display: 'inline-flex', alignItems: 'center', padding: '0 12px', borderRadius: 8, border: `1px solid ${C.border}`, color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none', fontFamily: 'inherit', background: 'transparent', cursor: 'pointer' };
+  return (
+    <SheetShell onClose={onClose} maxWidth={560}>
+      <div data-brouillons-vinted style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: C.text, flex: 1 }}>Tes brouillons Vinted</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ ...lien, border: 'none' }}>✕</button>
+        </div>
+        {liste === null && <div style={{ fontSize: 13.5, color: C.muted }}>Lecture de tes annonces…</div>}
+        {liste && !liste.length && <div data-brouillons-vide style={{ fontSize: 13.5, color: C.muted }}>Aucun brouillon dans tes dressings lus par VRM. Un brouillon enregistré sur Vinted apparaît ici à la prochaine lecture de ton dressing.</div>}
+        {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas pu lire ce qu'il sait de tes brouillons — « Mettre en ligne » attend ; « Ouvrir sur Vinted » marche.</div>}
+        {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 12.5, color: C.muted }}>Mettre un brouillon en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente dans ce navigateur.</div>}
+        {liste && liste.map((it) => {
+          const i = infos && infos[it.id];
+          const e = etat[it.id];
+          const connu = !!(i && i.uid === String((it._acc && it._acc.vinted_user_id) || ''));
+          const prixI = i && i.prix != null && i.prix !== '' ? Number(i.prix) : null;
+          const complet = connu && !!String(i.titre || '').trim() && prixI > 0 && Number(i.nph) > 0;
+          const publie = i && i.etat === 'publie';
+          const titre = it.title || (i && i.titre) || 'Brouillon sans titre';
+          const prixAff = prixI > 0 ? prixI : Number(it.price);
+          return (
+            <div key={it.id} data-brouillon={it.id} data-brouillon-etat={publie ? 'publie' : complet ? 'pret' : connu ? 'incomplet' : 'inconnu'} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
+              <div style={{ width: 56, height: 70, borderRadius: 8, overflow: 'hidden', background: C.bg, flexShrink: 0 }}>{it.photo ? <PhotoVinted src={it.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titre}</div>
+                <div style={{ fontSize: 12.5, color: C.muted }}>{prixAff > 0 ? `${prixAff.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € · ` : 'sans prix · '}{(it._acc && (it._acc.login || it._acc.username)) || ''}</div>
+                {e && e.etape === 'envoi' && <div style={{ fontSize: 12.5, color: C.muted }}>Mise en ligne…</div>}
+                {e && e.etape === 'fait' && <div data-brouillon-fait style={{ fontSize: 12.5, color: C.text }}>✓ En ligne sur Vinted</div>}
+                {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
+                {!e && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
+                {!e && !publie && connu && !complet && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String(i.titre || '').trim() && 'un titre', !(prixI > 0) && 'un prix', !(Number(i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
+                {!e && !publie && infos && !connu && <div style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas encore son contenu : ouvre-le sur Vinted et enregistre-le une fois.</div>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                {complet && !publie && brouillonOk && (!e || e.etape !== 'fait') && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
+                <a data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={lien}>Ouvrir sur Vinted ↗</a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </SheetShell>
+  );
+}
 const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
 const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
-function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, onClose }) {
+function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, brouillonOk, onClose }) {
   const [etape, setEtape] = useState('choix');
   const [sel, setSel] = useState(() => new Set());
   const [q, setQ] = useState('');
@@ -11588,6 +11675,9 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
   // (28 oct., sa demande) La description part TELLE QUELLE ; en option, UNE
   // lettre au hasard tout en bas de chacune (tirée ici, montrée sur la ligne).
   const [lettreOn, setLettreOn] = useState(false);
+  // (28 oct., sa demande : « ça met en brouillon puis ça publie ») Allumé par défaut
+  // quand l'extension sait le faire ; il peut repasser à la création directe.
+  const [viaBrouillon, setViaBrouillon] = useState(true);
   const [lettres, setLettres] = useState({});
   const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }); setLettres(o); };
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
@@ -11659,7 +11749,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '' }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain'].includes(r.etat) ? r.etat : 'echec';
       setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau } }));
@@ -11760,6 +11850,14 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
                 <span style={{ flex: '1 1 200px' }}>Une lettre différente pour chaque annonce, sur la dernière ligne (la lettre d'une recréation précédente est retirée d'abord).</span>
                 <button type="button" data-republier-lettres-retirer onClick={() => tirerLettres(choisies.map((a) => a.id))} style={btn(false)}>Tirer d'autres lettres</button>
               </div>}
+            </div>
+            <div data-republier-brouillon={viaBrouillon && brouillonOk ? 'oui' : 'non'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <span style={maj}>Publication</span>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: brouillonOk ? C.text : C.muted, minHeight: 44, cursor: brouillonOk ? 'pointer' : 'default' }}>
+                <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
+              </label>
+              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? 'Chaque annonce est d’abord rangée en brouillon sur Vinted, puis mise en ligne quelques secondes après. Si la mise en ligne échoue, le brouillon reste dans tes brouillons et l’ancienne annonce n’est pas touchée.' : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.brouillon} ou plus récente dans ce navigateur.`}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
@@ -33874,6 +33972,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [lotsOpen, setLotsOpen] = useState(false); // modale « Lots — titres & prix » (tranche 3)
   const [fileOpen, setFileOpen] = useState(false); // modale « File de publication » (tranche 4)
+  const [brouillonsOpen, setBrouillonsOpen] = useState(false); // « Brouillons » Vinted (28 oct.)
   const [republierOpen, setRepublierOpen] = useState(false); // « Republier » (28 oct.) : choisir → modifier → republier
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
@@ -38002,7 +38101,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // lesquelles le sont : « pas su » — on relit plutôt que de servir « aucune ».
     const cached0 = !force && !parSignal && entreeCache('listings');
     const cached = cached0 && Array.isArray(cached0.masquees) ? cached0 : null;
-    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
+    if (cached) { setListings({ loading:false, items:cached.items, comptes:cached.comptes, lues:cached.lues||{}, supprimees:cached.supprimees||{}, aConfirmer:cached.aConfirmer||[], masquees:cached.masquees, brouillons:cached.brouillons||null, ko:cached.failedUids, ...(cached.failedUids.length ? { incomplet: true } : {}) }); return; }
     // `silencieux` (5.165, relecture sur signal de l'extension) : on garde ce qui
     // est affiché pendant la lecture, et un échec ne remplace rien.
     if (!silencieux && !parSignal) setListings({ loading:true, items:null, error:false });
@@ -38024,7 +38123,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // dressing, ou sa lecture publique relue depuis un autre compte) ; les
     // annonces « à confirmer » (compte pas relu depuis 24 h) vivent à part —
     // jamais dans `items`, donc jamais comptées en ligne.
-    const lues = {}, supprimees = {}, aConfirmer = [], masquees = [];
+    const lues = {}, supprimees = {}, aConfirmer = [], masquees = [], brouillons = [];
     for (const { acc, r } of results) {
       const uid = String(acc.vinted_user_id);
       if (r === null) {                                    // relecture sur signal : ce compte garde ce qu'on montrait
@@ -38033,6 +38132,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (avant.supprimees && avant.supprimees[uid]) supprimees[uid] = avant.supprimees[uid];
         (avant.aConfirmer || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) aConfirmer.push(it); });
         (avant.masquees || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) masquees.push(it); });
+        (avant.brouillons || []).forEach(it => { if (String(it._acc && it._acc.vinted_user_id) === uid) brouillons.push(it); });
         if ((avant.ko || []).includes(uid)) { anyErr = true; failedUids.push(uid); }
         continue;
       }
@@ -38041,7 +38141,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         else if (r.source === 'harvest' && _harvestSeen[`${uid}_listings`]) lues[uid] = _harvestSeen[`${uid}_listings`];
         if (r.supprimees) supprimees[uid] = r.supprimees;
         (r.aConfirmer || []).forEach(it => aConfirmer.push({ ...it, _acc:acc }));
-        (r.masquees || []).forEach(it => masquees.push({ ...it, _acc:acc })); }
+        (r.masquees || []).forEach(it => masquees.push({ ...it, _acc:acc }));
+        (r.brouillons || []).forEach(it => brouillons.push({ ...it, _acc:acc })); }
       else { anyErr=true; failedUids.push(uid); }
     }
     const error = out.length===0 && anyErr && !anyOk;
@@ -38059,13 +38160,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (info.photos && info.photos.length && !(Array.isArray(it.photos) && it.photos.length)) it.photosDetail = info.photos;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
-    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer, masquees });
+    if (!error) putCache('listings', out, { failedUids }, demandes, { lues, supprimees, aConfirmer, masquees, brouillons });
     // Annonces que VINTED a marquées vendues (identité, jamais un titre). Sur
     // signal, seuls quelques comptes sont relus : on AJOUTE, on n'efface rien.
     if (vendues.size) setVenduesVinted(parSignal ? (p) => new Set([...p, ...vendues]) : vendues);
     // `incomplet` : au moins un compte n'a pas répondu. Les chiffres tirés de
     // cette liste sont alors des minorants (le bilan de la semaine le dit).
-    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, aConfirmer, masquees, ko: failedUids });
+    setListings({ loading:false, items: out, error, incomplet: anyErr, comptes: demandes, lues, supprimees, aConfirmer, masquees, brouillons, ko: failedUids });
     if (!parSignal && signalPendantLecture.current) { signalPendantLecture.current = false; setTimeout(() => loadListings(false, true, null), 200); }
   };
   const loadConvs = async (force) => {
@@ -43971,8 +44072,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (28 oct.) « Republier » : UN bouton, demandé par Julien — il remplace
                 « Lots » et « File de publication » du menu (deux écrans qui ne se
                 parlaient pas). */}
+            {/* (28 oct.) Republier et Brouillons dans leur propre groupe : sur téléphone, la
+                grille de la barre plaçait tout bouton direct dans la case de 44 px du micro
+                (« Republier » écrasé, « Brouillons » posé dessus). */}
+            <div className="vrm-ann-actions" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <button type="button" data-republier-ouvrir onClick={()=>setRepublierOpen(true)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Republier</button>
+            {Array.isArray(listings.brouillons) && listings.brouillons.length > 0 && <button type="button" data-brouillons-ouvrir onClick={()=>setBrouillonsOpen(true)}
+              style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Brouillons · {listings.brouillons.length}</button>}
+            </div>
             <div className="vrm-ann-outils" style={{position:'relative'}}>
               <button type="button" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
                 style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯<span className="vrm-ann-outils-mot"> Outils</span></button>
@@ -47403,6 +47511,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
+      {brouillonsOpen && (
+        <BrouillonsVinted brouillons={listings.brouillons} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setBrouillonsOpen(false)}
+          publier={async (it) => {
+            const uid = it._acc ? String(it._acc.vinted_user_id||'') : '';
+            if (!uid) return { etape:'echec', raison:'compte introuvable' };
+            let r=null; try { r=await vmrCmd({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true }, 120000); } catch(_) { r=null; }
+            if (r && r.accepte) return { etape:r.etape, raison:r.raison||'' };
+            return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
+          }} />
+      )}
       {republierOpen && (()=>{
         // Ses paires EN LIGNE sur Vinted (la même liste que la grille, `listings.items`).
         const annoncesR = (listings.items||[]).filter(it=>it && it.id!=null).map(it=>{
@@ -47422,12 +47540,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, confirme:true }, 180000); } catch(_) { r=null; }
+          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 180000); } catch(_) { r=null; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
-        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} onClose={()=>setRepublierOpen(false)} />;
+        return <RepublierVinted annonces={annoncesR} publier={publierR} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setRepublierOpen(false)} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont

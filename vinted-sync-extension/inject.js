@@ -457,6 +457,37 @@ function clocheFavorisNative(activer=false,origine){
     } catch (_) {}
   };
 
+  // ── SES BROUILLONS (28 octobre) ────────────────────────────────────────────
+  // Mesuré dans ses requêtes : un brouillon s'enregistre par
+  // `POST /api/v2/item_upload/drafts` (`{draft:{id:null,…}}`) et se met en ligne
+  // par `POST …/drafts/{id}/completion` (même corps, `draft.id` posé). On garde le
+  // CORPS qu'il vient d'enregistrer (2xx seulement), sous l'identifiant de la
+  // RÉPONSE (création) ou de l'ADRESSE (mise à jour `…/drafts/{id}`) : c'est ce
+  // qui permet ensuite de le mettre en ligne depuis VRM sans rien deviner.
+  // Lecture de ce que la page vient de faire : zéro requête de plus (§3).
+  const RE_BROUILLON = /^\/api\/v\d+\/item_upload\/drafts(?:\/(\d{4,15}))?\/?$/;
+  const noteBrouillon = (method, url, status, lireTexte, corps) => {
+    try {
+      const mt = String(method || '').toUpperCase();
+      if (mt !== 'POST' && mt !== 'PUT') return;
+      const st = Number(status);
+      if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname)) return;
+      const m = RE_BROUILLON.exec(U.pathname);
+      const t = corpsTexte(corps);
+      if (!m || !t) return;
+      if (m[1]) { post({ kind: 'brouillon', draftId: m[1], status: st, corps: t }); return; }
+      Promise.resolve().then(lireTexte).then((tx) => {
+        let j = null; try { j = JSON.parse(tx); } catch (_) {}
+        const d = j && ((j.draft && typeof j.draft === 'object') ? j.draft : (j.item && typeof j.item === 'object') ? j.item : j);
+        const id = d && d.id != null ? String(d.id) : '';
+        if (/^\d{4,15}$/.test(id)) post({ kind: 'brouillon', draftId: id, status: st, corps: t });
+        else post({ kind: 'brouillon', draftId: null, status: st, cles: j && typeof j === 'object' ? Object.keys(j).slice(0, 12) : [] });
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
 // <suivi-regle> — LA MÊME RÈGLE DANS inject.js ET background.js (§11), texte pour
 // texte ; comparées par scripts/audit-suivi-vinted.cjs (23 octobre, 5.214).
 // Le suivi que VINTED montre de SES commandes d'achat (le bouton « Suivre le
@@ -834,6 +865,7 @@ function contratSuivi(a) {
             noteSuppression(method, url, res.status);   // 5.165 : AVANT tout le reste (la page va naviguer)
             notePublication(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.201
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
+            noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
             noteCatalogueVinted(method, url, res.status, () => res.clone().text());
             noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
@@ -879,6 +911,7 @@ function contratSuivi(a) {
             noteSuppression(this.__cancaleMethod, url, this.status);   // 5.165
             notePublication(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.201
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
+            noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.
             noteCatalogueVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
