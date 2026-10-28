@@ -7587,6 +7587,15 @@ function photoViaServeur(url) {
   pomperPhotosServeur();return promesse;
 }
 
+// (28 oct.) Les octets d'une photo pour la DESSINER sur un carton en 3D : le CDN
+// Vinted n'envoie aucun en-tête CORS, une image chargée directement salirait la
+// toile WebGL. L'extension d'abord (rien ne sort de l'appareil), sinon la route.
+async function chargerPhotoBoite(url) {
+  if (!photosVinted.estPhotoVinted(url)) return null;
+  if (__vmrExtReady && __vmrEtat !== null) { const d = await vmrPhoto(url, 8000).catch(() => null); if (d) return d; }
+  return photoViaServeur(url);
+}
+
 const __photosDebut = Date.now();
 const PHOTOS_GRACE_EXT_MS = 7000;
 const secoursPhotos = () => {
@@ -27388,6 +27397,23 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     return out;
   }, [items]);
 
+  // (28 oct., « les photos avec les numéros sur les boîtes ») : la photo d'un
+  // carton, par son NUMÉRO — seulement si toutes les fiches qui portent ce N°
+  // montrent la MÊME photo (§5 : deux paires sous un N°, on ne choisit pas).
+  const photoParNum = useMemo(() => {
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const par = {};
+    Object.values(fiches).forEach(f => {
+      const n = f && f.numero != null ? String(f.numero).trim() : ''; if (!n) return;
+      const u = typeof (f && f.photo) === 'string' ? f.photo : (f && f.photo && f.photo.url) || '';
+      (par[n] = par[n] || []).push(u);
+    });
+    const out = {};
+    Object.entries(par).forEach(([n, us]) => { const cles = new Set(us.map(u => photoKey(u) || u)); if (cles.size === 1 && us[0] && /^https?:\/\//.test(us[0])) out[n] = us[0]; });
+    return out;
+  }, [items]);
+  const photoBoite = React.useCallback((n) => photoParNum[String(n == null ? '' : n).trim()] || null, [photoParNum]);
+
   const contenuMeuble = (it) => {
     const out = [];
     Object.entries(it.slots || {}).forEach(([cell, arr]) => {
@@ -27775,7 +27801,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       )}
 
       <React.Suspense fallback={<div style={{ fontSize: 12, color: C.muted, padding: 16 }}>Chargement du stock 3D…</div>}>
-        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} />
+        <Room3D key={`${activeRoom.id}-${room.w}-${room.h}-${room.wallH || 3.4}-${room.wallColor || 'def'}-${estRectangle(room) ? 'r' : poly.map(q => q.join(',')).join(';')}`} items={items} room={room} poly={poly} hi={hi} sel={sel} canMove={moveMode} onSelect={selectItem} onOpen={(id) => setSel(id)} onCellTap={fillCell} onPileTap={pileTap} onMove={moveItem} colorOf={colorOf} emojiOf={emojiOf} h3dOf={h3dOf} storedCount={storedCount} depot={depot} sortie={sortie} vueDessus={dispo} cibles={cibles3D} viseurRef={viseurRef} C={C} Icon={Icon} load={load} save={save} FURN_TYPES={FURN_TYPES} GARAGE_AMBIANCES={GARAGE_AMBIANCES} photoBoite={photoBoite} chargerPhoto={chargerPhotoBoite} />
       </React.Suspense>
       {chercheLoc && (
         <div data-a-chercher={chercheLoc.length} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
