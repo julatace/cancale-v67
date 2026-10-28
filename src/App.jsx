@@ -8546,55 +8546,66 @@ const readPdfFirstPageSize = async (pdfArrayBuffer) => {
 };
 // Empreinte de format = dimensions arrondies (ex "210x297").
 const bordereauFormatKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
-// Emplacement par défaut intelligent du tampon : en HAUT À GAUCHE. Sur le
-// bordereau Vinted (A4 : instructions en haut, étiquette/code-barres en bas),
-// le haut est vide -> on ne recouvre jamais le code-barres. Fonctionne aussi
-// pour les autres formats (le haut est presque toujours dégagé).
-const smartDefaultBordPos = (w, h) => ({ xr: 0.05, yr: 0.02 });
+// Les anciennes coordonnées ne prouvent pas qu'un autre PDF est dégagé.
+const smartDefaultBordPos = (w, h) => null;
 
-// pdf-lib est charge dynamiquement (import()) pour ne pas alourdir le bundle
-// initial - il n'est telecharge que la 1re fois qu'on genere un bordereau.
-// `pos` = { xr, yr } position (ratio 0..1, coin haut-gauche du tampon, yr depuis
-// le HAUT) choisie par l'utilisateur pour CE format. Si absent -> bandeau en bas
-// (comportement historique).
-// Dessine le tampon (N° + titre) sur la 1re page d'un PDF déjà chargé (pdf-lib),
-// à la position `pos` mémorisée pour ce format. Partagé par le téléchargement
-// unitaire ET le regroupement « à la suite ».
-const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
-  const first = pdf.getPages()[0];
-  const { width, height } = first.getSize();
-  const hasNum = numero != null && String(numero).trim() !== '';
-  if (pos && typeof pos.xr === 'number') {
-    // Tampon positionné : cartouche blanc + bord noir. N° (si présent) + titre.
-    const boxW = Math.min(width * 0.62, 230);
-    const boxH = 46;
-    let x = pos.xr * width, yTop = pos.yr * height;
-    x = Math.max(2, Math.min(width - boxW - 2, x));
-    let y = height - yTop - boxH; // origine PDF en bas à gauche
-    y = Math.max(2, Math.min(height - boxH - 2, y));
-    first.drawRectangle({ x, y, width:boxW, height:boxH, color: rgb(1,1,1), borderColor: rgb(0,0,0), borderWidth:1.5 });
-    const maxChars = Math.max(16, Math.floor((boxW - 16) / 5));
-    const t = (title || '').slice(0, maxChars);
-    if (hasNum) {
-      first.drawText(`N° ${numero}`, { x:x+8, y:y+boxH-26, size:20, font:bold, color:rgb(0,0,0) });
-      if (t) first.drawText(t, { x:x+8, y:y+6, size:9, font:reg, color:rgb(0.12,0.12,0.12) });
-    } else if (t) {
-      // Pas de numéro : le titre prend toute la place, plus gros.
-      first.drawText(t.slice(0, Math.max(20, Math.floor((boxW-16)/6.5))), { x:x+8, y:y+boxH/2-6, size:13, font:bold, color:rgb(0,0,0) });
-    }
-  } else {
-    const bandH = 74;
-    first.drawRectangle({ x:0, y:0, width, height:bandH, color: rgb(1,1,1) });
-    first.drawRectangle({ x:0, y:bandH, width, height:2, color: rgb(0,0,0) });
-    const maxChars = Math.max(20, Math.floor((width - 36) / 6.2));
-    const t = (title || '').slice(0, maxChars);
-    if (hasNum) {
-      first.drawText(`N° ${numero}`, { x:18, y:bandH-38, size:32, font:bold, color:rgb(0,0,0) });
-      if (t) first.drawText(t, { x:18, y:12, size:12, font:reg, color:rgb(0.12,0.12,0.12) });
-    } else if (t) {
-      first.drawText(t, { x:18, y:bandH-46, size:20, font:bold, color:rgb(0.08,0.08,0.08) });
+// Cherche une fenêtre entièrement blanche avec une marge autour du tampon.
+// Carte intégrale : chaque pixel non blanc compte, y compris images et QR.
+const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge) => {
+  const stride = width + 1, sums = new Uint32Array(stride * (height + 1));
+  for (let y=0;y<height;y++) {
+    let row=0;
+    for (let x=0;x<width;x++) {
+      const i=(y*width+x)*4;
+      row += pixels[i]<248 || pixels[i+1]<248 || pixels[i+2]<248 ? 1 : 0;
+      sums[(y+1)*stride+x+1]=sums[y*stride+x+1]+row;
     }
   }
+  const w=boxW+2*marge,h=boxH+2*marge;
+  for(let y=0;y+h<=height;y+=4) for(let x=0;x+w<=width;x+=4) {
+    const n=sums[(y+h)*stride+x+w]-sums[y*stride+x+w]-sums[(y+h)*stride+x]+sums[y*stride+x];
+    if(n===0) return {x:x+marge,y:y+marge};
+  }
+  return null;
+};
+const espaceBlancBordereau = async (pdf, avecTitre = false) => {
+  let documentPdf;
+  try {
+    const L=await chargerPdfjs();
+    documentPdf=await L.getDocument({data:await pdf.save(),isEvalSupported:false,stopAtErrors:true}).promise;
+    const page=await documentPdf.getPage(1), viewport=page.getViewport({scale:1.5});
+    const w=Math.ceil(viewport.width), h=Math.ceil(viewport.height);
+    if(w*h>12000000) throw Error('page trop grande');
+    const canvas=document.createElement('canvas'); canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+    await page.render({canvasContext:ctx,viewport}).promise;
+    const bw=avecTitre?160:84,bh=avecTitre?38:28;
+    const tourne=viewport.rotation%180!==0, rw=(tourne?bh:bw)*1.5, rh=(tourne?bw:bh)*1.5;
+    const point=trouverZoneBlanche(ctx.getImageData(0,0,w,h).data,w,h,Math.ceil(rw),Math.ceil(rh),18);
+    if(!point) throw Error('aucun espace blanc suffisant');
+    const corners=[viewport.convertToPdfPoint(point.x,point.y),viewport.convertToPdfPoint(point.x+rw,point.y+rh)];
+    return {x:Math.min(corners[0][0],corners[1][0]),y:Math.min(corners[0][1],corners[1][1]),w:Math.abs(corners[0][0]-corners[1][0]),h:Math.abs(corners[0][1]-corners[1][1]),verifie:true};
+  } catch(e) {
+    throw Error('Placement du numéro non vérifié : '+String(e.message||e)+'. Aucun numéro ajouté sur ce bordereau.');
+  } finally { if(documentPdf) await documentPdf.destroy(); }
+};
+const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
+  const first=pdf.getPages()[0];
+  const hasNum=numero!=null && String(numero).trim()!=='';
+  if(!hasNum && !String(title||'').trim()) return false;
+  if(!pos || pos.verifie!==true) throw Error('Espace blanc non vérifié : aucun tampon ajouté.');
+  const {x,y,w,h}=pos;
+  const fit=(text,font,size)=>{let t=String(text||'').replace(/[\r\n]+/g,' ');while(t&&font.widthOfTextAtSize(t,size)>w-8)t=t.slice(0,-1);return t;};
+  // Pas de rectangle opaque, de bande, de réduction ni de changement de page.
+  if(hasNum) {
+    const texte=`N° ${numero}`; let taille=18;
+    while(taille>9 && bold.widthOfTextAtSize(texte,taille)>w-8) taille--;
+    if(bold.widthOfTextAtSize(texte,taille)>w-8) throw Error('Numéro trop long pour cet espace blanc : aucun numéro tronqué.');
+    first.drawText(texte,{x:x+4,y:y+h-21,size:taille,font:bold,color:rgb(0,0,0)});
+  }
+  const t=fit(title,reg,8);
+  if(t) first.drawText(t,{x:x+4,y:y+3,size:8,font:reg,color:rgb(0,0,0)});
   return hasNum;
 };
 // ── IMPRIMANTE NORMALE OU THERMIQUE ─────────────────────────────────────────
@@ -8954,18 +8965,20 @@ const placementThermique = (r, sens, avecNum) => {
 // Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page
 // 100×150 chacune. Rend le nombre de pages ajoutées.
 const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold) => {
-  const n = numero == null ? '' : String(numero).trim();
+  const n = numero != null ? String(numero).trim() : '';
   const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
   let k = 0;
   for (const r of rects) {
-    const emb = await out.embedPage(page, { left: r.x, bottom: r.y, right: r.x + r.w, top: r.y + r.h });
-    const pl = placementThermique(r, r.sens != null ? r.sens : z.sens, !!n);
-    const p = out.addPage([ETIQ_TH.w, ETIQ_TH.h]);
-    p.drawPage(emb, { x: pl.x, y: pl.y, xScale: pl.s, yScale: pl.s, rotate: PL.degrees(pl.angle) });
-    if (n) {
-      const t = `N° ${n}`, taille = 9.5, larg = bold.widthOfTextAtSize(t, taille);
-      p.drawText(t, { x: (ETIQ_TH.w - larg) / 2, y: TH_MARGE + (TH_BANDE - taille) / 2 + 1, size: taille, font: bold, color: PL.rgb(0, 0, 0) });
+    const temp=await PL.PDFDocument.create();
+    const emb = await temp.embedPage(page, { left:r.x,bottom:r.y,right:r.x+r.w,top:r.y+r.h });
+    const pl=placementThermique(r,r.sens!=null?r.sens:z.sens,false);
+    const p=temp.addPage([ETIQ_TH.w,ETIQ_TH.h]);
+    p.drawPage(emb,{x:pl.x,y:pl.y,xScale:pl.s,yScale:pl.s,rotate:PL.degrees(pl.angle)});
+    if(n) {
+      const position=await espaceBlancBordereau(temp);
+      drawBordereauStamp(temp,PL.rgb,await temp.embedFont(PL.StandardFonts.HelveticaBold),await temp.embedFont(PL.StandardFonts.Helvetica),n,'',position);
     }
+    (await out.copyPages(temp,[0])).forEach(p=>out.addPage(p));
     k++;
   }
   return k;
@@ -8977,7 +8990,7 @@ const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
 // d'impression (une vente, un lot, Leboncoin) :
 //   thermique + étiquette reconnue ⇒ pages 100×150 (et les pages suivantes du
 //   PDF, une déclaration en douane par exemple, telles quelles) ;
-//   sinon ⇒ la page entière, tamponnée du N° à son emplacement appris.
+//   sinon ⇒ page originale, numéro dans un espace blanc vérifié sur ce PDF.
 // Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
 const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) => {
   const { rgb, StandardFonts } = PL;
@@ -8992,7 +9005,7 @@ const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) =
   }
   const sBold = await src.embedFont(StandardFonts.HelveticaBold);
   const sReg = await src.embedFont(StandardFonts.Helvetica);
-  drawBordereauStamp(src, rgb, sBold, sReg, numero, title, pos);
+  if (String(numero||'').trim() || String(title||'').trim()) drawBordereauStamp(src, rgb, sBold, sReg, numero, title, await espaceBlancBordereau(src,!!title));
   (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
   return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '' };
 };
@@ -9153,8 +9166,10 @@ const ImprimanteSetting = ({ nu = false }) => {
           const { width: fw, height: fh } = src.getPages()[0].getSize();
           const pos = (load('vinted_bordereau_formats', {}) || {})[bordereauFormatKey(fw, fh)] || smartDefaultBordPos(fw, fh);
           const r1 = await poserBordereau(PL, out, src, { numero: '123', title: '', pos, thermique }); return { octets: await out.save(), r1, pages: out.getPageCount() }; };
-        const normale = await fabrique(false), thermique = await fabrique(true);
-        e.exemple = { normale, thermique, zone: z.ok ? z : null };
+        try {
+          const normale = await fabrique(false), thermique = await fabrique(true);
+          e.exemple = { normale, thermique, zone: z.ok ? z : null };
+        } catch(err) { e.erreurPlacement=String(err.message||err); rates++; }
       }
       types.set(ty.cle, e);
     }
@@ -9170,8 +9185,8 @@ const ImprimanteSetting = ({ nu = false }) => {
         options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', data: { 'data-imprimante-choix': v } }))}/>
       <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
         {mode === 'thermique'
-          ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° en petit sous l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
-          : <>La page complète, <b style={{color:C.text}}>une feuille A4 par bordereau</b>, ton N° tamponné à l’emplacement appris. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</>}
+          ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié sur l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
+          : <>La page complète, <b style={{color:C.text}}>une feuille A4 par bordereau</b>, ton N° dans un espace blanc vérifié sur ce PDF, sans réduire le document. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</>}
       </div>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
@@ -9184,7 +9199,7 @@ const ImprimanteSetting = ({ nu = false }) => {
         {ap && ap.etat === 'vide' && <div data-apercus="vide" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{ap.partiel ? 'Une partie de tes bordereaux n’a pas pu être lue, et aucun PDF n’est arrivé dans le reste.' : 'Aucun bordereau avec son PDF pour l’instant : les aperçus apparaîtront avec ta prochaine vente.'}</div>}
         {ap && ap.etat === 'lu' && <div data-apercus="lu" style={{marginTop:6}}>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.5}} data-apercus-compte={ap.lus}>
-            D’après tes {ap.lus} derniers bordereaux{ap.total > ap.lus + ap.rates ? ` (sur ${ap.total})` : ''}.{ap.rates > 0 ? ` ${ap.rates} n’ont pas pu être lus (la base n’a pas répondu).` : ''}{ap.partiel ? ' Une partie de la liste n’a pas pu être lue.' : ''} Le N° montré est un exemple.
+            D’après tes {ap.lus} derniers bordereaux{ap.total > ap.lus + ap.rates ? ` (sur ${ap.total})` : ''}.{ap.rates > 0 ? ` ${ap.rates} n’ont pas pu être préparés ou vérifiés.` : ''}{ap.partiel ? ' Une partie de la liste n’a pas pu être lue.' : ''} Le N° montré est un exemple.
           </div>
           {ap.types.map((e) => (
             <div key={e.cle} data-apercu-type={e.type} data-apercu-isoles={e.isoles} data-apercu-n={e.n} style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
@@ -9192,13 +9207,14 @@ const ImprimanteSetting = ({ nu = false }) => {
               <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>
                 {e.n} bordereau{e.n > 1 ? 'x' : ''} · {e.isoles === e.n ? (e.n > 1 ? 'étiquette repérée sur tous' : 'étiquette repérée') : e.isoles === 0 ? <>étiquette <b style={{color:C.text}}>non repérée</b> : en thermique la page part entière ({[...e.raisons].join(' · ')})</> : <>étiquette repérée sur {e.isoles} — les autres partent entières en thermique ({[...e.raisons].join(' · ')})</>}
               </div>
-              <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:10,alignItems:'flex-start'}}>
+              {e.erreurPlacement && <p role="alert" style={{fontSize:12,color:C.warn}}>{e.erreurPlacement}</p>}
+              {e.exemple && <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:10,alignItems:'flex-start'}}>
                 <ApercuPdf octets={e.exemple.normale.octets} largeur={180} zone={e.exemple.zone} label={e.exemple.zone ? 'Normale · A4 (en pointillés : ce qui part en thermique)' : 'Normale · A4'}/>
                 {Array.from({ length: e.exemple.thermique.pages }, (_, i) => (
                   <ApercuPdf key={i} octets={e.exemple.thermique.octets} page={i + 1} largeur={e.exemple.thermique.r1.isole ? 120 : 180}
                     label={e.exemple.thermique.r1.isole ? `Thermique · 10×15${e.exemple.thermique.pages > 1 ? ` (${i + 1}/${e.exemple.thermique.pages})` : ''}` : 'Thermique · page entière'}/>
                 ))}
-              </div>
+              </div>}
             </div>
           ))}
           {(() => { const jamais = TYPES_BORDEREAU.filter(([k]) => !vus.has(k)); return jamais.length ? (
@@ -9362,7 +9378,8 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
-  for (const it of items) {
+  const reussis = [], rates = [];
+  for (const [index, it] of items.entries()) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
       const { width, height } = src.getPages()[0].getSize();
@@ -9373,12 +9390,12 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique });
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
       else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
-      count++;
+      count++; reussis.push(index);
       // Facture pro juste APRÈS son bordereau (comptes pro uniquement, §41).
       if (it.invBytes) {
         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
       }
-    } catch (_) {}
+    } catch (_) { rates.push(index); }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
   posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
@@ -9388,7 +9405,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers };
+  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -16369,13 +16386,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
     if (!pos) { pos = smartDefaultBordPos(w, h); const next = { ...bordFormats, [key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next); }
     return pos;
   };
-  const adjustBordPlacement = () => {
-    const r = bordResult; if (!r || !r.pdfBuf) return;
-    const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type: 'application/pdf' }));
-    setBordPlace({ numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, w: r.w, h: r.h, key: r.key, blobUrl, initPos: bordFormats[r.key] });
-    if (r.url) URL.revokeObjectURL(r.url);
-    setBordResult(null);
-  };
+  const adjustBordPlacement = () => { toast('Le numéro est placé dans un espace blanc vérifié sur ce PDF.'); };
   const confirmBordPlacement = async (pos) => {
     const p = bordPlace; if (!p) return;
     const next = { ...bordFormats, [p.key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next);
@@ -16513,7 +16524,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
+            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Comment est choisi l’emplacement du numéro ?</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
@@ -26585,6 +26596,14 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {search && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, padding: '0 12px' }}><Icon name="close" size={15}/></button>}
         </div>
       </div>
+      <GuideReglage titre={edition ? 'Aménager ton espace' : 'Retrouver et ranger tes articles'} etapes={edition ? [
+        ['Reproduis ton rangement', 'Ajoute tes meubles puis ajuste leur disposition pour reconnaître ton espace réel.'],
+        ['Passe en mode Ranger', 'Sélectionne un article numéroté et une place libre pour enregistrer son emplacement.']
+      ] : [
+        ['Choisis un article', 'Sélectionne son numéro dans « À ranger ». Il doit déjà avoir un numéro VRM.'],
+        ['Choisis sa place', 'Touche une place libre dans la pièce ou utilise « Ranger ici » lorsqu’une place est proposée.'],
+        ['Retrouve-le ensuite', 'Saisis son numéro dans la recherche : VRM indique le meuble et la case enregistrés.']
+      ]}/>
       {hi && hi.notFound && <div data-stock-pas-range="" style={{ fontSize: 12.5, color: C.warn, fontWeight: 600 }}>Aucune case ne contient « {search} ».{!sansSourisStock && aRanger.some(x => x.sur && cleNum(x.numero) === cleNum(search)) ? <> Appuie sur <b>Entrée</b> pour la ranger à la prochaine place libre.</> : <> Range-le : choisis-le dans « À ranger » puis touche une place libre.</>}</div>}
       {rangeClavier && (
         <div data-stock-clavier={rangeClavier.numero ? 'range' : 'info'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: C.text, lineHeight: 1.45, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px' }}>
@@ -28005,7 +28024,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
    Messages), tous rendus par <Comptabilite/>. On a donc retiré d'ici tout ce
    qui était en doublon (numérotation, sélecteur d'achat, vues, conversations,
    bordereaux) — un seul endroit par chose. */
-function VintedAccounts({ accounts, setAccounts, baseKO }) {
+function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   const [loading, setLoading] = useState(false);
 
   const [labels, setLabels] = useState(() => load('vinted_account_labels', {}));
@@ -28430,6 +28449,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO }) {
 
   return (
     <div style={{padding:'16px 14px 40px'}}>
+      {onRetour && <button type="button" className="vrm-settings-back" onClick={onRetour} style={{color:C.accent,borderColor:C.border}}>← Retour aux paramètres</button>}
+      <GuideReglage titre="Relier et vérifier un compte" etapes={[
+        ['Connecte ton compte', 'Ouvre Vinted avec l’extension VRM active, puis actualise cette liste.'],
+        ['Vérifie son identité', 'Contrôle le pseudo et associe l’adresse qui reçoit les emails de ce compte.'],
+        ['Consulte ses données', 'Ses annonces, ventes et messages se trouvent dans les onglets Vinted.']
+      ]}/>
       {vintedPris && (
         <div data-vinted-pris={vintedPris.uid} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
@@ -39618,14 +39643,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   };
 
-  // Routeur commun : lit le format du bordereau, tamponne à l'emplacement connu
-  // pour ce format (ou au défaut intelligent = haut de page, jamais sur le
-  // code-barres). On stocke tout pour permettre de DÉPLACER ensuite.
-  // Position mémorisée du tampon pour un format (WxH). Si le format est inédit,
-  // on retient l'emplacement intelligent par défaut → une fois que tu déplaces
-  // le N° une fois (bouton « déplacer »), TOUS les prochains bordereaux de ce
-  // format le mettent au même endroit. `mut` = autorise l'enregistrement (on le
-  // coupe pendant un lot pour ne pas empiler les setState).
+  // Coordonnées historiques : le moteur protège maintenant toute la page.
   const posForFormat = (w, h, mut = true) => {
     const key = bordereauFormatKey(w, h);
     let pos = bordFormats[key];
@@ -39972,7 +39990,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ouvrirLot = () => {
     const L = lignesLot();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    setLot({ coches: new Set(L.filter(l => !l.ancienne && !l.imprime).map(l => l.cle)), echecs: [] });
+    setLot({ lignes: L, coches: new Set(L.filter(l => !l.ancienne && !l.imprime).map(l => l.cle)), echecs: [] });
   };
   const batchBordereaux = async (cles) => {
     if (batchBusy) return;
@@ -39996,6 +40014,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
       .filter(e => !choisis || choisis.has(e.txn || e.key));
     if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
+    const encoreDisponibles = new Set(aImprimer.map(e => e.txn || e.key));
+    const disparus = choisis ? [...choisis].filter(cle => !encoreDisponibles.has(cle)) : [];
+    if (disparus.length) { libererOngletPdf(); toast(`${disparus.length} bordereau(x) sélectionné(s) ne sont plus disponibles à l’expédition. Ferme puis rouvre la sélection pour vérifier la liste. Aucun lot lancé.`); return; }
     const echecs = [], faits = [];
     setBatchBusy(true);
     try {
@@ -40023,7 +40044,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         let invBytes = null;
         const inv = b ? invForBord(b) : null;
         if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
-        items.push({ numero, title, pdfBuf: buf, invBytes });
+        items.push({ numero, title, pdfBuf: buf, invBytes, cle: e.txn || e.key });
       }
       if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint: true, imprimante });
@@ -40034,11 +40055,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // est écarté par la fusion, et il doit être compté ici aussi.
       const imprimes = Number(r && r.count) || 0;
       const illisibles = Math.max(0, items.length - imprimes);
-      // Les imprimés sont notés « ✓ Imprimé » (le prochain lot les décoche) ;
-      // quand la fusion a écarté un PDF illisible on ne sait pas lequel : rien
-      // n'est noté plutôt qu'un faux « imprimé ».
-      if (!illisibles && faits.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); faits.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
-      if (choisis) setLot(echecs.length || illisibles ? { coches: new Set(echecs), echecs } : null);
+      // La fusion rend l'identité exacte des PDF réussis et refusés.
+      const clesReussies = (r.reussis || []).map(i => items[i].cle);
+      (r.rates || []).forEach(i => echecs.push(items[i].cle));
+      if (clesReussies.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); clesReussies.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      if (choisis) setLot(x => echecs.length ? { ...x, coches: new Set(echecs), echecs } : null);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
@@ -40054,11 +40075,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   },[emailBords, only]);
   // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
   const adjustBordPlacement = () => {
-    const r = bordResult; if(!r || !r.pdfBuf) return;
-    const blobUrl = URL.createObjectURL(new Blob([r.pdfBuf], { type:'application/pdf' }));
-    setBordPlace({ numero:r.numero, title:r.title, pdfBuf:r.pdfBuf, w:r.w, h:r.h, key:r.key, blobUrl, initPos: bordFormats[r.key] });
-    if (r.url) URL.revokeObjectURL(r.url);
-    setBordResult(null);
+    toast('Le numéro est placé dans un espace blanc vérifié sur chaque PDF. Les anciennes positions ne sont pas réutilisées automatiquement.');
   };
   const confirmBordPlacement = async (pos) => {
     const p = bordPlace; if(!p) return;
@@ -44335,7 +44352,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
                 {lot && (()=>{
-                  const L = lignesLot();
+                  const L = lot.lignes || lignesLot();
                   const nb = L.filter(l=>lot.coches.has(l.cle)).length;
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
@@ -44349,7 +44366,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <div style={{fontSize:16,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
                           <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginTop:3}}>Le plus récent en haut. Seuls les cochés partent à l'impression, chacun sur sa feuille.</div>
                         </div>
-                        <div style={{overflowY:'auto',padding:'4px 18px'}}>
+                        <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 18px',fontSize:12,color:C.muted}}>
+                          <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
+                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.map(l=>l.cle))}))}>Tout sélectionner</button>
+                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
+                          <span>Décocher ne supprime aucun bordereau.</span>
+                        </div>
+                        <div style={{overflowY:'auto',minHeight:0,flex:'1 1 auto',padding:'4px 18px'}}>
                           {L.map(l => {
                             const o = l.e.o, coche = lot.coches.has(l.cle);
                             const num = (l.e.b ? numForBord(l.e.b) : '') || (o ? (effEntry(o)?.numero || '') : '');
@@ -45146,10 +45169,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {/* En thermique, le N° est dans la bande réservée sous l'étiquette :
-                il n'y a rien à déplacer — le bouton ne sert qu'à la page entière. */}
-            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>✋ Le N° n'est pas au bon endroit ? Le déplacer</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Le N° pas au bon endroit ? Imprime un bordereau seul (bouton 🖨 sur une ligne), déplace-le une fois — le nouvel emplacement s'appliquera à tous les prochains lots.</div>}
+            {/* Le placement est recalculé sur chaque PDF, sans position héritée. */}
+            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Comment est choisi l’emplacement du numéro ?</button>}
+            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est vérifié séparément pour trouver un espace blanc. Un emplacement non vérifié n’est pas réutilisé dans le lot.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -48927,6 +48949,13 @@ function PushPrefsSetting({ comptes, onMuets }) {
     </details>
   );
 }
+function GuideReglage({ titre, etapes }) {
+  return <details className="vrm-settings-guide" style={{background:C.card,borderColor:C.border,color:C.text}}>
+    <summary>{titre}<span style={{color:C.accent}}>Mode d’emploi</span></summary>
+    <ol>{etapes.map(([titreEtape, texte], i) => <li key={titreEtape}><span className="vrm-settings-step" style={{background:C.bg,color:C.accent}}>{i + 1}</span><div><b>{titreEtape}</b><p style={{color:C.muted}}>{texte}</p></div></li>)}</ol>
+  </details>;
+}
+
 function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
@@ -49031,12 +49060,13 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   //    d'écriture ne change : c'est le même composant, rangé ailleurs.
   const etroit = useEtroitReglages();
   const [nMuetsPush, setNMuetsPush] = React.useState(null);
+  const [rechercheReglage, setRechercheReglage] = React.useState('');
   const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
-  const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) l.scrollIntoView({ block: 'center' }); } catch (_) {} }, 0); };
+  const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
-  React.useEffect(() => { if (!etroit) setSous(null); }, [etroit]);
+
 
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
   //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
@@ -49088,16 +49118,8 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     // Un groupe « brut » (l'onglet Abonnement) se rend tel quel, sans liste.
     let corps;
     if (g.brut) corps = items.map((it) => <React.Fragment key={it.id}>{it.el}</React.Fragment>);
-    else if (etroit) corps = liste(items);
-    else {
-      const blocs = []; let courant = [];
-      items.forEach((it) => {
-        if (it.type === 'panneau') { if (courant.length) { blocs.push(liste(courant)); courant = []; } blocs.push(<React.Fragment key={it.id}>{contenuPanneau(it, true)}</React.Fragment>); }
-        else courant.push(it);
-      });
-      if (courant.length) blocs.push(liste(courant));
-      corps = blocs.map((b, i) => <React.Fragment key={i}>{b}</React.Fragment>);
-    }
+    else corps = liste(items);
+
     return (
       <section key={g.id} id={`reglages-${g.id}`} className="vrm-set-groupe" data-groupe-reglages={g.id}>
         {g.titre && <h3 className="vrm-set-titre" style={{color:C.muted}}>{g.titre}</h3>}
@@ -49161,13 +49183,13 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   // Réglages de l'APP.
   const GROUPES_REGLAGES = [
     { id:'comptes', titre:'Comptes Vinted', items:[
-      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', titreInterne:true, el:<ConnexionsSetting/> },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
-      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', el:<SecuriteSetting/> },
+      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Vérifier les pseudos et les adresses email de tes comptes Vinted.', onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Comprendre ce qui est connecté et ce qui demande une action.', titreInterne:true, el:<ConnexionsSetting/> },
+      { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Configurer le transfert et suivre les emails reçus par VRM.', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Consulter les vérifications d’accès et les éventuels problèmes.', el:<SecuriteSetting/> },
     ]},
-    MULTI_USER && { id:'stock', titre:'Stock et photos', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', val:valNumeros, el:<NumerosSetting nu/> },
+    MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Choisir le format des prochains numéros, sans changer les anciens.', val:valNumeros, el:<NumerosSetting nu/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
@@ -49181,23 +49203,23 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     { id:'impression', titre:'Impression', items:[
-      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Choisir le format du papier et prévisualiser le résultat.', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ]},
     { id:'compta', titre:'Comptabilité', items:[
-      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', el:<RegimeSetting nu/> },
-      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', el:<EmailStartSetting nu/> },
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Régler le statut et les taux utilisés dans les rapports.', el:<RegimeSetting nu/> },
+      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Choisir la date de début de l’historique à intégrer.', el:<EmailStartSetting nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
       { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
-      { id:'tampons', type:'action', ic:'doc', lib:'Position du N° tamponné', val:'Réinitialiser', onClick:async ()=>{ if(await askConfirm('Oublier les emplacements de tampon mémorisés ? L\'app te redemandera où placer le N° au prochain bordereau de chaque format.')){ save('vinted_bordereau_formats',{}); toast('✓ Emplacements réinitialisés.'); } } },
+      { id:'tampons', type:'panneau', nu:true, ic:'doc', lib:'Placement du numéro sur les bordereaux', desc:'Un espace blanc recherché sur chaque PDF, sans modifier la page.', el:<div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>VRM analyse le rendu de chaque page complète pour chercher une zone blanche avec une marge autour du numéro. Le document garde sa taille et sa disposition. Si l’analyse échoue ou qu’aucun espace suffisant n’est trouvé, le tamponnage est refusé plutôt que placé au hasard. Les anciennes positions restent conservées, sans être réutilisées automatiquement.<p>Vérifie le résultat dans « Imprimante et bordereaux », puis « Voir les aperçus ».</p></div> },
     ]},
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
       { id:'benefjournee', type:'el', el:<BeneficeJourneeSetting key="benefjournee"/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
-      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', el:widget },
+      urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Configurer l’affichage dans Scriptable avec ton lien privé.', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
       { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
@@ -49253,7 +49275,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
-  const ouvert = etroit && sous ? panneaux.find((it) => it.id === sous) : null;
+  const ouvert = sous ? panneaux.find((it) => it.id === sous) : null;
   const titreRetour = !ongletsCompte ? 'Paramètres' : vue === 'compte' ? 'Mon compte' : vue === 'abonnement' ? 'Abonnement' : 'Réglages';
 
   // ── TON COMPTE VRM ──────────────────────────────────────────────────────
@@ -49300,6 +49322,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         </div>
       ) : (<>
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
+        <p className="vrm-settings-intro" style={{color:C.muted}}>Tes comptes, ton rangement et les préférences de VRM, regroupés par usage.</p>
         <ReglagesPasLus/>
         {ongletsCompte && (
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
@@ -49315,33 +49338,23 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
 
       {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
 
-      {etroit ? (<>
-        {!ouvert && profil}
-        {!ouvert && groupes.map(groupe)}
-        {/* Les panneaux, tous montés ; seul celui du sous-écran se voit. */}
-        {panneaux.map((it) => (
-          // Le titre du sous-écran dit déjà celui de la carte : celle-ci le tait
-          // (CSS seulement — le texte reste dans la page, les bancs le lisent).
-          <div key={it.id} hidden={!ouvert || ouvert.id !== it.id} data-sous-ecran={it.id} className={it.titreInterne ? 'vrm-set-sans-titre' : undefined}>
-            {contenuPanneau(it, false)}
-          </div>
-        ))}
-      </>) : (
-        <div className="vrm-set-cols">
-          <nav className="vrm-set-sommaire" aria-label="Sommaire des paramètres">
-            {groupes.filter((g) => g.titre).map((g) => (
-              <a key={g.id} href={`#reglages-${g.id}`} style={{color:C.muted}}
-                onClick={(e)=>{ e.preventDefault(); try { document.getElementById(`reglages-${g.id}`).scrollIntoView({ behavior:'smooth', block:'start' }); } catch (_) {} }}>
-                {g.titre}
-              </a>
-            ))}
-          </nav>
-          <div className="vrm-set-corps">
-            {profil}
-            {groupes.map(groupe)}
-          </div>
-        </div>
-      )}
+      {!ouvert && <>
+        {profil}
+        <label className="vrm-settings-search" style={{background:C.card,borderColor:C.border,color:C.muted}}>
+          <Icon name="search" size={16}/>
+          <input type="search" value={rechercheReglage} onChange={e=>setRechercheReglage(e.target.value)} placeholder="Rechercher un réglage…" aria-label="Rechercher dans les paramètres" style={{color:C.text}}/>
+        </label>
+        {(() => {
+          const normaliser = v => String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+          const q=normaliser(rechercheReglage).trim();
+          const filtres=groupes.map(g=>({...g,items:q ? g.items.filter(it=>normaliser(`${g.titre||''} ${it.lib||''} ${typeof it.desc==='string'?it.desc:''} ${it.id}`).includes(q)) : g.items})).filter(g=>g.items.length);
+          return filtres.length ? filtres.map(groupe) : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé. Essaie « email », « numéro » ou « impression ».</p>;
+        })()}
+      </>}
+      {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
+        {ouvert?.id===it.id && it.desc && <p className="vrm-settings-intro" style={{color:C.muted}}>{it.desc}</p>}
+        {contenuPanneau(it,false)}
+      </div>)}
     </div>
   );
 }
@@ -50395,7 +50408,7 @@ async function imprimerBordereauEquipe(vendeur, row, numero, titre) {
     const pdf = await PDFDocument.load(lu.octets);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const reg = await pdf.embedFont(StandardFonts.Helvetica);
-    drawBordereauStamp(pdf, rgb, bold, reg, numero || '', titre || '');
+    drawBordereauStamp(pdf, rgb, bold, reg, numero || '', titre || '', await espaceBlancBordereau(pdf,!!titre));
     posePrefsImpression(PL, pdf);
     const url = URL.createObjectURL(new Blob([await pdf.save()], { type: 'application/pdf' }));
     return { ok: true, url, ouvert: ouvrirPdfOnglet(url) };
@@ -50761,8 +50774,14 @@ function NumerosSetting({ nu = false }) {
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
       <div style={{fontSize:12.5,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
-        Comment tu écris le numéro de tes paires (étiquette, boîte, sachet…). Ça ne change que les <b>prochains</b> numéros : ceux déjà donnés ne bougent jamais.
+        Chaque article reçoit un repère que tu peux écrire sur son étiquette, sa boîte ou son sachet. Choisis ici le format des <b>prochains</b> numéros : ceux déjà attribués restent identiques.
       </div>
+      <GuideReglage titre="Du numéro à l’emplacement" etapes={[
+        ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
+        ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
+        ['Indique où il est rangé', 'Dans Stock 3D, sélectionne cet article puis une place libre. Le numéro identifie l’article ; le meuble et la case indiquent son emplacement.']
+      ]}/>
+      <div role="status" style={{marginTop:12,fontSize:13,color:C.text}}>Format actuellement enregistré : <b>{enregistree ? `${enregistree} + chiffres` : 'Chiffres seuls'}</b>. Les changements acceptés sont enregistrés automatiquement.</div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
         <button type="button" onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>
         <button type="button" onClick={() => choix('lettre')} style={pill(mode === 'lettre')}>Avec une lettre · {ex}1, {ex}2…</button>
@@ -51467,7 +51486,7 @@ function SecuriteSetting() {
       <Ligne t="Création de compte" ok={s.mailAuto == null ? null : s.mailAuto === true}
         etat={s.mailAuto == null ? 'pas encore vérifié' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
         d={s.mailAuto == null ? PAS_SU : s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
-          : "Le serveur d'envoi de test de Supabase est limité à quelques emails par heure — une création peut rester bloquée. Authentication → Providers → Email → décocher « Confirm email »."}/>
+          : "Un lien de confirmation est nécessaire pour activer le compte. Si tu ne le reçois pas, vérifie les indésirables puis demande un nouveau lien depuis la connexion."}/>
       {/* ⚠️ LA MOITIÉ SERVEUR DU CLOISONNEMENT. Les emails, les rappels
           d'expédition et les notifications sont écrits par des routes qui
           tournent SANS vendeur connecté : sans clé de service elles ne
@@ -52169,7 +52188,7 @@ function ConnexionsSetting() {
       {Array.isArray(plantages) && plantages.length > 0 && (
         <div data-plantages={plantages.length}>
         <Ligne t="Écrans en erreur" coul={C.warn} etat={`${plantages.length} ces 7 derniers jours`}
-          d={<>Le dernier : « {plantages[0].message} »{plantages[0].ecran ? <> (écran {plantages[0].ecran})</> : null}, {depuis(Date.parse(plantages[0].at) || 0)}. Tes données ne sont pas touchées : c'est l'affichage qui a échoué, et l'erreur est notée pour être corrigée. <b>Signale-le dans une session VRM.</b></>}/>
+          d={<details><summary>Voir les détails pour l’assistance</summary>Dernier incident : {plantages[0].message}{plantages[0].ecran ? ` · ${plantages[0].ecran}` : ''} · {depuis(Date.parse(plantages[0].at) || 0)}</details>}/>
         </div>
       )}
       <Ligne t="Emails" coul={teinte(mail && mail.ts)}
@@ -54891,7 +54910,7 @@ function AppCoeur() {
         {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={[['compta','Comptabilité'],['factures','Factures']]}/></div>}
         {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts}/>}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',cat_achats:'achats',cat_bord:'bordereaux',cat_expedition:'bordereaux'}; return map[tab] ? <Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}/> : null; })()}
-        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO}/>}
+        {tab==='vintedaccounts'&&<VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/>}
         </>)}
         </EcranGardeFou>
       </main>
