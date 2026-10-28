@@ -1,5 +1,23 @@
 # VRM — dossier de passation
 
+> **28 octobre — la bonne catégorie sur chaque plateforme, Vestiaire en « smart listing », eBay publié en un clic (5.245) :**
+> Julien : « Vestiaire avec le smart listing », « la catégorie doit correspondre à celle de la plateforme »,
+> « eBay : j'appuie sur publier, l'annonce se publie toute seule avec les critères et la description ».
+> UNE règle `familleArticle` (bloc partagé `<annonce-lbc-regle>`, app = extension) : chemin du catalogue
+> Vinted (`catalog_id` → `vinted_catalogue`, désormais gardé dans `articleMaigre`), puis titre, pointure,
+> description ; le GENRE ne vient QUE du chemin Vinted (jamais du titre). Leboncoin : catégories MESURÉES
+> (fdata ; « Sacs à main » n'existait pas ⇒ « Accessoires & Bagagerie », enfant ⇒ rubriques Famille),
+> `choisirCategorie` ne clique qu'un libellé EXACT. Vestiaire (`categorieVcDe` sur `vc_catalogue`) :
+> univers Femme/Homme seulement si le genre est su, sous-catégorie vérifiée dans le catalogue, sinon laissée
+> à lui et DITE ; `vc-depot.js` suit le smart listing (photos d'abord), avance par « Continuer » seulement,
+> jamais « Publier », et relève boutons et titres de chaque étape (`panel_vc_form`). eBay : bouton
+> « Publier » par article (`data-publier-un-clic`) ⇒ analyse, critères remplis par des FAITS de Vinted
+> (marque, pointure, couleur, Département d'après la catégorie Vinted, Type), vérification à blanc, UNE
+> confirmation qui dit tout, puis publication ; critère obligatoire inconnu ⇒ rien ne part, il est nommé.
+> Preuves : `audit-categories-plateformes.cjs` (22 ; « Sacs à main » remis ⇒ 3 rouges), banc
+> `ebay-un-clic.cjs` (14). ⚠️ Non mesuré : les écrans du smart listing après les photos, le vrai Vestiaire.
+> Geste : installer la 5.245, rouvrir son dressing Vinted (le `catalog_id` y est capté, donc le genre).
+
 > **27 octobre (soir) — boutons et disposition revus, couleurs GARDÉES, animation de connexion :**
 > Julien : « je veux juste que les boutons, les dispositions soient modifiés… j'aimais bien
 > celle d'avant un peu vert » — une palette violette essayée puis REFUSÉE : ne pas la

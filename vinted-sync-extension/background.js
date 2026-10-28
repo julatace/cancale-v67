@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.244.0';
+const CODE_VERSION = '5.245.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2586,7 +2586,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const cle = String(msg.etape || Object.keys(etapes).length).slice(0, 120);
             if (!etapes[cle] && Object.keys(etapes).length >= 24) { sendResponse({ ok: true }); return; }
             let chemin = ''; try { chemin = new URL(String(msg.url || '')).pathname.replace(/\d{3,}/g, '{id}').slice(0, 120); } catch (_) {}
-            etapes[cle] = { chemin, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: Number(msg.fichiers) || 0, fichiersMultiple: !!msg.fichiersMultiple, ver: EXT_VERSION, at: new Date().toISOString() };
+            etapes[cle] = { chemin, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: Number(msg.fichiers) || 0, fichiersMultiple: !!msg.fichiersMultiple, boutons: (Array.isArray(msg.boutons) ? msg.boutons : []).slice(0, 40).map((t) => String(t || '').slice(0, 40)), titres: (Array.isArray(msg.titres) ? msg.titres : []).slice(0, 10).map((t) => String(t || '').slice(0, 60)), ver: EXT_VERSION, at: new Date().toISOString() };
             await supabaseUpsert('app_data', [{ id: 'panel_vc_form', data: { ...cur, etapes, at: new Date().toISOString() } }], 'id');
             sendResponse({ ok: true }); return;
           }
@@ -4002,7 +4002,10 @@ const CHAMPS_ARTICLE = ['id','title','price','url','brand','size','brand_title',
   'is_closed','is_hidden','is_draft','item_closing_action','is_reserved',
   // Boost en cours sur l'annonce (3 octobre) : Vinted l'envoie déjà dans le
   // dressing (prouvé sur 3 articles non allégés), l'allègement le jetait.
-  'promoted','can_push_up'];
+  'promoted','can_push_up',
+  // (28 oct.) La catégorie Vinted (et ses couleurs) : c'est d'elle que se
+  // déduit la catégorie sur Leboncoin, Vestiaire et eBay (genre compris).
+  'catalog_id','color1','color2','color1_id','color2_id'];
 
 function photoUtile(it) {
   const candidats = [it.photo,it.photo_url,it.photoUrl,it.image_url,it.imageUrl,it.item_photo,
@@ -8663,6 +8666,7 @@ async function publierDepuisAppSuite(msg, cmd, id, lbc) {
   // l'annonce part avec ses photos, sans attendre le fond.
   try { const cu = await compteConnecte('www.vinted.fr'); if (cu) await avecVinted(() => completerPhotosSiManque(cu, id)).catch(() => {}); } catch (_) {}
   await viderFiches({ force: true }).catch(() => {});   // 22 oct. : sa description enregistrée sur Vinted part avec l'annonce
+  if (lbc) await chargerCataloguesPlateformes();
   const r = lbc ? await buildLbcData() : await buildEbayData();
   const preuveKO = lbc ? !!(r && r.stats && r.stats.preuveKO) : !!(r && r.preuveKO);
   if (preuveKO) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" };
@@ -10686,8 +10690,94 @@ function viderMemoVisite(uid) {
 //    vêtement, pas une paire du 40.
 function lbcCategory(det, raw) {
   // La règle vit dans le bloc partagé avec l'app (`categorieLbcDe`, §11) : la
-  // fiche de VRM montre la catégorie que l'extension choisira.
-  return categorieLbcDe(det.title || raw.title || '', det.description || '', det.size || raw.size || det.size_title || raw.size_title || '');
+  // fiche de VRM montre la catégorie que l'extension choisira. (28 oct.) Avec le
+  // chemin de la catégorie Vinted quand on le connaît (le genre en dépend).
+  return categorieLbcDe(det.title || raw.title || '', det.description || '', det.size || raw.size || det.size_title || raw.size_title || '', cheminDeLAnnonce(raw, det), firstDefined(det.brand_dto && det.brand_dto.title, raw.brand_title, det.brand, raw.brand));
+}
+// ── LES CATALOGUES DES PLATEFORMES (28 oct.) ───────────────────────────────
+// Le catalogue Vinted (`vinted_catalogue`, ~550 Ko) et celui du dépôt Vestiaire
+// (`vc_catalogue.deposit_catalog`) sont lus SUR UN CLIC « Publier » seulement
+// (§4.4), gardés une heure en mémoire (une simple réserve : relus s'ils
+// manquent). Illisibles ⇒ `null` : la catégorie se décide sans le chemin Vinted
+// (titre, pointure), et Vestiaire ne choisit que ce qu'il SAIT.
+let _catVinted = null, _catVintedAt = 0, _catVc = null, _catVcAt = 0;
+async function chargerCataloguesPlateformes() {
+  const t = Date.now(), ttl = 3600000;
+  try {
+    if (!_catVinted || t - _catVintedAt > ttl) {
+      const r = await sbGet('app_data?id=eq.vinted_catalogue&select=c:data->>corps');
+      if (r && r[0] && r[0].c) { try { _catVinted = JSON.parse(r[0].c); _catVintedAt = t; } catch (_) {} }
+    }
+    if (!_catVc || t - _catVcAt > ttl) {
+      const r = await sbGet('app_data?id=eq.vc_catalogue&select=c:data->deposit_catalog->>corps');
+      if (r && r[0] && r[0].c) { try { _catVc = JSON.parse(r[0].c); _catVcAt = t; } catch (_) {} }
+    }
+  } catch (_) {}
+  return { vinted: !!_catVinted, vestiaire: !!_catVc };
+}
+function cheminDeLAnnonce(raw, det) {
+  const d = det || {}, r = raw || {};
+  const id = firstDefined(d.catalogId, d.catalog_id, d.codes && d.codes.catalog_id, r.catalog_id);
+  return id === '' ? '' : cheminCatalogueVinted(_catVinted, id);
+}
+// ── VESTIAIRE : la catégorie du dépôt (univers › catégorie › sous-catégorie) ──
+// Les libellés EXACTS du catalogue de dépôt capté (5.243). Une sous-catégorie
+// n'est retenue que si elle EXISTE dans cette catégorie de cet univers ; un
+// univers ne se décide que par le genre Vinted (femme/homme — un article enfant
+// est fille OU garçon : on ne tranche pas). Ce qui manque est NOMMÉ.
+const VC_SOUS = {
+  baskets: ['Baskets'], bottes: ['Bottes', 'Bottes & Boots', 'Boots', 'Bottes & Bottines'], sandales: ['Sandales'],
+  mocassins: ['Mocassins'], derbies: ['Derbies', 'A lacets'], escarpins: ['Escarpins'], ballerines: ['Ballerines'], espadrilles: ['Espadrilles'],
+  'sacs-dos': ['Sacs à dos', 'Sacs', 'Sacs & Trousses'], 'sacs-banane': ['Sacs banane', 'Sacs', 'Sacs & Trousses'], pochettes: ['Pochettes', 'Sacs', 'Sacs & Trousses'],
+  sacs: ['Sacs à main', 'Sacs', 'Sacs & Trousses'], portefeuilles: ['Portefeuilles', 'Petite maroquinerie'],
+  'tee-shirts': ['Tee shirts', 'Tops'], polos: ['Polos', 'Tops'], chemises: ['Chemises', 'Tops'],
+  pulls: ['Pulls, Gilets & Sweats', 'Pulls & Gilets'], manteaux: ['Manteaux', 'Blousons & Manteaux'],
+  vestes: ['Vestes & Blousons', 'Vestes', 'Blousons', 'Blousons & Manteaux'], jeans: ['Jeans'], pantalons: ['Pantalons'],
+  shorts: ['Shorts'], robes: ['Robes'], jupes: ['Jupes'], montres: ['Montres'], bijoux: ['Bijoux'],
+  casquettes: ['Chapeaux & Bonnets', 'Chapeaux', 'Chapeaux, Bonnets & Gants'], ceintures: ['Ceintures', 'Ceintures & Bretelles'],
+  lunettes: ['Lunettes'], echarpes: ['Chèches & Echarpes', 'Foulards', 'Foulards & Echarpes'], gants: ['Gants', 'Chapeaux, Bonnets & Gants'],
+};
+const VC_CAT = { chaussures: ['Chaussures'], vetements: ['Vêtements'], sacs: ['Sacs', 'Accessoires'], accessoires: ['Accessoires'], bijoux: ['Bijoux', 'Accessoires'] };
+function categorieVcDe(f, catalogue) {
+  const out = { univers: '', categorie: '', sous: '', ids: {}, manque: [], verifie: !!(catalogue && Array.isArray(catalogue.data)) };
+  const x = f || {};
+  if (!x.famille) { out.manque.push('catégorie'); return out; }
+  const univ = x.genre === 'femme' ? 'Mode femme' : x.genre === 'homme' ? 'Mode homme' : '';
+  if (!univ) out.manque.push('univers (femme / homme)');
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const univers = out.verifie ? catalogue.data.filter((u) => u && (!univ || norm(u.title) === norm(univ)) && /^mode (femme|homme)$/i.test(String(u.title || '').trim())) : [];
+  const nomsCat = VC_CAT[x.famille] || [];
+  const nomsSous = x.sous ? (VC_SOUS[x.sous] || []) : [];
+  if (!out.verifie) {
+    out.univers = univ; out.categorie = nomsCat[0] || ''; out.sous = nomsSous[0] || '';
+    if (!out.sous) out.manque.push('sous-catégorie');
+    return out;
+  }
+  // Une catégorie (et sa sous-catégorie) qui existe dans l'univers — ou dans
+  // TOUS les univers possibles quand on ne connaît pas le genre (même libellé).
+  let choix = null, repli = null;
+  for (const nc of nomsCat) {
+    const cands = univers.map((u) => ({ u, c: (u.categories || []).find((c) => norm(c.title) === norm(nc)) })).filter((p) => p.c);
+    if (!cands.length) continue;
+    let sous = '', sid = null;
+    for (const ns of nomsSous) {
+      const ok = cands.every((p) => (p.c.subCategories || []).some((s) => norm(s.title) === norm(ns)));
+      if (ok) { const s0 = (cands[0].c.subCategories || []).find((s) => norm(s.title) === norm(ns)); sous = String(s0.title).trim(); sid = cands.length === 1 ? s0.id : null; break; }
+    }
+    if (nomsSous.length && !sous) {                   // la catégorie existe, pas la sous-catégorie : on essaie la suivante
+      if (!repli) repli = { cands, cat: String(cands[0].c.title).trim(), sous: '', sid: null };
+      continue;
+    }
+    choix = { cands, cat: String(cands[0].c.title).trim(), sous, sid };
+    break;
+  }
+  if (!choix) choix = repli;                          // la catégorie sûre, la sous-catégorie à choisir
+  if (!choix) { out.manque.push('catégorie'); return out; }
+  out.univers = univ && choix.cands.length === 1 ? String(choix.cands[0].u.title).trim() : '';
+  out.categorie = choix.cat; out.sous = choix.sous;
+  if (choix.cands.length === 1) out.ids = { univers: choix.cands[0].u.id, categorie: choix.cands[0].c.id, sous: choix.sid };
+  if (!out.sous) out.manque.push('sous-catégorie');
+  return out;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // LE TITRE LEBONCOIN — 50 caractères, et ils se gagnent
@@ -10808,16 +10898,108 @@ function clePhotoLbc(u) {
     return x.pathname.replace(/\/(f\d+(?:x\d+)?|tc)\//, '/');
   } catch (_) { return ''; }
 }
-function categorieLbcDe(titre, description, taille) {
-  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
-  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
-  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
-  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
-  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
-  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
-  const p = parseFloat(String(taille || '').replace(',', '.'));
-  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
+// ── LA FAMILLE D'UN ARTICLE, pour choisir sa catégorie sur chaque plateforme ──
+// (28 oct., Julien : « la catégorie ne correspond peut-être pas exactement, elle
+// doit trouver celle qui correspond pour la plateforme ».) Une règle pour
+// Leboncoin, Vestiaire et eBay (§11). La source la plus sûre d'abord :
+//   1. le CHEMIN de la catégorie Vinted de l'annonce (« Hommes > Chaussures >
+//      Baskets », lu dans le catalogue Vinted capté) — il donne aussi le GENRE ;
+//   2. un mot du TITRE (« sneaker », « sac à dos », « jean »…) ;
+//   3. une POINTURE seule (34 à 50, demi-pointure comprise) ⇒ chaussures ;
+//   4. un mot de la DESCRIPTION, seulement si rien d'autre n'a parlé.
+// Le genre ne se devine JAMAIS du titre ni de la pointure : sans chemin Vinted
+// il reste vide (une plateforme qui l'exige le laisse à choisir). Rien de sûr ⇒
+// famille vide : mieux vaut une catégorie à choisir qu'une catégorie fausse (§5).
+const SOUS_FAMILLES = [
+  ['sandales', 'chaussures', /(sandale|\btongs?\b|claquette|\bmules?\b|nu-?pieds|slides?\b)/],
+  ['escarpins', 'chaussures', /escarpin/],
+  ['ballerines', 'chaussures', /ballerine/],
+  ['espadrilles', 'chaussures', /espadrille/],
+  ['mocassins', 'chaussures', /(mocassin|loafer)/],
+  ['derbies', 'chaussures', /(\bderby\b|derbies|richelieu|oxford)/],
+  ['bottes', 'chaussures', /(\bbottes?\b|bottine|\bboots?\b|chelsea)/],
+  ['baskets', 'chaussures', /(basket|sneaker|running|trainer|\brunners?\b)/],
+  ['chaussures', 'chaussures', /chaussure/],
+  ['sacs-dos', 'sacs', /(sacs? [àa] dos|backpack)/],
+  ['sacs-banane', 'sacs', /(banane|bum ?bag|waist ?bag)/],
+  ['pochettes', 'sacs', /pochette/],
+  ['portefeuilles', 'accessoires', /(portefeuille|porte-?monnaie|porte-?cartes)/],
+  ['sacs', 'sacs', /(\bsacs?\b|sacoche|bandouli|cabas|\btote\b)/],
+  ['tee-shirts', 'vetements', /(t-?shirt|tee-?shirt|\btee\b|d[ée]bardeur)/],
+  ['polos', 'vetements', /\bpolos?\b/],
+  ['chemises', 'vetements', /chemise/],
+  ['pulls', 'vetements', /(\bpulls?\b|sweat|hoodie|gilet|cardigan)/],
+  ['manteaux', 'vetements', /(manteau|doudoune|parka)/],
+  ['vestes', 'vetements', /(\bvestes?\b|blouson|bomber|coupe-?vent)/],
+  ['jeans', 'vetements', /\bjeans?\b/],
+  ['pantalons', 'vetements', /(pantalon|jogging|\bcargo\b|legging|surv[êe]tement)/],
+  ['shorts', 'vetements', /\bshorts?\b/],
+  ['robes', 'vetements', /\brobes?\b/],
+  ['jupes', 'vetements', /\bjupes?\b/],
+  ['vetements', 'vetements', /(v[êe]tement|maillot|combinaison)/],
+  ['montres', 'accessoires', /\bmontres?\b/],
+  ['bijoux', 'bijoux', /(bijou|collier|bracelet|\bbagues?\b|boucles? d.oreille|pendentif)/],
+  ['casquettes', 'accessoires', /(casquette|bonnet|chapeau|\bbob\b)/],
+  ['ceintures', 'accessoires', /ceinture/],
+  ['lunettes', 'accessoires', /lunettes/],
+  ['echarpes', 'accessoires', /([ée]charpe|foulard)/],
+  ['gants', 'accessoires', /\bgants?\b/],
+];
+const MARQUES_BASKETS = /\b(nike|adidas|new balance|salomon|asics|puma|reebok|vans|converse|jordan|autry|veja|hoka|on running|saucony|mizuno|onitsuka|diadora|le coq sportif|k-?swiss|fila|yeezy)\b/;
+function cheminCatalogueVinted(catalogue, id) {
+  if (id == null || id === '' || !catalogue || !Array.isArray(catalogue.catalogs)) return '';
+  const cible = String(id); const pile = catalogue.catalogs.slice();
+  let n = 0;
+  while (pile.length && n++ < 20000) {
+    const c = pile.pop();
+    if (!c || typeof c !== 'object') continue;
+    if (String(c.id) === cible) return (c.path ? String(c.path) + ' > ' : '') + String(c.title || '');
+    if (Array.isArray(c.catalogs)) for (const s of c.catalogs) pile.push(s);
+  }
   return '';
+}
+function familleArticle(o) {
+  const x = o || {};
+  const ch = String(x.chemin || '').toLowerCase();
+  const seg = ch ? ch.split('>').map((s) => s.trim()) : [];
+  let genre = '', famille = '', sous = '', source = '';
+  if (/^femmes?$/.test(seg[0] || '')) genre = 'femme';
+  else if (/^hommes?$/.test(seg[0] || '')) genre = 'homme';
+  else if (/^enfants?$/.test(seg[0] || '')) genre = 'enfant';
+  const deux = seg[1] || '';
+  if (/chaussure/.test(deux)) famille = 'chaussures';
+  else if (/v[êe]tement/.test(deux)) famille = 'vetements';
+  else if (/^sacs?\b/.test(deux)) famille = 'sacs';
+  else if (/bijou/.test(deux)) famille = 'bijoux';
+  else if (/accessoire/.test(deux)) famille = 'accessoires';
+  if (famille) source = 'vinted';
+  const essai = (txt) => {
+    for (const [s, f, re] of SOUS_FAMILLES) if ((!famille || famille === f || (famille === 'accessoires' && f === 'bijoux') || (famille === 'sacs' && f === 'accessoires')) && re.test(txt)) return [s, f];
+    return null;
+  };
+  let r = seg.length > 2 ? essai(seg.slice(2).join(' ')) : null;
+  if (!r) r = essai(String(x.titre || '').toLowerCase());
+  if (r) { if (r[0] !== r[1]) sous = r[0]; if (!famille) { famille = r[1]; source = 'titre'; } }
+  if (!famille) {
+    const t = String(x.taille || '').trim();
+    const p = parseFloat(t.replace(',', '.'));
+    if (/^\d{2}(?:[.,]5)?$/.test(t) && p >= 34 && p <= 50) { famille = 'chaussures'; source = 'pointure'; }
+  }
+  if (!famille) { r = essai(String(x.description || '').toLowerCase()); if (r) { famille = r[1]; if (r[0] !== r[1]) sous = r[0]; source = 'description'; } }
+  if (famille === 'chaussures' && !sous && MARQUES_BASKETS.test((String(x.marque || '') + ' ' + String(x.titre || '')).toLowerCase())) sous = 'baskets';
+  return { famille, sous, genre, source };
+}
+// Leboncoin : « Mode » (adulte) ou « Famille » (enfant), le libellé EXACT de sa
+// sous-catégorie (mesuré dans `lbc_catalogue`, fdata du 22 oct.).
+const LBC_CAT_ADULTE = { chaussures: 'Chaussures', vetements: 'Vêtements', sacs: 'Accessoires & Bagagerie', accessoires: 'Accessoires & Bagagerie', bijoux: 'Montres & Bijoux' };
+const LBC_CAT_ENFANT = { chaussures: 'Chaussures enfants', vetements: 'Vêtements enfants', sacs: 'Accessoires & bagagerie enfants', accessoires: 'Accessoires & bagagerie enfants', bijoux: 'Montres & bijoux enfants' };
+function categorieLbcDe(titre, description, taille, chemin, marque) {
+  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
+  if (!chemin && /(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(String(titre || '').toLowerCase())) return 'Livres';
+  const f = familleArticle({ chemin, titre, description, taille, marque });
+  if (!f.famille) return /(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t) ? 'Livres' : '';
+  const fam = f.sous === 'montres' ? 'bijoux' : f.famille;
+  return (f.genre === 'enfant' ? LBC_CAT_ENFANT : LBC_CAT_ADULTE)[fam] || '';
 }
 function descriptionLbcDe(o) {
   const ref = String(o.ref || '');
@@ -11334,6 +11516,7 @@ async function buildEbayData() {
     const pd = pageDet[id] || {}; const cur = details[id] || {};
     if (!cur.description && pd.description) cur.description = pd.description;
     if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
+    if (cur.catalogId == null && pd.catalogId != null) cur.catalogId = pd.catalogId;   // (28 oct.) la catégorie Vinted enregistrée
     details[id] = cur;
   }
   // ⚠️⚠️ UNE PAIRE DÉJÀ VENDUE NE DOIT PAS ENTRER DANS LA FILE eBAY.
@@ -11443,7 +11626,13 @@ async function annonceVestiaire(id) {
   const pd = ((rp && rp[0] && rp[0].data) || {})[String(id)] || {};
   if (!det.description && pd.description) det.description = pd.description;
   if ((!det.photos || !det.photos.length) && pd.photos && pd.photos.length) det.photos = pd.photos.map((u) => ({ url: u }));
-  return { ad: buildEbayAd(trouve.it, det, num, uid2login[trouve.uid]) };
+  if (det.catalogId == null && pd.catalogId != null) det.catalogId = pd.catalogId;
+  const ad = buildEbayAd(trouve.it, det, num, uid2login[trouve.uid]);
+  // (28 oct.) La catégorie de dépôt Vestiaire, déduite de la catégorie Vinted
+  // (§ « familleArticle ») et vérifiée contre le catalogue de dépôt capté.
+  const fam = familleArticle({ chemin: cheminDeLAnnonce(trouve.it, det), titre: firstDefined(det.title, trouve.it.title), description: det.description || '', taille: ad.taille, marque: ad.marque });
+  ad.vcCategorie = categorieVcDe(fam, _catVc);
+  return { ad };
 }
 async function publierVestiaire(msg) {
   const cmd = String(msg.cmd || ''); const id = String(msg.id || '');
@@ -11469,6 +11658,7 @@ async function publierVestiaire(msg) {
     }
     try { const cu = await compteConnecte('www.vinted.fr'); if (cu) await avecVinted(() => completerPhotosSiManque(cu, id)).catch(() => {}); } catch (_) {}
     await viderFiches({ force: true }).catch(() => {});
+    await chargerCataloguesPlateformes();
     const r = await annonceVestiaire(id);
     if (!r.ad) return { accepte: false, code: r.code || 'absente', raison: r.raison || 'annonce introuvable' };
     let tab = null;
@@ -11765,6 +11955,7 @@ async function buildLbcData() {
     const cur = details[id] || {};
     if (!cur.description && pd.description) cur.description = pd.description;
     if ((!cur.photos || !cur.photos.length) && pd.photos && pd.photos.length) cur.photos = pd.photos.map(u => ({ url: u }));
+    if (cur.catalogId == null && pd.catalogId != null) cur.catalogId = pd.catalogId;   // (28 oct.) la catégorie Vinted enregistrée
     details[id] = cur;
   }
   // ── « VENDUE » SE PROUVE, ELLE NE SE DÉDUIT PAS D'UNE ABSENCE ─────────────

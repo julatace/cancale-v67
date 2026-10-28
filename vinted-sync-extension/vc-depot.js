@@ -11,8 +11,16 @@
 // ⚠️ JE N'AI JAMAIS VU CE FORMULAIRE : rien n'est promis, rien n'est deviné.
 // ⚠️ 5.236 : VRM PUBLIE tout seul, SANS BOOSTER (`publierSansBooster`), quand
 //    tout est rempli ; une catégorie ou un modèle obligatoires restent à lui.
-// ⚠️ AUCUNE CATÉGORIE, AUCUN MODÈLE n'est choisi : une catégorie fausse fait
-//    plus de mal que pas de catégorie du tout (leçon eBay).
+// ⚠️ 28 oct. : LA CATÉGORIE vient de celle de Vinted (`ad.vcCategorie`, calculée
+//    par le fond sur le catalogue de dépôt capté : univers › catégorie ›
+//    sous-catégorie, libellés EXACTS). On ne clique qu'une option au libellé
+//    exactement égal ; ce que le fond ne sait pas (souvent l'univers femme /
+//    homme) reste à choisir et le bandeau le NOMME. Le MODÈLE n'est jamais choisi.
+// ⚠️ 28 oct. : le dépôt de Vestiaire est le SMART LISTING (`/smart-listing/`,
+//    mesuré le 27 : une page d'envoi de photos). Après les photos, on avance
+//    d'une étape par « Continuer / Suivant / Générer » — jamais un bouton qui
+//    publie, paye ou nomme une option ; Vestiaire pré-remplit, puis VRM corrige
+//    avec SES valeurs (catégorie, prix, état, marque, taille).
 // Ce fichier est une copie d'ebay.js : ses commentaires « eBay » disent pourquoi
 // chaque garde existe ; ils valent ici aussi.
 (function () {
@@ -291,6 +299,66 @@
     if (choisirListe([/pointure|taille|\bsize\b/], [ad.taille])) n++;
     return n + composFaits;
   }
+  // ── LA CATÉGORIE DE DÉPÔT (28 oct.) ─────────────────────────────────────────
+  // Trois niveaux, dans l'ordre (univers › catégorie › sous-catégorie). Pour
+  // chacun : un `<select>` (option au texte exact), une liste React (on l'ouvre,
+  // on clique l'option exacte), ou un choix cliquable (bouton, radio, option,
+  // tuile) dont le texte est EXACTEMENT le libellé — et un seul sur la page :
+  // deux éléments au même texte, on ne tranche pas. Jamais un lien (`<a>`).
+  const normTxt = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const visible = (el) => { try { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; } catch (_) { return false; } };
+  const estChoisi = (el) => el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-pressed') === 'true' || !!(el.querySelector && el.querySelector('input:checked'));
+  let _catFaits = new Set(); let _catEnCours = false;
+  async function choisirNiveauVc(motif, libelle) {
+    const cible = normTxt(libelle);
+    if (!cible) return false;
+    if (choisirListe([motif], [libelle])) return true;
+    if (await choisirComposant(motif, libelle)) return true;
+    const cands = Array.from(document.querySelectorAll('button,[role="option"],[role="radio"],[role="menuitem"],[role="tab"],label,li'))
+      .filter((el) => !DANS_ENTETE(el) && !NOTRE_UI_VC(el) && !el.closest('a[href]') && visible(el) && normTxt(el.innerText || el.textContent) === cible);
+    const uniques = cands.filter((el) => !cands.some((o) => o !== el && el.contains(o)));
+    if (uniques.length !== 1) return false;
+    const el = uniques[0];
+    if (estChoisi(el)) return true;
+    try { el.click(); } catch (_) { return false; }
+    return true;
+  }
+  async function choisirCategorieVc(ad) {
+    const c = ad && ad.vcCategorie;
+    if (!c || _catEnCours) return 0;
+    _catEnCours = true; let k = 0;
+    try {
+      const niveaux = [['u', /univers|genre|pour qui|gender|department/, c.univers], ['c', /cat[ée]gorie|category|type/, c.categorie], ['s', /sous.?cat|cat[ée]gorie|type|subcategory/, c.sous]];
+      for (const [cle, motif, lib] of niveaux) {
+        if (!lib) continue;
+        if (_catFaits.has(cle)) continue;
+        if (await choisirNiveauVc(motif, lib)) { _catFaits.add(cle); k++; await attendreVc(400); }
+        else break;            // le niveau suivant n'apparaît qu'après celui-ci
+      }
+    } catch (_) {}
+    _catEnCours = false; return k;
+  }
+  // ── LE SMART LISTING : avancer d'une étape, jamais publier ────────────────
+  const AVANCER_VC = /^(continuer|suivant|[ée]tape suivante|next|continue|g[ée]n[ée]rer( (mon|l['’]) ?annonce)?|analyser( mes| les)? photos)$/i;
+  const JAMAIS_AVANCER = /publier|mettre en vente|mettre en ligne|soumettre|submit|publish|payer|paiement/i;
+  const _avances = new Set();
+  function avancerVc() {
+    if (!(photosEtat && photosEtat.n > 0)) return false;          // les photos d'abord
+    if (_avances.size >= 6) return false;
+    const btns = Array.from(document.querySelectorAll('button,[role="button"],input[type="submit"]')).filter((b) => !DANS_ENTETE(b) && !NOTRE_UI_VC(b) && visible(b));
+    for (const b of btns) {
+      const t = String((b.innerText || b.value || '') || '').replace(/\s+/g, ' ').trim();
+      if (!t || !AVANCER_VC.test(t)) continue;
+      if (JAMAIS_AVANCER.test(t) || PRIX_ARGENT_VC.test(t) || NOM_BOOST_VC.test(t)) continue;
+      if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+      const cle = location.pathname + '|' + t + '|' + (derniereEtape || '');
+      if (_avances.has(cle)) return false;
+      _avances.add(cle);
+      try { b.click(); } catch (_) {}
+      return true;
+    }
+    return false;
+  }
   // ══════════════════════════════════════════════════════════════════════════
   // PUBLIER SANS BOOSTER (27 octobre, 5.236)
   // ══════════════════════════════════════════════════════════════════════════
@@ -475,25 +543,30 @@
       : publication.etat === 'clic' ? `<div data-vc-pub="clic" style="margin-top:6px">J'ai cliqué « ${esc(publication.bouton)} » (sans booster) — j'attends la confirmation de Vestiaire…</div>`
       : publication.raison ? `<div data-vc-pub="${esc(publication.etat || 'attente')}" style="color:#F5A524;margin-top:6px">${esc(publication.raison)}</div>`
       : `<div data-vc-pub="attente" style="margin-top:6px">Je publie tout seul, sans booster, dès que tout est rempli.</div>`;
+    const vcCat = ad.vcCategorie || null;
+    const cheminCat = vcCat ? [vcCat.univers, vcCat.categorie, vcCat.sous].filter(Boolean).join(' › ') : '';
+    const manqueCat = vcCat && Array.isArray(vcCat.manque) ? vcCat.manque : [];
+    const ligneCat = !vcCat ? ''
+      : `<div data-vc-categorie="${catChoisis ? 'choisie' : (cheminCat ? 'attente' : 'inconnue')}" style="margin-top:6px">🏷️ ${cheminCat ? `Catégorie (d'après Vinted) : <b>${esc(cheminCat)}</b>${catChoisis ? ` — ${catChoisis} niveau${catChoisis > 1 ? 'x' : ''} choisi${catChoisis > 1 ? 's' : ''}.` : ' — je la choisis dès qu\'elle s\'affiche.'}` : 'Catégorie : je n\'ai pas pu la déduire de Vinted.'}${manqueCat.length ? ` <span style="color:#F5A524">À choisir toi-même : ${esc(manqueCat.join(', '))}.</span>` : ''}</div>`;
     poserHtml(el, (n > 0
-      ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos}${ad.publier === true ? '' : ' Relis tout, choisis la catégorie et le modèle, puis publie.'}`
+      ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos}${ad.publier === true ? '' : ' Relis tout, vérifie la catégorie et choisis le modèle, puis publie.'}`
       : (formulaireVisible()
         ? `<b>N°${esc(ad.numero)}</b> — je n'ai reconnu aucun champ sur cette page. ${photos} Copie la description ci-dessous et colle-la.`
         : `<b>N°${esc(ad.numero)}</b> — clique <b>« Vendre un article »</b> sur Vestiaire : je remplis dès que le formulaire s'affiche.`))
-      + pub + fini
+      + ligneCat + pub + fini
       + `<div style="display:flex;gap:6px;margin-top:9px">
            <button id="vrm-vc-refill" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Re-remplir</button>
            <button id="vrm-vc-cdesc" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Copier la description</button>
            <button id="vrm-vc-close" title="Fermer" style="border:1px solid #1E2530;background:transparent;color:#8A93A3;border-radius:9px;padding:7px 9px;font:11.5px system-ui,sans-serif;cursor:pointer">✕</button>
          </div>
-         <div style="color:#8A93A3;font-size:10px;margin-top:7px">${ad.publier === true ? 'VRM ne coche jamais d\'option payante (boost, mise en avant) et ne clique jamais un bouton qui porte un prix. La catégorie et le modèle, VRM ne les devine pas.' : 'VRM ne publie pas à ta place ici : relis et clique toi-même. Une fois publiée, note-la « Déjà publiée » dans VRM.'}</div>`);
+         <div style="color:#8A93A3;font-size:10px;margin-top:7px">${ad.publier === true ? 'VRM ne coche jamais d\'option payante (boost, mise en avant) et ne clique jamais un bouton qui porte un prix. La catégorie suit celle de Vinted ; le modèle, VRM ne le devine pas.' : 'VRM ne publie pas à ta place ici : relis et clique toi-même. Une fois publiée, note-la « Déjà publiée » dans VRM.'}</div>`);
     el.querySelector('#vrm-vc-refill').onclick = () => { relancer(ad); };
     el.querySelector('#vrm-vc-cdesc').onclick = () => { copyDire(ad.description || '', 'Description'); };
     el.querySelector('#vrm-vc-close').onclick = () => { clearInterval(minuteur); el.remove(); send({ action: 'fini' }); };
   }
   // eBay reconstruit son formulaire au fil des étapes : on réessaie, sans jamais
   // écraser ce qui est déjà saisi. On s'arrête au bout de 90 s — et on le DIT.
-  let essais = 0, faits = 0, minuteur = null, arrete = false;
+  let essais = 0, faits = 0, minuteur = null, arrete = false, catChoisis = 0;
   let photosFaites = false, photosEtat = null;
   function surveiller(ad) {
     clearInterval(minuteur);
@@ -502,6 +575,8 @@
       // Les comboboxes React (état/marque/pointure) se remplissent en async ;
       // leur compte s'ajoute à `composFaits`, que `remplir` additionne.
       remplirComposants(ad).then((k) => { if (k) { const nn = remplir(ad); if (nn > faits) { faits = nn; bandeau(faits, ad); } } });
+      choisirCategorieVc(ad).then((k) => { if (k) { catChoisis += k; faits += k; bandeau(faits, ad); } });
+      if (essais % 3 === 0 && avancerVc()) bandeau(faits, ad);
       const n = remplir(ad);
       if (n > faits) { faits = n; bandeau(faits, ad); }
       // Les photos : dès qu'une étape porte un champ fichier, on attache. UNE
@@ -510,6 +585,7 @@
         photosFaites = true;
         attacherPhotos(ad).then((r2) => { photosEtat = r2; bandeau(faits, ad); });
       }
+      if (/smart-listing/i.test(location.pathname) && !formulaireVisible()) rapporterEtape();
       if (formulaireVisible()) { rapporterEtape(); if (essais % 2 === 0) tenterPublication(ad); }
       if (essais > 600) { clearInterval(minuteur); arrete = true; bandeau(faits, ad); }
     }, 1000);
@@ -517,6 +593,7 @@
   function relancer(ad) {
     arrete = false; essais = 0;
     _composFaits = new Set(); composFaits = 0;   // « Re-remplir » rouvre les menus
+    _catFaits = new Set(); catChoisis = 0;
     if (publication.etat === 'stop' || publication.etat === 'refusee') publication = { etat: '', raison: '', essais: 0, bouton: '', urlClic: '' };
     faits = remplir(ad);
     if (!photosFaites && champsFichier().length) {
@@ -577,11 +654,11 @@
   }
   let _releveMinuteur = null;
   function releverSansDepot() {
-    if (_releveMinuteur || !/sell|deposit|vendre/i.test(location.pathname)) return;
+    if (_releveMinuteur || !/sell|deposit|vendre|smart-listing/i.test(location.pathname)) return;
     let tours = 0;
     _releveMinuteur = setInterval(() => {
       tours += 1;
-      try { if (formulaireVisible()) rapporterEtape(); } catch (_) {}
+      try { if (formulaireVisible() || /smart-listing/i.test(location.pathname)) rapporterEtape(); } catch (_) {}
       if (tours > 90) { clearInterval(_releveMinuteur); _releveMinuteur = null; }
     }, 2000);
   }
@@ -636,11 +713,19 @@
       const fileInputs = Array.from(document.querySelectorAll('input[type="file"]')).filter((el) => !el.disabled && !DANS_ENTETE(el));
       const fichiers = fileInputs.length;
       const fichiersMultiple = fileInputs.some((el) => el.multiple);
-      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + selects.length + '#' + fichiers;
-      if (!fields.length && !selects.length && !fichiers) return;
+      // 28 oct. : le smart listing avance par BOUTONS et tuiles, pas par champs :
+      // on relève leurs LIBELLÉS (textes de l'interface, 40 caractères, 40 au
+      // plus) et les titres de l'étape — jamais une saisie.
+      const boutons = Array.from(document.querySelectorAll('button,[role="button"],[role="option"],[role="radio"],[role="tab"]'))
+        .filter((b) => !DANS_ENTETE(b) && !NOTRE_UI_VC(b) && visible(b))
+        .map((b) => String(b.innerText || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean);
+      const boutonsUniques = Array.from(new Set(boutons)).slice(0, 40);
+      const titres = Array.from(document.querySelectorAll('h1,h2,h3')).filter((h) => !DANS_ENTETE(h) && !NOTRE_UI_VC(h)).map((h) => String(h.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 60)).filter(Boolean).slice(0, 10);
+      const signature = fields.map((f) => f.name || f.id).join('|') + '#' + selects.length + '#' + fichiers + '#' + titres.join('/').slice(0, 60) + '#' + boutonsUniques.length;
+      if (!fields.length && !selects.length && !fichiers && !boutonsUniques.length) return;
       if (signature === derniereEtape) return;
       derniereEtape = signature;
-      send({ action: 'vcForm', url: location.href, fields, selects, fichiers, fichiersMultiple, ver: EXT_VER, etape: signature.slice(0, 120) });
+      send({ action: 'vcForm', url: location.href, fields, selects, fichiers, fichiersMultiple, boutons: boutonsUniques, titres, ver: EXT_VER, etape: signature.slice(0, 120) });
     } catch (_) {}
   }
 
