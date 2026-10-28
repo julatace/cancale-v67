@@ -46,7 +46,7 @@ const PONT = (o) => {
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && (d.cmd === 'republierVinted' || d.cmd === 'recreerVinted')) {
-      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages, lettre: d.lettre, viaBrouillon: d.viaBrouillon });
+      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages, lettre: d.lettre, viaBrouillon: d.viaBrouillon, versBrouillon: d.versBrouillon });
       const resp = d.id === '9107' ? { accepte: false, code: 'vinted-pause', raison: 'Vinted demande de ralentir — réessaie dans 15 min' }
         : d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
         : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
@@ -111,11 +111,21 @@ const projette = (row, sel) => {
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-        const bouton = pg.locator('[data-republier-ouvrir]').first();
+        const bouton = pg.locator('[data-actions-ouvrir]').first();
         await bouton.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
-        dit(await bouton.count() > 0 && await bouton.isVisible(), 'Annonces : un bouton « Republier » dans la barre');
+        dit(await bouton.count() > 0 && await bouton.isVisible(), 'Annonces : un bouton « Actions » dans la barre');
+        dit(await pg.locator('[data-republier-ouvrir],[data-brouillons-ouvrir]').count() === 0, 'un seul bouton : plus de « Republier » ni « Brouillons » à part');
         const lb = await bouton.boundingBox().catch(() => null);
-        dit(lb && lb.width >= 80 && lb.height >= 40, '« Republier » n’est pas écrasé dans une case de 44 px (barre du téléphone)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
+        dit(lb && lb.width >= 80 && lb.height >= 40, '« Actions » n’est pas écrasé dans une case de 44 px (barre du téléphone)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
+        await bouton.click();
+        await pg.locator('[data-actions-menu]').waitFor({ state: 'visible', timeout: 4000 });
+        const entrees = await pg.$$eval('[data-action]', (els) => els.map((e) => e.getAttribute('data-action')));
+        dit(entrees.join(',') === 'recreer,modifier,enLigne,versBrouillon,voir', 'le menu Actions : republier, modifier sur place, brouillons → en ligne, en ligne → brouillon, voir ses brouillons', entrees.join(','));
+        const hA = await pg.$$eval('[data-action]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hA.every((h) => h >= 44), 'chaque entrée du menu fait au moins 44 px', hA.join(','));
+        await pg.waitForTimeout(700); await pg.screenshot({ path: path.join(require('os').tmpdir(), `actions-menu-${vp.width}.png`) }).catch(() => {});
+        await pg.locator('[data-actions-menu] [aria-label="Fermer"]').click();
+        await pg.waitForTimeout(250);
         await pg.locator('.vrm-ann-toolbar').first().screenshot({ path: path.join(require('os').tmpdir(), `republier-barre-${vp.width}.png`) }).catch(() => {});
         dit(await pg.locator('[data-atelier-ouvrir]').count() === 0, 'plus de « ✨ Préparer » sur les cartes (un seul parcours)');
         const outils = pg.locator('[aria-label="Outils"]').first();
@@ -125,16 +135,15 @@ const projette = (row, sel) => {
         await pg.keyboard.press('Escape').catch(() => {});
         if (await outils.count()) { await pg.mouse.click(5, 5).catch(() => {}); await pg.waitForTimeout(150); }
         // (28 oct.) Ses brouillons : listés, « Mettre en ligne » seulement pour celui dont VRM a le contenu.
-        const bb = pg.locator('[data-brouillons-ouvrir]').first();
-        dit(await bb.count() > 0 && /2/.test(await bb.innerText()), 'Annonces : un bouton « Brouillons · 2 » (ses brouillons Vinted)', await bb.count() ? await bb.innerText() : 'absent');
-        if (await bb.count()) {
-          await bb.click();
+        dit(/2 brouillons/.test(await bouton.innerText()), '« Actions » dit combien de brouillons sont sur Vinted (2)', await bouton.innerText());
+        { await bouton.click(); await pg.locator('[data-action="voir"]').click();
           await pg.locator('[data-brouillons-vinted]').waitFor({ state: 'visible', timeout: 4000 });
           await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"]').waitFor({ timeout: 4000 }).catch(() => {});
           dit(await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"] [data-brouillon-publier]').count() === 1, 'le brouillon dont VRM a le contenu complet propose « Mettre en ligne »');
           dit(await pg.locator('[data-brouillon="9202"] [data-brouillon-publier]').count() === 0 && /items\/9202\/edit/.test(await pg.locator('[data-brouillon="9202"] [data-brouillon-ouvrir]').getAttribute('href') || ''), 'un brouillon inconnu : seulement « Ouvrir sur Vinted »');
           const tailles = await pg.$$eval('[data-brouillons-vinted] button, [data-brouillons-vinted] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
           dit(tailles.every((h) => h >= 44), 'boutons de la liste à 44 px au doigt', tailles.join(','));
+          dit(/vu sur Vinted il y a/.test(await pg.locator('[data-brouillon="9201"] [data-brouillon-vu]').innerText().catch(() => '')), 'chaque brouillon dit quand Vinted l’a montré (lecture du dressing)');
           await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
           await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();
           await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').waitFor({ timeout: 4000 }).catch(() => {});
@@ -145,7 +154,7 @@ const projette = (row, sel) => {
           await pg.waitForTimeout(300);
           await pg.evaluate(() => { window.__repub = []; });
         }
-        await bouton.click();
+        await bouton.click(); await pg.locator('[data-action="recreer"]').click();
         await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 4000 });
         const paires = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
         dit(paires.join(',') === '9103,9102,9106,9107', 'la liste = ses 4 paires en ligne, les plus anciennes d’abord', paires.join(','));
@@ -226,6 +235,79 @@ const projette = (row, sel) => {
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-' + vp.width + '.png') });
       await ctx.close();
     }
+    // ── (28 oct., 5.252) Les autres gestes du menu « Actions ».
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── Actions · ${vp.width} px`);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript(PONT, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      const action = async (k) => { await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator(`[data-action="${k}"]`).click(); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
+      const lancer = async () => { await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
+      const fermer = async () => { await pg.locator('[data-republier-fermer]').click().catch(() => {}); await pg.waitForTimeout(250); await pg.evaluate(() => { window.__repub = []; }); };
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 12000 });
+        // Brouillons → en ligne, à la suite.
+        await action('enLigne');
+        await pg.locator('[data-republier-paire="9201"]').waitFor({ timeout: 4000 });
+        dit(await pg.locator('[data-republier-paire="9202"] input[type=checkbox]').isDisabled() && /contenu/.test(await pg.locator('[data-republier-paire="9202"]').innerText()), 'brouillons → en ligne : un brouillon inconnu ne se coche pas, et dit pourquoi');
+        await pg.locator('[data-republier-tout]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        dit(await pg.locator('[data-republier-etape="envoi"]').count() === 1 && await pg.locator('[data-republier-esp]').count() === 1, '… pas d’étape « modifier » : on passe au lancement, temps fixe ou aléatoire');
+        await lancer();
+        const e1 = await pg.evaluate(() => window.__repub || []);
+        dit(e1.length === 1 && e1[0].cmd === 'publierBrouillon' && e1[0].draftId === '9201' && e1[0].confirme === true, '… seul le brouillon prêt part, par « publierBrouillon », avec la confirmation', JSON.stringify(e1));
+        dit(await pg.locator('[data-republier-ligne="9201"]').getAttribute('data-republier-statut') === 'fait' && /en ligne/.test(await pg.locator('[data-republier-ligne="9201"]').innerText()), '… et la ligne dit « en ligne »');
+        await fermer();
+        // Modifier sur place.
+        await action('modifier');
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        dit(await pg.locator('[data-republier-photos],[data-republier-description],[data-republier-brouillon]').count() === 0, 'modifier sur place : ni photos, ni description, ni brouillon — seulement prix et titre');
+        await pg.locator('[data-republier-suivant]').click();
+        await lancer();
+        const e2 = await pg.evaluate(() => window.__repub || []);
+        dit(e2.length === 1 && e2[0].cmd === 'republierVinted' && e2[0].id === '9102' && Math.abs(e2[0].prix - 44.1) < 1e-9 && e2[0].confirme === true, '… la commande est la modification EN PLACE (republierVinted), avec SON prix', JSON.stringify(e2));
+        dit(/modifiée/.test(await pg.locator('[data-republier-ligne="9102"]').innerText()), '… et la ligne dit « modifiée »');
+        await fermer();
+        // En ligne → brouillon.
+        await action('versBrouillon');
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        dit(await pg.locator('[data-republier-brouillon]').count() === 0 && await pg.locator('[data-republier-photos]').count() === 1, 'en ligne → brouillon : photos réglables, pas d’option « via brouillon »');
+        await pg.locator('[data-republier-suivant]').click();
+        await lancer();
+        const e3 = await pg.evaluate(() => window.__repub || []);
+        dit(e3.length === 1 && e3[0].cmd === 'recreerVinted' && e3[0].versBrouillon === true && e3[0].id === '9103', '… la commande est la recréation arrêtée au brouillon (versBrouillon)', JSON.stringify(e3));
+        await fermer();
+        // « Plus sur Vinted » : retiré de la liste, et « Les remettre ».
+        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="voir"]').click();
+        await pg.locator('[data-brouillon="9202"] [data-brouillon-ecarter]').click();
+        dit(await pg.locator('[data-brouillon="9202"]').count() === 0 && await pg.locator('[data-brouillons-ecartes="1"]').count() === 1, '« Plus sur Vinted » : le brouillon sort de la liste, et c’est dit');
+        await pg.locator('[data-brouillons-remettre]').click();
+        dit(await pg.locator('[data-brouillon="9202"]').count() === 1, '« Les remettre » le fait revenir');
+        const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « Actions » a tourné', String(e.message).slice(0, 300)); }
+      await ctx.close();
+    }
     // ── Temps ALÉATOIRE entre deux paires (sa demande) : horloge simulée.
     { console.log('── aléatoire 1–2 min');
       const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
@@ -249,8 +331,8 @@ const projette = (row, sel) => {
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-        for (let i = 0; i < 40 && !(await pg.locator('[data-republier-ouvrir]').count()); i++) await pg.clock.runFor(500);
-        await pg.locator('[data-republier-ouvrir]').first().click();
+        for (let i = 0; i < 40 && !(await pg.locator('[data-actions-ouvrir]').count()); i++) await pg.clock.runFor(500);
+        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="recreer"]').click();
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-suivant]').click();

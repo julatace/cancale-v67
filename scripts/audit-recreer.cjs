@@ -55,7 +55,7 @@ const suppressions = (j) => de(j, /\/items\/\d+\/delete$/);
 async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
-  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 const zero = (j) => j.vinted.length === 0;
@@ -175,6 +175,24 @@ const zero = (j) => j.vinted.length === 0;
     dit(completions(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "brouillon sans identifiant lisible : on ne devine rien, ni mise en ligne ni suppression", `m=${completions(f.j).length}`); }
   { const { f } = await run({});
     dit(brouillonsP(f.j).length === 0 && creations(f.j).length === 1, "sans l'option : création directe, comme avant", `b=${brouillonsP(f.j).length}`); }
+
+  // P — (28 oct., 5.252) « de en ligne à brouillon » : le brouillon est rangé,
+  // SON identifiant lu, et SEULEMENT ALORS l'annonce en ligne est supprimée — jamais de mise en ligne.
+  const seqDe = (j) => j.vinted.map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
+  { const { f, r } = await run({ versBrouillon: true });
+    const seq = seqDe(f.j);
+    dit(seq === 'PPBS' && r.etape === 'fait' && r.draftId === '88001' && r.brouillon === true, "en ligne → brouillon : photos, PUIS brouillon, PUIS suppression de l'annonce — aucune mise en ligne", `seq=${seq} etape=${r.etape} ${r.raison || ''}`);
+    dit(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'brouillon' && f.lignes['vinted_brouillon_88001'].ancienId === '9101' && f.lignes['vinted_brouillon_88001'].corps, "le brouillon est rangé « brouillon » avec son corps : il se remet en ligne d'ici", JSON.stringify(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat)); }
+  { const { f, r } = await run({ versBrouillon: true, brouillon: 422 });
+    dit(suppressions(f.j).length === 0 && completions(f.j).length === 0 && r.etape === 'echec', "en ligne → brouillon, brouillon refusé : l'annonce n'est PAS supprimée", `s=${suppressions(f.j).length}`); }
+  { const { f, r } = await run({ versBrouillon: true, brouillonSansId: true });
+    dit(suppressions(f.j).length === 0 && r.etape === 'echec', "en ligne → brouillon, brouillon sans identifiant : rien n'est supprimé", `s=${suppressions(f.j).length}`); }
+  { const { f, r } = await run({ versBrouillon: true, suppression: 502 });
+    dit(r.etape === 'double' && /PEUT-ÊTRE/.test(r.raison || ''), "en ligne → brouillon, suppression sans réponse claire : dit « peut-être encore en ligne », jamais « fait »", `etape=${r.etape}`); }
+  { const { f, r } = await run({ versBrouillon: true, suppression: 403 });
+    dit(r.etape === 'double' && /encore en ligne/.test(r.raison || ''), "en ligne → brouillon, suppression refusée : dit qu'elle est encore en ligne", `etape=${r.etape}`); }
+  { const { f, r } = await run({ versBrouillon: true, confirme: false });
+    dit(zero(f.j) && r.code === 'confirmation', "en ligne → brouillon sans confirmation : aucune requête", `code=${r.code}`); }
 
   // N — mettre en ligne SON brouillon depuis VRM (`publierBrouillon`).
   const CORPS_B = (o = {}) => JSON.stringify({ draft: { id: null, currency: 'EUR', temp_uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', title: 'Nike Air Max 1 dark teal', description: 'très bon état', brand_id: 53, brand: 'Nike', catalog_id: 1242, price: '65', package_size_id: 1, color_ids: [12], assigned_photos: [{ id: 1, orientation: 0 }], item_attributes: [{ code: 'size', ids: [785] }], ...o }, parcel: null, upload_session_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' });
