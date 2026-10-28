@@ -90,6 +90,11 @@ const projette = (row, sel) => {
       dit(!(await pg.locator('[data-numeros-reglage]').isVisible()), `${largeur} : les détails ne sont pas dépliés dans la liste`);
       await pg.locator('[aria-label="Rechercher dans les paramètres"]').fill('numero');
       dit(await pg.locator('[data-sous-ouvrir="numeros"]').isVisible() && !(await pg.locator('[data-sous-ouvrir="imprimante"]').count()), `${largeur} : recherche sans accent`);
+      await pg.locator('[aria-label="Rechercher dans les paramètres"]').fill('papier thermique');
+      dit(await pg.locator('[data-sous-ouvrir="imprimante"]').isVisible() && !(await pg.locator('[data-sous-ouvrir="numeros"]').count()), `${largeur} : recherche par termes courants et plusieurs mots`);
+      await pg.getByRole('button',{name:'Effacer la recherche des paramètres',exact:true}).click();
+      dit(await pg.locator('[aria-label="Rechercher dans les paramètres"]').inputValue()==='',`${largeur} : effacer rétablit la liste`);
+      await pg.locator('[aria-label="Rechercher dans les paramètres"]').fill('numero');
       await pg.locator('[data-sous-ouvrir="numeros"]').click();
       dit(await pg.locator('[data-numeros-reglage]').isVisible(), `${largeur} : ouverture du réglage`);
       dit(await pg.locator('[data-sous-retour]').isVisible(), `${largeur} : retour explicite`);

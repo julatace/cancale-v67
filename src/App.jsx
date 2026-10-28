@@ -1,3 +1,5 @@
+import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.js';
+import { filtrerReglages } from './rechercheReglages.js';
 import { preparerApercusModes } from './apercusBordereaux.js';
 import { actionsReglages } from './reglagesActions.js';
 import FavorisVinted from './FavorisVinted.jsx';
@@ -49262,7 +49264,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     ]},
     { id:'compta', titre:'Comptabilité', items:[
       { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Régler le statut et les taux utilisés dans les rapports.', el:<RegimeSetting nu/> },
-      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Choisir la date de début de l’historique à intégrer.', el:<EmailStartSetting nu/> },
+      { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Choisir la date de début de l’historique à intégrer.', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
@@ -49405,13 +49407,12 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):ouvrirSous(id)}/>}
         <label className="vrm-settings-search" style={{background:C.card,borderColor:C.border,color:C.muted}}>
           <Icon name="search" size={16}/>
-          <input type="search" value={rechercheReglage} onChange={e=>setRechercheReglage(e.target.value)} placeholder="Rechercher un réglage…" aria-label="Rechercher dans les paramètres" style={{color:C.text}}/>
+          <input type="search" value={rechercheReglage} onChange={e=>setRechercheReglage(e.target.value)} placeholder={`Rechercher dans ${titreRetour}…`} aria-label="Rechercher dans les paramètres" style={{color:C.text}}/>
+          {rechercheReglage&&<button type="button" aria-label="Effacer la recherche des paramètres" onClick={e=>{setRechercheReglage('');e.currentTarget.parentElement.querySelector('input')?.focus();}} style={{color:C.muted}}>Effacer</button>}
         </label>
         {(() => {
-          const normaliser = v => String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-          const q=normaliser(rechercheReglage).trim();
-          const filtres=groupes.map(g=>({...g,items:q ? g.items.filter(it=>normaliser(`${g.titre||''} ${it.lib||''} ${typeof it.desc==='string'?it.desc:''} ${it.id}`).includes(q)) : g.items})).filter(g=>g.items.length);
-          return filtres.length ? filtres.map(groupe) : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé. Essaie « email », « numéro » ou « impression ».</p>;
+          const filtres=filtrerReglages(groupes,rechercheReglage);
+          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{filtres.reduce((n,g)=>n+g.items.length,0)} réglage(s) trouvé(s) dans {titreRetour}.</p>}{filtres.map(groupe)}</> : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé dans cet onglet. Essaie « email », « numéro » ou « impression », ou change d’onglet.</p>;
         })()}
       </>}
       {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
@@ -51115,39 +51116,55 @@ function ReglagesPasLus() {
     </div>
   );
 }
+const brouillonsParametres=creerBrouillonsReglages();
+let proprietaireBrouillons=AUTH.user?.id||null;
+onAuthChange(a=>{const owner=a.user?.id||null;if(owner!==proprietaireBrouillons){brouillonsParametres.activer(owner);proprietaireBrouillons=owner;}});
+window.addEventListener('beforeunload',e=>{if(brouillonsParametres.existe(AUTH.user?.id||null)){e.preventDefault();e.returnValue='';}});
 function EmailStartSetting({ nu = false }) {
   const [date, setDate] = useState('');
+  const [base,setBase]=useState('');
+  const [reprise,setReprise]=useState(false);
+  const owner=AUTH.user?.id||null;
   const [status, setStatus] = useState('load'); // load | ok | saving | err | pasLu
   const HEADERS = sbAuth();
 
-  useEffect(() => { (async () => {
-    try {
-      // ⚠️⚠️ UNE LECTURE RATÉE AFFICHAIT LA DATE DU JOUR. Mesuré le
-      //    15 septembre : le vrai réglage est le **10 juillet**. Sur un 522
-      //    Cloudflare `res.json()` levait, et le `catch` posait « aujourd'hui »
-      //    en annonçant `ok` — l'écran lui disait donc « les emails ne sont pris
-      //    en compte qu'à partir du 15 septembre », et il pouvait croire avoir
-      //    perdu deux mois. Un mensonge d'affichage sur un écran de RÉGLAGES —
-      //    et s'il « corrigeait » le champ, il l'écrivait pour de bon.
-      const d = await lireReglage('vrm_email_config');
-      if (d === null) { setStatus('pasLu'); return; }   // « pas su » ≠ une date
-      setDate(d.startDate || '');
-      setStatus('ok');
-    } catch (_) { setStatus('pasLu'); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  })(); }, []);
+  useEffect(()=>{
+    let actif=true;setStatus('load');
+    (async()=>{
+      const d=await lireReglage('vrm_email_config');
+      if(!actif||(AUTH.user?.id||null)!==owner)return;
+      if(d===null){setStatus('pasLu');return;}
+      const actuelle=d.startDate||'',brouillon=brouillonsParametres.lire(owner,'email-import');
+      setBase(actuelle);
+      if(brouillon&&brouillon.valeur!==actuelle){setDate(brouillon.valeur);setReprise(true);setStatus('modifie');}
+      else{setDate(actuelle);setStatus('ok');brouillonsParametres.effacer(owner,'email-import');}
+    })().catch(()=>{if(actif&&(AUTH.user?.id||null)===owner)setStatus('pasLu');});
+    return()=>{actif=false;};
+  },[owner]);
 
+  React.useEffect(()=>{
+    if((AUTH.user?.id||null)!==owner)return;
+    const modifie=['modifie','err','saving'].includes(status)&&date!==base;
+    if(owner){if(modifie)brouillonsParametres.ecrire(owner,'email-import',{valeur:date,base});else if(['ok','modifie','err','saved'].includes(status))brouillonsParametres.effacer(owner,'email-import');}
+    const prevenir=e=>{if(modifie){e.preventDefault();e.returnValue='';}};
+    if(modifie)window.addEventListener('beforeunload',prevenir);
+    return()=>window.removeEventListener('beforeunload',prevenir);
+  },[date,base,status,owner]);
+  const annuler=()=>{if((AUTH.user?.id||null)!==owner)return;setDate(base);setReprise(false);setStatus('ok');brouillonsParametres.effacer(owner,'email-import');};
   const saveDate = async (v) => {
-    if (!v || status === 'pasLu' || status === 'saving') return;
+    if (!dateImportValide(v) || status === 'pasLu' || status === 'saving') return;
+    if((AUTH.user?.id||null)!==owner)return;
     setStatus('saving');
     if(!await askConfirm({title:'Modifier le début de l’import ?',desc:`Les prochains imports utiliseront la date du ${v.split('-').reverse().join('/')} comme début d’historique. Les données déjà présentes ne sont pas effacées par ce réglage.`,ok:'Enregistrer cette date',cancel:'Annuler'})){setStatus('modifie');return;}
+    if((AUTH.user?.id||null)!==owner)return;
     try {
       const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
         method:'POST',headers:{...HEADERS,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
         body:JSON.stringify([withOwner({id:'vrm_email_config',data:{startDate:v,updatedAt:new Date().toISOString()}})])
       });
       if(!r.ok) throw Error('refus de sauvegarde');
-      setStatus('saved');
+      if((AUTH.user?.id||null)!==owner)return;
+      setBase(v);setReprise(false);brouillonsParametres.effacer(owner,'email-import');setStatus('saved');
     } catch (_) {setStatus('err');}
   };
 
@@ -51157,6 +51174,7 @@ function EmailStartSetting({ nu = false }) {
       <div style={{fontSize:12.5,color:C.muted,marginBottom:12,lineHeight:1.45}}>
         Les emails Vinted (ventes, bordereaux, paiements) ne sont pris en compte qu'à partir de cette date. Change-la ici, c'est appliqué à la prochaine synchro (≤ 5 min).
       </div>
+      {reprise&&<p role="status" className="vrm-settings-draft" style={{color:C.warn}}>Une modification non enregistrée a été reprise pour ce compte. La date en ligne reste {base?base.split('-').reverse().join('/'):'non définie'} tant que tu ne valides pas.</p>}
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
         <input type="date" value={date} onChange={e=>{setDate(e.target.value);setStatus('modifie');}} disabled={status==='load'||status==='pasLu'||status==='saving'}
@@ -51165,7 +51183,9 @@ function EmailStartSetting({ nu = false }) {
           {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':status==='pasLu'?'':status==='modifie'?'Modification non enregistrée':status==='saved'?'✓ enregistré':date?'Date actuelle':'Aucune date définie'}
         </span>
       </div>
-      {(status==='modifie'||status==='err'||status==='saving') && <button type="button" disabled={!date||status==='saving'} onClick={()=>saveDate(date)} style={{marginTop:10,minHeight:44,padding:'8px 14px',borderRadius:10,border:`1px solid ${C.border}`,background:C.accent,color:C.onAccent||'#fff',font:'inherit',cursor:'pointer'}}>{status==='saving'?'Enregistrement…':status==='err'?'Réessayer l’enregistrement':'Enregistrer la date'}</button>}
+      {(status==='modifie'||status==='err'||status==='saving') && <button type="button" disabled={!dateImportValide(date)||status==='saving'} onClick={()=>saveDate(date)} style={{marginTop:10,minHeight:44,padding:'8px 14px',borderRadius:10,border:`1px solid ${C.border}`,background:C.accent,color:C.onAccent||'#fff',font:'inherit',cursor:'pointer'}}>{status==='saving'?'Enregistrement…':status==='err'?'Réessayer l’enregistrement':'Enregistrer la date'}</button>}
+      {['modifie','err'].includes(status)&&<button type="button" onClick={annuler} style={{margin:'10px 0 0 8px',minHeight:44,padding:'8px 12px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:10,color:C.text,font:'inherit',cursor:'pointer'}}>Revenir à la date en ligne</button>}
+      {date&&!dateImportValide(date)&&<p role="alert" style={{color:C.warn,fontSize:12}}>Choisis une date valide avant d’enregistrer.</p>}
       {status==='pasLu' && <div style={{marginTop:9}}><span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span></div>}
     </div>
   );

@@ -61,3 +61,12 @@ Validation : 17 tests unitaires transfert/réception (incluant séparation des p
 - Guide court de contrôle du papier, du document et du pilote d'impression.
 
 Validation : compilation, 23 contrôles du banc Paramètres à 390/1512 px, audit existant numéros à lettres, 3 tests des aperçus partiels et test du panneau de numérotation (série archivée et stockage refusé). Données synthétiques uniquement. Pas de déploiement.
+
+## Suite : brouillon d'import et recherche
+
+- La date d'import non enregistrée reste en mémoire pour le vendeur courant, même après une navigation hors des paramètres. Elle est reprise après lecture réussie du réglage serveur, avec rappel de la date en ligne. Retour explicite à la date en ligne et validation civile de la date avant envoi.
+- Ces brouillons ne sont jamais persistés dans localStorage ni envoyés automatiquement. Un changement d'identité invalide le stockage mémoire. La confirmation vérifie à nouveau l'identité avant d'émettre la requête ; une confirmation ouverte sous A ne peut pas écrire sous B.
+- Une protection beforeunload avertit des modifications en attente lorsque le navigateur la prend en charge. Cela ne promet pas une récupération après fermeture forcée, rechargement accepté ou arrêt du téléphone.
+- Recherche par mots et termes usuels (étiquette, PDF, papier thermique…), sans accents ; portée de l'onglet et nombre de résultats visibles, effacement avec retour du focus.
+
+Validation : compilation, 5 tests de recherche/brouillons/dates, test du vrai formulaire sur reprise/annulation/changement de compte, 27 contrôles du banc Paramètres et 5 du banc sauvegarde HTTP. Données synthétiques, aucune écriture réelle. Pas de déploiement.
