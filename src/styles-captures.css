@@ -195,3 +195,8 @@
 .vrm-chat-negociation>summary::after{content:'+';margin-left:auto;font-size:16px;}.vrm-chat-negociation[open]>summary::after{content:'−';}
 .vrm-chat-negociation .vrm-chat-offre-l{padding:4px 0;}
 @media(max-width:767px){.vrm-chat-negociation>summary{min-height:44px;}.vrm-chat-offer-event{padding:8px 10px;}.vrm-chat-offer-event strong{font-size:15px;}}
+
+/* Le statut reste écrit : la couleur complète le libellé. */
+.vrm-chat-offer-event[data-offer-status="acceptee"]{border-inline-start:3px solid #367664;background:linear-gradient(110deg,rgba(54,118,100,.08),var(--vrm-surface));}
+.vrm-chat-offer-event[data-offer-status="refusee"]{border-inline-start:3px solid #9a746b;}
+.vrm-chat-offer-event>div{flex-wrap:wrap;}

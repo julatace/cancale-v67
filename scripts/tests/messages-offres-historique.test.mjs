@@ -1,7 +1,8 @@
+import {etatOffreVinted} from '../../src/offresVinted.js';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 const s=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 const code=s.slice(s.indexOf('const normalizeConversationMessages ='),s.indexOf("// L'offre d'un ACHETEUR"));
-const normaliser=new Function('extractLinks','extractEventText',code+';return normalizeConversationMessages;')(()=>[],(e,t)=>e.body||t);
+const normaliser=new Function('extractLinks','extractEventText','etatOffreVinted',code+';return normalizeConversationMessages;')(()=>[],(e,t)=>e.body||t,etatOffreVinted);
 const offre=(user,price,extra={})=>({entity_type:'offer_request_message',created_at:'2026-10-25T08:00:00Z',entity:{user_id:user,price,status:10,current:true,...extra}});
 test('les offres reçues et envoyées sont des événements financiers distincts',()=>{
  const r=normaliser({opposite_user:{id:22},messages:[offre(22,{amount:'45,50',currency_code:'EUR'}),offre(11,{amount:'50.00',currency:'EUR'})]});

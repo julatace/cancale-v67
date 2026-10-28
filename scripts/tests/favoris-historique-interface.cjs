@@ -17,6 +17,8 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  const b=await chromium.launch({executablePath:(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let n=0;const check=(v,m)=>{assert.ok(v,m);n++;};
  try{for(const width of [320,390,1512]){const p=await b.newPage({viewport:{width,height:950}});await p.setContent('<div id="root"></div>');await p.addStyleTag({content:'body{margin:12px;font-family:Arial}'+fs.readFileSync(path.join(racine,'src/styles-captures.css'),'utf8')});await p.addScriptTag({content:bundle.outputFiles[0].text});
  await p.getByRole('button',{name:'Afficher les favoris'}).click();await p.locator('.vrm-favoris-rows article').waitFor();await p.getByText('Message déjà envoyé',{exact:true}).waitFor();
+ check(await p.getByRole('button',{name:'Dans la file (0)',exact:true}).count()===1,'queue filter with count');
+ check(await p.getByRole('button',{name:'Envoi à vérifier (0)',exact:true}).count()===1,'uncertain filter with count');
  check(await p.getByRole('checkbox',{name:'Sélectionner Camille 1',exact:true}).isDisabled(),'confirmed sent favorite cannot be selected');
  check((await p.locator('time').innerText()).includes('7 h'),'native age displayed');
  await p.getByRole('button',{name:'Récupérer toutes les pages',exact:true}).click();await p.getByRole('status').filter({hasText:'Toutes les pages disponibles ont été récupérées.'}).waitFor();
@@ -45,7 +47,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
 
  check(await p.getByText('Message déjà envoyé',{exact:true}).count()===1,'is_read never counts as sent');
  await p.getByRole('button',{name:'Déjà envoyés (1)',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===1,'sent filter');
- await p.getByRole('button',{name:'À contacter',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===3,'contact filter excludes confirmed sent');
+ await p.getByRole('button',{name:'À contacter (3)',exact:true}).click();check(await p.locator('.vrm-favoris-rows article').count()===3,'contact filter excludes confirmed sent');
  await p.getByRole('searchbox',{name:'Rechercher un favori'}).fill('Camille 3');check(await p.locator('.vrm-favoris-rows article').count()===1,'search works across recovered history');
  await p.getByRole('button',{name:'Sélectionner les 10 premiers'}).click();check(await p.getByRole('checkbox',{checked:true}).count()===1,'selection respects filtered list');
  await p.getByRole('textbox',{name:'Ton message',exact:true}).fill('Bonjour de démonstration');await p.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
