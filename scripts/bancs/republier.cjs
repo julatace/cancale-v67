@@ -53,7 +53,12 @@ const PONT = (o) => {
         : d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
         : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
         : { accepte: true, etape: 'fait', nouvelId: '99102', ancien: 49, nouveau: d.prix };
-      post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
+      // (28 oct.) La barre de progression : l'extension annonce ses étapes (5.259).
+      if (d.id === '9103' && d.cmd === 'recreerVinted') {
+        post({ __vmr: 'evt', evt: { type: 'maj', quoi: 'repub', id: '9103', etape: 'photos', fait: 0, total: 3 } });
+        post({ __vmr: 'evt', evt: { type: 'maj', quoi: 'repub', id: '9103', etape: 'brouillon' } });
+        setTimeout(() => post({ __vmr: 'cmd:result', reqId: d.reqId, resp }), 1500);
+      } else post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
     } else if (d.__vmr === 'cmd' && d.cmd === 'publierBrouillon') {
       window.__repub.push({ cmd: d.cmd, uid: d.uid, draftId: d.draftId, confirme: d.confirme });
       post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', itemId: d.draftId } });
@@ -212,8 +217,15 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').click();
+        { const b = pg.locator('[data-republier-progression="9103"][data-republier-etape="brouillon"]');
+          let vu = false; for (let i = 0; i < 30 && !vu; i++) { vu = await b.count() > 0; if (!vu) await pg.waitForTimeout(50); }
+          const txt = vu ? await b.innerText() : '';
+          const tot = await pg.locator('[data-republier-total]').getAttribute('data-republier-total').catch(() => null);
+          dit(vu && /Étape 4 sur 6/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 6 · Création du brouillon »)', txt || 'absente');
+          dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot)); }
         for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(250); }
         const envois = await pg.evaluate(() => window.__repub || []);
+        dit(await pg.locator('[data-republier-progression]').count() === 0, 'plus aucune barre de paire une fois la file arrêtée', String(await pg.locator('[data-republier-progression]').count()));
         dit(envois.length === 4, 'UNE commande par paire choisie (4)', JSON.stringify(envois.map((x) => x.id)));
         dit(envois.map((x) => x.id).join(',') === '9103,9102,9106,9107', 'les paires sont recréées DANS L’ORDRE affiché', envois.map((x) => x.id).join(','));
         dit(await pg.locator('[data-republier]').getAttribute('data-republier-mode') === 'pause' && await pg.locator('[data-republier-arret]').count() === 1, 'Vinted demande de ralentir : la file S’ARRÊTE et le dit (pas une rafale de refus)', await pg.locator('[data-republier-arret]').innerText().catch(() => 'absent'));
