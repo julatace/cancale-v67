@@ -409,6 +409,18 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             }
           }
         }
+        // (28 oct., « fais pareil pour les portants ») : chaque cintre porte UN
+        // vêtement ; la plaque dit le NOMBRE max de chaque BARRE (ses cintres,
+        // ceux sous lesquels la barre existe), au-dessus de la barre, en façade.
+        // Une barre absente partout n'a pas de plaque. Décor seul.
+        for (let r = 0; r < nr; r++) {
+          let n = 0, xs = 0; for (let c = 0; c < nc; c++) if (aBarre(r, c)) { n++; xs += -w / 2 + 0.04 + (c + 0.5) * pasC; }
+          if (!n) continue;
+          const pw = Math.min(0.2, w * 0.3), ph = pw / 2;
+          const nb = plaqueMaxPile(n, true); nb.scale.set(pw, ph, 1);
+          nb.position.set(xs / n, barY(r) + ph / 2 + 0.03, Math.min(0.21, d * 0.42) + 0.03);
+          nb.userData = { maxCase: 'barre_' + r, texte: 'max ' + n }; g.add(nb);
+        }
         const ghostM = new THREE.MeshStandardMaterial({ color: '#9aa3ad', roughness: 0.9, transparent: true, opacity: 0.22, depthWrite: false });
         const habits = ['#4f6fc9', '#c94f4f', '#4fae8f', '#d4a24b', '#8a5fb0', '#5f7f9b'];
         for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
