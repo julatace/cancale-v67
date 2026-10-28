@@ -7,6 +7,14 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — les PHOTOS EN DOUBLE (5.261), « c'est en brouillon mais pas en ligne » :** mesuré, le coffre
+> de la Jordan 3 portait 75 liens pour 15 photos (même clé `02_02248_…` sous `/tc/…` et `/t/…/f800/…`) ; VRM
+> prenait les 20 premiers ⇒ un brouillon de 20 photos dont des doublons, refusé à la mise en ligne. ⇒
+> `photosUniques` (clé `clePhotoRepub`, la fiche d'abord, le coffre ensuite, l'autre forme en secours) pour
+> recréer et refaire ; `publierBrouillon` retire les doublons d'un brouillon VRM d'avant (ordre des liens du
+> coffre de `ancienId`). Le texte de Republier décrit le chemin par brouillon. `vinted_refus_sans_champ_*`
+> note la forme d'un refus sans champ. Preuve : `audit-recreer.cjs` (96 ; 2 rouges sur la 5.260).
+
 > **28 octobre (nuit, fin) — la COULEUR, et la barre de progression (5.259) :** Julien : « ça a laissé
 > l'annonce en brouillon » (N°72) puis « 400 : Erreurs trouvées ». Mesuré : le brouillon de VRM ne différait
 > d'un brouillon accepté par Vinted que par `color_ids: []` — Vinted RANGE un brouillon sans couleur mais

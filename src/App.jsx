@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.260.0';
+const EXT_ATTENDUE = '5.261.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -12187,7 +12187,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </div>
           </>}
           {etape === 'envoi' && <>
-            {action === 'recreer' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée. Le N° VRM passe sur la nouvelle.</div>}
+            {action === 'recreer' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, {viaBrouillon && brouillonOk ? <>l'annonce est enregistrée dans VRM, retirée de Vinted, recréée en brouillon, puis mise en ligne. Si la mise en ligne échoue, le brouillon reste dans tes brouillons Vinted et rien n'est perdu.</> : <>la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée.</>} Le N° VRM passe sur la nouvelle.</div>}
             {action === 'modifier' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
             {action === 'versBrouillon' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
             {action === 'enLigne' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
