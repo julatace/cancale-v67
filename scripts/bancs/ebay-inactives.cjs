@@ -104,7 +104,7 @@ let rows = [];
 // `listingsCap` : la date de la dernière relecture des annonces EN LIGNE (par
 // défaut maintenant) · `sansListings` : aucune relecture des annonces rangée.
 // `main(m)` : retouche la copie de `main` (marqueur 013, dates de numérotation).
-const remettre = ({ inactives, multi, inactivesK2, listingsCap, sansListings, main, listingsItems } = {}) => {
+const remettre = ({ inactives, multi, inactivesK2, listingsCap, sansListings, main, listingsItems, retraits } = {}) => {
   const m = JSON.parse(JSON.stringify(MAIN));
   if (main) main(m);
   rows = [
@@ -117,6 +117,7 @@ const remettre = ({ inactives, multi, inactivesK2, listingsCap, sansListings, ma
     { id: 'ebay_programmees', data: { items: [], enLigne: [], complet: true, capturedAt: Date.now() } },
     { id: 'lbc_ventes', data: { ventes: {} } },
     ...(inactives ? [{ id: 'ebay_inactives', data: inactives }] : []),
+    ...(retraits ? [{ id: 'ebay_retraits_auto', data: { items: retraits } }] : []),
     ...(multi ? [
       { id: 'ebay_comptes', data: { comptes: [{ cle: K1, pseudo: 'paire_perso', principal: true, ajouteLe: 1 }, { cle: K2, pseudo: 'paire_pro', principal: false, ajouteLe: 2 }] } },
       { id: 'ebay_listings_' + K2, data: { items: [], capturedAt: Date.now() } },
@@ -224,6 +225,7 @@ const lire = (pg) => pg.evaluate(() => {
     id: e.getAttribute('data-ebay-inactive'), num: e.getAttribute('data-inactive-num'), fin: e.getAttribute('data-inactive-fin'),
     compte: e.getAttribute('data-inactive-compte'), vendue: e.getAttribute('data-inactive-vendue'), deja: e.getAttribute('data-inactive-deja'),
     vinted: e.getAttribute('data-inactive-vinted'),
+    retraitAuto: e.getAttribute('data-inactive-retrait-auto'),
     prix: (e.querySelector('[data-inactive-prix]') || {}).innerText || '',
     relancer: (e.querySelector('a[data-inactive-relancer]') || {}).href || '',
     relancerCible: (e.querySelector('a[data-inactive-relancer]') || { getAttribute: () => '' }).getAttribute('target') || '',
@@ -354,6 +356,34 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         if (vp.width < 600) { const c = await cibles(pg); const petites = c.filter((x) => x.h < 44); dit(c.length >= 5 && !petites.length, `${T} au doigt : chaque lien et bouton de la section fait au moins 44 px`, JSON.stringify(petites)); }
         else { const box = await pg.$eval('[data-ebay-inactives]', (e) => { const r = e.getBoundingClientRect(); return { top: r.top + window.scrollY, h: r.height }; }); dit(box.h > 100, `${T} la section est rendue (hauteur ${Math.round(box.h)} px)`); }
         dit(s.etat === 'lu' && !errs.length && !s.mort, `${T} la liste lue, aucune erreur de page`, errs.join(' | ').slice(0, 160));
+        await ctx.close();
+      });
+      // ── R. RETIRÉE PAR VRM (28 oct.) ───────────────────────────────────────
+      // Vu sur ses vraies données : une annonce que le retrait AUTOMATIQUE venait
+      // de terminer (paire vendue sur Vinted) s'affichait « pas reliée · Remettre
+      // en vente sur eBay ». Son journal (`ebay_retraits_auto`) dit, par
+      // l'identifiant de l'annonce, ce que VRM a fait : aucun « Remettre en vente ».
+      if (lance('R')) await essaie(T + ' R retirée par VRM', async () => {
+        const R = ina('120000000030', 'Nike Aquatone noir T44', 'VRM-559', '85.0', jour(5));
+        remettre({ inactives: lue([R, I.sans_sku]), retraits: [{ itemId: '120000000030', sku: 'VRM-559', at: Date.now() - 5 * JOUR, n: '559' }] });
+        const { ctx, pg, errs, envois } = await ouvrir(b, vp);
+        await versAnnonces(pg);
+        await pg.waitForSelector('[data-ebay-inactive="120000000030"]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(800);
+        const s = await lire(pg);
+        const L = Object.fromEntries(s.lignes.map((l) => [l.id, l]));
+        const r = L['120000000030'] || {}, a = L['120000000023'] || {};
+        dit(r.retraitAuto === '1' && !r.relancer && !!r.voir && /retirée par VRM/.test(r.texte) && /ne la remets pas en vente/.test(r.texte),
+          `${T} retirée d'eBay PAR VRM (journal du retrait automatique) ⇒ « retirée par VRM … ne la remets pas en vente », aucun « Remettre en vente »`, JSON.stringify({ ra: r.retraitAuto, relancer: r.relancer, t: (r.texte || '').replace(/\n/g, ' · ').slice(0, 160) }));
+        dit(!a.retraitAuto && !!a.relancer, `${T} l'autre sens : une inactive absente du journal garde son lien`, JSON.stringify({ ra: a.retraitAuto, relancer: a.relancer }));
+        // (28 oct.) Ventes : compte relié, ventes LUES, aucune ⇒ ne plus lui
+        // demander de « relier ton compte » (geste déjà fait).
+        await pg.getByRole('button', { name: 'Ventes', exact: true }).first().click({ timeout: 8000 });
+        await pg.waitForTimeout(1200);
+        const tv = await pg.evaluate(() => document.body.innerText);
+        dit(/Aucune vente eBay pour l'instant/.test(tv) && !/Relie ton compte/i.test(tv),
+          `${T} Ventes : compte relié, aucune vente ⇒ « Aucune vente eBay pour l'instant », jamais « Relie ton compte »`, (tv.match(/[^\n]*vente eBay[^\n]*/) || [''])[0].slice(0, 160));
+        dit(relistes(envois).length === 0 && !errs.length && !s.mort, `${T} rien ne part, aucune erreur de page`, errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
       // ── D. LECTURE EN PANNE ────────────────────────────────────────────────

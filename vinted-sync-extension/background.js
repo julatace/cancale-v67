@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.245.0';
+const CODE_VERSION = '5.246.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1625,9 +1625,22 @@ function verifFormeObjet(type, parsed, id) {
 //    `message_code` est un refus. On le compte pour ce qu'il est, on ne range
 //    rien, on ne juge aucune forme. Un profil d'erreur n'apprenait rien non plus
 //    (« banni » exige `is_account_banned === true`).
+// (28 oct., 5.246) Vinted écrit aussi ses refus avec un code TEXTE :
+// `{"code":"UNAUTHORIZED","message":"Authorization failed."}` (mesuré sur la
+// ligne `orders_sold` de jujuf38, 26 oct. : rangée À LA PLACE de ses ventes —
+// l'app disait « session expirée », à raison, mais la liste était perdue).
+// Est un refus : `message_code` + code numérique non nul (la forme vue jusqu'ici),
+// OU un objet qui ne porte QUE des clés d'erreur, avec un code non nul ou un
+// texte d'erreur. Une vraie réponse a toujours sa clé de données à côté.
+const CLES_REFUS_VINTED = new Set(['code', 'message', 'message_code', 'errors', 'error', 'status', 'details']);
 function estErreurVinted(p) {
-  return !!(p && typeof p === 'object' && !Array.isArray(p)
-    && typeof p.message_code === 'string' && typeof p.code === 'number' && p.code !== 0);
+  if (!(p && typeof p === 'object' && !Array.isArray(p))) return false;
+  if (typeof p.message_code === 'string' && typeof p.code === 'number' && p.code !== 0) return true;
+  const cles = Object.keys(p);
+  if (!cles.length || !cles.every((k) => CLES_REFUS_VINTED.has(k))) return false;
+  return (typeof p.code === 'string' && p.code.trim() !== '' && p.code !== '0')
+    || (typeof p.code === 'number' && p.code !== 0)
+    || (typeof p.error === 'string' && p.error.trim() !== '');
 }
 
 // Notifications: one archive per owner and Vinted account. Each page is

@@ -166,6 +166,11 @@ function lecteurAnnoncesApp(ligne, ids) {
   // 26 oct. : `dressingEnLigne` ferme les annonces d'un compte « retiré pour de bon »
   // (`annoncesRetirees`, `resRetire`). Sans ces aides le lecteur levait et l'écran
   // rendait [] (§6.3). Absentes d'un code d'avant le 26 oct. : rien à charger.
+  // 28 oct. : une ligne VIDÉE par « Supprimer des données… » (`supprime: true`,
+  // sans `payload`) est lue « vide », jamais « pas su ». Absente d'un code
+  // d'avant : rien à charger.
+  const lv = /const ligneVideeParToi = [^\n]*\n/.exec(F.app);
+  const videe = lv ? lv[0] : '';
   const rt = /const ANNONCES_RETIREES = [\s\S]*?\nconst resRetire = [\s\S]*?\}\);\n/.exec(F.app);
   const retirees = rt ? rt[0] : '';
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
@@ -177,7 +182,7 @@ function lecteurAnnoncesApp(ligne, ids) {
       return { ok: true, json: async () => projette([ligne], u) };
     } };
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 
@@ -416,6 +421,21 @@ const numsDe = (r) => ((r && r.queue) || []).map((a) => String(a.numero)).sort()
     const p2 = await lecteurAnnoncesApp(ligne2, supp)('9001', 'listings');
     const ecran2 = ids(ouv(p2 && p2.items));
     dit(ecran2 === '[101,202]', 'l’autre sens : relue après la suppression (capturedAt), elle reste à l’écran', ecran2);
+  });
+
+  console.log('── 8. Une ligne vidée par « Supprimer des données… » est lue VIDE, jamais « pas su »');
+  await essaie('ligne vidée', async () => {
+    // Mesuré le 28 oct. : le compte 199082413 (vidé par Julien) portait des lignes
+    // `{supprime: true, uid, purgedAt}` sans `payload`. Le lecteur rendait `null`
+    // (« pas su ») : le compte était dit « non chargé » et « ancien » sur Ventes.
+    const videe = { id: 'harvest_9001_listings', updated_at: new Date().toISOString(), data: { supprime: true, uid: '9001', purgedAt: new Date().toISOString() } };
+    const p = await lecteurAnnoncesApp(videe, {})('9001', 'listings');
+    dit(!!p, 'la ligne vidée est LUE (pas « pas su »)', JSON.stringify(p));
+    dit(!!(p && Array.isArray(p.items) && p.items.length === 0), 'et vide : aucune annonce', JSON.stringify(p && p.items));
+    // L'autre sens : une ligne qui porte `supprime` ET un payload reste lue normalement.
+    const pleine = dressing(Date.now())[0]; pleine.data.supprime = true;
+    const p2 = await lecteurAnnoncesApp(pleine, {})('9001', 'listings');
+    dit(!!(p2 && (p2.items || []).length === 2), 'l’autre sens : une ligne avec son payload garde ses annonces', JSON.stringify(p2 && (p2.items || []).length));
   });
 
   try { fs.unlinkSync(BG_MUT); } catch (_) {}

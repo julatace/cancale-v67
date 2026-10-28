@@ -772,6 +772,7 @@ function contratSuivi(a) {
         let j = null; try { j = JSON.parse(t); } catch (_) { return; }
         if (!j || typeof j !== 'object') return;
         if (typeof j.message_code === 'string' && typeof j.code === 'number' && j.code !== 0) return;   // un refus de Vinted n'est pas une forme
+        if (typeof j.code === 'string' && j.code && Object.keys(j).every((k) => /^(code|message|message_code|errors|error|status|details)$/.test(k))) return;   // 5.246 : refus à code texte (« UNAUTHORIZED »)
         const msg = { kind: 'suivi', quoi, id, forme: formeSuivi(j) };
         if (quoi !== 'code') { msg.allege = allegerSuivi(j); const tc = txDuCorps(j); if (tc) msg.txCorps = tc; }
         post(msg);

@@ -7,6 +7,68 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — le tour de Ma journée et de Colis sur ses vraies données :** Julien : « fais pareil pour
+> Ma journée et Colis ». Croisé (lecture seule) : 9 à envoyer (11 ventes `needs_action` moins 2 « colis
+> déposé » = litiges), N°30 tomj683 vraiment 5 j de retard (limite 23/10 10 h, ventes relues ce matin).
+> Corrigé : (1) sur TÉLÉPHONE « Vendu en octobre » n'affichait que « ≥ » — une règle de `styles-epure.css`
+> cachait le premier enfant du montant partiel (elle visait un mot « au moins » qui n'existe plus) ⇒ le
+> montant reste, « ≥ » devant (`vendu-recu.cjs`, 1 rouge sur l'avant) ; (2) Ma journée disait « 1 paire
+> vendue sur Vinted, encore en vente sur eBay » (VRM-81 lue N°81) quand l'écran eBay disait, à raison,
+> « pas reliée » : la mémoire de 800 ms de `fichesPourEbay` gardait des fiches VIDES lues juste avant le
+> nuage ⇒ elle est relue quand le nuage arrive (`audit-ebay-lien-identite`, 1 rouge sur l'avant) ;
+> (3) « Détail › » du bénéfice à 44 px au doigt. Textes de Ma journée NON touchés (autre agent).
+
+> **28 octobre — le tour de l'espace Vestiaire sur ses vraies données :** Julien : « fais pareil pour
+> Vestiaire ». Mesuré (lecture seule) : `vc_listings` vide (jamais lue : `product-listings` et
+> `awaiting-shipping-items` vus le 26 oct., VIDES, avant la 5.236/5.237 ; aucun `vc_ventes`, aucun `vc_achats`),
+> `vc_messages` 0 non lu (relevé du jour), un brouillon smart listing du 27 relié au N°94 (`liens`, id de
+> BROUILLON — sans effet, rien de publié). Rendu 390/1512 : corrigé la phrase du bas « tes ventes ne remontent
+> pas encore… choisis-la ci-dessous » (fausse depuis la 5.237, la liste est AU-DESSUS, redite des cartes, §7) ;
+> « VRM apprend à lire Vestiaire · 5 pages, 26 appels, 20 formes de réponse » ⇒ « Dernier passage de
+> l'extension sur Vestiaire : il y a … » (§2.7, chiffres en `data-vc-mesure-*`) ; « Où trouver ma clé
+> Photoroom » à 44 px. Preuve : `vestiaire.cjs` (4 rouges sur l'avant). Geste : ouvrir « Mes articles »,
+> « Mes ventes » et « Mes commandes » sur Vestiaire une fois avec l'extension à jour.
+
+> **28 octobre — le tour de l'espace eBay sur ses vraies données :** Julien : « vas-y » (après Leboncoin).
+> Rendu Ventes · Annonces · Messages · À traiter · Promotion · Achats · Compte (390/1512) sur la copie lecture
+> seule ; 5 annonces actives (toutes avec une règle d'offre), 0 commande, retrait automatique ALLUMÉ. Corrigé :
+> une inactive que le retrait AUTOMATIQUE venait de terminer (Aquatone 128086452103, paire vendue sur Vinted)
+> disait « pas reliée · Remettre en vente sur eBay » ⇒ lue dans son journal `ebay_retraits_auto` par
+> l'identifiant de l'annonce (`retraitsAuto`, `data-inactive-retrait-auto`) : « retirée par VRM le … : vendue
+> sur Vinted — ne la remets pas en vente », aucun lien de remise en vente (journal illisible ⇒ rien dit) ;
+> Ventes disait « Relie ton compte » à un compte relié et lu sans vente ⇒ « Aucune vente eBay pour
+> l'instant ». Preuve : `ebay-inactives` scénario R (4 rouges sur l'avant). Laissés, vrais : VRM-81/48/78
+> « à vérifier · pas reliée » (N° renumérotés pendant la panne du 18 oct.), une Air Max sans SKU. Gestes :
+> « Relier à une paire » sur ces quatre annonces ; savoir que le retrait automatique est allumé. ⚠️ Les
+> autres sections (Messages, À traiter, Promotion, Achats) lisent eBay en direct : non jugées sur la copie.
+
+> **28 octobre — le tour de l'espace Leboncoin sur ses vraies données :** Julien : « fais pareil pour
+> Leboncoin ». Rendu Ventes · Achats · Annonces · Messages · Colis (390/1512, clair/sombre) sur la copie
+> lecture seule ; CA finalisé 178 € (58 + 75 + 45) et achats reçus 115,50 € = la base. Corrigé : une vente
+> livrée affichait l'étape brute « Paiement effectué » (coupée à 390 px) alors que les totaux la comptent
+> finalisée ⇒ la ligne dit la règle (Finalisée · À envoyer · En transit · Annulée, `data-lbc-etat`) ;
+> « Mes annonces » montrait la référence BRUTE (« 493 ») ⇒ le N° de la règle de l'écran (`numeroLbcIdentite`,
+> lien posé à la main puis réf traduite par la 013 : « N°B233 ») ; achats sans année et dans le désordre
+> (2024/2025/2026) ⇒ le plus récent d'abord, l'année quand ce n'est pas celle-ci (ventes aussi) ; Messages
+> nommait « Compte Leboncoin » le compte du compteur alors que `lbc-account:{id}` (même identité) porte
+> « Totomondu · particulier ». Preuves : `plateformes-premium` (8 rouges sur l'avant), `lbc-messages`
+> (scénario session, 1 rouge). `lbc-publier-app` H/H2 instable (« not visible ») À L'IDENTIQUE sur l'avant.
+> Geste : rouvrir « Mes annonces » sur leboncoin.fr (lue il y a 6 j).
+
+> **28 octobre — le tour de l'espace Vinted sur ses vraies données (5.246) :** Julien : « commence par Vinted,
+> fais le tour et corrige tout ». Rendu Ventes · Achats · Annonces · Messages (390/1512, clair/sombre) sur une
+> copie lecture seule (scratchpad, jamais dans le dépôt) ; disponible 180 € et en attente 1 264,50 € = la base.
+> Corrigé : une ligne VIDÉE par « Supprimer des données… » (`{supprime:true}`, sans payload — compte 199082413)
+> était lue « pas su » ⇒ « compte non chargé » et « données anciennes » : `ligneVideeParToi` la lit « vide »
+> (`fetchHarvestBrut`, AVANT le dressing ; `fetchHarvestOrders`) ; un compte déjà dit « non chargé » sur Ventes
+> n'est plus redit dans la ligne de fraîcheur (`VintedResume sauf`), et ce bandeau est ambre, plus rouge (§7) ;
+> la fraîcheur des annonces ne parle plus à 24 min (« vu actif » seulement après 2 h) ni d'une version figée
+> (« 5.170.0 ») ; l'extension ne range plus un refus de Vinted à code TEXTE (`UNAUTHORIZED`, session expirée de
+> jujuf38) comme ses ventes (`estErreurVinted`, `noteSuivi`). Preuves : `audit-supprimees` §8 (2 rouges sur
+> l'avant), `audit-fiabilite-fond` §2 (1 rouge). Laissés, vrais : doublons de N° 50/60/82/88 (deux paires
+> vendues), offres « en attente » de sept./août (capture ancienne, même règle que le fil). Gestes : rouvrir Vinted
+> sur jujuf38 et julatace35260 ; « Supprimer ce compte » sur #199082413 s'il ne doit plus revenir.
+
 > **28 octobre — la bonne catégorie sur chaque plateforme, Vestiaire en « smart listing », eBay publié en un clic (5.245) :**
 > Julien : « Vestiaire avec le smart listing », « la catégorie doit correspondre à celle de la plateforme »,
 > « eBay : j'appuie sur publier, l'annonce se publie toute seule avec les critères et la description ».

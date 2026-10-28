@@ -134,7 +134,12 @@
      entière, barre du bas comprise. <main> devient son repère. */
   .vrm-app-shell .vrm-main { position: relative; }
   html:has(.vrm-app-shell), html:has(.vrm-app-shell) body { overflow: hidden; overscroll-behavior: none; }
-  /* « au moins » écrit en mot sous le titre : un « ≥ » suffit, comme le CA. */
-  .vrm-app-shell .vrm-day-layout [data-vendu-partiel="1"] > span:first-child { display: none !important; }
+  /* Total partiel (un compte pas lu) : « ≥ » devant le montant. Le montant
+     n'est JAMAIS caché (28 oct. : une règle visait un mot « au moins » qui
+     n'existe plus, et cachait le montant lui-même — il ne restait que « ≥ »). */
   .vrm-app-shell .vrm-day-layout [data-vendu-partiel="1"]::before { content: "≥ "; }
 }
+/* (28 oct.) « Détail › » du bénéfice dans Ma journée : un lien, pas un bouton —
+   la règle des 44 px des boutons ne le touchait pas (14 px au doigt). La zone
+   grandit, une marge négative garde la ligne fine. */
+.vrm-day-lien[data-journee-benef-detail] { display:inline-flex; align-items:center; min-height:44px; margin:-15px -6px; padding:0 6px; }
