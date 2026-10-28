@@ -856,6 +856,16 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
               for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
                 const key = r + '_' + c; const num = ((it.slots || {})[key] || []).map(v => String(v)).filter(Boolean)[0];
                 const cx = -w / 2 + (c + 0.5) * cellW, cbY = Math.max(0, ht - (r + 1) * cellH) + 0.025, z = d / 2 - bacD / 2 - 0.015;
+                // (28 oct., « fais pareil pour les étagères à bacs ») : « max 1 » en
+                // façade, en haut de la case — un bac par case. Pas sur une case sans
+                // plateau dessous (son bac tomberait). Décor seul, comme les étagères.
+                { const plxM = Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null;
+                  if (r === rows - 1 || !plxM || plxM.has((r + 1) + ':' + (c + 1))) {
+                    const pw = Math.min(0.2, cellW * 0.5), ph = pw / 2;
+                    const nb = plaqueMaxPile(1, true); nb.scale.set(pw, ph, 1);
+                    nb.position.set(cx, Math.max(cbY + ph / 2, ht - r * cellH - 0.03 - ph / 2), d / 2 + 0.03);
+                    nb.userData = { maxCase: key, texte: 'max 1' }; g.add(nb);
+                  } }
                 if (num) {
                   const bac = new THREE.Group(); bac.userData = { cell: key, num, idx: 0 };
                   const plast = flatMat(shade(base, -18), 0.55); const ep = 0.012;

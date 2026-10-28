@@ -434,6 +434,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await attendre3D(pg), t + ' : la 3D se monte');
       const pl0 = await sonde(pg, 'plateaux', 'b1');
       dit(pl0 && pl0.length === 4 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 4 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      const mb0 = await sonde(pg, 'maxCases', 'b1');
+      dit(mb0 && Object.keys(mb0).length === 6 && Object.values(mb0).every((v) => v.texte === 'max 1'), t + ' : chaque case des bacs porte « max 1 »', JSON.stringify(mb0));
       await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
       await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
       const p = await sonde(pg, 'project', 'b1', { cell: '0_0', num: '901' });
@@ -449,6 +451,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       await pg.waitForTimeout(1200);
       const pl1 = await sonde(pg, 'plateaux', 'b1');
       dit(pl1 && pl1.length === 4 && pl1.filter((x) => x.w < 0.7).length === 1, t + ' : la 3D dessine un plateau de moitié', JSON.stringify(pl1));
+      const mb1 = await sonde(pg, 'maxCases', 'b1');
+      dit(mb1 && !mb1['0_0'] && mb1['0_1'] && Object.keys(mb1).length === 5, t + ' : plus de « max 1 » sur la case sans plateau dessous, l\'autre la garde', JSON.stringify(mb1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-bacs-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
