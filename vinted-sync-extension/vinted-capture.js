@@ -180,8 +180,18 @@
   // Sur la page de dépôt, le numéro est RÉSERVÉ par le fond avant d'être montré.
   // Rien ne clique, rien n'envoie à Vinted : on pose une étiquette dans la page.
   const NUM_ATTR = 'data-vrm-num';
-  const STYLE_PILULE = 'display:inline-flex;align-items:center;gap:4px;font:700 12px/1 -apple-system,system-ui,sans-serif;'
-    + 'color:#fff;background:#10141B;border:1px solid #3D7BFF;border-radius:999px;padding:4px 8px;white-space:nowrap;letter-spacing:.01em;';
+  const STYLE_PILULE = 'display:inline-flex;align-items:center;gap:4px;font:700 11.5px/1 -apple-system,system-ui,sans-serif;'
+    + 'color:#fff;background:rgba(16,20,27,.88);border:1px solid rgba(61,123,255,.9);border-radius:999px;padding:4px 8px;white-space:nowrap;letter-spacing:.01em;'
+    + 'box-shadow:0 1px 3px rgba(0,0,0,.25);flex:none;width:auto;max-width:max-content;box-sizing:border-box;';
+  // (28 oct.) Sur une carte de Vinted, le lien RECOUVRE la photo (sans image
+  // dedans) et sa mise en page étirait l'étiquette sur toute la largeur, en bas
+  // de la photo. On la pose toujours en petite pastille, en haut à gauche, sans
+  // que le style du site puisse la déformer (!important), et sans gêner le clic.
+  const epingler = (e, a) => {
+    if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
+    const P = { position: 'absolute', top: '8px', left: '8px', right: 'auto', bottom: 'auto', width: 'auto', height: 'auto', 'max-width': 'calc(100% - 16px)', margin: '0', 'align-self': 'flex-start', 'z-index': '3', 'pointer-events': 'none', transform: 'none' };
+    for (const k in P) e.style.setProperty(k, P[k], 'important');
+  };
   const pilule = (texte, titre) => { const e = document.createElement('span'); e.setAttribute(NUM_ATTR, '1'); e.style.cssText = STYLE_PILULE; e.textContent = texte; if (titre) e.title = titre; return e; };
   const demander = (msg) => new Promise((res) => {
     if (!vivant()) return res(null);
@@ -240,10 +250,9 @@
       if (!n) { m = /\/transactions\/(\d{4,15})/.exec(h); n = m && connus.txs[m[1]]; }
       if (!n) continue;
       const e = pilule(`N°${n}`, 'Numéro VRM de cette paire');
-      if (a.querySelector('img')) {
-        if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
-        e.style.position = 'absolute'; e.style.top = '6px'; e.style.left = '6px'; e.style.zIndex = '2';
-      } else e.style.marginLeft = '6px';
+      const pa = getComputedStyle(a).position;
+      if (a.querySelector('img') || pa === 'absolute' || pa === 'fixed' || a.getBoundingClientRect().height > 80) epingler(e, a);
+      else { e.style.setProperty('margin-left', '6px', 'important'); e.style.setProperty('vertical-align', 'middle', 'important'); }
       a.appendChild(e);
     }
   }

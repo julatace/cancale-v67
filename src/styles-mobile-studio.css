@@ -482,3 +482,10 @@
 @media(max-width:767px){
  .vrm-main .vrm-set-titre.vrm-titre-compta{text-transform:none;letter-spacing:0;font-size:12px;}
 }
+
+/* (28 oct.) « Republier » et « Brouillons » : une rangée à eux sous la recherche
+   (la grille plaçait chaque bouton direct dans la case de 44 px du micro). */
+@media(max-width:767px){
+ .vrm-main .vrm-ann-toolbar>.vrm-ann-actions{grid-column:1/-1!important;grid-row:2!important;display:flex!important;gap:8px;}
+ .vrm-main .vrm-ann-toolbar>.vrm-ann-actions>button{flex:1 1 0;min-height:44px!important;width:auto!important;}
+}

@@ -73,7 +73,7 @@ const fichesLocales = (pg) => pg.evaluate(() => { try { return JSON.parse(localS
 const CAPTURE = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'vinted-capture.js'), 'utf8');
 const PAGES = {
   '/items/new': '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><form><h2>Vends ton article</h2><input name="title"><div class="actions"><button type="button">Brouillon</button><button type="submit">Ajouter</button></div></form></body></html>',
-  '/member/111': '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div class="grid"><a href="/items/10400000001-patta"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="200" height="260"></a><a href="/items/10400000099-autre"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="200" height="260"></a></div></body></html>',
+  '/member/111': '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div class="grid"><a href="/items/10400000001-patta"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="200" height="260"></a><a href="/items/10400000099-autre"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="200" height="260"></a><div class="carte" style="position:relative;width:200px;height:260px;background:#ddd"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="200" height="260"><a href="/items/10400000002-voile" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end"></a></div></div></body></html>',
   '/my_orders/sold': '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><ul><li><a href="/inbox/8000001">Commande traitée — Samba</a></li><li><a href="/inbox/8000099">Commande traitée — inconnue</a></li></ul></body></html>',
   '/items/10400000001-patta': '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><h1>Nike Patta taille 43</h1></body></html>',
 };
@@ -96,7 +96,7 @@ async function pageVinted(nav, chemin, reponses, taille) {
   try {
     for (const taille of [1512, 390]) {
       console.log(`\n── A. Sur Vinted (${taille} px)`);
-      const NUMS = { ok: true, items: { '10400000001': '73' }, convs: { '8000001': '60' }, txs: {} };
+      const NUMS = { ok: true, items: { '10400000001': '73', '10400000002': 'B528' }, convs: { '8000001': '60' }, txs: {} };
       let o = await pageVinted(nav, '/items/new', { numeroPourPublier: { ok: true, numero: '74' }, numeros: NUMS }, taille);
       const depot = await o.pg.evaluate(() => { const e = document.querySelector('[data-vrm-num-depot]'); const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Ajouter'); return e ? { n: e.getAttribute('data-vrm-num-depot'), t: e.textContent, colle: e.previousElementSibling === b } : null; });
       dit(!!depot && depot.n === '74' && /N°74/.test(depot.t) && depot.colle, 'page de dépôt : « N°74 » juste à côté du bouton « Ajouter »', JSON.stringify(depot));
@@ -112,6 +112,10 @@ async function pageVinted(nav, chemin, reponses, taille) {
       o = await pageVinted(nav, '/member/111', { numeros: NUMS }, taille);
       const tuiles = await o.pg.evaluate(() => [...document.querySelectorAll('a')].map((a) => (a.querySelector('[data-vrm-num]') || {}).textContent || ''));
       dit(tuiles[0] === 'N°73' && tuiles[1] === '', 'dressing : N°73 sur SA paire, rien sur une annonce inconnue', JSON.stringify(tuiles));
+      // (28 oct., capture de Julien) Une carte dont le lien COUVRE la photo sans la
+      // contenir : l'étiquette était étirée en barre sombre en bas de la photo.
+      const pil = await o.pg.evaluate(() => { const e = document.querySelector('a[href*="10400000002"] [data-vrm-num]'); const c = document.querySelector('.carte'); if (!e || !c) return null; const r = e.getBoundingClientRect(), q = c.getBoundingClientRect(); return { t: e.textContent, w: Math.round(r.width), dx: Math.round(r.left - q.left), dy: Math.round(r.top - q.top) }; });
+      dit(pil && pil.t === 'N°B528' && pil.w < 100 && pil.dx <= 12 && pil.dy <= 12, 'carte au lien superposé : une petite pastille en haut à gauche de la photo, pas une barre étirée', JSON.stringify(pil));
       await o.ctx.close();
       o = await pageVinted(nav, '/my_orders/sold', { numeros: NUMS }, taille);
       const ventes = await o.pg.evaluate(() => [...document.querySelectorAll('a')].map((a) => (a.querySelector('[data-vrm-num]') || {}).textContent || ''));

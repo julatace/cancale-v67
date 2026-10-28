@@ -26,11 +26,14 @@ const ITEMS = [
   ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', favourite_count: 0, created_at_ts: Math.floor(auj / 1000) - 60 * 86400 }),
   ann(9106, { title: 'Nike Dunk low panda taille 41', created_at_ts: Math.floor(auj / 1000) - 5 * 86400 }),
   ann(9107, { title: 'Asics Gel-Kayano 14 taille 43', brand_title: 'Asics', favourite_count: 0, created_at_ts: Math.floor(auj / 1000) - 2 * 86400 }),
+  ann(9201, { title: 'Nike Air Max 1 dark teal', is_draft: true, price: { amount: '0.0', currency_code: 'EUR' } }),
+  ann(9202, { title: '', is_draft: true }),
 ];
 const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9106': { numero: '45', buyPrice: '47', recreeAt: new Date(auj - 5 * 3600e3).toISOString() }, '9107': { numero: '46' } } };
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
+  { id: 'vinted_brouillon_9201', data: { id: '9201', uid: '111', titre: 'Nike Air Max 1 dark teal', prix: 65, nPhotos: 4, etat: 'brouillon' } },
   { id: 'vinted_item_details', data: { '9102': { photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg', 'https://images1.vinted.net/t/a/f800/3.jpeg'] } } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
@@ -43,12 +46,15 @@ const PONT = (o) => {
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && (d.cmd === 'republierVinted' || d.cmd === 'recreerVinted')) {
-      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages, lettre: d.lettre });
+      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages, lettre: d.lettre, viaBrouillon: d.viaBrouillon });
       const resp = d.id === '9107' ? { accepte: false, code: 'vinted-pause', raison: 'Vinted demande de ralentir — réessaie dans 15 min' }
         : d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
         : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
         : { accepte: true, etape: 'fait', nouvelId: '99102', ancien: 49, nouveau: d.prix };
       post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
+    } else if (d.__vmr === 'cmd' && d.cmd === 'publierBrouillon') {
+      window.__repub.push({ cmd: d.cmd, uid: d.uid, draftId: d.draftId, confirme: d.confirme });
+      post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', itemId: d.draftId } });
     } else if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
   });
   post({ __vmr: 'ready', version: o.version });
@@ -108,6 +114,9 @@ const projette = (row, sel) => {
         const bouton = pg.locator('[data-republier-ouvrir]').first();
         await bouton.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
         dit(await bouton.count() > 0 && await bouton.isVisible(), 'Annonces : un bouton « Republier » dans la barre');
+        const lb = await bouton.boundingBox().catch(() => null);
+        dit(lb && lb.width >= 80 && lb.height >= 40, '« Republier » n’est pas écrasé dans une case de 44 px (barre du téléphone)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
+        await pg.locator('.vrm-ann-toolbar').first().screenshot({ path: path.join(require('os').tmpdir(), `republier-barre-${vp.width}.png`) }).catch(() => {});
         dit(await pg.locator('[data-atelier-ouvrir]').count() === 0, 'plus de « ✨ Préparer » sur les cartes (un seul parcours)');
         const outils = pg.locator('[aria-label="Outils"]').first();
         if (await outils.count()) { await outils.click(); await pg.waitForTimeout(200); }
@@ -115,6 +124,27 @@ const projette = (row, sel) => {
         dit(!/Lots — titres|File de publication/.test(menu), 'le menu Outils ne propose plus « Lots » ni « File de publication »');
         await pg.keyboard.press('Escape').catch(() => {});
         if (await outils.count()) { await pg.mouse.click(5, 5).catch(() => {}); await pg.waitForTimeout(150); }
+        // (28 oct.) Ses brouillons : listés, « Mettre en ligne » seulement pour celui dont VRM a le contenu.
+        const bb = pg.locator('[data-brouillons-ouvrir]').first();
+        dit(await bb.count() > 0 && /2/.test(await bb.innerText()), 'Annonces : un bouton « Brouillons · 2 » (ses brouillons Vinted)', await bb.count() ? await bb.innerText() : 'absent');
+        if (await bb.count()) {
+          await bb.click();
+          await pg.locator('[data-brouillons-vinted]').waitFor({ state: 'visible', timeout: 4000 });
+          await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"]').waitFor({ timeout: 4000 }).catch(() => {});
+          dit(await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"] [data-brouillon-publier]').count() === 1, 'le brouillon dont VRM a le contenu complet propose « Mettre en ligne »');
+          dit(await pg.locator('[data-brouillon="9202"] [data-brouillon-publier]').count() === 0 && /items\/9202\/edit/.test(await pg.locator('[data-brouillon="9202"] [data-brouillon-ouvrir]').getAttribute('href') || ''), 'un brouillon inconnu : seulement « Ouvrir sur Vinted »');
+          const tailles = await pg.$$eval('[data-brouillons-vinted] button, [data-brouillons-vinted] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
+          dit(tailles.every((h) => h >= 44), 'boutons de la liste à 44 px au doigt', tailles.join(','));
+          await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
+          await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();
+          await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').waitFor({ timeout: 4000 }).catch(() => {});
+          const env = await pg.evaluate(() => (window.__repub || []).filter((x) => x.cmd === 'publierBrouillon'));
+          dit(env.length === 1 && env[0].draftId === '9201' && env[0].uid === '111' && env[0].confirme === true && await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').count() === 1, 'après sa confirmation, UNE commande « publierBrouillon » part pour ce brouillon, et l’écran dit « en ligne »', JSON.stringify(env));
+          await pg.keyboard.press('Escape').catch(() => {});
+          await pg.locator('[data-brouillons-vinted] [aria-label="Fermer"]').click().catch(() => {});
+          await pg.waitForTimeout(300);
+          await pg.evaluate(() => { window.__repub = []; });
+        }
         await bouton.click();
         await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 4000 });
         const paires = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
@@ -192,7 +222,7 @@ const projette = (row, sel) => {
         const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
         dit(!errs.length, 'aucune erreur d’app', errs[0]);
-      } catch (e) { dit(false, 'le scénario « Republier » a tourné', String(e.message).slice(0, 160)); }
+      } catch (e) { dit(false, 'le scénario « Republier » a tourné', String(e.message).slice(0, 1500)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-' + vp.width + '.png') });
       await ctx.close();
     }
@@ -258,6 +288,7 @@ const projette = (row, sel) => {
         dit(memo && memo.mode === 'aleatoire', 'le choix est retenu pour la prochaine fois', JSON.stringify(memo));
         const env = await pg.evaluate(() => window.__repub || []);
         dit(env.length === 2 && env.every((x) => /^[a-z]$/.test(x.lettre || '')), 'chaque annonce part avec SA lettre (une seule lettre)', JSON.stringify(env.map((x) => x.lettre)));
+        dit(env.length === 2 && env.every((x) => x.viaBrouillon === true), 'par défaut, chaque annonce passe par un brouillon Vinted puis est mise en ligne', JSON.stringify(env.map((x) => x.viaBrouillon)));
       } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, 160)); }
       await ctx.close(); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }

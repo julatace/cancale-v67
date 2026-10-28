@@ -28,7 +28,7 @@ const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', descr
 const PHOTOS = ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'];
 const PHOTOS_D = ['https://images1.vinted.net/t/b/f800/1.jpeg', 'https://images1.vinted.net/t/b/f800/2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
@@ -36,11 +36,14 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
   if (descDetails != null) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), description: descDetails };
   if (lettreCoffre && lignes['coffre_111_9101']) lignes['coffre_111_9101'].lettreVRM = lettreCoffre;
   if (cdn) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), photos: PHOTOS_D };
+  if (extra) Object.assign(lignes, extra);
   let n = 500;
   return faireFond({ src, lignes, connecte, comptes, cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/?$/.test(e.chemin)) return { status: brouillon, body: brouillonSansId ? { code: 0 } : { draft: { id: 88001 } } };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: completion, body: { code: 0 } };
       if (e.methode === 'POST' && /\/api\/v2\/items\/9101\/delete$/.test(e.chemin)) return { status: suppression, body: {} };
       return { status: 404, body: {} };
     } });
@@ -52,7 +55,7 @@ const suppressions = (j) => de(j, /\/items\/\d+\/delete$/);
 async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
-  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 const zero = (j) => j.vinted.length === 0;
@@ -150,6 +153,65 @@ const zero = (j) => j.vinted.length === 0;
   //     OffscreenCanvas) : rien ne part, jamais l'original à la place.
   { const { f, r } = await run({ reglages: { rot: 0, bright: 1.2, contrast: 1, sat: 1, zoom: 1 } });
     dit(photosP(f.j).length === 0 && creations(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "réglages photo impossibles ici : rien ne part (jamais la photo d'origine en silence)", `p=${photosP(f.j).length} c=${creations(f.j).length} ${r.raison || ''}`); }
+
+
+  // M — (28 oct.) « ça met en brouillon puis ça publie » : formes MESURÉES.
+  const brouillonsP = (j) => de(j, /\/item_upload\/drafts\/?$/);
+  const completions = (j) => de(j, /\/item_upload\/drafts\/\d+\/completion$/);
+  { const { f, r } = await run({ viaBrouillon: true });
+    const seq = f.j.vinted.map((v) => /photos$/.test(v.chemin) ? 'P' : /completion$/.test(v.chemin) ? 'M' : /drafts\/?$/.test(v.chemin) ? 'B' : /item_upload\/items/.test(v.chemin) ? 'C' : /delete$/.test(v.chemin) ? 'S' : '?').join('');
+    dit(seq === 'PPBMS' && r.etape === 'fait' && r.nouvelId === '88001', "via brouillon : photos, PUIS brouillon, PUIS mise en ligne, PUIS seulement la suppression de l'ancienne (même identifiant que le brouillon)", `seq=${seq} etape=${r.etape} id=${r.nouvelId} ${r.raison || ''}`);
+    let b = {}, c = {}; try { b = JSON.parse(brouillonsP(f.j)[0].corps); c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
+    dit(b.draft && b.draft.id === null && !('push_up' in b) && !('push_up' in b.draft) && b.parcel === null && b.upload_session_id === b.draft.temp_uuid && b.draft.title === 'Nike Air Max 1 — remise en ligne' && b.draft.price === '54', "brouillon : forme mesurée {draft:{id:null,…}, parcel:null, upload_session_id}, sans push_up", JSON.stringify({ id: b.draft && b.draft.id, pu: 'push_up' in b }));
+    dit(c.draft && c.draft.id === 88001 && c.push_up === false && c.parcel === null && /\/drafts\/88001\/completion$/.test(completions(f.j)[0].chemin) && c.draft.description === b.draft.description, "mise en ligne : POST …/drafts/88001/completion, même corps, draft.id posé, push_up false", JSON.stringify({ id: c.draft && c.draft.id, pu: c.push_up }));
+    dit(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'publie' && f.lignes['vinted_brouillon_88001'].ancienId === '9101', "le brouillon est noté « publié » (avec l'annonce qu'il remplace)", JSON.stringify(f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat)); }
+  { const { f, r } = await run({ viaBrouillon: true, completion: 422 });
+    dit(suppressions(f.j).length === 0 && r.etape === 'echec' && /brouillons/.test(r.raison || '') && f.lignes['vinted_brouillon_88001'] && f.lignes['vinted_brouillon_88001'].etat === 'brouillon', "mise en ligne refusée : l'ancienne n'est PAS supprimée, le brouillon reste (et c'est dit)", `s=${suppressions(f.j).length} ${r.raison || ''}`); }
+  { const { f, r } = await run({ viaBrouillon: true, completion: 502 });
+    dit(suppressions(f.j).length === 0 && r.etape === 'incertain', "mise en ligne sans réponse claire : « incertain », rien supprimé", `s=${suppressions(f.j).length} etape=${r.etape}`); }
+  { const { f, r } = await run({ viaBrouillon: true, brouillon: 422 });
+    dit(completions(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "brouillon refusé : ni mise en ligne, ni suppression", `m=${completions(f.j).length} s=${suppressions(f.j).length}`); }
+  { const { f, r } = await run({ viaBrouillon: true, brouillonSansId: true });
+    dit(completions(f.j).length === 0 && suppressions(f.j).length === 0 && r.etape === 'echec', "brouillon sans identifiant lisible : on ne devine rien, ni mise en ligne ni suppression", `m=${completions(f.j).length}`); }
+  { const { f } = await run({});
+    dit(brouillonsP(f.j).length === 0 && creations(f.j).length === 1, "sans l'option : création directe, comme avant", `b=${brouillonsP(f.j).length}`); }
+
+  // N — mettre en ligne SON brouillon depuis VRM (`publierBrouillon`).
+  const CORPS_B = (o = {}) => JSON.stringify({ draft: { id: null, currency: 'EUR', temp_uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', title: 'Nike Air Max 1 dark teal', description: 'très bon état', brand_id: 53, brand: 'Nike', catalog_id: 1242, price: '65', package_size_id: 1, color_ids: [12], assigned_photos: [{ id: 1, orientation: 0 }], item_attributes: [{ code: 'size', ids: [785] }], ...o }, parcel: null, upload_session_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' });
+  const dressing = (ids) => ({ harvest_111_listings: { capturedAt: nowISO(), payload: { items: ids.map((x) => ({ id: x, is_draft: true })) } } });
+  const pubB = async (opts = {}) => {
+    const extra = { ...(opts.dressing === false ? {} : dressing(['10432342904'])), ...(opts.ligne === false ? {} : { vinted_brouillon_10432342904: { id: '10432342904', uid: opts.uid || '111', corps: opts.corps || CORPS_B(), etat: 'brouillon' } }) };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: opts.completion || 200 });
+    if (typeof f.ctx.publierBrouillon !== 'function') return { f, r: { absent: true } };
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: opts.confirme !== false }); } catch (e) { r = { erreur: e.message }; }
+    return { f, r };
+  };
+  { const { f, r } = await pubB();
+    let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
+    dit(f.j.vinted.length === 1 && r.etape === 'fait' && c.draft && c.draft.id === 10432342904 && c.push_up === false && c.draft.title === 'Nike Air Max 1 dark teal' && /drafts\/10432342904\/completion$/.test(completions(f.j)[0].chemin), "brouillon complet de son dressing : UNE requête, la mise en ligne, avec SON corps tel quel", `n=${f.j.vinted.length} etape=${r.etape} ${r.raison || r.erreur || ''}`);
+    dit(f.lignes.vinted_brouillon_10432342904.etat === 'publie' && f.lignes.vrm_vinted_modele && f.lignes.vrm_vinted_modele['10432342904'], "noté « publié », et sa recette gardée pour une prochaine republication"); }
+  { const { f, r } = await pubB({ corps: CORPS_B({ price: 0 }) });
+    dit(zero(f.j) && r.code === 'incomplet' && /prix/.test(r.raison || ''), "brouillon sans prix : refusé, aucune requête, il est nommé ce qui manque", `n=${f.j.vinted.length} ${r.raison || ''}`); }
+  { const { f, r } = await pubB({ dressing: false });
+    dit(zero(f.j) && r.code === 'pas-dans-dressing', "un brouillon absent de son dressing lu : refusé, aucune requête", `code=${r.code}`); }
+  { const { f, r } = await pubB({ ligne: false });
+    dit(zero(f.j) && r.code === 'brouillon-inconnu' && /Enregistrer/.test(r.raison || ''), "contenu inconnu : refusé, aucune requête, et le geste qui l'apprend", `code=${r.code}`); }
+  { const { f, r } = await pubB({ uid: '222' });
+    dit(zero(f.j) && r.code === 'autre-compte', "brouillon d'un autre compte : refusé", `code=${r.code}`); }
+  { const { f, r } = await pubB({ confirme: false });
+    dit(zero(f.j) && r.code === 'confirmation', "sans confirmation : aucune requête", `code=${r.code}`); }
+  { const { f, r } = await pubB({ completion: 422 });
+    dit(r.etape === 'echec' && f.lignes.vinted_brouillon_10432342904.etat === 'brouillon', "mise en ligne refusée : le brouillon reste un brouillon, c'est dit", `etape=${r.etape}`); }
+  // O — le brouillon qu'il enregistre sur Vinted est appris (corps accepté, id).
+  { const f = monter({ src: process.env.BG_SRC || undefined });
+    let ok1 = false, ok2 = true;
+    if (typeof f.ctx.noterBrouillonVinted === 'function') {
+      ok1 = await f.ctx.noterBrouillonVinted('10432342904', 200, CORPS_B(), 'www.vinted.fr', { tab: { url: 'https://www.vinted.fr/items/new' } });
+      ok2 = await f.ctx.noterBrouillonVinted('10432342905', 200, CORPS_B({ id: 99 }), 'www.vinted.fr', { tab: { url: 'https://www.vinted.fr/items/new' } });
+    }
+    const l = f.lignes.vinted_brouillon_10432342904;
+    dit(ok1 && l && l.uid === '111' && l.titre === 'Nike Air Max 1 dark teal' && l.prix === 65 && l.nPhotos === 1 && l.etat === 'brouillon', "un brouillon enregistré sur Vinted est appris (compte du cookie, titre, prix, photos)", JSON.stringify(l && { uid: l.uid, t: l.titre, p: l.prix }));
+    dit(!ok2 && !f.lignes.vinted_brouillon_10432342905, "un corps qui contredit l'identifiant n'est pas rangé"); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique

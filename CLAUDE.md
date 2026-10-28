@@ -7,6 +7,26 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (soir) — ses BROUILLONS Vinted, et « brouillon puis en ligne » (5.251) :** Julien : « voir ses
+> brouillons, faire passer le statut de brouillon à en ligne ». Formes MESURÉES dans ses requêtes :
+> `POST /api/v2/item_upload/drafts` `{draft:{id:null,…},parcel:null,upload_session_id}` puis
+> `POST …/drafts/{id}/completion` (même corps, `draft.id` posé, `push_up:false`) ; un brouillon publié GARDE son
+> identifiant. (1) Annonces → **Brouillons · N** (`BrouillonsVinted`, dressing `is_draft`, par compte) : « Mettre
+> en ligne » (confirmé, `publierBrouillon`) seulement si l'extension a le CORPS accepté par Vinted
+> (`vinted_brouillon_{id}`, capté quand il enregistre le brouillon — `inject.js` `noteBrouillon`), du même compte,
+> présent dans son dressing comme brouillon, et complet (titre, prix, photos, catégorie, description) — sinon
+> « Ouvrir sur Vinted » ; rien n'est complété ni deviné. Les brouillons d'avant la 5.251 ne sont pas connus : les
+> rouvrir et les enregistrer une fois. (2) **Republier** : « Passer par un brouillon Vinted, puis le mettre en
+> ligne » (allumé par défaut, `viaBrouillon`) — photos → brouillon → 5 s → mise en ligne → SEULEMENT ALORS
+> suppression de l'ancienne ; brouillon ou mise en ligne refusés / sans réponse ⇒ rien supprimé ; 3 gestes du
+> plafond horaire par paire. (3) Visuel : l'étiquette N° sur les cartes Vinted (lien superposé à la photo) était
+> étirée en barre sombre en bas ⇒ pastille en haut à gauche ; au téléphone, « Republier » était écrasé dans la case
+> de 44 px du micro, le champ de recherche dessinait deux boîtes, l'icône du tri était un carré vide. Preuves :
+> `audit-recreer.cjs` (49 ; 19 rouges sur la 5.250), bancs `republier.cjs` et `numero-vinted.cjs` (barre étirée
+> reproduite sur l'avant : 194 px en bas de la photo). ⚠️ Non mesuré : la RÉPONSE de `POST …/drafts` (id lu
+> défensivement : `draft.id`, `item.id`, `id` ; illisible ⇒ rien n'est mis en ligne) et l'adresse d'édition d'un
+> brouillon (`/items/{id}/edit` supposée).
+
 > **28 octobre (après-midi) — Republier : photos PAR annonce, temps montrés avant, lettre en bas (5.250) :**
 > Julien : « je sélectionne 3 annonces, je modifie toutes les photos des 3 pour qu'elles ne soient pas similaires,
 > avec un visuel ; je choisis le temps (aléatoire, 1,23 puis 1,56…) » puis « la même description, absolument tout ;
@@ -18,10 +38,8 @@
 > Étape 3 : les temps aléatoires sont TIRÉS avant de lancer et écrits sur chaque ligne (« tout de suite », « +1 min
 > 23 s »), « Tirer d'autres temps » ; le moteur suit le temps montré. Description : reprise mot pour mot ; option
 > « lettre au hasard tout en bas » (extension 5.250, `msg.lettre`, `EXT_CAPACITES.lettre`) : « \n\n<lettre> » en fin,
-> la lettre d'une recréation précédente (`coffre.lettreVRM`) retirée d'abord — jamais d'empilement. ⚠️ « Mettre en
-> BROUILLON sur Vinted puis publier » : PAS fait — aucune requête de brouillon n'a jamais été vue
-> (`seen_urls` : `item_upload/items` seul) ; la recréation crée directement. Geste pour l'apprendre : enregistrer
-> une annonce en brouillon à la main une fois. Preuves : `audit-recreer.cjs` J (2 rouges sur la 5.249), banc
+> la lettre d'une recréation précédente (`coffre.lettreVRM`) retirée d'abord — jamais d'empilement. (Le brouillon puis
+> publier : fait le 28 au soir, voir au-dessus.) Preuves : `audit-recreer.cjs` J (2 rouges sur la 5.249), banc
 > `republier.cjs` (rouge sur le build de main).
 
 > **28 octobre (nuit) — audit de la recréation avant son premier essai, comparée au marché (5.249) :** Julien :
