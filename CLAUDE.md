@@ -7,6 +7,17 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — le tour de Ma journée et de Colis sur ses vraies données :** Julien : « fais pareil pour
+> Ma journée et Colis ». Croisé (lecture seule) : 9 à envoyer (11 ventes `needs_action` moins 2 « colis
+> déposé » = litiges), N°30 tomj683 vraiment 5 j de retard (limite 23/10 10 h, ventes relues ce matin).
+> Corrigé : (1) sur TÉLÉPHONE « Vendu en octobre » n'affichait que « ≥ » — une règle de `styles-epure.css`
+> cachait le premier enfant du montant partiel (elle visait un mot « au moins » qui n'existe plus) ⇒ le
+> montant reste, « ≥ » devant (`vendu-recu.cjs`, 1 rouge sur l'avant) ; (2) Ma journée disait « 1 paire
+> vendue sur Vinted, encore en vente sur eBay » (VRM-81 lue N°81) quand l'écran eBay disait, à raison,
+> « pas reliée » : la mémoire de 800 ms de `fichesPourEbay` gardait des fiches VIDES lues juste avant le
+> nuage ⇒ elle est relue quand le nuage arrive (`audit-ebay-lien-identite`, 1 rouge sur l'avant) ;
+> (3) « Détail › » du bénéfice à 44 px au doigt. Textes de Ma journée NON touchés (autre agent).
+
 > **28 octobre — le tour de l'espace Vestiaire sur ses vraies données :** Julien : « fais pareil pour
 > Vestiaire ». Mesuré (lecture seule) : `vc_listings` vide (jamais lue : `product-listings` et
 > `awaiting-shipping-items` vus le 26 oct., VIDES, avant la 5.236/5.237 ; aucun `vc_ventes`, aucun `vc_achats`),
