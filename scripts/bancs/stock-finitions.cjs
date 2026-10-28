@@ -67,6 +67,11 @@ const PLAN_BACS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wall
 const PLAN_BOIS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 'w1', type: 'bois', name: 'Étagère bois', x: 2, y: 0.1, w: 1.2, h: 0.45, rows: 4, cols: 2, h3d: 1.2, slots: { '1_0': ['611'], '1_1': ['612'] } },
 ] }], active: 'r1' };
+// XV. Anciens meubles (physique « colonne ») : une grille 3 × 2 et une commode 3 × 1.
+const PLAN_ANCIENS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'g1', type: 'grille', name: 'Grille', x: 1, y: 0.1, w: 1, h: 0.5, rows: 3, cols: 2, cell: 0.5, slots: { '2_0': ['921'] } },
+  { id: 'k1', type: 'commode', name: 'Commode', x: 3.5, y: 0.1, w: 1.2, h: 0.5, rows: 3, cols: 1, h3d: 1.0, slots: { '2_0': ['922'] } },
+] }], active: 'r1' };
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
 const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703', '801', '802', '803', '901', '902', '903', '611', '612'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
@@ -485,6 +490,23 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const pl1 = await sonde(pg, 'plateaux', 'w1');
       dit(pl1 && pl1.length === 5 && pl1.filter((x) => x.w < 0.7).length === 1, t + ' : la 3D dessine un plateau de bois de moitié', JSON.stringify(pl1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-bois-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XV. ANCIENS MEUBLES : LE NOMBRE MAX PAR CASE (28 oct.) ──────────────
+    if (fait('XV')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XV. anciens ' + vp.width, async () => {
+      const t = 'XV. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_ANCIENS);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const mg = await sonde(pg, 'maxCases', 'g1');
+      dit(mg && Object.keys(mg).length === 6 && Object.values(mg).every((v) => v.texte === 'max 1'), t + ' : chaque case de la grille porte « max 1 »', JSON.stringify(mg));
+      const mk = await sonde(pg, 'maxCases', 'k1');
+      dit(mk && Object.keys(mk).length === 3 && Object.values(mk).every((v) => v.texte === 'max 1'), t + ' : chaque tiroir de la commode porte « max 1 »', JSON.stringify(mk));
+      dit(mk && mk['0_0'].y > mk['1_0'].y && mk['1_0'].y > mk['2_0'].y, t + ' : une plaque en haut de chaque case, de haut en bas', JSON.stringify(mk));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-anciens-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
