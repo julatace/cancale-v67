@@ -811,7 +811,11 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
                   [[bacW, ep, bacD, 0, ep / 2, 0], [bacW, bacH, ep, 0, bacH / 2, -bacD / 2 + ep / 2], [ep, bacH, bacD, -bacW / 2 + ep / 2, bacH / 2, 0], [ep, bacH, bacD, bacW / 2 - ep / 2, bacH / 2, 0], [bacW, bacH * 0.72, ep, 0, bacH * 0.36, bacD / 2 - ep / 2]].forEach(([a, b, cc, x0, y0, z0]) => { const pan = box(a, b, cc, plast); pan.position.set(x0, y0, z0); pan.userData = { cell: key, num, idx: 0 }; bac.add(pan); });
                   const tag = makeColis(num, Math.min(bacW * 0.7, 0.2), Math.min(bacH * 0.5, 0.11), 0.006); tag.position.set(0, bacH * 0.36, bacD / 2 + 0.002); tag.userData = { cell: key, num, idx: 0 }; bac.add(tag);
                   bac.position.set(cx, cbY, z); g.add(bac);
-                } else { const gh = new THREE.Mesh(new THREE.BoxGeometry(bacW, bacH, bacD), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bacH / 2, z); g.add(gh); }
+                } else {
+                  // Pas de bac fantôme au-dessus d'un plateau qui MANQUE si la case du dessous est vide : il y tomberait.
+                  const plx = Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null;
+                  if (plx && r < rows - 1 && !plx.has((r + 1) + ':' + (c + 1)) && !((it.slots || {})[(r + 1) + '_' + c] || []).filter(Boolean).length) continue;
+                  const gh = new THREE.Mesh(new THREE.BoxGeometry(bacW, bacH, bacD), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bacH / 2, z); g.add(gh); }
               }
             } else
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
