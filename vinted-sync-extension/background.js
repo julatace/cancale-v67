@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.260.0';
+const CODE_VERSION = '5.261.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7705,6 +7705,7 @@ function raisonRefusVinted(rc) {
     if (champs.length >= 3) break;
   }
   const msg = typeof j.message === 'string' ? j.message.slice(0, 80) : '';
+  if (!champs.length) { try { noterDiag('vinted_refus_sans_champ_' + String(j.message_code || j.code || '').replace(/[^a-z0-9_]/gi, '').slice(0, 30) + '_' + Object.keys(j).slice(0, 8).join('_').replace(/[^a-z0-9_]/gi, '').slice(0, 60)); } catch (_) {} }
   if (champs.length) { try { noterDiag('vinted_refus_champs_' + errs.map((e) => String((e && (e.field || e.name)) || '').replace(/[^a-z0-9_]/gi, '')).join('_').slice(0, 80)); } catch (_) {} }
   return champs.length ? `${msg ? msg + ' — ' : ''}${champs.join(', ')}` : msg;
 }
@@ -8157,6 +8158,20 @@ async function publierBrouillon(msg) {
     else manque.push('de couleur');
   }
   if (manque.length) return { accepte: false, code: 'incomplet', raison: `ce brouillon n'a pas ${manque.join(', ')} — finis-le sur Vinted (« Modifier »), puis réessaie. Rien n'a été touché.` };
+  // (28 oct.) Un brouillon fait par VRM AVANT la 5.261 peut porter la même photo
+  // plusieurs fois (liens du coffre en double). Ses photos ont été envoyées dans
+  // l'ordre des liens du coffre de l'ancienne annonce : on retrouve la clé de
+  // chacune et on ne garde qu'UNE photo par clé. Coffre illisible ou incohérent ⇒
+  // le brouillon part tel quel (comme avant).
+  if (b.parVRM && /^\d{4,15}$/.test(String(b.ancienId || '')) && Array.isArray(r.d.assigned_photos) && r.d.assigned_photos.length > 1) {
+    let cf; try { cf = await sbGet(`app_data?id=eq.coffre_${uid}_${b.ancienId}&select=photos:data->photos`); } catch (_) { cf = null; }
+    const ph = (cf && cf[0] && Array.isArray(cf[0].photos)) ? cf[0].photos.filter((u) => typeof u === 'string' && /^https:\/\/images\d*\.vinted\.net\//i.test(u)) : [];
+    if (ph.length >= r.d.assigned_photos.length) {
+      const vues = new Set(); const garde = [];
+      r.d.assigned_photos.forEach((p, i) => { const k = clePhotoRepub(ph[i]); if (!vues.has(k)) { vues.add(k); garde.push(p); } });
+      if (garde.length && garde.length < r.d.assigned_photos.length) { noterDiag('brouillon_photos_doublons_retires'); r.d.assigned_photos = garde; r.nPhotos = garde.length; }
+    }
+  }
   const verrou = await lireVerrouRecreer('b' + id);
   if (verrou) return { accepte: false, code: 'incertaine', raison: `une mise en ligne de ce brouillon est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire — regarde ton dressing avant de réessayer` };
   const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
@@ -8248,7 +8263,7 @@ async function refaireBrouillon(msg) {
   if (!idsCouleurVinted(d).length && COULEURS_VINTED_SURES[Number(msg.couleur)]) d.color_ids = [Number(msg.couleur)];
   if (!idsCouleurVinted(d).length) return { accepte: false, code: 'couleur-absente', couleurs: COULEURS_VINTED_SURES, raison: "le contenu enregistré n'a pas de couleur, et Vinted refuse de mettre en ligne une annonce sans couleur. Si le brouillon est dans tes brouillons Vinted, ouvre-le, choisis la couleur et publie-le ; sinon, rien n'a été touché." };
   const okUrl = (u) => typeof u === 'string' && /^https:\/\/images\d*\.vinted\.net\//i.test(u);
-  const urls = (Array.isArray(sauve.photos) ? sauve.photos : []).filter(okUrl).slice(0, 20);
+  const urls = photosUniques([Array.isArray(sauve.photos) ? sauve.photos : []], 20).urls.filter(okUrl);
   if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo enregistrée pour cette annonce — rien n'a été touché" };
   const verrou = await lireVerrouRecreer('r' + id);
   if (verrou) return { accepte: false, code: 'incertaine', raison: `un brouillon de cette annonce est parti il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire — regarde tes brouillons Vinted avant de réessayer` };
@@ -8327,6 +8342,28 @@ async function refaireBrouillon(msg) {
     noterDiag('refaire_brouillon_en_ligne');
     return { accepte: true, etape: 'fait', nouvelId, draftId, nouveau: prixD, nouveauTitre: titre };
   });
+}
+// (28 oct., « c'est en brouillon mais pas en ligne ») Mesuré : le coffre de la
+// Jordan 3 portait 75 liens pour 15 photos (la même photo sous plusieurs formes :
+// `/tc/<clé>/<hash>.jpeg`, `/t/<clé>/f800/<hash>.webp`…) ; VRM en envoyait 20 —
+// des DOUBLONS — et Vinted refusait la mise en ligne (« Erreurs trouvées »). Une
+// photo = sa CLÉ (`02_02248_Ka3j…`), une seule fois, dans l'ordre de l'annonce
+// (la fiche d'abord, le coffre ensuite pour ce qu'elle n'a pas). `autres[i]` =
+// une autre forme de la même photo (lien de secours si le premier est périmé).
+function clePhotoRepub(u) {
+  const m = /\/(\d\d_[0-9a-f]{3,8}_[A-Za-z0-9]{6,})\//.exec(String(u || ''));
+  return m ? m[1] : String(u || '').split('?')[0];
+}
+function photosUniques(listes, max) {
+  const ordre = [], formes = new Map();
+  for (const l of listes) for (const u of (Array.isArray(l) ? l : [])) {
+    if (typeof u !== 'string' || !/^https:\/\/images\d*\.vinted\.net\//i.test(u)) continue;
+    const k = clePhotoRepub(u);
+    if (!formes.has(k)) { formes.set(k, []); ordre.push(k); }
+    const f = formes.get(k); if (!f.includes(u)) f.push(u);
+  }
+  const garde = ordre.slice(0, max || 20);
+  return { urls: garde.map((k) => formes.get(k)[0]), autres: garde.map((k) => formes.get(k)[1] || null), cles: garde };
 }
 async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
   const ids = [];
@@ -8425,9 +8462,9 @@ async function recreerVinted(msg) {
   const photosC = (sauve && Array.isArray(sauve.photos)) ? sauve.photos.filter((u) => typeof u === 'string') : [];
   const photosD = Array.isArray(details.photos) ? details.photos.filter((u) => typeof u === 'string') : [];
   const okUrl = (u) => /^https:\/\/images\d*\.vinted\.net\//i.test(u);
-  const princ = (photosD.length > photosC.length ? photosD : photosC).filter(okUrl).slice(0, 20);
-  const second = (photosD.length > photosC.length ? photosC : photosD).filter(okUrl);
-  const urls = princ;
+  const uniques = photosUniques([photosD, photosC], 20);
+  const urls = uniques.urls.filter(okUrl);
+  const second = uniques.autres;
   if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo de cette annonce n'est sauvegardée — passe sur Vinted une fois pour la capturer, puis réessaie (rien n'a été touché)" };
   // La description est reprise TELLE QUELLE (sa demande : « absolument tout »).
   // (28 oct.) Option : UNE lettre au hasard tout en bas (`msg.lettre`, choisie

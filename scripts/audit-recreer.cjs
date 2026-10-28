@@ -25,8 +25,8 @@ let ok = 0, ko = 0;
 const dit = (c, msg, det) => { if (c) { ok++; console.log('✅ ' + msg); } else { ko++; console.log('❌ ' + msg + (det ? '  → ' + det : '')); } };
 const nowISO = () => new Date().toISOString();
 const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', description: 'nickel', price: '60.0', currency: 'EUR', catalog_id: 1234, brand_id: 53, color_ids: [1], item_attributes: [{ code: 'size', ids: [56] }, { code: 'condition', ids: [2] }], package_size_id: 1, assigned_photos: [{ id: 1 }] } });
-const PHOTOS = ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'];
-const PHOTOS_D = ['https://images1.vinted.net/t/b/f800/1.jpeg', 'https://images1.vinted.net/t/b/f800/2.jpeg'];
+const PHOTOS = ['https://images1.vinted.net/t/01_0121e_hsUzFGeDP3Vk/f800/1.jpeg', 'https://images1.vinted.net/t/02_02248_Ka3jojtDMin8/f800/2.jpeg'];
+const PHOTOS_D = ['https://images1.vinted.net/tc/01_0121e_hsUzFGeDP3Vk/aa1.jpeg', 'https://images1.vinted.net/tc/02_02248_Ka3jojtDMin8/bb2.jpeg'];
 
 function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null, lecture = null, completionCorps = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
@@ -118,8 +118,14 @@ const zero = (j) => j.vinted.length === 0;
     const r2 = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });
     dit(r2.code !== 'recreer-incertaine', "une création refusée nette ne bloque pas la suivante", `code=${r2.code || r2.etape}`); }
   // K — un lien de photo périmé : l'autre copie (fiche) prend le relais.
-  { const { f, r } = await run({ cdn: (u) => /\/t\/b\//.test(u) ? { status: 200 } : { status: 404 } });
+  { const { f, r } = await run({ cdn: (u) => /\/t\//.test(u) ? { status: 200 } : { status: 404 } });
     dit(r.etape === 'fait' && photosP(f.j).length === 2, "un lien de photo périmé : l'autre copie de la même photo est prise", `etape=${r.etape} ${r.raison || ''}`); }
+  // K2 — (28 oct., Jordan 3) le coffre porte la MÊME photo sous plusieurs formes
+  //      (75 liens pour 15 photos) : chaque photo part UNE fois, jamais en double.
+  { const dbl = [...PHOTOS, ...PHOTOS_D, ...PHOTOS.map((u) => u + '?s=1'), 'https://images1.vinted.net/t/01_0121e_hsUzFGeDP3Vk/f1200/x.webp'];
+    const { f, r } = await run({ viaBrouillon: true, extra: { coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: dbl } } });
+    let cb = {}; try { cb = JSON.parse(de(f.j, /\/item_upload\/drafts\/?$/)[0].corps).draft; } catch (_) {}
+    dit(r.etape === 'fait' && photosP(f.j).length === 2 && cb.assigned_photos && cb.assigned_photos.length === 2, "même photo sous plusieurs liens : 2 photos envoyées (pas 7), le brouillon en porte 2", JSON.stringify({ e: r.etape, p: photosP(f.j).length, b: cb.assigned_photos && cb.assigned_photos.length, raison: r.raison })); }
   // F — refus avant tout : 0 requête chez Vinted.
   { const { f, r } = await run({ confirme: false });
     dit(zero(f.j) && r.code === 'confirmation', "sans confirmation : aucune requête chez Vinted", `n=${f.j.vinted.length} code=${r.code}`); }
@@ -278,6 +284,15 @@ const zero = (j) => j.vinted.length === 0;
     dit(zero(f.j) && r.code === 'couleur-absente', "une couleur que VRM ne connaît pas n'est jamais envoyée", `n=${f.j.vinted.length} code=${r.code}`); }
   { const { r } = await pubB({ completion: 400, completionCorps: { code: 99, message: 'Erreurs trouvées', message_code: 'validation_error', errors: [{ field: 'color_ids', value: 'Choisis une couleur' }] } });
     dit(r.etape === 'echec' && /couleur/.test(r.raison || '') && /Choisis une couleur/.test(r.raison || ''), "un refus de Vinted dit QUEL champ il réclame (plus seulement « Erreurs trouvées »)", r.raison || ''); }
+  // (28 oct.) Un brouillon fait par VRM avec des photos EN DOUBLE (avant 5.261) :
+  //  ses doublons sont retirés à la mise en ligne, d'après les liens du coffre.
+  { const corps = CORPS_B({ assigned_photos: [{ id: 11, orientation: 0 }, { id: 12, orientation: 0 }, { id: 13, orientation: 0 }, { id: 14, orientation: 0 }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9555' },
+      coffre_111_9555: { id: '9555', photos: [PHOTOS[0], PHOTOS[1], PHOTOS_D[0], PHOTOS_D[1]] } };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra });
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
+    dit(r.etape === 'fait' && c.draft && JSON.stringify(c.draft.assigned_photos.map((p) => p.id)) === '[11,12]', "brouillon VRM aux photos en double : la mise en ligne ne garde qu'UNE photo par photo", JSON.stringify({ e: r.etape, ids: c.draft && c.draft.assigned_photos && c.draft.assigned_photos.map((p) => p.id), raison: r.raison || r.erreur })); }
   // O — le brouillon qu'il enregistre sur Vinted est appris (corps accepté, id).
   { const f = monter({ src: process.env.BG_SRC || undefined });
     let ok1 = false, ok2 = true;
