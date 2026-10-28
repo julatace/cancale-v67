@@ -10,9 +10,11 @@
 > **28 octobre (après-midi) — Republier : photos PAR annonce, temps montrés avant, lettre en bas (5.250) :**
 > Julien : « je sélectionne 3 annonces, je modifie toutes les photos des 3 pour qu'elles ne soient pas similaires,
 > avec un visuel ; je choisis le temps (aléatoire, 1,23 puis 1,56…) » puis « la même description, absolument tout ;
-> une lettre aléatoire tout en bas de chaque annonce ». Étape « 2. Modifier » : chaque annonce montre TOUTES ses
-> photos (`vinted_item_details`, sinon la couverture) avec SES réglages ; « Régler cette annonce » (réglages à part,
-> `regPar`), « Varier chaque annonce » (petits réglages différents tirés au hasard), « Mêmes réglages pour toutes ».
+> une lettre aléatoire tout en bas de chaque annonce ». Étape « 2. Modifier » — RECTIFIÉ le même jour par lui :
+> « le réglage que j'applique s'applique à toutes celles que j'ai sélectionnées, toutes les photos de chaque annonce ;
+> on ne voit qu'une photo pour éviter que ça encombre l'écran » ⇒ UN réglage pour toutes les photos de toutes les
+> annonces choisies, une seule photo (la couverture) par annonce à l'écran, avec « N photos ». Plus de réglage par
+> annonce ni de « Varier » (retirés — ne pas les remettre).
 > Étape 3 : les temps aléatoires sont TIRÉS avant de lancer et écrits sur chaque ligne (« tout de suite », « +1 min
 > 23 s »), « Tirer d'autres temps » ; le moteur suit le temps montré. Description : reprise mot pour mot ; option
 > « lettre au hasard tout en bas » (extension 5.250, `msg.lettre`, `EXT_CAPACITES.lettre`) : « \n\n<lettre> » en fin,
