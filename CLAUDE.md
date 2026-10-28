@@ -58,6 +58,14 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — les TABLES aussi :** Julien : « fais pareil pour les tables ». Une table porte des
+> plateaux SOUS son dessus : « Niveaux sous la table » (stepper `sous-table`, ajoutés/retirés en bas ; refusé si un
+> niveau retiré porte une boîte ou si un niveau déborderait) et « Plateaux sous la table, place par place » (même
+> `ChoixPlanches`, le dessus est FIXE : `'1:c'` toujours posé, `data-plateau-fixe`). Sans plateau sous une place, ses
+> boîtes tombent au niveau du dessous ou au sol ; numéros inchangés. Capacité d'un niveau = sa hauteur
+> (`capaciteCase`). 3D : `buildTable` dessine les plateaux du dessous, morceaux compris. Banc `stock-finitions.cjs` X
+> (390/1512 ; mutation « table hors des plateaux réglables » ⇒ 2 rouges).
+
 > **28 octobre (nuit, fin) — les PLATEAUX de la pièce 3D, colonne par colonne :** Julien : « fais pareil pour les
 > planches de la vue 3D ». Étagère métal ou bois (pas à bacs, pas la table) : `it.planches`, même forme que « Mes
 > meubles » (règle déplacée dans `src/stockRegles.js` : `planchesCases`, `planchesRangees`, `plateauxMeuble`,

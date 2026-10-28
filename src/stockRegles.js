@@ -138,11 +138,19 @@ export const placerSansTraverser = (cx, cy, w, h, obstacles, poly) => {
 // numéroté : bijoux, accessoires, petits objets — une case, un numéro.
 export const BOITE_H = 0.145, BOITE_JEU = 0.008;    // une boîte à chaussures
 export const modeCase = (ft) => (ft && ft.cases) || 'colonne';
-export const capaciteCase = (ft, it, wallH = 3.4) => {
+// (28 oct.) `r` (rangée, 0 = le haut) : sous une TABLE, les rangées 1, 2…
+// sont les niveaux SOUS le dessus (le dernier est le sol) — leur hauteur est
+// celle de la table partagée entre eux. Sans `r` : le dessus de la table.
+export const capaciteCase = (ft, it, wallH = 3.4, r) => {
   const m = modeCase(ft);
   if (m === 'cintre') return 1;
   if (m !== 'pile') return 1;
   if (ft.bacs) return 1;                              // un bac par case (petits objets, accessoires)
+  if (ft.build === 'table' && r >= 1) {
+    const nr = Math.max(1, (it && it.rows) || 1); if (nr < 2) return 1;
+    const ht = Math.max(0.35, ((it && it.h3d) != null ? it.h3d : ft.h3d) * 1.5);
+    return Math.max(1, Math.floor((ht / (nr - 1) - 0.06) / (BOITE_H + BOITE_JEU)));
+  }
   if (ft.build === 'table') return Math.max(1, Math.min(12, Math.floor((Math.max(1.2, wallH * 0.7) - (ft.h3d || 0.5) * 1.5) / (BOITE_H + BOITE_JEU))));
   const rows = Math.max(1, (it && it.rows) || ft.rows || 1);
   const ht = Math.max(0.35, ((it && it.h3d) != null ? it.h3d : ft.h3d) * 1.5);
@@ -196,12 +204,17 @@ export const planchesRangees = (set, cols, rows) => {
 // Une étagère de la pièce 3D (métal ou bois, pas à bacs) : SANS réglage, tous
 // ses plateaux sont là (comme avant). Rend null pour un meuble sans plateaux
 // réglables (table, bacs, portant, mur de boîtes).
-export const plateauxReglables = (ft) => !!(ft && ft.build === 'metal' && !ft.bacs && modeCase(ft) === 'pile');
+// (28 oct.) « fais pareil pour les tables » : une table peut avoir des plateaux
+// SOUS son dessus (rangées 1, 2…) ; le dessus lui-même (sous la rangée 1) est
+// toujours là.
+export const plateauxReglables = (ft) => !!(ft && modeCase(ft) === 'pile' && !ft.bacs && (ft.build === 'metal' || ft.build === 'table'));
 export const plateauxMeuble = (it, ft) => {
   if (!plateauxReglables(ft)) return null;
   const nr = Math.max(1, (it && it.rows) || ft.rows || 1), nc = Math.max(1, (it && it.cols) || ft.cols || 1);
   const p = it && Array.isArray(it.planches) ? it.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1);
-  return planchesCases(p, nc, nr);
+  const out = planchesCases(p, nc, nr);
+  if (ft.build === 'table' && nr > 1) for (let c = 1; c <= nc; c++) out.add('1:' + c);   // le dessus de la table
+  return out;
 };
 // GRAVITÉ SUR UN PLATEAU QUI MANQUE : dans une colonne, les cases qui ne sont
 // séparées par AUCUN plateau forment une seule hauteur — les boîtes de la case du
@@ -212,7 +225,7 @@ export const tasserPlateaux = (slots, nr, nc, cases, cap) => {
   const out = {}; const s = slots || {};
   for (const k in s) { const a = nettoie(s[k]); if (a.length) out[k] = a; }
   if (!cases) return out;
-  const C = Math.max(1, cap || 1);
+  const C = (r) => Math.max(1, (typeof cap === 'function' ? cap(r) : cap) || 1);
   for (let c = 0; c < nc; c++) {
     const bornes = [0];
     for (let r = 1; r < nr; r++) if (cases.has(r + ':' + (c + 1))) bornes.push(r);
@@ -223,7 +236,7 @@ export const tasserPlateaux = (slots, nr, nc, cases, cap) => {
       const tout = [];
       for (let r = bas; r >= haut; r--) { tout.push(...(out[r + '_' + c] || [])); delete out[r + '_' + c]; }
       let r = bas;
-      while (tout.length && r >= haut) { const part = r === haut ? tout.splice(0) : tout.splice(0, C); out[r + '_' + c] = part; r--; }
+      while (tout.length && r >= haut) { const part = r === haut ? tout.splice(0) : tout.splice(0, C(r)); out[r + '_' + c] = part; r--; }
     }
   }
   return out;
@@ -270,13 +283,19 @@ export const cartonsDePile = (nums) => arr(nums).map((v) => String(v == null ? '
 export const prochainePlaceMeuble = (it, ft, wallH = 3.4) => {
   if (!it || !ft || ft.deco || ft.box || ft.pile) return null;
   const nr = Math.max(1, it.rows || 1), nc = Math.max(1, it.cols || 1), slots = it.slots || {};
-  const m = modeCase(ft), cap = capaciteCase(ft, it, wallH);
+  const m = modeCase(ft), capR = (r) => capaciteCase(ft, it, wallH, r);
   const n = (k) => nettoie(slots[k]).length;
   if (m === 'colonne') {
     for (let c = 0; c < nc; c++) for (let r = nr - 1; r >= 0; r--) { const k = r + '_' + c; if (!n(k)) return { cell: k }; }
     return null;
   }
-  for (let r = nr - 1; r >= 0; r--) for (let c = 0; c < nc; c++) { const k = r + '_' + c; if (n(k) < cap) return { cell: k }; }
+  const pl = plateauxMeuble(it, ft);
+  for (let r = nr - 1; r >= 0; r--) for (let c = 0; c < nc; c++) {
+    const k = r + '_' + c; if (n(k) >= capR(r)) continue;
+    // Pas une case au-dessus d'un plateau qui manque tant que celle du dessous a de la place.
+    if (pl && r < nr - 1 && !pl.has((r + 1) + ':' + (c + 1)) && n((r + 1) + '_' + c) < capR(r + 1)) continue;
+    return { cell: k };
+  }
   return null;
 };
 

@@ -25978,7 +25978,9 @@ const dimsMeuble = (it) => ({ nr: Math.max(1, (it && it.rows) || 1), nc: Math.ma
 const numsCase = (a) => (Array.isArray(a) ? a : []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
 // La physique d'une case (src/stockRegles.js) : 'colonne' (mur de boîtes, la
 // colonne tombe), 'pile' (un plateau tient ses boîtes empilées), 'cintre'.
-const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; return { mode: modeCase(ft), cap: capaciteCase(ft, it, wallH || 3.4) }; };
+// `capCase(clé)` : la contenance de CETTE case (sous une table, un niveau du bas
+// n'a pas la hauteur du dessus). `cap` reste celle du haut.
+const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; return { mode: modeCase(ft), cap: capaciteCase(ft, it, wallH || 3.4), capCase: (k) => capaciteCase(ft, it, wallH || 3.4, Number(String(k || '0_0').split('_')[0])) }; };
 // GRAVITÉ, comme la 3D : dans chaque colonne les boîtes tombent en bas, sans
 // trou. Contrairement à `compactSlots`, on garde TOUS les numéros d'une case
 // (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
@@ -25988,7 +25990,7 @@ const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; ret
 // les boîtes de la case du dessus tombent dans celle du dessous (`it` requis).
 const graviteCases = (slots, nr, nc, mode, it, wallH) => {
   const out = {};
-  if (mode === 'pile' && it) { const ft = FURN_TYPES[it.type] || {}; const pl = plateauxMeuble(it, ft); if (pl) return tasserPlateaux(slots, nr, nc, pl, capaciteCase(ft, it, wallH || 3.4)); }
+  if (mode === 'pile' && it) { const ft = FURN_TYPES[it.type] || {}; const pl = plateauxMeuble(it, ft); if (pl) return tasserPlateaux(slots, nr, nc, pl, (r) => capaciteCase(ft, it, wallH || 3.4, r)); }
   if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
   for (let c = 0; c < nc; c++) {
     const pleins = [];
@@ -26004,8 +26006,8 @@ const meublesDuPlan = (plan) => {
   const out = [];
   ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
     if (!meubleACases(it)) return;
-    const { nr, nc } = dimsMeuble(it); const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
-    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH) });
+    const { nr, nc } = dimsMeuble(it); const { mode, cap, capCase } = casesDe(it, rm.room && rm.room.wallH);
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, capCase, vue: graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH) });
   }));
   return out;
 };
@@ -26014,7 +26016,7 @@ const nomCase = (nr, key, mode, it) => {
   const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r;
   const ft = FURN_TYPES[it && it.type] || {};
   if (mode === 'cintre') return `cintre ${c + 1}`;
-  if (mode === 'pile' && ft.build === 'table') return `plateau · place ${c + 1}`;
+  if (mode === 'pile' && ft.build === 'table') return r === 0 ? `plateau · place ${c + 1}` : `sous la table, ${rang === 1 ? 'au sol' : (rang === 2 ? '1ᵉʳ' : (rang - 1) + 'ᵉ') + ' plateau depuis le bas'} · place ${c + 1}`;
   if (mode === 'pile') return `${rang === 1 ? '1ᵉʳ' : rang + 'ᵉ'} plateau depuis le bas · case ${c + 1}`;
   return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`;
 };
@@ -26025,7 +26027,7 @@ const premiereCaseLibre = (plan) => {
   for (const m of meublesDuPlan(plan)) {
     if (m.mode === 'pile' || m.mode === 'cintre') {
       for (let r = m.nr - 1; r >= 0; r--) for (let c = 0; c < m.nc; c++) {
-        const key = r + '_' + c; if ((m.vue[key] || []).length < m.cap) return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key, m.mode, m.it) };
+        const key = r + '_' + c; if ((m.vue[key] || []).length < m.capCase(key)) return { roomId: m.roomId, roomName: m.roomName, itemId: m.it.id, itemName: m.it.name, key, nom: nomCase(m.nr, key, m.mode, m.it) };
       }
       continue;
     }
@@ -26063,9 +26065,9 @@ const rangerNumeroDansPlan = (plan, itemId, key, num) => {
     if (it.id !== itemId || !meubleACases(it)) return it;
     const { nr, nc } = dimsMeuble(it); const c = Number(String(key).split('_')[1]);
     if (!(c >= 0 && c < nc)) return it;
-    const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
+    const { mode, capCase } = casesDe(it, rm.room && rm.room.wallH);
     if (mode === 'pile' || mode === 'cintre') {
-      const slots0 = empilerDansCase(graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH), key, v, cap);
+      const slots0 = empilerDansCase(graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH), key, v, capCase(key));
       if (!slots0) { plein = true; return it; }
       const slots = graviteCases(slots0, nr, nc, mode, it, rm.room && rm.room.wallH);
       const kk = Object.keys(slots).find((x) => (slots[x] || []).includes(v)) || key;
@@ -26763,7 +26765,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         updateItem(itemId, { slots: { ...(it.slots || {}), [cellKey]: neuve } });
         return;
       }
-      if (pile.length >= cz.cap) { toast(cz.mode === 'cintre' ? 'Ce cintre porte déjà un numéro.' : 'Cette case est pleine — choisis une autre case.'); return; }
+      if (pile.length >= cz.capCase(cellKey)) { toast(cz.mode === 'cintre' ? 'Ce cintre porte déjà un numéro.' : 'Cette case est pleine — choisis une autre case.'); return; }
       if (pairePrete) { rangerPaire(pairePrete, itemId, cellKey); return; }
       if (aRanger.length) { setRanger({ itemId, cellKey }); return; }
       poserDansCase(itemId, cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger ici :', value: '' }));
@@ -26819,7 +26821,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       const v = String(saisie).trim(); if (!v) return;
       const ou = dejaPoseOu(v);
       if (ou) { toast(`N°${v} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
-      const slots = empilerDansCase(it.slots, cellKey, v, cz.cap);
+      const slots = empilerDansCase(it.slots, cellKey, v, cz.capCase(cellKey));
       if (!slots) { toast('Cette case est pleine — choisis une autre case.'); return; }
       updateItem(itemId, { slots });
       setDepot({ itemId, cellKey, num: v, at: Date.now() });
@@ -26871,7 +26873,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const updateItem = (id, patch) => setItems(list => list.map(it => {
     if (it.id !== id) return it;
     const n = { ...it, ...patch };
-    if (patch && (patch.slots || patch.planches || patch.rows || patch.cols)) { const ft = FURN_TYPES[n.type] || {}; const pl = plateauxMeuble(n, ft); if (pl && Array.isArray(n.planches)) n.slots = tasserPlateaux(n.slots, Math.max(1, n.rows || 1), Math.max(1, n.cols || 1), pl, capaciteCase(ft, n, room.wallH || 3.4)); }
+    if (patch && (patch.slots || patch.planches || patch.rows || patch.cols)) { const ft = FURN_TYPES[n.type] || {}; const pl = plateauxMeuble(n, ft); if (pl && Array.isArray(n.planches)) n.slots = tasserPlateaux(n.slots, Math.max(1, n.rows || 1), Math.max(1, n.cols || 1), pl, (r) => capaciteCase(ft, n, room.wallH || 3.4, r)); }
     return n;
   }));
   // Déplacement d'un élément depuis la 3D. Une BOÎTE se cale sur la grille-sol
@@ -27312,6 +27314,24 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const slots = it.slots || {};
     if (cols < nc && Object.keys(slots).some(k => +k.split('_')[1] >= cols && numsCase(slots[k]).length)) { toast('Cette case porte encore un numéro — sors-le d\'abord.'); return; }
     let neuf = { ...slots };
+    if (ft.build === 'table' && rows !== nr) {
+      // (28 oct.) TABLE : les niveaux se comptent SOUS le dessus (rangée 0, qui
+      // ne bouge jamais) ; on ajoute ou retire celui du BAS (le sol). Refusé si
+      // le niveau retiré porte une boîte, ou si un niveau ne tient plus ses
+      // boîtes (la hauteur de la table se partage entre eux) — jamais en silence.
+      if (rows < nr && Object.keys(slots).some(k => +k.split('_')[0] >= rows && numsCase(slots[k]).length)) { toast('Le niveau du bas porte encore un numéro — sors-le d\'abord.'); return; }
+      const essai = { ...it, rows };
+      if (Object.keys(slots).some(k => { const r = +k.split('_')[0]; return r >= 1 && numsCase(slots[k]).length > capaciteCase(ft, essai, room.wallH || 3.4, r); })) { toast('Un niveau de plus sous la table ne tiendrait plus les boîtes déjà rangées — sors-en d\'abord.'); return; }
+      const patch = { cols, rows, slots: neuf };
+      if (Array.isArray(it.planches)) {
+        const cs = planchesCases(it.planches, nc, nr), u = new Set();
+        cs.forEach((k) => { const [r, c] = k.split(':').map(Number); if (r < rows && c <= cols) u.add(r + ':' + c); });
+        for (let r = nr; r < rows; r++) for (let c = 1; c <= cols; c++) u.add(r + ':' + c);
+        for (let c = nc + 1; c <= cols; c++) for (let r = 1; r < rows; r++) u.add(r + ':' + c);
+        patch.planches = planchesRangees(u, cols, rows);
+      }
+      changerDimensions(it, patch); return;
+    }
     if (rows !== nr) {
       // La rangée ajoutée ou retirée est celle du HAUT (r = 0) : les plateaux du
       // bas gardent leurs boîtes.
@@ -27382,7 +27402,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     if (ft.deco || ft.box) { toast('Ici on ne range rien — dépose-la sur une étagère, une table, un portant ou une pile.'); return true; }
     if (ft.build === 'pile') { setPairePrete(null); setSel(it.id); ajouterDansPile(it, numero); return true; }
     const cz = casesDe(it, room.wallH); let cell = v.cell != null ? v.cell : null;
-    if (cell != null && numsCase((it.slots || {})[cell]).length >= (cz.mode === 'colonne' ? 1 : cz.cap)) cell = null;
+    if (cell != null && numsCase((it.slots || {})[cell]).length >= (cz.mode === 'colonne' ? 1 : cz.capCase(cell))) cell = null;
     if (cell == null) { const p = prochainePlaceMeuble(it, ft, room.wallH || 3.4); if (!p) { toast(`« ${it.name} » est plein — choisis un autre meuble.`); return true; } cell = p.cell; }
     rangerPaire(numero, it.id, cell); return true;
   };
@@ -27533,7 +27553,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {ranger && (
         <RangerSheet
           paires={aRanger}
-          apercu={(() => { const it = items.find(x => x.id === ranger.itemId); return it ? { it, cellKey: ranger.cellKey, mode: casesDe(it, room.wallH).mode, cap: casesDe(it, room.wallH).cap } : null; })()}
+          apercu={(() => { const it = items.find(x => x.id === ranger.itemId); return it ? { it, cellKey: ranger.cellKey, mode: casesDe(it, room.wallH).mode, cap: casesDe(it, room.wallH).capCase(ranger.cellKey) } : null; })()}
           cellNom={(() => { const it = items.find(x => x.id === ranger.itemId); if (!it) return ''; const nr = Math.max(1, it.rows || 1); const cz = casesDe(it, room.wallH); return `${it.name || ''} · ${nomCase(nr, ranger.cellKey, cz.mode, it)}`; })()}
           onPick={(p) => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, p.numero); }}
           onLibre={async () => { const r = ranger; setRanger(null); poserDansCase(r.itemId, r.cellKey, await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro à ranger dans cette case :', value: '' })); }}
@@ -27757,17 +27777,18 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
                 {ft.build === 'metal' && pas('Niveaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {ft.build === 'table' && pas('Niveaux sous la table', nr - 1, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'sous-table')}
                 {ft.build === 'metal' && pas('Hauteur d’un niveau', `${Math.round(hauteurNiveau(selItem) * 100)} cm`, () => changerNiveau(selItem, -0.05), () => changerNiveau(selItem, 0.05), 'niveau')}
                 {pas('Largeur', `${Math.round(selItem.w * 100)} cm`, () => changerDimensions(selItem, { w: +Math.max(0.4, selItem.w - 0.1).toFixed(2) }), () => changerDimensions(selItem, { w: +Math.min(room.w, selItem.w + 0.1).toFixed(2) }), 'largeur')}
                 {pas('Profondeur', `${Math.round(selItem.h * 100)} cm`, () => changerDimensions(selItem, { h: +Math.max(0.25, selItem.h - 0.05).toFixed(2) }), () => changerDimensions(selItem, { h: +Math.min(room.h, selItem.h + 0.05).toFixed(2) }), 'profondeur')}
                 {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
                 <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
-                {plateauxReglables(ft) && nr > 1 && (
+                {plateauxReglables(ft) && nr > (ft.build === 'table' ? 2 : 1) && (
                   <details data-plateaux-3d="" style={{ flex: '1 1 100%' }}>
-                    <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>Plateaux, colonne par colonne</summary>
-                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu'elle a de la place. Aucun numéro ne change.</div>
+                    <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>{ft.build === 'table' ? 'Plateaux sous la table, place par place' : 'Plateaux, colonne par colonne'}</summary>
+                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu'elle a de la place. Aucun numéro ne change.{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</div>
                     <div style={{ textAlign: 'center' }}>
-                      <ChoixPlanches plateau cols={nc} rows={nr} planches={Array.isArray(selItem.planches) ? selItem.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1)} setPlanches={(v) => updateItem(selItem.id, { planches: planchesRangees(planchesCases(v, nc, nr), nc, nr) })} />
+                      <ChoixPlanches plateau fixe={ft.build === 'table' ? 1 : 0} cols={nc} rows={nr} planches={Array.isArray(selItem.planches) ? selItem.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1)} setPlanches={(v) => { const u = planchesCases(v, nc, nr); if (ft.build === 'table') for (let c = 1; c <= nc; c++) u.add('1:' + c); updateItem(selItem.id, { planches: planchesRangees(u, nc, nr) }); }} />
                     </div>
                   </details>
                 )}
@@ -27911,7 +27932,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   const prochaine = useMemo(() => premiereCaseLibre(plan), [plan]);
   const totalCases = meubles.reduce((s, m) => s + m.nr * m.nc, 0);
   // Une case « libre » : vide (mur de boîtes, cintre) ou qui a encore de la place (plateau).
-  const libresDe = (m) => m.mode === 'pile' ? Array.from({ length: m.nr * m.nc }, (_, i) => (m.vue[Math.floor(i / m.nc) + '_' + (i % m.nc)] || []).length < m.cap).filter(Boolean).length : (m.nr * m.nc - Object.keys(m.vue).length);
+  const libresDe = (m) => m.mode === 'pile' ? Array.from({ length: m.nr * m.nc }, (_, i) => (m.vue[Math.floor(i / m.nc) + '_' + (i % m.nc)] || []).length < m.capCase(Math.floor(i / m.nc) + '_' + (i % m.nc))).filter(Boolean).length : (m.nr * m.nc - Object.keys(m.vue).length);
   const casesLibres = meubles.reduce((s, m) => s + libresDe(m), 0);
   const hit = q.trim() ? ouEstNumero(plan, q) : null;
   const hitRef = React.useRef(null);
@@ -28034,7 +28055,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
             const enTete = plusieursPieces && (mi === 0 || meubles[mi - 1].roomId !== m.roomId);
             // La case où une boîte atterrit dans chaque colonne (gravité).
             const basLibre = {};
-            if (m.mode === 'pile' || m.mode === 'cintre') { for (let r = 0; r < m.nr; r++) for (let c = 0; c < m.nc; c++) { const k = r + '_' + c; if ((m.vue[k] || []).length < m.cap) basLibre[k] = true; } }
+            if (m.mode === 'pile' || m.mode === 'cintre') { for (let r = 0; r < m.nr; r++) for (let c = 0; c < m.nc; c++) { const k = r + '_' + c; if ((m.vue[k] || []).length < m.capCase(k)) basLibre[k] = true; } }
             else for (let c = 0; c < m.nc; c++) { let n = 0; for (let r = 0; r < m.nr; r++) if (m.vue[r + '_' + c]) n++; if (n < m.nr) basLibre[(m.nr - 1 - n) + '_' + c] = true; }
             return (
               <React.Fragment key={m.it.id}>
@@ -28598,7 +28619,8 @@ function StockMeubles() {
 // (28 oct.) Les planches d'un meuble, colonne par colonne : un morceau par
 // colonne entre deux rangées, ⟷ = toute la largeur. Le même dessin pour « Mes
 // meubles » et les étagères de la pièce 3D (§11).
-function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false }) {
+function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fixe = 0 }) {
+  // `fixe` : les rangées 1…fixe ont un plateau qui ne s'enlève pas (le dessus d'une table).
   const mot = plateau ? 'plateau' : 'planche', mots = plateau ? 'plateaux' : 'planches';
   // L'état garde la forme rangée (`planchesRangees`) : une planche pleine
   // largeur reste pleine si on ajoute une colonne.
@@ -28620,15 +28642,15 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false }) {
             {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
           </div>
         </div>
-        {Array.from({ length: rows - 1 }).map((_, i) => { const r = i + 1; const plein = pleine(r); return (
+        {Array.from({ length: rows - 1 }).map((_, i) => { const r = i + 1; const plein = pleine(r) || r <= fixe; return (
           <React.Fragment key={r}>
-            <button type="button" data-planche-choix={r} aria-pressed={plein} onClick={() => basculer(r)}
+            {r <= fixe ? <span data-plateau-fixe={r} title="Le dessus de la table" style={{ alignSelf: 'center', fontSize: 10.5, color: C.muted, fontWeight: 700, textAlign: 'center', lineHeight: 1.1 }}>dessus</span> : <button type="button" data-planche-choix={r} aria-pressed={plein} onClick={() => basculer(r)}
               aria-label={plein ? `Enlever la planche sous la rangée ${r}, sur toute la largeur` : `Poser une planche sous la rangée ${r}, sur toute la largeur`}
               title="Toute la largeur"
-              style={{ width: 30, height: 30, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 7, fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>⟷</button>
+              style={{ width: 30, height: 30, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 7, fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>⟷</button>}
             <div style={{ background: C.line, padding: '0 5px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
-                {Array.from({ length: cols }).map((_, c) => { const on = cases.has(r + ':' + (c + 1)); return (
+                {Array.from({ length: cols }).map((_, c) => { const on = cases.has(r + ':' + (c + 1)) || r <= fixe; return r <= fixe ? <span key={c} style={{ height: 30, display: 'flex', alignItems: 'center' }}><span style={{ display: 'block', width: '100%', height: 7, borderRadius: 3, background: C.text }} /></span> : (
                   <button key={c} type="button" data-planche-case-choix={r + ':' + (c + 1)} aria-pressed={on} onClick={() => basculerCase(r, c + 1)}
                     aria-label={on ? `Enlever la planche sous la rangée ${r}, colonne ${c + 1}` : `Poser une planche sous la rangée ${r}, colonne ${c + 1}`}
                     style={{ height: 30, margin: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
