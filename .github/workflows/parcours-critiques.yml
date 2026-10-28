@@ -21,6 +21,14 @@ jobs:
       - run: npm ci
       - run: node scripts/audit-parcours-production.mjs
       - run: npm run build
+      - name: Installer le navigateur de contrôle
+        run: |
+          npx playwright install --with-deps chromium
+          echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Vérifier récupération et fermeture de l'espace privé
+        run: |
+          node scripts/bancs/recuperation-auth.cjs
+          node scripts/bancs/confidentialite.cjs
       - name: Vérifier les politiques SQL sur une base jetable
         run: |
           sudo apt-get update
