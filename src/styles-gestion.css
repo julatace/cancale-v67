@@ -446,3 +446,10 @@
  .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code){flex-wrap:wrap;}
  .vrm-main .vrm-achats .vrm-pickup-card>div:has(>.vrm-pickup-code)>.vrm-pickup-code{flex:1 1 150px!important;}
 }
+
+/* (28 oct.) Stock en photos : halo fluo pulsant sur une paire VENDUE à sortir.
+   État persistant (pas déclenché en rafale) → respiration douce, infinie ;
+   la couleur vient de --halo (accent du thème). Mouvement réduit → anneau fixe. */
+@keyframes vrm-pulse-vendu{0%,100%{box-shadow:0 0 0 1px var(--halo,#3D7BFF);}50%{box-shadow:0 0 0 5px var(--halo,#3D7BFF);}}
+.vrm-stock-vendu{animation:vrm-pulse-vendu 1.5s ease-in-out infinite;}
+@media(prefers-reduced-motion:reduce){.vrm-stock-vendu{animation:none;box-shadow:0 0 0 3px var(--halo,#3D7BFF);}}
