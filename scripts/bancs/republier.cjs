@@ -22,11 +22,12 @@ const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4373;
 const auj = new Date();
 const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 10, favourite_count: 1 }, o);
 const ITEMS = [
-  ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon' }),
-  ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas' }),
-  ann(9106, { title: 'Nike Dunk low panda taille 41' }),
+  ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', favourite_count: 6, created_at_ts: Math.floor(auj / 1000) - 30 * 86400 }),
+  ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', favourite_count: 0, created_at_ts: Math.floor(auj / 1000) - 60 * 86400 }),
+  ann(9106, { title: 'Nike Dunk low panda taille 41', created_at_ts: Math.floor(auj / 1000) - 5 * 86400 }),
+  ann(9107, { title: 'Asics Gel-Kayano 14 taille 43', brand_title: 'Asics', favourite_count: 0, created_at_ts: Math.floor(auj / 1000) - 2 * 86400 }),
 ];
-const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9106': { numero: '45', buyPrice: '47' } } };
+const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9106': { numero: '45', buyPrice: '47', recreeAt: new Date(auj - 5 * 3600e3).toISOString() }, '9107': { numero: '46' } } };
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
@@ -43,7 +44,8 @@ const PONT = (o) => {
     if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
     if (d.__vmr === 'cmd' && (d.cmd === 'republierVinted' || d.cmd === 'recreerVinted')) {
       window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages });
-      const resp = d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
+      const resp = d.id === '9107' ? { accepte: false, code: 'vinted-pause', raison: 'Vinted demande de ralentir — réessaie dans 15 min' }
+        : d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
         : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
         : { accepte: true, etape: 'fait', nouvelId: '99102', ancien: 49, nouveau: d.prix };
       post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
@@ -116,11 +118,18 @@ const projette = (row, sel) => {
         await bouton.click();
         await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 4000 });
         const paires = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
-        dit(paires.sort().join(',') === '9102,9103,9106', 'la liste = ses 3 paires en ligne', paires.join(','));
+        dit(paires.join(',') === '9103,9102,9106,9107', 'la liste = ses 4 paires en ligne, les plus anciennes d’abord', paires.join(','));
+        const info = await pg.locator('[data-republier-paire="9102"]').innerText();
+        dit(/en ligne depuis 30 j/.test(info) && /6 favoris/.test(info) && /10 vues/.test(info), 'chaque paire dit son ancienneté, ses vues et ses favoris', info.replace(/\n/g, ' · '));
+        dit(await pg.locator('[data-republier-recente="9106"]').count() === 1 && await pg.locator('[data-republier-recente="9102"]').count() === 0, 'une paire recréée il y a moins de 2 jours le dit (et seulement elle)');
+        await pg.locator('[data-republier-tri]').selectOption('favoris');
+        const parFav = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
+        dit(parFav[parFav.length - 1] === '9102', 'tri « moins de favoris d’abord » : la paire à 6 favoris passe en dernier', parFav.join(','));
         dit(await pg.locator('[data-republier-suivant]').isDisabled(), 'sans paire choisie, « Continuer » est grisé');
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-paire="9106"]').click();
+        await pg.locator('[data-republier-paire="9107"]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-apercu="9102"]').waitFor({ timeout: 3000 });
         const p1 = await pg.locator('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix');
@@ -137,12 +146,30 @@ const projette = (row, sel) => {
         dit(await pg.locator('[data-republier-lancer]').isDisabled(), 'sans la case de confirmation, « Republier » est grisé');
         const avant = await pg.evaluate(() => (window.__repub || []).length);
         dit(avant === 0, 'rien n’est parti avant la confirmation', String(avant));
+        dit(await pg.locator('[data-republier-favoris]').getAttribute('data-republier-favoris').catch(() => '') === '7', 'avant de lancer : les favoris PERDUS sont comptés (6 + 1 = 7) et dits', await pg.locator('[data-republier-favoris]').innerText().catch(() => 'absent'));
+        dit(await pg.locator('[data-republier-recentes]').count() === 1, '… et la paire déjà recréée récemment est signalée');
+        const ordreLignes = () => pg.$$eval('[data-republier-ligne]', (els) => els.map((e) => e.getAttribute('data-republier-ligne')));
+        const o0 = await ordreLignes();
+        dit(o0.join(',') === '9102,9103,9106,9107', 'la file suit l’ordre de SA sélection', o0.join(','));
+        await pg.locator('[data-republier-melanger]').click();
+        const o1 = await ordreLignes();
+        dit(o1.join(',') !== o0.join(',') && [...o1].sort().join(',') === [...o0].sort().join(','), '« Mélanger » change l’ordre (les mêmes paires, aucune perdue)', o1.join(','));
+        await pg.locator('[data-republier-ordre-selection]').click();
+        dit((await ordreLignes()).join(',') === o0.join(','), '« Ordre de ma sélection » le remet');
+        await pg.locator('[data-republier-monter="9103"]').click();
+        const o2 = await ordreLignes();
+        dit(o2.join(',') === '9103,9102,9106,9107', 'la flèche ↑ monte une paire', o2.join(','));
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-ordre-' + vp.width + '.png') });
+        const petits = await pg.$$eval('[data-republier-monter],[data-republier-descendre],[data-republier-melanger]', (els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length);
+        dit(petits === 0, 'flèches et « Mélanger » font 44 px au doigt', String(petits));
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').click();
-        for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini') break; await pg.waitForTimeout(250); }
+        for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(250); }
         const envois = await pg.evaluate(() => window.__repub || []);
-        dit(envois.length === 3, 'UNE commande par paire choisie (3)', JSON.stringify(envois));
+        dit(envois.length === 4, 'UNE commande par paire choisie (4)', JSON.stringify(envois.map((x) => x.id)));
+        dit(envois.map((x) => x.id).join(',') === '9103,9102,9106,9107', 'les paires sont recréées DANS L’ORDRE affiché', envois.map((x) => x.id).join(','));
+        dit(await pg.locator('[data-republier]').getAttribute('data-republier-mode') === 'pause' && await pg.locator('[data-republier-arret]').count() === 1, 'Vinted demande de ralentir : la file S’ARRÊTE et le dit (pas une rafale de refus)', await pg.locator('[data-republier-arret]').innerText().catch(() => 'absent'));
         const e1 = envois.find((x) => x.id === '9102'), e2 = envois.find((x) => x.id === '9106');
         dit(envois.every((x) => x.cmd === 'recreerVinted'), 'chaque paire est SUPPRIMÉE ET RECRÉÉE (commande recreerVinted)', envois.map((x) => x.cmd).join(','));
         dit(e1 && e1.uid === '111' && Math.abs(e1.prix - 44.1) < 1e-9 && e1.confirme === true, 'la commande porte SON prix (44,10), son compte, et la confirmation', JSON.stringify(e1));

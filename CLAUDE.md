@@ -7,6 +7,25 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — audit de la recréation avant son premier essai, comparée au marché (5.249) :** Julien :
+> « refais des audits avant que je teste, inspire-toi de ce qui existe ». Outils regardés (Relister for Vinted,
+> Relisto, VintHelper, GEAR, VintedCRM, Fripio, Vintex, Dotb — pages d'éditeurs, non vérifiées) : republier en
+> priorité ce qui DORT, perte des favoris/vues dite, jamais deux annonces vivantes, 2-3 jours entre deux
+> recréations d'une même paire. Corrigé : (1) ⚠️ une création sans réponse claire (5xx, coupure, 60 s) était dite
+> « refusée — intacte » alors qu'elle a pu être créée ⇒ « incertain », l'ancienne n'est PAS supprimée, et une
+> nouvelle tentative sur la MÊME annonce est refusée 30 min (`vrmRecreerEnCours`) ; (2) une suppression sans
+> réponse claire dit « peut-être encore en ligne », jamais « refusée » ; (3) un lien de photo périmé prend l'autre
+> copie (coffre ↔ fiche) ; (4) ⚠️ une annonce et SA recréation au même N° (suppression ratée, ou dressing pas
+> encore relu) faisaient renuméroter une paire toute seule (`doublonsAReattribuer`) ⇒ jamais entre elles
+> (`recreeDe`, une identité) ; (5) Republier : tri « plus anciennes / moins vues / moins de favoris », vues,
+> favoris et ancienneté par paire, favoris PERDUS comptés avant de lancer (avec « baisser le prix les prévient »),
+> « déjà recréée il y a moins de 2 jours » signalé, la file S'ARRÊTE sur une pause Vinted ou le plafond horaire.
+> ORDRE DE REMISE EN LIGNE (sa demande, même soir : « je sélectionne P-6000, Spezial, Air Max 1… ça republie
+> Spezial, Air Max 1, P-6000 ») : la file suit l'ordre de SA sélection (ordre des clics), « Mélanger » le change
+> (mêmes paires), ↑ ↓ le règlent à la main. Chaque paire reste « recréée PUIS supprimée » : c'est l'ordre de
+> PASSAGE qui change — supprimer d'abord pour recréer ensuite exposerait à perdre une paire (§3, tranché).
+> Preuves : `audit-recreer.cjs` 26 (5 rouges sur la 5.248/main), banc `republier.cjs` (8 rouges sur le build de main).
+
 > **28 octobre (soir) — « Republier » SUPPRIME ET RECRÉE l'annonce, photos réglées (5.248) :** Julien : « je veux
 > que ça supprime et recrée l'annonce », « en modifiant les photos, c'est ce qu'on avait commencé dans Préparer ».
 > Mesuré d'abord (ses requêtes du 26 oct., `harvest_*_wreq_*`, noms et types seulement) : `POST /api/v2/photos`
