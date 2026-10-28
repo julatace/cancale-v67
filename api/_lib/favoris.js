@@ -5,6 +5,8 @@ import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
 import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
+import {sendPushToAll,pushCategorieActive} from './push.js';
+import {contexteVendeur} from './owner.js';
 import {preparerMessageFavori} from '../../src/favorisVinted.js';
 
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
@@ -28,6 +30,21 @@ async function parametresDesAutresComptes(req,{owner,uid}){
   return [...vus.values()].filter(p=>parForme.get(p.forme)===1);
 }
 
+export function texteFinFavoris(fin){
+  const {total=0,envoyes=0,incertains=0,interrompus=0,interrompue=false}=fin||{};
+  const t=interrompue?'⏸️ Messages aux favoris : file interrompue':'✅ Messages aux favoris : file terminée';
+  const b=[`${envoyes} message${envoyes>1?'s':''} envoyé${envoyes>1?'s':''} sur ${total}`];
+  if(incertains)b.push(`${incertains} à vérifier sur Vinted`);
+  if(interrompus)b.push(`${interrompus} interrompu${interrompus>1?'s':''}`);
+  return {title:t,body:b.join(' · ')+(interrompue?' — ouvre VRM pour voir pourquoi.':'.')};
+}
+async function notifierFinFavoris(owner,fin){
+  return contexteVendeur.run({owner},async()=>{
+    if(!(await pushCategorieActive('favoris')))return {envoye:false};
+    const {title,body}=texteFinFavoris(fin);
+    return sendPushToAll({title,body,url:'/?tab=cat_msg',tag:'favoris-file-'+String(fin.lot||'')});
+  });
+}
 export async function routeFavoris(req,res){
   res.setHeader('Cache-Control','no-store');
   if(!['GET','POST'].includes(req.method))return res.status(405).json({message:'GET ou POST seulement.'});
@@ -95,6 +112,10 @@ export async function routeFavoris(req,res){
     }
     const r=await modifierNeutre(cle,decision);
     if(!r)throw new RefusFavoris('État non confirmé. Actualise la file : aucun nouvel envoi ne doit être lancé.',503);
+    // (28 oct., « que ça me prévienne ») La file vient de finir : une notification
+    // avec le bilan (catégorie « favoris », activée par défaut). Un échec d'envoi
+    // ne change rien à la réponse : la file est déjà rangée.
+    if(req.method==='POST'&&req.body?.action==='terminer'&&r.valeur?.fin)await notifierFinFavoris(owner,r.valeur.fin).catch(()=>{});
     return res.status(200).json({ok:true,uid,...(['suivant','consommer','verifier'].includes(req.body?.action)?r.valeur:{vue:r.valeur}),serveur:maintenant});
   }catch(e){return res.status(e instanceof RefusFavoris?e.status:503).json({message:e instanceof RefusFavoris?e.message:'La file n’a pas pu être confirmée. Actualise avant toute nouvelle action.',...(e instanceof RefusFavoris&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?{code:e.code,diagnostic:e.diagnostic}:{})});}
 }

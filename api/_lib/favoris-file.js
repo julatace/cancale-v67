@@ -72,6 +72,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
   const j=g.jobs.find(x=>x.id===e.id);
+  const etaitActive=g.active===true;
   if(!j)throw new RefusFavoris('La tentative enregistrée nécessite une vérification.');
   if(!['envoye','ignore','refuse','incertain'].includes(resultat))throw new RefusFavoris('Accusé invalide.',400);
   if(['envoye','ignore'].includes(resultat)&&!e.autorise)throw new RefusFavoris('Cette tentative n’a pas été autorisée par le serveur.');
@@ -85,7 +86,11 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   j.traiteLe=fin;if(resultat==='envoye')j.envoyeLe=fin;
   if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
-  return {data:d,valeur:vueFile(d,owner)};
+  // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
+  // une seule fois (la transition active → inactive), pour la notification.
+  const valeur=vueFile(d,owner);
+  if(etaitActive&&!g.active){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)};}
+  return {data:d,valeur};
 }
 export function consommerFile(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];

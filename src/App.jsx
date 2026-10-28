@@ -50833,6 +50833,7 @@ const PUSH_CATS = [
   { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er du mois, si tu es micro-entrepreneur (ton statut se choisit dans Comptabilité).' },
   { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
   { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
+  { id:'favoris',  def:true,  titre:'❤️ Messages aux favoris', desc:"Quand la file d'envoi aux favoris est finie ou s'arrête, avec le bilan." },
   { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
   { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
   { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },

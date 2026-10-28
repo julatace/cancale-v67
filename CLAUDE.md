@@ -7,6 +7,13 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — la file des FAVORIS prévient quand elle finit :** `terminerFile` rend `valeur.fin` (total,
+> envoyés, à vérifier, interrompus, interrompue) UNE fois, à la transition active → inactive ; `routeFavoris` envoie alors
+> « ✅ … file terminée » / « ⏸️ … file interrompue » (`texteFinFavoris`, catégorie `favoris`, activée par défaut, dans
+> `PUSH_CATS` et `PUSH_DEFAUT`), dans le contexte du vendeur. Un rejeu de l'accusé ne renotifie pas. Preuve :
+> `scripts/tests/favoris-fin-file.test.mjs` (rouge sur l'avant). ⚠️ Le moteur reste dans l'écran des favoris : quitter
+> l'écran arrête toujours la file (`ecran_inactif`) — la notification le dira.
+
 > **28 octobre (nuit, fin) — LES COULEURS DE VINTED, mesurées (5.266) :** « Republier sans blocage sur la couleur ».
 > Mesuré : aucune ligne de sa base ne porte le NOM d'une couleur (les corps acceptés n'ont que `color_ids`), mais sa page de
 > dépôt charge `GET /api/v2/item_upload/colors` (vu sur ses 7 comptes). `inject.js` la capte en passant
