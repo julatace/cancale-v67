@@ -44,3 +44,11 @@ Aucune vraie vente, aucun email réel et aucune impression physique utilisés pa
 - Chaque panneau indique sa portée ; aide ciblée emails/comptes/impression et exemple concret de numéro/emplacement.
 - « Prévisualiser et ajuster le numéro » ouvre le PDF original et le rendu réel. Choix au clic ou aux flèches ; contrôle du blanc et de sa marge sur les pixels originaux ; confirmation bloquée avant contrôle ou après collision. La position est revérifiée au moment de générer le PDF, jamais mémorisée pour d'autres documents. Aucun envoi d'email ou test d'impression physique.
 - Tests complémentaires : `node --test scripts/tests/reglages-actions.test.mjs`, `VRM_CHROMIUM_PATH=/usr/bin/chromium node scripts/bancs/parametres-sauvegarde.cjs`, `VRM_PDFJS_DIR=/tmp/vrm-pdfjs node scripts/tests/bordereau-placement-interface.cjs`.
+
+## Suite : transfert guidé et raccourcis
+
+Le composant existant ConfigurerTransfert est réorganisé en cinq étapes, avec une seule explication longue visible à la fois, compte et adresse explicitement sélectionnés. Les états distinguent association, déclaration, preuve d'adresse, configuration externe et réception réellement observée. Un lien en préparation n'est pas annoncé envoyé ; un échec de déclaration ne valide pas l'étape ; une date invalide ou future ne certifie pas la réception. Le transfert dans Gmail/iCloud n'est jamais supposé actif depuis VRM. Aucun email de test envoyé.
+
+Les résultats des actions remontent au parcours, et une actualisation n'effectue qu'une lecture. Les raccourcis vers les adresses ouvrent maintenant le sous-écran, y compris lorsqu'un autre réglage est déjà ouvert. L'aide au placement des numéros rejoint Impression, au lieu de Comptabilité.
+
+Validation : 17 tests unitaires transfert/réception (incluant séparation des propriétaires), parcours du composant à 390 et 1512 pixels, et banc Paramètres incluant le raccourci vers un panneau auparavant caché. Aucun déploiement dans cette passe.

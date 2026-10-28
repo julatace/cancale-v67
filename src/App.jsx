@@ -40655,7 +40655,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    rendu invisible). Le détail (causes) vit dans Réglages.
         { const pp = misDeCote && misDeCote.installation ? phrasePersonne(misDeCote.installation.personne) : null;
           if (pp) jobs.push({id:'emails-personne',icon:'mail',color:C.warn,title:pp.titre,sub:pp.geste,tab:'settings',prio:4,
-            avant:()=>{ DEMANDE_ADRESSES.on = true; try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} }}); }
+            avant:()=>{ demanderAdresses(); try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} }}); }
         // ⚠️ ANTI DOUBLE VENTE (16 oct.) : une paire vendue sur une plateforme et
         //    encore en vente ailleurs, ou un numéro porté par deux annonces, ne
         //    vivait plus que dans la cloche (la refonte du tableau de bord l'avait
@@ -49099,9 +49099,10 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const etroit = useEtroitReglages();
   const [nMuetsPush, setNMuetsPush] = React.useState(null);
   const [rechercheReglage, setRechercheReglage] = React.useState('');
-  const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
+  const [sous, setSous] = React.useState(()=>DEMANDE_ADRESSES.on?'adresses':null);       // l'id du sous-écran ouvert (téléphone)
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  React.useEffect(()=>{const ouvrir=()=>{DEMANDE_ADRESSES.on=false;setVueBrute('reglages');setSous('adresses');};window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
 
@@ -49242,6 +49243,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     ]},
     { id:'impression', titre:'Impression', items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Choisir le format du papier et prévisualiser le résultat.', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
+      { id:'tampons', type:'panneau', nu:true, ic:'doc', lib:'Placement du numéro sur les bordereaux', desc:'Un espace blanc recherché sur chaque PDF, sans modifier la page.', el:<div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>VRM analyse le rendu de chaque page complète pour chercher une zone blanche avec une marge autour du numéro. Le document garde sa taille et sa disposition. Si l’analyse échoue ou qu’aucun espace suffisant n’est trouvé, le tamponnage est refusé plutôt que placé au hasard. Les anciennes positions restent conservées, sans être réutilisées automatiquement.<p>Vérifie le résultat dans « Imprimante et bordereaux », puis « Voir les aperçus ».</p></div> },
     ]},
     { id:'compta', titre:'Comptabilité', items:[
       { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Régler le statut et les taux utilisés dans les rapports.', el:<RegimeSetting nu/> },
@@ -49250,7 +49252,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       { id:'masques', type:'nav', ic:'eyeOff', lib:'Ventes et achats masqués', onClick:()=>setTab('masques') },
       { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
-      { id:'tampons', type:'panneau', nu:true, ic:'doc', lib:'Placement du numéro sur les bordereaux', desc:'Un espace blanc recherché sur chaque PDF, sans modifier la page.', el:<div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>VRM analyse le rendu de chaque page complète pour chercher une zone blanche avec une marge autour du numéro. Le document garde sa taille et sa disposition. Si l’analyse échoue ou qu’aucun espace suffisant n’est trouvé, le tamponnage est refusé plutôt que placé au hasard. Les anciennes positions restent conservées, sans être réutilisées automatiquement.<p>Vérifie le résultat dans « Imprimante et bordereaux », puis « Voir les aperçus ».</p></div> },
+
     ]},
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
@@ -51630,6 +51632,7 @@ function phrasePersonne(p) {
 // Le panneau des adresses se fait défiler jusqu'à lui quand on y arrive par le
 // geste de Ma journée (au moment du clic, Réglages n'est pas monté).
 const DEMANDE_ADRESSES = { on: false };
+function demanderAdresses(){DEMANDE_ADRESSES.on=true;window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
 // La forme acceptée pour une adresse de réception (saisie à la main OU
 // suggérée) : une seule règle.
 const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
@@ -51787,6 +51790,7 @@ function EmailsSetting({onComptes}) {
     }
     const p = await lirePreuvesAdresses(); setPreuves(p);
     if (r.etat === 'prouvee') lireMisDeCote();
+    return ['prouvee','envoi','envoyee'].includes(r.etat);
   };
   // Une ou plusieurs adresses d'un coup (saisie à la main, ou suggestion).
   const ajouterAdresses = async (liste) => {
@@ -51799,7 +51803,7 @@ function EmailsSetting({onComptes}) {
       nouv[adr] = { owner: uid || '', label: '', at: new Date().toISOString() };
       n++;
     }
-    if (!n) return;
+    if (!n) return false;
     const ok = await ecrire(nouv);
     // Déclarer une adresse envoie son lien de confirmation (base cloisonnée :
     // sinon aucune preuve n'est nécessaire). Le résultat s'écrit sur sa ligne.
@@ -51808,6 +51812,7 @@ function EmailsSetting({onComptes}) {
       for (const a of neuves) { if (!estRelaisApple(a)) await demanderPreuveAdresse(a); }
       setPreuves(await lirePreuvesAdresses());
     }
+    return ok === true;
   };
   const ajouter = async () => {
     const a = await askText({ desc: "Tes adresses personnelles.\n\nIndique les adresses où Vinted t’écrit, avant leur transfert vers VRM. Tu peux en ajouter plusieurs, séparées par des virgules. N’indique pas la boîte collective VRM.", value: '', ok: 'Ajouter' });
@@ -51922,7 +51927,7 @@ function EmailsSetting({onComptes}) {
   };
   return (
     <>
-      <SuiviReceptionEmails key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} quarantaine={quarantaine} onVerifier={()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'})}/>
+      <SuiviReceptionEmails key={uid} owner={uid} headers={sbAuth} theme={C} version={versionReception} onAdresses={setSuiviAdresses} onComptes={onComptes} onDeclarer={ajouterAdresses} preuves={preuves} onConfirmer={adr=>confirmerAdresse(adr,false)} quarantaine={quarantaine} onVerifier={()=>racine.current?.querySelector('[data-emails-mis-de-cote]')?.scrollIntoView({block:'center',behavior:'smooth'})}/>
     <div ref={racine} data-reglage-adresses="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Mes adresses de réception</div>
       {/* ⚠️ (16 octobre) Julien : « je ne comprends pas à quoi ça sert ». Le
@@ -54594,7 +54599,7 @@ function AppCoeur() {
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
-        <BandeauConfirmationAdresse onVoir={() => { DEMANDE_ADRESSES.on = true; try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} setTab('settings'); }}/>
+        <BandeauConfirmationAdresse onVoir={() => { demanderAdresses(); try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} setTab('settings'); }}/>
         <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}

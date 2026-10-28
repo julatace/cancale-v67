@@ -101,6 +101,9 @@ const projette = (row, sel) => {
       dit(await pg.locator('[data-imprimante-reglage]').isVisible(), `${largeur} : impression accessible sans défilement dans les emails`);
       dit(await pg.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1), `${largeur} : aucun débordement horizontal`);
       await pg.screenshot({path:`/tmp/vrm-parametres-${largeur}.png`,fullPage:true});
+      await pg.evaluate(()=>window.dispatchEvent(new Event('vrm:ouvrir-adresses')));
+      await pg.waitForSelector('[data-reglage-adresses]',{state:'visible'});
+      dit(await pg.locator('[data-reglages-disposition]').getAttribute('data-sous-ecran-ouvert')==='adresses', `${largeur} : un raccourci ouvre les adresses au lieu de défiler vers un panneau caché`);
     }
     dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
     await ctx.close();
