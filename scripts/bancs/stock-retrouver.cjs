@@ -21,7 +21,9 @@ const MAIN = {
     '9002': { numero: '128', title: 'Adidas Samba blanche taille 40' },
     '9003': { numero: '31', title: 'Salomon XT-6 Écru taille 43' },
     '9004': { numero: '7', title: 'Nike Dunk Low grise taille 41' },
-    '9005': { numero: '55', title: 'Puma Suede verte taille 39' },
+    '9005': { numero: '55', title: 'Puma Suede verte taille 39', accountId: '111' },
+    // Un compte supprimé (comme shop_cancale) : jamais montré dans le Stock.
+    '9006': { numero: '88', title: 'Nike Shop Retiree taille 42', accountId: '199082413' },
   },
   vrm_meubles: [{ id: 'mA', name: 'Étagère salon', cols: 4, rows: 3 }, { id: 'mB', name: 'Bacs garage', cols: 2, rows: 2 }],
   vrm_stock_vendus: { nums: ['7', '128'], at: new Date().toISOString() },
@@ -50,7 +52,7 @@ async function rendre(b, tel) {
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([]);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([{ id: 1, vinted_user_id: '111', login: 'compte_garde', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     if (/id=eq\.main/.test(u)) return j([{ id: 'main', data: MAIN }]);
     return j([]);
   });
@@ -95,6 +97,19 @@ const res = (pg) => pg.evaluate(() => ({
         x = await res(r.pg);
         dit(x.rien, `${t} : un N° absent du stock est DIT`, JSON.stringify(x));
         await inp.fill('');
+        // Les paires d'un compte supprimé (shop_cancale) n'apparaissent nulle part.
+        await inp.fill('shop');
+        x = await res(r.pg);
+        const ec = await r.pg.evaluate(() => { const e = document.querySelector('[data-stock-ecartes]'); return e ? e.getAttribute('data-stock-ecartes') : null; });
+        dit(x.rien && !x.nums.includes('88') && ec === '1', `${t} : la paire d'un compte supprimé n'est pas montrée, et c'est dit une fois`, JSON.stringify({ x, ec }));
+        await inp.fill('');
+        // De loin par défaut ; « De près » agrandit les cases.
+        const larg = () => r.pg.evaluate(() => { const c = document.querySelector('[data-meuble="mA"] [data-case-num="12"]'); return c ? Math.round(c.getBoundingClientRect().width) : 0; });
+        const l1 = await larg();
+        await r.pg.click('[data-zoom-choix="pres"]'); await r.pg.waitForTimeout(250);
+        const l2 = await larg();
+        await r.pg.click('[data-zoom-choix="loin"]'); await r.pg.waitForTimeout(250);
+        dit(l1 > 0 && l1 <= 66 && l2 > l1 + 10, `${t} : vue de loin par défaut (cases ≤ 64 px), « De près » les agrandit`, `${l1} → ${l2}`);
         // Règles : colonnes au-dessus, rangées à gauche.
         const regle = await r.pg.evaluate(() => ({ c: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-col]')].map((x) => x.innerText).join(','), r: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-rang]')].map((x) => x.innerText).join(',') }));
         dit(regle.c === '1,2,3,4' && regle.r === '1,2,3', `${t} : le meuble porte ses repères (colonnes 1-4, rangées 1-3)`, JSON.stringify(regle));

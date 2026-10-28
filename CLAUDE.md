@@ -40,6 +40,14 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (soir) — Stock sans shop_cancale, et vue « de loin » :** Julien : « je veux pas les annonces de shop
+> cancale » et « la vue d'un peu plus loin ». `comptesStockEcartes` (Mes meubles ET En photos) écarte une fiche dont
+> le compte (`accountId`) est masqué, retiré pour de bon, ou n'est plus LIÉ (`vinted_accounts` de l'appareil ; liste
+> vide ⇒ seulement masqués/retirés ; fiche sans compte ⇒ gardée). Rien n'est effacé ; c'est dit une fois
+> (`data-stock-ecartes`). Taille des cases « De loin » (64 px, défaut) · « Normale » (100) · « De près » (150),
+> mémorisée sur l'appareil (`vrm_meubles_zoom`) ; de loin et normale, les meubles se rangent côte à côte. Banc
+> `stock-retrouver.cjs` (compte supprimé jamais montré ; de loin par défaut, « De près » agrandit).
+
 > **28 octobre (suite) — retrouver encore plus vite :** les meubles portent leurs REPÈRES (colonnes numérotées
 > au-dessus, rangées à gauche, `data-regle-*`) ; micro dans la recherche (`MicDictee`, « numéro 12 » ⇒ N°12) ;
 > pendant une recherche, un meuble sans résultat se replie (« rien ici ») et l'autre dit « N ici » ; « Les montrer
