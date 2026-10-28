@@ -7,6 +7,19 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — le tour de l'espace eBay sur ses vraies données :** Julien : « vas-y » (après Leboncoin).
+> Rendu Ventes · Annonces · Messages · À traiter · Promotion · Achats · Compte (390/1512) sur la copie lecture
+> seule ; 5 annonces actives (toutes avec une règle d'offre), 0 commande, retrait automatique ALLUMÉ. Corrigé :
+> une inactive que le retrait AUTOMATIQUE venait de terminer (Aquatone 128086452103, paire vendue sur Vinted)
+> disait « pas reliée · Remettre en vente sur eBay » ⇒ lue dans son journal `ebay_retraits_auto` par
+> l'identifiant de l'annonce (`retraitsAuto`, `data-inactive-retrait-auto`) : « retirée par VRM le … : vendue
+> sur Vinted — ne la remets pas en vente », aucun lien de remise en vente (journal illisible ⇒ rien dit) ;
+> Ventes disait « Relie ton compte » à un compte relié et lu sans vente ⇒ « Aucune vente eBay pour
+> l'instant ». Preuve : `ebay-inactives` scénario R (4 rouges sur l'avant). Laissés, vrais : VRM-81/48/78
+> « à vérifier · pas reliée » (N° renumérotés pendant la panne du 18 oct.), une Air Max sans SKU. Gestes :
+> « Relier à une paire » sur ces quatre annonces ; savoir que le retrait automatique est allumé. ⚠️ Les
+> autres sections (Messages, À traiter, Promotion, Achats) lisent eBay en direct : non jugées sur la copie.
+
 > **28 octobre — le tour de l'espace Leboncoin sur ses vraies données :** Julien : « fais pareil pour
 > Leboncoin ». Rendu Ventes · Achats · Annonces · Messages · Colis (390/1512, clair/sombre) sur la copie
 > lecture seule ; CA finalisé 178 € (58 + 75 + 45) et achats reçus 115,50 € = la base. Corrigé : une vente
