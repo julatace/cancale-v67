@@ -145,6 +145,14 @@ function espionPosts(f) {
     dit(!f.j.diags.includes('conversation_lecture_ou_forme_ratee'), 'corps d\'erreur Vinted : pas compté comme une lecture ratée', f.j.diags.join(','));
     dit(f.j.diags.includes('ignore_erreur_vinted_conversation') && f.j.diags.includes('ignore_erreur_vinted_transaction'), 'le refus de Vinted est compté pour ce qu\'il est', '');
     dit(!Object.keys(f.lignes).some((id) => /_conv_|_txn_|_transaction$/.test(id)), 'aucune ligne rangée pour un corps d\'erreur', Object.keys(f.lignes).join(','));
+    // (28 oct.) Le refus à code TEXTE, mesuré sur la ligne `orders_sold` de jujuf38
+    // (rangé à la place de ses ventes) : ni ligne, ni « liste vide ».
+    const h = faireFond({ src: SRC, connecte: '111' });
+    h.ctx.compteNonCapte = async () => false;
+    await h.ctx.storeHarvest('www.vinted.fr', 'orders_sold', null, JSON.stringify({ code: 'UNAUTHORIZED', message: 'Authorization failed.' }));
+    await h.ctx.storeHarvestRow('111', 'orders_sold', { code: 'UNAUTHORIZED', message: 'Authorization failed.' }, 'www.vinted.fr');
+    dit(!Object.keys(h.lignes).some((id) => /_orders_sold$/.test(id)), 'refus « UNAUTHORIZED » (code texte) : aucune ligne de ventes rangée', Object.keys(h.lignes).join(',') || 'aucune');
+    dit(h.ctx.estErreurVinted({ my_orders: [], code: 0 }) === false && h.ctx.estErreurVinted({ code: 0 }) === false && h.ctx.estErreurVinted({ my_orders: [], code: 'X' }) === false, 'l\'autre sens : une réponse avec sa clé de données (ou code 0) n\'est pas un refus', '');
     // L'autre sens : une vraie conversation dont `messages` a disparu alerte toujours.
     const g = faireFond({ src: SRC, connecte: '111' });
     g.ctx.compteNonCapte = async () => false;

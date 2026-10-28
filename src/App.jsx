@@ -99,7 +99,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.245.0';
+const EXT_ATTENDUE = '5.246.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2982,6 +2982,11 @@ const messagesRetires = () => {
 //        pas été relu — c'est l'échec qu'il faut voir.
 const DRESSING_FRAIS_MS = 12 * 3600 * 1000;
 const DRESSING_ACTIVITE_MARGE_MS = 10 * 60 * 1000;
+// (28 oct.) L'app fait relire les VENTES à chaque ouverture (commande `ventes`,
+// toutes les 90 s au plus) : « ventes rangées après le dressing » ne prouve plus
+// une visite sur Vinted. Mesuré : angeled92 « annonces lues il y a 24 min »
+// signalé comme ancien. La règle d'activité ne joue qu'au-delà de 2 h.
+const DRESSING_ACTIVITE_AGE_MIN_MS = 2 * 3600 * 1000;
 const MOIS_COURT_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 const quandFr = (ts, maintenant = Date.now()) => {
   const d = new Date(Number(ts)); if (isNaN(d)) return '';
@@ -3005,7 +3010,7 @@ const dressingsAnciens = (lues, enLigne, maintenant = Date.now(), activite = nul
       const lu = Number(lues[u]);
       if (maintenant - lu > DRESSING_FRAIS_MS) return true;
       const act = activite && Number(activite[u]);
-      return !!(act > 0 && act - lu > DRESSING_ACTIVITE_MARGE_MS);
+      return !!(act > 0 && act - lu > DRESSING_ACTIVITE_MARGE_MS && maintenant - lu > DRESSING_ACTIVITE_AGE_MIN_MS);
     })
     .sort((a, b) => Number(lues[a]) - Number(lues[b]));
 // « il y a 5 h », « il y a 3 j » : l'âge d'une lecture, quand il dépasse un jour.
@@ -3107,12 +3112,12 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const elles = nAC > 0 ? (nAC > 1 ? 'elles seront vérifiées' : 'elle sera vérifiée') : 'elles seront relues';
   const visite = `à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes${aRelire.length > 3 ? ' (trois comptes par visite)' : ''}`;
   const geste = !aRelire.length ? null
-    : ailleurs ? `Avec l'extension VRM à jour (${EXT_CAPACITES.enligne}), sur l'ordinateur où elle est installée, ${elles} ${visite} ; plus ancienne, ouvre vinted.fr connecté sur ${ceux}.`
+    : ailleurs ? `Avec l'extension VRM à jour, sur l'ordinateur où elle est installée, ${elles} ${visite} ; plus ancienne, ouvre vinted.fr connecté sur ${ceux}.`
     : perime ? `L'extension de ce Chrome tourne encore sur son ancien code : rien ne sera relu tant qu'elle n'est pas rechargée — ouvre chrome://extensions et clique ⟳ sur VRM.`
     : cap === 'ok' && relit ? `${elles.charAt(0).toUpperCase() + elles.slice(1)} ${visite}.`
     : cap === 'ok' && (connexion === 'non' || connexion === 'autre') ? `L'extension de ce Chrome n'est pas connectée à ton compte VRM${connexion === 'autre' ? ' (elle écrit dans un autre)' : ''} : tant qu'elle ne l'est pas, rien ne sera relu. VRM la reconnecte de lui-même ; sinon, recharge cette page.`
     : cap === 'ok' ? `Dès que l'extension de ce Chrome aura répondu, ${elles} ${visite}.`
-    : `Mets l'extension à jour (${EXT_CAPACITES.enligne}) : elle les vérifiera ${visite}. D'ici là, ouvre vinted.fr connecté sur ${ceux} dans Chrome : elle relit son dressing.`;
+    : `Mets l'extension à jour (${EXT_ATTENDUE}) : elle les vérifiera ${visite}. D'ici là, ouvre vinted.fr connecté sur ${ceux} dans Chrome : elle relit son dressing.`;
   const num = (it) => { if (!numeros) return ''; const n = numeros[it.id] && numeros[it.id].numero; return n != null && String(n).trim() !== '' ? `N°${n}` : 'sans N°'; };
   return (
     <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-cap-suppr={capS}
@@ -3342,6 +3347,9 @@ const noterReglage = (id, rate) => {
   if (avant !== _reglagesRates.has(id)) _direReglages();
 };
 
+// Une ligne que « Supprimer des données… » a vidée (`{supprime:true, purgedAt}`) :
+// le DELETE ne passe pas sur `app_data`, on la vide à la place (§deleteVintedAccount).
+const ligneVideeParToi = (row) => !!(row && row.data && row.data.supprime === true && !row.data.payload);
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
@@ -3361,8 +3369,15 @@ const fetchHarvestBrut = async (uid, type, opts = {}) => {
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
     // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
     // 24 h. Tous les écrans qui en dérivent la suivent sans la recalculer (§11).
+    if (ligneVideeParToi(row)) return { conversations: [], items: [], _vrmSupprime: true };
     if (type === 'listings') return await dressingEnLigne(uid, row || null, opts);
     if (!row) return null;
+    // (28 oct.) Une ligne VIDÉE par « Supprimer des données… » (`{supprime:true}`)
+    // n'est ni une lecture ratée ni une vieille capture : c'est son choix. Elle
+    // vaut « lu, rien » — sans date (sinon « relu il y a 11 j » datait la
+    // suppression comme une lecture) et sans repli vers Vinted (sinon « la boîte
+    // de ce compte n'a pas pu être lue »). Une recapture la réécrit. (Testée
+    // plus haut, avant le dressing : une ligne vidée n'a rien à mettre en ligne.)
     // (Un dressing ne passe pas ici : il se date par `dateLectureDressing` dans
     // `dressingEnLigne`, comme chez tous ses autres lecteurs — §11.)
     const ts = harvestTs(row);
@@ -4738,6 +4753,9 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
   const targetId = `harvest_${uid}_orders_${wantSold ? 'sold' : 'purchased'}`;
   for (const r of rows) {
     if (String(r.id) !== targetId) continue;
+    // (28 oct.) Ligne vidée par « Supprimer des données… » : « lu, aucune » (ni
+    // « session expirée », ni la date de la suppression prise pour une lecture).
+    if (ligneVideeParToi(r)) return { my_orders: [], _vrmSupprime: true };
     const ts = harvestTs(r);
     if (!isNaN(ts)) _harvestSeen[`${uid}_orders_${wantSold ? 'sold' : 'purchased'}`] = ts;
     // Même principe : une moisson datée s'affiche au lieu de disparaître.
@@ -15757,7 +15775,7 @@ function RetirerArgent({ liveStats }) {
     </div>
   );
 }
-function VintedResume({ liveStats, baseKO, siAJour = true }) {
+function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
   //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
   //    (Comptabilite) porte la sienne. Deux lignes ici = « la panne dite trois
@@ -15780,7 +15798,23 @@ function VintedResume({ liveStats, baseKO, siAJour = true }) {
     </div></ResumePlateforme>
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
         ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
-    <div className="vrm-fraicheur-plat" style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={dAge} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={siAJour}/></div>
+    {(() => {
+      // (28 oct.) Sur Ventes, un compte dont les ventes n'ont PAS pu être lues est
+      // déjà dit par le bandeau « compte non chargé » de la liste : la ligne de
+      // fraîcheur ne le redit pas (une cause, une phrase — §7). Ailleurs, rien
+      // ne change. Le seul compte en retard ainsi retiré ⇒ la ligne se tait.
+      const ex = new Set((Array.isArray(sauf) ? sauf : []).map(String));
+      const tous = (liveStats && Array.isArray(liveStats.dataAgeComptes)) ? liveStats.dataAgeComptes : null;
+      let jours = dAge, compte = liveStats && liveStats.dataAgeCompte, comptes = tous;
+      if (ex.size && tous) {
+        comptes = tous.filter((x) => x && !ex.has(String(x.login)));
+        if (ex.has(String(compte || ''))) {
+          if (!comptes.length) return null;
+          jours = comptes[0].jours; compte = comptes[0].login;
+        }
+      }
+      return <div className="vrm-fraicheur-plat" style={{padding:'8px 16px 0'}}><FraicheurDonnees jours={jours} compte={compte} comptes={comptes} siAJour={siAJour}/></div>;
+    })()}
     </>
   );
 }
@@ -41210,7 +41244,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* Les comptes non chargés, jugés par leur IDENTITÉ (`failedUids`) et
             nommés au rendu — y compris quand la liste vient du cache. */}
         {nomsVentesKO.length>0 && (
-          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
+          <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
             ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
@@ -54737,7 +54771,7 @@ function AppCoeur() {
           {/* Résumé CA/argent TOUJOURS visible en haut, puis la liste (ventes par
               défaut) directement — plus d'écran « Aperçu » intermédiaire. Les
               sections restent les mêmes écrans (§11), juste à un tap. */}
-          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'}/>
+          <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={platSub!=='annonces'} sauf={(platSub || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>
           {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
               faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma
               journée » — mais depuis l'espace Vinted elle n'était joignable
