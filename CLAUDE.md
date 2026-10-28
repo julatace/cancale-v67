@@ -21,6 +21,11 @@
 > (`data-republier-progression`, `progressionRepub`) ; `lecturesPartagees` ne se vide pas sur ces
 > évènements. Preuves : `audit-recreer.cjs` (92 ; 10 rouges sur la 5.258), banc `republier.cjs` (barre).
 > N°72 : le brouillon 10574536209 est dans ses brouillons Vinted, SANS couleur — à finir sur Vinted.
+> **Suite (5.260), « ça ne publie pas, ça me met ce message »** : un brouillon sans couleur ⇒ l'extension
+> répond `couleur-absente` avec `couleurs` = celles dont l'identifiant est MESURÉ (`COULEURS_VINTED_SURES`,
+> aujourd'hui `{1:'Noir'}`, lu sur son « Nike p-6000 noir » accepté) ; l'app DEMANDE (« Noir — publier » /
+> « Autre couleur », `avecCouleurBrouillon`) et renvoie la commande avec `couleur` (publierBrouillon,
+> refaireBrouillon, Brouillons → en ligne). Une couleur non mesurée n'est jamais envoyée.
 
 > **28 octobre (nuit) — le coffre ne perd plus la sauvegarde d'un passage (5.256) :** l'archivage du dressing (à
 > chaque visite Vinted) et Republier / En ligne → brouillon lisent-fusionnent-réécrivent la MÊME ligne

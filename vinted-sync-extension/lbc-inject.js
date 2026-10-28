@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.259.0';
+  const CAPTEUR_VERSION='5.260.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;

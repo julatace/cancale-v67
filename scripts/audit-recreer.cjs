@@ -249,7 +249,7 @@ const zero = (j) => j.vinted.length === 0;
     const extra = { ...(opts.dressing === false ? {} : dressing(['10432342904'])), ...(opts.ligne === false ? {} : { vinted_brouillon_10432342904: { id: '10432342904', uid: opts.uid || '111', corps: opts.corps || CORPS_B(), etat: 'brouillon' } }) };
     const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: opts.completion || 200, completionCorps: opts.completionCorps || null });
     if (typeof f.ctx.publierBrouillon !== 'function') return { f, r: { absent: true } };
-    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: opts.confirme !== false }); } catch (e) { r = { erreur: e.message }; }
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: opts.confirme !== false, couleur: opts.couleur }); } catch (e) { r = { erreur: e.message }; }
     return { f, r };
   };
   { const { f, r } = await pubB();
@@ -269,7 +269,13 @@ const zero = (j) => j.vinted.length === 0;
   { const { f, r } = await pubB({ completion: 422 });
     dit(r.etape === 'echec' && f.lignes.vinted_brouillon_10432342904.etat === 'brouillon', "mise en ligne refusée : le brouillon reste un brouillon, c'est dit", `etape=${r.etape}`); }
   { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }) });
-    dit(zero(f.j) && r.code === 'incomplet' && /couleur/.test(r.raison || ''), "brouillon sans couleur : refusé AVANT d'envoyer (Vinted le refuserait), la couleur est nommée", `n=${f.j.vinted.length} ${r.raison || ''}`); }
+    dit(zero(f.j) && r.code === 'couleur-absente' && /couleur/.test(r.raison || '') && r.couleurs && r.couleurs[1] === 'Noir', "brouillon sans couleur : refusé AVANT d'envoyer (Vinted le refuserait), et les couleurs que VRM sait poser sont proposées", `n=${f.j.vinted.length} code=${r.code} ${r.raison || ''}`); }
+  // (28 oct., N°72) Il CHOISIT la couleur dans VRM : la mise en ligne part avec elle.
+  { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }), couleur: 1 });
+    let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
+    dit(r.etape === 'fait' && JSON.stringify(c.draft && c.draft.color_ids) === '[1]', "couleur choisie dans VRM (Noir) : la mise en ligne part avec color_ids [1]", JSON.stringify({ e: r.etape, code: r.code, c: c.draft && c.draft.color_ids })); }
+  { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }), couleur: 999 });
+    dit(zero(f.j) && r.code === 'couleur-absente', "une couleur que VRM ne connaît pas n'est jamais envoyée", `n=${f.j.vinted.length} code=${r.code}`); }
   { const { r } = await pubB({ completion: 400, completionCorps: { code: 99, message: 'Erreurs trouvées', message_code: 'validation_error', errors: [{ field: 'color_ids', value: 'Choisis une couleur' }] } });
     dit(r.etape === 'echec' && /couleur/.test(r.raison || '') && /Choisis une couleur/.test(r.raison || ''), "un refus de Vinted dit QUEL champ il réclame (plus seulement « Erreurs trouvées »)", r.raison || ''); }
   // O — le brouillon qu'il enregistre sur Vinted est appris (corps accepté, id).

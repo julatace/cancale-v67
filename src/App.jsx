@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.259.0';
+const EXT_ATTENDUE = '5.260.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11855,6 +11855,23 @@ function progressionRepub(p, action, viaB) {
   const part = Math.min(0.97, (i + dedans) / liste.length);
   const quoi = p.etape === 'photos' && p.total > 0 ? `Envoi de la photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}` : liste[i][1];
   return { etape: p.etape, part, texte: `Étape ${i + 1} sur ${liste.length} · ${quoi}…` };
+}
+// (28 oct., N°72 : « ça ne publie pas, ça me met ce message ») Un brouillon
+// sans couleur : Vinted refuse sa mise en ligne. L'extension (5.260) le dit
+// (`couleur-absente`) et nomme les couleurs qu'elle sait poser (mesurées dans ses
+// requêtes acceptées). On lui DEMANDE ; sur son « oui », la commande repart avec
+// la couleur. Jamais choisie à sa place.
+async function avecCouleurBrouillon(envoyer, titre) {
+  let r = await envoyer(undefined);
+  if (r && r.accepte === false && r.code === 'couleur-absente') {
+    const cs = r.couleurs && typeof r.couleurs === 'object' ? Object.entries(r.couleurs).filter(([id, nom]) => /^\d+$/.test(id) && nom) : [];
+    if (!cs.length) return r;
+    const [id, nom] = cs[0];
+    const ok = await askConfirm({ title: 'Ce brouillon n’a pas de couleur', desc: `Vinted refuse de mettre en ligne une annonce sans couleur.${titre ? `\n« ${titre} »` : ''}\nVRM peut mettre la couleur ${nom} et la publier tout de suite. Si c'est une autre couleur, choisis-la sur Vinted (« Modifier »).`, ok: `${nom} — publier`, cancel: 'Autre couleur' });
+    if (!ok) return { ...r, raison: "pas mise en ligne — choisis sa couleur sur Vinted (« Modifier »), puis publie-le. Rien n'a été touché." };
+    r = await envoyer(Number(id));
+  }
+  return r;
 }
 function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, action = 'recreer' }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
@@ -36247,7 +36264,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
   const refaireBrouillon = async (b) => {
     if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    const r=await vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true }, 180000);
+    const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true, couleur }, 180000), b.titre||b.title||'');
     brRefaire.relire(); brVinted.relire();
     if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
     if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };
@@ -48220,7 +48237,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           publier={async (it) => {
             const uid = it._acc ? String(it._acc.vinted_user_id||'') : '';
             if (!uid) return { etape:'echec', raison:'compte introuvable' };
-            const r=await vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true }, 120000);
+            const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true, couleur }, 120000), it.title||it.titre||'');
             if (r.sansReponse) { brVinted.relire(); return { etape:'incertain', raison:TEXTE_SANS_REPONSE }; }
             if (r && r.accepte) return { etape:r.etape, raison:r.raison||'' };
             return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
@@ -48280,7 +48297,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // de « Voir mes brouillons », §11) ; seuls ceux PRÊTS se cochent.
         const publierEnLigne = async (a) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true }, 120000);
+          const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true, couleur }, 120000), a.titre||'');
           if (r.sansReponse) { brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.etape==='fait') { brVinted.relire(); return { etat:'fait' }; }
           if (r && r.accepte && r.etape==='incertain') return { etat:'incertain', raison:r.raison||'' };
