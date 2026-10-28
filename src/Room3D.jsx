@@ -383,30 +383,46 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       // place un cintre — avec un vêtement et l'étiquette de son NUMÉRO quand il
       // porte quelque chose, en transparence quand il est libre (on le touche
       // pour y ranger). Chaque cintre porte sa case (`cell`) pour le clic.
-      const buildPortant = (w, d, ht, base, cols, slots) => {
+      // (28 oct.) Plusieurs BARRES (`rows`), et `barres` (Set « r:c ») : la barre
+      // de la rangée r−1 au cintre c. Absent = toutes ; la barre du bas est toujours là.
+      const buildPortant = (w, d, ht, base, cols, slots, rows, barres) => {
         const g = new THREE.Group(); const acier = new THREE.MeshStandardMaterial({ color: base, metalness: 0.7, roughness: 0.32 });
-        const nc = Math.max(1, cols || 6), barY = ht - 0.04;
+        const nc = Math.max(1, cols || 6), nr = Math.max(1, rows || 1);
+        const esp = nr > 1 ? (ht - 0.08) / nr : 0, barY = (r) => ht - 0.04 - r * esp;
+        const longV = nr > 1 ? Math.max(0.3, Math.min(0.62, esp - 0.16)) : 0.62;
+        const aBarre = (r, c) => r === nr - 1 || !barres || barres.has((r + 1) + ':' + (c + 1));
         [-1, 1].forEach(sx => {
           const pied = box(0.03, ht, 0.03, acier); pied.position.set(sx * (w / 2 - 0.02), ht / 2, 0); g.add(pied);
           const base2 = box(0.04, 0.03, d * 0.9, acier); base2.position.set(sx * (w / 2 - 0.02), 0.04, 0); g.add(base2);
           [-1, 1].forEach(sz => { const roue = cyl(0.03, 0.03, 0.025, metalMat, 10); roue.rotation.z = Math.PI / 2; roue.position.set(sx * (w / 2 - 0.02), 0.03, sz * d * 0.42); g.add(roue); });
         });
-        const rail = cyl(0.014, 0.014, w - 0.02, acier, 10); rail.rotation.z = Math.PI / 2; rail.position.set(0, barY, 0); g.add(rail);
+        const pasC = (w - 0.08) / nc;
+        for (let r = 0; r < nr; r++) {
+          // La barre, morceau par morceau (les cintres qui l'ont, d'affilée).
+          let deb = null;
+          for (let c = 0; c <= nc; c++) {
+            const on = c < nc && aBarre(r, c);
+            if (on && deb == null) deb = c;
+            if (!on && deb != null) {
+              const tout = deb === 0 && c === nc, x0 = tout ? -w / 2 + 0.01 : -w / 2 + 0.04 + deb * pasC, x1 = tout ? w / 2 - 0.01 : -w / 2 + 0.04 + c * pasC;
+              const rail = cyl(0.014, 0.014, x1 - x0, acier, 10); rail.rotation.z = Math.PI / 2; rail.position.set((x0 + x1) / 2, barY(r), 0); rail.userData.plateau = true; g.add(rail); deb = null;
+            }
+          }
+        }
         const ghostM = new THREE.MeshStandardMaterial({ color: '#9aa3ad', roughness: 0.9, transparent: true, opacity: 0.22, depthWrite: false });
         const habits = ['#4f6fc9', '#c94f4f', '#4fae8f', '#d4a24b', '#8a5fb0', '#5f7f9b'];
-        const pasC = (w - 0.08) / nc;
-        for (let c = 0; c < nc; c++) {
-          const cx = -w / 2 + 0.04 + (c + 0.5) * pasC, key = '0_' + c, a = ((slots || {})[key] || []).map(v => String(v)).filter(Boolean);
-          const crochet = cyl(0.004, 0.004, 0.06, metalMat, 5); crochet.position.set(cx, barY - 0.03, 0); g.add(crochet);
-          const epaules = box(Math.min(0.36, pasC * 0.9), 0.012, 0.012, a.length ? flatMat('#8a6f57', 0.6) : ghostM); epaules.position.set(cx, barY - 0.07, 0); epaules.rotation.y = Math.PI / 2; g.add(epaules);
+        for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
+          const by = barY(r);
+          const cx = -w / 2 + 0.04 + (c + 0.5) * pasC, key = r + '_' + c, a = ((slots || {})[key] || []).map(v => String(v)).filter(Boolean);
+          if (!a.length && !aBarre(r, c)) continue;   // pas de cintre sans barre
+          const crochet = cyl(0.004, 0.004, 0.06, metalMat, 5); crochet.position.set(cx, by - 0.03, 0); g.add(crochet);
+          const epaules = box(Math.min(0.36, pasC * 0.9), 0.012, 0.012, a.length ? flatMat('#8a6f57', 0.6) : ghostM); epaules.position.set(cx, by - 0.07, 0); epaules.rotation.y = Math.PI / 2; g.add(epaules);
           if (a.length) {
-            const vet = box(0.03, 0.62, Math.min(0.42, d * 0.85), flatMat(habits[c % habits.length], 0.92)); vet.position.set(cx, barY - 0.07 - 0.32, 0); vet.userData = { cell: key, num: a[0], idx: 0 }; g.add(vet);
-            // (17 oct.) L'étiquette du cintre FACE à soi : elle était tournée d'un quart
-            // de tour — de face on n'en voyait que la tranche (1,2 cm), donc aucun
-            // numéro. Elle pend devant le vêtement, sa face numérotée vers l'avant.
-            const tagW = Math.min(0.22, pasC * 0.94); const tag = makeColis(a[0], tagW, tagW * 0.75, 0.008); tag.position.set(cx, barY - 0.07 - 0.16, Math.min(0.21, d * 0.42) + 0.012); tag.userData = { cell: key, num: a[0], idx: 0 }; g.add(tag);
+            const vet = box(0.03, longV, Math.min(0.42, d * 0.85), flatMat(habits[c % habits.length], 0.92)); vet.position.set(cx, by - 0.07 - longV / 2 - 0.01, 0); vet.userData = { cell: key, num: a[0], idx: 0 }; g.add(vet);
+            // (17 oct.) L'étiquette du cintre FACE à soi : elle pend devant le vêtement, sa face numérotée vers l'avant.
+            const tagW = Math.min(0.22, pasC * 0.94); const tag = makeColis(a[0], tagW, tagW * 0.75, 0.008); tag.position.set(cx, by - 0.07 - Math.min(0.16, longV / 2), Math.min(0.21, d * 0.42) + 0.012); tag.userData = { cell: key, num: a[0], idx: 0 }; g.add(tag);
           } else {
-            const gh = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.55, Math.min(0.4, d * 0.8)), ghostM); gh.position.set(cx, barY - 0.07 - 0.29, 0); gh.userData = { cell: key, ghost: true }; g.add(gh);
+            const gh = new THREE.Mesh(new THREE.BoxGeometry(0.03, longV - 0.07, Math.min(0.4, d * 0.8)), ghostM); gh.position.set(cx, by - 0.07 - (longV - 0.07) / 2, 0); gh.userData = { cell: key, ghost: true }; g.add(gh);
           }
         }
         return g;
@@ -702,7 +718,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             case 'commode': g = buildCommode(w, d, ht, base, it.rows); break;
             case 'etagere': g = buildEtagere(w, d, ht, base, it.rows); break;
             case 'metal': g = buildMetal(w, d, ht, base, nr, !!(FURN_TYPES[it.type] || {}).bois, nc, Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null); break;
-            case 'portant': g = buildPortant(w, d, ht, base, nc, it.slots); break;
+            case 'portant': g = buildPortant(w, d, ht, base, nc, it.slots, nr, Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null); break;
             case 'armoire': g = buildArmoire(w, d, ht, base); break;
             case 'penderie': g = buildPenderie(w, d, ht, base); break;
             case 'table': g = buildTable(w, d, ht, base, nr, nc, Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null); break;
@@ -1408,7 +1424,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           // Les plateaux d'une étagère : [{ y, w }] (hauteur dans le meuble, largeur).
           plateaux: (itemId) => {
             const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
-            const out = []; g.traverse((o) => { if (o.isMesh && o.userData && o.userData.plateau && o.geometry && o.geometry.parameters) out.push({ y: +o.position.y.toFixed(3), w: +o.geometry.parameters.width.toFixed(3) }); });
+            const out = []; g.traverse((o) => { if (o.isMesh && o.userData && o.userData.plateau && o.geometry && o.geometry.parameters) out.push({ y: +o.position.y.toFixed(3), w: +(o.geometry.parameters.width != null ? o.geometry.parameters.width : o.geometry.parameters.height).toFixed(3) }); });
             return out;
           },
           etiquettes: () => ({ visibles: etiqVisibles, total: etiqTotal, puces: etiqRects.filter(r => r.puce).length, px: PX_ETIQ, rects: etiqRects.map(r => ({ ...r })) }),

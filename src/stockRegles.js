@@ -207,7 +207,11 @@ export const planchesRangees = (set, cols, rows) => {
 // (28 oct.) « fais pareil pour les tables » : une table peut avoir des plateaux
 // SOUS son dessus (rangées 1, 2…) ; le dessus lui-même (sous la rangée 1) est
 // toujours là.
-export const plateauxReglables = (ft) => !!(ft && modeCase(ft) === 'pile' && !ft.bacs && (ft.build === 'metal' || ft.build === 'table'));
+// (28 oct.) « fais pareil pour les portants » : un portant peut avoir plusieurs
+// BARRES (rangées, 0 = la barre du haut), réglables cintre par cintre. « r:c »
+// = la barre de la rangée r−1 (0-indexée) à ce cintre ; sans elle, le vêtement
+// descend sur la barre du dessous si elle est libre. La barre du bas est toujours là.
+export const plateauxReglables = (ft) => !!(ft && ((modeCase(ft) === 'pile' && !ft.bacs && (ft.build === 'metal' || ft.build === 'table')) || (modeCase(ft) === 'cintre' && ft.build === 'portant')));
 export const plateauxMeuble = (it, ft) => {
   if (!plateauxReglables(ft)) return null;
   const nr = Math.max(1, (it && it.rows) || ft.rows || 1), nc = Math.max(1, (it && it.cols) || ft.cols || 1);

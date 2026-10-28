@@ -97,6 +97,14 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — les PORTANTS aussi :** Julien : « fais pareil pour les portants ». Un portant à cintres
+> peut avoir plusieurs BARRES (stepper « Barres », `data-reglage="barres"`, ~80 cm par barre, refusé au-delà du
+> plafond ; la barre ajoutée l'est en haut) et « Barres, cintre par cintre » (`ChoixPlanches`). `"r:c"` = la barre de
+> la rangée r−1 au cintre c ; la barre du bas est toujours là. Sans barre, le vêtement descend sur la barre du dessous
+> si elle est libre (`tasserPlateaux`, cap 1) ; numéros inchangés. `plateauxReglables` inclut le portant ;
+> `buildPortant(…, rows, barres)` dessine chaque barre en morceaux (sonde `plateaux` lit aussi un cylindre).
+> Banc `stock-finitions.cjs` XI (390/1512 ; mutation « portant hors des plateaux réglables » ⇒ 2 rouges).
+
 > **28 octobre (nuit, fin) — les TABLES aussi :** Julien : « fais pareil pour les tables ». Une table porte des
 > plateaux SOUS son dessus : « Niveaux sous la table » (stepper `sous-table`, ajoutés/retirés en bas ; refusé si un
 > niveau retiré porte une boîte ou si un niveau déborderait) et « Plateaux sous la table, place par place » (même
