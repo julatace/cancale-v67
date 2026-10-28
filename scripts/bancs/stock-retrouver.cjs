@@ -21,10 +21,12 @@ const MAIN = {
     '9002': { numero: '128', title: 'Adidas Samba blanche taille 40' },
     '9003': { numero: '31', title: 'Salomon XT-6 Écru taille 43' },
     '9004': { numero: '7', title: 'Nike Dunk Low grise taille 41' },
+    '9005': { numero: '55', title: 'Puma Suede verte taille 39' },
   },
-  vrm_meubles: [{ id: 'mA', name: 'Étagère salon', cols: 4, rows: 3 }],
+  vrm_meubles: [{ id: 'mA', name: 'Étagère salon', cols: 4, rows: 3 }, { id: 'mB', name: 'Bacs garage', cols: 2, rows: 2 }],
+  vrm_stock_vendus: { nums: ['7', '128'], at: new Date().toISOString() },
   // N°12 : rangée 2, colonne 3 (case 6) ; N°128 : rangée 1, colonne 1 ; N°31 pas rangée.
-  vrm_slots: { '12': { m: 'mA', i: 6 }, '128': { m: 'mA', i: 0 }, '7': { m: 'mA', i: 11 } },
+  vrm_slots: { '12': { m: 'mA', i: 6 }, '128': { m: 'mA', i: 0 }, '7': { m: 'mA', i: 11 }, '55': { m: 'mB', i: 3 } },
 };
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -92,6 +94,30 @@ const res = (pg) => pg.evaluate(() => ({
         await inp.fill('999');
         x = await res(r.pg);
         dit(x.rien, `${t} : un N° absent du stock est DIT`, JSON.stringify(x));
+        await inp.fill('');
+        // Règles : colonnes au-dessus, rangées à gauche.
+        const regle = await r.pg.evaluate(() => ({ c: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-col]')].map((x) => x.innerText).join(','), r: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-rang]')].map((x) => x.innerText).join(',') }));
+        dit(regle.c === '1,2,3,4' && regle.r === '1,2,3', `${t} : le meuble porte ses repères (colonnes 1-4, rangées 1-3)`, JSON.stringify(regle));
+        // Dit à voix : « numéro 12 ».
+        await inp.fill('numéro 12');
+        x = await res(r.pg);
+        dit(JSON.stringify(x.nums) === '["12"]', `${t} : « numéro 12 » (à la voix) rend la N°12`, JSON.stringify(x.nums));
+        // Pendant une recherche, le meuble sans résultat se replie et le dit.
+        await inp.fill('puma');
+        const pl = await r.pg.evaluate(() => ({ a: document.querySelector('[data-meuble="mA"]').getAttribute('data-meuble-ici'), ag: !!document.querySelector('[data-meuble="mA"] [data-meuble-grille]'), b: document.querySelector('[data-meuble="mB"]').getAttribute('data-meuble-ici') }));
+        dit(pl.a === '0' && !pl.ag && pl.b === '1', `${t} : « puma » : l'étagère se replie (rien ici), les bacs disent « 1 ici »`, JSON.stringify(pl));
+        // Plusieurs résultats : « les montrer toutes » — triées dans l'ordre du chemin.
+        await inp.fill('nike');
+        await r.pg.click('[data-stock-tout-montrer]');
+        await r.pg.waitForTimeout(300);
+        const ci = await r.pg.evaluate(() => [...document.querySelectorAll('[data-cible]')].map((x) => x.getAttribute('data-cible')).join(','));
+        dit(ci === '12,7', `${t} : les Nike montrées ensemble, dans l'ordre du meuble (N°12 rangée 2 puis N°7 rangée 3)`, ci);
+        // « 2 vendues à sortir — où sont-elles ? »
+        await r.pg.click('[data-vendues-chercher]');
+        await r.pg.waitForTimeout(300);
+        const ve = await r.pg.evaluate(() => [...document.querySelectorAll('[data-cible]')].map((x) => x.getAttribute('data-cible')).join(','));
+        if (process.env.SHOT) await r.pg.screenshot({ path: process.env.SHOT + '-vendues' + (tel ? '-390' : '-1512') + '.png', fullPage: false });
+        dit(ve === '128,7', `${t} : les vendues à sortir listées avec leur place, dans l'ordre du chemin`, ve);
         await inp.fill('nike 42');
         await r.pg.click('[data-stock-res="12"]');
         await r.pg.waitForTimeout(1200);
