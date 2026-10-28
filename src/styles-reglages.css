@@ -153,3 +153,15 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(15,23,42,.05)
 .vrm-settings-search button{min-height:44px;flex-shrink:0;padding:6px 8px;border:0;background:transparent;font:inherit;font-size:12px;cursor:pointer;}
 .vrm-settings-search-info{font-size:12px;line-height:1.5;margin:-6px 0 16px;}
 .vrm-settings-draft{font-size:12px;line-height:1.6;padding:10px 12px;border:1px solid currentColor;border-radius:9px;}
+.vrm-connexions-entete{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+.vrm-connexions-entete p{flex:1 1 250px;font-size:12px;line-height:1.6;}
+.vrm-connexion-source{padding:14px 0;border-top:1px solid;margin-top:12px;font-size:12px;line-height:1.6;}
+.vrm-connexion-source h3{margin:0 0 5px;font-size:13px;}
+.vrm-connexion-source p{margin:6px 0;}
+.vrm-connexion-source time{display:block;font-size:12px;opacity:.7;}
+.vrm-connexion-source details{margin-top:10px;}
+.vrm-connexion-source summary{min-height:36px;cursor:pointer;font-weight:600;}
+.vrm-connexion-source code{overflow-wrap:anywhere;}
+.vrm-connexions-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+.vrm-connexions-actions a,.vrm-connexion-source button,.vrm-connexions-entete button{display:inline-flex;align-items:center;min-height:44px;padding:8px 12px;box-sizing:border-box;border:1px solid #9aacab88;border-radius:9px;background:transparent;color:inherit;font:inherit;font-size:12px;text-decoration:none;cursor:pointer;}
+.vrm-connexions-entete button:disabled{opacity:.6;cursor:default;}

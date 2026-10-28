@@ -1,3 +1,4 @@
+import { etatExtensionAffichage, etatDerniereLecture } from './etatConnexions.js';
 import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.js';
 import { filtrerReglages } from './rechercheReglages.js';
 import { preparerApercusModes } from './apercusBordereaux.js';
@@ -49240,7 +49241,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
   const GROUPES_REGLAGES = [
     { id:'comptes', titre:'Comptes Vinted', items:[
       { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Vérifier les pseudos et les adresses email de tes comptes Vinted.', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Comprendre ce qui est connecté et ce qui demande une action.', titreInterne:true, el:<ConnexionsSetting/> },
+      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Comprendre ce qui est connecté et ce qui demande une action.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'}/> },
       { id:'adresses', type:'panneau', ic:'mail', lib:'Réception des emails', desc:'Configurer le transfert et suivre les emails reçus par VRM.', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Consulter les vérifications d’accès et les éventuels problèmes.', el:<SecuriteSetting/> },
     ]},
@@ -52138,10 +52139,10 @@ function EmailsSetting({onComptes}) {
 }
 
 function ConnexionsSetting() {
-  const sansSouris = useSansSouris();
+  const [versionLecture,actualiser]=React.useReducer(n=>n+1,0);
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
-  const [mail, setMail] = useState(null);   // { ts, n } | 'vide' | null = en cours
-  const [capt, setCapt] = useState(null);   // { ts, n }
+  const [mail, majMail] = useState(undefined);   // { ts, n } | 'vide' | null = en cours
+  const [capt, majCapt] = useState(undefined);   // { ts, n }
   // ⚠️⚠️ QUELLE VERSION A VRAIMENT CAPTÉ ? Depuis son iPhone, le pont n'existe
   // pas — l'app ne pouvait donc PAS répondre « ton extension est-elle à jour ? »
   // sur l'appareil où il pose justement la question. L'extension inscrit
@@ -52153,19 +52154,19 @@ function ConnexionsSetting() {
   // pas — promettre sur cette valeur, ce serait annoncer à un iPhone ce qu'un
   // Chrome sait faire. Trois états, comme partout : `undefined` = en cours,
   // `null` = pas su, un objet = lu.
-  const [derniereExt, setDerniereExt] = useState(undefined);
+  const [derniereExt, majDerniereExt] = useState(undefined);
   // ⚠️ DÉRIVE DE FORMAT (sentinelle 5.139). L'extension note `forme_inconnue_*`
   // + un échantillon `rates.forme_<type>` quand Vinted/LBC/eBay renomme la clé de
   // liste d'une réponse — la capture tombe à 0 sans erreur. On le SURFACE ici
   // pour qu'il le sache (sinon la liste serait juste « vide »), mais SEULEMENT
   // si c'est RÉCENT (< 7 j) : une dérive déjà corrigée laisse son compteur, et
   // une alerte périmée fait cesser de lire les vraies.
-  const [drift, setDrift] = useState(undefined);
+  const [drift, majDrift] = useState(undefined);
   // Les plantages notés ces 7 derniers jours (src/plantages.js). Lecture ratée
   // ou aucun : rien n'est affiché — une alerte n'apparaît que sur un fait.
-  const [plantages, setPlantages] = useState(undefined);
+  const [plantages, majPlantages] = useState(undefined);
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
-  useEffect(() => { (async () => {
+  useEffect(()=>{let actif=true;const owner=AUTH.user?.id||null;const setPlantages=v=>{if(actif&&(AUTH.user?.id||null)===owner)majPlantages(v);};setPlantages(undefined);(async()=>{
     try {
       // Trié et filtré PAR LA BASE (la date est copiée dans `meta`) : sans
       // `order`, 60 lignes quelconques pouvaient laisser dehors celles de la semaine.
@@ -52177,8 +52178,8 @@ function ConnexionsSetting() {
       setPlantages(rows.filter(x => { const t = Date.parse(x.at || '') || 0; return t && (Date.now() - t) < 7 * 864e5; })
         .sort((a, b) => String(b.at).localeCompare(String(a.at))));
     } catch (_) { setPlantages(null); }
-  })(); }, []);
-  useEffect(() => { (async () => {
+  })();return()=>{actif=false;};},[versionLecture]);
+  useEffect(()=>{let actif=true;const owner=AUTH.user?.id||null;const setDerniereExt=v=>{if(actif&&(AUTH.user?.id||null)===owner)majDerniereExt(v);};setDerniereExt(undefined);const setDrift=v=>{if(actif&&(AUTH.user?.id||null)===owner)majDrift(v);};setDrift(undefined);(async()=>{
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_diag_capture&select=ver:data->>ver,verAt:data->>verAt,rates:data->rates`, { headers: sbAuth() });
       if (!r.ok) { setDerniereExt(null); setDrift(null); return; }
@@ -52199,11 +52200,11 @@ function ConnexionsSetting() {
         .filter(x => !estCorpsErreurVinted(x.cles));
       setDrift(recents);
     } catch (_) { setDerniereExt(null); setDrift(null); }
-  })(); }, []);
+  })();return()=>{actif=false;};},[versionLecture]);
   // Le type de capture → un mot que Julien lit (jamais le nom technique brut).
   const nomFamille = (t) => /orders_sold|transaction|txn/.test(t) ? 'ventes' : /orders_purchased/.test(t) ? 'achats'
     : /listings|item/.test(t) ? 'annonces' : /inbox|conv/.test(t) ? 'messages' : t;
-  useEffect(() => { (async () => {
+  useEffect(()=>{let actif=true;const owner=AUTH.user?.id||null;const setMail=v=>{if(actif&&(AUTH.user?.id||null)===owner)majMail(v);};setMail(undefined);const setCapt=v=>{if(actif&&(AUTH.user?.id||null)===owner)majCapt(v);};setCapt(undefined);(async()=>{
     const lire = async (motif) => {
       try {
         // ⚠️ `email_*` = 1 211 lignes, `harvest_*` = 1 127 : sans pagination on
@@ -52216,103 +52217,35 @@ function ConnexionsSetting() {
         return { n: rows.length, ts };
       } catch (_) { return null; }
     };
-    setMail(await lire('email_*') || 'vide');
-    setCapt(await lire('harvest_*') || 'vide');
-  })(); }, []);
-  const depuis = (ts) => {
-    if (!ts) return 'jamais';
-    const h = (Date.now() - ts) / 3600000;
-    return h < 1 ? "il y a moins d'une heure" : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} j`;
-  };
-  // Frais (< 2 j) = neutre, orange < 7 j, rouge au-delà. ⚠️ Plus de vert : c'était
-  // le #0F8A6A de l'ancienne palette menthe (revue du 16 oct.) — et §7 ne colore
-  // un état que s'il y a quelque chose à rattraper. Tout va bien = rien à voir.
-  const teinte = (ts) => !ts ? C.muted : (Date.now() - ts) < 2 * 864e5 ? C.muted
-                       : (Date.now() - ts) < 7 * 864e5 ? C.warn : C.danger;
-  const Ligne = ({ t, etat, coul, d }) => (
-    <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 0',borderTop:`1px solid ${C.border}`}}>
-      <span style={{flexShrink:0,width:9,height:9,borderRadius:8,background:coul,marginTop:5}}/>
-      <div style={{minWidth:0,flex:'1 1 140px'}}>
-        <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{t} <span style={{fontWeight:500,color:coul}}>· {etat}</span></div>
-        <div style={{fontSize:11.5,color:C.muted,lineHeight:1.45,marginTop:2}}>{d}</div>
-      </div>
-    </div>
-  );
-  return (
-    <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'12px 14px'}}>
-      <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>État des connexions</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:4,lineHeight:1.45}}>Ce qui alimente l'app, et depuis quand.</div>
-      {/* ⚠️ UN NUMÉRO DE VERSION NE VEUT RIEN DIRE TOUT SEUL. On dit s'il est
-          à jour, et sinon ce que ça coûte et quoi faire — une version en retard
-          ne « bugue » pas, elle ne capte simplement pas, en silence. */}
-      <Ligne t="Extension Chrome" coul={!ext.on ? C.warn : extEnRetard(ext.v) ? C.warn : C.muted}
-        etat={!ext.on ? 'pas détectée ici' : !ext.v ? 'détectée' : extEnRetard(ext.v) ? `version ${ext.v} — en retard` : `version ${ext.v} · à jour`}
-        d={!ext.on ? <>{sansSouris ? <>Sur ton téléphone, rien à faire ici : c'est l'ordinateur où VRM est installé dans Chrome qui fait remonter tes données.</> : <>Sur téléphone c'est normal (il n'y a pas d'extension). Sur l'ordinateur : ouvre l'app dans le Chrome où elle est installée, et recharge-la dans chrome://extensions.</>}{derniereExt && derniereExt !== 'aucune' ? <><br/><b style={{color: extEnRetard(derniereExt.v) ? C.warn : INV_STATUS.online.color}}>La dernière capture est partie d'une {derniereExt.v}{derniereExt.at ? ` (${depuis(Date.parse(derniereExt.at) || 0)})` : ''}.</b> {extEnRetard(derniereExt.v) ? `C'est donc l'ancienne qui tourne encore sur ton ordinateur — c'est là qu'il faut la remplacer par la ${EXT_ATTENDUE}.` : `Ton ordinateur est donc bien à jour — rien à faire ici.`}</> : null}</>
-           : extEnRetard(ext.v) ? `La ${EXT_ATTENDUE} est prête à télécharger (bouton ci-dessous). Dézippe, remplace l'ancien dossier « VRM-extension », puis ⟳ dans chrome://extensions — dans CHAQUE Chrome où elle est installée. Tant que c'est l'ancienne qui tourne, elle capte moins de choses que l'app en attend — sans jamais afficher d'erreur.`
-           : codePerime() ? textePerime()
-           : "Elle est branchée sur cette page : répondre à un message part de ton navigateur, jamais d'un serveur."}/>
-      {/* ⚠️ LE ZIP DOIT ÊTRE À UN CLIC. Pendant des semaines l'app a dit
-          « mets à jour l'extension » sans que le zip existe nulle part : le
-          dépôt n'en portait qu'un, du 30 août, en 4.13, alors que le code était
-          en 5.52. `scripts/audit-extension-zip.cjs` vérifie désormais que le
-          zip livré porte bien la version du manifeste. */}
-      {/* Revue du 16 octobre : sur un téléphone (aucune souris), ce bouton
-          proposait de télécharger un zip et de cliquer ⟳ dans chrome://extensions
-          — des gestes impossibles ici. La phrase du dessus dit où ça se passe. */}
-      {!sansSouris && <div style={{margin:'6px 0 2px',display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}>
-        <a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
-          style={{textDecoration:'none',border:'none',borderRadius:8,background:extEnRetard(ext.v)?C.warn:C.card2,color:extEnRetard(ext.v)?'#fff':C.text,fontSize:12,fontWeight:700,padding:'0 14px',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center',fontFamily:'inherit'}}>
-          Télécharger l'extension {EXT_ATTENDUE}
-        </a>
-        <span style={{fontSize:11,color:C.muted,flex:'1 1 180px',minWidth:0,lineHeight:1.4}}>
-          Le zip se dézippe en un seul dossier « VRM-extension » : remplace l'ancien au même endroit, PUIS clique ⟳ sur VRM dans chrome://extensions — dans chaque Chrome où elle est installée (sans ⟳, Chrome garde l'ancien code).
-        </span>
-      </div>}
-      <Ligne t="Capture Vinted" coul={teinte(capt && capt.ts)}
-        etat={capt === 'vide' || !capt ? 'inconnue' : `dernière ${depuis(capt.ts)}`}
-        d={capt && capt.ts && (Date.now() - capt.ts) > 2 * 864e5
-            ? "Repasse sur vinted.fr avec l'extension — c'est la navigation qui capte."
-            : "Annonces, ventes, achats et messages viennent de là."}/>
-      {/* ⚠️ DÉRIVE DE FORMAT DÉTECTÉE — l'alerte qui transforme un « vide
-          silencieux » en quelque chose d'actionnable. Ne s'affiche que si c'est
-          récent (la sentinelle 5.139 pose la date). */}
-      {Array.isArray(drift) && drift.length > 0 && (
-        <Ligne t="Format d'un site" coul={C.warn} etat="a changé récemment"
-          d={<>Un site a changé le format de sa réponse <b>{[...new Set(drift.map(x => nomFamille(x.type)))].join(', ')}</b> : la capture de ces données a pu en souffrir (une liste qui devient vide sans erreur). Ce n'est pas tes données qui sont perdues. <b>Signale-le dans une session VRM</b> pour qu'on adapte l'extension.</>}/>
-      )}
-      {Array.isArray(plantages) && plantages.length > 0 && (
-        <div data-plantages={plantages.length}>
-        <Ligne t="Écrans en erreur" coul={C.warn} etat={`${plantages.length} ces 7 derniers jours`}
-          d={<details><summary>Voir les détails pour l’assistance</summary>Dernier incident : {plantages[0].message}{plantages[0].ecran ? ` · ${plantages[0].ecran}` : ''} · {depuis(Date.parse(plantages[0].at) || 0)}</details>}/>
-        </div>
-      )}
-      <Ligne t="Emails" coul={teinte(mail && mail.ts)}
-        etat={mail === 'vide' || !mail ? 'inconnu' : mail.ts ? `dernier ${depuis(mail.ts)}` : 'aucun reçu'}
-        /* ⚠️ « Vinted ne les donne pas autrement » ÉTAIT FAUX pour les codes de
-           retrait, et c'est la mesure qui le dit : sur 139 emails de suivi, 20
-           seulement portent un code — et le code vit dans la CONVERSATION
-           Vinted, où l'extension va le lire depuis la 5.45. Cette phrase
-           l'envoyait fouiller sa boîte mail pour quelque chose qui n'y est pas.
-           Les bordereaux et le suivi, eux, viennent bien de l'email. */
-        d="Les bordereaux et le suivi des colis arrivent par email. Le code de retrait, lui, vit dans la conversation Vinted — c'est là que l'extension va le chercher."/>
-      {/* La version de l'app : ici, et plus dans l'en-tête de chaque écran. */}
-      <div style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:11,color:C.muted}}>
-        <span style={{flex:'1 1 220px'}}>{BUILD_ID==='inconnue'
-          ? <>Version de l'application · <b style={{color:C.text}}>inconnue</b> — recharge la page</>
-          : <>Cette page a été <b style={{color:C.text}}>compilée le <span style={{fontVariantNumeric:'tabular-nums'}}>{BUILD_ID}</span></b>.<br/>
-              Elle se rafraîchit toute seule quand tu reviens sur l'app ; si la date ne bouge pas après une mise à jour, force-la.</>}</span>
-        {/* ⚠️ Ce bouton vivait AU MILIEU DE L'ÉCRAN GARAGE (« Version : … ·
-            🔄 Forcer la mise à jour »), juste au-dessus de la pièce en 3D :
-            de l'outillage de développeur posé dans un écran de travail. Il ne
-            disparaît pas — il rejoint la version, là où on le cherche. */}
-        <button type="button" onClick={() => { if (window.__vrmForceUpdate) window.__vrmForceUpdate(); else window.location.reload(); }}
-          title="Vide le cache et recharge la dernière version"
-          style={{ border: `1px solid ${C.border}`, borderRadius: 999, background: C.card2, color: C.text, fontSize: 11, fontWeight: 600, padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Forcer la mise à jour</button>
-      </div>
-    </div>
-  );
+    const [emails,captures]=await Promise.all([lire('email_*'),lire('harvest_*')]);setMail(emails);setCapt(captures);
+  })();return()=>{actif=false;};},[versionLecture]);
+  const extension=etatExtensionAffichage({presente:ext.on,version:ext.v,retard:extEnRetard(ext.v)});
+  const emails=etatDerniereLecture(mail),capture=etatDerniereLecture(capt);
+  const lecture=[mail,capt,derniereExt,plantages].some(v=>v===undefined);
+  const dateLisible=d=>{const t=Date.parse(d||'');return Number.isFinite(t)&&t<=Date.now()+300000?new Date(t).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'date non vérifiée';};
+  return <div data-connexions-panneau="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:14}}>
+    <div className="vrm-titre-panneau" style={{fontSize:14,fontWeight:600,color:C.text}}>État des connexions</div>
+    <div className="vrm-connexions-entete"><p style={{color:C.muted}}>Chaque source a son propre état. Une donnée ancienne ou absente ne prouve pas qu’un compte est déconnecté.</p><button type="button" onClick={actualiser} disabled={lecture}>{lecture?'Vérification…':'Actualiser les états'}</button></div>
+    <section className="vrm-connexion-source" data-connexion="extension" style={{borderColor:C.border}}>
+      <h3>Extension · ce navigateur</h3><strong style={{color:extension.etat==='action'?C.warn:C.text}}>{extension.titre}</strong><p style={{color:C.muted}}>{extension.detail}</p>
+      {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
+      <details><summary>Installer ou mettre à jour l’extension</summary>
+        <div className="vrm-connexions-actions"><a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a><a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a></div>
+        <p>Chrome : remplace le dossier décompressé au même emplacement, puis clique sur Recharger dans <code>chrome://extensions</code>. Sur Edge, utilise <code>edge://extensions</code>.</p>
+        <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
+        <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
+      </details>
+      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Cette observation peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
+    </section>
+    <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Dernière mise à jour enregistrée pour cette source. Pour actualiser un compte, ouvre-le sur sa plateforme avec l’extension active ; vérifie ensuite ses annonces, ventes et messages.</p></section>
+    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Cette date est celle des données enregistrées, pas une preuve que chaque transfert fonctionne. Le suivi détaillé est dans « Réception des emails ».</p></section>
+    {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
+      {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
+      {Array.isArray(plantages)&&plantages.length>0&&<p>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
+    </details>}
+    <details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Version de l’application</summary><p>{BUILD_ID==='inconnue'?'Version non vérifiée.':`Compilation du ${BUILD_ID}.`}</p><button type="button" onClick={()=>{if(window.__vrmForceUpdate)window.__vrmForceUpdate();else window.location.reload();}}>Recharger la dernière version</button></details>
+  </div>;
 }
-
 
 // ── ONGLET « MASQUÉS » — VENTES MASQUÉES · ACHATS MASQUÉS ────────────────────
 // 30 sept. : d'abord rangé dans Réglages, puis Julien : « fais un onglet dédié,

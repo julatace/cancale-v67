@@ -70,3 +70,13 @@ Validation : compilation, 23 contrôles du banc Paramètres à 390/1512 px, audi
 - Recherche par mots et termes usuels (étiquette, PDF, papier thermique…), sans accents ; portée de l'onglet et nombre de résultats visibles, effacement avec retour du focus.
 
 Validation : compilation, 5 tests de recherche/brouillons/dates, test du vrai formulaire sur reprise/annulation/changement de compte, 27 contrôles du banc Paramètres et 5 du banc sauvegarde HTTP. Données synthétiques, aucune écriture réelle. Pas de déploiement.
+
+## Suite : état des connexions
+
+L'écran sépare l'extension qui répond dans ce navigateur, la version historiquement observée dans la boutique, les données captées et les données email. Il ne déduit plus qu'un ordinateur est à jour depuis une capture éventuellement issue d'un autre navigateur. Une version locale invalide reste inconnue.
+
+Chargement, échec de lecture, source vide, date absente et horodatage futur ont des états distincts. Un bouton permet de relire les états. Les réponses tardives sont ignorées après changement de lecture, démontage ou changement d'identité ; le panneau est remonté par propriétaire.
+
+Les instructions répétées sont regroupées ; les paquets ordinateur et Orion sont accessibles dans une aide repliable, sans inférer l'installation depuis la présence d'une souris. Incidents et informations de compilation restent secondaires. La date email est décrite comme mise à jour des données, et non comme preuve de réception exhaustive.
+
+Validation : compilation, 5 tests de classification des états, 13 contrôles du nouvel écran (503, réessai, version historique, accès au paquet Orion, 390/1512 px), et 27 contrôles des paramètres. Les tests n'ont chargé aucune vraie extension ni session de plateforme. Pas de déploiement.
