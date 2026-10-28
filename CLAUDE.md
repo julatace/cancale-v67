@@ -7,6 +7,23 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — UN bouton « Actions », et seulement les brouillons qui sont sur Vinted (5.252) :** Julien :
+> « un bouton Actions dans lequel on a republier, mettre de brouillon à en ligne, de en ligne à brouillon… » puis
+> « l'extension capte un ancien brouillon, je veux les brouillons qui sont sur Vinted ». Annonces → **Actions** (un
+> seul bouton, `data-actions-ouvrir`, menu `data-actions-menu`) : **Republier** (supprimer et recréer, inchangé) ·
+> **Modifier prix ou titre** sur place (`republierVinted`, PUT mesuré, favoris gardés) · **Brouillons → en ligne** à
+> la suite, temps fixe ou aléatoire (`publierBrouillon`, seuls les brouillons PRÊTS se cochent) · **En ligne →
+> brouillon** (`recreerVinted` + `versBrouillon` : brouillon rangé, son id lu, PUIS l'annonce supprimée ; jamais de
+> mise en ligne ; suppression sans réponse ⇒ « peut-être encore en ligne ») · **Voir mes brouillons**. Les quatre files
+> = UN composant (`RepublierVinted`, prop `action`, `ACTIONS_REPUB`). La liste des brouillons (`useBrouillonsVinted`,
+> §11) : ceux du DRESSING de son compte, datés de cette lecture (« vu sur Vinted il y a 3 h » ; supprimé après la
+> lecture ⇒ retiré), + ceux que l'extension a vu enregistrer APRÈS cette lecture ; « Plus sur Vinted » le retire de la
+> liste (`vrm_brouillons_ecartes`, synchronisé) jusqu'à ce qu'une lecture PLUS RÉCENTE de son dressing le montre
+> encore. Mesuré : le brouillon « Air Max 1 dark teal » (tomj, 3171228253) est bien `is_draft` dans le dressing lu le
+> 28 à 11 h — s'il n'est plus sur Vinted, le geste est « Plus sur Vinted » ou rouvrir ce compte sur vinted.fr.
+> Preuves : `audit-recreer.cjs` P (56 ; 6 rouges sur la 5.251), banc `republier.cjs` (menu, 3 gestes, « plus sur
+> Vinted »). `audit-commandes.cjs` rouge déjà sur main (App.jsx, Stock), pas ce chantier.
+
 > **28 octobre (soir) — ses BROUILLONS Vinted, et « brouillon puis en ligne » (5.251) :** Julien : « voir ses
 > brouillons, faire passer le statut de brouillon à en ligne ». Formes MESURÉES dans ses requêtes :
 > `POST /api/v2/item_upload/drafts` `{draft:{id:null,…},parcel:null,upload_session_id}` puis

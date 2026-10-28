@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.251.0';
+const CODE_VERSION = '5.252.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8216,7 +8216,8 @@ async function recreerVinted(msg) {
     // même corps, `draft.id` posé et `push_up:false`. Un brouillon publié garde son
     // identifiant (mesuré : 10344525517). Le brouillon n'est PAS en ligne : rien ne
     // peut être vendu deux fois tant que la mise en ligne n'a pas répondu.
-    const viaB = msg.viaBrouillon === true;
+    const versB = msg.versBrouillon === true;
+    const viaB = msg.viaBrouillon === true || versB;
     let draftId = '';
     await poserVerrouRecreer(id);
     let rc;
@@ -8240,6 +8241,27 @@ async function recreerVinted(msg) {
       await compterAction(uid, ACTIONS_MAX_HEURE);
       const corpsC = { draft: { ...brouillon, id: Number(draftId) }, push_up: false, parcel: null, upload_session_id: temp };
       await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsC), titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
+      // (28 oct., 5.252, sa demande : « de en ligne à brouillon ») L'annonce
+      // repasse en BROUILLON : le brouillon (copie complète) est rangé sur Vinted,
+      // SON identifiant est lu, et SEULEMENT ALORS l'annonce en ligne est
+      // supprimée. Pas de mise en ligne. Une suppression sans réponse claire le
+      // DIT (l'annonce est peut-être encore en ligne, le brouillon existe).
+      if (versB) {
+        await leverVerrouRecreer(id);
+        const rdB = await vintedSend(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
+        if (!rdB || rdB.status === 0 || rdB.status >= 500) {
+          noterDiag(`versbrouillon_suppression_incertaine_${(rdB && rdB.status) || 0}`);
+          return { accepte: true, etape: 'double', draftId, raison: "le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'annonce : elle est PEUT-ÊTRE encore en ligne — regarde ton dressing" };
+        }
+        if (!rdB.ok) {
+          noterDiag(`versbrouillon_suppression_refusee_${rdB.status}`);
+          return { accepte: true, etape: 'double', draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted a refusé de retirer l'annonce (${rdB.status}) — elle est encore en ligne : supprime-la à la main si tu veux qu'elle ne soit plus qu'en brouillon` };
+        }
+        await compterAction(uid, ACTIONS_MAX_HEURE);
+        try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {}
+        noterDiag('versbrouillon_ok');
+        return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre };
+      }
       await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
       rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
     } else {
