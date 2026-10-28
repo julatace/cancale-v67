@@ -540,16 +540,20 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       const capotPileMat = new THREE.MeshBasicMaterial({ color: '#2f3742', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
       const aretesCadre = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
       const plaqueMaxCache = new Map();
-      const plaqueMaxPile = (h) => {
-        let mat = plaqueMaxCache.get(h);
+      const plaqueMaxPile = (h, enMonde) => {
+        const cle = (enMonde ? 'm' : 'e') + h;
+        let mat = plaqueMaxCache.get(cle);
         if (!mat) {
           const c = document.createElement('canvas'); c.width = 128; c.height = 64; const x = c.getContext('2d');
           x.fillStyle = '#1f252d'; rrect(x, 4, 8, 120, 48, 14); x.fill();
           x.fillStyle = '#fff'; x.font = 'bold 30px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
           x.fillText('max ' + h, 64, 33);
-          mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, sizeAttenuation: false, toneMapped: false });
+          // Sur une ÉTAGÈRE (`enMonde`), la plaque a une taille dans la pièce : une
+          // étagère porte une plaque par case, à taille fixe à l'écran elles
+          // recouvriraient tout le meuble vu de loin.
+          mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, sizeAttenuation: !!enMonde, toneMapped: false });
           mat.map.colorSpace = THREE.SRGBColorSpace;
-          plaqueMaxCache.set(h, mat);
+          plaqueMaxCache.set(cle, mat);
         }
         const sp = new THREE.Sprite(mat); sp.raycast = () => {}; sp.renderOrder = 9; return sp;
       };
@@ -865,6 +869,17 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
               const plx = Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null;
               const tombe = plx && r < rows - 1 && !plx.has((r + 1) + ':' + (c + 1)) && ((it.slots || {})[(r + 1) + '_' + c] || []).filter(Boolean).length < capR(r + 1);
               if (arr.length < cap && !tombe) { const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bh / 2 + arr.length * pas, z); g.add(gh); }
+              // (28 oct., « fais pareil pour les étagères ») : le NOMBRE max de la
+              // case (`cap`, la même règle que le rangement) écrit en façade, en haut
+              // de la case. Pas sur une case sans plateau dessous (ses boîtes
+              // tombent : elle ne tient rien), ni sur une table. Décor seul.
+              const aPlateau = r === rows - 1 || !plx || plx.has((r + 1) + ':' + (c + 1));
+              if (!estTable && aPlateau) {
+                const pw = Math.min(0.2, cellW * 0.5), ph = pw / 2, haut = ht - r * cellH - 0.03;
+                const nb = plaqueMaxPile(cap, true); nb.scale.set(pw, ph, 1);
+                nb.position.set(cx, Math.max(cbY + ph / 2, haut - ph / 2), d / 2 + 0.03);
+                nb.userData = { maxCase: key, texte: 'max ' + cap }; g.add(nb);
+              }
             }
           } else if (physique === 'cintre') {
             // le portant dessine lui-même ses cintres
@@ -1465,6 +1480,12 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
             const out = [], txt = {}; g.traverse((o) => { if (o.userData && o.userData.hauteurMax != null) out.push({ c: o.userData.pileCol, h: o.userData.hauteurMax, haut: +(o.position.y + o.scale.y / 2).toFixed(3) }); if (o.isSprite && o.userData && o.userData.maxPile != null) txt[o.userData.maxPile] = { texte: o.userData.texte, y: +o.position.y.toFixed(3) }; });
             return out.sort((a, b) => a.c - b.c).map((x) => ({ ...x, texte: txt[x.c] ? txt[x.c].texte : null, texteY: txt[x.c] ? txt[x.c].y : null }));
+          },
+          // Le nombre max écrit dans chaque case d'une étagère : { 'r_c': { texte, y } }.
+          maxCases: (itemId) => {
+            const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
+            const out = {}; g.traverse((o) => { if (o.isSprite && o.userData && o.userData.maxCase) out[o.userData.maxCase] = { texte: o.userData.texte, y: +o.position.y.toFixed(3) }; });
+            return out;
           },
           // Les plateaux d'une étagère : [{ y, w }] (hauteur dans le meuble, largeur).
           plateaux: (itemId) => {
