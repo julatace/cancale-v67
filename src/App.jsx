@@ -32,7 +32,7 @@ import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -8259,6 +8259,33 @@ const numsPresents = () => {
   const l = Array.isArray(p) ? p : (p && Array.isArray(p.nums) ? p.nums : null);
   return l && l.length ? new Set(l.map(cleNum)) : null;
 };
+// (28 oct.) Les paires présentes QUE sur eBay ou Leboncoin, publiées avec la même
+// liste (titre, photo, plateformes) — pour les montrer « à ranger » comme les
+// fiches Vinted. [] si jamais publiées.
+const autresPresents = () => {
+  const p = load('vinted_nums_physiques', null);
+  return p && Array.isArray(p.autres) ? p.autres.filter((a) => a && cleNum(a.numero)) : [];
+};
+// Les fiches du Stock : celles de Vinted, puis les paires vues seulement sur eBay
+// ou Leboncoin (un N° qu'aucune fiche Vinted ne porte). Les fiches Vinted
+// reçoivent les autres plateformes de leur N°.
+const fichesStockToutes = (fiches) => {
+  const vint = Object.values(fiches || {}).filter(Boolean);
+  const autres = autresPresents(); const parCle = new Map(autres.map((a) => [cleNum(a.numero), a]));
+  const cles = new Set();
+  const out = vint.map((f) => { const k = cleNum(f.numero); if (!k) return f; cles.add(k); const a = parCle.get(k); return { ...f, plateformes: a ? [...(a.vinted ? ['vinted'] : []), ...(a.plateformes || [])] : ['vinted'] }; });
+  for (const a of autres) { const k = cleNum(a.numero); if (!cles.has(k)) { cles.add(k); out.push({ numero: a.numero, title: a.title || '', photo: a.photo || null, plateformes: a.plateformes || [], horsVinted: true }); } }
+  return out;
+};
+// Ajoute aux fiches Vinted (déjà filtrées) les paires présentes que sur eBay ou
+// Leboncoin dont aucune fiche ne porte le N°. Identifiant synthétique « plat:N ».
+const ajouterAutresPresents = (fiches) => {
+  const cles = new Set(fiches.map((f) => cleNum(f.numero)));
+  const plus = [];
+  for (const a of autresPresents()) { const k = cleNum(a.numero); if (k && !cles.has(k)) { cles.add(k); plus.push({ id: 'plat:' + k, numero: a.numero, title: a.title || '', photo: a.photo || null, plateformes: a.plateformes || [], horsVinted: true }); } }
+  return plus.length ? fiches.concat(plus) : fiches;
+};
+const NOM_PLAT_STOCK = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin' };
 
 // ── LA REMISE À ZÉRO DU 9 OCTOBRE : LES ANCIENS NUMÉROS SONT EN « B » ─────────
 // Julien : « tous les anciens numéros, tu les fais commencer par B1, B2… ; on
@@ -27312,14 +27339,16 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const aRanger = useMemo(() => {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const presents = numsPresents();
-    const vues = new Set(), out = [];
-    Object.values(fiches).forEach(f => {
+    // (28 oct.) Les fiches Vinted + les paires vues seulement sur eBay/Leboncoin,
+    // puis UN élément par article : même N° (clé) ou même photo exacte = une
+    // paire (`unParArticle`). Une paire déjà rangée sous l'un de ses N° sort.
+    const rangeesCle = new Set([...dejaRangees].map(cleNum));
+    const candidates = fichesStockToutes(fiches).filter(f => {
       const n = f && f.numero != null ? String(f.numero).trim() : '';
-      if (!n || vues.has(n) || dejaRangees.has(n)) return;
-      if (presents && !presents.has(cleNum(n))) return;
-      vues.add(n);
-      out.push({ numero: n, title: f.title || '', photo: f.photo || null, taille: extractSize(f.title || ''), at: f.numberedAt || 0, sur: !!presents });
+      return n && (!presents || presents.has(cleNum(n)));
     });
+    const out = unParArticle(candidates, { cle: cleNum, clePhoto: photoKey, estRangee: (f) => rangeesCle.has(cleNum(f.numero)) })
+      .map(f => { const n = String(f.numero).trim(); return { numero: n, title: f.title || '', photo: f.photo || null, taille: extractSize(f.title || ''), at: f.numberedAt || 0, sur: !!presents, plateformes: f.plateformes || [], aussi: f.aussi || [] }; });
     // ⚠️ L'ORDRE CHANGE SELON CE QU'ON SAIT, et on le dit dans la feuille.
     // Avec la liste des paires présentes : par numéro, c'est un inventaire.
     // SANS elle (écran Annonces jamais ouvert sur cet appareil), la liste
@@ -27347,7 +27376,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     const fiches = load('vinted_annonce_numeros', {}) || {};
     const presents = numsPresents();
     const par = {};
-    Object.values(fiches).forEach(f => {
+    fichesStockToutes(fiches).forEach(f => {
       const n = f && f.numero != null ? String(f.numero).trim() : ''; if (!n) return;
       (par[n] = par[n] || []).push(f);
     });
@@ -27728,10 +27757,11 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {aRanger.slice(0, 60).map(p => {
                 const on = pairePrete === p.numero;
                 return (
-                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
+                  <button type="button" key={p.numero} data-paire-a-ranger={p.numero} data-paire-plateformes={(p.plateformes || []).join(' ')} data-paire-aussi={(p.aussi || []).join(' ') || undefined} title={p.aussi && p.aussi.length ? `Même photo que N°${p.aussi.join(', N°')} : c'est une seule paire — range le carton sous le numéro écrit dessus.` : undefined} aria-pressed={on} onPointerDown={(e) => debutGlisser(e, p)} onClick={(e) => e.preventDefault()}
                     style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 10px 5px 5px', borderRadius: 999, border: `1px solid ${on ? C.text : C.border}`, background: on ? `${C.text}10` : C.bg, color: C.text, cursor: 'grab', fontFamily: 'inherit', touchAction: 'pan-x', userSelect: 'none' }}>
                     {p.photo ? <PhotoVinted src={p.photo} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: 'cover', background: C.card2 }}/> : <span style={{ width: 28, height: 28, borderRadius: 999, background: C.card2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={14} style={{ color: C.muted }}/></span>}
-                    <span style={{ fontSize: 13, fontWeight: 650 }}>N°{p.numero}</span>
+                    <span style={{ fontSize: 13, fontWeight: 650 }}>N°{p.numero}{p.aussi && p.aussi.length ? <span style={{ fontWeight: 500, color: C.muted }}> · N°{p.aussi.join(' · N°')}</span> : null}</span>
+                    {p.plateformes && p.plateformes.length && !p.plateformes.includes('vinted') ? <span style={{ fontSize: 11.5, color: C.muted }}>{p.plateformes.map(x => NOM_PLAT_STOCK[x] || x).join(' · ')}</span> : null}
                   </button>
                 );
               })}
@@ -28395,8 +28425,10 @@ function StockPhotos() {
   const estVendu = (f) => vendus.has(cleNum(f.numero));
   // Paires EN STOCK : une fiche numérotée, pas déclarée partie (même règle que
   // l'écran Annonces, `annonceDeclareePartie`).
-  const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
+  // (28 oct.) UN article une fois (même N° ou même photo exacte, `unParArticle`),
+  // et les paires vues seulement sur eBay ou Leboncoin (`ajouterAutresPresents`).
+  const fiches = unParArticle(ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f))), { cle: cleNum, clePhoto: photoKey });
   const filtre = q.trim().toLowerCase();
   const liste = fiches
     .filter((f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre))
@@ -28539,8 +28571,10 @@ function StockMeubles() {
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const estVendu = (f) => vendus.has(cleNum(f.numero));
   // Paires EN STOCK (même règle que StockPhotos et l'écran Annonces).
-  const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
+  // (28 oct.) Les paires vues seulement sur eBay ou Leboncoin s'ajoutent
+  // (`ajouterAutresPresents`) ; « À ranger » ne montre chaque article qu'une fois.
+  const fiches = ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f)));
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
   // Toute écriture des cases passe par la gravité des meubles qui l'ont.
   const tasserTout = (u, ms) => { let cur = u, b = {}; (ms || meubles).forEach((m) => { const r = tasserMeuble(cur, m, new Set(Object.keys(ficheParCle))); cur = r.slots; Object.assign(b, r.bouges); }); return { slots: cur, bouges: b }; };
@@ -28551,7 +28585,7 @@ function StockMeubles() {
   const cleDeFiche = (f) => cleNum(f.numero);
   const posee = (f) => !!slots[cleDeFiche(f)];
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
-  const aRanger = fiches.filter((f) => !posee(f)).sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0));
+  const aRanger = unParArticle(fiches.slice().sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0)), { cle: cleNum, clePhoto: photoKey, estRangee: posee });
   const filtre = q.trim().toLowerCase();
   // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
   // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
@@ -34522,13 +34556,40 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (identité, §5), lu une fois (la ligne est petite). Illisible ⇒ Set vide :
   // aucune pastille eBay, jamais une fausse.
   const [ebayNums, setEbayNums] = useState(() => new Set());
+  // (28 oct.) Les annonces eBay EN LIGNE avec leur N° (SKU, identité) — pour le
+  // Stock : une paire qui n'est QUE sur eBay est chez lui aussi. `null` = pas su.
+  const [ebayStock, setEbayStock] = useState(null);
+  // Les annonces Leboncoin EN VENTE (la règle `annonceLbcEnVente`, §11) avec leur
+  // N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence VRM —
+  // jamais le « nXXX » d'un titre). `null` = pas su (rien n'est ajouté).
+  const [lbcStock, setLbcStock] = useState(null);
+  useEffect(() => { let stop = false; (async () => {
+    try {
+      const items = await lbcAnnoncesSession();
+      if (!items || stop) return;
+      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
+      if (!vr.ok) return;
+      const vrows = await vr.json(); if (!Array.isArray(vrows) || stop) return;
+      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].ventes) || {});
+      const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+      const liste = [];
+      for (const ad of Object.values(items || {})) {
+        if (!annonceLbcEnVente(ad, vendues)) continue;
+        if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
+        const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
+        liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null });
+      }
+      setLbcStock(liste);
+    } catch (_) {}
+  })(); return () => { stop = true; }; }, []);
   useEffect(() => { let stop = false; (async () => {
     try {
       const lu = await lireEbayTous('ebay_listings', 'items:data->items', 'items');
       if (!lu || stop) return;
-      const set = new Set();
-      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); }
+      const set = new Set(); const liste = [];
+      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
       setEbayNums(set);
+      setEbayStock(liste);
     } catch (_) {}
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { (async () => {
@@ -36787,27 +36848,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // règle « la paire est physiquement là » — on la PUBLIE au lieu de la refaire ailleurs
   // (§11 : une seule règle par notion). Clé LOCALE (pas dans SYNC_KEYS) : c'est
   // une photo recalculable, elle n'a rien à faire dans le nuage.
-  useEffect(() => {
-    // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
-    // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
-    // présentes, `porteursNum`/`numDoublons`, §11).
-    // 22 oct. : et les masquées par Vinted (`annoncesPresentes`).
-    const presentes = annoncesPresentes;
-    if (!presentes.length) return;   // rien de sûr à publier
-    if (!sales.items) return;
-    const vivants = new Set();
-    for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
-    for (const o of (sales.items || [])) {
-      if (!needsBordereau(o.status)) continue;
-      const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
-    }
-    const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
-    try {
-      const avant = load('vinted_nums_physiques', null);
-      const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i]);
-      if (!memeChose) save('vinted_nums_physiques', { nums: liste, at: Date.now() });
-    } catch (_) {}
-  }, [annoncesPresentes, sales.items, numeros, saleOv]);
+  // ⚠️ (28 oct.) La publication est plus bas, après `annoncesVendues` (TDZ, §4.6).
 
   // ⚠️⚠️ LE RÉCAP URSSAF DU TABLEAU DE BORD AFFICHAIT 0 € PARTOUT.
   // Il lit `vinted_sales` — l'archive des anciennes ventes, VIDÉE en juillet
@@ -37512,6 +37553,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ids;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, txnItem, numeros]);
+  useEffect(() => {
+    // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
+    // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
+    // présentes, `porteursNum`/`numDoublons`, §11).
+    // 22 oct. : et les masquées par Vinted (`annoncesPresentes`).
+    // 28 oct. : et les paires EN VENTE sur eBay ou Leboncoin, même absentes de
+    // Vinted (`articlesAutresPlateformes`, par leur N° lu par identité), sauf un
+    // N° dont la vente Vinted est prouvée et le colis parti. Publiées aussi avec
+    // leur titre et leur photo (`autres`) : le Stock les propose « à ranger ».
+    const presentes = annoncesPresentes;
+    if (!presentes.length) return;   // rien de sûr à publier (Vinted pas encore lu : on ne publie pas eBay seul)
+    if (!sales.items) return;
+    const vivants = new Set();
+    for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    for (const o of (sales.items || [])) {
+      if (!needsBordereau(o.status)) continue;
+      const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
+    }
+    const clesVivants = new Set([...vivants].map(cleNum));
+    const vendusPartis = new Set();
+    for (const id of annoncesVendues) { const k = cleNum((numeros[id] || {}).numero); if (k && !clesVivants.has(k)) vendusPartis.add(k); }
+    const { articles, sansNumero } = articlesAutresPlateformes({ ebay: ebayStock || [], lbc: lbcStock || [], cle: cleNum, vendusPartis });
+    const autres = [];
+    for (const a of articles) { const surVinted = clesVivants.has(a.cle); if (!surVinted) { vivants.add(a.numero); clesVivants.add(a.cle); } autres.push({ numero: a.numero, title: a.title, photo: a.photo, plateformes: a.plateformes, vinted: surVinted }); }
+    const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
+    try {
+      const avant = load('vinted_nums_physiques', null);
+      const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i])
+        && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero);
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, at: Date.now() });
+    } catch (_) {}
+  }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock]);
   const articlesVendusFavoris=useMemo(()=>{
     const ids=new Set([...soldManual,...venduesVinted].map(String));
     for(const vente of sales.items||[]){
