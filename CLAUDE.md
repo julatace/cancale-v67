@@ -7,6 +7,17 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — le tour de l'espace Vestiaire sur ses vraies données :** Julien : « fais pareil pour
+> Vestiaire ». Mesuré (lecture seule) : `vc_listings` vide (jamais lue : `product-listings` et
+> `awaiting-shipping-items` vus le 26 oct., VIDES, avant la 5.236/5.237 ; aucun `vc_ventes`, aucun `vc_achats`),
+> `vc_messages` 0 non lu (relevé du jour), un brouillon smart listing du 27 relié au N°94 (`liens`, id de
+> BROUILLON — sans effet, rien de publié). Rendu 390/1512 : corrigé la phrase du bas « tes ventes ne remontent
+> pas encore… choisis-la ci-dessous » (fausse depuis la 5.237, la liste est AU-DESSUS, redite des cartes, §7) ;
+> « VRM apprend à lire Vestiaire · 5 pages, 26 appels, 20 formes de réponse » ⇒ « Dernier passage de
+> l'extension sur Vestiaire : il y a … » (§2.7, chiffres en `data-vc-mesure-*`) ; « Où trouver ma clé
+> Photoroom » à 44 px. Preuve : `vestiaire.cjs` (4 rouges sur l'avant). Geste : ouvrir « Mes articles »,
+> « Mes ventes » et « Mes commandes » sur Vestiaire une fois avec l'extension à jour.
+
 > **28 octobre — le tour de l'espace eBay sur ses vraies données :** Julien : « vas-y » (après Leboncoin).
 > Rendu Ventes · Annonces · Messages · À traiter · Promotion · Achats · Compte (390/1512) sur la copie lecture
 > seule ; 5 annonces actives (toutes avec une règle d'offre), 0 commande, retrait automatique ALLUMÉ. Corrigé :
