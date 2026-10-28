@@ -192,6 +192,59 @@ const projette = (row, sel) => {
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-' + vp.width + '.png') });
       await ctx.close();
     }
+    // ── Temps ALÉATOIRE entre deux paires (sa demande) : horloge simulée.
+    { console.log('── aléatoire 1–2 min');
+      const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
+      const pg = await ctx.newPage();
+      await pg.clock.install({ time: auj });
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript(PONT, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        for (let i = 0; i < 40 && !(await pg.locator('[data-republier-ouvrir]').count()); i++) await pg.clock.runFor(500);
+        await pg.locator('[data-republier-ouvrir]').first().click();
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-esp-choix="aleatoire"]').click();
+        await pg.locator('[data-republier-esp-min]').fill('1');
+        await pg.locator('[data-republier-esp-max]').fill('2');
+        dit(await pg.locator('[data-republier-esp-choix="aleatoire"]').getAttribute('aria-pressed') === 'true' && await pg.locator('[data-republier-esp-choix="fixe"]').getAttribute('aria-pressed') === 'false', '« Aléatoire » est bien le segment actif');
+        await pg.mouse.move(1, 1);
+        await pg.setViewportSize({ width: 390, height: 844 }); await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-alea-390.png') }); await pg.setViewportSize({ width: 1512, height: 950 });
+        dit(await pg.locator('[data-republier-esp="aleatoire"]').count() === 1, '« Aléatoire » se choisit, avec un minimum et un maximum en minutes');
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click();
+        for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 1; i++) await pg.clock.runFor(100);
+        await pg.clock.runFor(1000);
+        const prochaine = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
+        dit(prochaine >= 60 && prochaine <= 120, 'le temps tiré est entre 1 et 2 min, et le compte à rebours s’affiche', String(prochaine));
+        await pg.clock.runFor(57000);
+        const n1 = await pg.evaluate(() => (window.__repub || []).length);
+        dit(n1 === 1, 'rien ne part avant le minimum (1 min)', String(n1));
+        await pg.clock.runFor(63000);
+        for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 2; i++) await pg.clock.runFor(100);
+        const n2 = await pg.evaluate(() => (window.__repub || []).length);
+        dit(n2 === 2, 'la seconde paire est partie au plus tard au maximum (2 min)', String(n2));
+        const memo = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_republier_esp') || 'null'); } catch (_) { return null; } });
+        dit(memo && memo.mode === 'aleatoire', 'le choix est retenu pour la prochaine fois', JSON.stringify(memo));
+      } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, 160)); }
+      await ctx.close(); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }
   if (b) await b.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} republier : ${ko ? ko + ' rouge(s)' : 'tout est vert'}`);
