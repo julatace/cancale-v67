@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {ageFavori,dateNotificationFavori,contactFavori,lireFavorisVinted} from '../../src/favorisVinted.js';
+import {ageFavori,dateNotificationFavori,contactFavori,indexerContactsFavoris,lireFavorisVinted} from '../../src/favorisVinted.js';
 import {appelerFavorisDirect} from '../../src/favorisTransport.js';
 const T=Date.parse('2026-10-24T18:00:00Z'),owner='owner-fixture';
 const n=(id,date='2026-10-24T11:00:00Z')=>({id,user_id:201,body:'Camille a ajouté ton article à ses favoris.',link:'/items/101/conversation/new',updated_at:date});
@@ -28,4 +28,21 @@ test('Chrome direct : requête adressée, accusé unique et aucun rejeu sur erre
  assert.equal(await appelerFavorisDirect(erreur,id,{type:'favorisExec'},20),null);assert.equal(appels.length,2);
  let n=0;assert.equal(await appelerFavorisDirect({sendMessage(){n++;}},id,{type:'favorisExec'},10),null);assert.equal(n,1);
  assert.equal(await appelerFavorisDirect(rt,'invalide',{type:'favorisExec'}),null);assert.equal(appels.length,2);
+});
+
+test('l’index conserve la preuve la plus protectrice et l’ordre source à priorité égale',()=>{
+ const source=[{id:'preuve-a',notificationId:'n1',etat:'envoye'},{id:'preuve-b',notificationId:'n1',etat:'refuse'},{id:'identite',etat:'incertain'},{id:'premier',notificationId:'n2',etat:'ignore'},{id:'autre',etat:'ignore'}];
+ const ordre=source.slice(),lire=indexerContactsFavoris(source);
+ assert.equal(lire({id:'n1',identiteNotification:'identite'}),source[0]);
+ assert.equal(lire({id:'n2',identiteNotification:'autre'}),source[3]);
+ assert.equal(lire({id:'absent',identiteNotification:'identite'}),source[2]);
+ assert.equal(lire({id:'inconnu'}),null);assert.deepEqual(source,ordre);
+ assert.equal(indexerContactsFavoris(null)({id:'n1'}),null);
+});
+test('un long historique n’est indexé qu’une fois, sans rescanner les envois à chaque ligne',()=>{
+ let lectures=0;const source=Array.from({length:2000},(_,i)=>({notificationId:'n'+i,etat:'envoye'}));
+ const jobs=new Proxy(source,{get(t,p,r){if(/^\d+$/.test(String(p)))lectures++;return Reflect.get(t,p,r);}});
+ const lire=indexerContactsFavoris(jobs),avant=lectures;
+ for(let i=0;i<2000;i++)assert.equal(lire({id:'n'+i}),source[i]);
+ assert.equal(lectures,avant);assert.equal(indexerContactsFavoris([{notificationId:'n0',etat:'incertain'}])({id:'n0'}).etat,'incertain');
 });
