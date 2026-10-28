@@ -7,6 +7,18 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — plus LENT et AU HASARD, et le brouillon disparu (5.263) :** Julien : « la création du
+> brouillon a l'air très très rapide, va beaucoup plus doucement pour pas que je me fasse bannir » puis « il doit être
+> aléatoire ton comportement ». C'est SA décision (atelier §3, il lance). `pauseRepub` : une pause TIRÉE AU HASARD
+> entre deux photos (3–9 s), avant le brouillon ou la création (6–15 s), avant la mise en ligne (15–40 s, était 5 s
+> fixe), avant de retenter (8–20 s). Garde-fous inchangés (20 actions/h, file, pause Vinted). L'app attend 8 min
+> (republier, refaire) et 6 min (brouillon → en ligne). Et « Brouillons à refaire » disait « rien à refaire » : il avait
+> cliqué « C'est réglé » sur la N°72 — une ligne réglée reste joignable (« Le remettre dans la liste »). Le brouillon
+> 10574536209 n'est plus dans son dressing (lu complet à 19 h 22, après le passage) : `refaireBrouillon` en refait un
+> NEUF depuis le coffre quand une lecture COMPLÈTE du dressing faite APRÈS le passage ne le montre plus (pas su ⇒ comme
+> avant). Preuves : `audit-recreer.cjs` (103 ; 3 rouges sur la 5.262), banc `republier.cjs` (« Le remettre »).
+> ⚠️ Le contrôle « Noir — publier » du banc `republier` est tombé deux fois sans se reproduire (instable, à surveiller).
+
 > **28 octobre (nuit, fin) — « Erreur lors du chargement de la photo » (5.262) :** Julien, Jordan 3 (brouillon
 > 10574927717) : « Vinted a refusé la mise en ligne (400 : Erreurs trouvées — les photos (Erreur lors du chargement de
 > la photo…)) ». Cause : `photoReglee` rendait l'ORIGINAL quand les réglages étaient neutres — souvent un WEBP (forme

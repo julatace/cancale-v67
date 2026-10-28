@@ -473,6 +473,11 @@ const projette = (row, sel) => {
         dit(await pg.locator('[data-refaire-ligne="9500"]').getAttribute('data-refaire-statut') === 'fait', '… et la ligne dit « fait »');
         await pg.locator('[data-refaire-ligne="9504"] [data-refaire-regle]').click();
         dit(await pg.locator('[data-refaire-ligne="9504"]').count() === 0, '« C’est réglé » retire la ligne');
+        // (28 oct.) … mais elle n'est pas perdue : « Le remettre dans la liste » la rend.
+        dit(await pg.locator('[data-refaire-revoir="9504"]').count() === 1, '« C’est réglé » : la ligne reste joignable (« Le remettre dans la liste »)');
+        await pg.locator('[data-refaire-revoir="9504"]').click().catch(() => {});
+        await pg.locator('[data-refaire-ligne="9504"]').waitFor({ timeout: 3000 }).catch(() => {});
+        dit(await pg.locator('[data-refaire-ligne="9504"]').count() === 1, '« Le remettre dans la liste » : la ligne revient');
         await pg.screenshot({ path: path.join(require('os').tmpdir(), `refaire-liste-${vp.width}.png`) }).catch(() => {});
         await pg.locator('[data-refaire-liste] [aria-label="Fermer"]').click();
         // La ligne ratée de Republier porte son bouton.
