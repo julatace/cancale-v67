@@ -60,8 +60,10 @@ const PONT = (o) => {
         setTimeout(() => post({ __vmr: 'cmd:result', reqId: d.reqId, resp }), 1500);
       } else post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
     } else if (d.__vmr === 'cmd' && d.cmd === 'publierBrouillon') {
-      window.__repub.push({ cmd: d.cmd, uid: d.uid, draftId: d.draftId, confirme: d.confirme });
-      post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', itemId: d.draftId } });
+      window.__repub.push({ cmd: d.cmd, uid: d.uid, draftId: d.draftId, confirme: d.confirme, couleur: d.couleur });
+      // (28 oct.) Un brouillon SANS couleur : l'extension 5.260 le refuse et propose ce qu'elle sait poser.
+      if (window.__sansCouleur && !d.couleur) post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'couleur-absente', couleurs: { 1: 'Noir' }, raison: "ce brouillon n'a pas de couleur" } });
+      else post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', itemId: d.draftId } });
     } else if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
   });
   post({ __vmr: 'ready', version: o.version });
@@ -151,11 +153,17 @@ const projette = (row, sel) => {
           const tailles = await pg.$$eval('[data-brouillons-vinted] button, [data-brouillons-vinted] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
           dit(tailles.every((h) => h >= 44), 'boutons de la liste à 44 px au doigt', tailles.join(','));
           dit(/vu sur Vinted il y a/.test(await pg.locator('[data-brouillon="9201"] [data-brouillon-vu]').innerText().catch(() => '')), 'chaque brouillon dit quand Vinted l’a montré (lecture du dressing)');
+          await pg.evaluate(() => { window.__sansCouleur = true; });
           await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
           await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();
+          const noir = pg.getByRole('button', { name: 'Noir — publier', exact: true });
+          const vuNoir = await noir.waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+          dit(vuNoir, 'brouillon sans couleur : VRM DEMANDE la couleur (« Noir — publier »), au lieu d’un simple refus');
+          if (vuNoir) await noir.click();
           await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').waitFor({ timeout: 4000 }).catch(() => {});
           const env = await pg.evaluate(() => (window.__repub || []).filter((x) => x.cmd === 'publierBrouillon'));
-          dit(env.length === 1 && env[0].draftId === '9201' && env[0].uid === '111' && env[0].confirme === true && await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').count() === 1, 'après sa confirmation, UNE commande « publierBrouillon » part pour ce brouillon, et l’écran dit « en ligne »', JSON.stringify(env));
+          await pg.evaluate(() => { window.__sansCouleur = false; });
+          dit(env.length === 2 && !env[0].couleur && env[1].couleur === 1 && env.every((x) => x.draftId === '9201' && x.uid === '111' && x.confirme === true) && await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').count() === 1, 'sur son choix, la commande repart AVEC la couleur (1 = Noir) et l’écran dit « en ligne »', JSON.stringify(env));
           await pg.keyboard.press('Escape').catch(() => {});
           await pg.locator('[data-brouillons-vinted] [aria-label="Fermer"]').click().catch(() => {});
           await pg.waitForTimeout(300);
