@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.262.0';
+const CODE_VERSION = '5.263.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8093,6 +8093,18 @@ function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, 
 // c'est ce qui permet la mise en ligne sans rien deviner. Les scalaires passent
 // dans `meta` (la base les recopie) : l'app lit la liste sans le corps (§4.4).
 const BROUILLON_ATTENTE_MS = 5000;
+// (28 oct., SA demande : « va beaucoup plus doucement », « il doit être aléatoire »)
+// Entre deux gestes d'une même republication, une pause TIRÉE AU HASARD dans une
+// plage, jamais deux fois la même : entre deux photos 3–9 s, avant le brouillon
+// 6–15 s, avant la mise en ligne 15–40 s, avant de retenter 8–20 s. C'est lui qui
+// lance (atelier §3) ; les garde-fous (20 actions/h, file, pause Vinted) restent.
+const PAUSES_REPUB = { photo: [3000, 9000], brouillon: [6000, 15000], enLigne: [15000, 40000], reessai: [8000, 20000] };
+function pauseRepub(quoi) {
+  const p = PAUSES_REPUB[quoi] || [3000, 9000];
+  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push([quoi, ms]); } catch (_) {}
+  return new Promise((ok) => setTimeout(ok, ms));
+}
 function idDeBrouillon(j) {
   if (!j || typeof j !== 'object') return '';
   const c = [j.draft && j.draft.id, j.item && j.item.id, j.id];
@@ -8212,6 +8224,7 @@ async function publierBrouillon(msg) {
         r.d.assigned_photos = neuves.ids.map((pid) => ({ id: pid, orientation: 0 }));
         corpsC.draft = { ...r.d, id: Number(id) };
         noterDiag('brouillon_photos_renvoyees');
+        await pauseRepub('enLigne');
         await poserVerrouRecreer('b' + id);
         const rc2 = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
         if (!rc2 || rc2.status === 0 || rc2.status >= 500) {
@@ -8288,7 +8301,19 @@ async function refaireBrouillon(msg) {
   if (vb.etat === 'enregistre' && isFinite(atMs) && Date.now() - atMs < REFAIRE_INTERROMPU_MS) return { accepte: false, code: 'en-cours', raison: 'ce passage en brouillon a commencé il y a moins de 10 min — attends sa fin avant de le refaire' };
   // Le brouillon EXISTE déjà sur Vinted (mise en ligne refusée) : on le met en
   // ligne, sans en créer un second.
+  // (28 oct., N°72) … SAUF s'il n'est plus sur Vinted : une lecture COMPLÈTE de son
+  // dressing, faite APRÈS le passage, ne le montre pas (ni en ligne, ni brouillon).
+  // On en refait alors un, depuis ce qui est enregistré dans VRM. Pas su ⇒ comme avant.
+  let brouillonParti = false;
   if ((vb.etat === 'a-publier' || vb.etat === 'brouillon-range') && /^\d{4,15}$/.test(String(vb.draftId || ''))) {
+    let dr; try { dr = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,ids:data->payload->items,pg:data->payload->pagination`); } catch (_) { dr = null; }
+    const l = dr && dr[0];
+    const items = l && Array.isArray(l.ids) ? l.ids : null;
+    const total = l && l.pg && Number(l.pg.total_entries);
+    const apres = l && Date.parse(l.cap || '') > Date.parse(vb.majAt || vb.at || '');
+    if (items && apres && isFinite(total) && items.length >= total && !items.some((x) => x && String(x.id) === String(vb.draftId))) { brouillonParti = true; noterDiag('refaire_brouillon_disparu'); }
+  }
+  if (!brouillonParti && (vb.etat === 'a-publier' || vb.etat === 'brouillon-range') && /^\d{4,15}$/.test(String(vb.draftId || ''))) {
     if (!(vb.publier === true && vb.supprime === true)) { await majVersBrouillon(uid, id, { etat: 'fait' }); return { accepte: true, etape: 'fait', brouillon: true, draftId: String(vb.draftId) }; }
     const r = await publierBrouillon({ uid, draftId: String(vb.draftId), confirme: true, couleur: msg.couleur });
     if (r && r.accepte && r.etape === 'fait') await majVersBrouillon(uid, id, { etat: 'fait', nouvelId: r.itemId || null });
@@ -8317,10 +8342,11 @@ async function refaireBrouillon(msg) {
     const assigned = tp.ids.map((pid) => ({ id: pid, ai_detected: false, orientation: 0, c2pa_read_error: 'other', digital_source_type: [] }));
     const brouillon = { ...d, id: null, temp_uuid: temp, assigned_photos: assigned }; delete brouillon.push_up;
     const corpsB = { draft: brouillon, parcel: null, upload_session_id: temp };
+    await pauseRepub('brouillon');
     await poserVerrouRecreer('r' + id);
     let rb = null;
     for (let essai = 0; essai < 2; essai++) {
-      if (essai) await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
+      if (essai) await pauseRepub('reessai');
       rb = await vintedSend(acc, 'POST', '/api/v2/item_upload/drafts', corpsB, { timeoutMs: 60000 });
       if (!(rb && rb.ok === false && rb.status > 0 && rb.status < 500)) break;
     }
@@ -8355,7 +8381,7 @@ async function refaireBrouillon(msg) {
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId });
     // Mise en ligne DANS la même place de la file Vinted (publierBrouillon prend
     // sa propre place : l'appeler d'ici attendrait cette place pour toujours).
-    await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
+    await pauseRepub('enLigne');
     const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
     if (stopC) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'a pas été mis en ligne (${stopC.error}) — « Refaire » le remet en ligne, sans en créer un autre.` }; }
     await poserVerrouRecreer('b' + draftId);
@@ -8430,6 +8456,7 @@ async function photosNeuvesBrouillon(acc, uid, b, temp) {
 async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
   const ids = [];
   for (let i = 0; i < urls.length; i++) {
+    if (i > 0) await pauseRepub('photo');
     if (typeof suivi === 'function') { try { suivi(i, urls.length); } catch (_) {} }
     let blob = null;
     const essais = [urls[i], (second || [])[i]].filter((u, k, t) => u && t.indexOf(u) === k);
@@ -8632,9 +8659,10 @@ async function recreerVinted(msg) {
       await majVersBrouillon(uid, id, { etat: suppIncertaine ? 'suppression-incertaine' : 'supprime', supprime: !suppIncertaine, supprimeLe: suppIncertaine ? null : new Date().toISOString() });
       const peutEtre = suppIncertaine ? " Vinted n'a pas répondu clairement à la suppression : l'annonce est PEUT-ÊTRE encore en ligne — regarde ton dressing." : '';
       etapeRepub(id, 'brouillon');
+      await pauseRepub('brouillon');
       let rbV = null;
       for (let essai = 0; essai < 2; essai++) {
-        if (essai) await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
+        if (essai) await pauseRepub('reessai');
         rbV = await vintedSend(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });
         // Un refus CERTAIN se retente une fois ; une réponse floue jamais (le brouillon existe peut-être).
         if (!(rbV && rbV.ok === false && rbV.status > 0 && rbV.status < 500)) break;
@@ -8663,7 +8691,7 @@ async function recreerVinted(msg) {
       // 4. Republier : le brouillon est MIS EN LIGNE (formes mesurées, 5.251).
       etapeRepub(id, 'attente');
       await poserVerrouRecreer(id);
-      await new Promise((ok) => setTimeout(ok, BROUILLON_ATTENTE_MS));
+      await pauseRepub('enLigne');
       etapeRepub(id, 'en-ligne');
       const rcV = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
       if (!rcV || rcV.status === 0 || rcV.status >= 500) {
@@ -8692,6 +8720,7 @@ async function recreerVinted(msg) {
     let rc;
     {
       etapeRepub(id, 'creation');
+      await pauseRepub('brouillon');
       rc = await vintedSend(acc, 'POST', '/api/v2/item_upload/items', corps, { timeoutMs: 60000 });
     }
     if (!rc || rc.status === 0 || rc.status >= 500) {

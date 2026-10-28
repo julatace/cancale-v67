@@ -110,7 +110,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.262.0';
+const EXT_ATTENDUE = '5.263.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11663,21 +11663,25 @@ function useBrouillonsARefaire(actif) {
   }, [actif, tick]);
   const liste = React.useMemo(() => {
     if (!Array.isArray(rows)) return rows;
-    const out = [];
+    const out = []; const regles = [];
     for (const x of rows) {
       const m = /^coffre_(\d+)_(\d{4,15})$/.exec(String(x.id || ''));
       if (!m) continue;
       const quoi = etatARefaire(x);
       if (!quoi) continue;
       const e = Date.parse(ecartes[x.id] || ''), maj = Date.parse(x.majAt || x.at || '');
-      if (isFinite(e) && !(isFinite(maj) && maj > e)) continue;   // réglé à la main, rien de neuf depuis
+      // Réglé à la main, rien de neuf depuis : gardé à part (« Revoir »), jamais perdu.
+      const dest = (isFinite(e) && !(isFinite(maj) && maj > e)) ? regles : out;
       const prix = Number(x.prix);
-      out.push({ cle: String(x.id), uid: m[1], id: m[2], quoi, titre: String(x.titre || '').trim() || 'Annonce sans titre', prix: prix > 0 ? prix : null, photo: x.photo || '', supprime: String(x.supprime) === 'true', publier: String(x.publier) === 'true', peutExister: String(x.peut) === 'true', draftId: x.draftId || '', at: maj });
+      dest.push({ cle: String(x.id), uid: m[1], id: m[2], quoi, titre: String(x.titre || '').trim() || 'Annonce sans titre', prix: prix > 0 ? prix : null, photo: x.photo || '', supprime: String(x.supprime) === 'true', publier: String(x.publier) === 'true', peutExister: String(x.peut) === 'true', draftId: x.draftId || '', at: maj });
     }
-    return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    out.regles = regles;
+    return out;
   }, [rows, ecartes]);
+  const revoir = (cle) => setEcartes((e) => { const u = { ...e }; delete u[cle]; save(BROUILLONS_REFAIRE_ECARTES, u); return u; });
   const ecarter = (cle) => setEcartes((e) => { const u = { ...e, [cle]: new Date().toISOString() }; save(BROUILLONS_REFAIRE_ECARTES, u); return u; });
-  return { liste, ecarter, relire: () => setTick((t) => t + 1) };
+  return { liste, ecarter, revoir, relire: () => setTick((t) => t + 1) };
 }
 // Ce que dit chaque ligne, et ce que fait le bouton (une phrase par état).
 const TEXTE_REFAIRE = {
@@ -11688,7 +11692,8 @@ const TEXTE_REFAIRE = {
 };
 const BOUTON_REFAIRE = { 'a-refaire': 'Refaire le brouillon', 'a-publier': 'Mettre le brouillon en ligne', interrompu: 'Refaire le brouillon' };
 function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, raisonAgir }) {
-  const { liste, ecarter } = br;
+  const { liste, ecarter, revoir } = br;
+  const regles = (Array.isArray(liste) && Array.isArray(liste.regles)) ? liste.regles : [];
   const [etat, setEtat] = useState({});            // { [cle]: { etape, raison } }
   const lancer = async (b) => {
     const enLigne = b.publier && b.supprime;
@@ -11710,7 +11715,11 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
         </div>
         {liste === undefined && <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>}
         {liste === null && <div data-refaire-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire ce qui reste à refaire — rien n'est perdu, réessaie dans un moment.</div>}
-        {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>Rien à refaire : chaque passage par brouillon est allé au bout.</div>}
+        {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : chaque passage par brouillon est allé au bout.'}</div>}
+        {regles.length > 0 && <div data-refaire-regles={regles.length} style={{ fontSize: 13, color: C.muted, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div>{regles.length === 1 ? 'Tu as marqué un passage « C’est réglé » :' : `Tu as marqué ${regles.length} passages « C’est réglé » :`}</div>
+          {regles.map((b) => <button key={b.cle} type="button" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)} style={{ textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Le remettre dans la liste : {b.titre}</button>)}
+        </div>}
         {Array.isArray(liste) && liste.length > 0 && !peutAgir && <div data-refaire-bloque style={{ fontSize: 12.5, color: C.muted }}>{raisonAgir || "L'extension VRM à jour est nécessaire dans ce navigateur."}</div>}
         {Array.isArray(liste) && liste.map((b) => { const s = etat[b.cle] || {}; const fini = s.etape === 'fait'; const geste = BOUTON_REFAIRE[b.quoi]; return (
           <div key={b.cle} data-refaire-ligne={b.id} data-refaire-quoi={b.quoi} data-refaire-statut={s.etape || 'attente'} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
@@ -11818,7 +11827,7 @@ const ACTIONS_REPUB = {
 };
 // Les étapes d'une recréation, dans l'ordre (annoncées par l'extension 5.259).
 const ETAPES_REPUB = {
-  brouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'ancienne annonce"], ['brouillon', 'Création du brouillon'], ['attente', 'Petite pause avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
+  brouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'ancienne annonce"], ['brouillon', 'Création du brouillon'], ['attente', 'Pause (au hasard) avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
   versBrouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'annonce"], ['brouillon', 'Création du brouillon']],
   direct: [['photos', 'Envoi des photos'], ['creation', 'Création de la nouvelle annonce'], ['suppression', "Retrait de l'ancienne annonce"]],
 };
@@ -12116,7 +12125,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
               </label>
-              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? 'Comme les autres outils : chaque annonce est d’abord enregistrée dans VRM, puis supprimée, rangée en brouillon sur Vinted, et mise en ligne quelques secondes après. Si Vinted ne répond pas clairement à la suppression, VRM s’arrête (jamais deux fois en ligne). Si le brouillon ou sa mise en ligne échoue, rien n’est perdu : le brouillon est dans tes brouillons, ou tout est enregistré dans VRM.' : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? 'Comme les autres outils : chaque annonce est d’abord enregistrée dans VRM, puis supprimée, rangée en brouillon sur Vinted, et mise en ligne ensuite. Entre chaque geste (chaque photo, le brouillon, la mise en ligne), VRM attend un temps tiré au hasard — compte une à deux minutes par annonce. Si Vinted ne répond pas clairement à la suppression, VRM s’arrête (jamais deux fois en ligne). Si le brouillon ou sa mise en ligne échoue, rien n’est perdu : le brouillon est dans tes brouillons, ou tout est enregistré dans VRM.' : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
@@ -36248,7 +36257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
   const refaireBrouillon = async (b) => {
     if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true, couleur }, 180000), b.titre||b.title||'');
+    const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true, couleur }, 480000), b.titre||b.title||'');
     brRefaire.relire(); brVinted.relire();
     if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
     if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };
@@ -48232,7 +48241,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           publier={async (it) => {
             const uid = it._acc ? String(it._acc.vinted_user_id||'') : '';
             if (!uid) return { etape:'echec', raison:'compte introuvable' };
-            const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true, couleur }, 120000), it.title||it.titre||'');
+            const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true, couleur }, 360000), it.title||it.titre||'');
             if (r.sansReponse) { brVinted.relire(); return { etape:'incertain', raison:TEXTE_SANS_REPONSE }; }
             if (r && r.accepte) return { etape:r.etape, raison:r.raison||'' };
             return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
@@ -48261,7 +48270,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 180000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
@@ -48282,7 +48291,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // créé (sa décision du 28 oct. au soir). Le N° reste sur l'ancienne fiche.
         const publierVersB = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 180000);
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 480000);
           if (r.sansReponse) { brRefaire.relire(); brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' }; }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) { if (r.etape==='fait') brVinted.relire(); return { etat:r.etape, raison:r.raison||'' }; }
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
@@ -48292,7 +48301,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // de « Voir mes brouillons », §11) ; seuls ceux PRÊTS se cochent.
         const publierEnLigne = async (a) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true, couleur }, 120000), a.titre||'');
+          const r=await avecCouleurBrouillon((couleur)=>vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true, couleur }, 360000), a.titre||'');
           if (r.sansReponse) { brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.etape==='fait') { brVinted.relire(); return { etat:'fait' }; }
           if (r && r.accepte && r.etape==='incertain') return { etat:'incertain', raison:r.raison||'' };
