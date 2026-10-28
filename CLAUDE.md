@@ -7,6 +7,13 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — « de brouillon à en ligne ça marche pas » (5.265) :** mesuré sur l'Air Max 1 refaite à 20:25 :
+> brouillon rangé, puis la mise en ligne refusée pour les PHOTOS (`refaire_mise_en_ligne_refusee_400`,
+> `vinted_refus_champs_photos`) — des photos neuves en JPEG, acceptées par le brouillon. Cause NON mesurée.
+> `completionSecoursPhotos` (Republier, Refaire, Brouillons → en ligne) : attente, nouvel essai avec la forme courte des photos
+> (`{id, orientation:0}`, celle des brouillons du navigateur) ; toujours refusé ⇒ photos renvoyées, dernier essai ; le texte exact
+> du refus est gardé (`rates.vinted_refus_photos`) pour la passe suivante. Preuve : `audit-recreer.cjs` (110 ; 9 rouges sur la 5.264).
+
 > **28 octobre (nuit, fin) — DESCRIPTION trop courte, et le COMPTE RENDU d'une opération coupée (5.264) :** Julien
 > (Air Max 1 Athletic Department, zoom fly 5) : « Vinted a refusé le brouillon (400 : … Le champ Description doit comprendre
 > au moins 5 caractères) » ; puis « si l'app recharge ou est éteinte je veux un compte rendu de là où l'opération s'était

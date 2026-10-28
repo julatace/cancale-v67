@@ -300,19 +300,22 @@ const zero = (j) => j.vinted.length === 0;
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9555' },
       coffre_111_9555: { id: '9555', photos: [PHOTOS[0], PHOTOS[1], PHOTOS_D[0]] } };
     let nC = 0;
-    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: () => (++nC === 1 ? 400 : 200),
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: () => (++nC <= 2 ? 400 : 200),
       completionCorps: { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } });
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
     const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[1].corps); } catch (_) {}
     const ids = c2.draft && Array.isArray(c2.draft.assigned_photos) ? c2.draft.assigned_photos.map((p) => p.id) : [];
-    dit(r.etape === 'fait' && cs.length === 2 && photosP(f.j).length === 2 && ids.length === 2 && !ids.includes(11) && !ids.includes(12), "photos du brouillon refusées : renvoyées depuis le coffre (une par photo), puis la mise en ligne repart avec les NOUVELLES", JSON.stringify({ e: r.etape, m: cs.length, p: photosP(f.j).length, ids, raison: r.raison || r.erreur })); }
+    let c3 = {}; try { c3 = JSON.parse(cs[2].corps); } catch (_) {}
+    const ids3 = c3.draft && Array.isArray(c3.draft.assigned_photos) ? c3.draft.assigned_photos.map((p) => p.id) : [];
+    dit(JSON.stringify(ids) === '[11,12]', "photos refusées : d'abord un nouvel essai, mêmes photos (forme courte), après une attente", JSON.stringify(ids));
+    dit(r.etape === 'fait' && cs.length === 3 && photosP(f.j).length === 2 && ids3.length === 2 && !ids3.includes(11) && !ids3.includes(12), "toujours refusées : renvoyées depuis le coffre (une par photo), puis la mise en ligne repart avec les NOUVELLES", JSON.stringify({ e: r.etape, m: cs.length, p: photosP(f.j).length, ids3, raison: r.raison || r.erreur })); }
   // … sans coffre lisible : rien n'est renvoyé, c'est dit avec le geste Vinted.
   { const corps = CORPS_B();
     const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9556' } };
     const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: 400,
       completionCorps: { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } });
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
-    dit(r.etape === 'echec' && completions(f.j).length === 1 && photosP(f.j).length === 0 && /rajoute/.test(r.raison || ''), "photos refusées sans photo dans VRM : une seule tentative, et le geste sur Vinted est dit", JSON.stringify({ e: r.etape, m: completions(f.j).length, raison: r.raison })); }
+    dit(r.etape === 'echec' && completions(f.j).length === 2 && photosP(f.j).length === 0 && /rajoute/.test(r.raison || ''), "photos refusées sans photo dans VRM : un seul nouvel essai, et le geste sur Vinted est dit", JSON.stringify({ e: r.etape, m: completions(f.j).length, raison: r.raison })); }
   // Une photo d'origine en WEBP part en JPEG (son nom est « photo-N.jpg »).
   { const f = monter({ src: process.env.BG_SRC || undefined });
     f.ctx.createImageBitmap = async () => ({ width: 4, height: 4, close() {} });
@@ -366,6 +369,17 @@ const zero = (j) => j.vinted.length === 0;
     let b2 = {}; try { b2 = JSON.parse(de(f2.j, /\/item_upload\/drafts\/?$/)[0].corps); } catch (_) {}
     const d2 = (b2.draft && b2.draft.description) || '';
     dit(r2.etape === 'fait' && d2 === 'Très bon état, boîte d’origine\n\nq', "Refaire, description vide : reprise sur la fiche de l'annonce, la lettre gardée en bas", JSON.stringify({ e: r2.etape, d: d2, raison: r2.raison || r2.erreur })); }
+  // P2 — (28 oct., « de brouillon à en ligne ça marche pas ») Republier et
+  //      Refaire : la mise en ligne refusée pour les photos est réessayée.
+  { const erreurPhotos = { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] };
+    let nC = 0;
+    const f = monter({ src: process.env.BG_SRC || undefined, completion: () => (++nC === 1 ? 400 : 200), completionCorps: erreurPhotos });
+    let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', viaBrouillon: true, confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    dit(r.etape === 'fait' && nC === 2, "republier, mise en ligne refusée pour les photos : réessayée, elle passe", JSON.stringify({ e: r.etape, n: nC, raison: r.raison || r.erreur }));
+    let st = 422, nR = 0; const g = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st, completion: () => (++nR === 1 ? 400 : 200), completionCorps: erreurPhotos });
+    await g.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', viaBrouillon: true, confirme: true });
+    st = 200; let r2 = {}; try { r2 = typeof g.ctx.refaireBrouillon === 'function' ? await g.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true }) : {}; } catch (e) { r2 = { erreur: e.message }; }
+    dit(r2.etape === 'fait' && nR === 2, "Refaire, mise en ligne refusée pour les photos : réessayée, elle passe", JSON.stringify({ e: r2.etape, n: nR, raison: r2.raison || r2.erreur })); }
   // R — (28 oct., sa demande) « Refaire le brouillon » : depuis ce qui est
   //     enregistré dans VRM, sans JAMAIS retoucher l'annonce d'origine ; mise en
   //     ligne seulement si la suppression de l'ancienne est CERTAINE.

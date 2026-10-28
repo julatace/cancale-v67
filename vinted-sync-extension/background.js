@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.264.0';
+const CODE_VERSION = '5.265.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8219,24 +8219,17 @@ async function publierBrouillon(msg) {
     // WEBP avant la 5.262 : « Erreur lors du chargement de la photo »). Les photos
     // de l'annonce sont dans le coffre : on les RENVOIE (en JPEG), on remplace
     // celles du brouillon et on réessaie UNE fois. Rien d'autre ne change.
-    if (!rc.ok && rc.status < 500 && b.parVRM && photosRefusees(rc)) {
-      const neuves = await photosNeuvesBrouillon(acc, uid, b, temp);
-      if (neuves.ids) {
-        r.d.assigned_photos = neuves.ids.map((pid) => ({ id: pid, orientation: 0 }));
-        corpsC.draft = { ...r.d, id: Number(id) };
-        noterDiag('brouillon_photos_renvoyees');
-        await pauseRepub('enLigne');
-        await poserVerrouRecreer('b' + id);
-        const rc2 = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
-        if (!rc2 || rc2.status === 0 || rc2.status >= 500) {
-          noterDiag(`brouillon_publier_incertain_${(rc2 && rc2.status) || 0}`);
-          return { accepte: true, etape: 'incertain', raison: "photos renvoyées, mais Vinted n'a pas répondu clairement : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative pendant 30 min)" };
-        }
-        await leverVerrouRecreer('b' + id);
-        rc = rc2;
-      } else if (neuves.erreur) {
-        noterDiag('brouillon_photos_non_renvoyees');
-        return { accepte: true, etape: 'echec', raison: `Vinted refuse les photos de ce brouillon, et VRM n'a pas pu les renvoyer (${neuves.erreur}). Sur Vinted, ouvre le brouillon, retire les photos et rajoute-les, puis réessaie — le brouillon est intact` };
+    if (!rc.ok && rc.status < 500 && photosRefusees(rc)) {
+      let neuvesErr = null;
+      const renvoyer = b.parVRM ? async () => { const n = await photosNeuvesBrouillon(acc, uid, b, temp); if (!n.ids) neuvesErr = n.erreur || null; return n; } : null;
+      const rc2 = await completionSecoursPhotos(acc, id, corpsC, rc, renvoyer);
+      if (!rc2 || rc2.status === 0 || rc2.status >= 500) {
+        noterDiag(`brouillon_publier_incertain_${(rc2 && rc2.status) || 0}`);
+        return { accepte: true, etape: 'incertain', raison: "nouvel essai pour les photos, mais Vinted n'a pas répondu clairement : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative pendant 30 min)" };
+      }
+      rc = rc2;
+      if (!rc.ok && photosRefusees(rc)) {
+        return { accepte: true, etape: 'echec', raison: `Vinted refuse encore les photos de ce brouillon${neuvesErr ? ` (VRM n'a pas pu les renvoyer : ${neuvesErr})` : ''}. Sur Vinted, ouvre le brouillon (Mes brouillons), retire les photos et rajoute-les, puis publie — le brouillon est intact.` };
       }
     }
     if (!rc.ok) {
@@ -8401,7 +8394,11 @@ async function refaireBrouillon(msg) {
     const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
     if (stopC) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'a pas été mis en ligne (${stopC.error}) — « Refaire » le remet en ligne, sans en créer un autre.` }; }
     await poserVerrouRecreer('b' + draftId);
-    const rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
+    let rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
+    if (rc && rc.status > 0 && rc.status < 500 && !rc.ok && photosRefusees(rc)) {
+      await leverVerrouRecreer('b' + draftId);
+      rc = await completionSecoursPhotos(acc, draftId, corpsC, rc, () => televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp));
+    }
     if (!rc || rc.status === 0 || rc.status >= 500) {
       noterDiag(`refaire_mise_en_ligne_incertaine_${(rc && rc.status) || 0}`);
       await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine' });
@@ -8453,6 +8450,38 @@ function photosRefusees(rc) {
   if (!j) return false;
   const errs = Array.isArray(j.errors) ? j.errors : [];
   return errs.some((e) => e && (/^(assigned_photos|photos)\b/i.test(String(e.field || e.name || '')) || /photo/i.test(String(e.value || e.message || ''))));
+}
+// (28 oct., « de brouillon à en ligne ça marche pas ») Vinted refuse la mise en
+// ligne pour les PHOTOS (« Erreur lors du chargement de la photo ») alors que le
+// brouillon les a acceptées. Cause pas mesurée (photos encore en traitement chez
+// Vinted ? forme des photos ?). Le secours fait ce qui a déjà marché une fois (la
+// Jordan 3) : on attend, on réessaie avec la forme courte des photos (celle des
+// brouillons enregistrés par le navigateur : {id, orientation:0}) ; toujours
+// refusé ⇒ on RENVOIE les photos et on réessaie une dernière fois. Le texte exact
+// du refus est gardé (diagnostic) pour la passe suivante.
+async function completionSecoursPhotos(acc, draftId, corpsC, rc, renvoyer) {
+  try { echantillonRate('vinted_refus_photos', draftId, JSON.stringify((rc && rc.json && rc.json.errors) || (rc && rc.json) || '')); } catch (_) {}
+  const envoyer = async () => {
+    await poserVerrouRecreer('b' + draftId);
+    const r = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
+    if (r && r.status > 0 && r.status < 500) await leverVerrouRecreer('b' + draftId);
+    return r;
+  };
+  const court = (ids) => ids.map((pid) => ({ id: pid, orientation: 0 }));
+  const ids0 = ((corpsC.draft && corpsC.draft.assigned_photos) || []).map((p) => p && p.id).filter(Boolean);
+  await pauseRepub('reessai'); await pauseRepub('reessai');
+  corpsC.draft.assigned_photos = court(ids0);
+  noterDiag('completion_photos_reessai');
+  let r = await envoyer();
+  if (!r || r.status === 0 || r.status >= 500 || r.ok || !photosRefusees(r) || typeof renvoyer !== 'function') return r;
+  const neuves = await renvoyer();
+  if (!neuves || !neuves.ids) { noterDiag('completion_photos_non_renvoyees'); return r; }
+  corpsC.draft.assigned_photos = court(neuves.ids);
+  noterDiag('completion_photos_renvoyees');
+  await pauseRepub('enLigne');
+  r = await envoyer();
+  if (r && r.ok) noterDiag('completion_photos_secours_ok');
+  return r;
 }
 // Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
 // l'ancienne annonce (une par photo, avec ses réglages enregistrés).
@@ -8721,7 +8750,12 @@ async function recreerVinted(msg) {
       await poserVerrouRecreer(id);
       await pauseRepub('enLigne');
       etapeRepub(id, 'en-ligne');
-      const rcV = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
+      let rcV = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsCV, { timeoutMs: 60000 });
+      if (rcV && rcV.status > 0 && rcV.status < 500 && !rcV.ok && photosRefusees(rcV)) {
+        await leverVerrouRecreer(id);
+        rcV = await completionSecoursPhotos(acc, draftId, corpsCV, rcV, () => televerserPhotosRecreer(acc, urls, second, reglages, temp));
+        if (rcV && rcV.status > 0 && rcV.status < 500) await poserVerrouRecreer(id);
+      }
       if (!rcV || rcV.status === 0 || rcV.status >= 500) {
         noterDiag(`republier_mise_en_ligne_incertaine_${(rcV && rcV.status) || 0}`);
         await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId });
