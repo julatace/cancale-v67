@@ -31476,7 +31476,6 @@ function ChoixDepenses({ onAucune, onAjouter, compact = false }) {
   const lien = { background: 'none', border: 0, padding: 0, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit', minHeight: 0 };
   return (
     <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 12.5 : 13, color: compact ? 'inherit' : C.muted, lineHeight: 1.45 }}>
-      <span style={{ flex: '1 1 100%' }}>Aucune dépense notée : ce net est <b style={{ color: compact ? 'inherit' : C.text, fontWeight: 600 }}>avant tes dépenses</b>.</span>
       <button type="button" data-depenses-aucune="" onClick={onAucune} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: compact ? 'inherit' : C.text }}>Je n'ai pas de dépenses à noter</button>
       <button type="button" data-depenses-ajouter="" onClick={onAjouter} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
     </div>
@@ -31646,7 +31645,7 @@ function BeneficeJournee({ onNav, place }) {
         </div>
       ) : (<>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12, marginTop: 8 }}>
-          {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : `prix d'achat connus pour ${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n}`, 'brut')}
+          {chiffre('Brut ce mois', brutDe(B), B.n === 0 ? 'aucune vente finalisée' : '', 'brut')}
           {chiffre(B.depenses === 'jamais' ? 'Net avant tes dépenses' : 'Net ce mois', B.netFinal, raisonNet, 'net')}
         </div>
         {depenses === 'jamais' && (
@@ -40889,8 +40888,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 n'a pu être lu, le chiffre est « — » ; si une partie seulement,
                 c'est « au moins », et les comptes manquants sont nommés. */}
             {(() => { const actifs = (accounts||[]).filter(a=>!acctOff(a.vinted_user_id)).length; const toutKO = actifs>0 && nomsVentesKO.length>=actifs && moisN===0; const partiel = !toutKO && nomsVentesKO.length>0; return (<>
-            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <>{partiel && <span style={{display:'block',fontSize:'0.32em',fontWeight:600,color:C.muted,marginBottom:2,letterSpacing:0}}>au moins</span>}<CountUpEuro value={moisEur}/></>}</div>
-            {(toutKO || partiel) && <div data-vendu-manque="" style={{fontSize:12,color:C.muted,marginTop:4}}>{toutKO ? 'Tes ventes n\'ont pas pu être lues pour l\'instant — ce n\'est pas zéro.' : `sans ${nomsVentesKO.length>2 ? nomsVentesKO.length+' comptes' : nomsVentesKO.join(', ')} (ventes pas lues)`}</div>}
+            <div data-vendu-mois={toutKO ? '' : Math.round(moisEur*100)} data-vendu-partiel={partiel ? '1' : ''} className="vrm-display vrm-day-hero-n" style={{color:toutKO?C.muted:C.text}}>{toutKO ? '—' : <CountUpEuro value={moisEur}/>}</div>
+            {toutKO && <div data-vendu-manque="" style={{fontSize:12,color:C.muted,marginTop:4}}>Tes ventes n'ont pas pu être lues pour l'instant — ce n'est pas zéro.</div>}
             </>); })()}
             <div className="vrm-day-meta" style={{color:C.muted}}>
               <span><b style={{color:C.text,fontWeight:600}}>{moisN}</b> vente{moisN>1?'s':''}</span>
@@ -40902,16 +40901,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-recu-mois={recuMois==null?'':Math.round(recuMois*100)} data-recu-sans={recuSans ? nomsVentesKO.join(',') : ''} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
-                <div className="vrm-day-note" title={nomsVentesKO.length ? `ventes pas lues : ${nomsVentesKO.join(', ')}` : undefined} style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : recuSans + (caDeclareAilleurs > 0 ? `argent versé · dont ${Math.round(caDeclareAilleurs).toLocaleString('fr-FR')} € déjà déclarés en ${moisDeclAilleurs}` : 'argent versé · ton CA déclaré')}</div>
+                {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
             </div>
             <div data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} className="vrm-day-recu" style={{borderTop:`1px solid ${C.border}`}}>
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Chiffre d'affaires {anIci}</div>
-                <div className="vrm-day-note" style={{color:C.muted}}>{declarables === null ? 'dates de versement illisibles pour l\'instant' : `le CA déclaré, comme dans Compta · toutes plateformes${recuSans || adVinted>0 ? ' · au moins' : ''}`}</div>
+                {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
               </div>
-              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${(recuSans || adVinted>0) ? '≥ ' : ''}${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
+              <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : caAnnee == null ? '—' : `${Math.round(caAnnee).toLocaleString('fr-FR')} €`}</span>
             </div>
             <BeneficeJournee onNav={onNav} place="integre"/>
           </div>
