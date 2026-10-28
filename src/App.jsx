@@ -110,7 +110,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.261.0';
+const EXT_ATTENDUE = '5.262.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1979,7 +1979,7 @@ function ApercuMeuble({ it, cellKey, mode, cap, size = 132 }) {
   }
   return (
     <svg data-apercu-meuble={it.id} data-apercu-case={cellKey} role="img" aria-label={`${it.name || ft.label || 'Meuble'} vu de face, la case où ranger en couleur`} viewBox={`0 0 ${W} ${H}`} width={size} height={size * H / W} style={{ flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
-      {portant && <line x1={pad} x2={W - pad} y1={pad + 4} y2={pad + 4} stroke={C.muted} strokeWidth="2" />}
+      {portant && Array.from({ length: nr }, (_, r) => <line key={'b' + r} x1={pad} x2={W - pad} y1={pad + r * ch + 2} y2={pad + r * ch + 2} stroke={C.muted} strokeWidth="2" />)}
       {table && <><rect x={pad} y={pad + 6 + ch} width={iw} height="5" rx="1.5" fill={C.muted} fillOpacity="0.7" /><rect x={pad + 4} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /><rect x={W - pad - 8} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /></>}
       {!table && !portant && <rect x={pad} y={pad} width={iw} height={ih} fill="none" stroke={C.muted} strokeOpacity="0.6" strokeWidth="1.5" rx="2" />}
       {cases}
@@ -26031,7 +26031,7 @@ const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; ret
 // les boîtes de la case du dessus tombent dans celle du dessous (`it` requis).
 const graviteCases = (slots, nr, nc, mode, it, wallH) => {
   const out = {};
-  if (mode === 'pile' && it) { const ft = FURN_TYPES[it.type] || {}; const pl = plateauxMeuble(it, ft); if (pl) return tasserPlateaux(slots, nr, nc, pl, (r) => capaciteCase(ft, it, wallH || 3.4, r)); }
+  if ((mode === 'pile' || mode === 'cintre') && it) { const ft = FURN_TYPES[it.type] || {}; const pl = plateauxMeuble(it, ft); if (pl) return tasserPlateaux(slots, nr, nc, pl, (r) => capaciteCase(ft, it, wallH || 3.4, r)); }
   if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
   for (let c = 0; c < nc; c++) {
     const pleins = [];
@@ -26056,7 +26056,7 @@ const meublesDuPlan = (plan) => {
 const nomCase = (nr, key, mode, it) => {
   const p = String(key).split('_'); const r = +p[0], c = +p[1]; const rang = nr - r;
   const ft = FURN_TYPES[it && it.type] || {};
-  if (mode === 'cintre') return `cintre ${c + 1}`;
+  if (mode === 'cintre') return nr > 1 ? `${r === 0 ? 'barre du haut' : rang === 1 ? 'barre du bas' : (r + 1) + 'ᵉ barre depuis le haut'} · cintre ${c + 1}` : `cintre ${c + 1}`;
   if (mode === 'pile' && ft.build === 'table') return r === 0 ? `plateau · place ${c + 1}` : `sous la table, ${rang === 1 ? 'au sol' : (rang === 2 ? '1ᵉʳ' : (rang - 1) + 'ᵉ') + ' plateau depuis le bas'} · place ${c + 1}`;
   if (mode === 'pile') return `${rang === 1 ? '1ᵉʳ' : rang + 'ᵉ'} plateau depuis le bas · case ${c + 1}`;
   return `colonne ${c + 1} · ${rang === 1 ? '1ʳᵉ' : rang + 'ᵉ'} depuis le bas`;
@@ -27394,6 +27394,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     // Un plateau garde SA hauteur (réglée par « Hauteur d'un niveau », 37,5 cm
     // par défaut) : la contenance par case ne bouge pas.
     if (ft.build === 'metal') patch.h3d = +(rows * hauteurNiveau(it) / 1.5).toFixed(3);
+    // Un portant : environ 80 cm par barre (un vêtement pend sous chacune).
+    if (ft.build === 'portant' && rows !== nr) {
+      const h3d = +(Math.max(ft.h3d || 1.1, (0.12 + rows * 0.8) / 1.5)).toFixed(3);
+      if (h3d * 1.5 > (room.wallH || 3.4) - 0.05) { toast('Une barre de plus dépasserait le plafond de la pièce.'); return; }
+      patch.h3d = h3d;
+    }
     if (ft.build === 'portant' || ft.build === 'metal' || ft.build === 'table') { const w = ft.build === 'table' ? Math.max(it.w, +(cols * 0.6).toFixed(2)) : +(cols * (ft.build === 'portant' ? 0.19 : 0.6)).toFixed(2); patch.w = Math.max(0.6, w); }
     changerDimensions(it, patch);
   };
@@ -27818,16 +27824,17 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
                 {ft.build === 'metal' && pas('Niveaux', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'plateaux')}
+                {ft.build === 'portant' && pas('Barres', nr, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'barres')}
                 {ft.build === 'table' && pas('Niveaux sous la table', nr - 1, () => changerCases(selItem, 0, -1), () => changerCases(selItem, 0, 1), 'sous-table')}
                 {ft.build === 'metal' && pas('Hauteur d’un niveau', `${Math.round(hauteurNiveau(selItem) * 100)} cm`, () => changerNiveau(selItem, -0.05), () => changerNiveau(selItem, 0.05), 'niveau')}
                 {pas('Largeur', `${Math.round(selItem.w * 100)} cm`, () => changerDimensions(selItem, { w: +Math.max(0.4, selItem.w - 0.1).toFixed(2) }), () => changerDimensions(selItem, { w: +Math.min(room.w, selItem.w + 0.1).toFixed(2) }), 'largeur')}
                 {pas('Profondeur', `${Math.round(selItem.h * 100)} cm`, () => changerDimensions(selItem, { h: +Math.max(0.25, selItem.h - 0.05).toFixed(2) }), () => changerDimensions(selItem, { h: +Math.min(room.h, selItem.h + 0.05).toFixed(2) }), 'profondeur')}
                 {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
-                <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
+                <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nr * nc} cintres${nr > 1 ? ` sur ${nr} barres` : ''}` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
                 {plateauxReglables(ft) && nr > (ft.build === 'table' ? 2 : 1) && (
                   <details data-plateaux-3d="" style={{ flex: '1 1 100%' }}>
-                    <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>{ft.build === 'table' ? 'Plateaux sous la table, place par place' : 'Plateaux, colonne par colonne'}</summary>
-                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu'elle a de la place. Aucun numéro ne change.{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</div>
+                    <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>{ft.build === 'table' ? 'Plateaux sous la table, place par place' : ft.build === 'portant' ? 'Barres, cintre par cintre' : 'Plateaux, colonne par colonne'}</summary>
+                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>{ft.build === 'portant' ? 'Sans barre à un cintre, son vêtement descend sur la barre du dessous si elle est libre. Aucun numéro ne change. La barre du bas reste toujours là.' : <>Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu'elle a de la place. Aucun numéro ne change.{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</>}</div>
                     <div style={{ textAlign: 'center' }}>
                       <ChoixPlanches plateau fixe={ft.build === 'table' ? 1 : 0} cols={nc} rows={nr} planches={Array.isArray(selItem.planches) ? selItem.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1)} setPlanches={(v) => { const u = planchesCases(v, nc, nr); if (ft.build === 'table') for (let c = 1; c <= nc; c++) u.add('1:' + c); updateItem(selItem.id, { planches: planchesRangees(u, nc, nr) }); }} />
                     </div>

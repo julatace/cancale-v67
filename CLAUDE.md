@@ -7,6 +7,17 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — « Erreur lors du chargement de la photo » (5.262) :** Julien, Jordan 3 (brouillon
+> 10574927717) : « Vinted a refusé la mise en ligne (400 : Erreurs trouvées — les photos (Erreur lors du chargement de
+> la photo…)) ». Cause : `photoReglee` rendait l'ORIGINAL quand les réglages étaient neutres — souvent un WEBP (forme
+> `/f800/…webp` du coffre) envoyé sous le nom `photo-N.jpg` ; Vinted le prend puis refuse la mise en ligne. ⇒ un vrai
+> JPEG part toujours (réencodé si besoin). Et `publierBrouillon`, sur un refus qui porte sur les PHOTOS d'un brouillon
+> fait par VRM (`photosRefusees`), renvoie les photos du coffre de l'ancienne annonce (`photosNeuvesBrouillon`, une par
+> photo, ses réglages), remplace celles du brouillon et réessaie UNE fois ; pas de photo dans VRM ⇒ dit, avec le geste
+> Vinted. Les brouillons N°2 et N°72 se mettent donc en ligne par « Brouillons → en ligne ». Preuve :
+> `audit-recreer.cjs` (99 ; 3 rouges sur la 5.261). ⚠️ Non mesuré : que Vinted accepte les photos renvoyées dans un
+> brouillon existant (même `upload_session_id`).
+
 > **28 octobre (nuit) — les PHOTOS EN DOUBLE (5.261), « c'est en brouillon mais pas en ligne » :** mesuré, le coffre
 > de la Jordan 3 portait 75 liens pour 15 photos (même clé `02_02248_…` sous `/tc/…` et `/t/…/f800/…`) ; VRM
 > prenait les 20 premiers ⇒ un brouillon de 20 photos dont des doublons, refusé à la mise en ligne. ⇒
@@ -85,6 +96,14 @@
 > vente : un brouillon n'est jamais en ligne. Le §3 « recréer PUIS supprimer » vaut toujours pour Republier (en ligne →
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
+
+> **28 octobre (nuit, fin) — les PORTANTS aussi :** Julien : « fais pareil pour les portants ». Un portant à cintres
+> peut avoir plusieurs BARRES (stepper « Barres », `data-reglage="barres"`, ~80 cm par barre, refusé au-delà du
+> plafond ; la barre ajoutée l'est en haut) et « Barres, cintre par cintre » (`ChoixPlanches`). `"r:c"` = la barre de
+> la rangée r−1 au cintre c ; la barre du bas est toujours là. Sans barre, le vêtement descend sur la barre du dessous
+> si elle est libre (`tasserPlateaux`, cap 1) ; numéros inchangés. `plateauxReglables` inclut le portant ;
+> `buildPortant(…, rows, barres)` dessine chaque barre en morceaux (sonde `plateaux` lit aussi un cylindre).
+> Banc `stock-finitions.cjs` XI (390/1512 ; mutation « portant hors des plateaux réglables » ⇒ 2 rouges).
 
 > **28 octobre (nuit, fin) — les TABLES aussi :** Julien : « fais pareil pour les tables ». Une table porte des
 > plateaux SOUS son dessus : « Niveaux sous la table » (stepper `sous-table`, ajoutés/retirés en bas ; refusé si un
