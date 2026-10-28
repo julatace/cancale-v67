@@ -1,7 +1,7 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
 import {requeteJsonBornee} from './requeteJsonBornee.js';
-export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true}){
+export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,onPreparation,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true}){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
   const vivant=React.useRef(true),busy=React.useRef(false),pauseLocale=React.useRef(false),travail=React.useRef(null),lecture=React.useRef(0),mutation=React.useRef(false),decalage=React.useRef(0),prochaine=React.useRef(0);
   React.useEffect(()=>{if(onErreur)onErreur(erreur?controleErreur||{code:'non_precise'}:null);},[erreur,controleErreur]);
@@ -64,6 +64,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   React.useEffect(()=>{if(!vue?.active||!ecranActif)return;avancer();const t=setInterval(avancer,15000);return()=>clearInterval(t);},[vue?.active,disponible,ecranActif]);
   const agir=async action=>{
     if(!courant()||mutation.current)return;mutation.current=true;++lecture.current;setOccupe(true);setErreur('');setControleErreur(null);
+    if(action==='lancer')onPreparation?.(true);
     try{
       let configuration=reglages;const contexteAuDepart=contexte.current;
       const verifierPreparation=()=>{if(!ecran.current||contexte.current!==contexteAuDepart)throw Error('Préparation interrompue : la sélection, le message ou l’écran a changé. Vérifie les destinataires avant de relancer. Aucun envoi lancé.');};
@@ -85,7 +86,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       const j=await api(action,action==='lancer'?{selection,reglages:configuration}:{});
       if(courant()){adopter(j);pauseLocale.current=false;}
     }catch(e){if(courant()){setErreur(e.message);const diagnostic={};for(const k of ['notifications','tracesNatives','pairesNatives','formesUserId','liensExacts','parametresConfirmes','selection'])if(Number.isSafeInteger(e.diagnostic?.[k])&&e.diagnostic[k]>=0&&e.diagnostic[k]<=10000)diagnostic[k]=e.diagnostic[k];setControleErreur({code:['favoris_preuve_absente','favoris_identite_non_unique'].includes(e.code)?e.code:'non_precise',diagnostic});}}
-    finally{mutation.current=false;if(courant()){setOccupe(false);setPhase('');}}
+    finally{mutation.current=false;if(courant()){if(action==='lancer')onPreparation?.(false);setOccupe(false);setPhase('');}}
   };
   const p=progressionFavoris(vue,horloge+decalage.current);
   const rangPhase=phase==='Enregistrement du résultat'?Object.keys(ETAPES_FAVORIS).length:Object.values(ETAPES_FAVORIS).indexOf(phase);

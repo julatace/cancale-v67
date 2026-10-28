@@ -40,6 +40,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');const racine=p
    p=await page();await p.evaluate(()=>{window.savePause=true;window.afficher(true,true,'owner-test',true);});
    await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).click();await p.waitForFunction(()=>typeof window.finSauvegarde==='function');
    await p.evaluate(c=>{if(c==='selection')window.choix=['n2'];if(c==='message')window.texte='Autre message';window.afficher(true,true,'owner-test',true,c!=='ecran');},changement);
+   await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
    await p.evaluate(()=>window.finSauvegarde());await p.getByRole('alert').filter({hasText:'Préparation interrompue'}).waitFor();
    check(await p.evaluate(()=>window.envois.length===0&&!window.appels.some(x=>x.c.action==='lancer')),'préparation modifiée ('+changement+') : aucun lancement ni dispatch');await p.close();
   }
