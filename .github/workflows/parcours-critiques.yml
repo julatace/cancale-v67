@@ -30,6 +30,18 @@ jobs:
           node scripts/bancs/recuperation-auth.cjs
           node scripts/tests/recuperation-pannes-interface.cjs
           node scripts/bancs/confidentialite.cjs
+      - name: Préparer le moteur PDF de contrôle
+        run: |
+          mkdir -p "$RUNNER_TEMP/vrm-pdfjs"
+          curl --fail --silent --show-error https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js --output "$RUNNER_TEMP/vrm-pdfjs/pdf.min.js"
+          curl --fail --silent --show-error https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js --output "$RUNNER_TEMP/vrm-pdfjs/pdf.worker.min.js"
+          (cd "$RUNNER_TEMP/vrm-pdfjs" && sha256sum -c "$GITHUB_WORKSPACE/scripts/pdfjs-test.sha256")
+          echo "VRM_PDFJS_DIR=$RUNNER_TEMP/vrm-pdfjs" >> "$GITHUB_ENV"
+      - name: Vérifier le placement et la lecture des QR après tampon
+        run: |
+          node scripts/tests/bordereau-zone-protegee.cjs
+          node scripts/tests/bordereau-rendu-blanc.cjs
+          node scripts/tests/bordereau-qr-lecture.cjs
       - name: Vérifier les politiques SQL sur une base jetable
         run: |
           sudo apt-get update
