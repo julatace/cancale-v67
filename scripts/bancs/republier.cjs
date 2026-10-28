@@ -373,6 +373,108 @@ const projette = (row, sel) => {
         dit(env.length === 2 && env.every((x) => x.viaBrouillon === true), 'par défaut, chaque annonce passe par un brouillon Vinted puis est mise en ligne', JSON.stringify(env.map((x) => x.viaBrouillon)));
       } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, 160)); }
       await ctx.close(); }
+    // ── (28 oct., sa demande) « un bouton pour refaire un brouillon raté » :
+    //    sur la ligne ratée de Republier, et dans « Brouillons à refaire ».
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── brouillons à refaire · ${vp.width} px`);
+      const vieux = new Date(auj - 3600e3).toISOString(), recent = new Date(auj - 120e3).toISOString();
+      const vb = (o) => ({ corps: '{"draft":{}}', titre: 'Puma Suede bleu taille 42', prix: 55, at: vieux, majAt: vieux, uid: '111', publier: true, supprime: true, ...o });
+      const rows2 = rows.concat([
+        { id: 'coffre_111_9500', data: { id: '9500', uid: '111', title: 'Puma Suede', photos: [], versBrouillon: vb({ etat: 'a-refaire' }) } },
+        { id: 'coffre_111_9501', data: { id: '9501', uid: '111', title: 'En cours', photos: [], versBrouillon: vb({ etat: 'enregistre', at: recent, majAt: recent, titre: 'Passage en cours' }) } },
+        { id: 'coffre_111_9502', data: { id: '9502', uid: '111', title: 'Fait', photos: [], versBrouillon: vb({ etat: 'fait', titre: 'Déjà fait' }) } },
+        { id: 'coffre_111_9503', data: { id: '9503', uid: '111', title: 'Incertaine', photos: [], versBrouillon: vb({ etat: 'mise-en-ligne-incertaine', titre: 'Mise en ligne floue' }) } },
+        { id: 'coffre_111_9504', data: { id: '9504', uid: '111', title: 'Interrompu', photos: [], versBrouillon: vb({ etat: 'supprime', titre: 'Passage interrompu' }) } },
+      ]);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript((o) => {
+        const post = (m) => window.postMessage(m, '*');
+        window.__repub = [];
+        window.addEventListener('message', (e) => {
+          const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+          if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
+          if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+          if (d.__vmr === 'cmd') {
+            window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, confirme: d.confirme });
+            const resp = d.cmd === 'recreerVinted' ? { accepte: true, etape: 'brouillon-a-refaire', refaire: true, raison: "l'annonce est retirée de la vente, mais Vinted a refusé le brouillon (422)." }
+              : d.cmd === 'refaireBrouillon' ? { accepte: true, etape: 'fait', nouvelId: '99500', draftId: '88500' }
+              : { accepte: true, etape: 'recent' };
+            post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
+          }
+        });
+        post({ __vmr: 'ready', version: o.version });
+      }, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows2.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows2.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        const ligneR = pg.locator('[data-refaire-ouvrir]').first();
+        await ligneR.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
+        dit(await ligneR.getAttribute('data-refaire-ouvrir').catch(() => '') === '3', 'Annonces : « 3 brouillons à refaire » (à refaire, interrompu, mise en ligne floue ; ni le passage en cours, ni le fait)', await ligneR.getAttribute('data-refaire-ouvrir').catch(() => 'absent'));
+        await pg.locator('[data-actions-ouvrir]').first().click();
+        dit(await pg.locator('[data-action="refaire"]').count() === 1, 'le menu Actions propose « Brouillons à refaire »');
+        await pg.locator('[data-action="refaire"]').click();
+        await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
+        const lignes = await pg.$$eval('[data-refaire-ligne]', (els) => els.map((e) => e.getAttribute('data-refaire-ligne') + ':' + e.getAttribute('data-refaire-quoi')).sort());
+        dit(lignes.join(',') === '9500:a-refaire,9503:a-verifier,9504:interrompu', 'la liste : à refaire, interrompu, à vérifier', lignes.join(','));
+        dit(await pg.locator('[data-refaire-ligne="9503"] [data-refaire-bouton]').count() === 0, 'mise en ligne sans réponse claire : AUCUN bouton refaire (elle est peut-être en ligne), « Voir mes brouillons » à la place');
+        const hB = await pg.$$eval('[data-refaire-bouton],[data-refaire-regle]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hB.length && hB.every((h) => h >= 44), 'chaque bouton fait au moins 44 px', hB.join(','));
+        dit((await pg.evaluate(() => window.__repub.length)) === 0, 'rien ne part en ouvrant la liste');
+        await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
+        await pg.getByRole('button', { name: 'Annuler' }).last().click().catch(() => {});
+        await pg.waitForTimeout(300);
+        dit((await pg.evaluate(() => window.__repub.length)) === 0, '« Annuler » sur la confirmation : rien ne part');
+        await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
+        await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
+        for (let i = 0; i < 30 && (await pg.locator('[data-refaire-ligne="9500"]').getAttribute('data-refaire-statut')) !== 'fait'; i++) await pg.waitForTimeout(100);
+        const env = await pg.evaluate(() => window.__repub);
+        dit(env.length === 1 && env[0].cmd === 'refaireBrouillon' && env[0].id === '9500' && env[0].uid === '111' && env[0].confirme === true, 'confirmé : UNE commande refaireBrouillon, pour CETTE annonce, confirmée', JSON.stringify(env));
+        dit(await pg.locator('[data-refaire-ligne="9500"]').getAttribute('data-refaire-statut') === 'fait', '… et la ligne dit « fait »');
+        await pg.locator('[data-refaire-ligne="9504"] [data-refaire-regle]').click();
+        dit(await pg.locator('[data-refaire-ligne="9504"]').count() === 0, '« C’est réglé » retire la ligne');
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), `refaire-liste-${vp.width}.png`) }).catch(() => {});
+        await pg.locator('[data-refaire-liste] [aria-label="Fermer"]').click();
+        // La ligne ratée de Republier porte son bouton.
+        await pg.evaluate(() => { window.__repub.length = 0; });
+        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="recreer"]').click();
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click();
+        const l = pg.locator('[data-republier-ligne="9102"]');
+        for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'a-refaire'; i++) await pg.waitForTimeout(100);
+        dit(await l.getAttribute('data-republier-statut') === 'a-refaire' && /refusé le brouillon/.test(await l.innerText()), 'Republier, brouillon raté : la ligne dit « à refaire » avec SA raison', await l.innerText());
+        for (let i = 0; i < 40 && !(await pg.locator('[data-republier-refaire="9102"]').count()); i++) await pg.waitForTimeout(100);
+        dit(await pg.locator('[data-republier-refaire="9102"]').count() === 1, '… et porte « Refaire le brouillon »');
+        dit(/1 brouillon à refaire/.test(await pg.locator('[data-republier-bilan]').innerText().catch(() => '')), 'le bilan compte « 1 brouillon à refaire »');
+        await pg.locator('[data-republier-refaire="9102"]').click();
+        await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
+        for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'fait'; i++) await pg.waitForTimeout(100);
+        const env2 = await pg.evaluate(() => window.__repub);
+        dit(env2.length === 2 && env2[1].cmd === 'refaireBrouillon' && env2[1].id === '9102' && env2[1].confirme === true && await l.getAttribute('data-republier-statut') === 'fait' && /brouillon refait/.test(await l.innerText()), '« Refaire » sur la ligne : refaireBrouillon pour CETTE annonce, puis « brouillon refait »', JSON.stringify(env2.map((x) => x.cmd)));
+        const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « à refaire » a tourné', String(e.message).slice(0, 300)); }
+      await ctx.close();
+    }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }
   if (b) await b.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} republier : ${ko ? ko + ' rouge(s)' : 'tout est vert'}`);
