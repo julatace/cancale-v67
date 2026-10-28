@@ -577,7 +577,9 @@
       ? `<b>N°${esc(ad.numero)}</b> — ${n} champ${n > 1 ? 's' : ''} rempli${n > 1 ? 's' : ''}. ${photos}${ad.publier === true ? '' : ' Relis tout, vérifie la catégorie et choisis le modèle, puis publie.'}`
       : (formulaireVisible()
         ? `<b>N°${esc(ad.numero)}</b> — je n'ai reconnu aucun champ sur cette page. ${photos} Copie la description ci-dessous et colle-la.`
-        : `<b>N°${esc(ad.numero)}</b> — clique <b>« Vendre un article »</b> sur Vestiaire : je remplis dès que le formulaire s'affiche.`))
+        : (/smart-listing/i.test(location.pathname)
+          ? `<b>N°${esc(ad.numero)}</b> — j'attends l'étape des photos du dépôt Vestiaire. Si tu vois une page de connexion, connecte-toi : je reprends ensuite.`
+          : `<b>N°${esc(ad.numero)}</b> — clique <b>« Vendre un article »</b> sur Vestiaire : je remplis dès que le formulaire s'affiche.`)))
       + ligneCat + pub + fini
       + (photosEtat && photosEtat.n === 0 && photosEtat.pasDetourees > 0
         ? `<button id="vrm-vc-orig" data-vc-photos-origine style="display:block;width:100%;min-height:44px;margin-top:9px;border:0;background:#3D7BFF;color:#fff;border-radius:9px;padding:8px;font:700 12px system-ui,sans-serif;cursor:pointer">Attacher mes photos sans détourage</button>`
@@ -642,6 +644,21 @@
     // la main, sans paire lancée depuis VRM : c'est elle qui permettra de
     // choisir la catégorie tout seul. Rien n'est rempli ni cliqué ici.
     if (!ad) { releverSansDepot(); return; }
+    // 5.268 : une page « vendre » SANS formulaire (l'accueil `/sell-clothes-online/`,
+    // où VRM t'envoyait jusqu'ici) ne fait rien d'elle-même. On va au smart
+    // listing (`/smart-listing/`, mesuré), UNE fois par paire et par onglet —
+    // une navigation dans le même site, jamais un clic sur un bouton.
+    if (!/smart-listing/i.test(location.pathname) && /sell|vendre/i.test(location.pathname)) {
+      const cleNav = 'vrmVcVersSmart:' + String(ad.id);
+      let deja = true; try { deja = !!sessionStorage.getItem(cleNav); } catch (_) { deja = true; }
+      await new Promise((res) => setTimeout(res, 1500));
+      if (!deja && !formulaireVisible()) {
+        try { sessionStorage.setItem(cleNav, '1'); } catch (_) {}
+        toast('VRM ouvre le formulaire de dépôt de Vestiaire…');
+        location.assign('/smart-listing/');
+        return;
+      }
+    }
     bandeau(0, ad);
     surveiller(ad);
     // Un clic « Publier » déjà fait dans cet onglet (la page a rechargé après) :

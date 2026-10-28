@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.267.0';
+const CODE_VERSION = '5.268.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12730,11 +12730,14 @@ async function publierVestiaire(msg) {
     return { accepte: true, jobId: cleJob, etape: 'depot' };
   } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
 }
-// ⚠️ ADRESSE NON MESURÉE : la page « vendre » publique de Vestiaire (vue sur
-//    us.vestiairecollective.com, même chemin supposé en fr). Elle mène à
-//    « Vendre un article » ; vc-depot.js attend le formulaire quel que soit
-//    son chemin, seulement dans CET onglet.
-const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/sell-clothes-online/';
+// 28 oct. (5.268) : Julien — « ça m'amène juste sur Vestiaire, sur Vendre un
+//    article, et ça ne fait rien après ». On ouvrait la page d'ACCUEIL « vendre »
+//    (`/sell-clothes-online/`), qui ne porte aucun champ : il fallait cliquer
+//    « Vendre un article » soi-même. Le formulaire est le SMART LISTING,
+//    `/smart-listing/` — MESURÉ dans son navigateur (`vc_recon.pages`, et
+//    `panel_vc_form` relevé sur ce chemin le 28 à 13 h 37). On l'ouvre direct.
+//    vc-depot.js attend le formulaire, seulement dans CET onglet.
+const VC_PAGE_VENDRE = 'https://fr.vestiairecollective.com/smart-listing/';
 
 // ── VESTIAIRE : TES ANNONCES ET LEUR BOOST (5.236) ─────────────────────────
 // `vc_listings` = { items: { [id Vestiaire]: { boost: true|false|null, cles, ref,
