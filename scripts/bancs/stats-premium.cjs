@@ -275,7 +275,7 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
         dit(tcC.includes(fr(caMoisDecl)) && tcC.includes(fr(aPayer)) && tcC.includes(fr(net)), 'carte du mois : CA × 13,5 % = à payer, CA − à payer = net', `${fr(caMoisDecl)} → ${fr(aPayer)} · ${fr(net)}`);
         dit(new RegExp('(?<!\\d)' + nMoisDecl + '(?!\\d)').test(lc.textContent), 'carte du mois : nombre de ventes finalisées de la ligne publiée', String(nMoisDecl));
         dit(lc.couverture && /51 ventes Vinted/.test(lc.textContent) && tcC.includes(fr(982.7)), 'couverture : 51 ventes Vinted sans date de versement (982,70 €) restent dans la page');
-        dit(/2 ventes Leboncoin/.test(lc.textContent) && /Vestiaire Collective/.test(lc.textContent), 'couverture : Leboncoin sans date et Vestiaire pas relié restent dans la page');
+        dit(/2 ventes Leboncoin/.test(lc.textContent) && /Vestiaire Co/.test(lc.textContent), 'couverture : Leboncoin sans date et Vestiaire pas relié restent dans la page');
         dit(/sans date/.test(lc.texte), 'la couverture se VOIT sans rien déplier (au moins « sans date »)');
         // La lecture de `urssaf.cjs` (mêmes motifs, sur le texte VISIBLE) doit
         // toujours retrouver taux, CA cité, à payer, net et nombre de ventes.
