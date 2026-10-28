@@ -99,7 +99,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.244.0';
+const EXT_ATTENDUE = '5.245.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -258,16 +258,108 @@ function clePhotoLbc(u) {
     return x.pathname.replace(/\/(f\d+(?:x\d+)?|tc)\//, '/');
   } catch (_) { return ''; }
 }
-function categorieLbcDe(titre, description, taille) {
-  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
-  if (/(sac|sacoche|bandouli|cabas|pochette|portefeuille|porte-monnaie)/.test(t)) return 'Sacs à main';
-  if (/(veste|manteau|pull|t-?shirt|tee-?shirt|chemise|jean|pantalon|robe|jupe|short|sweat|hoodie|doudoune|gilet|d[ée]bardeur|combinaison|legging|surv[êe]tement|maillot)/.test(t)) return 'Vêtements';
-  if (/(casquette|bonnet|ceinture|montre|lunettes|[ée]charpe|gants|bijou|collier|bracelet|bague|foulard|cravate|portefeuille)/.test(t)) return 'Accessoires & Bagagerie';
-  if (/(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t)) return 'Livres';
-  if (/(chaussure|basket|sneaker|running|derby|mocassin|botte|bottine|escarpin|sandale|tong|ballerine|mule|richelieu|espadrille)/.test(t)) return 'Chaussures';
-  const p = parseFloat(String(taille || '').replace(',', '.'));
-  if (isFinite(p) && p >= 34 && p <= 50) return 'Chaussures';
+// ── LA FAMILLE D'UN ARTICLE, pour choisir sa catégorie sur chaque plateforme ──
+// (28 oct., Julien : « la catégorie ne correspond peut-être pas exactement, elle
+// doit trouver celle qui correspond pour la plateforme ».) Une règle pour
+// Leboncoin, Vestiaire et eBay (§11). La source la plus sûre d'abord :
+//   1. le CHEMIN de la catégorie Vinted de l'annonce (« Hommes > Chaussures >
+//      Baskets », lu dans le catalogue Vinted capté) — il donne aussi le GENRE ;
+//   2. un mot du TITRE (« sneaker », « sac à dos », « jean »…) ;
+//   3. une POINTURE seule (34 à 50, demi-pointure comprise) ⇒ chaussures ;
+//   4. un mot de la DESCRIPTION, seulement si rien d'autre n'a parlé.
+// Le genre ne se devine JAMAIS du titre ni de la pointure : sans chemin Vinted
+// il reste vide (une plateforme qui l'exige le laisse à choisir). Rien de sûr ⇒
+// famille vide : mieux vaut une catégorie à choisir qu'une catégorie fausse (§5).
+const SOUS_FAMILLES = [
+  ['sandales', 'chaussures', /(sandale|\btongs?\b|claquette|\bmules?\b|nu-?pieds|slides?\b)/],
+  ['escarpins', 'chaussures', /escarpin/],
+  ['ballerines', 'chaussures', /ballerine/],
+  ['espadrilles', 'chaussures', /espadrille/],
+  ['mocassins', 'chaussures', /(mocassin|loafer)/],
+  ['derbies', 'chaussures', /(\bderby\b|derbies|richelieu|oxford)/],
+  ['bottes', 'chaussures', /(\bbottes?\b|bottine|\bboots?\b|chelsea)/],
+  ['baskets', 'chaussures', /(basket|sneaker|running|trainer|\brunners?\b)/],
+  ['chaussures', 'chaussures', /chaussure/],
+  ['sacs-dos', 'sacs', /(sacs? [àa] dos|backpack)/],
+  ['sacs-banane', 'sacs', /(banane|bum ?bag|waist ?bag)/],
+  ['pochettes', 'sacs', /pochette/],
+  ['portefeuilles', 'accessoires', /(portefeuille|porte-?monnaie|porte-?cartes)/],
+  ['sacs', 'sacs', /(\bsacs?\b|sacoche|bandouli|cabas|\btote\b)/],
+  ['tee-shirts', 'vetements', /(t-?shirt|tee-?shirt|\btee\b|d[ée]bardeur)/],
+  ['polos', 'vetements', /\bpolos?\b/],
+  ['chemises', 'vetements', /chemise/],
+  ['pulls', 'vetements', /(\bpulls?\b|sweat|hoodie|gilet|cardigan)/],
+  ['manteaux', 'vetements', /(manteau|doudoune|parka)/],
+  ['vestes', 'vetements', /(\bvestes?\b|blouson|bomber|coupe-?vent)/],
+  ['jeans', 'vetements', /\bjeans?\b/],
+  ['pantalons', 'vetements', /(pantalon|jogging|\bcargo\b|legging|surv[êe]tement)/],
+  ['shorts', 'vetements', /\bshorts?\b/],
+  ['robes', 'vetements', /\brobes?\b/],
+  ['jupes', 'vetements', /\bjupes?\b/],
+  ['vetements', 'vetements', /(v[êe]tement|maillot|combinaison)/],
+  ['montres', 'accessoires', /\bmontres?\b/],
+  ['bijoux', 'bijoux', /(bijou|collier|bracelet|\bbagues?\b|boucles? d.oreille|pendentif)/],
+  ['casquettes', 'accessoires', /(casquette|bonnet|chapeau|\bbob\b)/],
+  ['ceintures', 'accessoires', /ceinture/],
+  ['lunettes', 'accessoires', /lunettes/],
+  ['echarpes', 'accessoires', /([ée]charpe|foulard)/],
+  ['gants', 'accessoires', /\bgants?\b/],
+];
+const MARQUES_BASKETS = /\b(nike|adidas|new balance|salomon|asics|puma|reebok|vans|converse|jordan|autry|veja|hoka|on running|saucony|mizuno|onitsuka|diadora|le coq sportif|k-?swiss|fila|yeezy)\b/;
+function cheminCatalogueVinted(catalogue, id) {
+  if (id == null || id === '' || !catalogue || !Array.isArray(catalogue.catalogs)) return '';
+  const cible = String(id); const pile = catalogue.catalogs.slice();
+  let n = 0;
+  while (pile.length && n++ < 20000) {
+    const c = pile.pop();
+    if (!c || typeof c !== 'object') continue;
+    if (String(c.id) === cible) return (c.path ? String(c.path) + ' > ' : '') + String(c.title || '');
+    if (Array.isArray(c.catalogs)) for (const s of c.catalogs) pile.push(s);
+  }
   return '';
+}
+function familleArticle(o) {
+  const x = o || {};
+  const ch = String(x.chemin || '').toLowerCase();
+  const seg = ch ? ch.split('>').map((s) => s.trim()) : [];
+  let genre = '', famille = '', sous = '', source = '';
+  if (/^femmes?$/.test(seg[0] || '')) genre = 'femme';
+  else if (/^hommes?$/.test(seg[0] || '')) genre = 'homme';
+  else if (/^enfants?$/.test(seg[0] || '')) genre = 'enfant';
+  const deux = seg[1] || '';
+  if (/chaussure/.test(deux)) famille = 'chaussures';
+  else if (/v[êe]tement/.test(deux)) famille = 'vetements';
+  else if (/^sacs?\b/.test(deux)) famille = 'sacs';
+  else if (/bijou/.test(deux)) famille = 'bijoux';
+  else if (/accessoire/.test(deux)) famille = 'accessoires';
+  if (famille) source = 'vinted';
+  const essai = (txt) => {
+    for (const [s, f, re] of SOUS_FAMILLES) if ((!famille || famille === f || (famille === 'accessoires' && f === 'bijoux') || (famille === 'sacs' && f === 'accessoires')) && re.test(txt)) return [s, f];
+    return null;
+  };
+  let r = seg.length > 2 ? essai(seg.slice(2).join(' ')) : null;
+  if (!r) r = essai(String(x.titre || '').toLowerCase());
+  if (r) { if (r[0] !== r[1]) sous = r[0]; if (!famille) { famille = r[1]; source = 'titre'; } }
+  if (!famille) {
+    const t = String(x.taille || '').trim();
+    const p = parseFloat(t.replace(',', '.'));
+    if (/^\d{2}(?:[.,]5)?$/.test(t) && p >= 34 && p <= 50) { famille = 'chaussures'; source = 'pointure'; }
+  }
+  if (!famille) { r = essai(String(x.description || '').toLowerCase()); if (r) { famille = r[1]; if (r[0] !== r[1]) sous = r[0]; source = 'description'; } }
+  if (famille === 'chaussures' && !sous && MARQUES_BASKETS.test((String(x.marque || '') + ' ' + String(x.titre || '')).toLowerCase())) sous = 'baskets';
+  return { famille, sous, genre, source };
+}
+// Leboncoin : « Mode » (adulte) ou « Famille » (enfant), le libellé EXACT de sa
+// sous-catégorie (mesuré dans `lbc_catalogue`, fdata du 22 oct.).
+const LBC_CAT_ADULTE = { chaussures: 'Chaussures', vetements: 'Vêtements', sacs: 'Accessoires & Bagagerie', accessoires: 'Accessoires & Bagagerie', bijoux: 'Montres & Bijoux' };
+const LBC_CAT_ENFANT = { chaussures: 'Chaussures enfants', vetements: 'Vêtements enfants', sacs: 'Accessoires & bagagerie enfants', accessoires: 'Accessoires & bagagerie enfants', bijoux: 'Montres & bijoux enfants' };
+function categorieLbcDe(titre, description, taille, chemin, marque) {
+  const t = (String(titre || '') + ' ' + String(description || '')).toLowerCase();
+  if (!chemin && /(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(String(titre || '').toLowerCase())) return 'Livres';
+  const f = familleArticle({ chemin, titre, description, taille, marque });
+  if (!f.famille) return /(manuel|livre|bouquin|roman|\bbd\b|scolaire|cahier)/.test(t) ? 'Livres' : '';
+  const fam = f.sous === 'montres' ? 'bijoux' : f.famille;
+  return (f.genre === 'enfant' ? LBC_CAT_ENFANT : LBC_CAT_ADULTE)[fam] || '';
 }
 function descriptionLbcDe(o) {
   const ref = String(o.ref || '');
@@ -16801,6 +16893,32 @@ function etatEbayDeVinted(etat, conditions) {
 // `faits` : ce que Vinted a ENREGISTRÉ pour la paire (marque, pointure) — pas
 // une déduction. Ils remplissent aussi un champ eBay en texte libre (la marque
 // n'a souvent pas de liste chez eBay) ; une déduction du titre, jamais.
+// (28 oct.) Le GENRE (« Département ») et la COULEUR ne se remplissent que d'un
+// FAIT de Vinted (catégorie de l'annonce, couleur choisie par le vendeur), avec
+// une valeur EXACTE de la liste d'eBay — jamais déduits du titre.
+// Le catalogue Vinted (`vinted_catalogue`, ~550 Ko) n'est lu qu'au choix d'un
+// article dans le formulaire eBay (§4.4), gardé une heure. Illisible ⇒ chemin
+// vide ⇒ aucun genre (« Département » reste à choisir, rien n'est deviné).
+let _catVintedApp = null, _catVintedAppAt = 0, _catVintedAppEnVol = null;
+async function cheminVintedApp(id) {
+  if (id == null || id === '') return '';
+  if (!_catVintedApp || Date.now() - _catVintedAppAt > 3600000) {
+    if (!_catVintedAppEnVol) _catVintedAppEnVol = (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_catalogue&select=c:data->>corps`, { headers: sbAuth() });
+        const rows = r.ok ? await r.json() : null; const c = rows && rows[0] && rows[0].c;
+        if (c) { _catVintedApp = JSON.parse(c); _catVintedAppAt = Date.now(); }
+      } catch (_) {}
+      _catVintedAppEnVol = null;
+    })();
+    await _catVintedAppEnVol;
+  }
+  return cheminCatalogueVinted(_catVintedApp, id);
+}
+// Le TYPE d'article (« Type » eBay) d'après la famille de l'article (§ familleArticle) :
+// seulement une valeur de la liste d'eBay EXACTEMENT égale, et une seule.
+const TYPE_EBAY = { baskets: ['basket', 'baskets', 'sneaker', 'sneakers', 'baskets mode', 'tennis'], bottes: ['botte', 'bottes', 'boots', 'bottine', 'bottines'], sandales: ['sandale', 'sandales'], mocassins: ['mocassin', 'mocassins'], derbies: ['derby', 'derbies', 'richelieu', 'richelieus'], escarpins: ['escarpin', 'escarpins'], ballerines: ['ballerine', 'ballerines'], espadrilles: ['espadrille', 'espadrilles'] };
+const DEPARTEMENT_EBAY = { homme: ['homme', 'hommes', 'men', "men's"], femme: ['femme', 'femmes', 'women', "women's"] };
 function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) {
   const out = {};
   const hay = ' ' + String(titre || '').toLowerCase() + ' ';
@@ -16812,6 +16930,21 @@ function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) 
       if (/marque|brand/.test(nl) && faits.marque) out[a.nom] = String(faits.marque);
       else if (/pointure|taille|size/.test(nl) && faits.taille) out[a.nom] = String(faits.taille).replace('.', ',');
       continue;
+    }
+    if (/d[ée]partement|department|\bgenre\b|gender/.test(nl)) {
+      const voulus = DEPARTEMENT_EBAY[faits.genre] || [];
+      const m = voulus.length ? a.valeurs.find((v) => voulus.includes(String(v).trim().toLowerCase())) : null;
+      if (m) out[a.nom] = m;
+      continue;                                   // le genre ne se devine jamais du titre
+    }
+    if (/^(type|style)\b/.test(nl) && faits.type) {
+      const voulus = TYPE_EBAY[faits.type] || [];
+      const hits = a.valeurs.filter((v) => voulus.includes(String(v).trim().toLowerCase()));
+      if (hits.length === 1) { out[a.nom] = hits[0]; continue; }
+    }
+    if (/couleur|colou?r/.test(nl) && faits.couleur) {
+      const m = a.valeurs.find((v) => String(v).trim().toLowerCase() === String(faits.couleur).trim().toLowerCase());
+      if (m) { out[a.nom] = m; continue; }
     }
     if (/pointure|taille|size/.test(nl) && taille) {
       const t = String(taille).replace(',', '.');
@@ -17840,8 +17973,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // état. Une LECTURE chez eBay (Taxonomy), rien n'est publié.
   const [autoAnalyse, setAutoAnalyse] = React.useState(0);
   const pairCourante = React.useRef(null);
+  // (28 oct.) Le genre de l'article, lu dans la catégorie Vinted (jamais deviné) :
+  // l'analyse l'attend avant de remplir « Département ».
+  const genreRef = React.useRef(null);
   const choisirPaire = (p) => {
     pairCourante.current = p.id;
+    genreRef.current = p.catalogId != null && p.catalogId !== '' ? cheminVintedApp(p.catalogId).then((ch) => familleArticle({ chemin: ch }).genre).catch(() => '') : Promise.resolve('');
     setPairId(p.id); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((p.photos || []).join('\n'));
@@ -17888,7 +18025,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     const conditions = Array.isArray(j.conditions) && j.conditions.length ? j.conditions : null;
     return { categoryId: catId, categoryName: catNom, required, attributs, cats: Array.isArray(j.categories) ? j.categories : [], conditions };
   };
-  const appliquerPubinfo = (j, nomForce, fresh) => {
+  const appliquerPubinfo = (j, nomForce, fresh, genre) => {
     const c = catDepuisPubinfo(j, nomForce);
     if (!c) { setRes({ err: (j && j.error) || 'eBay n\'a pas suggéré de catégorie pour ce titre.' }); return; }
     const { attributs, conditions } = c;
@@ -17906,7 +18043,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     // celle reconnue dans le titre (une liste de marques, jamais inventée).
     const src = pairSel ? pairSel.title : titre;
     const marqueV = (pairSel && pairSel.marque) || '';
-    const auto = autoRemplirAttributs(attributs, { titre: src, marque: marqueV || extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '', faits: { marque: marqueV, taille: (pairSel && pairSel.tailleVinted) || '' } });
+    const auto = autoRemplirAttributs(attributs, { titre: src, marque: marqueV || extractBrand(src) || '', taille: (pairSel && pairSel.taille) || extractSize(src) || '', faits: { marque: marqueV, taille: (pairSel && pairSel.tailleVinted) || '', genre: genre || '', couleur: (pairSel && pairSel.couleur) || '', type: familleArticle({ titre: src, taille: (pairSel && pairSel.taille) || '', marque: marqueV }).sous } });
     // Changement de catégorie ⇒ on repart des valeurs prouvées (les anciennes
     // caractéristiques n'ont pas de sens dans la nouvelle catégorie).
     if (fresh) setAsp(auto); else if (Object.keys(auto).length) setAsp(a => ({ ...auto, ...a }));
@@ -17918,7 +18055,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       const body = { action: 'pubinfo', title: titre, ...corpsCompteEbay(comptePub) };
       if (categoryId) body.categoryId = categoryId;   // choisir une autre catégorie → ses caractéristiques
       const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(body) });
-      appliquerPubinfo(await r.json(), nomForce, !!categoryId);
+      const j = await r.json();
+      let genre = ''; try { genre = await (genreRef.current || Promise.resolve('')); } catch (_) { genre = ''; }
+      appliquerPubinfo(j, nomForce, !!categoryId, genre);
     } catch (_) { setRes({ err: 'Analyse impossible (réseau).' }); }
     setAnalyse(false);
   };
@@ -18048,7 +18187,60 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     return null;
   };
   const garde = gardePublier();
-  const publier = async () => {
+  // ── PUBLIER EN UN CLIC (28 oct.) ─────────────────────────────────────────────
+  // Julien : « quand j'appuie sur publier, l'annonce se publie toute seule avec
+  // les critères et la description de la plateforme d'où elle vient ». Le clic
+  // sur « Publier » d'un article fait, dans l'ordre, ce qu'il faisait à la main :
+  //   1. l'article choisi : titre, prix, état, photos et description de Vinted ;
+  //   2. la catégorie suggérée par eBay et ses critères remplis par des FAITS de
+  //      Vinted (marque, pointure, état, genre d'après la catégorie Vinted,
+  //      couleur) — jamais devinés ;
+  //   3. un critère OBLIGATOIRE resté vide ⇒ on s'arrête, on le NOMME, le
+  //      formulaire est ouvert pour le choisir (rien n'est publié) ;
+  //   4. la vérification à blanc d'eBay (frais lus par nom) ; un refus ⇒ on s'arrête ;
+  //   5. UNE confirmation qui dit tout (titre, prix, catégorie, critères, compte,
+  //      frais), puis la publication — les gardes de `gardePublier` d'abord.
+  const [autoPub, setAutoPub] = React.useState(null);   // null · { id, etape: 'analyse' | 'verif' }
+  const publierEnUnClic = (p) => { setRes(null); setCheck(null); setAutoPub({ id: p.id, etape: 'analyse' }); choisirPaire(p); };
+  React.useEffect(() => {
+    if (!autoPub || autoPub.etape !== 'analyse' || analyse || pairId !== autoPub.id || !autoAnalyse) return;
+    if (!cat) { if (res && res.err) setAutoPub(null); return; }
+    const manquants = (cat.required || []).filter((n) => !String(asp[n] || '').trim());
+    if (manquants.length) {
+      setAutoPub(null);
+      setRes({ err: `Il manque ${manquants.length === 1 ? 'un critère obligatoire' : manquants.length + ' critères obligatoires'} que Vinted ne donne pas : ${manquants.join(', ')}. Choisis-le${manquants.length > 1 ? 's' : ''} ci-dessous, puis « Publier sur eBay » — rien n'est publié.` });
+      try { setTimeout(() => { const el = racine.current; if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 80); } catch (_) {}
+      return;
+    }
+    setAutoPub({ id: autoPub.id, etape: 'verif' });
+    (async () => {
+      const b = buildItem();
+      if (b.err) { setAutoPub(null); setRes({ err: b.err }); return; }
+      const g = gardePublier();
+      if (g) { setAutoPub(null); setRes({ err: g.t }); return; }
+      setVerif(true);
+      const { j } = await appelEbay({ action: 'pubverify', item: b.item, ...corpsCompteEbay(comptePub) });
+      setVerif(false);
+      if (!(j && j.ok)) { setAutoPub(null); setCheck({ err: (j && j.error) || 'eBay refuserait cette annonce — rien n\'est publié.' }); return; }
+      const avertissements = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
+      setCheck({ ok: true, fees: j.fees, frais: j.frais || null, avertissements });
+      const fr = j.frais && typeof j.frais.total === 'number' ? j.frais.total : (typeof j.fees === 'number' ? j.fees : null);
+      const crit = Object.entries(b.item.aspects || asp || {}).filter(([, v]) => String(v || '').trim()).map(([k, v]) => `${k} : ${v}`);
+      const texteConf = [
+        `${titre}`,
+        `Prix : ${eurEbay(Number(String(b.item.price).replace(',', '.')))}${plusieursPub ? ` · compte eBay « ${nomComptePub} »` : ''}`,
+        cat && cat.categoryName ? `Catégorie : ${cat.categoryName}` : '',
+        crit.length ? `Critères : ${crit.join(' · ')}` : '',
+        `Description : celle de Vinted${desc.trim() ? '' : ' (aucune captée : ses caractéristiques)'} · ${urls.length} photo${urls.length > 1 ? 's' : ''}`,
+        fr == null ? 'Frais d\'insertion : eBay ne les a pas annoncés.' : `Frais d'insertion annoncés par eBay : ${eurEbay(fr)}.`,
+        avertissements.length ? `eBay signale : ${avertissements.join(' · ')}` : '',
+      ].filter(Boolean).join('\n\n');
+      const ok = await askConfirm({ title: 'Publier cet article sur eBay ?', desc: texteConf, ok: 'Oui, publier', cancel: 'Annuler' });
+      setAutoPub(null);
+      if (ok) await publier({ dejaConfirme: true });
+    })();
+  }, [autoPub, analyse, cat, asp, pairId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const publier = async (opts = {}) => {
     const b = buildItem(); if (b.err) { setRes({ err: b.err }); return; }
     const g = gardePublier(); if (g) { setRes({ err: g.t }); return; }
     // (9 octobre) Une RÈGLE D'OFFRE part avec l'annonce : eBay vendra la paire
@@ -18069,7 +18261,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       ].filter(Boolean);
       const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
       if (!ok) return;
-    } else if (plusieursPub) {
+    } else if (plusieursPub && !(opts && opts.dejaConfirme)) {
       // Plusieurs comptes : la confirmation NOMME le compte où elle part.
       const ok = await askConfirm({
         title: `Publier sur ton compte eBay « ${nomComptePub} » ?`,
@@ -18187,8 +18379,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 260, overflowY: 'auto' }}>
                   {listePaires.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: '6px 2px' }}>Aucun article ne correspond.</div>}
                   {nJumellesMasquees > 0 && <div data-jumelles-masquees={nJumellesMasquees} style={{ fontSize: 11.5, color: C.muted, padding: '0 2px', lineHeight: 1.45 }}>{nJumellesMasquees === 1 ? 'Un article porte deux N° (même photo sur deux fiches) : il n\'est proposé qu\'une fois.' : `${nJumellesMasquees} articles portent deux N° (même photo sur deux fiches) : chacun n'est proposé qu'une fois.`}</div>}
-                  {listePaires.slice(0, 120).map(p => (
-                    <button key={p.id} type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flexShrink: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {listePaires.slice(0, 120).map(p => { const kP = cleNum(p.num); const bloqueP = !!((ventes && ventes.vendus && typeof ventes.vendus.get === 'function' && ventes.vendus.get(kP)) || (dejaSurEbay && typeof dejaSurEbay.get === 'function' && dejaSurEbay.get(kP))); return (
+                    <div key={p.id} style={{ display: 'flex', gap: 6, alignItems: 'stretch', flexShrink: 0 }}>
+                    <button type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span className="vrm-display" style={{ display: 'block', fontSize: 14, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
@@ -18198,7 +18391,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                           return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même article que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
                     </button>
-                  ))}
+                    {!bloqueP && <button type="button" data-publier-un-clic={p.num} onClick={() => publierEnUnClic(p)} disabled={!!autoPub || busy} title="Catégorie, critères et description de Vinted, vérifiés chez eBay — une confirmation avant de publier" style={{ flexShrink: 0, minWidth: 88, minHeight: 44, border: 'none', borderRadius: 10, background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: (autoPub || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (autoPub || busy) ? 0.55 : 1, padding: '0 12px' }}>{autoPub && autoPub.id === p.id ? (autoPub.etape === 'verif' ? 'eBay vérifie…' : 'Préparation…') : 'Publier'}</button>}
+                    </div>
+                  ); })}
                 </div>
               </>)
             ) : (<>
@@ -18350,7 +18545,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             {garde && <div data-publier-garde={garde.k} style={{ fontSize: 12.5, color: garde.k === 'en-cours' ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
-              <button type="button" data-publier-ebay="1" onClick={publier} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
+              <button type="button" data-publier-ebay="1" onClick={() => publier()} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 14, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
           {/* ENREGISTRER EN BROUILLON (5 octobre) : rien ne part chez eBay. Il
@@ -18400,13 +18595,13 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 //   l'affichage, pas ce qui est en vente sur Vinted). `toutesLues` : chaque
 //   compte a répondu — sans ça, le retrait automatique ne part pas.
 const lireAnnoncesVintedEnLigne = async (comptes) => {
-  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {} };
-  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {} };
+  if (!Array.isArray(comptes)) return { enLigne: null, toutesLues: false, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {}, catalogue: {}, couleur: {} };
+  if (!comptes.length) return { enLigne: new Set(), toutesLues: true, nPhotos: {}, prix: {}, compte: {}, couv: {}, titre: {}, etat: {}, marque: {}, taille: {}, catalogue: {}, couleur: {} };
   const lus = await Promise.all(comptes.map((a) => fetchHarvest(a && a.vinted_user_id, 'listings').catch(() => null)));
   // (16 oct.) Avec le PRIX de l'annonce en ligne (« le même prix d'une plateforme
   // à l'autre »), son COMPTE (l'extension ne lit que celui connecté dans Chrome)
   // et sa couverture — la même lecture, rien de plus n'est lu.
-  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {}, marque = {}, taille = {};
+  const enLigne = new Set(), nPhotos = {}, prix = {}, compte = {}, couv = {}, titre = {}, etat = {}, marque = {}, taille = {}, catalogue = {}, couleur = {};
   let okAny = false, toutes = true;
   lus.forEach((L, k) => {
     if (!(L && Array.isArray(L.items))) { toutes = false; return; }
@@ -18435,9 +18630,14 @@ const lireAnnoncesVintedEnLigne = async (comptes) => {
       if (typeof mq === 'string' && mq.trim()) marque[id] = mq.trim();
       const tl = it.size_title || it.size;
       if (typeof tl === 'string' && tl.trim()) taille[id] = tl.trim();
+      // (28 oct.) La CATÉGORIE Vinted (d'où vient le genre : « Département » sur
+      // eBay) et la couleur affichée — gardées par l'extension depuis la 5.245.
+      if (it.catalog_id != null && it.catalog_id !== '') catalogue[id] = it.catalog_id;
+      const co = it.color1 && typeof it.color1 === 'object' ? it.color1.title : it.color1;
+      if (typeof co === 'string' && co.trim()) couleur[id] = co.trim();
     }
   });
-  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat, marque, taille };
+  return { enLigne: okAny ? enLigne : null, toutesLues: okAny && toutes, nPhotos, prix, compte, couv, titre, etat, marque, taille, catalogue, couleur };
 };
 // (17 oct.) UNE PAIRE, UNE PROPOSITION — Julien : « une paire est deux fois
 // proposée, la 80 et la 81 … et ça me propose de la publier sur eBay, je l'ai
@@ -18487,7 +18687,7 @@ function useEbayPaires(comptes) {
       // La MÊME lecture que la coque (`lireAnnoncesVintedEnLigne`, §11).
       const lu = Array.isArray(comptes) && comptes.length ? await lireAnnoncesVintedEnLigne(comptes) : { enLigne: null, nPhotos: {} };
       const online = lu.enLigne; const nPhotosMap = lu.nPhotos || {};
-      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {}, marqueMap = lu.marque || {}, tailleMap = lu.taille || {};
+      const prixMap = lu.prix || {}, compteMap = lu.compte || {}, couvMap = lu.couv || {}, titreMap = lu.titre || {}, etatMap = lu.etat || {}, marqueMap = lu.marque || {}, tailleMap = lu.taille || {}, catMap = lu.catalogue || {}, couleurMap = lu.couleur || {};
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
@@ -18530,7 +18730,8 @@ function useEbayPaires(comptes) {
         const marque = String(marqueMap[String(id)] || cf.brand || '').trim();
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
         const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
-        out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '' });
+        out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '',
+          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '' });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
       if (!stop) setPaires(out);

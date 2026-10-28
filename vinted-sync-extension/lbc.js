@@ -1082,25 +1082,46 @@
   //    catégorie (`ad.category`, « Chaussures » pour ses paires). Repli : la
   //    liste « Ou choisissez une autre catégorie » (un composant), au cas où
   //    aucune suggestion ne colle.
+  // (28 oct., Julien : « la catégorie ne correspond peut-être pas exactement,
+  // elle doit trouver celle qui correspond ».) Leboncoin propose 3 catégories
+  // (« Mode > Chaussures », « Mode > Vêtements »…) et un champ « Ou choisissez
+  // une autre catégorie ». On compare le DERNIER segment du libellé, EXACTEMENT
+  // (« Chaussures » ≠ « Chaussures enfants ») ; sinon on cherche dans le champ et
+  // on ne clique qu'une option au dernier segment exact. Rien d'exact ⇒ rien
+  // n'est coché (l'annonce reste à compléter, et le bandeau le dit).
+  const normCat = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const dernierSegment = (t) => normCat(String(t || '').split('>').pop());
+  let _catRecherche = 0;
   function choisirCategorie(ad) {
     // ⚠️ Plus de défaut « Chaussures » : catégorie inconnue ⇒ on ne coche RIEN,
     //    Leboncoin la propose (il la devine du titre) et l'utilisateur choisit.
-    //    Un reseller qui ne fait pas de chaussures ne doit pas voir « Chaussures »
-    //    cochée à sa place (Julien, 20 sept.).
-    const cat = String(ad.category || '').trim().toLowerCase();
+    const cat = normCat(ad.category);
     if (!cat) return false;
     const radios = Array.from(document.querySelectorAll('input[type="radio"],[role="radio"]')).filter((el) => !el.disabled && !DANS_ENTETE(el));
     for (const rb of radios) {
-      let lab = (libelleDe(rb) || '').toLowerCase();
-      if (!lab) { const c = rb.closest('label,li,div,button'); if (c) { try { lab = (c.innerText || '').toLowerCase(); } catch (_) {} } }
-      if (lab.includes(cat)) {
+      let lab = (libelleDe(rb) || '');
+      if (!lab) { const c = rb.closest('label,li,div,button'); if (c) { try { lab = (c.innerText || ''); } catch (_) {} } }
+      if (dernierSegment(lab) === cat) {
         if (rb.checked || rb.getAttribute('aria-checked') === 'true') return false;
         try { rb.click(); } catch (_) {}
         return true;
       }
     }
+    // Aucune suggestion exacte : le champ de recherche de catégorie (une fois
+    // tapé, on regarde les options à chaque passage du minuteur, 20 s au plus).
+    const champs = Array.from(document.querySelectorAll('input[type="text"],input[type="search"],input:not([type])')).filter((el) => !el.disabled && !DANS_ENTETE(el) && /cat[ée]gorie/i.test(((libelleDe(el) || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.name || ''))));
+    const ch = champs[0];
+    if (!ch) return false;
+    const opts = Array.from(document.querySelectorAll('[role="option"],[role="listbox"] li,[role="menuitem"]')).filter((o) => !DANS_ENTETE(o) && dernierSegment(o.innerText || o.textContent) === cat);
+    if (opts.length === 1) { try { opts[0].click(); } catch (_) {} return true; }
+    if (opts.length > 1) return false;          // deux options au même nom : on ne tranche pas
+    if (normCat(ch.value) !== cat && Date.now() - _catRecherche > 20000) {
+      _catRecherche = Date.now();
+      try { ch.focus(); setField(ch, String(ad.category)); } catch (_) {}
+    }
     return false;
   }
+
   // ⚠️⚠️ JAMAIS « Publier » — on n'AVANCE que d'une étape (§3/§5 : aucune
   //    publication à l'aveugle). On n'accepte QUE « Continuer »/« Suivant », et
   //    on écarte tout bouton qui publie, dépose, valide, paye ou finalise.
