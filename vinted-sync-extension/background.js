@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.263.0';
+const CODE_VERSION = '5.264.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8093,6 +8093,7 @@ function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, 
 // c'est ce qui permet la mise en ligne sans rien deviner. Les scalaires passent
 // dans `meta` (la base les recopie) : l'app lit la liste sans le corps (§4.4).
 const BROUILLON_ATTENTE_MS = 5000;
+const DESCRIPTION_MIN = 5;   // mesuré : « Le champ Description doit comprendre au moins 5 caractères »
 // (28 oct., SA demande : « va beaucoup plus doucement », « il doit être aléatoire »)
 // Entre deux gestes d'une même republication, une pause TIRÉE AU HASARD dans une
 // plage, jamais deux fois la même : entre deux photos 3–9 s, avant le brouillon
@@ -8322,6 +8323,21 @@ async function refaireBrouillon(msg) {
   }
   let o = null; try { o = JSON.parse(vb.corps); } catch (_) { o = null; }
   const d = o && o.draft && typeof o.draft === 'object' ? o.draft : null;
+  // (28 oct.) Un brouillon enregistré avec une description vide (« \n\ne » : la seule
+  // lettre ajoutée — Vinted refuse moins de 5 caractères) : on reprend la
+  // description de la fiche de l'annonce (apprise depuis), la lettre au bout.
+  if (d) {
+    const brute = String(d.description || '').trim();
+    const lettre = /\n\n([a-z])$/i.exec(brute) ? brute.slice(-1) : (/^[a-z]$/i.test(brute) ? brute : '');
+    const base = lettre ? brute.slice(0, -1).trimEnd() : brute;
+    if (base.length < DESCRIPTION_MIN) {
+      const fiche = await lireFicheAnnonce(id);
+      const cand = [fiche && fiche.description, sauve && sauve.desc].map((t) => { const x = String(t || '').trim(); return /\n\n[a-z]$/i.test(x) ? x.slice(0, -3).trimEnd() : (/^[a-z]$/i.test(x) ? '' : x); }).find((x) => x.length >= DESCRIPTION_MIN);
+      if (!cand) { noterDiag('refaire_sans_description'); return { accepte: false, code: 'description-absente', raison: "VRM n'a pas la description de cette annonce, et Vinted refuse un brouillon sans description (5 caractères au moins). Rien n'a été touché." }; }
+      d.description = lettre ? `${cand}\n\n${lettre}` : cand;
+      noterDiag('refaire_description_reprise');
+    }
+  }
   const prixD = Number(d && (d.price && typeof d.price === 'object' ? d.price.amount : d.price));
   if (!d || !String(d.title || '').trim() || !(prixD > 0) || !(Number(d.catalog_id) > 0) || !String(d.description || '').trim()) return { accepte: false, code: 'illisible', raison: "le contenu enregistré est incomplet — rien n'a été touché" };
   if (!idsCouleurVinted(d).length && COULEURS_VINTED_SURES[Number(msg.couleur)]) d.color_ids = [Number(msg.couleur)];
@@ -8559,11 +8575,13 @@ async function recreerVinted(msg) {
   // (28 oct.) Option : UNE lettre au hasard tout en bas (`msg.lettre`, choisie
   // et montrée par l'app). La lettre d'une recréation précédente (notée dans le
   // coffre, `lettreVRM`) est retirée d'abord : les lettres ne s'empilent jamais.
-  let descBase = String((details.description || (sauve && sauve.desc) || '')).trim();
+  // (28 oct.) Une description sauvée qui n'est QUE la lettre d'une recréation
+  // précédente (« \n\ne ») ne compte pas : on prend la fiche, sinon le coffre.
   const ancienneLettre = sauve && /^[a-z]$/i.test(String(sauve.lettreVRM || '')) ? String(sauve.lettreVRM) : '';
-  if (ancienneLettre && descBase.endsWith('\n\n' + ancienneLettre)) descBase = descBase.slice(0, -(ancienneLettre.length + 2)).trimEnd();
+  const sansLettre = (t) => { const x = String(t || '').trim(); if (/^[a-z]$/i.test(x)) return ''; return /\n\n[a-z]$/i.test(x) ? x.slice(0, -3).trimEnd() : x; };
+  let descBase = [details.description, sauve && sauve.desc].map(sansLettre).find((x) => x.length >= DESCRIPTION_MIN) || sansLettre(details.description || (sauve && sauve.desc) || '');
   const lettreFin = /^[a-z]$/i.test(String(msg.lettre || '')) ? String(msg.lettre) : '';
-  const description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase;
+  let description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase;
   // 2. La recette de CETTE annonce.
   const modele = await lireModeleRepub(id);
   if (modele === null) return { accepte: false, code: 'modele-lecture', raison: "je n'ai pas pu lire le format — réessaie dans un moment" };
@@ -8573,15 +8591,25 @@ async function recreerVinted(msg) {
   if (!(isFinite(prix) && prix > 0 && prix < 100000)) return { accepte: false, code: 'prix', raison: 'prix illisible' };
   const pl = Number(msg.plancher); if (msg.plancher != null && isFinite(pl) && prix < pl) prix = pl;
   prix = Math.round(prix * 100) / 100;
+  // (28 oct., Air Max 1 Athletic Dept., Zoom Fly 5) Vinted refuse un brouillon dont la
+  // description fait moins de 5 caractères — et c'était APRÈS la suppression. Sans
+  // description connue, on la LIT chez Vinted (l'annonce est encore en ligne) ;
+  // toujours rien ⇒ on s'arrête AVANT de toucher à quoi que ce soit.
+  let appris = null;
+  if (descBase.length < DESCRIPTION_MIN) {
+    appris = await apprendreRecetteVinted(acc, uid, id);
+    const d2 = sansLettre(appris && appris.description);
+    if (d2.length >= DESCRIPTION_MIN) { descBase = d2; description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase; if (appris.codes) details.codes = { ...(details.codes || {}), ...appris.codes }; }
+    else { noterDiag('recreer_sans_description'); return { accepte: false, code: 'description-absente', raison: "VRM ne connaît pas la description de cette annonce, et Vinted refuse une annonce sans description (5 caractères au moins). Ouvre-la sur Vinted → « Modifier » → « Enregistrer » une fois : l'extension l'apprend. Rien n'a été touché." }; }
+  }
   let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
   // (28 oct., « j'ai modifié, corrige et fais ça bien ») La recette manque : on la
   // LIT chez Vinted, comme le fait sa page « Modifier » (une lecture, aucun geste).
   if (essai.manque) {
-    const appris = await apprendreRecetteVinted(acc, uid, id);
+    if (!appris) appris = await apprendreRecetteVinted(acc, uid, id);
     if (appris && appris.codes) {
       details.codes = { ...(details.codes || {}), ...appris.codes };
-      if (!details.description && appris.description) details.description = appris.description;
-      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description: description || appris.description || '', brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
     } else if (appris && appris.raison) {
       return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
     }

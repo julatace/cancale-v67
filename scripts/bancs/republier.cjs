@@ -230,7 +230,12 @@ const projette = (row, sel) => {
           const txt = vu ? await b.innerText() : '';
           const tot = await pg.locator('[data-republier-total]').getAttribute('data-republier-total').catch(() => null);
           dit(vu && /Étape 4 sur 6/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 6 · Création du brouillon »)', txt || 'absente');
-          dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot)); }
+          dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot));
+          // (28 oct., sa demande) Le compte rendu est écrit à chaque pas, pendant la file.
+          globalThis.__jMid = await pg.evaluate(() => localStorage.getItem('vrm_operation_repub'));
+          let jm = {}; try { jm = JSON.parse(globalThis.__jMid || '{}'); } catch (_) {}
+          const pc = (jm.paires || []).find((x) => x.id === '9103') || {};
+          dit(jm.action === 'recreer' && !jm.fini && pc.etat === 'encours' && pc.etape === 'brouillon' && (jm.paires || []).filter((x) => x.etat === 'attente').length === 3, 'pendant la file, l’appareil garde où elle en est (9103 en cours, étape brouillon, 3 pas commencées)', String(globalThis.__jMid).slice(0, 200)); }
         for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(250); }
         const envois = await pg.evaluate(() => window.__repub || []);
         dit(await pg.locator('[data-republier-progression]').count() === 0, 'plus aucune barre de paire une fois la file arrêtée', String(await pg.locator('[data-republier-progression]').count()));
@@ -255,6 +260,17 @@ const projette = (row, sel) => {
         dit(await l2.getAttribute('data-republier-statut') === 'echec' && /catégorie exacte/.test(await l2.innerText()), 'la paire refusée dit « pas faite » avec SA raison, jamais « recréée »', await l2.innerText());
         const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+        // (28 oct., sa demande) L'app rechargée EN PLEINE file : le compte rendu dit où elle s'était arrêtée.
+        await pg.evaluate((j) => localStorage.setItem('vrm_operation_repub', j), globalThis.__jMid || '');
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        const cr = pg.locator('[data-compte-rendu]');
+        const vuCr = await cr.waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+        const tcr = vuCr ? await cr.innerText() : '';
+        dit(vuCr && await pg.locator('[data-cr-encours="9103"]').count() === 1 && /Création du brouillon/.test(tcr) && await pg.locator('[data-cr-restent="3"]').count() === 1, 'après un rechargement : le compte rendu dit la paire en cours (et son étape) et les 3 pas commencées', tcr.slice(0, 300));
+        await pg.locator('[data-cr-reprendre]').click().catch(() => {});
+        const suiv = pg.locator('[data-republier-suivant]');
+        await suiv.waitFor({ timeout: 4000 }).catch(() => {});
+        dit(/\(3\)/.test(await suiv.innerText().catch(() => '')), '« Reprendre » rouvre Republier avec les 3 pas commencées déjà choisies', await suiv.innerText().catch(() => 'absent'));
         dit(!errs.length, 'aucune erreur d’app', errs[0]);
       } catch (e) { dit(false, 'le scénario « Republier » a tourné', String(e.message).slice(0, 1500)); }
       await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-' + vp.width + '.png') });
