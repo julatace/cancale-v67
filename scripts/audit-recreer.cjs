@@ -324,6 +324,26 @@ const zero = (j) => j.vinted.length === 0;
     const v = f.lignes['coffre_111_9101'].versBrouillon;
     dit(r.etape === 'fait' && v && typeof v.corps === 'string' && v.etat === 'fait', "archivage lent pendant une republication : la sauvegarde du passage reste dans VRM (rien de perdu)", JSON.stringify({ etape: r.etape, vb: v ? v.etat : 'PERDUE' })); }
 
+  // G2 — (28 oct., vu chez Julien) un identifiant d'annonce au-delà de 2 147 483 647
+  //      (« 10312441750 ») : la base répondait 400 à `data->10312441750` (lu comme un
+  //      index de tableau) ⇒ « je n'ai pas pu lire la fiche — on ne touche à rien ».
+  { const GID = '10312441750';
+    const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { [GID]: { numero: '2' } } }, vinted_item_details: { [GID]: { description: 'Jordan 3 Fear', photos: PHOTOS_D } },
+      ['coffre_111_' + GID]: { id: GID, title: 'Jordan 3', price: 120, desc: 'Jordan 3 Fear', photos: PHOTOS },
+      vrm_vinted_modele: { [GID]: { corps: MODELE.replace('9101', GID), at: nowISO(), uid: '111' } } };
+    let n = 500;
+    const f = faireFond({ src: process.env.BG_SRC || undefined, lignes, connecte: '111', retardLecture: () => 0, cdn: () => ({ status: 200 }),
+      vinted: (e) => {
+        if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: 200, body: { id: ++n } };
+        if (e.methode === 'POST' && /\/item_upload\/items\/?$/.test(e.chemin)) return { status: 200, body: { item: { id: 77002 } } };
+        if (e.methode === 'POST' && /\/item_upload\/drafts\/?$/.test(e.chemin)) return { status: 200, body: { draft: { id: 88002 } } };
+        if (e.methode === 'POST' && /\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: 200, body: { code: 0 } };
+        if (e.methode === 'POST' && new RegExp('/items/' + GID + '/delete$').test(e.chemin)) return { status: 200, body: {} };
+        return { status: 404, body: {} };
+      } });
+    let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: GID, prix: 110, titre: 'Jordan 3 Fear', viaBrouillon: true, confirme: true }); } catch (e) { r = { erreur: String(e.message) }; }
+    dit(r.code !== 'fiche-lecture' && r.etape === 'fait', `identifiant d'annonce > 2 147 483 647 : la fiche se lit et la republication aboutit`, JSON.stringify({ code: r.code, etape: r.etape, raison: r.raison })); }
+
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique
   //     (le carton porte ce N°) ; deux paires sans lien, si.

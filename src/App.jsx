@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.256.0';
+const EXT_ATTENDUE = '5.257.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11840,8 +11840,16 @@ const ACTIONS_REPUB = {
   versBrouillon: { titre: 'Repasser en brouillon', etapes: [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Passer en brouillon']], lancer: 'Passer en brouillon', fait: '✓ en brouillon', faits: 'passée en brouillon', confirme: () => `seront retirées de la vente et rangées dans mes brouillons Vinted, comme dans l'aperçu.` },
   enLigne: { titre: 'Mettre des brouillons en ligne', etapes: [['choix', '1. Choisir'], ['envoi', '2. Mettre en ligne']], lancer: 'Mettre en ligne', fait: '✓ en ligne', faits: 'mise en ligne', confirme: () => `seront mis en ligne sur mon compte Vinted, tels que je les ai enregistrés.` },
 };
-function RepublierVinted({ annonces, publier, refaire = null, compteChrome, majExt, lettreOk, brouillonOk, onClose, action = 'recreer' }) {
+function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, action = 'recreer' }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
+  // (28 oct., sa demande) Seules les paires du compte Vinted OUVERT DANS CHROME
+  // (cookie lu par l'extension, `vintedDeChrome`) : c'est le seul au nom duquel
+  // l'extension peut agir (garde stricte). Compte pas su ou aucun ⇒ aucune paire,
+  // et la phrase dit pourquoi — jamais une liste d'un autre compte.
+  const compteUid = compteChrome ? String(compteChrome) : '';
+  const annonces = compteUid ? toutes.filter((a) => String(a.uid || '') === compteUid) : [];
+  const horsCompte = toutes.length - annonces.length;
+  const nomCompte = (compteVinted && compteVinted.login) || (compteUid ? `compte ${compteUid}` : '');
   const recree = action === 'recreer' || action === 'versBrouillon';   // une nouvelle annonce / un brouillon : favoris perdus
   const [etape, setEtape] = useState('choix');
   const [sel, setSel] = useState(() => new Set());
@@ -12022,11 +12030,18 @@ function RepublierVinted({ annonces, publier, refaire = null, compteChrome, majE
                 <option value="favoris">Les moins de favoris d'abord</option>
               </select>
             </div>}
+            <div data-republier-compte={compteUid || (compteVinted === null ? 'aucun' : 'passu')} style={{ fontSize: 12.5, color: compteUid ? C.muted : C.warn, lineHeight: 1.45 }}>
+              {compteUid
+                ? <>Compte ouvert dans Chrome : <b style={{ color: C.text }}>{nomCompte}</b>{horsCompte > 0 ? ` · ${horsCompte} ${action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'paire' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes : ouvre vinted.fr sur l'un d'eux dans Chrome pour ${horsCompte > 1 ? 'les' : 'la'} voir ici.` : ''}</>
+                : compteVinted === null
+                  ? "Aucun compte Vinted n'est ouvert dans Chrome : ouvre vinted.fr connecté sur le compte à republier, puis rouvre cette fenêtre."
+                  : "VRM ne sait pas encore quel compte Vinted est ouvert dans Chrome (extension pas encore interrogée ou qui ne répond pas) : ouvre vinted.fr sur le compte à republier, puis rouvre cette fenêtre."}
+            </div>
             <div style={{ fontSize: 12.5, color: C.muted }}>{action === 'enLigne' ? `${annonces.length} brouillon${annonces.length > 1 ? 's' : ''} sur Vinted` : `${annonces.length} paire${annonces.length > 1 ? 's' : ''} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce reste la même sur Vinted (même N°, favoris et vues gardés) : seuls le prix et le titre changent.</div>}
             {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait. Favoris et vues ne suivent pas.</div>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : action === 'enLigne' ? "Aucun brouillon sur Vinted d'après tes dressings lus par VRM." : "Aucune paire en ligne sur Vinted n'a été lue pour l'instant."}</div>}
+              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucune paire en ligne sur ce compte n'a été lue pour l'instant."}</div>}
               {liste.map((a) => (
                 <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? `${C.accent}0d` : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
                   <input type="checkbox" disabled={!!a.bloque} checked={sel.has(a.id) && !a.bloque} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
@@ -18783,8 +18798,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         if (pairCourante.current !== p.id) return;
         if (!(r && r.accepte && r.etape === 'fait')) { setPhotosEtat({ raison: (r && r.raison) || "l'extension n'a pas répondu" }); return; }
         try {
-          const rq = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=d:data->${encodeURIComponent(String(p.id))}`, { headers: sbAuth() });
-          const rows = rq.ok ? await rq.json() : null;
+          const rq = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=d:data->${encodeURIComponent('"' + String(p.id) + '"')}`, { headers: sbAuth() });
+          let rows = rq.ok ? await rq.json() : null;
+          // Une clé numérique (identifiant d'annonce) peut être refusée par la base : la ligne entière, une fois.
+          if (!rq.ok) { const rq2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() }); const r2 = rq2.ok ? await rq2.json() : null; rows = r2 && r2[0] && r2[0].data ? [{ d: r2[0].data[String(p.id)] }] : null; }
           const d = rows && rows[0] && rows[0].d;
           const lues = Array.isArray(d && d.photos) ? d.photos.map((x) => typeof x === 'string' ? x : (x && (x.url || x.full_size_url)) || '').filter(Boolean) : [];
           if (lues.length) {
@@ -48130,10 +48147,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // la liste « Brouillons à refaire » (§11), l'annonce désignée par son identité.
         const refaireOk = extSait('refaire')==='ok';
         const refaireLigne = refaireOk ? async (a) => { const r = await refaireBrouillon({ uid:a.uid, id:a.id }); return r.etape==='fait' ? { etat:'fait', raison:r.raison||'' } : r.etape==='incertain' ? { etat:'incertain', raison:r.raison||'' } : r.refaire ? { etat:'a-refaire', raison:r.raison||'' } : { etat:'echec', raison:r.raison||'' }; } : null;
-        if (repubAction==='enLigne') return <RepublierVinted key="enLigne" action="enLigne" annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
-        if (repubAction==='modifier') return <RepublierVinted key="modifier" action="modifier" annonces={annoncesR} publier={publierModif} compteChrome={etatX} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
-        if (repubAction==='versBrouillon') return <RepublierVinted key="versBrouillon" action="versBrouillon" annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
-        return <RepublierVinted key="recreer" annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='enLigne') return <RepublierVinted key="enLigne" action="enLigne" annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='modifier') return <RepublierVinted key="modifier" action="modifier" annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
+        if (repubAction==='versBrouillon') return <RepublierVinted key="versBrouillon" action="versBrouillon" annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
+        return <RepublierVinted key="recreer" annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont

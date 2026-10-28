@@ -33,10 +33,12 @@ const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { num
 const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
+  // (28 oct.) Un AUTRE compte (222) : ses paires ne sont pas proposées tant que Chrome est sur 111.
+  { id: 'harvest_222_listings', data: { capturedAt: auj.toISOString(), payload: { items: [ann(9301, { title: 'Puma Suede autre compte taille 42', created_at_ts: Math.floor(auj / 1000) - 90 * 86400 })] } } },
   { id: 'vinted_brouillon_9201', data: { id: '9201', uid: '111', titre: 'Nike Air Max 1 dark teal', prix: 65, nPhotos: 4, etat: 'brouillon' } },
   { id: 'vinted_item_details', data: { '9102': { photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg', 'https://images1.vinted.net/t/a/f800/3.jpeg'] } } },
 ];
-const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }, { id: 2, vinted_user_id: '222', login: 'autre_compte', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const VERSION = (/EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '5.247.0';
 const PONT = (o) => {
   const post = (m) => window.postMessage(m, '*');
@@ -158,6 +160,9 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 4000 });
         const paires = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
         dit(paires.join(',') === '9103,9102,9106,9107', 'la liste = ses 4 paires en ligne, les plus anciennes d’abord', paires.join(','));
+        dit(!paires.includes('9301'), 'seules les paires du compte ouvert dans Chrome (111) : celle de l’autre compte n’est pas proposée', paires.join(','));
+        const ligneCompte = await pg.locator('[data-republier-compte]').first().innerText().catch(() => '');
+        dit(/compte_test/.test(ligneCompte) && /1 paire sur tes autres comptes/.test(ligneCompte), 'la fenêtre nomme le compte ouvert et dit combien de paires sont sur les autres', ligneCompte);
         const info = await pg.locator('[data-republier-paire="9102"]').innerText();
         dit(/en ligne depuis 30 j/.test(info) && /6 favoris/.test(info) && /10 vues/.test(info), 'chaque paire dit son ancienneté, ses vues et ses favoris', info.replace(/\n/g, ' · '));
         dit(await pg.locator('[data-republier-recente="9106"]').count() === 1 && await pg.locator('[data-republier-recente="9102"]').count() === 0, 'une paire recréée il y a moins de 2 jours le dit (et seulement elle)');
