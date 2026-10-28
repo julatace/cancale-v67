@@ -7,6 +7,19 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — le tour de l'espace Leboncoin sur ses vraies données :** Julien : « fais pareil pour
+> Leboncoin ». Rendu Ventes · Achats · Annonces · Messages · Colis (390/1512, clair/sombre) sur la copie
+> lecture seule ; CA finalisé 178 € (58 + 75 + 45) et achats reçus 115,50 € = la base. Corrigé : une vente
+> livrée affichait l'étape brute « Paiement effectué » (coupée à 390 px) alors que les totaux la comptent
+> finalisée ⇒ la ligne dit la règle (Finalisée · À envoyer · En transit · Annulée, `data-lbc-etat`) ;
+> « Mes annonces » montrait la référence BRUTE (« 493 ») ⇒ le N° de la règle de l'écran (`numeroLbcIdentite`,
+> lien posé à la main puis réf traduite par la 013 : « N°B233 ») ; achats sans année et dans le désordre
+> (2024/2025/2026) ⇒ le plus récent d'abord, l'année quand ce n'est pas celle-ci (ventes aussi) ; Messages
+> nommait « Compte Leboncoin » le compte du compteur alors que `lbc-account:{id}` (même identité) porte
+> « Totomondu · particulier ». Preuves : `plateformes-premium` (8 rouges sur l'avant), `lbc-messages`
+> (scénario session, 1 rouge). `lbc-publier-app` H/H2 instable (« not visible ») À L'IDENTIQUE sur l'avant.
+> Geste : rouvrir « Mes annonces » sur leboncoin.fr (lue il y a 6 j).
+
 > **28 octobre — le tour de l'espace Vinted sur ses vraies données (5.246) :** Julien : « commence par Vinted,
 > fais le tour et corrige tout ». Rendu Ventes · Achats · Annonces · Messages (390/1512, clair/sombre) sur une
 > copie lecture seule (scratchpad, jamais dans le dépôt) ; disponible 180 € et en attente 1 264,50 € = la base.

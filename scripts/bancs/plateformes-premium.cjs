@@ -50,7 +50,7 @@ const MAIN = { vinted_annonce_numeros: {
   '9106': { numero: '45', buyPrice: '35' },
   '9201': { numero: '46' },
   '9202': { numero: '47', buyPrice: '40' },
-} };
+}, vrm_lbc_liens: { lb3: 'B233' } };
 const DETAILS = Object.fromEntries([...ITEMS_A, ...ITEMS_B].map((it, k) => [String(it.id), { photos: Array.from({ length: k % 3 === 0 ? 3 : 6 }, (_, i) => `https://images1.vinted.net/t/b${k * 7 + i}/f800/d${it.id}-${i}.jpeg`), description: 'Très bon état, portée quelques fois.' }]));
 const ACCS = [
   { id: 1, vinted_user_id: '111', login: 'julatace35260', domain: 'www.vinted.fr', updated_at: cap },
@@ -59,14 +59,19 @@ const ACCS = [
 // Leboncoin : trois ventes, un achat ; des annonces portant la référence VRM.
 const lbc = (txId, titre, cents, o) => Object.assign({ txId, title: titre, price: cents, isSeller: true, at: ilYaJ(2).toISOString(), image: `https://images1.vinted.net/t/b${++nPhoto}/f800/lbc${txId}.jpeg`, photo: `https://images1.vinted.net/t/b${nPhoto}/f800/lbc${txId}.jpeg` }, o);
 const LBC_VENTES = { ventes: {
-  l1: lbc('l1', 'Nike Air Force 1 blanc taille 42 — très bon état', 6500, { stepStatus: 'done', stepLabel: 'Paiement effectué', deliveryLabel: 'Mondial Relay' }),
+  // (28 oct.) La forme RÉELLE d'une vente livrée : l'étape dit encore « Paiement effectué ».
+  l1: lbc('l1', 'Nike Air Force 1 blanc taille 42 — très bon état', 6500, { itemId: 'lb1', stepStatus: 'validation', stepLabel: 'Paiement effectué', parcelStatus: 'delivered', deliveryLabel: 'Mondial Relay', dateVente: ilYaJ(3).toISOString() }),
   l2: lbc('l2', 'Adidas Gazelle bleu taille 40', 7200, { stepLabel: 'Colis à envoyer', deliveryLabel: 'Colissimo' }),
   l3: lbc('l3', 'Salomon Speedcross 5 noir taille 44', 11000, { stepLabel: 'En cours de livraison', deliveryLabel: 'Shop2Shop' }),
-  a1: lbc('a1', 'Lot New Balance 990v5 gris taille 43', 8500, { isSeller: false, stepStatus: 'done', stepLabel: 'Terminé' }),
+  a3: lbc('a3', 'Ancien achat Vapor Pro', 1200, { isSeller: false, stepStatus: 'done', stepLabel: 'Terminé', dateVente: '2024-06-14T12:00:00.000Z' }),
+  a1: lbc('a1', 'Lot New Balance 990v5 gris taille 43', 8500, { isSeller: false, stepStatus: 'done', stepLabel: 'Terminé', dateVente: ilYaJ(5).toISOString() }),
   a2: lbc('a2', 'Asics Gel-Kayano 14 argent taille 42', 6000, { isSeller: false, stepLabel: 'En cours de livraison', deliveryLabel: 'Mondial Relay', label: { qrUrl: 'https://img.test/qr-a2.png', trackingUrl: 'https://suivi.test/a2' } }),
 } };
 const LBC_LISTINGS = { items: [
-  { id: 'lb1', ref: 'VRM-41', subject: 'Nike Air Max 1 obsidian lilac T42', price: 119, status: 'active', url: 'https://www.leboncoin.fr/ad/1' },
+  { id: 'lb1', ref: 'VRM-41', account: 'acc1', subject: 'Nike Air Max 1 obsidian lilac T42', price: 119, status: 'active', url: 'https://www.leboncoin.fr/ad/1' },
+  // (28 oct.) Une référence BRUTE d'avant (« 493 ») et un lien posé à la main
+  // (B233) : « Mes annonces » dit le N° de la règle, jamais « 493 ».
+  { id: 'lb3', ref: '493', account: 'acc1', subject: 'Nike Sacai LD waffle T45', price: 145, status: 'active', url: 'https://www.leboncoin.fr/ad/3' },
   { id: 'lb2', ref: 'VRM-43', subject: 'Adidas Samba OG noir T38,5', price: 89, status: 'active', url: 'https://www.leboncoin.fr/ad/2' },
 ], capturedAt: cap };
 const LBC_MSG = { compteurs: { u1: { unread: 3, at: cap } }, comptes: { u1: { name: 'Julien F.', pro: false, at: cap } } };
@@ -225,8 +230,8 @@ const mesurer = (pg, tel) => pg.evaluate((tel) => {
 
 const ecrans = [
   { nom: 'annonces', tab: 'plat_vinted', section: 'annonces', attend: '[data-carte-annonce]', attrs: ['[data-ann-resume]', '.vrm-ann-grid', '[data-carte-annonce="9101"]'] },
-  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]'] },
-  { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: null, attrs: ['[data-plat-resume]'] },
+  { nom: 'leboncoin-ventes', tab: 'plat_leboncoin', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="leboncoin"]', '[data-section="annonces"]', '[data-lbc-vente="l1"][data-lbc-etat="Finalisée"]'] },
+  { nom: 'leboncoin-annonces', tab: 'plat_leboncoin', section: 'annonces', attend: null, attrs: ['[data-plat-resume]', '[data-lbc-catalog-id="lb3"] [data-lbc-catalog-num="B233"]'] },
   { nom: 'leboncoin-achats', tab: 'plat_leboncoin', section: 'achats', attend: '[data-lbc-achat]', attrs: ['.vrm-buy-row[data-lbc-achat="a1"]', '.vrm-buy-row[data-lbc-achat="a2"]', '[data-lbc-achat="a2"] a[href="https://suivi.test/a2"]', '[data-lbc-achat="a2"] [data-lbc-achat-qr]'] },
   { nom: 'leboncoin-messages', tab: 'plat_leboncoin', section: 'messages', attend: '[data-messages-lbc]', attrs: ['[data-messages-lbc]', '[data-compte-lbc="u1"]'] },
   { nom: 'ebay-ventes', tab: 'plat_ebay', section: 'ventes', attend: '[data-ventes-kpi]', attrs: ['[data-ventes-kpi="ebay"]'] },
@@ -300,6 +305,17 @@ const ecrans = [
             if (/^ebay/.test(ec.nom)) dit(b2.etats.every((e) => !e.coupe), 'l’état d’une vente eBay n’est pas coupé', JSON.stringify(b2.etats));
           }
           if (ec.nom === 'leboncoin-achats') dit(!b2.titreAchats, 'pas de second titre « Achats Leboncoin » sous l’onglet Achats');
+          if (ec.nom === 'leboncoin-achats') {
+            // (28 oct.) Le plus récent d'abord, et l'année quand ce n'est pas celle-ci.
+            const o = await pg.evaluate(() => [...document.querySelectorAll('[data-lbc-achat]')].map((e) => ({ id: e.getAttribute('data-lbc-achat'), t: e.innerText })));
+            const i1 = o.findIndex((x) => x.id === 'a1'), i3 = o.findIndex((x) => x.id === 'a3');
+            dit(i1 >= 0 && i3 > i1, 'les achats Leboncoin : le plus récent d’abord', JSON.stringify(o.map((x) => x.id)));
+            dit(i3 >= 0 && /2024/.test(o[i3].t), 'un achat d’une autre année dit son année', i3 >= 0 ? o[i3].t.replace(/\n/g, ' · ') : '');
+          }
+          if (ec.nom === 'leboncoin-annonces') {
+            const t = await pg.evaluate(() => { const e = document.querySelector('[data-lbc-catalog-id="lb3"]'); return e ? e.innerText : ''; });
+            dit(t && !/\b493\b/.test(t), 'la référence brute (« 493 ») n’est pas affichée', t.replace(/\n/g, ' · '));
+          }
           if (ec.evaluer && !tel) {
             // Annuler la confirmation n'envoie RIEN ; « Laisser l'évaluation » envoie
             // exactement { action:'evaluer', itemId, transactionId, buyer, confirme:true }.
