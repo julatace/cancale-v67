@@ -58,6 +58,16 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — les PLATEAUX de la pièce 3D, colonne par colonne :** Julien : « fais pareil pour les
+> planches de la vue 3D ». Étagère métal ou bois (pas à bacs, pas la table) : `it.planches`, même forme que « Mes
+> meubles » (règle déplacée dans `src/stockRegles.js` : `planchesCases`, `planchesRangees`, `plateauxMeuble`,
+> `tasserPlateaux`). ABSENT ⇒ tous les plateaux (comme avant). Sans plateau sous une case, ses boîtes tombent dans la
+> case du dessous tant qu'elle a de la place (`graviteCases(…, it)`, et `updateItem` tasse toute écriture) ; aucune
+> boîte perdue, aucun numéro changé. Réglage : Aménager → toucher l'étagère → « Plateaux, colonne par colonne »
+> (`ChoixPlanches plateau`, le même dessin que « Mes meubles »). La 3D dessine les morceaux (`buildMetal`, sonde
+> `plateaux`) et ne montre plus de place libre au-dessus d'un plateau qui manque. Ajouter un niveau (en haut) décale
+> les plateaux réglés. Banc `stock-finitions.cjs` IX (390/1512 ; `tasserPlateaux` neutralisé ⇒ 4 rouges).
+
 > **28 octobre (nuit, suite) — les planches COLONNE PAR COLONNE :** Julien : « rends les planches réglables
 > colonne par colonne ». `m.planches` garde un NOMBRE pour une planche pleine largeur (forme d'avant, lue telle
 > quelle) et une chaîne « r:c » pour un morceau sous la rangée r, colonne c. Une règle : `planchesCases` (lit) /

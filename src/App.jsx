@@ -29,7 +29,7 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -25984,8 +25984,11 @@ const casesDe = (it, wallH) => { const ft = FURN_TYPES[it && it.type] || {}; ret
 // (une case de commode peut en empiler plusieurs) — ne jamais en perdre un.
 // ⚠️ Seulement pour un MUR de boîtes : sur un plateau (étagère, table) rien ne
 //    tombe d'un plateau à l'autre — chaque case garde sa pile.
-const graviteCases = (slots, nr, nc, mode) => {
+// (28 oct.) Sur une étagère dont un plateau a été retiré (colonne par colonne),
+// les boîtes de la case du dessus tombent dans celle du dessous (`it` requis).
+const graviteCases = (slots, nr, nc, mode, it, wallH) => {
   const out = {};
+  if (mode === 'pile' && it) { const ft = FURN_TYPES[it.type] || {}; const pl = plateauxMeuble(it, ft); if (pl) return tasserPlateaux(slots, nr, nc, pl, capaciteCase(ft, it, wallH || 3.4)); }
   if (mode === 'pile' || mode === 'cintre') { for (const k in (slots || {})) { const a = numsCase(slots[k]); if (a.length) out[k] = a; } return out; }
   for (let c = 0; c < nc; c++) {
     const pleins = [];
@@ -26002,7 +26005,7 @@ const meublesDuPlan = (plan) => {
   ((plan && plan.rooms) || []).forEach(rm => (rm.items || []).forEach(it => {
     if (!meubleACases(it)) return;
     const { nr, nc } = dimsMeuble(it); const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
-    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode) });
+    out.push({ roomId: rm.id, roomName: rm.name, it, nr, nc, mode, cap, vue: graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH) });
   }));
   return out;
 };
@@ -26038,7 +26041,7 @@ const ouEstNumero = (plan, num) => {
   const t = cleNum(num); if (!t) return null;
   for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
     if (meubleACases(it)) {
-      const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode);
+      const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH);
       for (const k in vue) if (vue[k].some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: k, nom: nomCase(nr, k, mode, it) };
     }
     if (Array.isArray(it.nums) && it.nums.some(v => cleNum(v) === t)) return { roomId: rm.id, roomName: rm.name, itemId: it.id, itemName: it.name, key: null, nom: 'dans la pile', pileIdx: it.nums.findIndex(v => cleNum(v) === t) };
@@ -26062,9 +26065,11 @@ const rangerNumeroDansPlan = (plan, itemId, key, num) => {
     if (!(c >= 0 && c < nc)) return it;
     const { mode, cap } = casesDe(it, rm.room && rm.room.wallH);
     if (mode === 'pile' || mode === 'cintre') {
-      const slots = empilerDansCase(graviteCases(it.slots, nr, nc, mode), key, v, cap);
-      if (!slots) { plein = true; return it; }
-      res = { itemName: it.name, roomName: rm.name, key, nom: nomCase(nr, key, mode, it) };
+      const slots0 = empilerDansCase(graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH), key, v, cap);
+      if (!slots0) { plein = true; return it; }
+      const slots = graviteCases(slots0, nr, nc, mode, it, rm.room && rm.room.wallH);
+      const kk = Object.keys(slots).find((x) => (slots[x] || []).includes(v)) || key;
+      res = { itemName: it.name, roomName: rm.name, key: kk, nom: nomCase(nr, kk, mode, it) };
       return { ...it, slots };
     }
     const vue = graviteCases(it.slots, nr, nc);
@@ -26098,7 +26103,7 @@ const libererNumeroDuPlan = (plan, itemId, num) => {
     if (it.id !== itemId || !meubleACases(it)) return it;
     const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const slots = {};
     for (const k in (it.slots || {})) { const a = numsCase(it.slots[k]); const reste = a.filter(v => cleNum(v) !== t); if (reste.length !== a.length) fait = true; if (reste.length) slots[k] = reste; }
-    return fait ? { ...it, slots: graviteCases(slots, nr, nc, mode) } : it;
+    return fait ? { ...it, slots: graviteCases(slots, nr, nc, mode, it, rm.room && rm.room.wallH) } : it;
   }) }));
   return fait ? { ...plan, rooms } : null;
 };
@@ -26860,7 +26865,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
     if (items.some(o => !['cadre', 'fenetre'].includes((FURN_TYPES[o.type] || {}).build) && !rectDans(empreinte(o).cx, empreinte(o).cy, empreinte(o).w, empreinte(o).h, p2))) { toast('Un meuble serait hors de la pièce — déplace-le d\'abord.'); return; }
     patchRoom(r => ({ room: { ...r.room, w, h } })); signalerDisposition();
   };
-  const updateItem = (id, patch) => setItems(list => list.map(it => it.id === id ? { ...it, ...patch } : it));
+  // (28 oct.) Toute écriture d'une étagère passe ici : si un plateau manque
+  // (réglé colonne par colonne), les boîtes du dessus tombent dans la case du
+  // dessous — une règle, `tasserPlateaux` (src/stockRegles.js).
+  const updateItem = (id, patch) => setItems(list => list.map(it => {
+    if (it.id !== id) return it;
+    const n = { ...it, ...patch };
+    if (patch && (patch.slots || patch.planches || patch.rows || patch.cols)) { const ft = FURN_TYPES[n.type] || {}; const pl = plateauxMeuble(n, ft); if (pl && Array.isArray(n.planches)) n.slots = tasserPlateaux(n.slots, Math.max(1, n.rows || 1), Math.max(1, n.cols || 1), pl, capaciteCase(ft, n, room.wallH || 3.4)); }
+    return n;
+  }));
   // Déplacement d'un élément depuis la 3D. Une BOÎTE se cale sur la grille-sol
   // (0,5 m) et s'EMPILE : son niveau = nb de boîtes déjà présentes sur cette
   // colonne (donc lâchée sur une pile, elle se pose dessus). Les autres meubles
@@ -27306,6 +27319,17 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       neuf = {}; for (const k in slots) { const [r, c] = k.split('_').map(Number); const nrr = r + (rows - nr); if (nrr >= 0) neuf[nrr + '_' + c] = slots[k]; }
     }
     const patch = { cols, rows, slots: neuf };
+    // Les plateaux réglés colonne par colonne suivent leurs cases : la rangée
+    // ajoutée ou retirée est celle du HAUT, donc chaque plateau descend ou monte
+    // d'un cran dans la numérotation (1 = le haut). Un niveau ajouté arrive avec
+    // son plateau ; une colonne retirée emporte les siens.
+    if (Array.isArray(it.planches)) {
+      const dr = rows - nr, cs = planchesCases(it.planches, nc, nr), u = new Set();
+      cs.forEach((k) => { const [r, c] = k.split(':').map(Number); if (r + dr >= 1 && c <= cols) u.add((r + dr) + ':' + c); });
+      for (let r = 1; r <= dr; r++) for (let c = 1; c <= cols; c++) u.add(r + ':' + c);
+      for (let c = nc + 1; c <= cols; c++) for (let r = 1; r < rows; r++) u.add(r + ':' + c);
+      patch.planches = planchesRangees(u, cols, rows);
+    }
     // Un plateau garde SA hauteur (réglée par « Hauteur d'un niveau », 37,5 cm
     // par défaut) : la contenance par case ne bouge pas.
     if (ft.build === 'metal') patch.h3d = +(rows * hauteurNiveau(it) / 1.5).toFixed(3);
@@ -27738,6 +27762,15 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 {pas('Profondeur', `${Math.round(selItem.h * 100)} cm`, () => changerDimensions(selItem, { h: +Math.max(0.25, selItem.h - 0.05).toFixed(2) }), () => changerDimensions(selItem, { h: +Math.min(room.h, selItem.h + 0.05).toFixed(2) }), 'profondeur')}
                 {pas(ft.build === 'portant' ? 'Cintres' : ft.build === 'table' ? 'Places sur le plateau' : 'Cases par plateau', nc, () => changerCases(selItem, -1, 0), () => changerCases(selItem, 1, 0), 'cases')}
                 <span style={{ fontSize: 12, color: C.muted }}>{cz.mode === 'cintre' ? `${nc} cintres` : `${nr * nc} case${nr * nc > 1 ? 's' : ''} · jusqu'à ${cz.cap} boîte${cz.cap > 1 ? 's' : ''} empilée${cz.cap > 1 ? 's' : ''} par case`}</span>
+                {plateauxReglables(ft) && nr > 1 && (
+                  <details data-plateaux-3d="" style={{ flex: '1 1 100%' }}>
+                    <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>Plateaux, colonne par colonne</summary>
+                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu'elle a de la place. Aucun numéro ne change.</div>
+                    <div style={{ textAlign: 'center' }}>
+                      <ChoixPlanches plateau cols={nc} rows={nr} planches={Array.isArray(selItem.planches) ? selItem.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1)} setPlanches={(v) => updateItem(selItem.id, { planches: planchesRangees(planchesCases(v, nc, nr), nc, nr) })} />
+                    </div>
+                  </details>
+                )}
               </div>
             );
           })()}
@@ -28164,23 +28197,6 @@ function placeDansMeubles(i, m) {
 // une chaîne « r:c » = un morceau sous la rangée r, colonne c (1 = la gauche).
 // Une règle (§11) : `planchesCases` lit, `planchesRangees` range, et tout le
 // reste (dessin, éditeur, gravité) passe par elles.
-function planchesCases(planches, cols, rows) {
-  const c = Math.max(1, +cols || 1), r = Math.max(1, +rows || 1), out = new Set();
-  (Array.isArray(planches) ? planches : []).forEach((x) => {
-    if (typeof x === 'number' || /^\d+$/.test(String(x))) { const n = +x; if (Number.isInteger(n) && n >= 1 && n < r) for (let k = 1; k <= c; k++) out.add(n + ':' + k); return; }
-    const mm = /^(\d+):(\d+)$/.exec(String(x)); if (!mm) return;
-    const n = +mm[1], k = +mm[2]; if (n >= 1 && n < r && k >= 1 && k <= c) out.add(n + ':' + k);
-  });
-  return out;
-}
-function planchesRangees(set, cols, rows) {
-  const c = Math.max(1, +cols || 1), r = Math.max(1, +rows || 1), out = [];
-  for (let n = 1; n < r; n++) {
-    const ks = []; for (let k = 1; k <= c; k++) if (set.has(n + ':' + k)) ks.push(k);
-    if (ks.length === c) out.push(n); else ks.forEach((k) => out.push(n + ':' + k));
-  }
-  return out;
-}
 function planchesDe(m) { return planchesRangees(planchesCases(m && m.planches, m && m.cols, m && m.rows), m && m.cols, m && m.rows); }
 function tasserMeuble(slots, m, presents) {
   const out = { ...slots }; const bouges = {};
@@ -28579,17 +28595,14 @@ function StockMeubles() {
   </>);
 }
 
-// Éditeur de meuble (nom + colonnes × lignes), avec aperçu des cases.
-function EditeurMeuble({ modal, onSave, onDelete }) {
-  const [name, setName] = React.useState(modal.name || '');
-  const [cols, setCols] = React.useState(modal.cols || 4);
-  const [rows, setRows] = React.useState(modal.rows || 3);
-  const [planches, setPlanches] = React.useState(() => (Array.isArray(modal.planches) ? modal.planches : []));
-  const [gravite, setGravite] = React.useState(!!modal.gravite);
+// (28 oct.) Les planches d'un meuble, colonne par colonne : un morceau par
+// colonne entre deux rangées, ⟷ = toute la largeur. Le même dessin pour « Mes
+// meubles » et les étagères de la pièce 3D (§11).
+function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false }) {
+  const mot = plateau ? 'plateau' : 'planche', mots = plateau ? 'plateaux' : 'planches';
   // L'état garde la forme rangée (`planchesRangees`) : une planche pleine
   // largeur reste pleine si on ajoute une colonne.
   const cases = planchesCases(planches, cols, rows);
-  const pl = planchesRangees(cases, cols, rows);
   const pleine = (r) => { for (let c = 1; c <= cols; c++) if (!cases.has(r + ':' + c)) return false; return true; };
   const auMoinsUne = (r) => { for (let c = 1; c <= cols; c++) if (cases.has(r + ':' + c)) return true; return false; };
   const nPlanches = Array.from({ length: Math.max(0, rows - 1) }, (_, i) => i + 1).filter(auMoinsUne).length;
@@ -28597,35 +28610,9 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   const poser = (u) => setPlanches(planchesRangees(u, cols, rows));
   const basculer = (r) => { const u = new Set(cases); const plein = pleine(r); for (let c = 1; c <= cols; c++) { if (plein) u.delete(r + ':' + c); else u.add(r + ':' + c); } poser(u); };
   const basculerCase = (r, c) => { const u = new Set(cases), k = r + ':' + c; if (u.has(k)) u.delete(k); else u.add(k); poser(u); };
-  const step = (set, v, d, min, max) => () => set(Math.max(min, Math.min(max, v + d)));
-  const Stepper = ({ v, set, min, max, label }) => (
-    <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'center', background: C.card2, border: `1px solid ${C.line}`, borderRadius: 12, width: 'fit-content' }}>
-        <button type="button" onClick={step(set, v, -1, min, max)} aria-label="Moins" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 24, cursor: 'pointer' }}>−</button>
-        <span style={{ minWidth: 48, textAlign: 'center', fontSize: 19, fontWeight: 800, color: C.text }}>{v}</span>
-        <button type="button" onClick={step(set, v, 1, min, max)} aria-label="Plus" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 24, cursor: 'pointer' }}>+</button>
-      </div>
-    </div>
-  );
   return (<>
-    <h3 style={{ margin: '0 0 2px', fontSize: 18, color: C.text }}>{modal.id ? 'Modifier le meuble' : 'Nouveau meuble'}</h3>
-    <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Un nom, et le nombre de cases.</div>
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>Nom</div>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Étagère salon" maxLength={30} style={{ width: '100%', background: C.card2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 16, outline: 'none' }} />
-    </div>
-    <div style={{ display: 'flex', gap: 22, marginBottom: 6 }}>
-      <Stepper v={cols} set={setCols} min={1} max={8} label="Colonnes" />
-      <Stepper v={rows} set={setRows} min={1} max={10} label="Lignes" />
-    </div>
-    <label data-gravite-choix="" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '12px 0 4px', cursor: 'pointer', minHeight: 44 }}>
-      <input type="checkbox" checked={gravite} onChange={(e) => setGravite(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
-      <span style={{ fontSize: 14, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Quand tu retires un article, ceux du dessus descendent jusqu'à la planche en dessous.</span></span>
-    </label>
-    <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{nPlanches}</b> planche{nPlanches > 1 ? 's' : ''}{nPartielles ? <> (dont {nPartielles} partielle{nPartielles > 1 ? 's' : ''})</> : null}</> : null}</div>
-      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées, sous une colonne, pour poser ou enlever la planche à cet endroit. Le bouton ⟷ à gauche fait toute la largeur.</div>}
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{nPlanches}</b> {nPlanches > 1 ? mots : mot}{nPartielles ? <> (dont {nPartielles} {plateau ? 'partiel' : 'partielle'}{nPartielles > 1 ? 's' : ''})</> : null}</> : null}</div>
+      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées, sous une colonne, pour poser ou enlever {plateau ? 'le plateau' : 'la planche'} à cet endroit. Le bouton ⟷ à gauche fait toute la largeur.</div>}
       <div data-editeur-planches="" style={{ display: 'grid', gridTemplateColumns: '30px 1fr', columnGap: 6, maxWidth: 300, margin: '0 auto' }}>
         <span />
         <div style={{ background: C.line, padding: '5px 5px 0', borderRadius: '7px 7px 0 0' }}>
@@ -28662,6 +28649,45 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
         <button type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Une à chaque rangée</button>
         <button type="button" onClick={() => setPlanches([])} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Aucune</button>
       </div>}
+  </>);
+}
+
+// Éditeur de meuble (nom + colonnes × lignes), avec aperçu des cases.
+function EditeurMeuble({ modal, onSave, onDelete }) {
+  const [name, setName] = React.useState(modal.name || '');
+  const [cols, setCols] = React.useState(modal.cols || 4);
+  const [rows, setRows] = React.useState(modal.rows || 3);
+  const [planches, setPlanches] = React.useState(() => (Array.isArray(modal.planches) ? modal.planches : []));
+  const [gravite, setGravite] = React.useState(!!modal.gravite);
+  const pl = planchesRangees(planchesCases(planches, cols, rows), cols, rows);
+  const step = (set, v, d, min, max) => () => set(Math.max(min, Math.min(max, v + d)));
+  const Stepper = ({ v, set, min, max, label }) => (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', background: C.card2, border: `1px solid ${C.line}`, borderRadius: 12, width: 'fit-content' }}>
+        <button type="button" onClick={step(set, v, -1, min, max)} aria-label="Moins" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 24, cursor: 'pointer' }}>−</button>
+        <span style={{ minWidth: 48, textAlign: 'center', fontSize: 19, fontWeight: 800, color: C.text }}>{v}</span>
+        <button type="button" onClick={step(set, v, 1, min, max)} aria-label="Plus" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 24, cursor: 'pointer' }}>+</button>
+      </div>
+    </div>
+  );
+  return (<>
+    <h3 style={{ margin: '0 0 2px', fontSize: 18, color: C.text }}>{modal.id ? 'Modifier le meuble' : 'Nouveau meuble'}</h3>
+    <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Un nom, et le nombre de cases.</div>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>Nom</div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Étagère salon" maxLength={30} style={{ width: '100%', background: C.card2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 16, outline: 'none' }} />
+    </div>
+    <div style={{ display: 'flex', gap: 22, marginBottom: 6 }}>
+      <Stepper v={cols} set={setCols} min={1} max={8} label="Colonnes" />
+      <Stepper v={rows} set={setRows} min={1} max={10} label="Lignes" />
+    </div>
+    <label data-gravite-choix="" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '12px 0 4px', cursor: 'pointer', minHeight: 44 }}>
+      <input type="checkbox" checked={gravite} onChange={(e) => setGravite(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
+      <span style={{ fontSize: 14, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Quand tu retires un article, ceux du dessus descendent jusqu'à la planche en dessous.</span></span>
+    </label>
+    <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
+      <ChoixPlanches cols={cols} rows={rows} planches={planches} setPlanches={setPlanches} />
     </div>
     <button type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
     {onDelete && <button type="button" onClick={onDelete} style={{ width: '100%', border: `1px solid ${C.line}`, background: 'transparent', color: C.danger, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 9 }}>Supprimer ce meuble</button>}
