@@ -1,0 +1,28 @@
+name: Parcours critiques VRM
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: parcours-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  comptes-et-reception:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/audit-parcours-production.mjs
+      - run: npm run build
+      - name: Vérifier les politiques SQL sur une base jetable
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql
+          node scripts/audit-confidentialite-sql.cjs
