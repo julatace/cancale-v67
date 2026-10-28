@@ -7,10 +7,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { plateauxMeuble, hauteurPile } from './stockRegles.js';
 
-function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
+// (28 oct., « les photos avec les numéros sur les boîtes ») : une image par adresse,
+// gardée pour la session (une reconstruction de la scène ne la redemande pas).
+// `null` = pas pu la lire : on n'insiste pas, le carton garde son numéro seul.
+const IMAGES_BOITES = new Map();
+const imageBoite = (url, charger) => {
+  if (IMAGES_BOITES.has(url)) return IMAGES_BOITES.get(url);
+  const p = Promise.resolve(typeof charger === 'function' ? charger(url) : null).then((d) => new Promise((ok) => {
+    if (!d || !/^data:image\//.test(d)) return ok(null);
+    const img = new Image(); img.onload = () => ok(img); img.onerror = () => ok(null); img.src = d;
+  })).catch(() => null);
+  IMAGES_BOITES.set(url, p); return p;
+};
+
+function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES, photoBoite, chargerPhoto }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
+  const photoRef = React.useRef({}); photoRef.current = { photoBoite, chargerPhoto }; // (28 oct.) la photo d'un carton, lue au dessin
   const moveRef = React.useRef(canMove); moveRef.current = canMove; // lu en direct par les handlers
   const cbRef = React.useRef({}); cbRef.current = { onCellTap, onPileTap, onSelect, onOpen, onMove }; // callbacks à jour
   const selRef = React.useRef({}); selRef.current = { sel, hi }; // lu par la mise en page des étiquettes
@@ -265,8 +279,8 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       // Face AVANT premium : carton kraft réaliste + ÉTIQUETTE D'EXPÉDITION blanche
       // avec le numéro EN GROS, très lisible (bande d'accent colorée en tête).
       // `accent` = couleur perso du vendeur (code couleur de rangement) sinon teal.
-      const colisFrontTex = (num, accent) => {
-        const S = 320; const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+      const colisFrontTex = (num, accent, img, A, toile) => {
+        const S = 320; const c = toile || document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
         const AC = accent || '#0a7f74';
         x.fillStyle = KRAFT; x.fillRect(0, 0, S, S);
         for (let i = 0; i < 70; i++) { x.fillStyle = `rgba(90,60,25,${0.02 + Math.random() * 0.035})`; x.fillRect(Math.random() * S, Math.random() * S, 3 + Math.random() * 40, 1 + Math.random() * 3); } // grain carton
@@ -282,9 +296,21 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         // Petit label « N° » sur la bande.
         x.fillStyle = 'rgba(255,255,255,0.95)'; x.font = `800 ${Math.round(lh * 0.11)}px system-ui,sans-serif`; x.textAlign = 'left'; x.textBaseline = 'middle';
         x.fillText('N°', lx + lw * 0.08, ly + lh * 0.1);
-        // NUMÉRO en très gros, noir, centré.
-        x.fillStyle = '#131313'; x.font = `900 ${Math.round(lh * 0.6)}px system-ui,"Arial Black",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.fillText(String(num).slice(0, 4), S / 2, ly + lh * 0.6);
+        // (28 oct.) LA PHOTO de la paire à gauche de l'étiquette, le numéro à droite.
+        // La face est plus large que haute (A = largeur / hauteur) : la photo est
+        // dessinée A fois plus étroite pour paraître CARRÉE sur le carton.
+        let numX = S / 2, numTaille = lh * 0.6;
+        if (img) {
+          const ph = lh * 0.72, pw = Math.min(lw * 0.5, ph / Math.max(1, Math.min(4, A || 1))), px = lx + lw * 0.05, py = ly + lh * 0.23;
+          const cote = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height), sx = ((img.naturalWidth || img.width) - cote) / 2, sy = ((img.naturalHeight || img.height) - cote) / 2;
+          x.save(); rrect(x, px, py, pw, ph, 6); x.clip(); try { x.drawImage(img, sx, sy, cote, cote, px, py, pw, ph); } catch (_) {} x.restore();
+          x.strokeStyle = 'rgba(0,0,0,0.12)'; x.lineWidth = 2; rrect(x, px, py, pw, ph, 6); x.stroke();
+          numX = (px + pw + lx + lw) / 2; numTaille = lh * 0.52;
+        }
+        // NUMÉRO en très gros, noir, centré (à droite de la photo quand elle est là).
+        x.fillStyle = '#131313'; x.font = `900 ${Math.round(numTaille)}px system-ui,"Arial Black",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText(String(num).slice(0, 4), numX, ly + lh * 0.6);
+        if (toile) return null;
         const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 8; return t;
       };
       // Dessus : rabats du carton + petite étiquette avec le numéro (gros aussi).
@@ -302,6 +328,15 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         let cc = colisCache.get(num);
         if (!cc) {
           const frontMat = new THREE.MeshStandardMaterial({ map: colisFrontTex(num), roughness: 0.9 });
+          // (28 oct.) La photo arrive plus tard : la face est redessinée dans la
+          // MÊME toile, le numéro reste. Pas de photo sûre pour ce N° ⇒ rien.
+          const { photoBoite, chargerPhoto } = photoRef.current || {};
+          const url = typeof photoBoite === 'function' ? photoBoite(num) : null;
+          if (url) imageBoite(url, chargerPhoto).then((img) => {
+            if (!img || colisCache.get(num) !== cc || !frontMat.map || !frontMat.map.image) return; // scène reconstruite entre-temps : rien
+            colisFrontTex(num, null, img, bw / Math.max(0.01, bh), frontMat.map.image);
+            frontMat.map.needsUpdate = true; frontMat.userData.photo = true;
+          });
           const topMat = new THREE.MeshStandardMaterial({ map: colisTopTex(num), roughness: 0.92 });
           const kraft = kraftMat();
           // ordre BoxGeometry : +X, -X, +Y(dessus), -Y, +Z(avant), -Z → n° avant + dessus, kraft uni ailleurs
@@ -1515,6 +1550,12 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
             const out = [], txt = {}; g.traverse((o) => { if (o.userData && o.userData.hauteurMax != null) out.push({ c: o.userData.pileCol, h: o.userData.hauteurMax, haut: +(o.position.y + o.scale.y / 2).toFixed(3) }); if (o.isSprite && o.userData && o.userData.maxPile != null) txt[o.userData.maxPile] = { texte: o.userData.texte, y: +o.position.y.toFixed(3) }; });
             return out.sort((a, b) => a.c - b.c).map((x) => ({ ...x, texte: txt[x.c] ? txt[x.c].texte : null, texteY: txt[x.c] ? txt[x.c].y : null }));
+          },
+          // (28 oct.) Les cartons qui portent leur photo : { num: true|false }.
+          photosBoites: (itemId) => {
+            const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
+            const out = {}; g.traverse((o) => { if (o.isMesh && Array.isArray(o.material) && o.material[4] && o.userData && o.userData.num != null) out[o.userData.num] = !!o.material[4].userData.photo; });
+            return out;
           },
           // Le nombre max écrit dans chaque case d'une étagère : { 'r_c': { texte, y } }.
           maxCases: (itemId) => {

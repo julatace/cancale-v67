@@ -198,6 +198,15 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — la PHOTO de la paire sur chaque carton (3D) :** « mettre les photos avec les numéros sur
+> les boîtes ». Face avant : la photo à gauche de l'étiquette (dessinée carrée malgré la face allongée), le N° à droite,
+> toujours en gros. La photo d'un N° (`photoParNum`, Stock) : seulement si TOUTES les fiches qui portent ce N° montrent
+> la même photo (`photoKey`) — deux paires sous un N° ⇒ aucune photo, rien demandé (§5). Octets par l'extension, sinon
+> `/api/compte?mode=photo` (`chargerPhotoBoite` : le CDN n'envoie pas de CORS, une image directe salirait la toile WebGL) ;
+> gardés pour la session (`IMAGES_BOITES`) ; illisible ⇒ le numéro seul. Sonde `photosBoites`. Banc `stock-finitions.cjs`
+> XVI (+3 par taille ; garde « une seule photo » retirée ⇒ 2 rouges). ⚠️ Non mesuré : sur sa vraie pièce, le nombre
+> d'appels à la route photo (un par carton, une fois par session ; 3 en vol au plus).
+
 > **28 octobre (nuit, fin) — le nombre max sur les ANCIENS MEUBLES :** « fais pareil pour les anciens meubles ».
 > Grille de boîtes, commode, étagère d'avant, casiers, armoire (physique « colonne ») : une boîte par case
 > (`capaciteCase`) ⇒ une plaque « max 1 » en façade, en haut de chaque case, taille dans la pièce. Sonde
