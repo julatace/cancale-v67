@@ -11556,6 +11556,18 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
   const [pArr, setPArr] = useState('aucun');
   const [pFin, setPFin] = useState('aucune');
   const [esp, setEsp] = useState(REPUB_ESP_DEFAUT);
+  // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
+  // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
+  const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
+  const [espMode, setEspMode] = useState(espMem.mode === 'aleatoire' ? 'aleatoire' : 'fixe');
+  const [espMin, setEspMin] = useState(Number(espMem.min) > 0 ? Number(espMem.min) : 1);
+  const [espMax, setEspMax] = useState(Number(espMem.max) > 0 ? Number(espMem.max) : 3);
+  const [prochaine, setProchaine] = useState(null);  // { at, s } : la prochaine paire part à `at`
+  const [, setTic] = useState(0);
+  const minutesOk = (v) => { const n = Number(String(v).replace(',', '.')); return isFinite(n) && n > 0 ? Math.min(60, Math.round(n * 10) / 10) : 1; };
+  const bornesAlea = () => { const a = fileClamp(minutesOk(espMin) * 60), b = fileClamp(minutesOk(espMax) * 60); return [Math.min(a, b), Math.max(a, b)]; };
+  React.useEffect(() => { save('vrm_republier_esp', { mode: espMode, min: espMin, max: espMax }); }, [espMode, espMin, espMax]);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (!prochaine) return undefined; const t = setInterval(() => setTic((n) => n + 1), 1000); return () => clearInterval(t); }, [prochaine]);
   const [ok, setOk] = useState(false);
   const [mode, setMode] = useState('idle');          // idle | run | pause | fini
   const [st, setSt] = useState({});                  // id → { etat, raison, ancien, nouveau }
@@ -11616,8 +11628,12 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
     if (!suiv) { setMode('fini'); return; }
     const premier = !Object.keys(st).length;
     let annule = false;
+    let delai = 0;
+    if (!premier) { if (espMode === 'aleatoire') { const [a, b] = bornesAlea(); delai = a + Math.floor(Math.random() * (b - a + 1)); } else delai = fileClamp(esp); }
+    setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
       if (annule) return;
+      setProchaine(null);
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
@@ -11628,9 +11644,9 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
       if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
-    }, premier ? 0 : fileClamp(esp) * 1000);
-    return () => { annule = true; clearTimeout(t); };
-  }, [mode, st, esp]);   // eslint-disable-line react-hooks/exhaustive-deps
+    }, delai * 1000);
+    return () => { annule = true; clearTimeout(t); setProchaine(null); };
+  }, [mode, st, esp, espMode, espMin, espMax]);   // eslint-disable-line react-hooks/exhaustive-deps
   const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
   const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
   const nDouble = Object.values(st).filter((s) => s.etat === 'double' || s.etat === 'incertain').length;
@@ -11758,7 +11774,18 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
             {majExt && <div data-republier-maj style={{ fontSize: 12.5, color: C.warn }}>L'extension VRM de ce navigateur doit être à jour ({EXT_ATTENDUE}) et connectée — sinon chaque annonce ressortira « pas faite », rien ne sera touché.</div>}
             {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 12.5, color: C.warn }}>{autresComptes} sont sur un autre compte que celui ouvert dans Chrome : ouvre Vinted sur ce compte-là, sinon elles ressortiront « pas faites ».</div>}
             {mode === 'idle' && <>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>
+              <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={maj}>Temps entre deux paires</span>
+                <Segmente plein label="Temps entre deux paires" value={espMode} onChange={setEspMode} options={[{ v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }, { v: 'aleatoire', l: 'Aléatoire', data: { 'data-republier-esp-choix': 'aleatoire' } }]} />
+                {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
+                {espMode === 'aleatoire' && <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: C.text, flexWrap: 'wrap' }}>
+                    <span>Entre</span><input data-republier-esp-min value={espMin} onChange={(ev) => setEspMin(ev.target.value)} onBlur={() => setEspMin(minutesOk(espMin))} inputMode="decimal" aria-label="Minimum en minutes" style={{ ...champ, width: 64 }} />
+                    <span>et</span><input data-republier-esp-max value={espMax} onChange={(ev) => setEspMax(ev.target.value)} onBlur={() => setEspMax(minutesOk(espMax))} inputMode="decimal" aria-label="Maximum en minutes" style={{ ...champ, width: 64 }} /><span>minutes</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted }}>Un temps différent est tiré au hasard avant chaque paire, entre ces deux bornes (60 min au plus). La première part tout de suite.</div>
+                </>}
+              </div>
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, color: C.text, cursor: 'pointer' }}>
                 <input type="checkbox" data-republier-confirme checked={ok} onChange={(ev) => setOk(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0, marginTop: 1 }} />
                 <span>Je confirme : ces {aFaire.length} annonce{aFaire.length > 1 ? 's' : ''} seront supprimées et recréées sur mon compte Vinted, comme dans l'aperçu.</span>
@@ -11782,7 +11809,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, onClose }) {
                 </div>
               ); })}
             </div>
-            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} recréée{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{nDouble ? ` · ${nDouble} à vérifier sur Vinted` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}</div>}
+            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} recréée{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{nDouble ? ` · ${nDouble} à vérifier sur Vinted` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}{mode === 'run' && prochaine ? (() => { const r = Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)); return <span data-republier-prochaine={prochaine.s}> · prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span>; })() : ''}</div>}
           </>}
         </div>
         <div style={{ display: 'flex', gap: 8, padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'wrap' }}>

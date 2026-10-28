@@ -24,6 +24,10 @@
 > Spezial, Air Max 1, P-6000 ») : la file suit l'ordre de SA sélection (ordre des clics), « Mélanger » le change
 > (mêmes paires), ↑ ↓ le règlent à la main. Chaque paire reste « recréée PUIS supprimée » : c'est l'ordre de
 > PASSAGE qui change — supprimer d'abord pour recréer ensuite exposerait à perdre une paire (§3, tranché).
+> TEMPS ALÉATOIRE entre deux paires (sa demande, même nuit) : « Fixe » (secondes) ou « Aléatoire » entre SON
+> minimum et SON maximum (minutes, 1 à 3 par défaut, 60 au plus), tiré avant chaque paire, la première part tout
+> de suite ; compte à rebours affiché (`data-republier-prochaine`), choix retenu (`vrm_republier_esp`, appareil).
+> C'est lui qui le règle et qui lance (§3, l'atelier). Banc `republier.cjs` (horloge simulée).
 > Preuves : `audit-recreer.cjs` 26 (5 rouges sur la 5.248/main), banc `republier.cjs` (8 rouges sur le build de main).
 
 > **28 octobre (soir) — « Republier » SUPPRIME ET RECRÉE l'annonce, photos réglées (5.248) :** Julien : « je veux
