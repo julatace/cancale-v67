@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.247.0';
+const CODE_VERSION = '5.248.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3146,6 +3146,11 @@ async function noterSuppression(domain, itemId, status, at) {
   if (!/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('suppression_refusee_forme'); return; }
   const uid = await activeAccountId(domain);
   if (!uid) { noterDiag('suppression_sans_compte'); return; }   // on ne devine pas le compte
+  return noterSuppressionCompte(uid, id, at);
+}
+// (28 oct., 5.248) La suppression faite PAR l'extension (recréation) : le compte
+// est celui de la commande, pas celui du cookie.
+async function noterSuppressionCompte(uid, id, at) {
   let t = Date.parse(String(at || ''));
   if (isNaN(t) || t > Date.now() + 5 * 60000) t = Date.now();   // l'heure de la page ne dicte rien de futur
   // ⚠️ L'ENFILAGE PASSE AUSSI PAR LA CHAÎNE. Dix suppressions reçues en même
@@ -7897,6 +7902,197 @@ async function republierVinted(msg) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// SUPPRIMER ET RECRÉER UNE ANNONCE (28 octobre, 5.248) — sa décision
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux que ça supprime et recrée l'annonce », « en modifiant les
+// photos, c'est ce qu'on avait commencé dans Préparer ». Le refus du §3 tenait
+// tant que la FORME n'était pas mesurée. Elle l'est (ses propres gestes, 26 oct.,
+// `harvest_*_wreq_*`, noms de champs et types) :
+//   · `POST /api/v2/photos` — FormData photo[type]=item, photo[file]=jpeg,
+//     photo[temp_uuid]=<le temp_uuid de l'annonce> ;
+//   · `POST /api/v2/item_upload/items` — { item:{ id:null, …, temp_uuid,
+//     assigned_photos:[{id, orientation:0, ai_detected:false,
+//     c2pa_read_error:'other', digital_source_type:[]}], item_attributes,
+//     shipment_prices:{domestic:null,international:null} }, parcel:null,
+//     push_up:false, upload_session_id:<= temp_uuid> } ;
+//   · `POST /api/v2/items/{id}/delete` — corps vide.
+// L'ORDRE EST LA SÛRETÉ : téléverser → créer → LIRE l'identifiant de la nouvelle
+// annonce → et SEULEMENT ALORS supprimer l'ancienne. Un échec avant la création
+// ne touche à rien (l'ancienne reste en ligne) ; une création sans identifiant
+// lisible ne supprime RIEN ; une suppression refusée le DIT (la paire est alors
+// en vente deux fois — c'est écrit en toutes lettres, jamais caché).
+// La « recette » (catégorie, marque, couleurs, taille/état/matière, colis) n'est
+// JAMAIS devinée : le corps que Vinted a accepté pour CETTE annonce (une
+// modification ou la recréation précédente, `vrm_vinted_modele`), sinon les codes
+// rangés de sa fiche (`vinted_item_details[id].codes`). Sans elle : refus, et le
+// geste qui l'apprend.
+const RECREER_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
+function reglagesPhotoSurs(r) {
+  const o = { ...RECREER_DEF };
+  if (!r || typeof r !== 'object') return o;
+  const borne = (v, a, b, d) => { const n = Number(v); return isFinite(n) ? Math.min(b, Math.max(a, n)) : d; };
+  o.rot = borne(r.rot, -15, 15, 0); o.bright = borne(r.bright, 0.5, 1.5, 1); o.contrast = borne(r.contrast, 0.5, 1.5, 1);
+  o.sat = borne(r.sat, 0, 2, 1); o.zoom = borne(r.zoom, 1, 2, 1);
+  return o;
+}
+function reglagesNeutres(r) { return r.rot === 0 && r.bright === 1 && r.contrast === 1 && r.sat === 1 && r.zoom === 1; }
+// Le rendu de l'aperçu de l'app (CSS : filtre puis rotation et zoom autour du
+// centre, l'image couvrant son cadre) refait EN PIXELS, à partir de l'ORIGINAL.
+async function photoReglee(blob, r) {
+  if (reglagesNeutres(r)) return blob;
+  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap !== 'function') throw new Error('réglages photo impossibles dans ce navigateur');
+  const bmp = await createImageBitmap(blob);
+  const w = bmp.width, h = bmp.height;
+  const cv = new OffscreenCanvas(w, h);
+  const ctx = cv.getContext('2d');
+  if (!ctx || !('filter' in ctx)) throw new Error('réglages photo impossibles dans ce navigateur');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+  ctx.filter = `brightness(${r.bright}) contrast(${r.contrast}) saturate(${r.sat})`;
+  ctx.translate(w / 2, h / 2); ctx.rotate(r.rot * Math.PI / 180); ctx.scale(r.zoom, r.zoom);
+  ctx.drawImage(bmp, -w / 2, -h / 2, w, h);
+  try { bmp.close(); } catch (_) {}
+  return await cv.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+}
+// Un envoi multipart vers Vinted : `vintedSend` impose du JSON. Même file
+// (`requeteVinted`), mêmes en-têtes d'identité, sans Content-Type (la frontière
+// du multipart est posée par le navigateur).
+async function vintedEnvoyerForm(acc, endpoint, form) {
+  const domain = acc.domain || 'www.vinted.fr';
+  return requeteVinted('api', async () => {
+    try {
+      const res = await fetch(`https://${domain}${endpoint}`, {
+        method: 'POST', credentials: 'omit', signal: AbortSignal.timeout(60000),
+        headers: { 'Authorization': `Bearer ${acc.access_token}`, 'x-anon-id': acc.anon_id || '', 'x-csrf-token': acc.csrf_token || lastCsrfByDomain[domain] || '', 'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'fr-FR,fr;q=0.9' },
+        body: form,
+      });
+      let json = null; try { json = await res.json(); } catch (_) {}
+      return { status: res.status, ok: res.ok, json };
+    } catch (_) { return { status: 0, ok: false, json: null }; }
+  });
+}
+function idPhotoReponse(j) {
+  const n = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : ((typeof v === 'string' && /^\d{1,15}$/.test(v)) ? Number(v) : null);
+  if (!j || typeof j !== 'object') return null;
+  return n(j.id) ?? n(j.photo && j.photo.id) ?? n(j.item_photo && j.item_photo.id) ?? null;
+}
+function uuidRecreer() {
+  try { if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (_) {}
+  const b = new Uint8Array(16); crypto.getRandomValues(b); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+// Le corps de création : la recette de CETTE annonce, jamais un champ deviné.
+// Rend { item } ou { manque: [...] }.
+function itemPourRecreer({ modeleCorps, codes, titre, prix, description, brand, photoIds, temp }) {
+  const assigned = photoIds.map((id) => ({ id, ai_detected: false, orientation: 0, c2pa_read_error: 'other', digital_source_type: [] }));
+  let base = null;
+  if (modeleCorps) { try { const o = JSON.parse(modeleCorps); const it = o && (o.item && typeof o.item === 'object' ? o.item : null); if (it && it.catalog_id != null) base = { ...it }; } catch (_) {} }
+  if (!base) {
+    const c = codes || {};
+    const manque = [];
+    if (!(Number(c.catalog_id) > 0)) manque.push('la catégorie');
+    if (!(Array.isArray(c.item_attributes) && c.item_attributes.length)) manque.push('la taille et l’état');
+    if (!(Number(c.package_size_id) > 0)) manque.push('la taille du colis');
+    if (manque.length) return { manque };
+    base = { id: null, isbn: null, brand: c.brand || brand || null, brand_id: Number(c.brand_id) > 0 ? Number(c.brand_id) : null, catalog_id: Number(c.catalog_id),
+      color_ids: Array.isArray(c.color_ids) ? c.color_ids : [], item_attributes: c.item_attributes, package_size_id: Number(c.package_size_id),
+      manufacturer: null, measurement_width: null, measurement_length: null, manufacturer_labelling: null };
+    if (typeof c.is_unisex === 'boolean') base.is_unisex = c.is_unisex;
+  }
+  const item = { ...base, id: null, currency: base.currency || 'EUR', temp_uuid: temp, title: titre, price: String(prix), description: description || base.description || '',
+    ai_photo: false, assigned_photos: assigned, shipment_prices: { domestic: null, international: null } };
+  if (!item.description.trim()) return { manque: ['la description'] };
+  return { item };
+}
+async function recreerVinted(msg) {
+  const uid = String(msg.uid || ''), id = String(msg.id || '');
+  if (!/^\d+$/.test(uid) || !/^\d{4,15}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce incomplète' };
+  if (msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'supprimer et recréer une annonce demande ta confirmation' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
+  const stop0 = await gardeStricte(uid, acc, { lecture: true });   // compte et pause d'abord, sans compter de geste
+  if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  // 1. Le coffre (photos, description) : le filet ET la matière de la nouvelle annonce.
+  let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
+  if (coffre === null) return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde — on ne touche à rien" };
+  const sauve = (coffre && coffre[0] && coffre[0].data) || null;
+  let details = null; try { const d = await sbGet(`app_data?id=eq.vinted_item_details&select=f:data->${id}`); details = d === null ? null : ((d && d[0] && d[0].f) || {}); } catch (_) { details = null; }
+  if (details === null) return { accepte: false, code: 'fiche-lecture', raison: "je n'ai pas pu lire la fiche de l'annonce — on ne touche à rien" };
+  const photosC = (sauve && Array.isArray(sauve.photos)) ? sauve.photos.filter((u) => typeof u === 'string') : [];
+  const photosD = Array.isArray(details.photos) ? details.photos.filter((u) => typeof u === 'string') : [];
+  const urls = (photosD.length > photosC.length ? photosD : photosC).filter((u) => /^https:\/\/images\d*\.vinted\.net\//i.test(u)).slice(0, 20);
+  if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo de cette annonce n'est sauvegardée — passe sur Vinted une fois pour la capturer, puis réessaie (rien n'a été touché)" };
+  const description = String((details.description || (sauve && sauve.desc) || '')).trim();
+  // 2. La recette de CETTE annonce.
+  const modele = await lireModeleRepub(id);
+  if (modele === null) return { accepte: false, code: 'modele-lecture', raison: "je n'ai pas pu lire le format — réessaie dans un moment" };
+  const titre = String(msg.titre != null ? msg.titre : ((sauve && sauve.title) || '')).replace(/\s+/g, ' ').trim();
+  if (!titre || titre.length > 100) return { accepte: false, code: 'titre', raison: 'titre vide ou trop long (100 caractères au plus)' };
+  let prix = Number(msg.prix != null ? msg.prix : (sauve && sauve.price));
+  if (!(isFinite(prix) && prix > 0 && prix < 100000)) return { accepte: false, code: 'prix', raison: 'prix illisible' };
+  const pl = Number(msg.plancher); if (msg.plancher != null && isFinite(pl) && prix < pl) prix = pl;
+  prix = Math.round(prix * 100) / 100;
+  const essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+  if (essai.manque) return { accepte: false, code: 'recette-absente', raison: `VRM ne connaît pas encore ${essai.manque.join(', ')} exact${essai.manque.length > 1 ? 's' : ''} de CETTE annonce. Ouvre-la sur Vinted → « Modifier » → « Enregistrer » (sans rien changer) une fois : l'extension l'apprend. Rien n'a été touché.` };
+  const reglages = reglagesPhotoSurs(msg.reglages);
+  // 3. Le 1er geste (créer) entre dans le plafond horaire ; la suppression compte le second.
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  return await avecVinted(async () => {
+    const temp = uuidRecreer();
+    const ids = [];
+    for (let i = 0; i < urls.length; i++) {
+      let blob = null;
+      try { const r = await fetch(urls[i]); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); } catch (e) {
+        return { accepte: true, etape: 'echec', raison: `la photo ${i + 1} n'a pas pu être lue (${String(e && e.message || e).slice(0, 40)}) — rien n'a été créé, ton annonce est intacte` };
+      }
+      try { blob = await photoReglee(blob, reglages); } catch (e) {
+        return { accepte: true, etape: 'echec', raison: `${String(e && e.message || e).slice(0, 80)} — rien n'a été créé, ton annonce est intacte` };
+      }
+      const fd = new FormData();
+      fd.append('photo[type]', 'item');
+      fd.append('photo[file]', blob, `photo-${i + 1}.jpg`);
+      fd.append('photo[temp_uuid]', temp);
+      const rp = await vintedEnvoyerForm(acc, '/api/v2/photos', fd);
+      const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
+      if (!pid) {
+        noterDiag(rp && rp.ok ? 'recreer_photo_sans_id' : `recreer_photo_refuse_${(rp && rp.status) || 0}`);
+        if (rp && rp.ok && rp.json && typeof rp.json === 'object') { try { await noterDiag('recreer_photo_cles_' + Object.keys(rp.json).slice(0, 6).join('_').replace(/[^a-z0-9_]/gi, '').slice(0, 60)); } catch (_) {} }
+        return { accepte: true, etape: 'echec', raison: `Vinted n'a pas accepté la photo ${i + 1} (${(rp && rp.status) || 0}) — rien n'a été créé, ton annonce est intacte` };
+      }
+      ids.push(pid);
+    }
+    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp });
+    const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
+    const rc = await vintedSend(acc, 'POST', '/api/v2/item_upload/items', corps);
+    if (!rc || !rc.ok) {
+      noterDiag(`recreer_creation_refusee_${(rc && rc.status) || 0}`);
+      const msgV = rc && rc.json && (rc.json.message || (rc.json.errors && rc.json.errors[0] && (rc.json.errors[0].value || rc.json.errors[0].message)));
+      return { accepte: true, etape: 'echec', raison: `Vinted a refusé la nouvelle annonce (${(rc && rc.status) || 0}${msgV ? ' : ' + String(msgV).slice(0, 80) : ''}) — ton annonce d'origine est intacte` };
+    }
+    const j = rc.json || {}; const it = (j.item && typeof j.item === 'object') ? j.item : j;
+    const nouvelId = it && it.id != null && /^\d{4,15}$/.test(String(it.id)) ? String(it.id) : '';
+    if (!nouvelId) {
+      noterDiag('recreer_creation_sans_id');
+      return { accepte: true, etape: 'incertain', raison: "Vinted a répondu sans l'identifiant de la nouvelle annonce : elle a peut-être été créée. L'ancienne n'a PAS été supprimée — regarde ton dressing et supprime l'une des deux à la main." };
+    }
+    // La recette de la nouvelle annonce : le corps que Vinted vient d'accepter.
+    try { await noterModeleRepub(nouvelId, JSON.stringify(corps), uid, acc.domain || 'www.vinted.fr'); } catch (_) {}
+    try { await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${nouvelId}`, data: { ...(sauve || {}), id: nouvelId, uid, title: titre, price: prix, desc: description, photos: urls, savedAt: new Date().toISOString(), firstSavedAt: new Date().toISOString(), recreeDe: id } }], 'id'); } catch (_) {}
+    await compterAction(uid, ACTIONS_MAX_HEURE);
+    const rd = await vintedSend(acc, 'POST', `/api/v2/items/${id}/delete`, null);
+    if (!rd || !rd.ok) {
+      noterDiag(`recreer_suppression_refusee_${(rd && rd.status) || 0}`);
+      return { accepte: true, etape: 'double', nouvelId, ancien: sauve && sauve.price, nouveau: prix, nouveauTitre: titre, raison: `la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l'ancienne (${(rd && rd.status) || 0}) — la paire est en vente DEUX fois : supprime l'ancienne à la main tout de suite` };
+    }
+    try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {}
+    noterDiag('recreer_vinted_ok');
+    return { accepte: true, etape: 'fait', nouvelId, ancien: sauve && Number(sauve.price), nouveau: prix, nouveauTitre: titre };
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // GARDE-FOU ANTI-BLOCAGE — à passer AVANT toute action envoyée à Vinted
 // ══════════════════════════════════════════════════════════════════════════════
 // Demande de Julien : « améliore tout ça pour ne pas que je me fasse ban ».
@@ -8769,6 +8965,7 @@ async function executerCommande(msg) {
   }
   // 22 oct. : mettre UNE annonce Leboncoin en pause, sur son clic (voir `pauseLbcDepuisApp`).
   if (msg && msg.cmd === 'republierVinted') return await republierVinted(msg);
+  if (msg && msg.cmd === 'recreerVinted') return await recreerVinted(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);

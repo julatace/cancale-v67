@@ -63,7 +63,7 @@ function filtreOk(row, u) {
 // `vinted(req)` → { status, body } (body : objet → JSON, chaîne → texte).
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
-  connecte = '111', comptes = null, store = {}, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
+  connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
@@ -79,7 +79,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     const texte = typeof body === 'string' ? body : JSON.stringify(body == null ? null : body);
     return { ok: status >= 200 && status < 400, status, headers: { get: () => ctype },
       json: async () => JSON.parse(texte), text: async () => texte, clone() { return this; },
-      arrayBuffer: async () => Buffer.from(texte).buffer };
+      arrayBuffer: async () => Buffer.from(texte).buffer, blob: async () => new Blob([texte]) };
   };
   const appelVinted = async (url, opts, origine) => {
     const u = String(url);
@@ -101,7 +101,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms || 0, 2)), clearTimeout, setInterval: (fn, ms) => { j.minuteries.push(ms); return 0; }, clearInterval,
-    URL, TextDecoder, TextEncoder, Buffer, AbortController, Intl, crypto: require('crypto').webcrypto,
+    URL, TextDecoder, TextEncoder, Buffer, AbortController, AbortSignal, FormData, Blob, Intl, crypto: require('crypto').webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome: {
       runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { ecouteur = fn; } },
@@ -141,6 +141,8 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
         return appelVinted('https://www.vinted.fr' + u0, opts, 'page');
       }
       if (/^https:\/\/[^/]*vinted\.(fr|com|it|de)\//.test(u0)) return appelVinted(u0, opts, 'fond');
+      // 28 oct. : le CDN des photos Vinted (recréation d'une annonce), servi par l'audit.
+      if (/^https:\/\/images\d*\.vinted\.net\//.test(u0)) { j.cdn = (j.cdn || 0) + 1; const c = cdn ? cdn(u0) : null; return c ? rep(c.status || 200, c.body || 'JPEGDATA', 'image/jpeg') : rep(404, ''); }
       if (!/\/rest\/v1\//.test(u0)) return rep(404, {});
       if ((opts.method || 'GET') === 'POST') {
         let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
