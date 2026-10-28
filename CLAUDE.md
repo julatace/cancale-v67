@@ -7,6 +7,20 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — MESSAGES AUX FAVORIS refaits comme Republier :** Julien : « fais comme pour les
+> republications, un onglet qui s'ouvre avec les paramètres, les réductions, le temps aléatoire… enlève ce qui existe et
+> restructure ». Messages → Favoris reçus ne garde qu'un résumé (`data-favoris-resume` : à contacter · déjà envoyés · en
+> conversation), l'état d'une file (`data-favoris-file`) et UN bouton « Envoyer un message aux favoris »
+> (`data-favoris-ouvrir`). La fenêtre (`data-favoris-feuille`, portail sur `<body>`, `FermeAuRetour` passé par l'app) :
+> 1. Choisir (filtres, recherche, 10 au plus, outils : récupérer les pages, vérifier un favori, tester) · 2. Message
+> (texte, réduction, aperçu) · 3. Envoi (rythme **Fixe** ou **Aléatoire** min–max, compte rendu par favori
+> `data-favoris-envoi`, Lancer/Arrêter, « Enregistrer sans envoyer »). Le moteur (`AutomatisationFavoris`, plus de
+> `<details>`) reste monté fenêtre fermée. Temps aléatoire : `intervalleMaxMinutes` dans `vrm_favoris_reglages_{uid}`
+> (null = fixe, réglages d'avant lus tels quels) ; c'est le SERVEUR qui tire (`delaiFavori`, empreinte du jeton : une
+> décision rejouée donne le même temps), `enCours.delai` repris par `terminerFile` ; le plafond 10/60 min passe avant.
+> Preuves : `scripts/tests/favoris-temps-aleatoire.test.mjs` (215, rouge sur l'avant), interfaces `favoris-vinted`
+> (105), `favoris-historique` (132), `favoris-automatisation` (84), banc `achats-messages-premium` (61).
+
 > **28 octobre (nuit, fin) — messages aux favoris sur ses AUTRES comptes :** « Le lien du favori n'est pas confirmé ».
 > Mesuré : sur 3175765377 (deux favoris ouverts depuis la cloche) les 77 favoris se résolvent, chacun vers SA personne
 > (`offering_id`, 77 destinataires distincts, des messages sont partis) ; sur ses autres comptes, aucune ouverture ⇒ refus.
