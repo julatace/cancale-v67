@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.252.0';
+const EXT_ATTENDUE = '5.253.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -493,7 +493,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.252.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -11701,8 +11701,8 @@ const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
 // pour quatre gestes. `action` :
 //   · recreer      — supprimer et recréer (la nouvelle d'abord, l'ancienne ensuite) ;
 //   · modifier     — prix / titre SUR PLACE (`republierVinted`, PUT : favoris gardés) ;
-//   · versBrouillon— l'annonce repasse en brouillon (brouillon rangé d'abord,
-//                    l'annonce en ligne retirée ensuite) ;
+//   · versBrouillon— l'annonce repasse en brouillon (enregistrée dans VRM,
+//                    retirée de Vinted, PUIS le brouillon créé — 28 oct. au soir) ;
 //   · enLigne      — ses brouillons prêts, mis en ligne tels qu'enregistrés.
 const ACTIONS_REPUB = {
   recreer: { titre: 'Republier sur Vinted', etapes: [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Republier']], lancer: 'Republier', fait: '✓ recréée', faits: 'recréée', confirme: (n) => `seront supprimées et recréées sur mon compte Vinted, comme dans l'aperçu.` },
@@ -11878,7 +11878,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, br
             </div>}
             <div style={{ fontSize: 12.5, color: C.muted }}>{action === 'enLigne' ? `${annonces.length} brouillon${annonces.length > 1 ? 's' : ''} sur Vinted` : `${annonces.length} paire${annonces.length > 1 ? 's' : ''} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce reste la même sur Vinted (même N°, favoris et vues gardés) : seuls le prix et le titre changent.</div>}
-            {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce est copiée en brouillon sur Vinted (photos, description, recette), puis retirée de la vente — seulement si le brouillon est bien rangé. Favoris et vues ne suivent pas.</div>}
+            {action === 'versBrouillon' && <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait. Favoris et vues ne suivent pas.</div>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : action === 'enLigne' ? "Aucun brouillon sur Vinted d'après tes dressings lus par VRM." : "Aucune paire en ligne sur Vinted n'a été lue pour l'instant."}</div>}
               {liste.map((a) => (
@@ -11986,7 +11986,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, br
           {etape === 'envoi' && <>
             {action === 'recreer' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à supprimer et recréer sur Vinted, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, la nouvelle annonce est créée, et <b>seulement si elle est bien en ligne</b> l'ancienne est supprimée. Le N° VRM passe sur la nouvelle.</div>}
             {action === 'modifier' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à modifier sur Vinted, une par une, sur place : même annonce, même N°, favoris et vues gardés. Rien n'est supprimé ni créé.</div>}
-            {action === 'versBrouillon' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, un brouillon est rangé sur Vinted, et <b>seulement s'il est bien rangé</b> l'annonce en ligne est retirée. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
+            {action === 'versBrouillon' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} annonce{aFaire.length > 1 ? 's' : ''}</b> à repasser en brouillon, une par une. Pour chacune : elle est <b>enregistrée dans VRM</b>, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est <b>retirée</b>, puis le <b>brouillon est créé</b> sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</div>}
             {action === 'enLigne' && <div data-republier-explique style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}><b>{aFaire.length} brouillon{aFaire.length > 1 ? 's' : ''}</b> à mettre en ligne sur Vinted, un par un, tels que tu les as enregistrés.</div>}
             {recree && (() => { const fav = aFaire.reduce((n, a) => n + (a.favoris || 0), 0); const nFav = aFaire.filter((a) => a.favoris > 0).length; const nRec = aFaire.filter(recente).length; return mode === 'idle' && <>
               {fav > 0 && <div data-republier-favoris={fav} style={{ fontSize: 12.5, color: C.warn }}>{fav} favori{fav > 1 ? 's' : ''} sur {nFav} de ces paires {fav > 1 ? 'seront perdus' : 'sera perdu'} : une annonce recréée repart de zéro (favoris, vues, ancienneté). Pour une paire qui a des favoris, baisser le prix de l'annonce actuelle les prévient — c'est souvent mieux que la recréer.</div>}
@@ -47669,8 +47669,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
         // (28 oct., 5.252) En ligne → brouillon : la même recréation, arrêtée au
-        // brouillon (`versBrouillon`) ; l'annonce en ligne n'est retirée qu'une fois
-        // le brouillon rangé. Le N° reste sur l'ancienne fiche (historique).
+        // brouillon (`versBrouillon`) : enregistrée, retirée, PUIS le brouillon
+        // créé (sa décision du 28 oct. au soir). Le N° reste sur l'ancienne fiche.
         const publierVersB = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
           let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 180000); } catch(_) { r=null; }

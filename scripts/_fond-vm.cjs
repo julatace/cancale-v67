@@ -62,7 +62,7 @@ function filtreOk(row, u) {
 
 // `vinted(req)` → { status, body } (body : objet → JSON, chaîne → texte).
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
-function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false,
+function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false, ecritureKO = () => false,
   connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
@@ -146,6 +146,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (!/\/rest\/v1\//.test(u0)) return rep(404, {});
       if ((opts.method || 'GET') === 'POST') {
         let rows = []; try { rows = JSON.parse(opts.body || '[]'); } catch (_) {}
+        if (rows.some((r) => r && ecritureKO(String(r.id)))) return rep(503, '{}');
         j.posts.push(rows.map((r) => r.id));
         for (const r of rows) if (r && r.id != null) lignes[r.id] = copie(r.data);
         return rep(201, '');
