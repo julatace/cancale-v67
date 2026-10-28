@@ -475,6 +475,76 @@ const projette = (row, sel) => {
       } catch (e) { dit(false, 'le scénario « à refaire » a tourné', String(e.message).slice(0, 300)); }
       await ctx.close();
     }
+    // ── (28 oct.) L'extension ne répond pas à temps : « pas su », jamais « échec ».
+    //    Elle a pu supprimer ou recréer pendant que l'app attendait : la ligne le
+    //    dit, la file S'ARRÊTE (rien ne s'empile derrière), aucun « Réessayer ».
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── extension sans réponse · ${vp.width} px`);
+      const vieux = new Date(auj - 3600e3).toISOString();
+      const rows3 = rows.concat([{ id: 'coffre_111_9500', data: { id: '9500', uid: '111', title: 'Puma Suede', photos: [], versBrouillon: { corps: '{"draft":{}}', titre: 'Puma Suede bleu taille 42', prix: 55, at: vieux, majAt: vieux, uid: '111', publier: true, supprime: true, etat: 'a-refaire' } } }]);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} window.__VRM_ATTENTE_GESTE = 1500; });
+      await pg.addInitScript((o) => {
+        const post = (m) => window.postMessage(m, '*');
+        window.__repub = [];
+        window.addEventListener('message', (e) => {
+          const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+          if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
+          if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+          if (d.__vmr === 'cmd') window.__repub.push({ cmd: d.cmd, id: d.id });   // elle travaille… et ne répond jamais
+        });
+        post({ __vmr: 'ready', version: o.version });
+      }, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows3.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows3.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 12000 });
+        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="recreer"]').click();
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {});
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click();
+        const l = pg.locator('[data-republier-ligne="9102"]');
+        for (let i = 0; i < 60 && !['incertain', 'echec'].includes(await l.getAttribute('data-republier-statut')); i++) await pg.waitForTimeout(100);
+        await pg.waitForTimeout(1200);
+        const st = await l.getAttribute('data-republier-statut');
+        dit(st === 'incertain', 'pas de réponse à temps : la ligne dit « pas su » (incertain), jamais « échec »', st);
+        dit(/peut-être fini/.test(await l.innerText()), '… et dit de regarder sur Vinted avant de relancer', await l.innerText());
+        dit(await pg.locator('[data-republier]').getAttribute('data-republier-mode') === 'pause' && await pg.locator('[data-republier-arret]').count() === 1, 'la file S’ARRÊTE (elle travaille peut-être encore sur cette paire)', await pg.locator('[data-republier]').getAttribute('data-republier-mode'));
+        const env = await pg.evaluate(() => window.__repub);
+        dit(env.length === 1 && env[0].id === '9102', 'la paire suivante n’est PAS envoyée derrière', JSON.stringify(env.map((x) => x.id)));
+        await pg.locator('[data-republier] [aria-label="Fermer"]').first().click().catch(() => {});
+        await pg.waitForTimeout(300);
+        await pg.locator('[data-refaire-ouvrir]').first().click();
+        await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
+        await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
+        await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
+        const lr = pg.locator('[data-refaire-ligne="9500"]');
+        for (let i = 0; i < 60 && ['envoi', 'attente'].includes(await lr.getAttribute('data-refaire-statut')); i++) await pg.waitForTimeout(100);
+        dit(await lr.getAttribute('data-refaire-statut') === 'incertain', 'Brouillons à refaire, sans réponse : « pas su »', await lr.getAttribute('data-refaire-statut'));
+        dit(await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').count() === 0, '… et AUCUN « Réessayer » (un second brouillon serait créé)');
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « sans réponse » a tourné', String(e.message).slice(0, 300)); }
+      await ctx.close();
+    }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }
   if (b) await b.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} republier : ${ko ? ko + ' rouge(s)' : 'tout est vert'}`);

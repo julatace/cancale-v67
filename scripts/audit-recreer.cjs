@@ -28,7 +28,7 @@ const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', descr
 const PHOTOS = ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'];
 const PHOTOS_D = ['https://images1.vinted.net/t/b/f800/1.jpeg', 'https://images1.vinted.net/t/b/f800/2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
@@ -38,7 +38,7 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
   if (cdn) lignes.vinted_item_details['9101'] = { ...(lignes.vinted_item_details['9101'] || {}), photos: PHOTOS_D };
   if (extra) Object.assign(lignes, extra);
   let n = 500;
-  return faireFond({ src, lignes, connecte, comptes, ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
+  return faireFond({ src, lignes, connecte, comptes, retardLecture: retardLecture || (() => 0), ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
@@ -303,6 +303,26 @@ const zero = (j) => j.vinted.length === 0;
     dit(okL && c2.title === 'Nike Air Max 1 bis' && c2.lettreVRM === 'q' && c2.versBrouillon && c2.versBrouillon.etat === 'a-refaire', "archiver le dressing (en lot) garde aussi la lettre et l'état", JSON.stringify({ ok: okL, t: c2.title, l: c2.lettreVRM })); }
   { const { f } = await run({ viaBrouillon: true });
     dit(f.lignes['coffre_111_88001'] && !f.lignes['coffre_111_88001'].versBrouillon && vb(f).etat === 'fait', "la nouvelle annonce ne reprend pas l'état du brouillon de l'ancienne ; l'ancienne est notée « fait »", JSON.stringify({ n: f.lignes['coffre_111_88001'] && Object.keys(f.lignes['coffre_111_88001']), v: vb(f).etat })); }
+
+  // R3 — (28 oct., fiabilité) l'archivage du dressing et un passage en brouillon
+  //      écrivent la MÊME ligne du coffre. Une lecture lente de l'archivage, faite
+  //      AVANT l'écriture du passage et rendue APRÈS, réécrivait la ligne d'avant :
+  //      l'état reculait, ou la sauvegarde (« tout est enregistré dans VRM »)
+  //      disparaissait. Une seule écriture du coffre à la fois.
+  { const f = monter({ src: process.env.BG_SRC || undefined, retardLecture: (u) => (/id=like\.coffre_111_/.test(u) ? 300 : 0) });
+    f.lignes['coffre_111_9101'].versBrouillon = { corps: '{}', etat: 'enregistre', uid: '111' };
+    const pa = f.ctx.archiverLot('111', [{ id: '9101', title: 'Nike Air Max 1', price: { amount: '62' }, photos: [] }], []).catch(() => false);
+    await new Promise((r) => setTimeout(r, 50));
+    let okM = false; try { okM = await f.ctx.majVersBrouillon('111', '9101', { etat: 'supprime', supprime: true }); } catch (_) {}
+    await pa;
+    const v = f.lignes['coffre_111_9101'].versBrouillon || {};
+    dit(okM && v.etat === 'supprime' && v.supprime === true, "archivage lent + passage en brouillon : l'état écrit par le passage n'est pas effacé", JSON.stringify({ ok: okM, etat: v.etat, supprime: v.supprime })); }
+  { const f = monter({ src: process.env.BG_SRC || undefined, retardLecture: (u) => (/id=like\.coffre_111_/.test(u) ? 600 : 0) });
+    const pa = f.ctx.archiverLot('111', [{ id: '9101', title: 'Nike Air Max 1', price: { amount: '62' }, photos: [] }], []).catch(() => false);
+    let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1 — remise en ligne', viaBrouillon: true, confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    await pa;
+    const v = f.lignes['coffre_111_9101'].versBrouillon;
+    dit(r.etape === 'fait' && v && typeof v.corps === 'string' && v.etat === 'fait', "archivage lent pendant une republication : la sauvegarde du passage reste dans VRM (rien de perdu)", JSON.stringify({ etape: r.etape, vb: v ? v.etat : 'PERDUE' })); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.255.0';
+const CODE_VERSION = '5.256.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8140,7 +8140,8 @@ async function publierBrouillon(msg) {
 //   | a-publier | mise-en-ligne-incertaine | fait).
 // L'app lit cet état pour proposer « Refaire le brouillon ». Lecture ratée ⇒
 // rien n'est écrit (jamais un état repartant de vide).
-async function majVersBrouillon(uid, id, patch) {
+function majVersBrouillon(uid, id, patch) { return unCoffreALaFois(() => majVersBrouillonMaintenant(uid, id, patch)); }
+async function majVersBrouillonMaintenant(uid, id, patch) {
   let rows; try { rows = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { rows = null; }
   if (rows === null) { noterDiag('versbrouillon_etat_lecture_ratee'); return false; }
   const cur = (rows && rows[0] && rows[0].data) || null;
@@ -8379,7 +8380,7 @@ async function recreerVinted(msg) {
     if (viaB) {
       const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;
       const corpsBV = { draft: brouillonV, parcel: null, upload_session_id: temp };
-      const okCoffre = await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid } } }], 'id');
+      const okCoffre = await unCoffreALaFois(() => supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid } } }], 'id'));
       if (okCoffre !== true) {
         noterDiag('versbrouillon_enregistrement_rate');
         return { accepte: true, etape: 'echec', raison: "VRM n'a pas pu enregistrer l'annonce avant de la retirer — rien n'a été supprimé, elle est toujours en ligne (réessaie dans un moment)" };
@@ -9877,13 +9878,28 @@ function coffreRecord(uid, it, fiche) {
 // sans eux : la lettre suivante s'empilait, « Refaire le brouillon » perdait sa
 // matière. Ils sont recopiés de l'ancienne ligne, jamais inventés.
 const COFFRE_CLES_VRM = ['lettreVRM', 'recreeDe', 'versBrouillon'];
+// (28 oct.) UNE écriture du coffre à la fois. L'archivage du dressing (à chaque
+// visite) et un passage en brouillon (Republier) lisent-fusionnent-réécrivent
+// la MÊME ligne : une lecture lente de l'archivage, faite avant l'écriture du
+// passage et rendue après, réécrivait la ligne d'avant — l'état reculait, ou la
+// sauvegarde « tout est enregistré dans VRM » disparaissait juste avant la
+// suppression de l'annonce. Une chaîne de promesses : chacun relit la ligne au
+// moment d'écrire (§4.9 : ce n'est pas un tampon de données). ⚠️ Jamais un
+// appel chaîné DEPUIS une fonction déjà dans la chaîne (il attendrait pour toujours).
+let _chaineCoffre = Promise.resolve();
+function unCoffreALaFois(fn) {
+  const p = _chaineCoffre.then(fn, fn);
+  _chaineCoffre = p.then(() => {}, () => {});
+  return p;
+}
 function garderClesVrm(rec, anc) {
   if (!anc) return false;
   let change = false;
   for (const k of COFFRE_CLES_VRM) if (anc[k] != null && rec[k] == null) { rec[k] = anc[k]; change = true; }
   return change;
 }
-async function archiverAnnonce(uid, it, fiche) {
+function archiverAnnonce(uid, it, fiche) { return unCoffreALaFois(() => archiverAnnonceMaintenant(uid, it, fiche)); }
+async function archiverAnnonceMaintenant(uid, it, fiche) {
   try {
     const rec = coffreRecord(uid, it, fiche);
     if (!rec.id) return false;
@@ -9915,7 +9931,8 @@ async function archiverAnnonce(uid, it, fiche) {
 // Archivage EN LOT (tout le dressing d'un compte) : une lecture, une écriture.
 // Ne dégrade jamais un enregistrement déjà riche (la description vient de la
 // fiche, le dressing ne l'a pas — on complète, on n'écrase pas).
-async function archiverLot(uid, items, tous) {
+function archiverLot(uid, items, tous) { return unCoffreALaFois(() => archiverLotMaintenant(uid, items, tous)); }
+async function archiverLotMaintenant(uid, items, tous) {
   items = items || [];
   // ⚠️ ON NE SORT PLUS QUAND IL N'Y A AUCUNE ANNONCE EN LIGNE : la passe de
   // complétion ci-dessous (le texte lu sur la page) doit tourner même pour un
