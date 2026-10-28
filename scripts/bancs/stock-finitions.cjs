@@ -47,8 +47,12 @@ const PLAN_NICHES = { rooms: [{ id: 'r1', name: 'Boutique', room: { w: 8, h: 6, 
 const PLAN_PILE = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 'p1', type: 'pile', name: 'Cartons au sol', x: 2, y: 2, w: 1.5, h: 0.5, rows: 3, cols: 3, cell: 0.5, h3d: 0.34, nums: ['1', '2', '3', '4', '5', '6', '7', '8', '9'], lift: 0 },
 ] }], active: 'r1' };
+// IX. Étagère métal 5 niveaux × 2 cases, N°601 et N°602 au 2ᵉ niveau depuis le haut.
+const PLAN_PLATEAUX = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'm1', type: 'metal', name: 'Étagère réglable', x: 2, y: 0.1, w: 1.2, h: 0.5, rows: 5, cols: 2, h3d: 1.25, slots: { '1_0': ['601'], '1_1': ['602'] } },
+] }], active: 'r1' };
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
-const PRESENTS = { nums: ['700', '401', '402', '501', '801'], at: Date.now() };
+const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
 
 let ko = 0;
@@ -294,6 +298,42 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       dit(await pg.waitForSelector('[data-trouve-num="402"]', { timeout: 6000 }).then(() => true).catch(() => false), 'VII. chercher « 402 » dit le meuble et la case');
       dit(await pg.evaluate(() => /Étagère baskets/.test((document.querySelector('[data-trouve-num]') || {}).textContent || '')), 'VII. … en nommant le bon meuble');
       dit(errs.length === 0, 'aucune erreur d’app (barre)', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── IX. LES PLATEAUX D'UNE ÉTAGÈRE, COLONNE PAR COLONNE ─────────────────
+    if (fait('IX')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('IX. plateaux ' + vp.width, async () => {
+      const t = 'IX. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_PLATEAUX);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const pl0 = await sonde(pg, 'plateaux', 'm1');
+      dit(pl0 && pl0.length === 6 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 6 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
+      const p = await sonde(pg, 'project', 'm1', { cell: '1_0', num: '601' });
+      if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
+      await pg.waitForSelector('[data-plateaux-3d]', { timeout: 8000, state: 'attached' });
+      await pg.evaluate(() => { const d = document.querySelector('[data-plateaux-3d]'); d.open = true; });
+      // Retirer le plateau sous la rangée 2, colonne 1 seulement.
+      await cliquerSel(pg, '[data-plateaux-3d] [data-planche-case-choix="2:1"]');
+      let q = await attendrePlan(pg, (x) => Array.isArray(item(x, 'm1').planches));
+      const m = item(q, 'm1');
+      dit(JSON.stringify(m.planches) === '[1,"2:2",3,4]', t + ' : le plateau retiré n\'est retiré que sous la colonne 1', JSON.stringify(m.planches));
+      dit(JSON.stringify(m.slots['2_0']) === '["601"]' && !m.slots['1_0'] && JSON.stringify(m.slots['1_1']) === '["602"]', t + ' : N°601 tombe d\'un niveau, N°602 (colonne 2, plateau gardé) ne bouge pas', JSON.stringify(m.slots));
+      await pg.waitForTimeout(1200);
+      await pg.evaluate(() => document.querySelector('[data-plateaux-3d]').scrollIntoView({ block: 'center' })).catch(() => {});
+      await pg.screenshot({ path: path.join(CAPT, 'stock-plateaux-reglage-' + vp.width + '.png') }).catch(() => {});
+      const pl1 = await sonde(pg, 'plateaux', 'm1');
+      dit(pl1 && pl1.filter((x) => x.w < 0.7).length === 1 && pl1.length === 6, t + ' : la 3D dessine un plateau de moitié', JSON.stringify(pl1));
+      // « Aucun » : tout tombe en bas de sa colonne.
+      await cliquerTexte(pg, '^Aucune$');
+      q = await attendrePlan(pg, (x) => JSON.stringify(item(x, 'm1').planches) === '[]');
+      const m2 = item(q, 'm1');
+      dit(JSON.stringify(m2.slots['4_0']) === '["601"]' && JSON.stringify(m2.slots['4_1']) === '["602"]', t + ' : sans plateau, les boîtes descendent tout en bas, numéros inchangés', JSON.stringify(m2.slots));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-plateaux-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
       await ctx.close();
     });
 
