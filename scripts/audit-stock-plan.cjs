@@ -29,8 +29,11 @@ const MUTATIONS = {
   croisee_ok: (s) => s.replace("if (seCroise(out)) return null;", ''),
   // Le défaut du 17 oct. : retirer sur TOUTE la liste (« ça décolle tout »).
   pile_toute_liste: (s) => s.replace("const col = a.slice(deb, fin); col.splice(idx - deb, 1);", "const col = a.slice(deb); col.splice(idx - deb, 1); return sansTrouFinal([...a.slice(0, deb), ...col]);"),
+  hauteur_ignoree: (s) => s.replace("const h = hauteurPile(R, hauteurs, c);\n    for (let p = 0; p < h; p++) {", "const h = R;\n    for (let p = 0; p < h; p++) {"),
+  hauteur_reflow: (s) => s.replace("for (let p = 0; p < R2; p++) out.push(p < part.length ? part[p] : '');", "part.forEach((x) => { if (!estTrou(x)) out.push(x); });"),
+  hauteur_sans_garde: (s) => s.replace("if (haut + 1 > nh) return", "if (false) return"),
   trou_ignore: (s) => s.replace("const t = a.findIndex(estTrou);", "const t = -1;"),
-  place_haut_dabord: (s) => s.replace("for (let r = nr - 1; r >= 0; r--) for (let c = 0; c < nc; c++) { const k = r + '_' + c; if (n(k) < cap) return { cell: k }; }", "for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) { const k = r + '_' + c; if (n(k) < cap) return { cell: k }; }"),
+  place_haut_dabord: (s) => s.replace("for (let r = nr - 1; r >= 0; r--) for (let c = 0; c < nc; c++) {\n    const k = r + '_' + c; if (n(k) >= capR(r)) continue;", "for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {\n    const k = r + '_' + c; if (n(k) >= capR(r)) continue;"),
 };
 
 async function charger(src) {
@@ -96,6 +99,19 @@ async function audit(src, bavard) {
     const p5 = R.retirerDePile(['1', '2', '3', '4', '5'], 3, 3);
     dit(JSON.stringify(p5) === '["1","2","3","5"]', 'dans la DERNIÈRE colonne : elle raccourcit simplement', JSON.stringify(p5));
     dit(R.retirerDePile(['1', '', '3'], 1, 3) === null, 'une place vide ne se « retire » pas');
+    // (28 oct.) Une hauteur par pile : `rows` = 3 (le pas), la pile 1 n'en prend que 2.
+    const h1 = R.ajouterAPile(['1', '2', '', '4', '5', '6'], '99', 3, [2, 3]);
+    dit(JSON.stringify(h1) === '["1","2","","4","5","6","99"]', 'hauteur par pile : la place au-dessus de la hauteur de la pile 1 n’est jamais comblée', JSON.stringify(h1));
+    const h2 = R.ajouterAPile(['1', '', '', '4', '5'], '99', 3, [2, 3]);
+    dit(JSON.stringify(h2) === '["1","99","","4","5"]', 'hauteur par pile : une pile pas pleine reçoit le carton', JSON.stringify(h2));
+    const c1 = R.changerHauteurPile(['1', '2', '3', '4', '5', '6'], 3, null, 1, 5);
+    dit(c1 && JSON.stringify(c1.nums) === '["1","2","3","","","4","5","6"]' && c1.rows === 5 && JSON.stringify(c1.hauteurs) === '[3,5]', 'agrandir la pile 2 : chaque carton garde sa pile et sa place, la pile 1 reste à 3', JSON.stringify(c1));
+    const c2 = R.changerHauteurPile(['1', '2', '3', '4', '5', '6'], 3, null, 0, 2);
+    dit(c2 && c2.erreur && !c2.nums, 'réduire une pile sous ses cartons : refusé, rien ne bouge', JSON.stringify(c2));
+    const c3 = R.changerHauteurPile(['1', '2', '3', '', '', '4', '5', '6'], 5, [3, 5], 1, 3);
+    dit(c3 && JSON.stringify(c3.nums) === '["1","2","3","4","5","6"]' && c3.rows === 3 && c3.hauteurs === null, 'deux piles revenues à la même hauteur : une seule hauteur, comme avant', JSON.stringify(c3));
+    const c4 = R.retirerDePile(['1', '2', '', '4', '5', '6'], 0, 3);
+    dit(JSON.stringify(c4) === '["2","","","4","5","6"]', 'pile plus basse : retirer son carton du bas ne touche pas la pile voisine', JSON.stringify(c4));
     const a1 = R.ajouterAPile(['2', '3', '', '4', '5', '6'], '99');
     dit(JSON.stringify(a1) === '["2","3","99","4","5","6"]', 'ajouter comble d’abord la place vide (le haut de la colonne entamée)', JSON.stringify(a1));
     dit(JSON.stringify(R.ajouterAPile(['1', '2'], '3')) === '["1","2","3"]', 'sans place vide, il se pose au-dessus');
