@@ -7,6 +7,16 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — REPUBLIER « comme les autres » (5.254), §3 renversé SUR SA DÉCISION :** Julien : « fais
+> comme eux : on supprime, on enregistre au cas où dans VRM toutes les infos si ça échoue, on met en brouillon puis on met
+> en ligne ». Republier par brouillon (`viaBrouillon`, défaut) = photos → ENREGISTRÉE dans le coffre (écriture ratée ⇒ rien
+> supprimé) → SUPPRIMÉE (refus ⇒ arrêt, « toujours en ligne » ; sans réponse claire ⇒ ARRÊT aussi : jamais deux en ligne)
+> → brouillon (refus retenté une fois) → 5 s → mise en ligne. Échec après la suppression : `brouillon-a-refaire` (le
+> brouillon est dans ses brouillons Vinted, « Actions → Brouillons → en ligne », ou tout est dans VRM). Ne PAS remettre
+> « recréer puis supprimer » sur ce chemin : c'est son choix, en connaissance du risque. La création directe (case
+> décochée) garde l'ancien ordre. `EXT_CAPACITES.republierbrouillon = '5.254.0'` (la case suit cette capacité).
+> Preuve : `audit-recreer.cjs` M (62 ; 7 rouges sur la 5.253).
+
 > **28 octobre (nuit, suite) — « En ligne → brouillon » dans SON ordre (5.253) :** Julien : « c'est enregistrement de
 > l'annonce, puis suppression, et après création du brouillon ». `recreerVinted` + `versBrouillon` : photos renvoyées →
 > l'annonce ENREGISTRÉE dans le coffre (`coffre_{uid}_{id}`, avec `versBrouillon.corps` = le corps exact du brouillon ;
