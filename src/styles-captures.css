@@ -211,3 +211,4 @@
 .vrm-favoris-destinataires span{font-size:11px;color:var(--vrm-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
 .vrm-favoris-destinataires button{flex-shrink:0;}
 .vrm-favoris-raison{display:block;font-size:11px;line-height:1.45;color:var(--vrm-muted);margin-top:4px;overflow-wrap:anywhere;}
+.vrm-favoris-badge.is-vendu{background:var(--vrm-card2);color:var(--vrm-ink);font-weight:600;}.vrm-favoris-vendu-action{font-size:11px;color:var(--vrm-muted);}
