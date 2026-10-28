@@ -52,6 +52,11 @@ const parts = [
   bloc('relevePage'), bloc('_couperSelon'), bloc('estTailleEtiquette'), bloc('avecSens'), bloc('zoneEtiquette'),
   bloc('posePrefsImpression'), bloc('drawBordereauStamp'), bloc('placementThermique'), bloc('poserEtiquettesThermiques'),
   bloc('poserBordereau'), bloc('typeBordereau'),
+  // `espaceBlancBordereau` (28 oct.) cherche une zone BLANCHE en dessinant la page
+  // avec pdf.js dans un canvas : rien de ça n'existe hors d'un navigateur. Cet
+  // audit juge la DÉCOUPE et la taille des pages, pas la place du numéro (le banc
+  // `imprimante.cjs` la rend dans Chromium) : une place fixe, vérifiée, suffit ici.
+  'const espaceBlancBordereau = async (pdf, avecTitre = false) => ({ x: 20, y: 20, w: avecTitre ? 160 : 84, h: avecTitre ? 38 : 28, verifie: true });',
 ];
 
 let R = null;

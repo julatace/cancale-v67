@@ -28796,7 +28796,7 @@ function StockMeubles() {
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger la paire N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.line}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
