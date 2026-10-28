@@ -1,5 +1,12 @@
 # VRM — dossier de passation
 
+> ⛔ **28 octobre — DÉCISION DE JULIEN : VRM RESTE SUR LA FRANCE.** Question posée : « est-ce que les
+> Américains peuvent utiliser VRM ? » — réponse : pas vraiment (Vinted absent des États-Unis, argent en euros
+> seulement, URSSAF/DAC7, CGV et app en français). Julien : « reste sur la France pour l'instant mais fais ça
+> bien ». ⇒ Aucun chantier international (traduction, dollars, comptabilité étrangère, Depop/Poshmark/
+> Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
+> La priorité : que tout ce qui est français soit juste et fiable.
+
 > **28 octobre — la bonne catégorie sur chaque plateforme, Vestiaire en « smart listing », eBay publié en un clic (5.245) :**
 > Julien : « Vestiaire avec le smart listing », « la catégorie doit correspondre à celle de la plateforme »,
 > « eBay : j'appuie sur publier, l'annonce se publie toute seule avec les critères et la description ».
