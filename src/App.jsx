@@ -1,3 +1,4 @@
+import { actionsReglages } from './reglagesActions.js';
 import FavorisVinted from './FavorisVinted.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
@@ -2095,6 +2096,7 @@ const onSyncChange = (fn) => { _syncListeners.push(fn); return () => { _syncList
 // (16 oct., Julien : « pourquoi le nuage en haut est barré ? ») L'état de la
 // synchro porte maintenant SA RAISON et l'heure : le panneau du nuage les dit
 // en clair (« la base a répondu 503 », « pas de réseau ») au lieu d'une icône.
+let _settingsRevision = 0, _settingsConfirmed = 0;
 let _syncInfo = { etat: 'attente', raison: '', at: null, okAt: null, reprise: null };
 const _emitSync = (status, raison) => {
   const now = Date.now();
@@ -2273,6 +2275,7 @@ const cloudPush = () => {
   _cloudTimer = setTimeout(async () => {
     if (AUTH.user?.id !== owner || readSession()?.user?.id !== owner) return;
     try {
+      const revision = Object.keys(_saveTimers).length || [..._failedLocalSaves.values()].some(d=>d.owner===owner) ? _settingsConfirmed : _settingsRevision;
       const payload = {};
       SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) { let val; try { val = JSON.parse(v); } catch { val = v; } const f = ALLEGER_AVANT_CLOUD[k]; payload[k] = f ? f(val) : val; } });
       // verrou 2 : ne JAMAIS écraser le cloud avec un état vide.
@@ -2302,7 +2305,7 @@ const cloudPush = () => {
         if (code) { _pushBloque = true; _emitSync('refus', 'cet écran est plus ancien que tes données (numérotation) — recharge la page'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
         _emitSync('error', res.status === 401 || res.status === 403 ? `la base a refusé l'envoi (${res.status}) — ta session a peut-être expiré` : res.status >= 500 ? `la base ne répond pas (${res.status})` : `la base a répondu ${res.status}`);
         planifierReprise();
-      } else { _repriseN = 0; _emitSync('synced'); }
+      } else { _settingsConfirmed = Math.max(_settingsConfirmed, revision); _repriseN = 0; _emitSync('synced'); }
     } catch (_) { _emitSync('error', typeof navigator !== 'undefined' && navigator.onLine === false ? 'pas de connexion internet' : 'la base n’a pas répondu'); planifierReprise(); }
     _cloudTimer = null;
   }, 800);
@@ -2312,12 +2315,18 @@ onCloudReady(() => { if (_pushPending) { _pushPending = false; cloudPush(); } })
 
 // Sauvegarde : localStorage immediat (differe 500ms) PUIS push cloud
 let _saveTimers = {};
+const _failedLocalSaves = new Map();
 const save = (k,v) => {
+  if (SYNC_KEYS.includes(k)) { _settingsRevision++; try { window.dispatchEvent(new Event('vrm:reglage-attente')); } catch (_) {} }
   const owner = AUTH.user?.id;
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   _saveTimers[k] = setTimeout(() => {
     if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; return; }
-    try { localStorage.setItem(k,JSON.stringify(v)); } catch {}
+    try { localStorage.setItem(k,JSON.stringify(v)); _failedLocalSaves.delete(k); }
+    catch (_) {
+      delete _saveTimers[k]; _failedLocalSaves.set(k,{owner,v});
+      _emitSync('error','le stockage de cet appareil a refusé la modification'); return;
+    }
     delete _saveTimers[k];
     // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
     // qui relit les ventes masquées) savent ainsi qu'une clé vient de changer.
@@ -8568,7 +8577,7 @@ const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge) => {
   }
   return null;
 };
-const espaceBlancBordereau = async (pdf, avecTitre = false) => {
+const espaceBlancBordereau = async (pdf, avecTitre = false, choix = null) => {
   let documentPdf;
   try {
     const L=await chargerPdfjs();
@@ -8582,7 +8591,17 @@ const espaceBlancBordereau = async (pdf, avecTitre = false) => {
     await page.render({canvasContext:ctx,viewport}).promise;
     const bw=avecTitre?160:84,bh=avecTitre?38:28;
     const tourne=viewport.rotation%180!==0, rw=(tourne?bh:bw)*1.5, rh=(tourne?bw:bh)*1.5;
-    const point=trouverZoneBlanche(ctx.getImageData(0,0,w,h).data,w,h,Math.ceil(rw),Math.ceil(rh),18);
+    const pixels=ctx.getImageData(0,0,w,h).data;
+    let point;
+    if(choix && Number.isFinite(choix.vx) && Number.isFinite(choix.vy)) {
+      const x=Math.round(choix.vx*w-rw/2),y=Math.round(choix.vy*h-rh/2);
+      if(x<18||y<18||x+Math.ceil(rw)+18>w||y+Math.ceil(rh)+18>h) throw Error('le numéro dépasse de la page ou de sa marge');
+      for(let py=y-18;py<y+Math.ceil(rh)+18;py++) for(let px=x-18;px<x+Math.ceil(rw)+18;px++) {
+        const i=(py*w+px)*4;
+        if(pixels[i]<248||pixels[i+1]<248||pixels[i+2]<248) throw Error('cette zone contient du texte, une image ou un code');
+      }
+      point={x,y};
+    } else point=trouverZoneBlanche(pixels,w,h,Math.ceil(rw),Math.ceil(rh),18);
     if(!point) throw Error('aucun espace blanc suffisant');
     const corners=[viewport.convertToPdfPoint(point.x,point.y),viewport.convertToPdfPoint(point.x+rw,point.y+rh)];
     return {x:Math.min(corners[0][0],corners[1][0]),y:Math.min(corners[0][1],corners[1][1]),w:Math.abs(corners[0][0]-corners[1][0]),h:Math.abs(corners[0][1]-corners[1][1]),verifie:true};
@@ -9005,7 +9024,7 @@ const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) =
   }
   const sBold = await src.embedFont(StandardFonts.HelveticaBold);
   const sReg = await src.embedFont(StandardFonts.Helvetica);
-  if (String(numero||'').trim() || String(title||'').trim()) drawBordereauStamp(src, rgb, sBold, sReg, numero, title, await espaceBlancBordereau(src,!!title));
+  if (String(numero||'').trim() || String(title||'').trim()) drawBordereauStamp(src, rgb, sBold, sReg, numero, title, await espaceBlancBordereau(src,!!title,pos));
   (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
   return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '' };
 };
@@ -9080,6 +9099,7 @@ const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = nul
   // `isEvalSupported: false` : pdf.js sonde sinon `new Function('')`, ce que la
   // politique de sécurité du contenu refuse (une violation par aperçu).
   const d = await L.getDocument({ data: octets.slice ? octets.slice(0) : octets, isEvalSupported: false }).promise;
+  try {
   const pg = await d.getPage(page);
   const v0 = pg.getViewport({ scale: 1 });
   const dpr = Math.min(2, window.devicePixelRatio || 1), sc = (largeur / v0.width) * dpr;
@@ -9094,6 +9114,7 @@ const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = nul
     c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
   }
   return d.numPages;
+  } finally { await d.destroy(); }
 };
 
 function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
@@ -16380,17 +16401,14 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const [bordResult, setBordResult] = React.useState(null);
   const [bordPlace, setBordPlace] = React.useState(null);
   const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
-  const posForFormat = (w, h) => {
-    const key = bordereauFormatKey(w, h);
-    let pos = bordFormats[key];
-    if (!pos) { pos = smartDefaultBordPos(w, h); const next = { ...bordFormats, [key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next); }
-    return pos;
+  const posForFormat = () => null; // Analyse du PDF courant, jamais une position héritée.
+  const adjustBordPlacement = () => {
+    const r=bordResult;if(!r?.pdfBuf)return;
+    setBordPlace({...r,blobUrl:URL.createObjectURL(new Blob([r.pdfBuf],{type:'application/pdf'}))});
   };
-  const adjustBordPlacement = () => { toast('Le numéro est placé dans un espace blanc vérifié sur ce PDF.'); };
   const confirmBordPlacement = async (pos) => {
     const p = bordPlace; if (!p) return;
-    const next = { ...bordFormats, [p.key]: pos }; setBordFormats(next); if (typeof save === 'function') save('vinted_bordereau_formats', next);
-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero: p.numero, title: p.title, pdfBuf: p.pdfBuf, key: p.key, w: p.w, h: p.h }); } catch (err) { toast('Erreur : ' + String(err)); }
+    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero: p.numero, title: p.title, pdfBuf: p.pdfBuf, key: p.key, w: p.w, h: p.h }); } catch (err) { toast('Erreur : ' + String(err)); throw err; }
     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
   };
   const cancelBordPlacement = () => { if (bordPlace) { URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
@@ -16524,7 +16542,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Comment est choisi l’emplacement du numéro ?</button>}
+            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Prévisualiser et ajuster le numéro</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
@@ -32556,59 +32574,52 @@ function LoadError({ onRetry }) {
   </div>;
 }
 
-// Modale de placement du tampon sur un NOUVEAU format de bordereau. L'utilisateur
-// fait glisser le cartouche « N° + titre » là où il y a de la place sur SON
-// étiquette (proportions réelles de la page), puis l'app mémorise cette position
-// pour ce format et ne redemandera plus.
-function BordPlacer({ place, onConfirm, onCancel }) {
-  const { numero, title, w, h, blobUrl } = place;
-  const padRef = React.useRef(null);
-  const boxW = Math.min(w*0.62, 230), boxH = 46;      // taille réelle du tampon (pt)
-  const wr = boxW/w, hr = boxH/h;                       // taille en ratio de page
-  const [xr,setXr] = useState(place.initPos?.xr ?? 0.05);
-  const [yr,setYr] = useState(place.initPos?.yr ?? 0.02); // défaut : haut de page
-  const dragging = React.useRef(false);
-  const moveTo = (cx, cy) => {
-    const r = padRef.current?.getBoundingClientRect(); if(!r) return;
-    let nx = (cx - r.left)/r.width - wr/2;
-    let ny = (cy - r.top)/r.height - hr/2;
-    nx = Math.max(0, Math.min(1-wr, nx));
-    ny = Math.max(0, Math.min(1-hr, ny));
-    setXr(nx); setYr(ny);
+// Placement sur le PDF courant : original et rendu réel, sans réutiliser
+// la géométrie d'un autre bordereau. La validation relit les pixels originaux.
+function BordPlacer({place,onConfirm,onCancel}) {
+  const original=React.useRef(null),apercu=React.useRef(null),sequence=React.useRef(0),pointClavier=React.useRef({vx:.5,vy:.5});
+  const [choix,setChoix]=React.useState(null),[etat,setEtat]=React.useState('charge'),[erreur,setErreur]=React.useState('');
+  const [confirme,setConfirme]=React.useState(false);
+  React.useEffect(()=>{
+    let vivant=true;
+    dessinerPdf(original.current,place.pdfBuf,{largeur:Math.min(460,window.innerWidth-72)}).then(()=>{if(vivant)setEtat('pret');}).catch(()=>{if(vivant){setEtat('erreur');setErreur('Aperçu indisponible. Aucun emplacement validé.');}});
+    return ()=>{vivant=false;sequence.current++;};
+  },[place.pdfBuf]);
+  const verifier=async candidat=>{
+    const id=++sequence.current;setEtat('verification');setErreur('');setChoix(null);
+    try {
+      const PL=await import('pdf-lib'),doc=await PL.PDFDocument.load(place.pdfBuf);
+      const pos=await espaceBlancBordereau(doc,!!place.title,candidat);
+      drawBordereauStamp(doc,PL.rgb,await doc.embedFont(PL.StandardFonts.HelveticaBold),await doc.embedFont(PL.StandardFonts.Helvetica),place.numero,place.title,pos);
+      const bytes=await doc.save();if(id!==sequence.current)return;
+      const rendu=document.createElement('canvas');
+      await dessinerPdf(rendu,bytes,{largeur:Math.min(460,window.innerWidth-72)});
+      if(id!==sequence.current||!apercu.current)return;
+      apercu.current.width=rendu.width;apercu.current.height=rendu.height;
+      apercu.current.style.width=rendu.style.width;apercu.current.style.height=rendu.style.height;
+      apercu.current.getContext('2d').drawImage(rendu,0,0);
+      setChoix(candidat||null);setEtat(candidat?'valide':'auto');
+    } catch(e){if(id===sequence.current){setEtat('erreur');setErreur(String(e.message||e));}}
   };
-  const pt = (e)=> e.touches && e.touches[0] ? e.touches[0] : e;
-  const onDown = (e)=>{ dragging.current=true; const p=pt(e); moveTo(p.clientX,p.clientY); };
-  const onMove = (e)=>{ if(!dragging.current) return; const p=pt(e); moveTo(p.clientX,p.clientY); if(e.cancelable) e.preventDefault(); };
-  const onUp = ()=>{ dragging.current=false; };
-  return (
-    <div onClick={onCancel} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-      <FermeAuRetour fermer={onCancel}/>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:10,maxWidth:420,width:'100%',maxHeight:'92vh',overflow:'auto',padding:16}}>
-        <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:2}}>📄 Nouveau format de bordereau</div>
-        <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginBottom:12}}>
-          Fais glisser l'étiquette <b>N° + titre</b> là où il y a de la place sur ton bordereau. L'app <b>retiendra</b> cet emplacement pour ce format.
-          <button type="button" onClick={()=>window.open(blobUrl,'_blank')} style={{marginLeft:6,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:500,cursor:'pointer',padding:0,fontSize:12}}>👁 Voir mon bordereau</button>
-        </div>
-        <div ref={padRef}
-          onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-          onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
-          style={{position:'relative',aspectRatio:`${w} / ${h}`,maxWidth:'100%',maxHeight:'56vh',margin:'0 auto',background:C.surface,border:`1px dashed ${C.border}`,borderRadius:8,touchAction:'none',cursor:'grab',overflow:'hidden'}}>
-          {/* Repères de zones (indicatif) */}
-          <div style={{position:'absolute',top:0,left:0,right:0,height:'34%',background:`${C.muted}0d`,borderBottom:`1px dashed ${C.border}`}}/>
-          <div style={{position:'absolute',top:'4%',left:0,right:0,textAlign:'center',fontSize:9,color:C.muted}}>haut (souvent code-barres / adresse)</div>
-          {/* Le tampon déplaçable */}
-          <div style={{position:'absolute',left:`${xr*100}%`,top:`${yr*100}%`,width:`${wr*100}%`,height:`${hr*100}%`,background:'#fff',border:'1.5px solid #000',borderRadius:5,display:'flex',flexDirection:'column',justifyContent:'center',padding:'2px 5px',boxSizing:'border-box',boxShadow:'0 1px 6px rgba(0,0,0,.25)',cursor:'grab'}}>
-            <div style={{fontSize:'min(3.4vw,15px)',fontWeight:700,color:'#000',lineHeight:1}}>N° {numero}</div>
-            <div style={{fontSize:'min(2.4vw,9px)',color:'#222',lineHeight:1.1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{title}</div>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:8,marginTop:14}}>
-          <button type="button" onClick={onCancel} style={{flex:1,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'10px'}}>Annuler</button>
-          <button type="button" onClick={()=>onConfirm({xr,yr})} style={{flex:2,border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'10px'}}>Valider & tamponner</button>
-        </div>
-      </div>
+  const choisir=e=>{
+    if(etat==='charge'||confirme)return;
+    const r=original.current.getBoundingClientRect();
+    pointClavier.current={vx:(e.clientX-r.left)/r.width,vy:(e.clientY-r.top)/r.height};verifier(pointClavier.current);
+  };
+  const valider=async()=>{setConfirme(true);try{await onConfirm(choix);}catch(e){setErreur(String(e.message||e));setEtat('erreur');}finally{setConfirme(false);}};
+  return createPortal(<div className="vrm-placement-overlay" data-noswipe="1" role="dialog" aria-modal="true" aria-label="Aperçu du numéro sur le bordereau">
+    <FermeAuRetour fermer={onCancel}/>
+    <div className="vrm-placement-panel" style={{background:C.card,color:C.text}}>
+      <h2>Aperçu du bordereau</h2><p style={{color:C.muted}}>Touche un espace blanc dans l’original, puis vérifie le résultat. Le QR code, les textes et leur marge doivent rester libres. Ce choix concerne uniquement ce PDF.</p>
+      <button type="button" disabled={etat==='charge'||etat==='verification'||confirme} onClick={()=>verifier(null)}>Trouver un espace blanc</button>
+      <div className="vrm-placement-pages"><div><b>Original · choisir ici</b><canvas ref={original} onClick={choisir} tabIndex={0} aria-label="Choisir l’emplacement : cliquer ou utiliser les flèches du clavier" onKeyDown={e=>{
+        const d={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.02],ArrowDown:[0,.02]}[e.key];
+        if(!d||etat==='charge'||confirme)return;e.preventDefault();
+        pointClavier.current={vx:Math.max(0,Math.min(1,pointClavier.current.vx+d[0])),vy:Math.max(0,Math.min(1,pointClavier.current.vy+d[1]))};verifier(pointClavier.current);
+      }} style={{cursor:'crosshair'}}/></div><div><b>Résultat avant impression</b><canvas ref={apercu} hidden={!['valide','auto'].includes(etat)}/><p role="status">{etat==='charge'?'Chargement…':etat==='verification'?'Vérification de la zone…':['valide','auto'].includes(etat)?'Zone blanche vérifiée.':erreur||'Choisis un emplacement ou lance la recherche automatique.'}</p></div></div>
+      <div className="vrm-placement-actions"><button type="button" disabled={confirme} onClick={onCancel}>Annuler</button><button type="button" data-imprime="1" disabled={confirme||!['valide','auto'].includes(etat)} onClick={valider}>{confirme?'Préparation…':'Valider et ouvrir le PDF'}</button></div>
     </div>
-  );
+  </div>,document.body);
 }
 
 // Réponses rapides prêtes à l'emploi : un clic REMPLIT la zone de texte (tu peux
@@ -39644,12 +39655,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
 
   // Coordonnées historiques : le moteur protège maintenant toute la page.
-  const posForFormat = (w, h, mut = true) => {
-    const key = bordereauFormatKey(w, h);
-    let pos = bordFormats[key];
-    if (!pos) { pos = smartDefaultBordPos(w, h); if (mut) { const next = { ...bordFormats, [key]: pos }; setBordFormats(next); save('vinted_bordereau_formats', next); } }
-    return pos;
-  };
+  const posForFormat = () => null; // Analyse du PDF courant, jamais une position héritée.
   const processBordereau = async (numero, title, pdfBuf) => {
     try {
       const { width, height } = await readPdfFirstPageSize(pdfBuf);
@@ -40075,13 +40081,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   },[emailBords, only]);
   // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
   const adjustBordPlacement = () => {
-    toast('Le numéro est placé dans un espace blanc vérifié sur chaque PDF. Les anciennes positions ne sont pas réutilisées automatiquement.');
+    const r=bordResult;if(!r?.pdfBuf)return;
+    setBordPlace({...r,blobUrl:URL.createObjectURL(new Blob([r.pdfBuf],{type:'application/pdf'}))});
   };
   const confirmBordPlacement = async (pos) => {
     const p = bordPlace; if(!p) return;
-    const next = { ...bordFormats, [p.key]: pos };
-    setBordFormats(next); save('vinted_bordereau_formats', next);
-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ toast('Erreur : '+String(err)); }
+    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ toast('Erreur : '+String(err)); throw err; }
     URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
   };
   const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
@@ -45170,7 +45175,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* Le placement est recalculé sur chaque PDF, sans position héritée. */}
-            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Comment est choisi l’emplacement du numéro ?</button>}
+            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Prévisualiser et ajuster le numéro</button>}
             {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est vérifié séparément pour trouver un espace blanc. Un emplacement non vérifié n’est pas réutilisé dans le lot.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
@@ -48956,6 +48961,39 @@ function GuideReglage({ titre, etapes }) {
   </details>;
 }
 
+function StatutSauvegardeReglages() {
+  const [,maj]=React.useReducer(n=>n+1,0);
+  React.useEffect(()=>{
+    const f=()=>maj();const stop=onSyncChange(f);
+    window.addEventListener('vrm:reglage-attente',f);window.addEventListener('vrm:save',f);
+    return ()=>{stop();window.removeEventListener('vrm:reglage-attente',f);window.removeEventListener('vrm:save',f);};
+  },[]);
+  if(!AUTH.user || !CLOISONNE) return <div className="vrm-settings-status" style={{color:C.muted}}>Sans synchronisation de boutique active, les réglages locaux restent sur cet appareil.</div>;
+  const attente=_settingsRevision>_settingsConfirmed;
+  const stockage=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
+  const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
+  return <div className="vrm-settings-status" role="status" style={{color:echec?C.warn:C.muted}}>
+    {stockage?'Modification non enregistrée sur cet appareil.':attente ? echec?'Modifications non synchronisées.':'Enregistrement dans ta boutique en cours…' : _settingsConfirmed>0?'Modifications synchronisées avec ta boutique.':'Les réglages de boutique sont synchronisés entre tes appareils.'}
+    {stockage&&<span> Le stockage de cet appareil a refusé une modification.</span>}
+    {echec&&<button type="button" onClick={()=>{for(const [k,d] of _failedLocalSaves)if(d.owner===AUTH.user?.id&&!_saveTimers[k])save(k,d.v);cloudPush();}}>Réessayer</button>}
+    <small>Les réglages de cet appareil restent locaux. Chaque formulaire indique aussi son propre résultat.</small>
+  </div>;
+}
+function ActionsReglages({comptes,onOuvrir}) {
+  const [preuves,setPreuves]=React.useState(null);
+  const [tick,maj]=React.useReducer(n=>n+1,0);
+  React.useEffect(()=>{let vivant=true,requete=0;const lire=()=>{const id=++requete;return lirePreuvesAdresses().then(v=>{if(vivant&&id===requete)setPreuves(v);});};lire();
+    const f=()=>{if(vivant){maj();lire();}};const stop=onCloudReady(f);window.addEventListener('vrm:save',f);window.addEventListener('focus',f);
+    return ()=>{vivant=false;if(typeof stop==='function')stop();window.removeEventListener('vrm:save',f);window.removeEventListener('focus',f);};},[]);
+  const emails=isCloudReady()?load('vinted_account_emails',{}):null;
+  const masques=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
+  const actions=actionsReglages({comptes:comptes.filter(c=>!masques.has(String(c.vinted_user_id))),emails,preuves});
+  if(!actions.length)return null;
+  return <section className="vrm-settings-todo" style={{background:C.card,borderColor:C.border}} aria-label="À terminer">
+    <h3>À terminer</h3>{actions.map(a=><div key={a.id}><span><b>{a.titre}</b><small style={{color:C.muted}}>{a.texte}</small></span><button type="button" onClick={()=>onOuvrir(a.cible)} style={{color:C.accent,borderColor:C.border}}>{a.geste}</button></div>)}
+  </section>;
+}
+
 function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark, notifEnabled, onToggleNotif }) {
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
@@ -49230,6 +49268,11 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         {' '}<span className="vrm-aide" style={{color:C.muted,fontWeight:400}}>Sans les PDF de bordereau ni tes connexions Vinted.</span>
       </span>
     )},
+    {id:'aide',titre:'Besoin d’aide ?',items:[{id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes ou impression : trouver la bonne vérification.',el:<div className="vrm-settings-help">
+      <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><button type="button" onClick={()=>ouvrirSous('adresses')}>Ouvrir la réception des emails</button></details>
+      <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><button type="button" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</button></details>
+      <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><button type="button" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</button></details>
+    </div>}]},
   ];
   // « Mon compte » : la PERSONNE.
   const GROUPES_COMPTE = MULTI_USER ? [
@@ -49312,6 +49355,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
     <div ref={racine} className="vrm-set" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
       <AcctSheet/>
+      <StatutSauvegardeReglages/>
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
         <div className="vrm-set-nav">
@@ -49336,10 +49380,12 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
         )}
       </>)}
 
+      {ouvert && <div className="vrm-settings-scope" style={{color:C.muted}}>Portée : {['zoom','widget'].includes(ouvert.id)?'cet appareil':ouvert.id==='push'?'cet appareil et préférences par compte':ouvert.id==='imprimante'?'toute la boutique · impression':vue==='compte'?'ton compte VRM':'ta boutique VRM'}</div>}
       {ouvert && <h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2>}
 
       {!ouvert && <>
         {profil}
+        {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):ouvrirSous(id)}/>}
         <label className="vrm-settings-search" style={{background:C.card,borderColor:C.border,color:C.muted}}>
           <Icon name="search" size={16}/>
           <input type="search" value={rechercheReglage} onChange={e=>setRechercheReglage(e.target.value)} placeholder="Rechercher un réglage…" aria-label="Rechercher dans les paramètres" style={{color:C.text}}/>
@@ -50779,7 +50825,7 @@ function NumerosSetting({ nu = false }) {
       <GuideReglage titre="Du numéro à l’emplacement" etapes={[
         ['Choisis un format', 'Chiffres seuls ou lettres suivies de chiffres. Les exemples montrent un format, pas le prochain numéro disponible.'],
         ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
-        ['Indique où il est rangé', 'Dans Stock 3D, sélectionne cet article puis une place libre. Le numéro identifie l’article ; le meuble et la case indiquent son emplacement.']
+        ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
       ]}/>
       <div role="status" style={{marginTop:12,fontSize:13,color:C.text}}>Format actuellement enregistré : <b>{enregistree ? `${enregistree} + chiffres` : 'Chiffres seuls'}</b>. Les changements acceptés sont enregistrés automatiquement.</div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
@@ -51068,16 +51114,17 @@ function EmailStartSetting({ nu = false }) {
   })(); }, []);
 
   const saveDate = async (v) => {
-    if (!v || status === 'pasLu') return;   // on n'écrit pas par-dessus ce qu'on n'a pas lu
-    setDate(v); setStatus('saving');
+    if (!v || status === 'pasLu' || status === 'saving') return;
+    setStatus('saving');
+    if(!await askConfirm({title:'Modifier le début de l’import ?',desc:`Les prochains imports utiliseront la date du ${v.split('-').reverse().join('/')} comme début d’historique. Les données déjà présentes ne sont pas effacées par ce réglage.`,ok:'Enregistrer cette date',cancel:'Annuler'})){setStatus('modifie');return;}
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-        method: 'POST',
-        headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([withOwner({ id: 'vrm_email_config', data: { startDate: v, updatedAt: new Date().toISOString() } })]),
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+        method:'POST',headers:{...HEADERS,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify([withOwner({id:'vrm_email_config',data:{startDate:v,updatedAt:new Date().toISOString()}})])
       });
-      setStatus('ok');
-    } catch (_) { setStatus('err'); }
+      if(!r.ok) throw Error('refus de sauvegarde');
+      setStatus('saved');
+    } catch (_) {setStatus('err');}
   };
 
   return (
@@ -51088,12 +51135,13 @@ function EmailStartSetting({ nu = false }) {
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <span style={{fontSize:12,fontWeight:500,color:C.text}}>À partir du</span>
-        <input type="date" value={date} onChange={e=>saveDate(e.target.value)} disabled={status==='load'||status==='pasLu'}
+        <input type="date" value={date} onChange={e=>{setDate(e.target.value);setStatus('modifie');}} disabled={status==='load'||status==='pasLu'||status==='saving'}
           style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'6px 10px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none',opacity:status==='pasLu'?0.45:1}}/>
         <span style={{fontSize:11,color:status==='err'?C.danger:C.muted}}>
-          {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':status==='pasLu'?'':'✓ enregistré'}
+          {status==='load'?'chargement…':status==='saving'?'enregistrement…':status==='err'?'⚠ échec — réessaie':status==='pasLu'?'':status==='modifie'?'Modification non enregistrée':status==='saved'?'✓ enregistré':date?'Date actuelle':'Aucune date définie'}
         </span>
       </div>
+      {(status==='modifie'||status==='err'||status==='saving') && <button type="button" disabled={!date||status==='saving'} onClick={()=>saveDate(date)} style={{marginTop:10,minHeight:44,padding:'8px 14px',borderRadius:10,border:`1px solid ${C.border}`,background:C.accent,color:C.onAccent||'#fff',font:'inherit',cursor:'pointer'}}>{status==='saving'?'Enregistrement…':status==='err'?'Réessayer l’enregistrement':'Enregistrer la date'}</button>}
       {status==='pasLu' && <div style={{marginTop:9}}><span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span></div>}
     </div>
   );

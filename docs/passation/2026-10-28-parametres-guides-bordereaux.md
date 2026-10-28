@@ -19,7 +19,7 @@ Le rendu de la première page est analysé avec le lecteur pdf.js existant (3.11
 
 Les anciennes coordonnées sont conservées mais ne constituent pas une preuve de zone blanche sur un autre PDF. Elles ne sont plus utilisées pour tamponner. Le bouton de remise à zéro qui effaçait les positions a été remplacé par une explication. La commande « déplacer » ne conduit plus vers un faux canevas sans véritable aperçu.
 
-Si le lecteur PDF échoue, si la page est trop grande ou sans espace suffisant, le tamponnage est refusé explicitement ; aucun placement au hasard. Il n'y a pas encore d'éditeur de placement manuel avec vérification des pixels. Le rendu dépend actuellement du chargement pdf.js déjà utilisé par l'app ; ne pas annoncer un fonctionnement hors connexion. La détection de blanc n'est pas une certification transporteur : un véritable bordereau et son scan restent à contrôler avant publication.
+Si le lecteur PDF échoue, si la page est trop grande ou sans espace suffisant, le tamponnage est refusé explicitement ; aucun placement au hasard. L’éditeur de placement manuel, ajouté dans le complément ci-dessous, revérifie les pixels du PDF original. Le rendu dépend actuellement du chargement pdf.js déjà utilisé par l'app ; ne pas annoncer un fonctionnement hors connexion. La détection de blanc n'est pas une certification transporteur : un véritable bordereau et son scan restent à contrôler avant publication.
 
 ## Lot Colis
 
@@ -35,3 +35,12 @@ La sélection affichée conserve ses lignes pendant le traitement. Tout décoche
   - `VRM_CHROMIUM_PATH=/usr/bin/chromium VRM_PDFJS_DIR=/tmp/vrm-pdfjs node scripts/bancs/lot-bordereaux.cjs` : lot mixte, fichiers illisible/absent, identité exacte des échecs.
 
 Aucune vraie vente, aucun email réel et aucune impression physique utilisés par ces tests. Aucun déploiement réalisé dans cette passe.
+
+## Complément : actions, enregistrement et éditeur réel
+
+- « À terminer » n'affiche que des adresses manquantes après lecture et des liens de confirmation effectivement envoyés/expirés. Une absence de réponse ne vaut pas une panne confirmée. Les comptes masqués sont exclus.
+- Le statut de synchronisation suit les demandes locales et leur acquittement serveur ; les changements en attente ne sont pas déclarés synchronisés par une réponse d'un envoi antérieur. Les échecs de stockage local restent rejouables uniquement pour le vendeur courant.
+- L'import des emails demande une sauvegarde explicite et un récapitulatif annulable. HTTP 503 n'est plus affiché comme un succès ; la saisie reste disponible pour réessayer.
+- Chaque panneau indique sa portée ; aide ciblée emails/comptes/impression et exemple concret de numéro/emplacement.
+- « Prévisualiser et ajuster le numéro » ouvre le PDF original et le rendu réel. Choix au clic ou aux flèches ; contrôle du blanc et de sa marge sur les pixels originaux ; confirmation bloquée avant contrôle ou après collision. La position est revérifiée au moment de générer le PDF, jamais mémorisée pour d'autres documents. Aucun envoi d'email ou test d'impression physique.
+- Tests complémentaires : `node --test scripts/tests/reglages-actions.test.mjs`, `VRM_CHROMIUM_PATH=/usr/bin/chromium node scripts/bancs/parametres-sauvegarde.cjs`, `VRM_PDFJS_DIR=/tmp/vrm-pdfjs node scripts/tests/bordereau-placement-interface.cjs`.
