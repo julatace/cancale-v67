@@ -52691,11 +52691,11 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
         <div className="vrm-connexions-actions"><a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a><a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a></div>
-        <p>Chrome : remplace le dossier décompressé au même emplacement, puis clique sur Recharger dans <code>chrome://extensions</code>. Sur Edge, utilise <code>edge://extensions</code>.</p>
+        <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque Chrome où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, Chrome garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
       </details>
-      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} Cette observation peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
+      <details><summary>Dernière version observée dans ma boutique</summary><p>{derniereExt===undefined?'Lecture en cours…':derniereExt===null?'Cette information n’a pas pu être lue.':derniereExt==='aucune'?'Aucune version enregistrée.':`Version ${derniereExt.v} · ${dateLisible(derniereExt.at)}.`} C’est la version de la dernière capture enregistrée : elle peut venir d’un autre navigateur. Elle ne confirme pas la version utilisée ici.</p></details>
     </section>
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Données de l’extension</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Dernière mise à jour enregistrée pour cette source. Pour actualiser un compte, ouvre-le sur sa plateforme avec l’extension active ; vérifie ensuite ses annonces, ventes et messages.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
