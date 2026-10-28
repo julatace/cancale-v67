@@ -30,6 +30,11 @@ jobs:
           node scripts/bancs/recuperation-auth.cjs
           node scripts/tests/recuperation-pannes-interface.cjs
           node scripts/bancs/confidentialite.cjs
+      - name: Vérifier réception multi-comptes, favoris et inscription
+        run: |
+          node scripts/tests/reception-synthese-interface.cjs
+          node scripts/tests/favoris-automatisation-interface.cjs
+          node scripts/bancs/inscription-fiable.cjs
       - name: Préparer le moteur PDF de contrôle
         run: |
           mkdir -p "$RUNNER_TEMP/vrm-pdfjs"

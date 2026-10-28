@@ -102,3 +102,8 @@ test('capture, compte, format, phrase, lien, doublons ou sélection incompatible
   for(const selection of [[],['n2','n2'],['introuvable']])assert.throws(()=>resoudreCiblesFavoris({uid:'123',capture:capture(),trace:trace(),selection}));
   for(const body of ['{',JSON.stringify({item_id:'101',opposite_user_id:'201'}),JSON.stringify({initiator:'native-fixture',item_id:'101',opposite_user_id:'201',reply:'non'})])assert.throws(()=>resoudreCiblesFavoris({uid:'123',capture:capture(),trace:{...trace(),body},selection:['n2']}));
 });
+
+test('écran quitté avant le dispatch : réservation close sans message ni faux accusé',()=>{
+ const d=claim(lancer().data).data;const fin=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'refuse',raison:'ecran_inactif',maintenant:T+100});
+ assert.equal(fin.valeur.active,false);assert.equal(fin.valeur.jobs[0].etat,'refuse');assert.equal(fin.valeur.jobs[0].raison,'ecran_inactif');assert.equal(fin.valeur.jobs[0].envoyeLe,undefined);assert.equal(fin.data.enCours,null);assert.match(fin.valeur.raison,/Écran des favoris quitté/);
+});

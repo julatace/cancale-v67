@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const {build}=require('esbuild'),{chromium}=require('playwright');const racine=path.resolve(__dirname,'../..');
+const {build}=require('esbuild'),{chromium}=require('playwright');const racine=process.env.VRM_UI_ROOT||path.resolve(__dirname,'../..');
 (async()=>{
  const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
  import React from'react';import{createRoot}from'react-dom/client';import Auto from'./src/AutomatisationFavoris.jsx';
@@ -17,10 +17,10 @@ const {build}=require('esbuild'),{chromium}=require('playwright');const racine=p
   if(c.action==='lancer')j={ok:true,vue:active};
   if(window.cas==='compteArebours'&&['lancer','suivant'].includes(c.action)){window.echeance=window.echeance||Date.now()+4000;j={ok:true,vue:{...active,prochain:window.echeance,intervalleMinutes:6}};}
   if(c.action==='suivant'&&window.cas!=='compteArebours')j=window.n++?{ok:true,vue:active}:{ok:true,vue:{...active,jobs:active.jobs.map(x=>({...x,etat:'reserve'}))},travail:{jeton:'jeton-unique',suivi:'s1'}};
-  if(c.action==='terminer')j={ok:true,vue:fini};
+  if(c.action==='terminer')j={ok:true,vue:{...fini,jobs:fini.jobs.map(x=>({...x,etat:c.resultat,raison:c.raison}))}};
   return{ok:true,json:async()=>j};
  };
- window.afficher=(disponible=true,prets=true,owner='owner-test',autoSave=false)=>root.render(<Auto key={owner} uid="123" owner={owner} ownerActuel={()=>window.owner} headers={()=>({Authorization:'Bearer fixture'})} selection={['n1','n2']} reglagesPrets={prets} reglages={{message:"Bonjour",pourcentage:10,intervalleMinutes:6}} disponible={disponible} preparerReglages={autoSave?async()=>{window.saves++;if(window.saveFail)throw Error('Sauvegarde non confirmée.');return{message:'Bonjour',pourcentage:10,intervalleMinutes:6};}:undefined} executer={async t=>{window.envois.push(t);if(window.pauseExec)await new Promise(r=>window.resoudreExec=r);return{ok:true,data:{resultat:'envoye'}};}}/>);
+ window.afficher=(disponible=true,prets=true,owner='owner-test',autoSave=false,ecranActif=true)=>root.render(<Auto ecranActif={ecranActif} key={owner} uid="123" owner={owner} ownerActuel={()=>window.owner} headers={()=>({Authorization:'Bearer fixture'})} selection={['n1','n2']} reglagesPrets={prets} reglages={{message:"Bonjour",pourcentage:10,intervalleMinutes:6}} disponible={disponible} preparerReglages={autoSave?async()=>{window.saves++;if(window.saveFail)throw Error('Sauvegarde non confirmée.');return{message:'Bonjour',pourcentage:10,intervalleMinutes:6};}:undefined} executer={async t=>{window.envois.push(t);if(window.pauseExec)await new Promise(r=>window.resoudreExec=r);return{ok:true,data:{resultat:'envoye'}};}}/>);
  window.afficher();`},bundle:true,write:false,format:'iife',logLevel:'silent'});
  const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});let controles=0;
  const check=(v,m)=>{assert.ok(v,m);controles++;};
@@ -48,6 +48,10 @@ const {build}=require('esbuild'),{chromium}=require('playwright');const racine=p
   await p.evaluate(()=>window.resoudreExec());await p.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor();check(await p.getByRole('progressbar').getAttribute('value')==='1','barre avancée après accusé serveur');await p.close();
   p=await page();await p.evaluate(()=>window.cas='compteArebours');await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).click();await p.getByRole('status').filter({hasText:'Prochaine vérification dans'}).waitFor();const avant=await p.getByRole('status').filter({hasText:'Prochaine vérification dans'}).innerText();await p.waitForTimeout(1200);const apres=await p.getByRole('status').filter({hasText:'Prochaine vérification dans'}).innerText();if(process.env.SHOTS)await p.screenshot({path:path.join(process.env.SHOTS,'attente-'+largeur+'.png'),fullPage:true});check(avant!==apres,'compte à rebours réellement actualisé');check(await p.evaluate(()=>window.envois.length===0),'attente sans envoi prématuré');await p.close();
   p=await page();await p.evaluate(()=>window.cas='bloque');await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).click();await p.getByRole('alert').waitFor();check(await p.evaluate(()=>window.envois.length===0),'destinataire non confirmé : aucun dispatch');await p.close();
+  p=await page();await p.evaluate(()=>{window.cas='retard';window.afficher(true,true,'owner-test',false,true);});await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).click();await p.waitForFunction(()=>typeof window.liberer==='function');
+  await p.evaluate(()=>window.afficher(true,true,'owner-test',false,false));await p.waitForTimeout(50);await p.evaluate(()=>window.liberer());await p.waitForTimeout(100);
+  check(await p.evaluate(()=>window.envois.length===0),'écran quitté pendant la réservation : aucun message dispatché');check(await p.evaluate(()=>window.appels.some(x=>x.c.action==='terminer'&&x.c.resultat==='refuse'&&x.c.raison==='ecran_inactif')),'réservation annulée explicitement sans inventer un envoi');await p.close();
+  p=await page();await p.evaluate(()=>{Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true});});await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).click();await p.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor();check(await p.evaluate(()=>window.envois.length===1),'ancien Safari : la fonction absente ne bloque plus le parcours');await p.close();
   p=await page();await p.evaluate(()=>window.cas='retard');await p.getByRole('button',{name:'Lancer les envois sélectionnés'}).click();await p.waitForFunction(()=>typeof window.liberer==='function');
   await p.evaluate(()=>{window.owner='autre-vendeur';window.afficher(true,true,'autre-vendeur');window.liberer();});await p.waitForTimeout(100);
   check(await p.evaluate(()=>window.envois.length===0),'session changée avant départ : aucune exécution');await p.close();

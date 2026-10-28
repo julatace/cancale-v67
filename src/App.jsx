@@ -13925,6 +13925,7 @@ function AuthScreen() {
   const [prenom, setPrenom] = React.useState('');
   const [pw, setPw] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const demandeEnCours=React.useRef(false);
   const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
   const [info, setInfo] = React.useState('');
   const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
@@ -13959,14 +13960,14 @@ function AuthScreen() {
 
   const submit = async (e) => {
     e && e.preventDefault();
-    if(busy)return;
+    if(busy||demandeEnCours.current)return;
     if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
     setErr(''); setInfo('');
     if (mode !== 'newpw' && !email.trim()) { setErr('Indique ton email.'); return; }
     if (mode !== 'reset' && pw.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères.'); return; }
     // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
     if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr('Mélange lettres et chiffres — ce mot de passe protège ta compta.'); return; }
-    setBusy(true);
+    demandeEnCours.current=true;setBusy(true);
     try {
       if (mode === 'newpw') {
         const r = await authSetPassword(pw);
@@ -13997,7 +13998,7 @@ function AuthScreen() {
         // pourrait garder en mémoire les données du vendeur précédent.
         else location.reload();
       }
-    } finally { setBusy(false); }
+    } finally { demandeEnCours.current=false;setBusy(false); }
   };
 
   // 16 px : sous 16 px, Safari iPhone ZOOME la page au toucher d'un champ.
@@ -14164,16 +14165,16 @@ function AuthScreen() {
               bonjour serait un péage. */}
           {mode==='up' && (
             <input type="text" autoComplete="given-name" placeholder="Ton prénom (facultatif)"
-              value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={{...field, marginBottom:9}}/>
+              disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={{...field, marginBottom:9}}/>
           )}
           {mode!=='newpw' && (
             <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="Email"
-              value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={{...field, marginBottom:9}}/>
+              disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={{...field, marginBottom:9}}/>
           )}
           {mode!=='reset' && (
             <input type="password" autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'}
               placeholder={mode==='newpw'?'Nouveau mot de passe (8 caractères min.)':'Mot de passe'}
-              value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
+              disabled={busy} value={pw} onChange={e=>setPw(e.target.value)} style={{...field, marginBottom:9}}/>
           )}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
@@ -14919,7 +14920,7 @@ function FavorisConnectes(props){
   React.useEffect(()=>onVmrExt(maj),[]);
   const mesure=directVu.current&&Date.now()-directVu.current.at<45000?directVu.current.etat:null;
   const etat=etatExtensionFavoris(props.uid,mesure);
-  React.useEffect(()=>{const t=setInterval(async()=>{if(document.hidden||transport.current?.mode!=='direct')return;const id=transport.current.id;const r=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);if(r?.ok&&r.ext===id){directVu.current={etat:r,at:Date.now()};maj();}},20000);return()=>clearInterval(t);},[props.uid,props.owner]);
+  React.useEffect(()=>{const t=setInterval(async()=>{if(document.hidden||props.ecranActif===false||transport.current?.mode!=='direct')return;const id=transport.current.id;const r=await appelerFavorisDirect(canalExt(),id,{type:'favorisEtat'},5000);if(r?.ok&&r.ext===id){directVu.current={etat:r,at:Date.now()};maj();}},20000);return()=>clearInterval(t);},[props.uid,props.owner,props.ecranActif]);
   const verifier=async()=>{
     sonderPonts();
     if(__vmrTour)await new Promise(resolve=>{const t=setTimeout(resolve,2500);__vmrAttenteTour.push(()=>{clearTimeout(t);resolve();});});
@@ -45601,7 +45602,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>
         </div>
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
-        <FavorisConnectes chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
+        <FavorisConnectes ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" placeholder="Rechercher" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
