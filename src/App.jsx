@@ -1684,6 +1684,12 @@ const SYNC_KEYS = [
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
   'vrm_compta',
+  // (28 octobre) Stock « Mes meubles » : les MEUBLES que Julien crée lui-même
+  // (nom, colonnes × lignes = cases) et la case où chaque paire est rangée.
+  // `vrm_meubles` = [{id,name,cols,rows}] ; `vrm_slots` = { [cleNum]: {m,i} }.
+  // OWNED par l'app, synchronisé (il range sur l'ordi, cherche sur le téléphone),
+  // jamais écrit par l'extension. Le NUMÉRO reste l'identité (§5), jamais le titre.
+  'vrm_meubles','vrm_slots',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -27018,6 +27024,244 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
   );
 }
 
+// (28 oct.) STOCK « MES MEUBLES » — demande de Julien, validée sur prototype :
+// « créer mon meuble moi-même avec le nombre de cases », puis y déposer chaque
+// article. Rien à dessiner, rien à placer en 3D : il règle colonnes × lignes, et
+// range chaque paire dans une case. Les articles = ses paires numérotées en stock
+// (vraie photo + N°) ; « vendu » vient de `vrm_stock_vendus` (§11, publié par
+// Annonces) ; sortir du stock passe par `vinted_pairs_lost`. Les MEUBLES et la
+// CASE de chaque paire sont synchronisés (`vrm_meubles`, `vrm_slots`) ;
+// l'identité d'une place est le NUMÉRO (`cleNum`), jamais le titre (§5).
+function StockMeubles() {
+  const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
+  const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
+  const [pairsLost, setPairsLost] = React.useState(() => load('vinted_pairs_lost', {}));
+  const [q, setQ] = React.useState('');
+  const [place, setPlace] = React.useState(null);           // cleNum en cours de pose
+  const [modal, setModal] = React.useState(null);           // {type:'meuble'|'placer'|'fiche', …}
+  // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
+  // un meuble créé ou une case posée pendant le chargement.
+  React.useEffect(() => onCloudReady(() => {
+    setMeubles((prev) => (prev && prev.length) ? prev : (Array.isArray(load('vrm_meubles', [])) ? load('vrm_meubles', []) : []));
+    setSlots((prev) => (prev && Object.keys(prev).length) ? prev : (load('vrm_slots', {}) || {}));
+    setPairsLost((prev) => (prev && Object.keys(prev).length) ? prev : (load('vinted_pairs_lost', {}) || {}));
+  }), []);
+  const ecrireMeubles = (u) => { setMeubles(u); save('vrm_meubles', u); };
+  const ecrireSlots = (u) => { setSlots(u); save('vrm_slots', u); };
+
+  const numeros = load('vinted_annonce_numeros', {}) || {};
+  const venduSig = load('vrm_stock_vendus', null);
+  const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
+  const estVendu = (f) => vendus.has(cleNum(f.numero));
+  const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost));
+  const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
+  const cleDeFiche = (f) => cleNum(f.numero);
+  const posee = (f) => !!slots[cleDeFiche(f)];
+  const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
+  const aRanger = fiches.filter((f) => !posee(f)).sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0));
+  const filtre = q.trim().toLowerCase();
+  const correspond = (f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre);
+  const nVendus = fiches.filter(estVendu).length;
+
+  const poser = (cle, mid, i) => {
+    const u = { ...slots };
+    const occ = Object.keys(u).find((c) => u[c] && u[c].m === mid && u[c].i === i);
+    const ancien = u[cle];
+    if (occ && occ !== cle) { if (ancien) u[occ] = ancien; else delete u[occ]; }
+    u[cle] = { m: mid, i };
+    ecrireSlots(u);
+  };
+  const retirerCase = (cle) => { const u = { ...slots }; delete u[cle]; ecrireSlots(u); };
+  const sortir = (f) => {
+    const cle = cleDeclarationPartie(f.numero, f.id, numeros);
+    setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
+    retirerCase(cleDeFiche(f));
+  };
+  const cliquerCase = (mid, i) => {
+    const occ = occupant(mid, i);
+    if (place) { poser(place, mid, i); setPlace(null); return; }
+    if (occ) setModal({ type: 'fiche', cle: cleDeFiche(occ) });
+    else setModal({ type: 'placer', m: mid, i });
+  };
+
+  const Vignette = ({ f, sold }) => (
+    <>
+      {f.photo
+        ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 10 }}>pas de photo</div>}
+      <span style={{ position: 'absolute', left: 4, top: 4, background: sold ? C.accent : 'rgba(0,0,0,0.6)', color: sold ? C.onAccent : '#fff', fontWeight: 800, fontSize: 11, padding: '1px 6px', borderRadius: 6 }}>N°{f.numero}</span>
+      {sold && <span style={{ position: 'absolute', right: 4, top: 4, background: C.accent, color: C.onAccent, fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 999, letterSpacing: 0.3 }}>VENDU</span>}
+    </>
+  );
+
+  const total = (m) => m.cols * m.rows;
+  const cadreMeuble = (m) => {
+    const filled = Array.from({ length: total(m) }).filter((_, i) => occupant(m.id, i)).length;
+    return (
+      <section key={m.id} style={{ marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 9px' }}>
+          <span style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{m.name}</span>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}</span>
+          <span style={{ flex: 1 }} />
+          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: 8, borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)' }}>
+          {Array.from({ length: total(m) }).map((_, i) => {
+            const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const dim = occ && filtre && !correspond(occ);
+            return (
+              <button type="button" key={i} onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}` : 'Case vide'}
+                style={{ position: 'relative', aspectRatio: '1 / 1', border: occ && sold ? `2px solid ${C.accent}` : 'none', padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
+                {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 300, opacity: place ? 0.8 : 0.35 }}>+</span>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
+  const fermerModal = () => setModal(null);
+  const btnSec = { flex: 1, border: `1px solid ${C.line}`, background: C.card2, color: C.text, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: 46 };
+  const Modale = () => {
+    if (!modal) return null;
+    let corps = null;
+    if (modal.type === 'meuble') {
+      corps = <EditeurMeuble modal={modal} onSave={(nom, cols, rows) => {
+        if (modal.id) { const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows } : x);
+          const max = cols * rows, us = { ...slots }; Object.keys(us).forEach((c) => { if (us[c] && us[c].m === modal.id && us[c].i >= max) delete us[c]; });
+          ecrireMeubles(u); ecrireSlots(us);
+        } else { ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows }]); }
+        fermerModal();
+      }} onDelete={modal.id ? async () => {
+        if (!(await askConfirm({ titre: 'Supprimer ce meuble ?', desc: 'Les articles qu\'il contient repartent dans « À ranger ». Aucun numéro n\'est perdu.', danger: true, ok: 'Supprimer' }))) return;
+        const us = { ...slots }; Object.keys(us).forEach((c) => { if (us[c] && us[c].m === modal.id) delete us[c]; });
+        ecrireMeubles(meubles.filter((x) => x.id !== modal.id)); ecrireSlots(us); fermerModal();
+      } : null} />;
+    } else if (modal.type === 'placer') {
+      const m = meubles.find((x) => x.id === modal.m);
+      corps = (<>
+        <h3 style={{ margin: '0 0 2px', fontSize: 18, color: C.text }}>Ranger dans {m ? m.name : ''}</h3>
+        <div style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>Case {modal.i + 1} · choisis l'article à y poser</div>
+        {aRanger.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '52vh', overflowY: 'auto' }}>
+          {aRanger.map((f) => (
+            <button type="button" key={f.id} onClick={() => { poser(cleDeFiche(f), modal.m, modal.i); fermerModal(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 8px', borderRadius: 11, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+              <span style={{ position: 'relative', width: 46, height: 46, borderRadius: 9, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={estVendu(f)} /></span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.title || '—'}</span>
+              <span style={{ fontWeight: 800, color: estVendu(f) ? C.accent : C.muted }}>N°{f.numero}</span>
+            </button>
+          ))}
+        </div> : <div style={{ color: C.muted, padding: '22px 0', textAlign: 'center' }}>Tous tes articles sont déjà rangés 👌</div>}
+      </>);
+    } else if (modal.type === 'fiche') {
+      const f = ficheParCle[modal.cle]; if (!f) { setTimeout(fermerModal, 0); return null; }
+      const sold = estVendu(f); const s = slots[modal.cle]; const m = s && meubles.find((x) => x.id === s.m);
+      corps = (<>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} /></span>
+          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? 'Vendu — à sortir du stock' : 'En stock'} · N°{f.numero}</div></div>
+        </div>
+        <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? 'Va le chercher' : 'Rangé dans'}</div>
+          <div style={{ fontSize: 23, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : 'Pas rangé'}{m ? ` · case ${s.i + 1}` : ''}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 9 }}>
+          <button type="button" onClick={() => { setPlace(modal.cle); fermerModal(); }} style={btnSec}>Déplacer</button>
+          <button type="button" onClick={() => { retirerCase(modal.cle); fermerModal(); }} style={btnSec}>Retirer de la case</button>
+        </div>
+        {sold && <button type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', minHeight: 46, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
+      </>);
+    }
+    return (
+      <div onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(2,5,10,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label="Fermer" style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
+          {corps}
+        </div>
+      </div>
+    );
+  };
+
+  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune paire numérotée en stock. Donne un numéro à tes annonces dans l'onglet <b style={{ color: C.text }}>Annonces</b> et tu pourras les ranger dans tes meubles ici.</Card>;
+
+  return (<>
+    {aRanger.length > 0 && (
+      <Card style={{ padding: '12px 13px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: C.text }}>À ranger</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.onAccent, background: C.accent, borderRadius: 999, padding: '1px 8px' }}>{aRanger.length}</span>
+          <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>touche un article puis une case</span>
+        </div>
+        <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
+          {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
+            return (
+              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: (sel || sold) ? `2px solid ${C.accent}` : `1px solid ${C.line}`, opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+                <Vignette f={f} sold={sold} />
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+    )}
+
+    {place && (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', borderRadius: 10, background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 700, position: 'sticky', top: 8, zIndex: 20, boxShadow: '0 3px 12px rgba(0,0,0,0.18)' }}>
+        <span>Où ranger <b>N°{(ficheParCle[place] || {}).numero || place}</b> ? Touche une case</span>
+        <button type="button" onClick={() => setPlace(null)} style={{ background: 'rgba(0,0,0,0.18)', border: 'none', color: C.onAccent, borderRadius: 999, padding: '5px 11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Annuler</button>
+      </div>
+    )}
+
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher une paire" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
+    </div>
+
+    {meubles.map(cadreMeuble)}
+
+    <button type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.line}`, color: C.accent, borderRadius: 14, padding: 15, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>+ Créer un meuble</button>
+
+    <Modale />
+  </>);
+}
+
+// Éditeur de meuble (nom + colonnes × lignes), avec aperçu des cases.
+function EditeurMeuble({ modal, onSave, onDelete }) {
+  const [name, setName] = React.useState(modal.name || '');
+  const [cols, setCols] = React.useState(modal.cols || 4);
+  const [rows, setRows] = React.useState(modal.rows || 3);
+  const step = (set, v, d, min, max) => () => set(Math.max(min, Math.min(max, v + d)));
+  const Stepper = ({ v, set, min, max, label }) => (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', background: C.card2, border: `1px solid ${C.line}`, borderRadius: 12, width: 'fit-content' }}>
+        <button type="button" onClick={step(set, v, -1, min, max)} aria-label="Moins" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 24, cursor: 'pointer' }}>−</button>
+        <span style={{ minWidth: 48, textAlign: 'center', fontSize: 19, fontWeight: 800, color: C.text }}>{v}</span>
+        <button type="button" onClick={step(set, v, 1, min, max)} aria-label="Plus" style={{ width: 48, height: 48, background: 'transparent', border: 'none', color: C.text, fontSize: 24, cursor: 'pointer' }}>+</button>
+      </div>
+    </div>
+  );
+  return (<>
+    <h3 style={{ margin: '0 0 2px', fontSize: 18, color: C.text }}>{modal.id ? 'Modifier le meuble' : 'Nouveau meuble'}</h3>
+    <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Un nom, et le nombre de cases.</div>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, marginBottom: 7 }}>Nom</div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Étagère salon" maxLength={30} style={{ width: '100%', background: C.card2, border: `1px solid ${C.line}`, color: C.text, borderRadius: 12, padding: '13px 14px', fontSize: 16, outline: 'none' }} />
+    </div>
+    <div style={{ display: 'flex', gap: 22, marginBottom: 6 }}>
+      <Stepper v={cols} set={setCols} min={1} max={8} label="Colonnes" />
+      <Stepper v={rows} set={setRows} min={1} max={10} label="Lignes" />
+    </div>
+    <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases</div>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4, maxWidth: 220, margin: '0 auto', background: C.line, padding: 5, borderRadius: 7 }}>
+        {Array.from({ length: cols * rows }).map((_, i) => <div key={i} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+      </div>
+    </div>
+    <button type="button" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows)} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
+    {onDelete && <button type="button" onClick={onDelete} style={{ width: '100%', border: `1px solid ${C.line}`, background: 'transparent', color: C.danger, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 9 }}>Supprimer ce meuble</button>}
+  </>);
+}
+
 function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
@@ -27029,7 +27273,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // n'a plus que la pièce (3D + vue du dessus) et l'assistant « Ranger » ; la
   // grille de zones et la photo du local ne s'ouvrent plus (mesuré : vides chez
   // lui). Un choix mémorisé « grille »/« photo » retombe sur la pièce.
-  const [garageView,setGarageView]=useState(()=>{ if (DEMANDE_STOCK_CHERCHE.nums) return 'plan'; const v=load('vinted_garage_view','plan'); return v==='ranger'?'ranger':'plan'; }); // plan | ranger
+  const [garageView,setGarageView]=useState(()=>{ if (DEMANDE_STOCK_CHERCHE.nums) return 'meubles'; const v=load('vinted_garage_view','meubles'); return ['meubles','plan','ranger'].includes(v)?v:'meubles'; }); // meubles | plan | ranger
 
   // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
   useEffect(()=>{
@@ -27239,13 +27483,14 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
       {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
           de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
       <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {[['plan','home','Ma pièce'],['ranger','grid','Liste des cases']].map(([v,ic,l])=>(
+        {[['meubles','box','Mes meubles'],['plan','home','Ma pièce'],['ranger','grid','Liste des cases']].map(([v,ic,l])=>(
           <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
             <Icon name={ic} size={15}/>{l}
           </button>
         ))}
       </nav>
 
+      {garageView==='meubles' && <StockMeubles/>}
       {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
       {garageView==='ranger' && <RoomPlan mode="2d"/>}
 
