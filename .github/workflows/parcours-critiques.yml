@@ -28,6 +28,7 @@ jobs:
       - name: Vérifier récupération et fermeture de l'espace privé
         run: |
           node scripts/bancs/recuperation-auth.cjs
+          node scripts/tests/recuperation-pannes-interface.cjs
           node scripts/bancs/confidentialite.cjs
       - name: Vérifier les politiques SQL sur une base jetable
         run: |
