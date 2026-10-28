@@ -16601,12 +16601,17 @@ function CarteLbc({ o, num = '', benef = null }) {
   // VENTE relevée, jamais `at` = heure de capture) et PAR QUOI elle part ;
   // l'étape qui demande un geste (colis à envoyer) passe en ambre.
   const dv = Date.parse(o.dateVente || '');
-  const sous = [isNaN(dv) ? '' : new Date(dv).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), o.deliveryLabel || ''].filter(Boolean).join(' · ');
+  const sous = [isNaN(dv) ? '' : new Date(dv).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(new Date(dv).getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }), o.deliveryLabel || ''].filter(Boolean).join(' · ');
   // « À envoyer » = la règle de l'onglet Colis (vente prouvée, ni annulée, ni
   // finalisée, pas encore partie) — jamais une lecture du libellé (§11).
   const aLabel = !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
   const ton = lbcAnnulee(o) ? 'annule' : ((o.isSeller === true || (o.isSeller !== false && aLabel)) && !lbcFinalisee(o) && !lbcExpediee(o) && !((load('vrm_lbc_colis_done', {}) || {})[o.txId]) ? 'action' : '');
-  return <LigneVente data={{ 'data-lbc-vente': String(o.txId) }} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={o.stepLabel || o.stepStatus || ''}
+  // (28 oct.) L'état de la LIGNE dit la règle qui compte la vente (§11) :
+  // « Paiement effectué » (l'étape brute de Leboncoin) s'affichait — coupé à
+  // 390 px — sur une vente que les totaux comptent finalisée. L'étape brute
+  // reste dans le détail.
+  const etatCourt = lbcAnnulee(o) ? 'Annulée' : lbcFinalisee(o) ? 'Finalisée' : ton === 'action' ? 'À envoyer' : lbcExpediee(o) ? 'En transit' : (o.stepLabel || o.stepStatus || '');
+  return <LigneVente data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt }} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · bénéfice {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -16652,7 +16657,7 @@ function LigneAchatLbc({ o }) {
   const date = o.dateVente ? new Date(o.dateVente) : null;
   return <LigneAchat data={{ 'data-lbc-achat': String(o.txId || '') }} attenue={st.step === 0}
     photo={photoArticle(o)} titre={o.title} statut={st} montant={lbcEuro(o.price)}
-    meta={<>{date && !isNaN(date) && <span style={{ whiteSpace: 'nowrap' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}{o.deliveryLabel && <span>· {o.deliveryLabel}</span>}</>}
+    meta={<>{date && !isNaN(date) && <span style={{ whiteSpace: 'nowrap' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) })}</span>}{o.deliveryLabel && <span>· {o.deliveryLabel}</span>}</>}
     sous={qr && qrUrl ? <div style={{ marginTop: 8 }}><QrColis url={qrUrl} size={120} /></div> : null}
     actions={<>
       {suivi && <a className="vrm-buy-quick" href={suivi} target="_blank" rel="noreferrer" title="Suivre le colis" aria-label="Suivre le colis" style={{ color: C.muted }}><Icon name="truck" size={16} /></a>}
@@ -16759,7 +16764,10 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const annules = achats.filter(lbcAnnulee);
   const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
   const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
-  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{arr.map(o => <LigneAchatLbc key={o.txId} o={o} />)}</div>;
+  // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
+  // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
+  const tsAchat = (o) => { const t = o && o.dateVente ? Date.parse(o.dateVente) : NaN; return isNaN(t) ? -Infinity : t; };
+  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}>{[...arr].sort((a, b) => tsAchat(b) - tsAchat(a)).map(o => <LigneAchatLbc key={o.txId} o={o} />)}</div>;
   return (
     <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
       {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
@@ -47798,7 +47806,12 @@ function MessagesLeboncoin() {
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, []);
   const cap = extSait('lbcmsg');
-  const nomDe = (id) => { const c = (d && d.comptes[id]) || {}; const a = (d && d.acc[id]) || {}; return c.name || a.name || 'Compte Leboncoin'; };
+  // (28 oct.) `8442c3e8…` (compteur de messagerie) et `lbc-account:8442c3e8…`
+  // (session privée, qui porte le NOM) sont UNE identité (5.212) : le compte
+  // connecté s'affichait « Compte Leboncoin » alors que son nom était rangé.
+  const nu = (id) => String(id || '').replace(/^lbc-account:/, '');
+  const accDe = (id) => { if (!d) return {}; const k = nu(id); return { ...(d.acc[k] || {}), ...(d.acc['lbc-account:' + k] || {}) }; };
+  const nomDe = (id) => { const c = (d && d.comptes[id]) || {}; const a = accDe(id); return c.name || a.name || 'Compte Leboncoin'; };
   const age = (iso) => { const t = Date.parse(iso || ''); if (!t) return null; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
   const ouvrir = <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" style={{ display: 'inline-block', marginTop: 10, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}>Ouvrir mes messages Leboncoin ↗</a>;
   if (d === undefined) return <div style={{ fontSize: 13, color: C.muted }}>Chargement…</div>;
@@ -47827,7 +47840,7 @@ function MessagesLeboncoin() {
         return (
           <div key={l.id} data-compte-lbc={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{((d.comptes[l.id] || {}).pro || (d.acc[l.id] || {}).type === 'pro') ? ' · pro' : (d.acc[l.id] || {}).type === 'particulier' ? ' · particulier' : ''}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{((d.comptes[l.id] || {}).pro || accDe(l.id).type === 'pro') ? ' · pro' : accDe(l.id).type === 'particulier' ? ' · particulier' : ''}</div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
                 {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu — connecte-toi une fois à ce compte sur leboncoin.fr'}
               </div>
@@ -48296,6 +48309,15 @@ function LeboncoinScreen() {
   //    exactement la régression que le bloc détaillé (« VENDUE SE PROUVE »)
   //    existe pour empêcher. Aligné sur eBay (`dvVue.aRetirerEbay`) et la
   //    cloche (`lbcRemoveCount`), qui ne comptent que le prouvé.
+  // (28 oct.) Le N° d'une annonce de « Mes annonces » : la règle de l'écran
+  // (lien posé à la main, sinon référence VRM traduite par la 013), jamais la
+  // référence brute (§5, §11).
+  const numeroAnnonceLbc = React.useMemo(() => {
+    if (!data || !Array.isArray(data.catalogueAds)) return null;
+    const parId = {}; for (const a of data.catalogueAds) if (a && a.id != null) parId[String(a.id)] = a;
+    const liens = data.liensMain || null;
+    return (ad) => (ad && ad.id != null) ? numeroLbcIdentite({ itemId: ad.id }, parId, liens) : '';
+  }, [data]);
   const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
   const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
@@ -48379,7 +48401,7 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {data && <AnnoncesLeboncoin annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO}/>}
+      {data && <AnnoncesLeboncoin annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore

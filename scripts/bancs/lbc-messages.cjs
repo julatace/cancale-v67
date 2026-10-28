@@ -27,7 +27,7 @@ srv.listen(PORT);
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--no-proxy-server'] });
-    for (const etat of ['lu', 'jamais', 'panne']) {
+    for (const etat of ['lu', 'jamais', 'panne', 'session']) {
       console.log(`── ${etat}`);
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
       const pg = await ctx.newPage();
@@ -39,8 +39,12 @@ srv.listen(PORT);
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
         if (/id=eq\.lbc_messages/.test(u)) {
           if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
+          if (etat === 'session') return j([{ data: { compteurs: { abc: { unread: 2, at: auj.toISOString() } }, comptes: {} } }]);
           return j(etat === 'lu' ? [{ data: MSG }] : []);
         }
+        // (28 oct.) Le compteur porte l'id NU, la session privée le range sous
+        // `lbc-account:{id}` avec son NOM : une seule identité (5.212).
+        if (etat === 'session' && /id=eq\.lbc_accounts/.test(u)) return j([{ data: { accounts: { abc: { id: 'abc', sessionAt: auj.toISOString() }, 'lbc-account:abc': { id: 'lbc-account:abc', name: 'Moncompte', type: 'particulier', sessionAt: auj.toISOString() } } } }]);
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -56,6 +60,9 @@ srv.listen(PORT);
         dit(c2 && /Boutique pro/.test(c2.t) && /—/.test(c2.t) && !/\b0\b/.test(c2.t), 'un compte jamais relevé dit « — », pas « 0 »', c2 && c2.t.replace(/\n/g, ' · '));
       } else if (etat === 'jamais') {
         dit(v && v.etat === 'jamais' && !v.comptes.length, 'jamais relevé : aucune ligne à zéro, la consigne', v && v.t.slice(0, 80));
+      } else if (etat === 'session') {
+        const c = v && v.comptes.find((x) => x.id === 'abc');
+        dit(c && /Moncompte/.test(c.t) && /particulier/.test(c.t) && !/Compte Leboncoin/.test(c.t), 'le compte du compteur est NOMMÉ par sa session privée (même identité, `lbc-account:`)', c && c.t.replace(/\n/g, ' · '));
       } else {
         dit(v && v.etat === 'pas-su' && !/\b0 non lu/.test(v.t) && !/Pas encore de messages/.test(v.t), 'lecture ratée : ni zéro, ni « jamais relevé »', v && v.t.slice(0, 80));
       }
