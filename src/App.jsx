@@ -28109,6 +28109,36 @@ function placeDansMeubles(i, m) {
   const cols = Math.max(1, +m.cols || 1);
   return { rangee: Math.floor(i / cols) + 1, colonne: (i % cols) + 1 };
 }
+// (28 oct.) Les PLANCHES d'un meuble et la GRAVITÉ. Julien : « quand on enlève
+// un article, ceux du dessus descendent — il faut pouvoir faire des barres »,
+// puis « pas imaginaires justement » : ce sont les vraies planches de son
+// meuble, dessinées. `m.planches` = les rangées (1 = celle du haut) SOUS
+// lesquelles il y a une planche ; le bas du meuble en est toujours une.
+// `m.gravite` : dans chaque colonne, entre deux planches, les articles posent
+// sur celui du dessous — un vide se comble par le haut. On ne déplace que des
+// articles PRÉSENTS (`presents`), jamais leur numéro ; seule la case change.
+// Rend { slots, bouges: { cle: nbRangéesDescendues } }.
+function planchesDe(m) {
+  const r = Math.max(1, +m.rows || 1);
+  return [...new Set((Array.isArray(m.planches) ? m.planches : []).map((x) => +x).filter((x) => Number.isInteger(x) && x >= 1 && x < r))].sort((a, b) => a - b);
+}
+function tasserMeuble(slots, m, presents) {
+  const out = { ...slots }; const bouges = {};
+  if (!m || !m.gravite) return { slots: out, bouges };
+  const cols = Math.max(1, +m.cols || 1), rows = Math.max(1, +m.rows || 1);
+  const bornes = [0, ...planchesDe(m), rows];          // segments [haut, bas[ en rangées 0-based
+  const chez = {};                                      // i → clé présente
+  Object.keys(out).forEach((k) => { const v = out[k]; if (v && v.m === m.id && presents.has(k) && v.i < cols * rows && chez[v.i] == null) chez[v.i] = k; });
+  for (let c = 0; c < cols; c++) {
+    for (let b = 0; b < bornes.length - 1; b++) {
+      const haut = bornes[b], bas = bornes[b + 1] - 1;
+      const pile = [];                                    // du bas vers le haut
+      for (let r = bas; r >= haut; r--) { const k = chez[r * cols + c]; if (k) pile.push([k, r]); }
+      pile.forEach(([k, r0], j) => { const r1 = bas - j; if (r1 !== r0) { out[k] = { m: m.id, i: r1 * cols + c }; bouges[k] = r1 - r0; } });
+    }
+  }
+  return { slots: out, bouges };
+}
 function ouDansMeubles(num, meublesArg, slotsArg) {
   const k = cleNum(num); if (!k) return null;
   const slots = slotsArg || load('vrm_slots', {}) || {};
@@ -28150,7 +28180,8 @@ function StockMeubles() {
     setPairsLost((prev) => (prev && Object.keys(prev).length) ? prev : (load('vinted_pairs_lost', {}) || {}));
   }), []);
   const ecrireMeubles = (u) => { setMeubles(u); save('vrm_meubles', u); };
-  const ecrireSlots = (u) => { setSlots(u); save('vrm_slots', u); };
+  const [tombes, setTombes] = React.useState({});   // cle → rangées descendues (animation)
+  const ecrireSlotsBrut = (u) => { setSlots(u); save('vrm_slots', u); };
 
   const numeros = load('vinted_annonce_numeros', {}) || {};
   const horsCompte = comptesStockEcartes();
@@ -28161,6 +28192,12 @@ function StockMeubles() {
   const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
     .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
+  // Toute écriture des cases passe par la gravité des meubles qui l'ont.
+  const tasserTout = (u, ms) => { let cur = u, b = {}; (ms || meubles).forEach((m) => { const r = tasserMeuble(cur, m, new Set(Object.keys(ficheParCle))); cur = r.slots; Object.assign(b, r.bouges); }); return { slots: cur, bouges: b }; };
+  const ecrireSlots = (u, ms) => {
+    const r = tasserTout(u, ms); ecrireSlotsBrut(r.slots);
+    if (Object.keys(r.bouges).length) { setTombes(r.bouges); setTimeout(() => setTombes({}), 700); }
+  };
   const cleDeFiche = (f) => cleNum(f.numero);
   const posee = (f) => !!slots[cleDeFiche(f)];
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
@@ -28260,10 +28297,10 @@ function StockMeubles() {
       <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} style={{ marginBottom: replie ? 10 : 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 9px', opacity: replie ? 0.55 : 1 }}>
           <span style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{m.name}</span>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}</span>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}{m.gravite ? ' · empilé' : ''}</span>
           {cherche && <span style={{ fontSize: 12, fontWeight: 800, color: nIci ? C.onAccent : C.muted, background: nIci ? C.accent : 'transparent', borderRadius: 999, padding: '1px 8px' }}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
         <div data-meuble-grille="" data-zoom={zoom} style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: zoom === 'loin' ? 4 : 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * (caseMax + (zoom === 'loin' ? 4 : 6)) + 28}px)` }}>
@@ -28279,10 +28316,11 @@ function StockMeubles() {
               <React.Fragment key={i}>
               {pl.colonne === 1 && <span data-regle-rang={pl.rangee} style={regle}>{pl.rangee}</span>}
               <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
-                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} className={flash && flash === kOcc ? 'vrm-case-flash' : undefined}
-                style={{ position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
+                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={[flash && flash === kOcc ? 'vrm-case-flash' : '', kOcc && tombes[kOcc] ? 'vrm-case-tombe' : ''].filter(Boolean).join(' ') || undefined}
+                style={{ ...(kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + 6px))` } : {}), position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
                 {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 300, opacity: place ? 0.8 : 0.35 }}>+</span>}
               </button>
+              {pl.colonne === m.cols && pl.rangee < m.rows && planchesDe(m).includes(pl.rangee) && <span data-planche={pl.rangee} aria-hidden="true" style={{ gridColumn: '2 / -1', height: 6, margin: '-1px 0', borderRadius: 3, background: C.muted, boxShadow: '0 2px 3px rgba(0,0,0,0.3)' }} />}
               </React.Fragment>
             );
           })}
@@ -28297,12 +28335,16 @@ function StockMeubles() {
     if (!modal) return null;
     let corps = null;
     if (modal.type === 'meuble') {
-      corps = <EditeurMeuble modal={modal} onSave={(nom, cols, rows) => {
-        if (modal.id) { const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows } : x);
-          // les paires hors des nouvelles cases repartent « à ranger »
-          const max = cols * rows, us = { ...slots }; Object.keys(us).forEach((c) => { if (us[c] && us[c].m === modal.id && us[c].i >= max) delete us[c]; });
-          ecrireMeubles(u); ecrireSlots(us);
-        } else { ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows }]); }
+      corps = <EditeurMeuble modal={modal} onSave={(nom, cols, rows, extra = {}) => {
+        const planches = (extra.planches || []).filter((x) => x >= 1 && x < rows), gravite = !!extra.gravite;
+        if (modal.id) { const ancien = meubles.find((x) => x.id === modal.id) || {};
+          const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows, planches, gravite } : x);
+          // Les paires gardent leur rangée et leur colonne quand le nombre de
+          // colonnes change ; celles hors des nouvelles cases repartent « à ranger ».
+          const oc = Math.max(1, +ancien.cols || cols), us = { ...slots };
+          Object.keys(us).forEach((c) => { const v = us[c]; if (!v || v.m !== modal.id) return; const r = Math.floor(v.i / oc), co = v.i % oc; if (r >= rows || co >= cols) delete us[c]; else us[c] = { m: modal.id, i: r * cols + co }; });
+          ecrireMeubles(u); ecrireSlots(us, u);
+        } else { ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows, planches, gravite }]); }
         fermerModal();
       }} onDelete={modal.id ? async () => {
         if (!(await askConfirm({ titre: 'Supprimer ce meuble ?', desc: 'Les articles qu\'il contient repartent dans « À ranger ». Aucun numéro n\'est perdu.', danger: true, ok: 'Supprimer' }))) return;
@@ -28472,6 +28514,10 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   const [name, setName] = React.useState(modal.name || '');
   const [cols, setCols] = React.useState(modal.cols || 4);
   const [rows, setRows] = React.useState(modal.rows || 3);
+  const [planches, setPlanches] = React.useState(() => (Array.isArray(modal.planches) ? modal.planches : []));
+  const [gravite, setGravite] = React.useState(!!modal.gravite);
+  const pl = planches.filter((x) => x >= 1 && x < rows);
+  const basculer = (r) => setPlanches((p) => (p.includes(r) ? p.filter((x) => x !== r) : [...p, r]));
   const step = (set, v, d, min, max) => () => set(Math.max(min, Math.min(max, v + d)));
   const Stepper = ({ v, set, min, max, label }) => (
     <div style={{ flex: 1 }}>
@@ -28494,13 +28540,36 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
       <Stepper v={cols} set={setCols} min={1} max={8} label="Colonnes" />
       <Stepper v={rows} set={setRows} min={1} max={10} label="Lignes" />
     </div>
+    <label data-gravite-choix="" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '12px 0 4px', cursor: 'pointer', minHeight: 44 }}>
+      <input type="checkbox" checked={gravite} onChange={(e) => setGravite(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
+      <span style={{ fontSize: 14, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Quand tu retires un article, ceux du dessus descendent jusqu'à la planche en dessous.</span></span>
+    </label>
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases</div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4, maxWidth: 220, margin: '0 auto', background: C.line, padding: 5, borderRadius: 7 }}>
-        {Array.from({ length: cols * rows }).map((_, i) => <div key={i} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{pl.length}</b> planche{pl.length > 1 ? 's' : ''}</> : null}</div>
+      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées pour poser ou enlever une planche, comme sur ton vrai meuble.</div>}
+      <div data-editeur-planches="" style={{ display: 'flex', flexDirection: 'column', maxWidth: 240, margin: '0 auto', background: C.line, padding: 5, borderRadius: 7 }}>
+        {Array.from({ length: rows }).map((_, r) => (
+          <React.Fragment key={r}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+              {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+            </div>
+            {r < rows - 1 && (
+              <button type="button" data-planche-choix={r + 1} aria-pressed={pl.includes(r + 1)} onClick={() => basculer(r + 1)}
+                aria-label={pl.includes(r + 1) ? `Enlever la planche sous la rangée ${r + 1}` : `Poser une planche sous la rangée ${r + 1}`}
+                style={{ height: 22, margin: '0 -5px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <span style={{ display: 'block', width: '100%', height: pl.includes(r + 1) ? 7 : 2, borderRadius: 3, background: pl.includes(r + 1) ? C.text : 'transparent', borderTop: pl.includes(r + 1) ? 'none' : `2px dashed ${C.muted}`, opacity: pl.includes(r + 1) ? 1 : 0.5 }} />
+              </button>
+            )}
+          </React.Fragment>
+        ))}
+        <span aria-hidden="true" style={{ display: 'block', height: 7, borderRadius: 3, background: C.text, margin: '4px -5px -5px' }} />
       </div>
+      {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
+        <button type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Une à chaque rangée</button>
+        <button type="button" onClick={() => setPlanches([])} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Aucune</button>
+      </div>}
     </div>
-    <button type="button" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows)} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
+    <button type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
     {onDelete && <button type="button" onClick={onDelete} style={{ width: '100%', border: `1px solid ${C.line}`, background: 'transparent', color: C.danger, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 9 }}>Supprimer ce meuble</button>}
   </>);
 }

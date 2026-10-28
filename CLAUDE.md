@@ -40,6 +40,16 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit) — les PLANCHES et les articles EMPILÉS (Stock → Mes meubles) :** Julien : « quand on enlève un
+> article, ceux du dessus descendent — il faut pouvoir faire des barres », puis « pas imaginaires justement ». Les
+> planches sont celles de son vrai meuble, DESSINÉES (`data-planche`) : dans l'éditeur, toucher entre deux rangées pose
+> ou enlève une planche (`m.planches` = rangées sous lesquelles il y en a une ; le bas du meuble en est une), « Une à
+> chaque rangée » / « Aucune ». Case « Articles empilés » (`m.gravite`, éteinte par défaut) : `tasserMeuble` — dans
+> chaque colonne, entre deux planches, les articles posent sur celui du dessous ; retirer, sortir, déplacer ou poser
+> dans une case du haut passe par elle (`ecrireSlots`), le N° ne change jamais, seule la case. L'article qui descend
+> glisse (`vrm-case-tombe`, rien si « réduire les animations »). Changer le nombre de colonnes garde rangée et colonne
+> de chaque paire. Banc `stock-planches.cjs` (390/1512 ; mutation « planches ignorées » ⇒ 6 rouges).
+
 > **28 octobre (soir) — Stock sans shop_cancale, et vue « de loin » :** Julien : « je veux pas les annonces de shop
 > cancale » et « la vue d'un peu plus loin ». `comptesStockEcartes` (Mes meubles ET En photos) écarte une fiche dont
 > le compte (`accountId`) est masqué, retiré pour de bon, ou n'est plus LIÉ (`vinted_accounts` de l'appareil ; liste
