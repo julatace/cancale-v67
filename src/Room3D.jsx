@@ -411,8 +411,22 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         }
         return g;
       };
-      const buildTable = (w, d, ht, base) => {
+      // (28 oct.) Une table peut avoir des niveaux SOUS son dessus (`rows` > 1) :
+      // des plateaux entre le dessus et le sol, morceau par morceau (`plateaux`).
+      const buildTable = (w, d, ht, base, rows, cols, plateaux) => {
         const g = new THREE.Group(); const m = woodMat(base); const top = box(w, 0.08, d, m); top.position.y = ht; g.add(top);
+        const nr = Math.max(1, rows || 1), nc = Math.max(1, cols || 1);
+        if (nr > 2) {
+          const sous = ht / (nr - 1), lg = 0.09, larg = w - 2 * lg;
+          for (let R = 2; R < nr; R++) {
+            const yy = ht - (R - 1) * sous; let deb = null;
+            for (let c = 1; c <= nc + 1; c++) {
+              const on = c <= nc && (!plateaux || plateaux.has(R + ':' + c));
+              if (on && deb == null) deb = c - 1;
+              if (!on && deb != null) { const a = deb / nc, b = (c - 1) / nc; const sh = box(larg * (b - a), 0.03, d - 0.04, m); sh.position.set(-w / 2 + lg + larg * (a + b) / 2, yy, 0); sh.userData.plateau = true; g.add(sh); deb = null; }
+            }
+          }
+        }
         const lg = 0.09; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const l = box(lg, ht, lg, m); l.position.set(sx * (w / 2 - lg), ht / 2, sz * (d / 2 - lg)); g.add(l); });
         return g;
       };
@@ -691,7 +705,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             case 'portant': g = buildPortant(w, d, ht, base, nc, it.slots); break;
             case 'armoire': g = buildArmoire(w, d, ht, base); break;
             case 'penderie': g = buildPenderie(w, d, ht, base); break;
-            case 'table': g = buildTable(w, d, ht, base); break;
+            case 'table': g = buildTable(w, d, ht, base, nr, nc, Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null); break;
             case 'boites': g = buildBoites(w, d, ht, base); break;
             case 'crate': g = buildCrate(w, d, ht, base); break;
             case 'malle': g = buildMalle(w, d, ht, base); break;
@@ -759,11 +773,13 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             // transparence, qu'on touche pour ranger. Une TABLE porte ses piles
             // SUR son plateau, pas dessous.
             const estTable = shape === 'table';
-            const cols = Math.max(1, it.cols || 1), rows = estTable ? 1 : Math.max(1, it.rows || 1);
+            const cols = Math.max(1, it.cols || 1), rows = Math.max(1, it.rows || 1);
             const cellW = w / cols, cellH = estTable ? Math.max(0.6, (room.wallH || 3.4) * 0.7 - ht) : ht / rows;
+            const sousH = estTable && rows > 1 ? ht / (rows - 1) : 0;   // la hauteur d'un niveau sous la table
             const bw = Math.min(cellW * 0.84, 0.52), bd = Math.min(d * 0.72, 0.44), bh = 0.145, pas = bh + 0.008;
             const enBacs = !!(FURN_TYPES[it.type] || {}).bacs;
             const cap = enBacs ? 1 : Math.max(1, Math.floor((cellH - 0.04) / pas));
+            const capR = (r) => (estTable && r >= 1 ? Math.max(1, Math.floor((sousH - 0.06) / pas)) : cap);
             const ghostM = new THREE.MeshStandardMaterial({ color: shade(base, 26), roughness: 0.95, transparent: true, opacity: 0.18, depthWrite: false });
             if (enBacs) {
               // (17 oct.) ÉTAGÈRE À BACS : chaque case tient UN bac ouvert, son
@@ -785,13 +801,14 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
               const key = r + '_' + c; const arr = ((it.slots || {})[key] || []).map(v => String(v)).filter(Boolean);
               const cx = -w / 2 + (c + 0.5) * cellW;
-              const cbY = estTable ? ht + 0.04 : Math.max(0, ht - (r + 1) * cellH) + 0.025;   // dessus du plateau
+              const cbY = estTable ? (r === 0 ? ht + 0.04 : Math.max(0, ht - r * sousH) + (r === rows - 1 ? 0.005 : 0.02)) : Math.max(0, ht - (r + 1) * cellH) + 0.025;   // dessus du plateau
               const z = estTable ? 0 : d / 2 - bd / 2 - 0.015;
+              const cap = capR(r);
               arr.slice(0, cap).forEach((num, i) => { const m = makeColis(num, bw, bh, bd); m.userData = { cell: key, num, idx: i }; m.position.set(cx, cbY + bh / 2 + i * pas, z); g.add(m); });
               // Pas de place libre fantôme au-dessus d'un plateau qui MANQUE tant que
               // la case du dessous a de la place : une boîte posée là tomberait.
-              const plx = !estTable && Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null;
-              const tombe = plx && r < rows - 1 && !plx.has((r + 1) + ':' + (c + 1)) && ((it.slots || {})[(r + 1) + '_' + c] || []).filter(Boolean).length < cap;
+              const plx = Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null;
+              const tombe = plx && r < rows - 1 && !plx.has((r + 1) + ':' + (c + 1)) && ((it.slots || {})[(r + 1) + '_' + c] || []).filter(Boolean).length < capR(r + 1);
               if (arr.length < cap && !tombe) { const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bh / 2 + arr.length * pas, z); g.add(gh); }
             }
           } else if (physique === 'cintre') {

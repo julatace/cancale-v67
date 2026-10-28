@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.259.0';
+const CODE_VERSION = '5.260.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7708,6 +7708,10 @@ function raisonRefusVinted(rc) {
   if (champs.length) { try { noterDiag('vinted_refus_champs_' + errs.map((e) => String((e && (e.field || e.name)) || '').replace(/[^a-z0-9_]/gi, '')).join('_').slice(0, 80)); } catch (_) {} }
   return champs.length ? `${msg ? msg + ' — ' : ''}${champs.join(', ')}` : msg;
 }
+// Les couleurs dont l'identifiant Vinted est MESURÉ dans ses propres requêtes
+// acceptées (« Nike p-6000 noir » ⇒ color_ids [1]). Seules celles-ci peuvent être
+// posées depuis VRM, sur SON choix : une autre se choisit sur Vinted.
+const COULEURS_VINTED_SURES = { 1: 'Noir' };
 function idsCouleurVinted(it, num) {
   if (!it || typeof it !== 'object') return [];
   const n = num || ((v) => (typeof v === 'number' && isFinite(v)) ? v : ((typeof v === 'string' && /^\d{1,12}$/.test(v)) ? Number(v) : null));
@@ -8145,7 +8149,13 @@ async function publierBrouillon(msg) {
   if (!r.nPhotos) manque.push('des photos');
   if (!(Number(r.d.catalog_id) > 0)) manque.push('une catégorie');
   if (!String(r.d.description || '').trim()) manque.push('une description');
-  if (!idsCouleurVinted(r.d).length) manque.push('de couleur');
+  if (!idsCouleurVinted(r.d).length) {
+    // (28 oct.) Il a CHOISI la couleur dans VRM : on la pose (seulement une couleur mesurée).
+    const ch = Number(msg.couleur);
+    if (COULEURS_VINTED_SURES[ch]) r.d.color_ids = [ch];
+    else if (!manque.length) return { accepte: false, code: 'couleur-absente', couleurs: COULEURS_VINTED_SURES, raison: "ce brouillon n'a pas de couleur, et Vinted refuse de le mettre en ligne sans. Choisis-la (dans VRM, ou sur Vinted → « Modifier »). Rien n'a été touché." };
+    else manque.push('de couleur');
+  }
   if (manque.length) return { accepte: false, code: 'incomplet', raison: `ce brouillon n'a pas ${manque.join(', ')} — finis-le sur Vinted (« Modifier »), puis réessaie. Rien n'a été touché.` };
   const verrou = await lireVerrouRecreer('b' + id);
   if (verrou) return { accepte: false, code: 'incertaine', raison: `une mise en ligne de ce brouillon est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire — regarde ton dressing avant de réessayer` };
@@ -8226,7 +8236,7 @@ async function refaireBrouillon(msg) {
   // ligne, sans en créer un second.
   if ((vb.etat === 'a-publier' || vb.etat === 'brouillon-range') && /^\d{4,15}$/.test(String(vb.draftId || ''))) {
     if (!(vb.publier === true && vb.supprime === true)) { await majVersBrouillon(uid, id, { etat: 'fait' }); return { accepte: true, etape: 'fait', brouillon: true, draftId: String(vb.draftId) }; }
-    const r = await publierBrouillon({ uid, draftId: String(vb.draftId), confirme: true });
+    const r = await publierBrouillon({ uid, draftId: String(vb.draftId), confirme: true, couleur: msg.couleur });
     if (r && r.accepte && r.etape === 'fait') await majVersBrouillon(uid, id, { etat: 'fait', nouvelId: r.itemId || null });
     else if (r && r.accepte && r.etape === 'incertain') await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine' });
     return r && r.accepte ? { ...r, draftId: String(vb.draftId), refaire: r.etape === 'echec' } : r;
@@ -8235,7 +8245,8 @@ async function refaireBrouillon(msg) {
   const d = o && o.draft && typeof o.draft === 'object' ? o.draft : null;
   const prixD = Number(d && (d.price && typeof d.price === 'object' ? d.price.amount : d.price));
   if (!d || !String(d.title || '').trim() || !(prixD > 0) || !(Number(d.catalog_id) > 0) || !String(d.description || '').trim()) return { accepte: false, code: 'illisible', raison: "le contenu enregistré est incomplet — rien n'a été touché" };
-  if (!idsCouleurVinted(d).length) return { accepte: false, code: 'couleur-absente', raison: "le contenu enregistré n'a pas de couleur, et Vinted refuse de mettre en ligne une annonce sans couleur. Si le brouillon est dans tes brouillons Vinted, ouvre-le, choisis la couleur et publie-le ; sinon, rien n'a été touché." };
+  if (!idsCouleurVinted(d).length && COULEURS_VINTED_SURES[Number(msg.couleur)]) d.color_ids = [Number(msg.couleur)];
+  if (!idsCouleurVinted(d).length) return { accepte: false, code: 'couleur-absente', couleurs: COULEURS_VINTED_SURES, raison: "le contenu enregistré n'a pas de couleur, et Vinted refuse de mettre en ligne une annonce sans couleur. Si le brouillon est dans tes brouillons Vinted, ouvre-le, choisis la couleur et publie-le ; sinon, rien n'a été touché." };
   const okUrl = (u) => typeof u === 'string' && /^https:\/\/images\d*\.vinted\.net\//i.test(u);
   const urls = (Array.isArray(sauve.photos) ? sauve.photos : []).filter(okUrl).slice(0, 20);
   if (!urls.length) return { accepte: false, code: 'coffre-absent', raison: "aucune photo enregistrée pour cette annonce — rien n'a été touché" };
