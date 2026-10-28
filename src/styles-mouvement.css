@@ -29,3 +29,9 @@
 @keyframes vrm-case-flash { 0%,100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 5px var(--vrm-accent, #3D7BFF); } }
 .vrm-case-flash { animation: vrm-case-flash .7s ease-in-out 4; position: relative; z-index: 2; }
 @media (prefers-reduced-motion: reduce) { .vrm-case-flash { animation: none; box-shadow: 0 0 0 4px var(--vrm-accent, #3D7BFF); } }
+
+/* (28 oct.) Stock « Mes meubles » empilé : l'article qui descend glisse depuis sa
+   case d'avant (data-tombe = nombre de rangées). */
+@keyframes vrm-case-tombe { from { transform: translateY(var(--vrm-tombe, -100%)); } to { transform: none; } }
+.vrm-case-tombe { animation: vrm-case-tombe .35s cubic-bezier(.3,1.25,.5,1) both; z-index: 2; }
+@media (prefers-reduced-motion: reduce) { .vrm-case-tombe { animation: none; } }
