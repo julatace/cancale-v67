@@ -2177,7 +2177,7 @@ const reprendreSyncMaintenant = () => { if (_repriseT) { clearTimeout(_repriseT)
 // c'est ce qui faisait « changer » les numéros entre deux connexions).
 let _cloudReady = false;
 let _cloudReadyListeners = [];
-const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
+const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
 
@@ -47308,9 +47308,15 @@ const numeroExterne = (k, id, liste, dateMs) => {
 const LIENS_EBAY = 'vrm_ebay_liens';
 const _depuisEbay = new Map();
 const _fichesEbayMemo = { at: 0, v: {} };
+// (28 oct., tour de Ma journée sur ses vraies données) La mémoire de 800 ms
+// gardait les fiches VIDES lues juste avant l'arrivée du nuage : Ma journée
+// lisait alors « VRM-81 » comme la N°81 (aucune fiche ⇒ le SKU tel quel),
+// vendue sur Vinted, et disait « 1 paire à retirer d'eBay » pendant que l'écran
+// eBay — sur des fiches lues — disait « pas reliée ». Une mémoire prise AVANT le
+// nuage ne sert plus une fois le nuage arrivé.
 const fichesPourEbay = () => {
-  const t = Date.now();
-  if (t - _fichesEbayMemo.at > 800) { let v = {}; try { v = load('vinted_annonce_numeros', {}) || {}; } catch (_) {} _fichesEbayMemo.at = t; _fichesEbayMemo.v = v; }
+  const t = Date.now(); const nuage = !!globalThis.__vrmNuagePret;   // posé par markCloudReady (un drapeau global : les audits qui chargent cette règle sans le nuage restent inchangés)
+  if (t - _fichesEbayMemo.at > 800 || _fichesEbayMemo.nuage !== nuage) { let v = {}; try { v = load('vinted_annonce_numeros', {}) || {}; } catch (_) {} _fichesEbayMemo.at = t; _fichesEbayMemo.v = v; _fichesEbayMemo.nuage = nuage; }
   return _fichesEbayMemo.v;
 };
 const lienEbay = (itemId) => { let l = {}; try { l = load(LIENS_EBAY, {}) || {}; } catch (_) {} const x = itemId != null ? l[String(itemId)] : null; return x && x.pairId ? x : null; };

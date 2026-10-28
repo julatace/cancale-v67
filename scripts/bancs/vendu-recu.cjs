@@ -289,6 +289,18 @@ const lire = (pg) => pg.evaluate(() => {
       dit(widget.length === 0, 'le widget ne reçoit pas ce total partiel', `${widget.length} écriture(s)`);
       await ctx.close();
     });
+    // (28 oct.) Sur téléphone, une règle de styles-epure.css cachait le PREMIER
+    // enfant du montant « partiel » (elle visait un mot « au moins » qui
+    // n'existe plus) : il ne restait que « ≥ », sans aucun montant.
+    await essaie('un compte illisible, téléphone', async () => {
+      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'journee', { comptes: ACCOUNTS2, ventesKO: ['222'] });
+      await pg.waitForSelector('[data-vendu-partiel="1"]', { timeout: 15000 }).catch(() => {});
+      const v = await pg.evaluate(() => { const e = document.querySelector('[data-vendu-partiel="1"]'); return e ? { t: e.innerText.trim(), cents: e.getAttribute('data-vendu-mois') } : null; });
+      const eur = v && v.cents ? Math.round(Number(v.cents) / 100).toLocaleString('fr-FR') : '?';
+      dit(v && v.t.replace(/\s/g, '').includes(eur.replace(/\s/g, '')), 'téléphone, total partiel : le montant du mois reste affiché (pas un « ≥ » seul)', JSON.stringify(v));
+      dit(errs.length === 0, 'aucune erreur', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
     console.log('\n── Leboncoin illisible');
     await essaie('lbc illisible', async () => {
       const { ctx, lu, errs, widget } = await ouvrir(b, { width: 1512, height: 950 }, true, 'dashboard', { lbcKO: true });

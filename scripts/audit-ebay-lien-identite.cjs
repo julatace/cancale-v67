@@ -44,6 +44,7 @@ function charger(store) {
     console, Date, Math, JSON, Map, Set, Object, String, Number };
   vm.createContext(ctx);
   vm.runInContext(src + '\n;this.F = { numEbayLu, skuEbayDouteux, noterLienEbay, _fichesEbayMemo };', ctx);
+  ctx.F.__ctx = ctx;
   return ctx.F;
 }
 
@@ -66,6 +67,18 @@ const fiches = {
 const store = { vinted_annonce_numeros: fiches, vrm_ebay_liens: {} };
 const F = charger(store);
 
+// (28 oct., sur ses vraies données) Une mémoire de fiches prise AVANT le nuage
+// (vide) ne doit plus servir une fois le nuage arrivé : sinon « VRM-81 » se lit
+// N°81 (aucune fiche ⇒ le SKU tel quel), et Ma journée criait « à retirer d'eBay ».
+{
+  const s2 = { vinted_annonce_numeros: {}, vrm_ebay_liens: {} };
+  const G = charger(s2);
+  G.numEbayLu('VRM-81', '128137574967', null, '2026-10-15T21:40:06.000Z');   // mémoire prise, fiches vides
+  s2.vinted_annonce_numeros = { lacoste: { numero: '81', auto: true, numberedAt: PANNE } };
+  G.__ctx.__vrmNuagePret = true;                                              // le nuage arrive (dans les 800 ms)
+  const n = G.numEbayLu('VRM-81', '128137574967', null, '2026-10-15T21:40:06.000Z');
+  dit(n == null, 'le nuage arrivé, la mémoire des fiches est relue : VRM-81 (publiée le 15) ne désigne pas la N°81 redonnée le 18', String(n));
+}
 dit(F.numEbayLu('VRM-82', '128137572355', null, '2026-10-15T21:37:54.000Z') == null,
   'VRM-82 publiée le 15 : le N°82 redonné le 18 (Vapor Pro) ne désigne PAS cette annonce', String(F.numEbayLu('VRM-82', '128137572355', null, '2026-10-15T21:37:54.000Z')));
 dit(F.skuEbayDouteux({ sku: 'VRM-82', itemId: '128137572355', depuis: '2026-10-15T21:37:54.000Z' }), '… et la carte la dit « à vérifier »');
