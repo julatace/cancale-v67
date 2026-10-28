@@ -7,6 +7,16 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, suite) — « En ligne → brouillon » dans SON ordre (5.253) :** Julien : « c'est enregistrement de
+> l'annonce, puis suppression, et après création du brouillon ». `recreerVinted` + `versBrouillon` : photos renvoyées →
+> l'annonce ENREGISTRÉE dans le coffre (`coffre_{uid}_{id}`, avec `versBrouillon.corps` = le corps exact du brouillon ;
+> écriture ratée ⇒ rien supprimé) → SUPPRIMÉE de Vinted (refus certain ⇒ on s'arrête, « toujours en ligne » ; sans réponse
+> claire ⇒ on continue et on le dit) → brouillon CRÉÉ (refus certain retenté une fois, réponse floue jamais ;
+> échec ⇒ `etape: 'brouillon-a-refaire'`, « rien n'est perdu, tout est enregistré dans VRM »). Pas de risque de double
+> vente : un brouillon n'est jamais en ligne. Le §3 « recréer PUIS supprimer » vaut toujours pour Republier (en ligne →
+> en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
+> `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
+
 > **28 octobre (nuit) — UN bouton « Actions », et seulement les brouillons qui sont sur Vinted (5.252) :** Julien :
 > « un bouton Actions dans lequel on a republier, mettre de brouillon à en ligne, de en ligne à brouillon… » puis
 > « l'extension capte un ancien brouillon, je veux les brouillons qui sont sur Vinted ». Annonces → **Actions** (un
