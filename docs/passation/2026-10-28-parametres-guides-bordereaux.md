@@ -52,3 +52,12 @@ Le composant existant ConfigurerTransfert est réorganisé en cinq étapes, avec
 Les résultats des actions remontent au parcours, et une actualisation n'effectue qu'une lecture. Les raccourcis vers les adresses ouvrent maintenant le sous-écran, y compris lorsqu'un autre réglage est déjà ouvert. L'aide au placement des numéros rejoint Impression, au lieu de Comptabilité.
 
 Validation : 17 tests unitaires transfert/réception (incluant séparation des propriétaires), parcours du composant à 390 et 1512 pixels, et banc Paramètres incluant le raccourci vers un panneau auparavant caché. Aucun déploiement dans cette passe.
+
+## Suite : rangement et cohérence des formats
+
+- Numéros : récapitulatif du format réellement appliqué localement, exemples explicitement distincts du prochain numéro disponible, accès direct au stock. Une écriture locale refusée ne laisse pas croire qu'une nouvelle série est appliquée. La série archivée reste interdite ; les règles d'attribution sont inchangées.
+- Imprimante : choix local appliqué immédiatement, avant l'écriture différée et la synchronisation, pour éviter une impression sur l'ancien format juste après un clic. Les erreurs de stockage sont affichées.
+- Aperçus : les modes A4 et thermique sont préparés indépendamment. L'échec d'un mode ne cache plus le PDF exploitable de l'autre. Chaque erreur est rattachée à son mode ; actualisation possible et exception générale affichée plutôt qu'un chargement sans fin.
+- Guide court de contrôle du papier, du document et du pilote d'impression.
+
+Validation : compilation, 23 contrôles du banc Paramètres à 390/1512 px, audit existant numéros à lettres, 3 tests des aperçus partiels et test du panneau de numérotation (série archivée et stockage refusé). Données synthétiques uniquement. Pas de déploiement.

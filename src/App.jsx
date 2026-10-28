@@ -1,3 +1,4 @@
+import { preparerApercusModes } from './apercusBordereaux.js';
 import { actionsReglages } from './reglagesActions.js';
 import FavorisVinted from './FavorisVinted.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
@@ -9150,9 +9151,15 @@ const ImprimanteSetting = ({ nu = false }) => {
   const [mode, setMode] = React.useState(imprimanteChoisie);
   const touche = React.useRef(false);
   React.useEffect(() => onCloudReady(() => { if (!touche.current) setMode(imprimanteChoisie()); }), []);
-  const choisir = (v) => { touche.current = true; const m = imprMode(v); setMode(m); save('vrm_imprimante', m); };
+  const [erreurMode,setErreurMode]=React.useState('');
+  const choisir = (v) => {
+    const m=imprMode(v);touche.current=true;
+    try{localStorage.setItem('vrm_imprimante',JSON.stringify(m));}
+    catch(_){setErreurMode('Le format n’a pas pu être appliqué sur cet appareil. Réessaie après avoir libéré du stockage.');return;}
+    setErreurMode('');setMode(m);save('vrm_imprimante',m);
+  };
   const [ap, setAp] = React.useState(null);   // null = pas demandé · {etat:'charge'|'pasSu'|'vide'|'lu', ...}
-  const charger = async () => {
+  const chargerBrut = async () => {
     setAp({ etat: 'charge' });
     const [emails, captes] = await Promise.all([
       lireTout('id=like.email_bord_*&meta->>_pdf=eq.true&select=id,at:meta->>receivedAt'),
@@ -9187,10 +9194,9 @@ const ImprimanteSetting = ({ nu = false }) => {
           const { width: fw, height: fh } = src.getPages()[0].getSize();
           const pos = (load('vinted_bordereau_formats', {}) || {})[bordereauFormatKey(fw, fh)] || smartDefaultBordPos(fw, fh);
           const r1 = await poserBordereau(PL, out, src, { numero: '123', title: '', pos, thermique }); return { octets: await out.save(), r1, pages: out.getPageCount() }; };
-        try {
-          const normale = await fabrique(false), thermique = await fabrique(true);
-          e.exemple = { normale, thermique, zone: z.ok ? z : null };
-        } catch(err) { e.erreurPlacement=String(err.message||err); rates++; }
+        const modes=await preparerApercusModes(fabrique);
+        e.exemple={...modes,zone:z.ok?z:null};
+        if(Object.keys(modes.erreurs).length) rates++;
       }
       types.set(ty.cle, e);
     }
@@ -9198,12 +9204,19 @@ const ImprimanteSetting = ({ nu = false }) => {
     const doubles = new Set([...types.values()].filter((e) => [...sens].filter((k) => k.startsWith(e.type + '|')).length > 1).map((e) => e.type));
     setAp({ etat: 'lu', lus, rates, total: lignes.length, types: [...types.values()].sort((a, b) => b.n - a.n), doubles, partiel: emails === null || captes === null });
   };
+  const charger = async () => {if(ap?.etat==='charge')return;try{await chargerBrut();}catch(_){setAp({etat:'erreur'});}};
   const vus = ap && ap.etat === 'lu' ? new Set(ap.types.map((e) => e.type)) : new Set();
   return (
     <div data-imprimante-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:10,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Imprimante et bordereaux</div>}
       <Segmente label="Imprimante" plein value={mode} onChange={choisir} style={{marginTop:nu?0:10}}
         options={IMPR_MODES.map((v) => ({ v, l: v === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', data: { 'data-imprimante-choix': v } }))}/>
+      <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?'étiquettes 100 × 150 mm':'papier A4'}.`}</div>
+      <GuideReglage titre="Avant d’imprimer" etapes={[
+        ['Choisis le papier', 'A4 pour une imprimante classique ; 100 × 150 mm pour une imprimante thermique.'],
+        ['Vérifie le document', 'Ouvre un aperçu reçu sur ta boutique et contrôle que les codes restent lisibles et le numéro dans un espace blanc.'],
+        ['Contrôle la fenêtre d’impression', 'Vérifie le papier et l’échelle. L’app prépare le PDF ; le pilote de ton imprimante décide du réglage final.']
+      ]}/>
       <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
         {mode === 'thermique'
           ? <>Chaque étiquette sort <b style={{color:C.text}}>seule, au format 10 × 15 cm</b>, tournée à l’endroit et entière (sans la fiche destinataire ni la pub), ton N° dans un espace blanc vérifié sur l’étiquette. Quand l’app ne sait pas repérer l’étiquette sur un bordereau, la page part <b style={{color:C.text}}>entière</b> et l’écran le dit — jamais un code-barres coupé. Dans la fenêtre d’impression, choisis le papier <b style={{color:C.text}}>100 × 150 mm</b> et l’échelle <b style={{color:C.text}}>100 %</b> (ou « taille réelle »).</>
@@ -9211,11 +9224,13 @@ const ImprimanteSetting = ({ nu = false }) => {
       </div>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
+        {ap&&ap.etat!=='charge'&&<button type="button" onClick={charger} style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,padding:'8px 12px',font:'inherit',cursor:'pointer'}}>Actualiser les aperçus</button>}
         {!ap && <>
           <div style={{fontSize:12.5,color:C.muted,marginTop:4,lineHeight:1.5}}>Pour chaque type que l’app a reçu, ce qui sortira sur une imprimante normale et sur une thermique. Calculé sur tes {APERCU_MAX} derniers bordereaux.</div>
           <button type="button" data-apercus-voir onClick={charger} style={{marginTop:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'0 16px',minHeight:44,fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Voir les aperçus</button>
         </>}
         {ap && ap.etat === 'charge' && <div data-apercus="charge" style={{fontSize:12.5,color:C.muted,marginTop:6}}>Je lis tes bordereaux…</div>}
+        {ap&&ap.etat==='erreur'&&<p role="alert" style={{color:C.warn,fontSize:12}}>Les aperçus n’ont pas pu être préparés. Aucun bordereau n’a été modifié. Utilise « Actualiser les aperçus » pour réessayer.</p>}
         {ap && ap.etat === 'pasSu' && <div data-apercus="passu" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>La base n’a pas répondu : je n’ai pas pu lire tes bordereaux. <button type="button" onClick={charger} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Réessayer</button></div>}
         {ap && ap.etat === 'vide' && <div data-apercus="vide" style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.5}}>{ap.partiel ? 'Une partie de tes bordereaux n’a pas pu être lue, et aucun PDF n’est arrivé dans le reste.' : 'Aucun bordereau avec son PDF pour l’instant : les aperçus apparaîtront avec ta prochaine vente.'}</div>}
         {ap && ap.etat === 'lu' && <div data-apercus="lu" style={{marginTop:6}}>
@@ -9228,10 +9243,10 @@ const ImprimanteSetting = ({ nu = false }) => {
               <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>
                 {e.n} bordereau{e.n > 1 ? 'x' : ''} · {e.isoles === e.n ? (e.n > 1 ? 'étiquette repérée sur tous' : 'étiquette repérée') : e.isoles === 0 ? <>étiquette <b style={{color:C.text}}>non repérée</b> : en thermique la page part entière ({[...e.raisons].join(' · ')})</> : <>étiquette repérée sur {e.isoles} — les autres partent entières en thermique ({[...e.raisons].join(' · ')})</>}
               </div>
-              {e.erreurPlacement && <p role="alert" style={{fontSize:12,color:C.warn}}>{e.erreurPlacement}</p>}
+              {Object.entries(e.exemple?.erreurs||{}).map(([mode,message])=><p key={mode} role="alert" style={{fontSize:12,color:C.warn}}><b>{mode==='normale'?'A4':'Thermique'} :</b> {message}</p>)}
               {e.exemple && <div style={{display:'flex',gap:14,flexWrap:'wrap',marginTop:10,alignItems:'flex-start'}}>
-                <ApercuPdf octets={e.exemple.normale.octets} largeur={180} zone={e.exemple.zone} label={e.exemple.zone ? 'Normale · A4 (en pointillés : ce qui part en thermique)' : 'Normale · A4'}/>
-                {Array.from({ length: e.exemple.thermique.pages }, (_, i) => (
+                {e.exemple.normale && <ApercuPdf octets={e.exemple.normale.octets} largeur={180} zone={e.exemple.zone} label={e.exemple.zone ? 'Normale · A4 (en pointillés : ce qui part en thermique)' : 'Normale · A4'}/>}
+                {e.exemple.thermique && Array.from({ length: e.exemple.thermique.pages }, (_, i) => (
                   <ApercuPdf key={i} octets={e.exemple.thermique.octets} page={i + 1} largeur={e.exemple.thermique.r1.isole ? 120 : 180}
                     label={e.exemple.thermique.r1.isole ? `Thermique · 10×15${e.exemple.thermique.pages > 1 ? ` (${i + 1}/${e.exemple.thermique.pages})` : ''}` : 'Thermique · page entière'}/>
                 ))}
@@ -49228,7 +49243,7 @@ function SettingsScreen({ setTab, comptes, onExport, onImport, dark, toggleDark,
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Consulter les vérifications d’accès et les éventuels problèmes.', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Choisir le format des prochains numéros, sans changer les anciens.', val:valNumeros, el:<NumerosSetting nu/> },
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Choisir le format des prochains numéros, sans changer les anciens.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
@@ -50779,13 +50794,13 @@ function PrenomSetting() {
 // porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
 // carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
 // tapé à la main peut toujours être « 125 » ou « C40 ».
-function NumerosSetting({ nu = false }) {
+function NumerosSetting({ nu = false, onStock }) {
   const [p, setP] = React.useState(() => prefixeNumeros());
   const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
   const touche = React.useRef(false);
   React.useEffect(() => onCloudReady(() => {
     if (touche.current) return;                            // §5.49 : ne remplacer que le vide
-    const v = prefixeNumeros(); if (v) { setP(v); setMode('lettre'); }
+    const v=prefixeNumeros();setP(v||'');setMode(v?'lettre':'chiffres');
   }), []);
   // La lettre des ANCIENS numéros (remise à zéro, migration 013) ne peut pas
   // être celle des nouveaux : « B12 » désignerait deux paires. La base le
@@ -50797,6 +50812,7 @@ function NumerosSetting({ nu = false }) {
   //    lettre TAPÉE et acceptée, et l'écran dit ce qui est réellement enregistré.
   const arch = archiveNumeros();
   const [refusee, setRefusee] = React.useState('');
+  const [erreurLocal,setErreurLocal]=React.useState('');
   const poser = (v) => {
     touche.current = true;
     const n = String(v || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
@@ -50805,7 +50821,7 @@ function NumerosSetting({ nu = false }) {
     setP(n);
     // La copie locale tout de suite (`save` écrit 500 ms plus tard) : les champs
     // N° et la numérotation automatique la lisent dès le prochain rendu.
-    try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n)); } catch (_) {}
+    try { localStorage.setItem('vrm_num_prefixe', JSON.stringify(n));setErreurLocal(''); } catch (_) {setErreurLocal('Le format n’a pas pu être appliqué sur cet appareil. Aucun numéro existant n’est modifié.');setP(prefixeNumeros());setMode(prefixeNumeros()?'lettre':'chiffres');return;}
     save('vrm_num_prefixe', n);
     try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {}
   };
@@ -50829,10 +50845,15 @@ function NumerosSetting({ nu = false }) {
         ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
         ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
       ]}/>
-      <div role="status" style={{marginTop:12,fontSize:13,color:C.text}}>Format actuellement enregistré : <b>{enregistree ? `${enregistree} + chiffres` : 'Chiffres seuls'}</b>. Les changements acceptés sont enregistrés automatiquement.</div>
+      <div className="vrm-numeros-recap" style={{borderColor:C.border,background:C.bg}}>
+        <span style={{color:C.muted}}>Format appliqué sur cet appareil</span><b>{enregistree?`${enregistree} + chiffres`:'Chiffres seuls'}</b>
+        <span style={{color:C.muted}}>Exemples de lecture</span><strong>{enregistree?`${enregistree}125 · ${enregistree}126`:'125 · 126'}</strong>
+        <small style={{color:C.muted}}>Exemples uniquement : cet écran n’attribue aucun numéro et ne renumérote aucun article.</small>
+      </div>
+      {erreurLocal&&<p role="alert" style={{fontSize:12,color:C.warn}}>{erreurLocal}</p>}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-        <button type="button" onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>
-        <button type="button" onClick={() => choix('lettre')} style={pill(mode === 'lettre')}>Avec une lettre · {ex}1, {ex}2…</button>
+        <button type="button" aria-pressed={mode==='chiffres'} onClick={() => choix('chiffres')} style={pill(mode === 'chiffres')}>Chiffres · 1, 2, 3…</button>
+        <button type="button" aria-pressed={mode==='lettre'} onClick={() => choix('lettre')} style={pill(mode === 'lettre')}>Avec une lettre · {ex}1, {ex}2…</button>
       </div>
       {mode === 'lettre' && (
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:12.5,color:C.text}}>
@@ -50855,6 +50876,7 @@ function NumerosSetting({ nu = false }) {
         Tu peux toujours taper un numéro à la main, dans n'importe quelle forme : 125, {lettreEx}125, {lettreEx2}40. « {lettreEx.toLowerCase()}125 » et « {lettreEx}125 » sont le même numéro.
         {arch && <> Les anciens numéros (<b>{arch}…</b>) ne se redonnent pas.</>}
       </div>
+      {onStock&&<div className="vrm-settings-next" style={{borderColor:C.border}}><b>Ensuite : indiquer l’emplacement</b><p style={{color:C.muted}}>Une fois le numéro sur l’article, choisis sa place dans le stock. Tu pourras le retrouver en recherchant ce même numéro.</p><button type="button" onClick={onStock} style={{color:C.accent,borderColor:C.border}}>Ouvrir mon stock</button></div>}
     </div>
   );
 }

@@ -99,6 +99,10 @@ const projette = (row, sel) => {
       await pg.screenshot({path:`/tmp/vrm-parametres-liste-${largeur}.png`,fullPage:true});
       await pg.locator('[data-sous-ouvrir="imprimante"]').click();
       dit(await pg.locator('[data-imprimante-reglage]').isVisible(), `${largeur} : impression accessible sans défilement dans les emails`);
+      await pg.locator('[data-imprimante-choix="thermique"]').click();
+      dit(await pg.evaluate(()=>JSON.parse(localStorage.getItem('vrm_imprimante')))==='thermique', `${largeur} : le choix thermique est utilisable immédiatement par l’impression`);
+      await pg.locator('[data-imprimante-choix="normale"]').click();
+      dit(await pg.evaluate(()=>JSON.parse(localStorage.getItem('vrm_imprimante')))==='normale', `${largeur} : retour au format A4 cohérent`);
       dit(await pg.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1), `${largeur} : aucun débordement horizontal`);
       await pg.screenshot({path:`/tmp/vrm-parametres-${largeur}.png`,fullPage:true});
       await pg.evaluate(()=>window.dispatchEvent(new Event('vrm:ouvrir-adresses')));
