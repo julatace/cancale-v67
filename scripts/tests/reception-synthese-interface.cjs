@@ -1,5 +1,5 @@
 // Composant réel, réseau simulé : contrôle regroupement, concurrence et propriétaire.
-const {build}=require('esbuild'),{chromium}=require('playwright');const path=require('path'),assert=require('assert/strict');
+const {build}=require('esbuild'),{chromium}=require('playwright');const path=require('path'),assert=require('assert/strict'),fs=require('fs');
 const racine=process.env.VRM_UI_ROOT||path.join(__dirname,'../..');
 (async()=>{
  const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
@@ -24,6 +24,6 @@ const racine=process.env.VRM_UI_ROOT||path.join(__dirname,'../..');
   await p.evaluate(()=>{window.owner='B';window.attendre=false;window.afficher();});await p.locator('.vrm-reception-liste').getByText('Mail B',{exact:true}).waitFor();
   assert.equal(await p.evaluate(()=>window.appels[1].signal.aborted),true);await p.evaluate(()=>window.reponses.forEach(r=>r()));await p.waitForTimeout(40);
   assert.equal(await p.locator('.vrm-reception-liste').getByText('Mail A',{exact:true}).count(),0);assert.equal(await p.evaluate(()=>window.retour.at(-1)),'B');
-  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await p.close();console.log('OK réception '+width+'px : synthèse, recherche, lecture unique, panneau masqué et réponse périmée isolée.');
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);if(process.env.SHOTS){fs.mkdirSync(process.env.SHOTS,{recursive:true});await p.screenshot({path:path.join(process.env.SHOTS,'reception-synthese-'+width+'.png'),fullPage:true});}await p.close();console.log('OK réception '+width+'px : synthèse, recherche, lecture unique, panneau masqué et réponse périmée isolée.');
  }}finally{await nav.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

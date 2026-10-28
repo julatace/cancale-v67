@@ -33,3 +33,7 @@
 .vrm-reception-synthese article p{display:flex;flex-direction:column;gap:4px;margin:0;}
 .vrm-reception-synthese small{font-size:11px;color:var(--muted,#536b69);}
 .vrm-reception-synthese button{align-self:flex-start;min-height:44px;}
+.vrm-reception .vrm-reception-synthese{margin:8px 12px;padding:0;}
+.vrm-reception .vrm-reception-synthese>summary{padding:0 10px;min-height:44px;}
+.vrm-reception .vrm-reception-synthese[open]{padding:0 10px 10px;}
+.vrm-reception .vrm-reception-synthese[open]>summary{padding:0;}

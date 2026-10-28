@@ -22,12 +22,13 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     try{const j=await api();if(courant()&&n===lecture.current){adopter(j);setErreur('');pauseLocale.current=false;}}
     catch(e){if(courant()&&n===lecture.current){setErreur(e.message);pauseLocale.current=true;}}
   };
-  React.useEffect(()=>{vivant.current=true;if(uid&&owner)lire();return()=>{vivant.current=false;lecture.current++;};},[]);
+  React.useEffect(()=>{vivant.current=true;return()=>{vivant.current=false;lecture.current++;};},[]);
+  React.useEffect(()=>{if(uid&&owner&&ecranActif)lire();},[uid,owner,ecranActif]);
   React.useEffect(()=>{
     const suivre=e=>{const d=e.detail;if(courant()&&d?.type==='favoris'&&String(d.uid)===String(uid)&&d.suivi&&d.suivi===travail.current?.suivi&&ETAPES_FAVORIS[d.etape])setPhase(ETAPES_FAVORIS[d.etape]);};
     window.addEventListener('vrm:ext',suivre);return()=>window.removeEventListener('vrm:ext',suivre);
   },[uid,owner]);
-  React.useEffect(()=>{if(!vue?.active)return;const t=setInterval(()=>setHorloge(Date.now()),1000);return()=>clearInterval(t);},[vue?.active]);
+  React.useEffect(()=>{if(!vue?.active||!ecranActif)return;setHorloge(Date.now());const t=setInterval(()=>setHorloge(Date.now()),1000);return()=>clearInterval(t);},[vue?.active,ecranActif]);
   const avancer=async()=>{
     if(prochaine.current>Date.now()+decalage.current)return;
     if(!courant()||busy.current||mutation.current||pauseLocale.current||!vue?.active||!ecran.current||!disponible||document.visibilityState==='hidden'||typeof executer!=='function')return;
