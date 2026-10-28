@@ -510,6 +510,10 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           cellMesh.position.set(cx, cy, 0);
           cellMesh.userData = arr.length ? { cell: key, num: String(arr[0]) } : { cell: key }; // pour remplir la case au clic
           g.add(cellMesh);
+          // (28 oct., « fais pareil pour les anciens meubles ») : « max 1 » en façade,
+          // en haut de la case — un mur de boîtes tient UNE boîte par case. Décor seul.
+          { const pw = Math.min(0.2, cw * 0.5), ph = pw / 2; const nb = plaqueMaxPile(1, true); nb.scale.set(pw, ph, 1);
+            nb.position.set(cx, cy + chh / 2 - gap - ph / 2, dep / 2 + 0.03); nb.userData = { maxCase: key, texte: 'max 1' }; g.add(nb); }
         }
         return g;
       };
@@ -920,6 +924,10 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
               const key = r + '_' + c; const arr = (it.slots || {})[key] || [];
               const cx = -w / 2 + (c + 0.5) * cellW, cbY = Math.max(0, ht - (r + 1) * cellH); // bas de la case
+              // (28 oct., « fais pareil pour les anciens meubles ») : physique « colonne »,
+              // une boîte par case (capaciteCase) ⇒ « max 1 » en façade, en haut de la case.
+              if (canAdd) { const pw = Math.min(0.2, cellW * 0.5), ph = pw / 2; const nb = plaqueMaxPile(1, true); nb.scale.set(pw, ph, 1);
+                nb.position.set(cx, Math.max(cbY + ph / 2, ht - r * cellH - 0.03 - ph / 2), d / 2 + 0.03); nb.userData = { maxCase: key, texte: 'max 1' }; g.add(nb); }
               if (arr.length) {
                 arr.forEach((num, i) => { if (total++ > 260) return; const m = makeColis(num, bw, bh, bd); m.userData = { cell: key, num: String(num) }; m.position.set(cx, cbY + bh / 2 + i * (bh + 0.008), d / 2 - bd / 2 - 0.015); g.add(m); });
               } else if (ghostM) {
