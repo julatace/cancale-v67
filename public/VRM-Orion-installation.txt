@@ -1,6 +1,6 @@
 VRM POUR ORION — IPHONE ET IPAD
 
-Version du moteur VRM : 5.256.0
+Version du moteur VRM : 5.257.0
 Paquet d’import WebExtension adapté à Orion, distinct du ZIP Chrome.
 Ni fiche de boutique ni application Safari signée par Apple.
 

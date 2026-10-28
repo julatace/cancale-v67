@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.256.0';
+const CODE_VERSION = '5.257.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8295,6 +8295,22 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp) {
   }
   return { ids };
 }
+// (28 oct.) La fiche d'UNE annonce dans `vinted_item_details`. ⚠️ Mesuré dans
+// les journaux de la base : `select=f:data->10312441750` répond 400 — un nombre
+// est lu par PostgREST comme un INDEX DE TABLEAU, et au-delà de 2 147 483 647
+// (toutes ses annonces récentes) il déborde. La clé est donc mise entre
+// guillemets (une clé, plus un index) ; si cette forme est refusée aussi, on lit
+// la ligne entière et on prend la clé (une fois par geste). `null` = pas su.
+async function lireFicheAnnonce(id) {
+  const prendre = (d) => (d === null ? null : ((d && d[0] && d[0].f) || {}));
+  try { const d = await sbGet(`app_data?id=eq.vinted_item_details&select=f:data->"${id}"`); if (d !== null) return prendre(d); } catch (_) {}
+  try {
+    const d = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+    if (d === null) return null;
+    const tout = (d && d[0] && d[0].data) || {};
+    return (tout && typeof tout === 'object' && tout[id] && typeof tout[id] === 'object') ? tout[id] : {};
+  } catch (_) { return null; }
+}
 async function recreerVinted(msg) {
   const uid = String(msg.uid || ''), id = String(msg.id || '');
   if (!/^\d+$/.test(uid) || !/^\d{4,15}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce incomplète' };
@@ -8308,7 +8324,7 @@ async function recreerVinted(msg) {
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
   if (coffre === null) return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde — on ne touche à rien" };
   const sauve = (coffre && coffre[0] && coffre[0].data) || null;
-  let details = null; try { const d = await sbGet(`app_data?id=eq.vinted_item_details&select=f:data->${id}`); details = d === null ? null : ((d && d[0] && d[0].f) || {}); } catch (_) { details = null; }
+  const details = await lireFicheAnnonce(id);
   if (details === null) return { accepte: false, code: 'fiche-lecture', raison: "je n'ai pas pu lire la fiche de l'annonce — on ne touche à rien" };
   const photosC = (sauve && Array.isArray(sauve.photos)) ? sauve.photos.filter((u) => typeof u === 'string') : [];
   const photosD = Array.isArray(details.photos) ? details.photos.filter((u) => typeof u === 'string') : [];

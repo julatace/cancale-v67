@@ -40,7 +40,7 @@ function projette(row, select) {
     const texte = /->>[^>]*$/.test(expr);
     const parts = expr.split(/->>|->/);
     let v = parts[0] === 'data' ? row.data : row[parts[0]];
-    for (const p of parts.slice(1)) v = v == null ? undefined : v[p];
+    for (const p0 of parts.slice(1)) { const p = p0.replace(/^"(.*)"$/, '$1'); v = v == null ? undefined : v[p]; }
     if (texte && v != null && typeof v !== 'string') v = typeof v === 'object' ? JSON.stringify(v) : String(v);
     out[alias || parts[parts.length - 1]] = v === undefined ? null : v;
   }
@@ -156,6 +156,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       if (/app_data\?select=owner&limit=1/.test(u)) return rep(400, { message: 'column app_data.owner does not exist' });
       if (lectureKO(u)) return rep(522, '<html>522</html>', 'text/html');
       const sel = (/[?&]select=([^&]+)/.exec(u) || [])[1] || '';
+      // PostgREST lit un segment NUMÉRIQUE nu comme un index de tableau (int) : au-delà
+      // de 2 147 483 647 il répond 400 (mesuré le 28 oct. sur `data->10312441750`).
+      if (/->\d+/.test(sel) && (sel.match(/->(\d+)/g) || []).some((x) => Number(x.slice(2)) > 2147483647)) return rep(400, { code: '22003', message: 'value out of range for type integer' });
       const eq = /[?&]id=eq\.([^&]+)/.exec(u), like = /[?&]id=like\.([^&]+)/.exec(u), dans = /[?&]id=in\.\(([^)]*)\)/.exec(u);
       const sortie = [];
       if (eq) { if (lignes[eq[1]] !== undefined) sortie.push({ id: eq[1], data: lignes[eq[1]] }); }
