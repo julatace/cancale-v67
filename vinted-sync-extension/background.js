@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.261.0';
+const CODE_VERSION = '5.262.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7986,8 +7986,24 @@ function reglagesNeutres(r) { return r.rot === 0 && r.bright === 1 && r.contrast
 // Le rendu de l'aperçu de l'app (CSS : filtre puis rotation et zoom autour du
 // centre, l'image couvrant son cadre) refait EN PIXELS, à partir de l'ORIGINAL.
 async function photoReglee(blob, r) {
-  if (reglagesNeutres(r)) return blob;
-  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap !== 'function') throw new Error('réglages photo impossibles dans ce navigateur');
+  // (28 oct.) Le fichier part sous le nom « photo-N.jpg » : un original en WEBP
+  // (la forme /f800/…webp du coffre) était envoyé tel quel, et Vinted le prenait
+  // puis refusait la mise en ligne (« Erreur lors du chargement de la photo »).
+  // Réglages neutres ⇒ un vrai JPEG part quand même (réencodé si besoin).
+  const dejaJpeg = /^image\/jpe?g$/i.test(String(blob && blob.type || ''));
+  if (reglagesNeutres(r) && dejaJpeg) return blob;
+  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap !== 'function') {
+    if (reglagesNeutres(r)) { noterDiag('photo_non_jpeg_sans_canvas'); return blob; }
+    throw new Error('réglages photo impossibles dans ce navigateur');
+  }
+  if (reglagesNeutres(r)) {
+    const bm = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(bm.width, bm.height); const cx = c.getContext('2d');
+    cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, bm.width, bm.height); cx.drawImage(bm, 0, 0);
+    try { bm.close(); } catch (_) {}
+    noterDiag('photo_reencodee_jpeg');
+    return await c.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+  }
   const bmp = await createImageBitmap(blob);
   const w = bmp.width, h = bmp.height;
   const cv = new OffscreenCanvas(w, h);
@@ -8180,12 +8196,35 @@ async function publierBrouillon(msg) {
     const temp = (typeof r.d.temp_uuid === 'string' && r.d.temp_uuid) ? r.d.temp_uuid : uuidRecreer();
     const corpsC = { draft: { ...r.d, id: Number(id) }, push_up: false, parcel: null, upload_session_id: temp };
     await poserVerrouRecreer('b' + id);
-    const rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
+    let rc = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
     if (!rc || rc.status === 0 || rc.status >= 500) {
       noterDiag(`brouillon_publier_incertain_${(rc && rc.status) || 0}`);
       return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative pendant 30 min)" };
     }
     await leverVerrouRecreer('b' + id);
+    // (28 oct.) Vinted refuse les PHOTOS d'un brouillon fait par VRM (envoyées en
+    // WEBP avant la 5.262 : « Erreur lors du chargement de la photo »). Les photos
+    // de l'annonce sont dans le coffre : on les RENVOIE (en JPEG), on remplace
+    // celles du brouillon et on réessaie UNE fois. Rien d'autre ne change.
+    if (!rc.ok && rc.status < 500 && b.parVRM && photosRefusees(rc)) {
+      const neuves = await photosNeuvesBrouillon(acc, uid, b, temp);
+      if (neuves.ids) {
+        r.d.assigned_photos = neuves.ids.map((pid) => ({ id: pid, orientation: 0 }));
+        corpsC.draft = { ...r.d, id: Number(id) };
+        noterDiag('brouillon_photos_renvoyees');
+        await poserVerrouRecreer('b' + id);
+        const rc2 = await vintedSend(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
+        if (!rc2 || rc2.status === 0 || rc2.status >= 500) {
+          noterDiag(`brouillon_publier_incertain_${(rc2 && rc2.status) || 0}`);
+          return { accepte: true, etape: 'incertain', raison: "photos renvoyées, mais Vinted n'a pas répondu clairement : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing avant de réessayer (VRM bloque une nouvelle tentative pendant 30 min)" };
+        }
+        await leverVerrouRecreer('b' + id);
+        rc = rc2;
+      } else if (neuves.erreur) {
+        noterDiag('brouillon_photos_non_renvoyees');
+        return { accepte: true, etape: 'echec', raison: `Vinted refuse les photos de ce brouillon, et VRM n'a pas pu les renvoyer (${neuves.erreur}). Sur Vinted, ouvre le brouillon, retire les photos et rajoute-les, puis réessaie — le brouillon est intact` };
+      }
+    }
     if (!rc.ok) {
       noterDiag(`brouillon_publier_refuse_${rc.status}`);
       const msgV = raisonRefusVinted(rc);
@@ -8364,6 +8403,29 @@ function photosUniques(listes, max) {
   }
   const garde = ordre.slice(0, max || 20);
   return { urls: garde.map((k) => formes.get(k)[0]), autres: garde.map((k) => formes.get(k)[1] || null), cles: garde };
+}
+// (28 oct.) Vinted a-t-il refusé les PHOTOS (champ assigned_photos/photos, ou
+// « chargement de la photo ») ?
+function photosRefusees(rc) {
+  const j = rc && rc.json && typeof rc.json === 'object' ? rc.json : null;
+  if (!j) return false;
+  const errs = Array.isArray(j.errors) ? j.errors : [];
+  return errs.some((e) => e && (/^(assigned_photos|photos)\b/i.test(String(e.field || e.name || '')) || /photo/i.test(String(e.value || e.message || ''))));
+}
+// Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
+// l'ancienne annonce (une par photo, avec ses réglages enregistrés).
+// Rend { ids } · { erreur } · {} (rien à renvoyer : pas de coffre).
+async function photosNeuvesBrouillon(acc, uid, b, temp) {
+  if (!/^\d{4,15}$/.test(String(b.ancienId || ''))) return {};
+  let cf; try { cf = await sbGet(`app_data?id=eq.coffre_${uid}_${b.ancienId}&select=photos:data->photos,vb:data->versBrouillon`); } catch (_) { cf = null; }
+  if (cf === null) return { erreur: "le coffre n'a pas pu être lu" };
+  const ph = (cf && cf[0] && Array.isArray(cf[0].photos)) ? cf[0].photos : [];
+  const u = photosUniques([ph], 20);
+  const urls = u.urls.filter((x) => /^https:\/\/images\d*\.vinted\.net\//i.test(x));
+  if (!urls.length) return { erreur: 'aucune photo enregistrée dans VRM pour cette annonce' };
+  const vb = (cf && cf[0] && cf[0].vb && typeof cf[0].vb === 'object') ? cf[0].vb : {};
+  const tp = await televerserPhotosRecreer(acc, urls, u.autres, reglagesPhotoSurs(vb.reglages), temp);
+  return tp.ids ? { ids: tp.ids } : { erreur: tp.erreur };
 }
 async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
   const ids = [];

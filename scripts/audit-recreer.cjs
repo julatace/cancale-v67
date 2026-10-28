@@ -293,6 +293,33 @@ const zero = (j) => j.vinted.length === 0;
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
     let c = {}; try { c = JSON.parse(completions(f.j)[0].corps); } catch (_) {}
     dit(r.etape === 'fait' && c.draft && JSON.stringify(c.draft.assigned_photos.map((p) => p.id)) === '[11,12]', "brouillon VRM aux photos en double : la mise en ligne ne garde qu'UNE photo par photo", JSON.stringify({ e: r.etape, ids: c.draft && c.draft.assigned_photos && c.draft.assigned_photos.map((p) => p.id), raison: r.raison || r.erreur })); }
+  // (28 oct., N°2 Jordan 3) Vinted refuse les PHOTOS d'un brouillon fait par VRM
+  //  (« Erreur lors du chargement de la photo ») : VRM renvoie les photos du
+  //  coffre, remplace celles du brouillon, et réessaie UNE fois.
+  { const corps = CORPS_B({ assigned_photos: [{ id: 11, orientation: 0 }, { id: 12, orientation: 0 }] });
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9555' },
+      coffre_111_9555: { id: '9555', photos: [PHOTOS[0], PHOTOS[1], PHOTOS_D[0]] } };
+    let nC = 0;
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: () => (++nC === 1 ? 400 : 200),
+      completionCorps: { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } });
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    const cs = completions(f.j); let c2 = {}; try { c2 = JSON.parse(cs[1].corps); } catch (_) {}
+    const ids = c2.draft && Array.isArray(c2.draft.assigned_photos) ? c2.draft.assigned_photos.map((p) => p.id) : [];
+    dit(r.etape === 'fait' && cs.length === 2 && photosP(f.j).length === 2 && ids.length === 2 && !ids.includes(11) && !ids.includes(12), "photos du brouillon refusées : renvoyées depuis le coffre (une par photo), puis la mise en ligne repart avec les NOUVELLES", JSON.stringify({ e: r.etape, m: cs.length, p: photosP(f.j).length, ids, raison: r.raison || r.erreur })); }
+  // … sans coffre lisible : rien n'est renvoyé, c'est dit avec le geste Vinted.
+  { const corps = CORPS_B();
+    const extra = { ...dressing(['10432342904']), vinted_brouillon_10432342904: { id: '10432342904', uid: '111', corps, etat: 'brouillon', parVRM: true, ancienId: '9556' } };
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: 400,
+      completionCorps: { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'assigned_photos', value: 'Erreur lors du chargement de la photo' }] } });
+    let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    dit(r.etape === 'echec' && completions(f.j).length === 1 && photosP(f.j).length === 0 && /rajoute/.test(r.raison || ''), "photos refusées sans photo dans VRM : une seule tentative, et le geste sur Vinted est dit", JSON.stringify({ e: r.etape, m: completions(f.j).length, raison: r.raison })); }
+  // Une photo d'origine en WEBP part en JPEG (son nom est « photo-N.jpg »).
+  { const f = monter({ src: process.env.BG_SRC || undefined });
+    f.ctx.createImageBitmap = async () => ({ width: 4, height: 4, close() {} });
+    f.ctx.OffscreenCanvas = class { constructor() {} getContext() { return { fillRect() {}, drawImage() {}, translate() {}, rotate() {}, scale() {}, filter: '' }; } async convertToBlob(o) { return new Blob(['j'], { type: o.type }); } };
+    let t1 = '', t2 = '';
+    try { const neutre = f.ctx.reglagesPhotoSurs({}); t1 = (await f.ctx.photoReglee(new Blob(['w'], { type: 'image/webp' }), neutre)).type; t2 = (await f.ctx.photoReglee(new Blob(['j'], { type: 'image/jpeg' }), neutre)).type; } catch (e) { t1 = 'erreur ' + e.message; }
+    dit(t1 === 'image/jpeg' && t2 === 'image/jpeg', "une photo WEBP, réglages neutres : réencodée en JPEG avant l'envoi (un JPEG part tel quel)", JSON.stringify({ t1, t2 })); }
   // O — le brouillon qu'il enregistre sur Vinted est appris (corps accepté, id).
   { const f = monter({ src: process.env.BG_SRC || undefined });
     let ok1 = false, ok2 = true;

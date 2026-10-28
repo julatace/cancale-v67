@@ -7,6 +7,17 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — « Erreur lors du chargement de la photo » (5.262) :** Julien, Jordan 3 (brouillon
+> 10574927717) : « Vinted a refusé la mise en ligne (400 : Erreurs trouvées — les photos (Erreur lors du chargement de
+> la photo…)) ». Cause : `photoReglee` rendait l'ORIGINAL quand les réglages étaient neutres — souvent un WEBP (forme
+> `/f800/…webp` du coffre) envoyé sous le nom `photo-N.jpg` ; Vinted le prend puis refuse la mise en ligne. ⇒ un vrai
+> JPEG part toujours (réencodé si besoin). Et `publierBrouillon`, sur un refus qui porte sur les PHOTOS d'un brouillon
+> fait par VRM (`photosRefusees`), renvoie les photos du coffre de l'ancienne annonce (`photosNeuvesBrouillon`, une par
+> photo, ses réglages), remplace celles du brouillon et réessaie UNE fois ; pas de photo dans VRM ⇒ dit, avec le geste
+> Vinted. Les brouillons N°2 et N°72 se mettent donc en ligne par « Brouillons → en ligne ». Preuve :
+> `audit-recreer.cjs` (99 ; 3 rouges sur la 5.261). ⚠️ Non mesuré : que Vinted accepte les photos renvoyées dans un
+> brouillon existant (même `upload_session_id`).
+
 > **28 octobre (nuit) — les PHOTOS EN DOUBLE (5.261), « c'est en brouillon mais pas en ligne » :** mesuré, le coffre
 > de la Jordan 3 portait 75 liens pour 15 photos (même clé `02_02248_…` sous `/tc/…` et `/t/…/f800/…`) ; VRM
 > prenait les 20 premiers ⇒ un brouillon de 20 photos dont des doublons, refusé à la mise en ligne. ⇒
