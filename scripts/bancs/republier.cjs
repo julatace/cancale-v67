@@ -62,7 +62,7 @@ const PONT = (o) => {
     } else if (d.__vmr === 'cmd' && d.cmd === 'publierBrouillon') {
       window.__repub.push({ cmd: d.cmd, uid: d.uid, draftId: d.draftId, confirme: d.confirme, couleur: d.couleur });
       // (28 oct.) Un brouillon SANS couleur : l'extension 5.260 le refuse et propose ce qu'elle sait poser.
-      if (window.__sansCouleur && !d.couleur) post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'couleur-absente', couleurs: { 1: 'Noir' }, raison: "ce brouillon n'a pas de couleur" } });
+      if (window.__sansCouleur && !d.couleur) post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'couleur-absente', couleurs: window.__couleursListe || { 1: 'Noir' }, raison: "ce brouillon n'a pas de couleur" } });
       else post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', itemId: d.draftId } });
     } else if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
   });
@@ -153,6 +153,21 @@ const projette = (row, sel) => {
           const tailles = await pg.$$eval('[data-brouillons-vinted] button, [data-brouillons-vinted] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
           dit(tailles.every((h) => h >= 44), 'boutons de la liste à 44 px au doigt', tailles.join(','));
           dit(/vu sur Vinted il y a/.test(await pg.locator('[data-brouillon="9201"] [data-brouillon-vu]').innerText().catch(() => '')), 'chaque brouillon dit quand Vinted l’a montré (lecture du dressing)');
+          // 5.266 — l'extension a lu la LISTE des couleurs de Vinted : il choisit parmi elles.
+          await pg.evaluate(() => { window.__sansCouleur = true; window.__couleursListe = { 1: 'Noir', 12: 'Blanc', 27: 'Beige' }; window.__repub = []; });
+          await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
+          await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();
+          const choix = pg.locator('[data-ask-choix]');
+          const vuChoix = await choix.waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+          const libs = vuChoix ? await choix.locator('button').allInnerTexts() : [];
+          dit(vuChoix && libs.join(',') === 'Noir,Blanc,Beige', 'plusieurs couleurs connues : VRM propose CHACUNE, avec le nom de Vinted', libs.join(','));
+          const hauteurs = vuChoix ? await choix.locator('button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height))) : [];
+          dit(hauteurs.length && hauteurs.every((h) => h >= 44), 'chaque couleur à 44 px au doigt', hauteurs.join(','));
+          if (vuChoix) await pg.getByRole('button', { name: 'Pas maintenant', exact: true }).click();
+          await pg.waitForTimeout(400);
+          const env0 = await pg.evaluate(() => (window.__repub || []).filter((x) => x.cmd === 'publierBrouillon'));
+          dit(env0.length === 1 && !env0[0].couleur, '« Pas maintenant » : aucune couleur posée à sa place, rien ne repart', JSON.stringify(env0));
+          await pg.evaluate(() => { window.__couleursListe = null; window.__repub = []; });
           await pg.evaluate(() => { window.__sansCouleur = true; });
           await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
           await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();

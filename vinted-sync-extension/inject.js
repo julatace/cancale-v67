@@ -788,6 +788,24 @@ function contratSuivi(a) {
       }).catch(() => {});
     } catch (_) {}
   };
+  // 5.266 : la LISTE des couleurs de Vinted (`GET /api/v2/item_upload/colors`,
+  // chargée par la page de dépôt). Id et nom seulement : des libellés publics.
+  let couleursVu = 0;
+  const noteCouleursVinted = (method, url, status, lireTexte) => {
+    try {
+      if (String(method || 'GET').toUpperCase() !== 'GET' || !(Number(status) >= 200 && Number(status) < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !/^\/api\/v\d+\/item_upload\/colors\/?$/.test(U.pathname)) return;
+      Promise.resolve().then(lireTexte).then((t) => {
+        if (typeof t !== 'string' || t.length < 2 || t.length > 200000 || t.length === couleursVu) return;
+        let j = null; try { j = JSON.parse(t); } catch (_) { return; }
+        const liste = Array.isArray(j) ? j : (j && Array.isArray(j.colors) ? j.colors : (j && Array.isArray(j.item_colors) ? j.item_colors : null));
+        if (!liste) return;
+        couleursVu = t.length;
+        post({ kind: 'couleursVinted', couleurs: liste.slice(0, 80).map((c) => ({ id: c && c.id, title: c && (c.title != null ? c.title : c.name) })) });
+      }).catch(() => {});
+    } catch (_) {}
+  };
   const noteSuivi = (method, url, status, lireTexte) => {
     try {
       if (String(method || 'GET').toUpperCase() !== 'GET') return;
@@ -867,6 +885,7 @@ function contratSuivi(a) {
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
             noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
             noteCatalogueVinted(method, url, res.status, () => res.clone().text());
+            noteCouleursVinted(method, url, res.status, () => res.clone().text());
             noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
@@ -913,6 +932,7 @@ function contratSuivi(a) {
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
             noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.
             noteCatalogueVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
+            noteCouleursVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
