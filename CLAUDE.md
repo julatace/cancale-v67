@@ -7,6 +7,15 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — messages aux favoris sur ses AUTRES comptes :** « Le lien du favori n'est pas confirmé ».
+> Mesuré : sur 3175765377 (deux favoris ouverts depuis la cloche) les 77 favoris se résolvent, chacun vers SA personne
+> (`offering_id`, 77 destinataires distincts, des messages sont partis) ; sur ses autres comptes, aucune ouverture ⇒ refus.
+> ⚠️ Le `user_id` des notifications est le MÊME pour toutes (3175383732 sur deux comptes) : il n'est JAMAIS une preuve
+> de destinataire. ⇒ Seul le PARAMÈTRE prouvé (`offering_id`, deux destinataires natifs distincts) sur un autre compte du
+> MÊME vendeur vaut ici (`parametresDesAutresComptes`, owner filtré ; `parametresAilleurs`, deux clés contradictoires ⇒
+> rien). Preuve : `audit-favoris-autres-comptes.cjs` (3 mutations rouges). Et Republier ne dit plus « 0 annonce à supprimer »
+> après un passage (les anciennes sont parties de Vinted).
+
 > **28 octobre (nuit, fin) — la paire REPUBLIÉE garde son numéro, et les N° revus sur Vinted (5.265) :** Julien :
 > « quand la paire est republiée elle ne conserve pas son numéro, sur Vinted il n'y a plus les numéros ». Mesuré :
 > Jordan 3 N°2→107, Air Max 1 N°53→108, zoom fly N°94→109 (toutes `auto`, données après la mise en ligne d'un brouillon :

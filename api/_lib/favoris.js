@@ -10,6 +10,24 @@ import {preparerMessageFavori} from '../../src/favorisVinted.js';
 // The neutral row cannot be edited by the browser (RLS). One row per Vinted
 // UID, including the rolling quota shared across all devices and VRM owners.
 // This endpoint NEVER calls Vinted. Only the seller's extension dispatches.
+// Les paramètres de lien (« offering_id = destinataire ») prouvés par les
+// ouvertures natives des AUTRES comptes de ce vendeur (jamais d'un autre
+// vendeur : owner filtré, RLS). Lecture ratée ⇒ [] (rien n'est envoyé).
+async function parametresDesAutresComptes(req,{owner,uid}){
+  const rows=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&or=(id.like.harvest_*_favoris_archive,id.like.harvest_*_wreq_api_v2_conversations)&select=id,owner,data`);
+  if(!Array.isArray(rows))return [];
+  const vus=new Map();
+  for(const r of rows){
+    const m=/^harvest_([1-9]\d{0,19})_favoris_archive$/.exec(String(r.id||''));if(!m||m[1]===uid||r.owner!==owner)continue;
+    const a=r.data,trace=rows.find(x=>x.id===`harvest_${m[1]}_wreq_api_v2_conversations`&&x.owner===owner)?.data;
+    if(!a||a.archiveVersion!==1||String(a.uid)!==m[1]||!trace)continue;
+    try{for(const p of resoudreCiblesFavoris({uid:m[1],capture:{...a,type:'notifications'},trace,selection:['x'],traces:a.creations||[],lectures:a.lecturesLiees||[],parametresSeuls:true}))vus.set(p.forme+'\u0000'+p.cle,p);}catch{}
+  }
+  // Deux clés différentes pour une même forme : ça se contredit, rien.
+  const parForme=new Map();for(const p of vus.values())parForme.set(p.forme,(parForme.get(p.forme)||0)+1);
+  return [...vus.values()].filter(p=>parForme.get(p.forme)===1);
+}
+
 export async function routeFavoris(req,res){
   res.setHeader('Cache-Control','no-store');
   if(!['GET','POST'].includes(req.method))return res.status(405).json({message:'GET ou POST seulement.'});
@@ -49,7 +67,13 @@ export async function routeFavoris(req,res){
         try{targets=resoudreCiblesFavoris(opts);}catch(e){
           if(e.code!=='favoris_preuve_absente')throw e;
           const conversations=await lirePreuvesConversationsFavoris(req,{owner,uid,capture:complete,selection:c.selection});
-          targets=resoudreCiblesFavoris({...opts,conversations});
+          try{targets=resoudreCiblesFavoris({...opts,conversations});}catch(e2){
+            if(e2.code!=='favoris_preuve_absente')throw e2;
+            // Le paramètre du lien prouvé sur un autre compte du MÊME vendeur.
+            const parametresAilleurs=await parametresDesAutresComptes(req,{owner,uid});
+            if(!parametresAilleurs.length)throw e2;
+            targets=resoudreCiblesFavoris({...opts,conversations,parametresAilleurs});
+          }
         }
         const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,maintenant,lot});
       }else if(c.action==='suivant'){

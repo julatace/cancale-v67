@@ -15,7 +15,7 @@ function corpsNatif(trace,uid){
 // Native item/member pairs prove the role of user_id; an observed native link
 // can instead prove its recipient parameter, or that exact notification alone.
 // No identity is guessed from text, title, photo, username or parameter names.
-export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations=[],traces=[],lectures=[]}){
+export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations=[],traces=[],lectures=[],parametresAilleurs=[],parametresSeuls=false}){
  if(capture?.type!=='notifications'||String(capture.uid)!==String(uid)||String(trace?.uid)!==String(uid)||trace?.method!=='POST'||trace?.path!=='/api/v2/conversations')throw new RefusFavoris('Ouvre un favori sur Vinted avec ce compte, puis actualise : le raccordement natif doit être confirmé.');
  const corps=corpsNatif(trace,uid);if(!corps)throw new RefusFavoris('La création native de conversation ne confirme pas le format attendu.');
  if(!Array.isArray(selection)||!selection.length||selection.length>10||new Set(selection).size!==selection.length||selection.some(x=>typeof x!=='string'||!x||x.length>160))throw new RefusFavoris('Sélectionne de 1 à 10 favoris différents.',400);
@@ -60,6 +60,17 @@ export function resoudreCiblesFavoris({uid,capture,trace,selection,conversations
  // Two different native recipients must establish an unknown parameter before
  // it can address favorites that have never been opened natively.
  parametres=parametres.filter(p=>new Set(parametres.filter(q=>q.forme===p.forme&&q.cle===p.cle).map(q=>q.recipientId)).size>=2);
+ // (28 oct.) Un paramètre de lien (« offering_id = destinataire ») prouvé par
+ // deux destinataires natifs distincts sur un AUTRE compte du même vendeur vaut
+ // ici : c'est la forme du lien de Vinted. Jamais la forme « user_id » (elle
+ // porte la même valeur pour toutes les notifications d'un compte).
+ if(parametresSeuls)return [...new Map(parametres.map(p=>[p.forme+'\u0000'+p.cle,{forme:p.forme,cle:p.cle}])).values()];
+ const ailleurs=(Array.isArray(parametresAilleurs)?parametresAilleurs:[]).filter(a=>a&&typeof a.forme==='string'&&typeof a.cle==='string'&&/^[a-zA-Z_][a-zA-Z0-9_.-]{0,79}$/.test(a.cle));
+ for(const a of ailleurs){
+  if(ailleurs.some(b=>b.forme===a.forme&&b.cle!==a.cle))continue;   // ils se contredisent : rien
+  if(parametres.some(p=>p.forme===a.forme&&p.cle!==a.cle))continue;   // contredit ici : ignoré
+  parametres.push({forme:a.forme,cle:a.cle,initiator:corps.initiator,recipientId:null,source:'ailleurs'});
+ }
  const erreurRaccordement=(message,code)=>{const e=new RefusFavoris(message);e.code=code;e.diagnostic={notifications:candidats.length,tracesNatives:natifs.length,pairesNatives:paires.size,formesUserId:formes.size,liensExacts:exacts.size,parametresConfirmes:new Set(parametres.map(p=>p.forme+':'+p.cle)).size,selection:selection.length};return e;};
  if(!formes.size&&!exacts.size&&!parametres.length){throw erreurRaccordement('Le lien du favori n’est pas confirmé. Avec l’extension 5.229 ou plus récente, ouvre ce favori depuis la cloche de Vinted (connecté sur ce compte), attends que sa page de message s’affiche, puis relance. Aucun message envoyé.','favoris_preuve_absente');}
  return selection.map(notificationId=>{
