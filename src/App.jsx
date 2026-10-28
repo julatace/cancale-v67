@@ -28158,18 +28158,41 @@ function placeDansMeubles(i, m) {
 // sur celui du dessous — un vide se comble par le haut. On ne déplace que des
 // articles PRÉSENTS (`presents`), jamais leur numéro ; seule la case change.
 // Rend { slots, bouges: { cle: nbRangéesDescendues } }.
-function planchesDe(m) {
-  const r = Math.max(1, +m.rows || 1);
-  return [...new Set((Array.isArray(m.planches) ? m.planches : []).map((x) => +x).filter((x) => Number.isInteger(x) && x >= 1 && x < r))].sort((a, b) => a - b);
+// (28 oct., suite) « rends les planches réglables colonne par colonne » : une
+// planche peut ne couvrir que certaines colonnes. Rangé dans `m.planches` :
+// un NOMBRE = une planche sur toute la largeur (la forme d'avant, toujours lue),
+// une chaîne « r:c » = un morceau sous la rangée r, colonne c (1 = la gauche).
+// Une règle (§11) : `planchesCases` lit, `planchesRangees` range, et tout le
+// reste (dessin, éditeur, gravité) passe par elles.
+function planchesCases(planches, cols, rows) {
+  const c = Math.max(1, +cols || 1), r = Math.max(1, +rows || 1), out = new Set();
+  (Array.isArray(planches) ? planches : []).forEach((x) => {
+    if (typeof x === 'number' || /^\d+$/.test(String(x))) { const n = +x; if (Number.isInteger(n) && n >= 1 && n < r) for (let k = 1; k <= c; k++) out.add(n + ':' + k); return; }
+    const mm = /^(\d+):(\d+)$/.exec(String(x)); if (!mm) return;
+    const n = +mm[1], k = +mm[2]; if (n >= 1 && n < r && k >= 1 && k <= c) out.add(n + ':' + k);
+  });
+  return out;
 }
+function planchesRangees(set, cols, rows) {
+  const c = Math.max(1, +cols || 1), r = Math.max(1, +rows || 1), out = [];
+  for (let n = 1; n < r; n++) {
+    const ks = []; for (let k = 1; k <= c; k++) if (set.has(n + ':' + k)) ks.push(k);
+    if (ks.length === c) out.push(n); else ks.forEach((k) => out.push(n + ':' + k));
+  }
+  return out;
+}
+function planchesDe(m) { return planchesRangees(planchesCases(m && m.planches, m && m.cols, m && m.rows), m && m.cols, m && m.rows); }
 function tasserMeuble(slots, m, presents) {
   const out = { ...slots }; const bouges = {};
   if (!m || !m.gravite) return { slots: out, bouges };
   const cols = Math.max(1, +m.cols || 1), rows = Math.max(1, +m.rows || 1);
-  const bornes = [0, ...planchesDe(m), rows];          // segments [haut, bas[ en rangées 0-based
+  const cases = planchesCases(m.planches, cols, rows);
   const chez = {};                                      // i → clé présente
   Object.keys(out).forEach((k) => { const v = out[k]; if (v && v.m === m.id && presents.has(k) && v.i < cols * rows && chez[v.i] == null) chez[v.i] = k; });
   for (let c = 0; c < cols; c++) {
+    const bornes = [0];                                   // segments [haut, bas[ en rangées 0-based, propres à CETTE colonne
+    for (let r = 1; r < rows; r++) if (cases.has(r + ':' + (c + 1))) bornes.push(r);
+    bornes.push(rows);
     for (let b = 0; b < bornes.length - 1; b++) {
       const haut = bornes[b], bas = bornes[b + 1] - 1;
       const pile = [];                                    // du bas vers le haut
@@ -28332,6 +28355,7 @@ function StockMeubles() {
     // Pendant une recherche, un meuble où rien ne correspond se replie : celui
     // qui contient l'article remonte sous les yeux.
     const replie = cherche && nIci === 0 && meubles.length > 1;
+    const casesPl = planchesCases(m.planches, m.cols, m.rows);
     const regle = { fontSize: 11, fontWeight: 700, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' };
     return (
       <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} style={{ marginBottom: replie ? 10 : 22 }}>
@@ -28360,7 +28384,13 @@ function StockMeubles() {
                 style={{ ...(kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + 6px))` } : {}), position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
                 {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 300, opacity: place ? 0.8 : 0.35 }}>+</span>}
               </button>
-              {pl.colonne === m.cols && pl.rangee < m.rows && planchesDe(m).includes(pl.rangee) && <span data-planche={pl.rangee} aria-hidden="true" style={{ gridColumn: '2 / -1', height: 6, margin: '-1px 0', borderRadius: 3, background: C.muted, boxShadow: '0 2px 3px rgba(0,0,0,0.3)' }} />}
+              {pl.colonne === m.cols && pl.rangee < m.rows && (() => {
+                const ks = Array.from({ length: m.cols }, (_, c) => casesPl.has(pl.rangee + ':' + (c + 1)));
+                const barre = { height: 6, margin: '-1px 0', borderRadius: 3, background: C.muted, boxShadow: '0 2px 3px rgba(0,0,0,0.3)' };
+                if (ks.every(Boolean)) return <span data-planche={pl.rangee} aria-hidden="true" style={{ gridColumn: '2 / -1', ...barre }} />;
+                if (!ks.some(Boolean)) return null;
+                return <>{<span aria-hidden="true" />}{ks.map((o, c) => <span key={'p' + c} data-planche-case={o ? pl.rangee + ':' + (c + 1) : undefined} aria-hidden="true" style={o ? barre : { height: 0 }} />)}</>;
+              })()}
               </React.Fragment>
             );
           })}
@@ -28376,7 +28406,7 @@ function StockMeubles() {
     let corps = null;
     if (modal.type === 'meuble') {
       corps = <EditeurMeuble modal={modal} onSave={(nom, cols, rows, extra = {}) => {
-        const planches = (extra.planches || []).filter((x) => x >= 1 && x < rows), gravite = !!extra.gravite;
+        const planches = planchesRangees(planchesCases(extra.planches, cols, rows), cols, rows), gravite = !!extra.gravite;
         if (modal.id) { const ancien = meubles.find((x) => x.id === modal.id) || {};
           const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows, planches, gravite } : x);
           // Les paires gardent leur rangée et leur colonne quand le nombre de
@@ -28545,7 +28575,7 @@ function StockMeubles() {
 
     <button type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.line}`, color: C.accent, borderRadius: 14, padding: 15, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>+ Créer un meuble</button>
 
-    <Modale />
+    {Modale()}
   </>);
 }
 
@@ -28556,8 +28586,17 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   const [rows, setRows] = React.useState(modal.rows || 3);
   const [planches, setPlanches] = React.useState(() => (Array.isArray(modal.planches) ? modal.planches : []));
   const [gravite, setGravite] = React.useState(!!modal.gravite);
-  const pl = planches.filter((x) => x >= 1 && x < rows);
-  const basculer = (r) => setPlanches((p) => (p.includes(r) ? p.filter((x) => x !== r) : [...p, r]));
+  // L'état garde la forme rangée (`planchesRangees`) : une planche pleine
+  // largeur reste pleine si on ajoute une colonne.
+  const cases = planchesCases(planches, cols, rows);
+  const pl = planchesRangees(cases, cols, rows);
+  const pleine = (r) => { for (let c = 1; c <= cols; c++) if (!cases.has(r + ':' + c)) return false; return true; };
+  const auMoinsUne = (r) => { for (let c = 1; c <= cols; c++) if (cases.has(r + ':' + c)) return true; return false; };
+  const nPlanches = Array.from({ length: Math.max(0, rows - 1) }, (_, i) => i + 1).filter(auMoinsUne).length;
+  const nPartielles = Array.from({ length: Math.max(0, rows - 1) }, (_, i) => i + 1).filter((r) => auMoinsUne(r) && !pleine(r)).length;
+  const poser = (u) => setPlanches(planchesRangees(u, cols, rows));
+  const basculer = (r) => { const u = new Set(cases); const plein = pleine(r); for (let c = 1; c <= cols; c++) { if (plein) u.delete(r + ':' + c); else u.add(r + ':' + c); } poser(u); };
+  const basculerCase = (r, c) => { const u = new Set(cases), k = r + ':' + c; if (u.has(k)) u.delete(k); else u.add(k); poser(u); };
   const step = (set, v, d, min, max) => () => set(Math.max(min, Math.min(max, v + d)));
   const Stepper = ({ v, set, min, max, label }) => (
     <div style={{ flex: 1 }}>
@@ -28585,24 +28624,39 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
       <span style={{ fontSize: 14, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Quand tu retires un article, ceux du dessus descendent jusqu'à la planche en dessous.</span></span>
     </label>
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{pl.length}</b> planche{pl.length > 1 ? 's' : ''}</> : null}</div>
-      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées pour poser ou enlever une planche, comme sur ton vrai meuble.</div>}
-      <div data-editeur-planches="" style={{ display: 'flex', flexDirection: 'column', maxWidth: 240, margin: '0 auto', background: C.line, padding: 5, borderRadius: 7 }}>
-        {Array.from({ length: rows }).map((_, r) => (
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{nPlanches}</b> planche{nPlanches > 1 ? 's' : ''}{nPartielles ? <> (dont {nPartielles} partielle{nPartielles > 1 ? 's' : ''})</> : null}</> : null}</div>
+      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées, sous une colonne, pour poser ou enlever la planche à cet endroit. Le bouton ⟷ à gauche fait toute la largeur.</div>}
+      <div data-editeur-planches="" style={{ display: 'grid', gridTemplateColumns: '30px 1fr', columnGap: 6, maxWidth: 300, margin: '0 auto' }}>
+        <span />
+        <div style={{ background: C.line, padding: '5px 5px 0', borderRadius: '7px 7px 0 0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+            {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+          </div>
+        </div>
+        {Array.from({ length: rows - 1 }).map((_, i) => { const r = i + 1; const plein = pleine(r); return (
           <React.Fragment key={r}>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
-              {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+            <button type="button" data-planche-choix={r} aria-pressed={plein} onClick={() => basculer(r)}
+              aria-label={plein ? `Enlever la planche sous la rangée ${r}, sur toute la largeur` : `Poser une planche sous la rangée ${r}, sur toute la largeur`}
+              title="Toute la largeur"
+              style={{ width: 30, height: 30, alignSelf: 'center', padding: 0, border: `1px solid ${plein ? C.text : C.line}`, background: plein ? C.text : 'transparent', color: plein ? C.bg : C.muted, borderRadius: 7, fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>⟷</button>
+            <div style={{ background: C.line, padding: '0 5px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+                {Array.from({ length: cols }).map((_, c) => { const on = cases.has(r + ':' + (c + 1)); return (
+                  <button key={c} type="button" data-planche-case-choix={r + ':' + (c + 1)} aria-pressed={on} onClick={() => basculerCase(r, c + 1)}
+                    aria-label={on ? `Enlever la planche sous la rangée ${r}, colonne ${c + 1}` : `Poser une planche sous la rangée ${r}, colonne ${c + 1}`}
+                    style={{ height: 30, margin: 0, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ display: 'block', width: '100%', height: on ? 7 : 2, borderRadius: 3, background: on ? C.text : 'transparent', borderTop: on ? 'none' : `2px dashed ${C.muted}`, opacity: on ? 1 : 0.5 }} />
+                  </button>); })}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+                {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+              </div>
             </div>
-            {r < rows - 1 && (
-              <button type="button" data-planche-choix={r + 1} aria-pressed={pl.includes(r + 1)} onClick={() => basculer(r + 1)}
-                aria-label={pl.includes(r + 1) ? `Enlever la planche sous la rangée ${r + 1}` : `Poser une planche sous la rangée ${r + 1}`}
-                style={{ height: 22, margin: '0 -5px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <span style={{ display: 'block', width: '100%', height: pl.includes(r + 1) ? 7 : 2, borderRadius: 3, background: pl.includes(r + 1) ? C.text : 'transparent', borderTop: pl.includes(r + 1) ? 'none' : `2px dashed ${C.muted}`, opacity: pl.includes(r + 1) ? 1 : 0.5 }} />
-              </button>
-            )}
-          </React.Fragment>
-        ))}
-        <span aria-hidden="true" style={{ display: 'block', height: 7, borderRadius: 3, background: C.text, margin: '4px -5px -5px' }} />
+          </React.Fragment>); })}
+        <span />
+        <div style={{ background: C.line, padding: '4px 5px 5px', borderRadius: '0 0 7px 7px' }}>
+          <span aria-hidden="true" style={{ display: 'block', height: 7, borderRadius: 3, background: C.text }} />
+        </div>
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
         <button type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Une à chaque rangée</button>

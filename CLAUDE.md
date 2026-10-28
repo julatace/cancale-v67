@@ -58,6 +58,15 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, suite) — les planches COLONNE PAR COLONNE :** Julien : « rends les planches réglables
+> colonne par colonne ». `m.planches` garde un NOMBRE pour une planche pleine largeur (forme d'avant, lue telle
+> quelle) et une chaîne « r:c » pour un morceau sous la rangée r, colonne c. Une règle : `planchesCases` (lit) /
+> `planchesRangees` (range) ; `tasserMeuble` prend les planches de CHAQUE colonne. Éditeur : un morceau par colonne
+> entre deux rangées, ⟷ à gauche = toute la largeur. ⚠️ Trouvé au passage : la fenêtre du Stock était un composant
+> défini dans `StockMeubles` (`<Modale />`) — chaque rafraîchissement la REMONTAIT et effaçait ce qu'on venait de
+> toucher dans l'éditeur ⇒ appelée en fonction (`{Modale()}`). Banc `stock-planches.cjs` (mutation « morceaux
+> ignorés » ⇒ 8 rouges).
+
 > **28 octobre (nuit) — les PLANCHES et les articles EMPILÉS (Stock → Mes meubles) :** Julien : « quand on enlève un
 > article, ceux du dessus descendent — il faut pouvoir faire des barres », puis « pas imaginaires justement ». Les
 > planches sont celles de son vrai meuble, DESSINÉES (`data-planche`) : dans l'éditeur, toucher entre deux rangées pose
