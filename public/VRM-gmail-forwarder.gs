@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════
 // VRM — Transfert Gmail → app (script Google Apps Script)
 //
-// Rôle : toutes les 5 minutes, prend les emails Vinted pas encore
+// Rôle : toutes les minutes, prend les emails Vinted pas encore
 // traités et les POSTe tels quels à l'app (api/email-inbound), qui se
 // charge de TOUT : parsing (vente / bordereau / argent reçu), rangement
 // dans Supabase, et notifications push.
@@ -311,10 +311,11 @@ function verifierInstallationVRM(){
 function installerVRM(){
  verifierInstallationVRM();
  const declencheurs=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='forwardVintedEmails');
- if(!declencheurs.length)ScriptApp.newTrigger('forwardVintedEmails').timeBased().everyMinutes(5).create();
- // Ne supprime aucun déclencheur étranger au transfert VRM.
- declencheurs.slice(1).forEach(t=>ScriptApp.deleteTrigger(t));
- Logger.log('Transfert VRM programmé toutes les cinq minutes.');
+ // Créer d’abord : si Google refuse, le déclencheur existant reste actif.
+ ScriptApp.newTrigger('forwardVintedEmails').timeBased().everyMinutes(1).create();
+ // Remplace aussi l'ancien rythme de cinq minutes, sans toucher aux autres fonctions.
+ declencheurs.forEach(t=>ScriptApp.deleteTrigger(t));
+ Logger.log('Transfert VRM programmé toutes les minutes. Les quotas Google restent applicables.');
 }
 
 function preparerCleReceptionVRM(){
