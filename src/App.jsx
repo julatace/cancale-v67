@@ -28144,7 +28144,7 @@ function StockMeubles() {
   // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
   // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
   const sansAccent = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const motsQ = sansAccent(filtre).replace(/^(n°|n|#)\s*(?=\w*\d)/, '').split(/\s+/).filter(Boolean);
+  const motsQ = sansAccent(filtre).replace(/^(numero|num|no|n°|n|#)\.?\s*(?=\w*\d)/, '').split(/\s+/).filter(Boolean);
   const qEstNum = motsQ.length === 1 && !!cleNum(motsQ[0]) && /\d/.test(motsQ[0]);
   const correspond = (f) => {
     if (!filtre) return true;
@@ -28217,36 +28217,50 @@ function StockMeubles() {
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 10 }}>pas de photo</div>}
       <span style={{ position: 'absolute', left: 4, top: 4, background: sold ? C.accent : 'rgba(0,0,0,0.6)', color: sold ? C.onAccent : '#fff', fontWeight: 800, fontSize: 11, padding: '1px 6px', borderRadius: 6 }}>N°{f.numero}</span>
-      {sold && <span style={{ position: 'absolute', right: 4, top: 4, background: C.accent, color: C.onAccent, fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 999, letterSpacing: 0.3 }}>VENDU</span>}
+      {sold && <span style={{ position: 'absolute', right: 4, bottom: 4, background: C.accent, color: C.onAccent, fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 999, letterSpacing: 0.3 }}>VENDU</span>}
     </>
   );
 
   const total = (m) => m.cols * m.rows;
   const cadreMeuble = (m) => {
     const filled = Array.from({ length: total(m) }).filter((_, i) => occupant(m.id, i)).length;
+    const cherche = !!(filtre || cibles.length);
+    const nIci = cherche ? Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); if (!o) return false; const k = cleDeFiche(o); return cibles.includes(k) || (filtre && correspond(o)); }).length : 0;
+    // Pendant une recherche, un meuble où rien ne correspond se replie : celui
+    // qui contient l'article remonte sous les yeux.
+    const replie = cherche && nIci === 0 && meubles.length > 1;
+    const regle = { fontSize: 11, fontWeight: 700, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' };
     return (
-      <section key={m.id} style={{ marginBottom: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 9px' }}>
+      <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} style={{ marginBottom: replie ? 10 : 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 9px', opacity: replie ? 0.55 : 1 }}>
           <span style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{m.name}</span>
           <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}</span>
+          {cherche && <span style={{ fontSize: 12, fontWeight: 800, color: nIci ? C.onAccent : C.muted, background: nIci ? C.accent : 'transparent', borderRadius: 999, padding: '1px 8px' }}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
           <span style={{ flex: 1 }} />
           <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: 8, borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * 150 + 16}px)` }}>
+        {!replie && (
+        <div data-meuble-grille="" style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * 150 + 28}px)` }}>
+          {/* Règle : colonnes numérotées au-dessus, rangées à gauche (comme sur le meuble). */}
+          <span />
+          {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} style={regle}>{c + 1}</span>)}
           {Array.from({ length: total(m) }).map((_, i) => {
             const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const kOcc = occ ? cleDeFiche(occ) : null;
             const vise = kOcc && (flash === kOcc || cibles.includes(kOcc) || (filtre && correspond(occ)));
-            const dim = occ ? ((filtre || cibles.length) && !vise) : (filtre || cibles.length);
+            const dim = occ ? (cherche && !vise) : cherche;
             const pl = placeDansMeubles(i, m);
             return (
-              <button type="button" key={i} onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
+              <React.Fragment key={i}>
+              {pl.colonne === 1 && <span data-regle-rang={pl.rangee} style={regle}>{pl.rangee}</span>}
+              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
                 data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} className={flash && flash === kOcc ? 'vrm-case-flash' : undefined}
                 style={{ position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
                 {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 300, opacity: place ? 0.8 : 0.35 }}>+</span>}
               </button>
+              </React.Fragment>
             );
           })}
-        </div>
+        </div>)}
       </section>
     );
   };
@@ -28326,10 +28340,12 @@ function StockMeubles() {
       <div style={{ position: 'relative' }}>
         <span aria-hidden="true" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: C.muted, display: 'flex' }}><Icon name="search" size={18} /></span>
         <input ref={chercheRef} value={q} onChange={(e) => { setQ(e.target.value); setCibles([]); }}
-          onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); setCibles([]); } if (e.key === 'Enter' && resultats.length === 1) { e.preventDefault(); const f = resultats[0]; if (ouEst(f)) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); } }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setQ(''); setCibles([]); } if (e.key === 'Enter' && resultats.length === 1) { e.preventDefault(); const f = resultats[0]; if (ouEst(f)) montrer(f); else setModal({ type: 'fiche', cle: cleDeFiche(f) }); }
+            else if (e.key === 'Enter' && resultats.length > 1) { e.preventDefault(); setCibles(resultats.map(cleDeFiche)); setQ(''); try { e.currentTarget.blur(); } catch (_) {} } }}
           type="search" enterKeyHint="search" autoComplete="off"
-          placeholder="Retrouver un article : N°, marque, modèle, taille…" aria-label="Retrouver un article dans le stock"
-          style={{ width: '100%', boxSizing: 'border-box', padding: '13px 40px 13px 40px', borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 16, outline: 'none', minHeight: 48 }} />
+          placeholder="N°, marque, taille…" aria-label="Retrouver un article dans le stock"
+          style={{ width: '100%', boxSizing: 'border-box', padding: `13px ${DICTEE_OK ? 92 : 40}px 13px 40px`, borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 16, outline: 'none', minHeight: 48 }} />
+        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(String(t).replace(/[.!?]+$/, '')); setCibles([]); }} /></span>
         {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
       </div>
       {filtre && (
@@ -28352,16 +28368,30 @@ function StockMeubles() {
                   <span style={{ color: C.accent, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
                 </button>
               ); })}
+          {resultats.length > 1 && <button type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%', minHeight: 46, background: 'transparent', border: 'none', color: C.accent, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
           {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{resultats.length} trouvées — {MAX_RES} affichées, précise ta recherche.</div>}
         </div>
       )}
-      {cibles.length > 0 && !filtre && (
-        <div data-stock-cibles={cibles.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '10px 12px', fontSize: 14, color: C.text, lineHeight: 1.5 }}>
-          <b>À aller chercher :</b>{' '}
-          {cibles.map((k, j) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
-            return <span key={k}>{j ? ' · ' : ''}<b>N°{f ? f.numero : k}</b> {ou ? `${ou.meuble.name}, rangée ${ou.rangee}, colonne ${ou.colonne}` : (f ? 'pas rangé' : 'plus en stock')}</span>; })}
-        </div>
-      )}
+      {cibles.length > 0 && !filtre && (() => {
+        // Dans l'ordre du chemin : meuble par meuble, de haut en bas, de gauche à droite.
+        const rang = (k) => { const f = ficheParCle[k]; const ou = f && ouEst(f); if (!ou) return [9999, 0]; return [meubles.findIndex((x) => x.id === ou.meuble.id), ou.i]; };
+        const tri = [...cibles].sort((a, b) => { const x = rang(a), y = rang(b); return x[0] - y[0] || x[1] - y[1]; });
+        return (
+        <div data-stock-cibles={cibles.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '8px 6px 8px 12px', fontSize: 14, color: C.text, maxHeight: '40vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <b>À aller chercher{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
+            <span style={{ flex: 1 }} />
+            <button type="button" onClick={() => setCibles([])} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 13, cursor: 'pointer', minHeight: 36 }}>Fermer</button>
+          </div>
+          {tri.map((k) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
+            return (
+              <button type="button" key={k} data-cible={k} onClick={() => { if (f && ou) montrer(f); else if (f) setModal({ type: 'fiche', cle: k }); }}
+                style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 4px', minHeight: 44, background: 'transparent', border: 'none', borderTop: `1px solid ${C.line}`, color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 14 }}>
+                <b style={{ minWidth: 48 }}>N°{f ? f.numero : k}</b>
+                <span style={{ flex: 1, minWidth: 0, color: ou ? C.text : C.muted, fontWeight: ou ? 600 : 400 }}>{ou ? `${ou.meuble.name} · rangée ${ou.rangee}, colonne ${ou.colonne}` : (f ? 'pas encore rangé' : 'plus en stock')}</span>
+              </button>
+            ); })}
+        </div>); })()}
     </div>
   );
 
@@ -28394,7 +28424,7 @@ function StockMeubles() {
       </div>
     )}
 
-    <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
+    <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ background: 'transparent', border: 'none', padding: '0 2px', minHeight: 36, color: C.accent, fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
 
     {meubles.map(cadreMeuble)}
 

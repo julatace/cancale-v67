@@ -40,6 +40,14 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (suite) — retrouver encore plus vite :** les meubles portent leurs REPÈRES (colonnes numérotées
+> au-dessus, rangées à gauche, `data-regle-*`) ; micro dans la recherche (`MicDictee`, « numéro 12 » ⇒ N°12) ;
+> pendant une recherche, un meuble sans résultat se replie (« rien ici ») et l'autre dit « N ici » ; « Les montrer
+> toutes (N) » et Entrée sur plusieurs résultats ⇒ liste « À aller chercher » triée dans l'ordre du chemin
+> (meuble, puis de haut en bas, de gauche à droite), chaque ligne mène à SA case ; « N vendues à sortir — où
+> sont-elles ? » fait pareil pour les vendues. Badge VENDU en bas de la vignette (il couvrait le N°). Banc
+> `stock-retrouver.cjs` : 34 contrôles.
+
 > **28 octobre — RETROUVER N'IMPORTE QUEL ARTICLE dans Stock → Mes meubles :** Julien : « je veux pouvoir
 > retrouver facilement n'importe quel article ». Grande recherche collée en haut (`data-stock-recherche`) : plusieurs
 > mots, sans accent (« nike 42 noir ») ; un N° seul par IDENTITÉ (« 12 » ≠ N°128 ; un nombre peut aussi être une
