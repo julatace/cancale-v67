@@ -28331,7 +28331,11 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // n'a plus que la pièce (3D + vue du dessus) et l'assistant « Ranger » ; la
   // grille de zones et la photo du local ne s'ouvrent plus (mesuré : vides chez
   // lui). Un choix mémorisé « grille »/« photo » retombe sur la pièce.
-  const [garageView,setGarageView]=useState(()=>{ if (DEMANDE_STOCK_CHERCHE.nums) return 'meubles'; const v=load('vinted_garage_view','meubles'); return ['meubles','plan','ranger','photos'].includes(v)?v:'meubles'; }); // meubles | plan | ranger | photos
+  const [garageView,setGarageView]=useState(()=>{ const dn = DEMANDE_STOCK_CHERCHE.nums;
+    // Une demande (Colis, loupe globale) ouvre la vue où ces paires SONT rangées :
+    // « Mes meubles » d'abord, sinon la pièce 3D si elles y sont (ou s'il n'a
+    // créé aucun meuble : la pièce se lit à son ouverture), sinon les meubles.
+    if (dn && dn.length) { if (dn.some(n => ouDansMeubles(n))) return 'meubles'; try { const pl = load('vrm_room_plan', null); if (pl && dn.some(n => ouEstNumero(normalizePlan(pl), n))) return 'plan'; } catch (_) {} const ms = load('vrm_meubles', []); return (Array.isArray(ms) && ms.length) ? 'meubles' : 'plan'; } const v=load('vinted_garage_view','meubles'); return ['meubles','plan','ranger','photos'].includes(v)?v:'meubles'; }); // meubles | plan | ranger | photos
 
   // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
   useEffect(()=>{
