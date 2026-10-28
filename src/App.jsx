@@ -112,7 +112,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.268.0';
+const EXT_ATTENDUE = '5.269.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -376,15 +376,26 @@ function categorieLbcDe(titre, description, taille, chemin, marque) {
 }
 function descriptionLbcDe(o) {
   const ref = String(o.ref || '');
+  // Le texte de Vinted, sans la lettre ajoutée par Republier (une lettre seule
+  // sur sa dernière ligne) ni une ancienne « Réf. VRM-n » : elles reviennent
+  // sinon en double (28 oct., « ça met deux descriptions »).
+  let texte = String(o.texte || o.base || '').trim();
+  texte = texte.replace(/\n\s*\n\s*[a-z]\s*$/i, '').replace(/^[^\S\n]*(?:📦\s*)?R[ée]f\.?\s*VRM-[A-Z0-9]+[^\S\n]*$/gim, '').replace(/\n{3,}/g, '\n\n').trim();
+  const sans = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  const t = sans(texte);
+  const dit = (v) => { const x = sans(v).trim(); return !!x && t.includes(x); };
+  // Une caractéristique que le texte dit déjà n'est pas répétée.
   const specs = [];
-  if (o.marque) specs.push('Marque : ' + o.marque);
-  if (o.taille) specs.push('Taille : ' + o.taille);
-  if (o.etat) specs.push('État : ' + o.etat);
-  if (o.couleur) specs.push('Couleur : ' + o.couleur);
-  const parts = ['📦 Réf. ' + ref, '', String(o.texte || o.base || '').trim()];
+  if (o.marque && !dit(o.marque)) specs.push('Marque : ' + o.marque);
+  if (o.taille && !new RegExp('(taille|pointure|\\bt)\\s*:?\\s*' + sans(o.taille).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(t)) specs.push('Taille : ' + o.taille);
+  if (o.etat && !dit(o.etat)) specs.push('État : ' + o.etat);
+  if (o.couleur && !dit(o.couleur)) specs.push('Couleur : ' + o.couleur);
+  const parts = ['📦 Réf. ' + ref, '', texte];
   if (specs.length) { parts.push(''); parts.push(specs.join('\n')); }
-  parts.push('');
-  parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  if (!/envoi|exp[ée]di|envoye/.test(t)) {
+    parts.push('');
+    parts.push('Envoi rapide et soigné (remise en main propre possible). N\'hésitez pas pour toute question.');
+  }
   parts.push('Réf. ' + ref);
   return parts.join('\n');
 }
