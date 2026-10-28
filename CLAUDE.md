@@ -123,6 +123,15 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — BOÎTES AU SOL : une hauteur par pile :** Julien : « fais le point 1 » (pas de plateau
+> imaginaire sur une pile au sol — refusé exprès, rien ne tient un carton par terre). `it.rows` reste le PAS de `nums`
+> (la plus haute pile) ; `it.hauteurs[c]` (absent ⇒ `rows`, comme avant) = combien de cartons la pile c accepte.
+> Sélection de la pile → « Hauteur de chaque pile » (±, `data-pile-col`/`data-pile-h`, dès 2 piles). `changerHauteurPile` :
+> chaque carton garde sa pile et sa place, les autres piles ne bougent pas ; réduire sous ses cartons est refusé et dit.
+> `ajouterAPile(…, rows, hauteurs)` ne comble jamais une place au-dessus de la hauteur d'une pile. « Boîtes de haut
+> (toutes les piles) » re-empile tout et remet une seule hauteur. Preuves : `audit-stock-plan.cjs` (+6, 3 mutations
+> rouges ; ancre périmée de `place_haut_dabord` réparée), banc `stock-finitions.cjs` XIV (390/1512).
+
 > **28 octobre (nuit, fin) — l'étagère EN BOIS, et « fais pour tout » :** l'étagère bois (`build: 'metal'`, `bois`)
 > avait déjà les plateaux réglables (IX) ; le banc `stock-finitions.cjs` XIII le prouve sur elle (plateau de bois
 > dessiné en morceaux, la boîte descend). Tous les meubles à étages de la palette l'ont donc : métal, bois, bacs,

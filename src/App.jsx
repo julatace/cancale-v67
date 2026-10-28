@@ -31,7 +31,7 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
-import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
+import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
@@ -26308,7 +26308,7 @@ function SortisDuStock({ plan, planLu, ecrire }) {
     else if (x.key) { const r = rangerNumeroDansPlan(plan, x.itemId, x.key, x.num); if (r.erreur) { toast(r.erreur); return; } next = r.plan; }
     else {
       let fait = false;
-      const rooms = (plan.rooms || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => { if (it.id !== x.itemId || !Array.isArray(it.nums)) return it; const n2 = ajouterAPile(it.nums, x.num); if (!n2) return it; fait = true; return { ...it, nums: n2 }; }) }));
+      const rooms = (plan.rooms || []).map(rm => ({ ...rm, items: (rm.items || []).map(it => { if (it.id !== x.itemId || !Array.isArray(it.nums)) return it; const n2 = ajouterAPile(it.nums, x.num, Math.max(1, it.rows || 5), it.hauteurs); if (!n2) return it; fait = true; return { ...it, nums: n2 }; }) }));
       if (!fait) { toast(`« ${x.itemName} » n'existe plus : range la N°${x.num} à la main.`); return; }
       next = { ...plan, rooms };
     }
@@ -26751,8 +26751,18 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const pileSet = (it, nums) => { const rows = Math.max(1, it.rows || 5); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { nums, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
   // Changer la hauteur RE-EMPILE les colonnes : c'est un rangement voulu, les
   // places vides ('') disparaissent.
-  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = cartonsDePile(pileNums(it)); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, nums, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
-  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; const n2 = ajouterAPile(nums, t); if (n2) pileSet(it, n2); };
+  // (28 oct.) Ce réglage vaut pour TOUTES les piles : il remet une seule hauteur.
+  const pileHeight = (it, d) => { const rows = Math.max(1, Math.min(40, (it.rows || 5) + d)); const nums = cartonsDePile(pileNums(it)); const cols = Math.max(1, Math.ceil(nums.length / rows)); updateItem(it.id, { rows, cols, nums, hauteurs: null, w: +(cols * (it.cell || 0.5)).toFixed(2) }); };
+  // (28 oct.) « une hauteur différente pour chaque pile » : seule la pile c change,
+  // chaque carton garde sa pile et sa place (`changerHauteurPile`).
+  const pileHauteurCol = (it, c, d) => {
+    const R = Math.max(1, it.rows || 5);
+    const r = changerHauteurPile(pileNums(it), R, it.hauteurs, c, hauteurPile(R, it.hauteurs, c) + d);
+    if (r.erreur) { toast(r.erreur); return; }
+    const cols = Math.max(1, Math.ceil(r.nums.length / r.rows));
+    updateItem(it.id, { nums: r.nums, rows: r.rows, hauteurs: r.hauteurs, cols, w: +(cols * (it.cell || 0.5)).toFixed(2) });
+  };
+  const pileAdd = async (it) => { const nums = pileNums(it).slice(); const nextN = nums.reduce((m, v) => { const n = parseInt(v, 10); return isNaN(n) ? m : Math.max(m, n); }, 0) + 1; const v = await askText({ numeric: true, desc: 'Numéro de la nouvelle boîte (au-dessus) :', value: String(nextN) }); if (v == null) return; const t = String(v).trim(); if (!t) return; const n2 = ajouterAPile(nums, t, Math.max(1, it.rows || 5), it.hauteurs); if (n2) pileSet(it, n2); };
   const pileRemoveLast = (it) => { const nums = pileNums(it).slice(); if (cartonsDePile(nums).length <= 1) return; while (nums.length && !String(nums[nums.length - 1] || '').trim()) nums.pop(); nums.pop(); while (nums.length && !String(nums[nums.length - 1] || '').trim()) nums.pop(); pileSet(it, nums); };
   const pileRestart = async (it) => { const s = await askText({ numeric: true, desc: 'Renuméroter toute la pile à partir de (dans l\'ordre) :', value: String(it.start || (cartonsDePile(pileNums(it))[0]) || 1) }); if (s == null) return; const st = parseInt(s, 10); if (isNaN(st)) return; let k = 0; const nums = pileNums(it).map((v) => String(v || '').trim() ? String(st + k++) : ''); updateItem(it.id, { nums, start: st }); };
   // Toucher une boîte de la pile (pile déjà sélectionnée) → changer SON numéro
@@ -27497,7 +27507,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
   const ajouterDansPile = (it, numero) => {
     const v = String(numero || '').trim(); if (!v) return;
     const ou = dejaPoseOu(v); if (ou) { toast(`N°${v} déjà rangé dans « ${ou.meuble} »${ou.piece ? ` (${ou.piece})` : ''} — retire-le de là-bas d'abord.`); return; }
-    const n2 = ajouterAPile(pileNums(it), v); if (n2) { pileSet(it, n2); toast(`N°${v} posé sur « ${it.name} ».`); }
+    const n2 = ajouterAPile(pileNums(it), v, Math.max(1, it.rows || 5), it.hauteurs); if (n2) { pileSet(it, n2); toast(`N°${v} posé sur « ${it.name} ».`); }
   };
   const rangerPaire = (numero, itemId, cellKey) => {
     const it = items.find(o => o.id === itemId); if (!it) return;
@@ -27932,7 +27942,17 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 900 }}>📦 Pile</span>
                 <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 14, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Boîtes de haut</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                {cols > 1 && <span data-pile-hauteurs style={{ flex: '1 1 100%', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Hauteur de chaque pile (depuis la gauche)</span>
+                  {Array.from({ length: cols }, (_, c) => { const h = hauteurPile(rows, selItem.hauteurs, c); return (
+                    <span key={c} data-pile-col={c + 1} data-pile-h={h} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                      <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 700 }}>Pile {c + 1}</span>
+                      <button className="vrm-icon-control" type="button" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</button>
+                      <b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{h}</b>
+                      <button className="vrm-icon-control" type="button" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</button>
+                    </span>); })}
+                </span>}
                 <button type="button" onClick={() => pileRestart(selItem)} style={{ border: `1px solid ${C.accent}`, borderRadius: 7, background: `${C.accent}14`, color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>🔢 Renuméroter</button>
                 <button type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)" style={{ border: 'none', borderRadius: 7, background: C.accent, color: '#fff', fontSize: 11, fontWeight: 900, padding: '6px 10px', cursor: 'pointer' }}>🪑 Poser sur un meuble</button>
                 {(selItem.lift || 0) > 0 && <button type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol" style={{ border: `1px solid ${C.border}`, borderRadius: 7, background: 'transparent', color: C.text, fontSize: 11, fontWeight: 800, padding: '5px 9px', cursor: 'pointer' }}>⬇️ Au sol</button>}
