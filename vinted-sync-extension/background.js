@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.257.0';
+const CODE_VERSION = '5.258.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8311,6 +8311,32 @@ async function lireFicheAnnonce(id) {
     return (tout && typeof tout === 'object' && tout[id] && typeof tout[id] === 'object') ? tout[id] : {};
   } catch (_) { return null; }
 }
+// (28 oct.) La recette d'une annonce (catégorie, taille/état, colis, marque,
+// couleurs) LUE chez Vinted : `GET /api/v2/item_upload/items/{id}`, l'adresse que
+// sa page « Modifier » charge pour remplir le formulaire (vue dans ses chemins).
+// Une LECTURE de sa propre annonce (budget de lecture, file Vinted, compte du
+// cookie). On n'en garde que ce que `ficheDeCorpsVinted` sait lire — la même règle
+// que pour une modification ; rien n'est deviné. Forme inconnue ⇒ on note ses
+// NOMS de clés (jamais une valeur) pour la passe suivante, et on le dit.
+async function apprendreRecetteVinted(acc, uid, id) {
+  const stop = await gardeLecture(uid, acc, 'clic');
+  if (stop) return { raison: stop.error || 'la lecture n’est pas possible pour l’instant' };
+  const r = await vintedGet(acc, `/api/v2/item_upload/items/${id}`, { timeoutMs: 30000 });
+  if (!r || !r.ok) { noterDiag(`recette_lecture_refuse_${(r && r.status) || 0}`); return { raison: `Vinted a refusé la lecture (${(r && r.status) || 'pas de réponse'})` }; }
+  const j = r.json && typeof r.json === 'object' ? r.json : null;
+  const f = j ? ficheDeCorpsVinted(j.item && typeof j.item === 'object' ? j : { item: j }, id) : null;
+  const c = f && f.codes;
+  const complet = c && Number(c.catalog_id) > 0 && Array.isArray(c.item_attributes) && c.item_attributes.length && Number(c.package_size_id) > 0;
+  if (!complet) {
+    const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
+    const cles = it ? Object.keys(it).slice(0, 40).map((k) => k.replace(/[^a-z0-9_]/gi, '')).join('_').slice(0, 180) : 'vide';
+    noterDiag('recette_forme_' + cles);
+    return { raison: 'sa réponse ne contient pas ces informations sous une forme que VRM connaît (c’est noté pour la prochaine version)' };
+  }
+  noterDiag('recette_lue');
+  try { await enfilerFiches([{ id: String(id), src: 'modif', at: new Date().toISOString(), f }]); await viderFiches({ force: true }); } catch (_) {}
+  return f;
+}
 async function recreerVinted(msg) {
   const uid = String(msg.uid || ''), id = String(msg.id || '');
   if (!/^\d+$/.test(uid) || !/^\d{4,15}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce incomplète' };
@@ -8351,7 +8377,19 @@ async function recreerVinted(msg) {
   if (!(isFinite(prix) && prix > 0 && prix < 100000)) return { accepte: false, code: 'prix', raison: 'prix illisible' };
   const pl = Number(msg.plancher); if (msg.plancher != null && isFinite(pl) && prix < pl) prix = pl;
   prix = Math.round(prix * 100) / 100;
-  const essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+  // (28 oct., « j'ai modifié, corrige et fais ça bien ») La recette manque : on la
+  // LIT chez Vinted, comme le fait sa page « Modifier » (une lecture, aucun geste).
+  if (essai.manque && !(modele && modele.corps)) {
+    const appris = await apprendreRecetteVinted(acc, uid, id);
+    if (appris && appris.codes) {
+      details.codes = { ...(details.codes || {}), ...appris.codes };
+      if (!details.description && appris.description) details.description = appris.description;
+      essai = itemPourRecreer({ modeleCorps: null, codes: details.codes, titre, prix, description: description || appris.description || '', brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+    } else if (appris && appris.raison) {
+      return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
+    }
+  }
   if (essai.manque) return { accepte: false, code: 'recette-absente', raison: `VRM ne connaît pas encore ${essai.manque.join(', ')} exact${essai.manque.length > 1 ? 's' : ''} de CETTE annonce. Ouvre-la sur Vinted → « Modifier » → « Enregistrer » (sans rien changer) une fois : l'extension l'apprend. Rien n'a été touché.` };
   const reglages = reglagesPhotoSurs(msg.reglages);
   // Une recréation dont l'issue est INCONNUE (création partie sans réponse) bloque
