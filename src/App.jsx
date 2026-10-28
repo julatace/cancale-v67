@@ -11577,24 +11577,15 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
   const [reg, setReg] = useState(() => ({ ...REPUB_REG_DEF }));
-  // (28 oct., sa demande) Chaque annonce peut avoir SES réglages : « modifier
-  // toutes les photos des annonces pour qu'elles ne soient pas similaires ».
-  // `regPar[id]` remplace les réglages communs pour CETTE annonce ; `cible` dit
-  // ce que les curseurs règlent (« tous » ou une annonce).
-  const [regPar, setRegPar] = useState({});
+  // (28 oct., sa demande) UN réglage pour toutes les photos de toutes les
+  // annonces choisies ; une photo par annonce à l'écran (pas d'encombrement).
   // (28 oct., sa demande) La description part TELLE QUELLE ; en option, UNE
   // lettre au hasard tout en bas de chacune (tirée ici, montrée sur la ligne).
   const [lettreOn, setLettreOn] = useState(false);
   const [lettres, setLettres] = useState({});
   const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }); setLettres(o); };
-  const [cible, setCible] = useState('tous');
-  const regDe = (a) => (a && regPar[a.id]) || reg;
-  const regCour = cible === 'tous' ? reg : (regPar[cible] || reg);
-  const poserReg = (k, v) => cible === 'tous' ? setReg((r) => ({ ...r, [k]: v })) : setRegPar((p) => ({ ...p, [cible]: { ...(p[cible] || reg), [k]: v } }));
-  const cssDe = (r) => ({ filter: `brightness(${r.bright}) contrast(${r.contrast}) saturate(${r.sat})`, transform: `rotate(${r.rot}deg) scale(${r.zoom})`, transformOrigin: 'center center' });
-  const neutre = (r) => Object.keys(REPUB_REG_DEF).every((k) => Number(r[k]) === REPUB_REG_DEF[k]);
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
-  const regNeutre = neutre(reg) && Object.values(regPar).every(neutre);
+  const regNeutre = Object.keys(REPUB_REG_DEF).every((k) => Number(reg[k]) === REPUB_REG_DEF[k]);
   const busy = React.useRef(false);
   const bas = (s) => String(s || '').toLowerCase();
   // (28 oct.) Comme les outils du marché : on republie d'abord les paires qui
@@ -11662,7 +11653,7 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...regDe(suiv) }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '' }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '' }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       const etat = r && ['fait', 'double', 'incertain'].includes(r.etat) ? r.etat : 'echec';
       setSt((p) => ({ ...p, [suiv.id]: { etat, raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau } }));
@@ -11675,20 +11666,12 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
   const nFait = Object.values(st).filter((s) => s.etat === 'fait').length;
   const nEchec = Object.values(st).filter((s) => s.etat === 'echec').length;
   const nDouble = Object.values(st).filter((s) => s.etat === 'double' || s.etat === 'incertain').length;
-  // « Varier chaque annonce » : de petits réglages DIFFÉRENTS par annonce
-  // (redresser, zoom, lumière), tirés au hasard — c'est lui qui les voit et
-  // peut les reprendre un par un.
-  const varier = () => {
-    const u = (a, b) => Math.round((a + Math.random() * (b - a)) * 100) / 100;
-    const o = {}; choisies.forEach((a) => { o[a.id] = { rot: (Math.random() < 0.5 ? -1 : 1) * (1 + Math.round(Math.random() * 4) / 2), bright: u(0.96, 1.06), contrast: u(0.97, 1.07), sat: u(0.95, 1.08), zoom: u(1.03, 1.1) }; });
-    setRegPar(o); setCible('tous');
-  };
   const cssReg = { filter: `brightness(${reg.bright}) contrast(${reg.contrast}) saturate(${reg.sat})`, transform: `rotate(${reg.rot}deg) scale(${reg.zoom})`, transformOrigin: 'center center' };
   const curseur = (lab, cle, min, max, pas) => (
     <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
       <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
-      <input type="range" min={min} max={max} step={pas} value={regCour[cle]} data-republier-reglage={cle} onChange={(ev) => poserReg(cle, Number(ev.target.value))} style={{ flex: 1, accentColor: C.accent }} />
-      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${regCour.rot}°` : `${Math.round(regCour[cle] * 100)} %`}</span>
+      <input type="range" min={min} max={max} step={pas} value={reg[cle]} data-republier-reglage={cle} onChange={(ev) => setReg((r) => ({ ...r, [cle]: Number(ev.target.value) }))} style={{ flex: 1, accentColor: C.accent }} />
+      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)} %`}</span>
     </label>
   );
   const fermer = () => { if (mode === 'run') return; onClose(); };
@@ -11738,40 +11721,26 @@ function RepublierVinted({ annonces, publier, compteChrome, majExt, lettreOk, on
             </div>
           </>}
           {etape === 'modif' && <>
-            <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} data-republier-cible={cible} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={maj}>Photos</span>
-              <div style={{ fontSize: 12.5, color: C.muted }}>Chaque annonce montre toutes ses photos, telles qu'elles partiront. Règle toutes les annonces d'un coup, ou une seule pour qu'elle ne ressemble pas aux autres.</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button type="button" data-republier-varier onClick={varier} disabled={choisies.length < 1} style={btn(false, choisies.length >= 1)}>Varier chaque annonce</button>
-                {Object.keys(regPar).length > 0 && <button type="button" data-republier-communs onClick={() => { setRegPar({}); setCible('tous'); }} style={btn(false)}>Mêmes réglages pour toutes</button>}
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                {choisies.map((a) => { const n = (a.photos && a.photos.length) || (a.photo ? 1 : 0); return (
+                  <div key={a.id} data-republier-photos-annonce={a.id} data-republier-photos-n={n} style={{ width: 72, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span data-republier-photo-case={a.id} style={{ width: 72, height: 90, borderRadius: 8, overflow: 'hidden', background: C.border }}>{a.photo ? <PhotoVinted src={a.photo} alt="" data-republier-photo-apercu={a.id} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssReg }} /> : null}</span>
+                    <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? `N°${a.numero}` : a.titre}{n > 1 ? ` · ${n} photos` : ''}</span>
+                  </div>
+                ); })}
               </div>
-              {choisies.map((a) => { const r = regDe(a); const sienne = !!regPar[a.id]; const cur = cible === a.id; const ph = (a.photos && a.photos.length ? a.photos : (a.photo ? [a.photo] : [])); return (
-                <div key={a.id} data-republier-photos-annonce={a.id} data-republier-photos-n={ph.length} data-republier-photos-propres={sienne ? '1' : ''} style={{ border: `1px solid ${cur ? C.accent : C.border}`, borderRadius: 10, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
-                    <span style={{ flexShrink: 0, fontSize: 12, color: C.muted }}>{ph.length} photo{ph.length > 1 ? 's' : ''}{sienne ? ' · réglages à part' : ''}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-                    {ph.length ? ph.map((u, i) => <span key={i} data-republier-photo-case={a.id} style={{ width: 64, height: 80, borderRadius: 8, overflow: 'hidden', background: C.border, flexShrink: 0 }}><PhotoVinted src={u} alt="" data-republier-photo-apercu={a.id} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssDe(r) }} /></span>)
-                      : <span style={{ fontSize: 12, color: C.muted }}>Aucune photo captée pour cette annonce.</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button type="button" data-republier-regler={a.id} aria-pressed={cur} onClick={() => setCible(cur ? 'tous' : a.id)} style={btn(cur)}>{cur ? 'Fini pour celle-ci' : 'Régler cette annonce'}</button>
-                    {sienne && <button type="button" data-republier-reset={a.id} onClick={() => { setRegPar((p) => { const u = { ...p }; delete u[a.id]; return u; }); if (cur) setCible('tous'); }} style={btn(false)}>Comme les autres</button>}
-                  </div>
-                </div>
-              ); })}
-              <div data-republier-curseurs={cible} style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>{cible === 'tous' ? 'Réglages communs (les annonces sans réglages à part)' : `Réglages de ${(() => { const a = choisies.find((x) => x.id === cible); return a ? (a.numero ? 'N°' + a.numero : a.titre) : 'cette annonce'; })()} seulement`}</div>
               {curseur('Redresser', 'rot', -15, 15, 0.5)}
               {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
               {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
               {curseur('Saturation', 'sat', 0, 2, 0.01)}
               {curseur('Zoom', 'zoom', 1, 2, 0.01)}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => Object.entries({ ...REPUB_REG_DEF, ...p.r }).forEach(([k, v]) => poserReg(k, v))} style={btn(false)}>{p.nom}</button>)}
-                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => { setReg({ ...REPUB_REG_DEF }); setRegPar({}); setCible('tous'); }} style={btn(false)}>Photos d'origine</button>}
+                {presets.map((p) => <button key={p.nom} type="button" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })} style={btn(false)}>{p.nom}</button>)}
+                {!regNeutre && <button type="button" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })} style={btn(false)}>Photos d'origine</button>}
               </div>
-              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Les photos sont refaites à partir de l’original au moment de republier.'}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{regNeutre ? 'Les photos partent telles quelles.' : 'Ce réglage s’applique à TOUTES les photos de chaque annonce choisie, refaites à partir de l’original au moment de republier. Ici, une photo par annonce pour l’aperçu.'}</div>
             </div>
             <div data-republier-description={lettreOn ? 'lettre' : 'telle'} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Description</span>

@@ -141,11 +141,8 @@ const projette = (row, sel) => {
         const tf = await pg.locator('[data-republier-photos]').getAttribute('data-republier-photos-css').catch(() => '');
         dit(/scale\(1\.2\)/.test(tf || ''), 'les réglages photo se voient dans l’aperçu (zoom 1,2)', tf);
         // (28 oct., sa demande) toutes les photos de chaque annonce, et des réglages PAR annonce.
-        { const nph = await pg.locator('[data-republier-photos-annonce="9102"]').getAttribute('data-republier-photos-n'); const nim = await pg.locator('[data-republier-photo-case="9102"]').count(); dit(nph === '3' && nim === 3, 'chaque annonce montre TOUTES ses photos (3 pour la 9102)', nph + ' / ' + nim); }
-        await pg.locator('[data-republier-regler="9103"]').click();
-        await pg.locator('[data-republier-reglage="rot"]').evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '5'); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
-        dit(await pg.locator('[data-republier-photos-annonce="9103"]').getAttribute('data-republier-photos-propres') === '1' && await pg.locator('[data-republier-photos-annonce="9102"]').getAttribute('data-republier-photos-propres') === '', 'régler UNE annonce ne touche que celle-là');
-        await pg.locator('[data-republier-regler="9103"]').click();
+        { const nph = await pg.locator('[data-republier-photos-annonce="9102"]').getAttribute('data-republier-photos-n'); const nim = await pg.locator('[data-republier-photo-case="9102"]').count(); dit(nph === '3' && nim === 1, 'une seule photo par annonce à l’écran (la 9102 en a 3, le réglage vaut pour les 3)', nph + ' / ' + nim); }
+        dit(await pg.locator('[data-republier-regler],[data-republier-varier]').count() === 0, 'un seul réglage pour toutes : pas de réglage par annonce');
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-modif-' + vp.width + '.png'), fullPage: true });
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-lancer]').waitFor({ timeout: 3000 });
@@ -180,8 +177,7 @@ const projette = (row, sel) => {
         dit(envois.every((x) => x.cmd === 'recreerVinted'), 'chaque paire est SUPPRIMÉE ET RECRÉÉE (commande recreerVinted)', envois.map((x) => x.cmd).join(','));
         dit(e1 && e1.uid === '111' && Math.abs(e1.prix - 44.1) < 1e-9 && e1.confirme === true, 'la commande porte SON prix (44,10), son compte, et la confirmation', JSON.stringify(e1));
         dit(e1 && e1.reglages && Math.abs(e1.reglages.zoom - 1.2) < 1e-9 && e1.reglages.rot === 0, 'les réglages photo partent avec la commande', JSON.stringify(e1 && e1.reglages));
-        const e3 = envois.find((x) => x.id === '9103');
-        dit(e3 && e3.reglages && e3.reglages.rot === 5 && Math.abs(e3.reglages.zoom - 1.2) < 1e-9, 'l’annonce réglée à part part avec SES réglages (redressée 5°)', JSON.stringify(e3 && e3.reglages));
+        dit(envois.length > 1 && envois.every((x) => x.reglages && Math.abs(x.reglages.zoom - 1.2) < 1e-9), 'le même réglage part pour TOUTES les annonces choisies', JSON.stringify(envois.map((x) => x.reglages && x.reglages.zoom)));
         dit(e2 && Math.abs(e2.prix - 47) < 1e-9 && Number(e2.plancher) === 47, '… et le plancher (prix d’achat) part avec', JSON.stringify(e2));
         dit(await pg.locator('[data-republier-ligne="9102"]').getAttribute('data-republier-statut') === 'fait', 'la paire recréée dit « recréée »');
         const l3 = pg.locator('[data-republier-ligne="9103"]');
@@ -228,9 +224,6 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-suivant]').click();
-        await pg.locator('[data-republier-varier]').click();
-        const propres = await pg.$$eval('[data-republier-photos-annonce]', (els) => els.map((e) => e.getAttribute('data-republier-photos-propres')));
-        dit(propres.length === 2 && propres.every((x) => x === '1'), '« Varier chaque annonce » donne des réglages à chacune', propres.join(','));
         await pg.locator('[data-republier-lettre]').check();
         dit(await pg.locator('[data-republier-lettre-de]').count() === 2, 'option « lettre au hasard tout en bas » : la lettre de chaque annonce se voit dans l’aperçu');
         await pg.locator('[data-republier-suivant]').click();
@@ -245,7 +238,7 @@ const projette = (row, sel) => {
         await pg.clock.runFor(300);
         const att0 = await pg.locator('[data-republier-ligne="9102"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => '');
         const att1 = Number(await pg.locator('[data-republier-ligne="9103"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => 'NaN'));
-        dit(att0 === '0' && att1 >= 60 && att1 <= 120 && /\+1 min/.test(await pg.locator('[data-republier-ligne="9103"]').innerText()), 'AVANT de lancer, chaque ligne montre son temps tiré (1re : tout de suite, 2e : +1 min …)', `${att0} / ${att1}`);
+        dit(att0 === '0' && att1 >= 60 && att1 <= 120 && /\+[12] min/.test(await pg.locator('[data-republier-ligne="9103"]').innerText()), 'AVANT de lancer, chaque ligne montre son temps tiré (1re : tout de suite, 2e : +1 min …)', `${att0} / ${att1}`);
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').click();
         for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 1; i++) await pg.clock.runFor(100);
@@ -265,7 +258,6 @@ const projette = (row, sel) => {
         dit(memo && memo.mode === 'aleatoire', 'le choix est retenu pour la prochaine fois', JSON.stringify(memo));
         const env = await pg.evaluate(() => window.__repub || []);
         dit(env.length === 2 && env.every((x) => /^[a-z]$/.test(x.lettre || '')), 'chaque annonce part avec SA lettre (une seule lettre)', JSON.stringify(env.map((x) => x.lettre)));
-        dit(env.length === 2 && JSON.stringify(env[0].reglages) !== JSON.stringify(env[1].reglages), 'après « Varier », les deux annonces partent avec des réglages DIFFÉRENTS', JSON.stringify(env.map((x) => x.reglages)));
       } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, 160)); }
       await ctx.close(); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }
