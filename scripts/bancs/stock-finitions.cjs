@@ -500,6 +500,8 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const hm = await sonde(pg, 'hauteursMax', 'p1');
       const hs3 = hm && hm.map((x) => x.h), ht3 = hm && hm.map((x) => x.haut);
       dit(JSON.stringify(hs3) === '[3,5,3]' && ht3[1] > ht3[0] + 0.5 && Math.abs(ht3[0] - ht3[2]) < 0.005, t + ' : en 3D, le cadre de la pile 2 monte à 5, les autres restent à 3', JSON.stringify(hm));
+      dit(hm && JSON.stringify(hm.map((x) => x.texte)) === '["max 3","max 5","max 3"]', t + ' : en 3D, le nombre max est écrit au-dessus de chaque pile (3, 5, 3)', JSON.stringify(hm && hm.map((x) => x.texte)));
+      dit(hm && hm.every((x) => x.texteY != null && x.texteY > x.haut), t + ' : le nombre est posé au-dessus du sommet de sa pile', JSON.stringify(hm));
       await cliquerSel(pg, '[aria-label="Réduire la pile 1"]'); await pg.waitForTimeout(700);
       const m2 = item(await plan(pg), 'p1');
       dit(JSON.stringify(m2.hauteurs) === '[3,5,3]' && m2.nums.length === 13, t + ' : réduire la pile 1 sous ses 3 cartons est refusé, rien ne bouge', JSON.stringify(m2.hauteurs));

@@ -151,6 +151,11 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — le NOMBRE max au-dessus de chaque pile :** Julien : « affiche le nombre max au-dessus
+> de chaque pile ». `buildPile` pose, au-dessus du couvercle, une plaque « max N » (`plaqueMaxPile`, sprite à taille
+> FIXE à l'écran — `sizeAttenuation: false` —, encre sombre, décor seul, raycast vide). Sonde `hauteursMax` rend
+> `texte` et `texteY`. Banc `stock-finitions.cjs` XIV (+2 par taille ; plaque retirée ⇒ rouge).
+
 > **28 octobre (nuit, fin) — la HAUTEUR MAX de chaque pile en 3D :** Julien : « montre la hauteur max de chaque pile
 > en 3D ». `buildPile` (Room3D) dessine, par pile, un cadre fin gris ardoise jusqu'à `hauteurPile(rows, hauteurs, c)` (la
 > règle du réglage, §11) et un couvercle pâle au sommet — décor seul (raycast vide, aucune couleur d'accent). Sonde
