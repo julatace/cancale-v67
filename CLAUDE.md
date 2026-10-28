@@ -7,6 +7,24 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit) — le coffre ne perd plus la sauvegarde d'un passage (5.256) :** l'archivage du dressing (à
+> chaque visite Vinted) et Republier / En ligne → brouillon lisent-fusionnent-réécrivent la MÊME ligne
+> `coffre_{uid}_{id}`. Reproduit : une lecture lente de l'archivage, rendue APRÈS l'écriture du passage, faisait
+> reculer l'état (`supprime` → `enregistre`) ou effaçait `versBrouillon` (« tout est enregistré dans VRM ») juste
+> avant la suppression de l'annonce. ⇒ `unCoffreALaFois` (chaîne, comme `unItemDetailsALaFois`) autour
+> d'`archiverAnnonce`, `archiverLot`, `majVersBrouillon` et de la sauvegarde de `recreerVinted`. Preuve :
+> `audit-recreer.cjs` R3 (80 ; 2 rouges sur la 5.255) — `_fond-vm.cjs` sait rendre une lecture en retard
+> (`retardLecture`). ⚠️ Jamais un appel chaîné depuis une fonction déjà dans la chaîne.
+
+> **28 octobre (nuit) — « pas de réponse » n'est plus « pas fait » (fiabilité) :** Republier, En ligne → brouillon,
+> Brouillons → en ligne, Modifier, et « Refaire le brouillon » attendaient l'extension 1 à 3 min puis disaient
+> « échec — l'extension n'a pas répondu » et ENCHAÎNAIENT la paire suivante — alors que l'extension (file Vinted
+> occupée, photos lentes) a pu supprimer, créer ou publier entre-temps. `vmrCmdSuivi` : trois issues (réponse ·
+> `envoye:false` aucune extension ici · `sansReponse` = PAS SU) ⇒ la ligne dit « incertain » (`TEXTE_SANS_REPONSE` :
+> regarde sur Vinted avant de relancer), la file S'ARRÊTE (`code:'sans-reponse'`), et ni « Réessayer » (Brouillons à
+> refaire) ni un second « Mettre en ligne » ne sont proposés. Banc `republier.cjs` « extension sans réponse »
+> (`window.__VRM_ATTENTE_GESTE` raccourcit l'attente). App seule, extension inchangée.
+
 > **28 octobre (nuit) — « REFAIRE LE BROUILLON » (5.255), sa demande :** « un bouton pour refaire un brouillon raté ».
 > Un passage par brouillon (Republier, En ligne → brouillon) note son avancée dans le coffre de l'annonce
 > (`coffre_{uid}_{id}.versBrouillon.etat` : enregistre → supprime | suppression-incertaine → a-refaire | brouillon-range |
@@ -39,6 +57,24 @@
 > vente : un brouillon n'est jamais en ligne. Le §3 « recréer PUIS supprimer » vaut toujours pour Republier (en ligne →
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
+
+> **28 octobre (nuit) — les PLANCHES et les articles EMPILÉS (Stock → Mes meubles) :** Julien : « quand on enlève un
+> article, ceux du dessus descendent — il faut pouvoir faire des barres », puis « pas imaginaires justement ». Les
+> planches sont celles de son vrai meuble, DESSINÉES (`data-planche`) : dans l'éditeur, toucher entre deux rangées pose
+> ou enlève une planche (`m.planches` = rangées sous lesquelles il y en a une ; le bas du meuble en est une), « Une à
+> chaque rangée » / « Aucune ». Case « Articles empilés » (`m.gravite`, éteinte par défaut) : `tasserMeuble` — dans
+> chaque colonne, entre deux planches, les articles posent sur celui du dessous ; retirer, sortir, déplacer ou poser
+> dans une case du haut passe par elle (`ecrireSlots`), le N° ne change jamais, seule la case. L'article qui descend
+> glisse (`vrm-case-tombe`, rien si « réduire les animations »). Changer le nombre de colonnes garde rangée et colonne
+> de chaque paire. Banc `stock-planches.cjs` (390/1512 ; mutation « planches ignorées » ⇒ 6 rouges).
+
+> **28 octobre (soir) — Stock sans shop_cancale, et vue « de loin » :** Julien : « je veux pas les annonces de shop
+> cancale » et « la vue d'un peu plus loin ». `comptesStockEcartes` (Mes meubles ET En photos) écarte une fiche dont
+> le compte (`accountId`) est masqué, retiré pour de bon, ou n'est plus LIÉ (`vinted_accounts` de l'appareil ; liste
+> vide ⇒ seulement masqués/retirés ; fiche sans compte ⇒ gardée). Rien n'est effacé ; c'est dit une fois
+> (`data-stock-ecartes`). Taille des cases « De loin » (64 px, défaut) · « Normale » (100) · « De près » (150),
+> mémorisée sur l'appareil (`vrm_meubles_zoom`) ; de loin et normale, les meubles se rangent côte à côte. Banc
+> `stock-retrouver.cjs` (compte supprimé jamais montré ; de loin par défaut, « De près » agrandit).
 
 > **28 octobre (suite) — retrouver encore plus vite :** les meubles portent leurs REPÈRES (colonnes numérotées
 > au-dessus, rangées à gauche, `data-regle-*`) ; micro dans la recherche (`MicDictee`, « numéro 12 » ⇒ N°12) ;

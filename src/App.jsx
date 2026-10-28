@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.255.0';
+const EXT_ATTENDUE = '5.256.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -6889,6 +6889,20 @@ const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
 // 5.183 : sur le téléphone, une commande permise part par le RELAIS (l'extension
 // de l'ordinateur l'exécute) ; ailleurs, par le pont, comme avant.
 const vmrCmd = (p, timeoutMs = 9000) => (p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
+// (28 oct.) Les gestes LONGS sur Vinted (recréer, passer en brouillon, refaire,
+// mettre un brouillon en ligne, modifier) : « pas de réponse à temps » n'est PAS
+// « pas fait ». L'extension a pu supprimer, créer ou publier pendant que l'app
+// attendait (file Vinted occupée, photos lentes) — dire « échec » faisait
+// relancer une annonce peut-être déjà traitée. Trois issues, jamais deux :
+// la réponse · `{ envoye: false }` (aucune extension ici : rien n'est parti) ·
+// `{ sansReponse: true }` (envoyée, pas de réponse : PAS SU).
+const TEXTE_SANS_REPONSE = "l'extension n'a pas répondu à temps : elle a peut-être fini. Regarde l'annonce sur Vinted avant de relancer";
+const attenteGeste = (ms) => { const f = typeof window !== 'undefined' && window.__VRM_ATTENTE_GESTE; return Number.isFinite(f) && f > 0 ? f : ms; };
+async function vmrCmdSuivi(p, timeoutMs) {
+  if (!vmrExtPresent()) return { accepte: false, envoye: false, raison: "l'extension ne répond pas dans ce navigateur : rien n'est parti" };
+  let r = null; try { r = await vmrCmd(p, attenteGeste(timeoutMs)); } catch (_) { r = null; }
+  return r || { sansReponse: true };
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // LE RELAIS DU TÉLÉPHONE (extension 5.183) — « quand je suis sur mon téléphone
@@ -11729,7 +11743,7 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.titre}{b.prix ? ` · ${prixCourt(b.prix)}` : ''}</div>
               <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.45 }}>{fini ? (s.raison || 'Fait.') : s.etape && s.etape !== 'envoi' ? s.raison : TEXTE_REFAIRE[b.quoi](b)}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {geste && !fini && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
+                {geste && !fini && s.etape !== 'incertain' && <button type="button" data-refaire-bouton={b.id} disabled={!peutAgir || s.etape === 'envoi'} onClick={() => lancer(b)} style={{ border: 'none', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 700, background: peutAgir ? C.accent : C.border, color: peutAgir ? '#fff' : C.muted, cursor: peutAgir ? 'pointer' : 'default', fontFamily: 'inherit' }}>{s.etape === 'envoi' ? 'En cours…' : s.etape && s.etape !== 'fait' ? 'Réessayer' : geste}</button>}
                 {b.quoi === 'a-verifier' && <button type="button" onClick={onVoirBrouillons} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes brouillons</button>}
                 {!fini && <button type="button" data-refaire-regle={b.id} onClick={() => ecarter(b.cle)} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>C'est réglé</button>}
               </div>
@@ -11792,7 +11806,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {!e && it._etat === 'inconnu' && <div style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas encore son contenu : ouvre-le sur Vinted et enregistre-le une fois.</div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                {complet && brouillonOk && (!e || e.etape !== 'fait') && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
+                {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
                 <a data-brouillon-ouvrir href={`https://${domaine(it)}/items/${it.id}/edit`} target="_blank" rel="noopener noreferrer" style={lien}>Ouvrir sur Vinted ↗</a>
                 {!e && <button type="button" data-brouillon-ecarter onClick={() => ecarter(it.id)} title="Il n'est plus sur Vinted : le retirer de cette liste" style={{ ...lien, border: 'none', color: C.muted, fontWeight: 500 }}>Plus sur Vinted</button>}
               </div>
@@ -11948,6 +11962,10 @@ function RepublierVinted({ annonces, publier, refaire = null, compteChrome, majE
       // Un refus qui vaut pour TOUTE la file (Vinted demande de ralentir, plafond
       // de l'heure atteint) : on s'arrête au lieu d'enchaîner les refus.
       if (r && (r.code === 'vinted-pause' || r.code === 'plafond')) { setArret(r.raison || ''); setMode('pause'); }
+      // (28 oct.) L'extension n'a pas répondu à temps : elle travaille peut-être
+      // encore sur CETTE paire. Enchaîner empilerait la suivante derrière elle et
+      // laisserait croire à un échec : la file s'arrête, la ligne dit « pas su ».
+      else if (r && r.code === 'sans-reponse') { setArret(r.raison || ''); setMode('pause'); }
     }, delai * 1000);
     return () => { annule = true; clearTimeout(t); setProchaine(null); };
   }, [mode, st, esp, espMode, espMin, espMax, plan]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -28027,11 +28045,29 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 // Preuve de vente : §11, l'écran Annonces PUBLIE `vrm_stock_vendus`, on CONSOMME.
 // Rien ne sort du stock sans le clic ; une vente annulée/repostée n'est plus
 // publiée → halo éteint, la paire RESTE (jamais de retrait automatique).
+// (28 oct.) Le Stock ne montre que les paires des comptes que Julien GARDE dans
+// l'app — Julien : « je veux pas les annonces de shop cancale ». Une fiche porte
+// l'identifiant du compte qui l'a numérotée (`accountId`, posé par `updatePair`).
+// Elle est écartée si ce compte est masqué, retiré pour de bon, ou n'est plus
+// lié (supprimé — c'est le cas de shop_cancale). La liste des comptes liés est
+// celle que la coque range sur l'appareil (`vinted_accounts`) ; pas encore lue
+// (vide) ⇒ on n'écarte que les masqués et retirés (« pas su » ne cache rien).
+// Une fiche sans compte connu reste. Rien n'est effacé : le N° et la case
+// restent, ils réapparaissent si le compte revient.
+const comptesStockEcartes = () => {
+  const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+  const retires = annoncesRetirees();
+  let lies = null;
+  try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a) && a.length) lies = new Set(a.map((x) => String(x && x.vinted_user_id || '')).filter(Boolean)); } catch (_) {}
+  return (f) => { const u = f && f.accountId != null ? String(f.accountId) : ''; if (!u) return false; return masques.has(u) || retires.has(u) || (lies ? !lies.has(u) : false); };
+};
+
 function StockPhotos() {
   const [pairsLost, setPairsLost] = React.useState(() => load('vinted_pairs_lost', {}));
   const [max, setMax] = React.useState(60);
   const [q, setQ] = React.useState('');
   const numeros = load('vinted_annonce_numeros', {}) || {};
+  const horsCompte = comptesStockEcartes();
   const venduSig = load('vrm_stock_vendus', null);
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const venduSu = !!venduSig;                                   // a-t-on déjà une mesure de ventes ?
@@ -28039,7 +28075,7 @@ function StockPhotos() {
   // Paires EN STOCK : une fiche numérotée, pas déclarée partie (même règle que
   // l'écran Annonces, `annonceDeclareePartie`).
   const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost));
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
   const filtre = q.trim().toLowerCase();
   const liste = fiches
     .filter((f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre))
@@ -28096,6 +28132,36 @@ function placeDansMeubles(i, m) {
   const cols = Math.max(1, +m.cols || 1);
   return { rangee: Math.floor(i / cols) + 1, colonne: (i % cols) + 1 };
 }
+// (28 oct.) Les PLANCHES d'un meuble et la GRAVITÉ. Julien : « quand on enlève
+// un article, ceux du dessus descendent — il faut pouvoir faire des barres »,
+// puis « pas imaginaires justement » : ce sont les vraies planches de son
+// meuble, dessinées. `m.planches` = les rangées (1 = celle du haut) SOUS
+// lesquelles il y a une planche ; le bas du meuble en est toujours une.
+// `m.gravite` : dans chaque colonne, entre deux planches, les articles posent
+// sur celui du dessous — un vide se comble par le haut. On ne déplace que des
+// articles PRÉSENTS (`presents`), jamais leur numéro ; seule la case change.
+// Rend { slots, bouges: { cle: nbRangéesDescendues } }.
+function planchesDe(m) {
+  const r = Math.max(1, +m.rows || 1);
+  return [...new Set((Array.isArray(m.planches) ? m.planches : []).map((x) => +x).filter((x) => Number.isInteger(x) && x >= 1 && x < r))].sort((a, b) => a - b);
+}
+function tasserMeuble(slots, m, presents) {
+  const out = { ...slots }; const bouges = {};
+  if (!m || !m.gravite) return { slots: out, bouges };
+  const cols = Math.max(1, +m.cols || 1), rows = Math.max(1, +m.rows || 1);
+  const bornes = [0, ...planchesDe(m), rows];          // segments [haut, bas[ en rangées 0-based
+  const chez = {};                                      // i → clé présente
+  Object.keys(out).forEach((k) => { const v = out[k]; if (v && v.m === m.id && presents.has(k) && v.i < cols * rows && chez[v.i] == null) chez[v.i] = k; });
+  for (let c = 0; c < cols; c++) {
+    for (let b = 0; b < bornes.length - 1; b++) {
+      const haut = bornes[b], bas = bornes[b + 1] - 1;
+      const pile = [];                                    // du bas vers le haut
+      for (let r = bas; r >= haut; r--) { const k = chez[r * cols + c]; if (k) pile.push([k, r]); }
+      pile.forEach(([k, r0], j) => { const r1 = bas - j; if (r1 !== r0) { out[k] = { m: m.id, i: r1 * cols + c }; bouges[k] = r1 - r0; } });
+    }
+  }
+  return { slots: out, bouges };
+}
 function ouDansMeubles(num, meublesArg, slotsArg) {
   const k = cleNum(num); if (!k) return null;
   const slots = slotsArg || load('vrm_slots', {}) || {};
@@ -28121,6 +28187,12 @@ function StockMeubles() {
   const [cibles, setCibles] = React.useState(() => (demande && demande.length > 1 ? demande.map((x) => cleNum(x)).filter(Boolean) : []));
   const [flash, setFlash] = React.useState(null);           // cleNum de la case montrée
   const chercheRef = React.useRef(null);
+  // « Voir de plus loin » : la taille des cases, choisie par appareil
+  // (commodité d'affichage, jamais une donnée). Par défaut : de loin.
+  const ZOOMS = { loin: 64, normal: 100, pres: 150 };
+  const [zoom, setZoomEtat] = React.useState(() => { try { const z = localStorage.getItem('vrm_meubles_zoom'); return ZOOMS[z] ? z : 'loin'; } catch (_) { return 'loin'; } });
+  const setZoom = (z) => { setZoomEtat(z); try { localStorage.setItem('vrm_meubles_zoom', z); } catch (_) {} };
+  const caseMax = ZOOMS[zoom] || 64;
   const [place, setPlace] = React.useState(null);           // cleNum en cours de pose
   const [modal, setModal] = React.useState(null);           // {type:'meuble'|'placer'|'fiche', …}
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
@@ -28131,16 +28203,24 @@ function StockMeubles() {
     setPairsLost((prev) => (prev && Object.keys(prev).length) ? prev : (load('vinted_pairs_lost', {}) || {}));
   }), []);
   const ecrireMeubles = (u) => { setMeubles(u); save('vrm_meubles', u); };
-  const ecrireSlots = (u) => { setSlots(u); save('vrm_slots', u); };
+  const [tombes, setTombes] = React.useState({});   // cle → rangées descendues (animation)
+  const ecrireSlotsBrut = (u) => { setSlots(u); save('vrm_slots', u); };
 
   const numeros = load('vinted_annonce_numeros', {}) || {};
+  const horsCompte = comptesStockEcartes();
   const venduSig = load('vrm_stock_vendus', null);
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const estVendu = (f) => vendus.has(cleNum(f.numero));
   // Paires EN STOCK (même règle que StockPhotos et l'écran Annonces).
   const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost));
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
+  // Toute écriture des cases passe par la gravité des meubles qui l'ont.
+  const tasserTout = (u, ms) => { let cur = u, b = {}; (ms || meubles).forEach((m) => { const r = tasserMeuble(cur, m, new Set(Object.keys(ficheParCle))); cur = r.slots; Object.assign(b, r.bouges); }); return { slots: cur, bouges: b }; };
+  const ecrireSlots = (u, ms) => {
+    const r = tasserTout(u, ms); ecrireSlotsBrut(r.slots);
+    if (Object.keys(r.bouges).length) { setTombes(r.bouges); setTimeout(() => setTombes({}), 700); }
+  };
   const cleDeFiche = (f) => cleNum(f.numero);
   const posee = (f) => !!slots[cleDeFiche(f)];
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
@@ -28192,6 +28272,7 @@ function StockMeubles() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
   const nVendus = fiches.filter(estVendu).length;
+  const nEcartes = Object.keys(numeros).filter((id) => { const f = { id, ...(numeros[id] || {}) }; return String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && horsCompte(f); }).length;
 
   const poser = (cle, mid, i) => {
     const u = { ...slots };
@@ -28220,7 +28301,7 @@ function StockMeubles() {
     <>
       {f.photo
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 10 }}>pas de photo</div>}
+        : <div className="vrm-sans-photo" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 10 }}>pas de photo</div>}
       <span style={{ position: 'absolute', left: 4, top: 4, background: sold ? C.accent : 'rgba(0,0,0,0.6)', color: sold ? C.onAccent : '#fff', fontWeight: 800, fontSize: 11, padding: '1px 6px', borderRadius: 6 }}>N°{f.numero}</span>
       {sold && <span style={{ position: 'absolute', right: 4, bottom: 4, background: C.accent, color: C.onAccent, fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 999, letterSpacing: 0.3 }}>VENDU</span>}
     </>
@@ -28239,13 +28320,13 @@ function StockMeubles() {
       <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} style={{ marginBottom: replie ? 10 : 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 9px', opacity: replie ? 0.55 : 1 }}>
           <span style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{m.name}</span>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}</span>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}{m.gravite ? ' · empilé' : ''}</span>
           {cherche && <span style={{ fontSize: 12, fontWeight: 800, color: nIci ? C.onAccent : C.muted, background: nIci ? C.accent : 'transparent', borderRadius: 999, padding: '1px 8px' }}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+          <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
-        <div data-meuble-grille="" style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * 150 + 28}px)` }}>
+        <div data-meuble-grille="" data-zoom={zoom} style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: zoom === 'loin' ? 4 : 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * (caseMax + (zoom === 'loin' ? 4 : 6)) + 28}px)` }}>
           {/* Règle : colonnes numérotées au-dessus, rangées à gauche (comme sur le meuble). */}
           <span />
           {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} style={regle}>{c + 1}</span>)}
@@ -28258,10 +28339,11 @@ function StockMeubles() {
               <React.Fragment key={i}>
               {pl.colonne === 1 && <span data-regle-rang={pl.rangee} style={regle}>{pl.rangee}</span>}
               <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
-                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} className={flash && flash === kOcc ? 'vrm-case-flash' : undefined}
-                style={{ position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
+                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={[flash && flash === kOcc ? 'vrm-case-flash' : '', kOcc && tombes[kOcc] ? 'vrm-case-tombe' : ''].filter(Boolean).join(' ') || undefined}
+                style={{ ...(kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + 6px))` } : {}), position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
                 {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 300, opacity: place ? 0.8 : 0.35 }}>+</span>}
               </button>
+              {pl.colonne === m.cols && pl.rangee < m.rows && planchesDe(m).includes(pl.rangee) && <span data-planche={pl.rangee} aria-hidden="true" style={{ gridColumn: '2 / -1', height: 6, margin: '-1px 0', borderRadius: 3, background: C.muted, boxShadow: '0 2px 3px rgba(0,0,0,0.3)' }} />}
               </React.Fragment>
             );
           })}
@@ -28276,12 +28358,16 @@ function StockMeubles() {
     if (!modal) return null;
     let corps = null;
     if (modal.type === 'meuble') {
-      corps = <EditeurMeuble modal={modal} onSave={(nom, cols, rows) => {
-        if (modal.id) { const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows } : x);
-          // les paires hors des nouvelles cases repartent « à ranger »
-          const max = cols * rows, us = { ...slots }; Object.keys(us).forEach((c) => { if (us[c] && us[c].m === modal.id && us[c].i >= max) delete us[c]; });
-          ecrireMeubles(u); ecrireSlots(us);
-        } else { ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows }]); }
+      corps = <EditeurMeuble modal={modal} onSave={(nom, cols, rows, extra = {}) => {
+        const planches = (extra.planches || []).filter((x) => x >= 1 && x < rows), gravite = !!extra.gravite;
+        if (modal.id) { const ancien = meubles.find((x) => x.id === modal.id) || {};
+          const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows, planches, gravite } : x);
+          // Les paires gardent leur rangée et leur colonne quand le nombre de
+          // colonnes change ; celles hors des nouvelles cases repartent « à ranger ».
+          const oc = Math.max(1, +ancien.cols || cols), us = { ...slots };
+          Object.keys(us).forEach((c) => { const v = us[c]; if (!v || v.m !== modal.id) return; const r = Math.floor(v.i / oc), co = v.i % oc; if (r >= rows || co >= cols) delete us[c]; else us[c] = { m: modal.id, i: r * cols + co }; });
+          ecrireMeubles(u); ecrireSlots(us, u);
+        } else { ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows, planches, gravite }]); }
         fermerModal();
       }} onDelete={modal.id ? async () => {
         if (!(await askConfirm({ titre: 'Supprimer ce meuble ?', desc: 'Les articles qu\'il contient repartent dans « À ranger ». Aucun numéro n\'est perdu.', danger: true, ok: 'Supprimer' }))) return;
@@ -28429,9 +28515,16 @@ function StockMeubles() {
       </div>
     )}
 
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>
+    </div>
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ background: 'transparent', border: 'none', padding: '0 2px', minHeight: 36, color: C.accent, fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
 
-    {meubles.map(cadreMeuble)}
+    {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
+    <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
+      {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
+    </div>
 
     <button type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.line}`, color: C.accent, borderRadius: 14, padding: 15, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>+ Créer un meuble</button>
 
@@ -28444,6 +28537,10 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   const [name, setName] = React.useState(modal.name || '');
   const [cols, setCols] = React.useState(modal.cols || 4);
   const [rows, setRows] = React.useState(modal.rows || 3);
+  const [planches, setPlanches] = React.useState(() => (Array.isArray(modal.planches) ? modal.planches : []));
+  const [gravite, setGravite] = React.useState(!!modal.gravite);
+  const pl = planches.filter((x) => x >= 1 && x < rows);
+  const basculer = (r) => setPlanches((p) => (p.includes(r) ? p.filter((x) => x !== r) : [...p, r]));
   const step = (set, v, d, min, max) => () => set(Math.max(min, Math.min(max, v + d)));
   const Stepper = ({ v, set, min, max, label }) => (
     <div style={{ flex: 1 }}>
@@ -28466,13 +28563,36 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
       <Stepper v={cols} set={setCols} min={1} max={8} label="Colonnes" />
       <Stepper v={rows} set={setRows} min={1} max={10} label="Lignes" />
     </div>
+    <label data-gravite-choix="" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '12px 0 4px', cursor: 'pointer', minHeight: 44 }}>
+      <input type="checkbox" checked={gravite} onChange={(e) => setGravite(e.target.checked)} style={{ width: 22, height: 22, marginTop: 1, accentColor: C.accent, flexShrink: 0 }} />
+      <span style={{ fontSize: 14, color: C.text, lineHeight: 1.4 }}><b>Articles empilés</b><br /><span style={{ color: C.muted, fontSize: 13 }}>Quand tu retires un article, ceux du dessus descendent jusqu'à la planche en dessous.</span></span>
+    </label>
     <div style={{ background: C.card2, border: `1px solid ${C.line}`, borderRadius: 14, padding: 13, margin: '8px 0 4px', textAlign: 'center' }}>
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases</div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4, maxWidth: 220, margin: '0 auto', background: C.line, padding: 5, borderRadius: 7 }}>
-        {Array.from({ length: cols * rows }).map((_, i) => <div key={i} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}><b style={{ color: C.text, fontSize: 15 }}>{cols * rows}</b> cases{rows > 1 ? <> · <b style={{ color: C.text }}>{pl.length}</b> planche{pl.length > 1 ? 's' : ''}</> : null}</div>
+      {rows > 1 && <div style={{ fontSize: 12, color: C.muted, marginBottom: 9 }}>Touche entre deux rangées pour poser ou enlever une planche, comme sur ton vrai meuble.</div>}
+      <div data-editeur-planches="" style={{ display: 'flex', flexDirection: 'column', maxWidth: 240, margin: '0 auto', background: C.line, padding: 5, borderRadius: 7 }}>
+        {Array.from({ length: rows }).map((_, r) => (
+          <React.Fragment key={r}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 4 }}>
+              {Array.from({ length: cols }).map((_, c) => <div key={c} style={{ aspectRatio: '1 / 1', background: C.bg, borderRadius: 2 }} />)}
+            </div>
+            {r < rows - 1 && (
+              <button type="button" data-planche-choix={r + 1} aria-pressed={pl.includes(r + 1)} onClick={() => basculer(r + 1)}
+                aria-label={pl.includes(r + 1) ? `Enlever la planche sous la rangée ${r + 1}` : `Poser une planche sous la rangée ${r + 1}`}
+                style={{ height: 22, margin: '0 -5px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <span style={{ display: 'block', width: '100%', height: pl.includes(r + 1) ? 7 : 2, borderRadius: 3, background: pl.includes(r + 1) ? C.text : 'transparent', borderTop: pl.includes(r + 1) ? 'none' : `2px dashed ${C.muted}`, opacity: pl.includes(r + 1) ? 1 : 0.5 }} />
+              </button>
+            )}
+          </React.Fragment>
+        ))}
+        <span aria-hidden="true" style={{ display: 'block', height: 7, borderRadius: 3, background: C.text, margin: '4px -5px -5px' }} />
       </div>
+      {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
+        <button type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Une à chaque rangée</button>
+        <button type="button" onClick={() => setPlanches([])} style={{ border: `1px solid ${C.line}`, background: 'transparent', color: C.text, borderRadius: 9, padding: '8px 12px', fontSize: 13, cursor: 'pointer', minHeight: 40 }}>Aucune</button>
+      </div>}
     </div>
-    <button type="button" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows)} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
+    <button type="button" data-meuble-enregistrer="" onClick={() => onSave((name || '').trim() || 'Meuble', cols, rows, { planches: pl, gravite })} style={{ width: '100%', border: 'none', background: C.accent, color: C.onAccent, borderRadius: 12, padding: 13, fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: 9 }}>{modal.id ? 'Enregistrer' : 'Créer le meuble'}</button>
     {onDelete && <button type="button" onClick={onDelete} style={{ width: '100%', border: `1px solid ${C.line}`, background: 'transparent', color: C.danger, borderRadius: 12, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 9 }}>Supprimer ce meuble</button>}
   </>);
 }
@@ -35961,8 +36081,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
   const refaireBrouillon = async (b) => {
     if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    let r=null; try { r=await vmrCmd({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true }, 180000); } catch(_) { r=null; }
+    const r=await vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), confirme:true }, 180000);
     brRefaire.relire(); brVinted.relire();
+    if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
     if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };
     return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
   };
@@ -47933,7 +48054,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           publier={async (it) => {
             const uid = it._acc ? String(it._acc.vinted_user_id||'') : '';
             if (!uid) return { etape:'echec', raison:'compte introuvable' };
-            let r=null; try { r=await vmrCmd({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true }, 120000); } catch(_) { r=null; }
+            const r=await vmrCmdSuivi({ cmd:'publierBrouillon', uid, draftId:String(it.id), confirme:true }, 120000);
+            if (r.sansReponse) { brVinted.relire(); return { etape:'incertain', raison:TEXTE_SANS_REPONSE }; }
             if (r && r.accepte) return { etape:r.etape, raison:r.raison||'' };
             return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
           }} />
@@ -47961,7 +48083,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         });
         const publierR = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 180000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, viaBrouillon:v.viaBrouillon===true, confirme:true }, 180000);
+          if (r.sansReponse) { brRefaire.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.nouvelId && (r.etape==='fait' || r.etape==='double')) reporterNumero(a.id, String(r.nouvelId));
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) return { etat:r.etape, raison:r.raison||'', nouveau:r.nouveau };
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
@@ -47971,7 +48094,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // prix et le titre EXACTS de l'aperçu ; jamais sous le prix d'achat.
         const publierModif = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000);
+          if (r.sansReponse) return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE };
           if (r && r.accepte && r.etape==='fait') return { etat:'fait', nouveau:r.nouveau };
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
@@ -47980,7 +48104,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // créé (sa décision du 28 oct. au soir). Le N° reste sur l'ancienne fiche.
         const publierVersB = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 180000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'recreerVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, reglages:v.reglages, lettre:v.lettre||undefined, versBrouillon:true, confirme:true }, 180000);
+          if (r.sansReponse) { brRefaire.relire(); brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' }; }
           if (r && r.accepte && ['fait','double','incertain'].includes(r.etape)) { if (r.etape==='fait') brVinted.relire(); return { etat:r.etape, raison:r.raison||'' }; }
           if (r && r.accepte && r.refaire) { brRefaire.relire(); return { etat:'a-refaire', raison:r.raison||'' }; }
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
@@ -47989,7 +48114,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // de « Voir mes brouillons », §11) ; seuls ceux PRÊTS se cochent.
         const publierEnLigne = async (a) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
-          let r=null; try { r=await vmrCmd({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true }, 120000); } catch(_) { r=null; }
+          const r=await vmrCmdSuivi({ cmd:'publierBrouillon', uid:a.uid, draftId:a.id, confirme:true }, 120000);
+          if (r.sansReponse) { brVinted.relire(); return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE }; }
           if (r && r.accepte && r.etape==='fait') { brVinted.relire(); return { etat:'fait' }; }
           if (r && r.accepte && r.etape==='incertain') return { etat:'incertain', raison:r.raison||'' };
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };

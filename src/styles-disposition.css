@@ -123,3 +123,7 @@
 
 /* Vinted : « À faire aujourd'hui » et le choix du compte se touchaient (2 px). */
 .vrm-market-space .vrm-compte-choix { margin-top: 10px; }
+
+/* (28 oct.) Stock « Mes meubles », vue de loin : la case est trop petite pour
+   « pas de photo » — le N° suffit. */
+[data-meuble-grille][data-zoom="loin"] .vrm-sans-photo { font-size: 0 !important; }
