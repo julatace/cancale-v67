@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const {build}=require('esbuild'),{chromium}=require('playwright');const racine=path.resolve(__dirname,'../..');
+const {build}=require('esbuild'),{chromium}=require('playwright');const racine=process.env.VRM_UI_ROOT||path.resolve(__dirname,'../..');
 (async()=>{
  const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
  import React from'react';import{createRoot}from'react-dom/client';import Auto from'./src/AutomatisationFavoris.jsx';

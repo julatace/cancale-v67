@@ -11,6 +11,7 @@ export async function requeteJsonBornee(url,options={},delai=15000,fetcher=fetch
   return {ok:r.ok,status:r.status,json};
  }catch(e){
   if(controle.signal.aborted){const erreur=Error('La demande a été interrompue ou le service n’a pas répondu à temps.');erreur.name='AbortError';throw erreur;}
+  if(e?.name==='TypeError')throw Error('La connexion au service a échoué. Le résultat de la demande reste à vérifier.');
   throw e;
  }
  finally{clearTimeout(timer);externe?.removeEventListener('abort',interrompre);}
