@@ -112,7 +112,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.266.0';
+const EXT_ATTENDUE = '5.267.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -23350,8 +23350,8 @@ function PublierVestiaire({ comptes }) {
       <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Mettre une paire en vente sur Vestiaire</div>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>
         {auto
-          ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
-          : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
+          ? <span data-vc-auto="oui">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, attache les photos — détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage — <b style={{ color: C.text }}>et publie toute seule, sans booster</b> : elle décoche toute option payante et ne clique jamais un bouton qui porte un prix. Si Vestiaire exige un champ qu'elle ne devine pas (catégorie, modèle), elle attend que tu le choisisses, puis publie.</span>
+          : <span data-vc-auto="non">L'extension ouvre Vestiaire (clique « Vendre un article » si besoin), remplit la description, le prix et ce qu'elle reconnaît, et attache les photos{' '}— détourées si ta clé Photoroom est posée, sinon elle te propose de les attacher sans détourage. <b style={{ color: C.text }}>C'est toi qui choisis la catégorie et le modèle, puis qui publies</b>{extSait('vcauto') === 'retard' ? <> — pour qu'elle publie toute seule, sans booster, mets l'extension à jour ({EXT_CAPACITES.vcauto}).</> : '.'}</span>}
         {glob ? <div data-vc-raison={glob.code} style={{ color: C.warn, marginTop: 6 }}>{glob.texte}</div> : null}
         {resumeBoost ? <div data-vc-boost-resume={resumeBoost.code} style={{ marginTop: 6 }}>{resumeBoost.texte}</div> : null}
       </div>

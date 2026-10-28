@@ -7,6 +7,14 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — VESTIAIRE bloqué faute de clé Photoroom (5.267) :** Julien : « ça ne veut pas faire de smart
+> listing ni de Photoroom ». Mesuré : aucune clé Photoroom (ni `PHOTOROOM_API_KEY` sur Vercel, ni `vrm_photoroom_cle`), 24
+> `detourage_no_key` ; or `vc-depot.js` n'attache QUE des photos détourées (sa règle du 27 oct.) ⇒ 0 photo, et le smart
+> listing (photos d'abord) ne démarrait jamais. Le bandeau dit la raison en français et propose, sur SON clic, « Attacher mes
+> photos sans détourage » (WebP converti en JPEG) ; la publication ne les bloque plus ensuite. Geste : coller sa clé Photoroom
+> dans VRM → Vestiaire (son compte paie). Preuve : `audit-vc-publier.cjs` (+3). ⚠️ Non mesuré : les écrans du smart listing
+> après les photos (`panel_vc_form` n'en a jamais vu).
+
 > **28 octobre (nuit, fin) — la file des FAVORIS prévient quand elle finit :** `terminerFile` rend `valeur.fin` (total,
 > envoyés, à vérifier, interrompus, interrompue) UNE fois, à la transition active → inactive ; `routeFavoris` envoie alors
 > « ✅ … file terminée » / « ⏸️ … file interrompue » (`texteFinFavoris`, catégorie `favoris`, activée par défaut, dans

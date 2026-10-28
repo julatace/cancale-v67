@@ -141,23 +141,47 @@
   // Jamais une photo d'origine du CDN (souvent WebP), jamais un autre format.
   const FORMAT_DES_OCTETS = (buf) => (buf.length > 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) ? 'jpg'
     : (buf.length > 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) ? 'png' : '';
-  function fichiersDepuis(photos, numero) {
+  // 28 oct. — « ça ne veut pas faire de smart listing » : sans clé Photoroom,
+  // AUCUNE photo n'était attachée, et le smart listing (qui commence par les
+  // photos) ne démarrait jamais. La règle de Julien reste (détourées d'abord) ;
+  // mais sur SON clic (« Attacher mes photos sans détourage »), les photos
+  // d'origine partent, converties en JPEG si le CDN les sert en WebP.
+  const RAISONS_DETOURAGE = {
+    'no-key': 'aucune clé Photoroom — colle la tienne dans VRM → Vestiaire',
+    session: 'pas de session VRM dans l\'extension', abonnement: 'abonnement VRM coupé',
+    reserve: 'détourage réservé — colle ta clé Photoroom dans VRM → Vestiaire',
+    plafond: 'plafond Photoroom du mois atteint', compteur: 'compteur Photoroom illisible',
+    cache: 'serveur de détourage indisponible', acces: 'accès au détourage pas vérifié',
+  };
+  const raisonDetourageLisible = (r) => RAISONS_DETOURAGE[String(r || '')] || String(r || 'détourage pas fait');
+  async function enJpeg(buf) {
+    try {
+      const bmp = await createImageBitmap(new Blob([buf]));
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      c.getContext('2d').drawImage(bmp, 0, 0);
+      const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.92));
+      return b ? new Uint8Array(await b.arrayBuffer()) : null;
+    } catch (_) { return null; }
+  }
+  async function fichiersDepuis(photos, numero, origine) {
     const out = [];
     for (let i = 0; i < photos.length; i++) {
       const ph = photos[i];
-      if (!ph || !ph.b64 || ph.detoure !== true) continue;
+      if (!ph || !ph.b64 || (ph.detoure !== true && !origine)) continue;
       try {
         const bin = atob(ph.b64);
         const buf = new Uint8Array(bin.length);
         for (let j = 0; j < bin.length; j++) buf[j] = bin.charCodeAt(j);
-        const ext = FORMAT_DES_OCTETS(buf);
+        let ext = FORMAT_DES_OCTETS(buf), octets = buf;
+        if (!ext && origine && ph.detoure !== true) { const j = await enJpeg(buf); if (j && FORMAT_DES_OCTETS(j) === 'jpg') { octets = j; ext = 'jpg'; } }
         if (!ext) continue;
-        out.push(new File([buf], `VRM-${numero}-${i + 1}.${ext}`, { type: ext === 'png' ? 'image/png' : 'image/jpeg' }));
+        out.push(new File([octets], `VRM-${numero}-${i + 1}.${ext}`, { type: ext === 'png' ? 'image/png' : 'image/jpeg' }));
       } catch (_) {}
     }
     return out;
   }
-  async function attacherPhotos(ad) {
+  async function attacherPhotos(ad, opts) {
+    const origine = !!(opts && opts.origine);
     const urls = (ad.photos || []).slice(0, 12);
     if (!urls.length) return { n: 0, raison: 'aucune photo à attacher' };
     const cible = champsFichier()[0];
@@ -169,10 +193,11 @@
     const rates = photos.filter((ph) => ph && ph.erreur).length;
     // Une photo lue mais PAS détourée n'est jamais attachée : on dit combien, et pourquoi.
     const pasDetourees = photos.filter((ph) => ph && ph.b64 && ph.detoure !== true);
-    const raisonDetourage = pasDetourees.length ? String(pasDetourees[0].detourage || 'détourage pas fait') : '';
-    const fichiers = fichiersDepuis(photos, ad.numero);
-    const horsFormat = photos.filter((ph) => ph && ph.b64 && ph.detoure === true).length - fichiers.length;
-    const etat = { rates, pasDetourees: pasDetourees.length, raisonDetourage, horsFormat };
+    const raisonDetourage = pasDetourees.length ? raisonDetourageLisible(pasDetourees[0].detourage) : '';
+    const fichiers = await fichiersDepuis(photos, ad.numero, origine);
+    const horsFormat = photos.filter((ph) => ph && ph.b64 && (origine || ph.detoure === true)).length - fichiers.length;
+    // Sur son clic, les photos d'origine sont SON choix : elles ne bloquent plus la publication.
+    const etat = { rates, pasDetourees: origine ? 0 : pasDetourees.length, origine: origine ? pasDetourees.length : 0, raisonDetourage, horsFormat };
     if (!fichiers.length) return Object.assign({ n: 0, raison: pasDetourees.length ? 'photos pas détourées (' + raisonDetourage + ') — Vestiaire les veut détourées' : (rates ? 'les photos n\'ont pas pu être lues' : 'aucune photo en JPG ou PNG') }, etat);
     try {
       const dt = new DataTransfer();
@@ -527,7 +552,7 @@
     //    information utile — et la seule honnête quand c'est le cas.
     const photos = photosEtat
       ? (photosEtat.n > 0
-          ? `📷 <b>${photosEtat.n} photo${photosEtat.n > 1 ? 's' : ''} attachée${photosEtat.n > 1 ? 's' : ''}</b>${photosEtat.n > 1 ? ' détourées' : ' détourée'}${photosEtat.rates ? ` (${photosEtat.rates} illisible${photosEtat.rates > 1 ? 's' : ''})` : ''}${photosEtat.pasDetourees ? ` · ${photosEtat.pasDetourees} pas détourée${photosEtat.pasDetourees > 1 ? 's' : ''} (${esc(photosEtat.raisonDetourage)}), laissée${photosEtat.pasDetourees > 1 ? 's' : ''} de côté` : ''}.`
+          ? `📷 <b>${photosEtat.n} photo${photosEtat.n > 1 ? 's' : ''} attachée${photosEtat.n > 1 ? 's' : ''}</b>${photosEtat.origine ? ' (sans détourage, ton choix)' : (photosEtat.n > 1 ? ' détourées' : ' détourée')}${photosEtat.rates ? ` (${photosEtat.rates} illisible${photosEtat.rates > 1 ? 's' : ''})` : ''}${photosEtat.pasDetourees ? ` · ${photosEtat.pasDetourees} pas détourée${photosEtat.pasDetourees > 1 ? 's' : ''} (${esc(photosEtat.raisonDetourage)}), laissée${photosEtat.pasDetourees > 1 ? 's' : ''} de côté` : ''}.`
           : `📷 aucune photo attachée — ${esc(photosEtat.raison || 'raison inconnue')}.`)
       : `📷 j'attache les photos dès que l'étape photo s'affiche.`;
     // ⚠️ L'ARRÊT AU BOUT DE 90 s SE DISAIT EN SILENCE. La mise en vente eBay se
@@ -554,6 +579,9 @@
         ? `<b>N°${esc(ad.numero)}</b> — je n'ai reconnu aucun champ sur cette page. ${photos} Copie la description ci-dessous et colle-la.`
         : `<b>N°${esc(ad.numero)}</b> — clique <b>« Vendre un article »</b> sur Vestiaire : je remplis dès que le formulaire s'affiche.`))
       + ligneCat + pub + fini
+      + (photosEtat && photosEtat.n === 0 && photosEtat.pasDetourees > 0
+        ? `<button id="vrm-vc-orig" data-vc-photos-origine style="display:block;width:100%;min-height:44px;margin-top:9px;border:0;background:#3D7BFF;color:#fff;border-radius:9px;padding:8px;font:700 12px system-ui,sans-serif;cursor:pointer">Attacher mes photos sans détourage</button>`
+        : '')
       + `<div style="display:flex;gap:6px;margin-top:9px">
            <button id="vrm-vc-refill" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Re-remplir</button>
            <button id="vrm-vc-cdesc" style="flex:1;border:1px solid #1E2530;background:transparent;color:#E8ECF2;border-radius:9px;padding:7px;font:600 11.5px system-ui,sans-serif;cursor:pointer">Copier la description</button>
@@ -561,6 +589,8 @@
          </div>
          <div style="color:#8A93A3;font-size:10px;margin-top:7px">${ad.publier === true ? 'VRM ne coche jamais d\'option payante (boost, mise en avant) et ne clique jamais un bouton qui porte un prix. La catégorie suit celle de Vinted ; le modèle, VRM ne le devine pas.' : 'VRM ne publie pas à ta place ici : relis et clique toi-même. Une fois publiée, note-la « Déjà publiée » dans VRM.'}</div>`);
     el.querySelector('#vrm-vc-refill').onclick = () => { relancer(ad); };
+    const orig = el.querySelector('#vrm-vc-orig');
+    if (orig) orig.onclick = () => { orig.disabled = true; orig.textContent = 'J\'attache les photos…'; attacherPhotos(ad, { origine: true }).then((r2) => { photosEtat = r2; bandeau(faits, ad); }); };
     el.querySelector('#vrm-vc-cdesc').onclick = () => { copyDire(ad.description || '', 'Description'); };
     el.querySelector('#vrm-vc-close').onclick = () => { clearInterval(minuteur); el.remove(); send({ action: 'fini' }); };
   }

@@ -255,6 +255,23 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
       dit(sq.pub === 0 && /détour|JPG ou PNG/.test(sq.b), `photos ${quoi} : rien n'est publié, et le bandeau dit pourquoi`, sq.b.slice(0, 200));
       await pq.close();
     }
+    // 28 oct. — « ça ne veut pas faire de smart listing » : sans clé Photoroom,
+    // aucune photo n'était attachée et rien ne le débloquait. Le bandeau le dit en
+    // français et propose, sur SON clic, les photos d'origine.
+    {
+      const pk = await ctxN.newPage();
+      await pk.addInitScript(fauxChrome(AD, [{ b64: '/9j/AA==', type: 'image/jpeg', detoure: false, detourage: 'no-key' }, { b64: 'iVBORw0KGgo=', type: 'image/png', detoure: false, detourage: 'no-key' }]));
+      await pk.goto('https://fr.vestiairecollective.com/sell/');
+      await pk.addScriptTag({ content: code });
+      await pk.waitForTimeout(3500);
+      const k0 = await pk.evaluate(() => ({ n: document.getElementById('f').files.length, b: (document.getElementById('vrm-vc-b') || {}).innerText || '', bouton: !!document.querySelector('[data-vc-photos-origine]') }));
+      dit(k0.n === 0 && /clé Photoroom/.test(k0.b) && !/no-key/.test(k0.b), 'sans clé Photoroom : aucune photo attachée d\'office, et la raison est dite en français', k0.b.slice(0, 200));
+      dit(k0.bouton, 'et le bandeau propose « Attacher mes photos sans détourage »', String(k0.bouton));
+      if (k0.bouton) { await pk.click('[data-vc-photos-origine]'); await pk.waitForTimeout(1500); }
+      const k1 = await pk.evaluate(() => ({ n: document.getElementById('f').files.length, b: (document.getElementById('vrm-vc-b') || {}).innerText || '' }));
+      dit(k1.n === 2 && /sans détourage/.test(k1.b), 'sur son clic, les photos d\'origine sont attachées et le bandeau le dit', k1.n + ' · ' + k1.b.slice(0, 160));
+      await pk.close();
+    }
     dit(st.pub === 0, 'sans feu vert (app d\'avant / « préparer seulement ») : VRM ne clique pas « Publier »', String(st.pub));
     dit(/champ/.test(st.b) && /publies?/.test(st.b), 'le bandeau dit le chiffre et que c\'est lui qui publie', st.b);
     const form = st.envois.find((m) => m.action === 'vcForm');
