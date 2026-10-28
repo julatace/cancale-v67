@@ -7,6 +7,20 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre — le tour de l'espace Vinted sur ses vraies données (5.246) :** Julien : « commence par Vinted,
+> fais le tour et corrige tout ». Rendu Ventes · Achats · Annonces · Messages (390/1512, clair/sombre) sur une
+> copie lecture seule (scratchpad, jamais dans le dépôt) ; disponible 180 € et en attente 1 264,50 € = la base.
+> Corrigé : une ligne VIDÉE par « Supprimer des données… » (`{supprime:true}`, sans payload — compte 199082413)
+> était lue « pas su » ⇒ « compte non chargé » et « données anciennes » : `ligneVideeParToi` la lit « vide »
+> (`fetchHarvestBrut`, AVANT le dressing ; `fetchHarvestOrders`) ; un compte déjà dit « non chargé » sur Ventes
+> n'est plus redit dans la ligne de fraîcheur (`VintedResume sauf`), et ce bandeau est ambre, plus rouge (§7) ;
+> la fraîcheur des annonces ne parle plus à 24 min (« vu actif » seulement après 2 h) ni d'une version figée
+> (« 5.170.0 ») ; l'extension ne range plus un refus de Vinted à code TEXTE (`UNAUTHORIZED`, session expirée de
+> jujuf38) comme ses ventes (`estErreurVinted`, `noteSuivi`). Preuves : `audit-supprimees` §8 (2 rouges sur
+> l'avant), `audit-fiabilite-fond` §2 (1 rouge). Laissés, vrais : doublons de N° 50/60/82/88 (deux paires
+> vendues), offres « en attente » de sept./août (capture ancienne, même règle que le fil). Gestes : rouvrir Vinted
+> sur jujuf38 et julatace35260 ; « Supprimer ce compte » sur #199082413 s'il ne doit plus revenir.
+
 > **28 octobre — la bonne catégorie sur chaque plateforme, Vestiaire en « smart listing », eBay publié en un clic (5.245) :**
 > Julien : « Vestiaire avec le smart listing », « la catégorie doit correspondre à celle de la plateforme »,
 > « eBay : j'appuie sur publier, l'annonce se publie toute seule avec les critères et la description ».
