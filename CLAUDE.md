@@ -7,6 +7,16 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — STOCK : un article une fois, et les articles de TOUTES les plateformes :** Julien
+> (« les deux ») : (1) une paire sur Vinted, Leboncoin et eBay n'apparaît qu'UNE fois dans « À ranger » — même N° (clé)
+> ou même PHOTO EXACTE (deux fiches = une paire, l'autre N° dit à côté ; l'une rangée ⇒ aucune proposée) :
+> `unParArticle` (stockRegles.js), 3D, « Mes meubles », En photos ; (2) une paire en vente SEULEMENT sur eBay (SKU
+> `numEbayLu`) ou Leboncoin (`numeroLbcIdentite`, annonce en vente `annonceLbcEnVente`) est présente :
+> `articlesAutresPlateformes`, publiée avec la liste `vinted_nums_physiques` (`autres`, `sansNumero`), jamais un N°
+> dont la vente Vinted est prouvée et le colis parti ; Vinted pas lu ⇒ rien publié. Une annonce sans N° n'est pas
+> proposée. Preuve : banc `stock-plateformes.cjs` (10 rouges sur l'avant ; mutations « autres vidés » 8, « sans
+> garde vendue + sans photo » rouges). ⚠️ Non mesuré : sa vraie base.
+
 > **28-29 octobre (nuit) — VESTIAIRE : étiquette en 2ᵉ, Taille/État/Prix remplis, description sans doublon (5.269-5.270) :**
 > MESURÉ (`panel_vc_form`, 28 oct. 23 h 06, 5.268) : après les photos, l'écran « Détails » est une liste de LIGNES-BOUTONS
 > (« Marque Nike », « Taille Ajouter », « État Ajouter », « Prix Ajouter », « Votre adresse Ajouter »…), chacune ouvre une
