@@ -32,7 +32,11 @@ const root=process.env.VRM_RECUPERATION_ROOT||path.join(__dirname,'../../public'
    verification=200;await page.locator('#lien').fill(lien);await page.locator('#secours [type=submit]').click();
    await page.locator('#password').waitFor({state:'visible'});
    await page.locator('#password').fill('NouveauSecret123');await page.locator('#confirmation').fill('NouveauSecret123');
-   await page.locator('#nouveau [type=submit]').click();
+   const attente=await page.evaluate(()=>{
+    const f=document.getElementById('nouveau');f.requestSubmit();f.requestSubmit();
+    return {busy:f.getAttribute('aria-busy'),texte:f.querySelector('[type=submit]').textContent,disabled:f.querySelector('[type=submit]').disabled};
+   });
+   assert.equal(attente.busy,'true');assert.equal(attente.texte,'Enregistrement…');assert.equal(attente.disabled,true);
    await page.getByText('L’enregistrement n’est pas confirmé.',{exact:false}).waitFor();
    assert.equal(appels,1);assert.equal(sorties,0);assert.equal(await page.locator('#password').inputValue(),'NouveauSecret123');
    enregistrement=200;await page.locator('#nouveau [type=submit]').click();
