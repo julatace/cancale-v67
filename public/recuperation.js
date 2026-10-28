@@ -46,17 +46,22 @@ if(typeof document!=='undefined'){
   }catch(_){msg('La connexion au service sécurisé est momentanément indisponible. Réessaie avec le lien ci-dessous.',true);$('secours').hidden=false;}
  }
  $('voir').onclick=()=>{const voir=$('password').type==='password';$('password').type=voir?'text':'password';$('voir').textContent=voir?'Masquer':'Voir';$('voir').setAttribute('aria-label',voir?'Masquer le mot de passe':'Afficher le mot de passe');};
- async function verifier(raw){if(occupe)return;occupe=true;const b=$('secours').querySelector('[type=submit]');b.disabled=true;try{await ouvrir(raw);}finally{occupe=false;b.disabled=false;}}
+ async function verifier(raw){
+  if(occupe)return;occupe=true;
+  const b=$('secours').querySelector('[type=submit]'),texte=b.textContent;
+  b.disabled=true;b.textContent='Vérification…';$('secours').setAttribute('aria-busy','true');msg('Vérification de ton lien sécurisé…');
+  try{await ouvrir(raw);}finally{occupe=false;b.disabled=false;b.textContent=texte;$('secours').removeAttribute('aria-busy');}
+ }
  $('secours').onsubmit=e=>{e.preventDefault();verifier($('lien').value);};
  $('nouveau').onsubmit=async e=>{e.preventDefault();if(occupe||!jeton)return;const p=$('password').value;
   if(p.length<8||p.length>128||!/[\p{L}]/u.test(p)||!/[\p{N}]/u.test(p)){msg('Choisis au moins 8 caractères, avec des lettres et des chiffres.',true);return;}
   if(p!==$('confirmation').value){msg('Les deux mots de passe ne correspondent pas.',true);return;}
-  occupe=true;const bouton=$('nouveau').querySelector('[type=submit]');bouton.disabled=true;
+  occupe=true;const bouton=$('nouveau').querySelector('[type=submit]'),texte=bouton.textContent;bouton.disabled=true;bouton.textContent='Enregistrement…';$('nouveau').setAttribute('aria-busy','true');msg('Enregistrement du nouveau mot de passe…');
   try{const r=await appel('user',{password:p},'PUT',jeton);if(!r.ok||!r.json.id){msg(erreurRecuperation(r,'enregistrement'),true);return;}
    $('password').value='';$('confirmation').value='';$('nouveau').hidden=true;$('connexion').textContent='Se connecter à VRM';msg('Ton nouveau mot de passe est enregistré. Fermeture des anciennes sessions…');
    const fermeture=await appel('logout?scope=global',null,'POST',jeton).catch(()=>null);jeton='';msg('Ton nouveau mot de passe est enregistré. Tu peux maintenant te connecter à VRM.'+(!fermeture?.ok?' La fermeture des anciennes sessions n’a pas été confirmée.':''));
   }catch(_){msg('La connexion a été interrompue : l’enregistrement n’est pas confirmé. Essaie de te connecter avec ton nouveau mot de passe avant de recommencer.',true);}
-  finally{occupe=false;bouton.disabled=false;}
+  finally{occupe=false;bouton.disabled=false;bouton.textContent=texte;$('nouveau').removeAttribute('aria-busy');}
  };
  verifier(brut);
 }
