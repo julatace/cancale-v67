@@ -109,6 +109,12 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — les ÉTAGÈRES À BACS aussi :** Julien : « fais pareil pour les étagères à bacs ».
+> `plateauxReglables` inclut l'étagère à bacs (`ft.bacs`, build métal) : « Plateaux, colonne par colonne »
+> (`ChoixPlanches`) ; sans plateau sous une case, son bac descend dans la case du dessous si elle est vide
+> (`tasserPlateaux`, cap 1) ; numéros inchangés. 3D : `buildMetal` dessine les morceaux, aucun bac fantôme
+> au-dessus d'un plateau qui manque. Banc `stock-finitions.cjs` XII (390/1512 ; règle d'avant ⇒ 2 rouges).
+
 > **28 octobre (nuit, fin) — les PORTANTS aussi :** Julien : « fais pareil pour les portants ». Un portant à cintres
 > peut avoir plusieurs BARRES (stepper « Barres », `data-reglage="barres"`, ~80 cm par barre, refusé au-delà du
 > plafond ; la barre ajoutée l'est en haut) et « Barres, cintre par cintre » (`ChoixPlanches`). `"r:c"` = la barre de
