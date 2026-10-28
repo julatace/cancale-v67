@@ -157,7 +157,8 @@ function forwardVintedEmails() {
   // par modeScript. Aucune facture des autres utilisateurs n'est ajoutée ici.
   // (22 oct., revue) Les factures PASSENT AVANT les liens : elles partagent le
   // quota d'envoi de cette boîte, et une facture compte plus qu'un lien.
-  sendQueuedInvoices();
+  const factures=sendQueuedInvoices(verrou);
+  if(factures && factures.aVerifier)bilan.facturesAVerifier=factures.aVerifier;
   // Les liens de confirmation d'adresse demandés par les vendeurs (22 oct.).
   envoyerPreuvesAdresse();
   if(Date.now()-debut<230000)nettoyerTraites();
@@ -185,16 +186,29 @@ function nettoyerTraites() {
 // (ou s'il clique « Envoyer » manuellement sur une facture). Ce script
 // les envoie depuis cette boîte Gmail puis les marque 'sent'.
 // ════════════════════════════════════════════════════════════════════
-function sendQueuedInvoices() {
-  if (!SECRET) { Logger.log('Factures : pas de clé secrète — rien à envoyer.'); return; }
+function sendQueuedInvoices(verrouExistant) {
+  const bilan={aVerifier:0};
+  if (!secretVRM()) { Logger.log('Factures : pas de clé secrète — rien à envoyer.'); return bilan; }
+  const verrou=verrouExistant||LockService.getScriptLock(),propre=!verrouExistant;
+  if(verrouExistant&&(typeof verrouExistant.hasLock!=='function'||!verrouExistant.hasLock())){Logger.log('Factures : le verrou du passage n’est pas confirmé.');return bilan;}
+  if(propre&&!verrou.tryLock(1000)){Logger.log('Factures : un passage est déjà en cours.');return bilan;}
+  try {
   let r;
-  try { r = appVRM('factures'); } catch (e) { Logger.log('Factures : VRM injoignable — ' + e); return; }
-  if (!r.ok) { Logger.log('Factures : VRM a répondu ' + r.code + ' — rien envoyé.'); return; }
-  if (!r.data.actif) return; // facturation coupée dans l'app → on ne touche à rien
+  try { r = appVRM('factures'); } catch (e) { Logger.log('Factures : VRM injoignable — ' + e); bilan.aVerifier++; return bilan; }
+  if (!r.ok) { Logger.log('Factures : VRM a répondu ' + r.code + ' — rien envoyé.'); bilan.aVerifier++; return bilan; }
+  if (!r.data.actif) return bilan; // facturation coupée dans l'app → on ne touche à rien
   const cfg = { nom: r.data.nom, logo: r.data.logo };
   const queued = r.data.factures || [];
-  if (queued.length === 0) return;
-
+  if (queued.length === 0) return bilan;
+  const proprietes=PropertiesService.getScriptProperties(),prefixe='VRM_FACTURE_ENVOI_';
+  // Reçus sans destinataire ni contenu : les confirmés anciens peuvent être
+  // purgés, jamais une tentative incertaine ou encore à confirmer.
+  const tous=proprietes.getProperties();let recus=0;
+  Object.keys(tous).filter(k=>k.indexOf(prefixe)===0).forEach(k=>{
+    let v=null;try{v=JSON.parse(tous[k]);}catch(_){}
+    if(v&&v.etat==='confirme'&&Number.isFinite(v.at)&&Date.now()-v.at>90*86400000)proprietes.deleteProperty(k);else recus++;
+  });
+  function noter(cle,valeur){const json=JSON.stringify(valeur);proprietes.setProperty(cle,json);if(proprietes.getProperty(cle)!==json)throw Error('Journal non confirmé : aucun nouvel envoi autorisé.');}
   queued.forEach(d => {
     try {
       const opts = { htmlBody: d.html, name: cfg.nom || 'Facturation' };
@@ -214,22 +228,36 @@ function sendQueuedInvoices() {
           avecRetour = true;
         } catch (e) { throw new Error('Formulaire de retour illisible : facture conservée en attente, aucun email envoyé.'); }
       }
-      GmailApp.sendEmail(
-        d.buyerEmail,
-        'Votre facture ' + d.number + (cfg.nom ? ' – ' + cfg.nom : ''),
-        'Bonjour,\n\nVeuillez trouver votre facture ' + d.number + ' pour votre achat Vinted'
-          + (avecRetour ? ', ainsi que le formulaire de retour en pièce jointe' : '')
-          + '.\n\nMerci pour votre achat !',
-        opts
-      );
-      // Marque la facture comme envoyée (sinon elle repartirait au passage
-      // suivant : le dire au journal si VRM ne l'a pas noté).
+      if(!d.id||!d.buyerEmail||!d.number||!d.html)throw Error('Facture incomplète : aucun email envoyé.');
+      const cle=prefixe+empreinteVRM(String(d.id));
+      const empreinte=empreinteVRM(JSON.stringify([d.id,d.number,d.buyerEmail,d.html,d.retourB64||'',d.retourNom||'']));
+      const brut=proprietes.getProperty(cle),avant=brut?JSON.parse(brut):null;
+      if(avant&&(avant.empreinte!==empreinte||!['envoye','confirme'].includes(avant.etat)))throw Error('Envoi à vérifier dans Gmail : renvoi automatique suspendu pour éviter un doublon. Ne pas effacer le reçu sans vérification.');
+      if(!avant){
+        if(recus>=1000)throw Error('Journal des factures plein : aucun nouvel envoi. Conserver les reçus incertains et vérifier les confirmations.');
+        noter(cle,{etat:'prepare',empreinte,at:Date.now()});recus++;
+        GmailApp.sendEmail(
+          d.buyerEmail,
+          'Votre facture ' + d.number + (cfg.nom ? ' – ' + cfg.nom : ''),
+          'Bonjour,\n\nVeuillez trouver votre facture ' + d.number + ' pour votre achat Vinted'
+            + (avecRetour ? ', ainsi que le formulaire de retour en pièce jointe' : '')
+            + '.\n\nMerci pour votre achat !',
+          opts
+        );
+        // Une interruption après Gmail laisse « prepare » : on vérifie au
+        // lieu de recommencer une action dont le résultat est inconnu.
+        noter(cle,{etat:'envoye',empreinte,at:Date.now()});
+      }
+      // Si seul cet accusé échoue, le prochain passage le retente SANS email.
       const m = appVRM('facture-envoyee', 'post', { id: d.id });
+      if(m.ok)noter(cle,{etat:'confirme',empreinte,at:Date.now()});else bilan.aVerifier++;
       Logger.log('Facture ' + d.number + ' envoyée à ' + d.buyerEmail + (m.ok ? '' : ' — ⚠️ VRM ne l\'a pas notée envoyée (' + m.code + ')'));
     } catch (e) {
-      Logger.log('Erreur envoi facture : ' + e);
+      bilan.aVerifier++;Logger.log('Facture '+(d.number||'sans numéro')+' : '+e);
     }
   });
+  return bilan;
+  } finally {if(propre)verrou.releaseLock();}
 }
 
 // ════════════════════════════════════════════════════════════════════

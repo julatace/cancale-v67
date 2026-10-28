@@ -8674,6 +8674,11 @@ const drawBordereauStamp = (pdf, rgb, bold, reg, numero, title, pos) => {
   if(!hasNum && !String(title||'').trim()) return false;
   if(!pos || pos.verifie!==true) throw Error('Espace blanc non vérifié : aucun tampon ajouté.');
   const {x,y,w,h}=pos;
+  // L'analyse sérialise le PDF. Un document assemblé (thermique) a déjà un
+  // flux de dessin mis en cache par pdf-lib : écrire dans ce même flux peut
+  // faire disparaître le numéro à la sauvegarde. Cette API publique ouvre un
+  // nouveau flux, sans déplacer ni redimensionner les éléments existants.
+  first.resetPosition();
   const fit=(text,font,size)=>{let t=String(text||'').replace(/[\r\n]+/g,' ');while(t&&font.widthOfTextAtSize(t,size)>w-8)t=t.slice(0,-1);return t;};
   // Pas de rectangle opaque, de bande, de réduction ni de changement de page.
   if(hasNum) {
