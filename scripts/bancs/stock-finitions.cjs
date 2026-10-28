@@ -55,8 +55,12 @@ const PLAN_PLATEAUX = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, 
 const PLAN_TABLE = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 't1', type: 'table', name: 'Table à étagère', x: 2, y: 2, w: 2, h: 1, rows: 3, cols: 2, h3d: 0.5, slots: { '0_0': ['701'], '1_0': ['702'], '1_1': ['703'] } },
 ] }], active: 'r1' };
+// XI. Portant 3 cintres, 2 barres : N°801 et N°802 en haut, N°803 en bas (sous le 802).
+const PLAN_PORTANT = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'p1', type: 'cintres', name: 'Portant', x: 2, y: 2, w: 0.8, h: 0.5, rows: 2, cols: 3, h3d: 1.15, slots: { '0_0': ['801'], '0_1': ['802'], '1_1': ['803'] } },
+] }], active: 'r1' };
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
-const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703'], at: Date.now() };
+const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703', '801', '802', '803'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
 
 let ko = 0;
@@ -365,6 +369,35 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const pl1 = await sonde(pg, 'plateaux', 't1');
       dit(pl1 && pl1.length === 1 && pl1[0].w < 1.0, t + ' : la 3D dessine un plateau de moitié sous la table', JSON.stringify(pl1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-table-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XI. LES BARRES D'UN PORTANT, CINTRE PAR CINTRE ───────────────────────
+    if (fait('XI')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XI. portant ' + vp.width, async () => {
+      const t = 'XI. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_PORTANT);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const pl0 = await sonde(pg, 'plateaux', 'p1');
+      dit(pl0 && pl0.length === 2, t + ' : sans réglage, les deux barres sont entières', JSON.stringify(pl0));
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
+      const p = await sonde(pg, 'project', 'p1', { cell: '0_0', num: '801' });
+      if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
+      await pg.waitForSelector('[data-plateaux-3d]', { timeout: 8000, state: 'attached' });
+      dit(await pg.evaluate(() => (document.querySelector('[data-reglage="barres"] b') || {}).textContent === '2'), t + ' : « Barres » dit 2');
+      await pg.evaluate(() => { const d = document.querySelector('[data-plateaux-3d]'); d.open = true; });
+      await cliquerSel(pg, '[data-plateaux-3d] [data-planche-case-choix="1:1"]');
+      const q = await attendrePlan(pg, (x) => Array.isArray(item(x, 'p1').planches));
+      const m = item(q, 'p1');
+      dit(JSON.stringify(m.planches) === '["1:2","1:3"]', t + ' : la barre du haut n\'est retirée qu\'au cintre 1', JSON.stringify(m.planches));
+      dit(JSON.stringify(m.slots['1_0']) === '["801"]' && JSON.stringify(m.slots['0_1']) === '["802"]' && JSON.stringify(m.slots['1_1']) === '["803"]' && !m.slots['0_0'], t + ' : N°801 descend sur la barre du bas, N°802 et N°803 ne bougent pas', JSON.stringify(m.slots));
+      await pg.waitForTimeout(1200);
+      const pl1 = await sonde(pg, 'plateaux', 'p1');
+      dit(pl1 && pl1.length === 2 && Math.min(...pl1.map(v => v.w)) < Math.max(...pl1.map(v => v.w)) * 0.8, t + ' : la 3D dessine une barre du haut raccourcie', JSON.stringify(pl1));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-portant-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
