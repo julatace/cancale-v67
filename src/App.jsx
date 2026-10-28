@@ -28022,11 +28022,29 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 // Preuve de vente : §11, l'écran Annonces PUBLIE `vrm_stock_vendus`, on CONSOMME.
 // Rien ne sort du stock sans le clic ; une vente annulée/repostée n'est plus
 // publiée → halo éteint, la paire RESTE (jamais de retrait automatique).
+// (28 oct.) Le Stock ne montre que les paires des comptes que Julien GARDE dans
+// l'app — Julien : « je veux pas les annonces de shop cancale ». Une fiche porte
+// l'identifiant du compte qui l'a numérotée (`accountId`, posé par `updatePair`).
+// Elle est écartée si ce compte est masqué, retiré pour de bon, ou n'est plus
+// lié (supprimé — c'est le cas de shop_cancale). La liste des comptes liés est
+// celle que la coque range sur l'appareil (`vinted_accounts`) ; pas encore lue
+// (vide) ⇒ on n'écarte que les masqués et retirés (« pas su » ne cache rien).
+// Une fiche sans compte connu reste. Rien n'est effacé : le N° et la case
+// restent, ils réapparaissent si le compte revient.
+const comptesStockEcartes = () => {
+  const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+  const retires = annoncesRetirees();
+  let lies = null;
+  try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a) && a.length) lies = new Set(a.map((x) => String(x && x.vinted_user_id || '')).filter(Boolean)); } catch (_) {}
+  return (f) => { const u = f && f.accountId != null ? String(f.accountId) : ''; if (!u) return false; return masques.has(u) || retires.has(u) || (lies ? !lies.has(u) : false); };
+};
+
 function StockPhotos() {
   const [pairsLost, setPairsLost] = React.useState(() => load('vinted_pairs_lost', {}));
   const [max, setMax] = React.useState(60);
   const [q, setQ] = React.useState('');
   const numeros = load('vinted_annonce_numeros', {}) || {};
+  const horsCompte = comptesStockEcartes();
   const venduSig = load('vrm_stock_vendus', null);
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const venduSu = !!venduSig;                                   // a-t-on déjà une mesure de ventes ?
@@ -28034,7 +28052,7 @@ function StockPhotos() {
   // Paires EN STOCK : une fiche numérotée, pas déclarée partie (même règle que
   // l'écran Annonces, `annonceDeclareePartie`).
   const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost));
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
   const filtre = q.trim().toLowerCase();
   const liste = fiches
     .filter((f) => !filtre || String(f.numero).toLowerCase().includes(filtre) || String(f.title || '').toLowerCase().includes(filtre))
@@ -28116,6 +28134,12 @@ function StockMeubles() {
   const [cibles, setCibles] = React.useState(() => (demande && demande.length > 1 ? demande.map((x) => cleNum(x)).filter(Boolean) : []));
   const [flash, setFlash] = React.useState(null);           // cleNum de la case montrée
   const chercheRef = React.useRef(null);
+  // « Voir de plus loin » : la taille des cases, choisie par appareil
+  // (commodité d'affichage, jamais une donnée). Par défaut : de loin.
+  const ZOOMS = { loin: 64, normal: 100, pres: 150 };
+  const [zoom, setZoomEtat] = React.useState(() => { try { const z = localStorage.getItem('vrm_meubles_zoom'); return ZOOMS[z] ? z : 'loin'; } catch (_) { return 'loin'; } });
+  const setZoom = (z) => { setZoomEtat(z); try { localStorage.setItem('vrm_meubles_zoom', z); } catch (_) {} };
+  const caseMax = ZOOMS[zoom] || 64;
   const [place, setPlace] = React.useState(null);           // cleNum en cours de pose
   const [modal, setModal] = React.useState(null);           // {type:'meuble'|'placer'|'fiche', …}
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
@@ -28129,12 +28153,13 @@ function StockMeubles() {
   const ecrireSlots = (u) => { setSlots(u); save('vrm_slots', u); };
 
   const numeros = load('vinted_annonce_numeros', {}) || {};
+  const horsCompte = comptesStockEcartes();
   const venduSig = load('vrm_stock_vendus', null);
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const estVendu = (f) => vendus.has(cleNum(f.numero));
   // Paires EN STOCK (même règle que StockPhotos et l'écran Annonces).
   const fiches = Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost));
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f));
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
   const cleDeFiche = (f) => cleNum(f.numero);
   const posee = (f) => !!slots[cleDeFiche(f)];
@@ -28187,6 +28212,7 @@ function StockMeubles() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
   const nVendus = fiches.filter(estVendu).length;
+  const nEcartes = Object.keys(numeros).filter((id) => { const f = { id, ...(numeros[id] || {}) }; return String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && horsCompte(f); }).length;
 
   const poser = (cle, mid, i) => {
     const u = { ...slots };
@@ -28215,7 +28241,7 @@ function StockMeubles() {
     <>
       {f.photo
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 10 }}>pas de photo</div>}
+        : <div className="vrm-sans-photo" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 10 }}>pas de photo</div>}
       <span style={{ position: 'absolute', left: 4, top: 4, background: sold ? C.accent : 'rgba(0,0,0,0.6)', color: sold ? C.onAccent : '#fff', fontWeight: 800, fontSize: 11, padding: '1px 6px', borderRadius: 6 }}>N°{f.numero}</span>
       {sold && <span style={{ position: 'absolute', right: 4, bottom: 4, background: C.accent, color: C.onAccent, fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 999, letterSpacing: 0.3 }}>VENDU</span>}
     </>
@@ -28240,7 +28266,7 @@ function StockMeubles() {
           <button type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows })} aria-label="Modifier le meuble" style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.muted, borderRadius: 9, width: 36, height: 36, cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
-        <div data-meuble-grille="" style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * 150 + 28}px)` }}>
+        <div data-meuble-grille="" data-zoom={zoom} style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: zoom === 'loin' ? 4 : 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * (caseMax + (zoom === 'loin' ? 4 : 6)) + 28}px)` }}>
           {/* Règle : colonnes numérotées au-dessus, rangées à gauche (comme sur le meuble). */}
           <span />
           {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} style={regle}>{c + 1}</span>)}
@@ -28424,9 +28450,16 @@ function StockMeubles() {
       </div>
     )}
 
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>
+    </div>
+    {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ background: 'transparent', border: 'none', padding: '0 2px', minHeight: 36, color: C.accent, fontWeight: 800, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
 
-    {meubles.map(cadreMeuble)}
+    {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. */}
+    <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
+      {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
+    </div>
 
     <button type="button" onClick={() => setModal({ type: 'meuble' })} style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.line}`, color: C.accent, borderRadius: 14, padding: 15, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>+ Créer un meuble</button>
 
