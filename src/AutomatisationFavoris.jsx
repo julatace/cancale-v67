@@ -11,7 +11,7 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     if(!vue?.active&&!busy.current&&!mutation.current&&['favoris_preuve_absente','favoris_identite_non_unique'].includes(controleErreur?.code)){setErreur('');setControleErreur(null);}
   },[revisionVerification]);
   const ecran=React.useRef(ecranActif);ecran.current=ecranActif;
-  const contexte=React.useRef('');contexte.current=JSON.stringify([owner,uid,selection,reglages?.message,reglages?.pourcentage,reglages?.intervalleMinutes]);
+  const contexte=React.useRef('');contexte.current=JSON.stringify([owner,uid,selection,reglages?.message,reglages?.pourcentage,reglages?.intervalleMinutes,reglages?.intervalleMaxMinutes]);
   const courant=()=>vivant.current&&ownerActuel()===owner;
   const adopter=j=>{if(!j.vue||!Array.isArray(j.vue.jobs)||typeof j.vue.active!=='boolean')throw Error('L’état de la file n’a pas été confirmé.');if(Number.isSafeInteger(j.serveur))decalage.current=j.serveur-Date.now();prochaine.current=Number(j.vue?.prochain)||0;setHorloge(Date.now());setVue(j.vue);if(onEtat)onEtat(j.vue);};
   const api=async(action,donnees={},h=headers())=>{
@@ -93,17 +93,14 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
   const avancement=Math.min(p.total,p.termines+(p.encours&&rangPhase>=0?(rangPhase+1)/(Object.keys(ETAPES_FAVORIS).length+2):0));
   const raisons=[...new Set(p.jobs.filter(x=>['refuse','incertain'].includes(x.etat)).map(x=>RAISONS_FAVORIS[x.raison]).filter(Boolean))];
   if(masquerSansSelection&&!selection.length&&!p.total&&!vue?.active&&!erreur)return null;
-  return <details className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" open={!!vue?.active||!!selection.length||!!p.total||!!erreur}>
-    <summary>Envoi automatique aux favoris</summary>
-    <p>Le même message enregistré est envoyé à chaque favori sélectionné. Maximum 10 messages sur 60 minutes par compte. Une conversation contenant déjà des messages est ignorée.</p>
-    <p>Garde cet écran ouvert et visible, avec l’extension à jour et le bon compte Vinted connecté. Aucune garantie contre un blocage Vinted.</p>
+  return <div className="vrm-favoris-automatisation" aria-label="Envoi automatique aux favoris" data-favoris-moteur={vue?.active?'active':'repos'}>
     {!disponible&&<p>{raisonExtension||'La connexion à l’extension sera vérifiée au lancement.'}</p>}
-    {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:<button type="button" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>}
+    {vue?.active?<button type="button" disabled={occupe} onClick={()=>agir('arreter')}>Arrêter la file</button>:selection.length?<button type="button" className="is-principal" disabled={occupe} onClick={()=>agir('lancer')}>{occupe?'Vérification…':'Lancer les envois sélectionnés'}</button>:null}
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">
       {!!p.total&&<><div className="vrm-favoris-progress-head" role="status"><strong>{p.termines} / {p.total} traités</strong><span>{p.envoyes} envoyé(s) · {p.ignores} ignoré(s)</span></div><progress aria-label="Traitement des favoris" aria-valuetext={`${p.termines} sur ${p.total} traités${phase?' · '+phase:''}`} value={avancement} max={p.total}/></>}
       <p role="status" aria-live={phase?'polite':'off'}>{phase|| (vue?.active?(p.secondes>0?`Prochaine vérification dans ${dureeFavoris(p.secondes)}`:'En attente du prochain passage'):p.incertains||p.refuses?'File interrompue : vérifie le résultat ci-dessous.':'Sélection traitée ou file arrêtée.')}</p>
       {!!p.ignores&&<small>Ignorés : la conversation contient déjà des messages. Aucun nouveau message envoyé à ces favoris.</small>}
-      {vue?.active&&vue.intervalleMinutes&&<small>Intervalle minimum entre les messages : {vue.intervalleMinutes} min. Le plafond horaire peut prolonger l’attente.</small>}
+      {vue?.active&&vue.intervalleMinutes&&<small>{vue.intervalleMaxMinutes?`Temps entre les messages : entre ${vue.intervalleMinutes} et ${vue.intervalleMaxMinutes} min, tiré au hasard.`:`Temps entre les messages : ${vue.intervalleMinutes} min.`} Le plafond horaire peut prolonger l’attente.</small>}
       {!!p.total&&<p>{p.attente} en attente · {p.encours} en cours{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu(s)`:''}{p.annules?` · ${p.annules} annulé(s)`:''}{p.verifies?` · ${p.verifies} clôturé(s) après vérification manuelle`:''}</p>}
       {vue?.active&&!phase&&(!ecranActif||typeof document!=='undefined'&&document.visibilityState==='hidden'||!disponible)&&<p role="status">Envois suspendus : {disponible?'reviens sur cet écran pour reprendre.':'vérifie la connexion de l’extension au bon compte.'}</p>}
     </div>}
@@ -111,5 +108,5 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
     {!!p.incertains&&!vue?.active&&<button type="button" disabled={occupe} onClick={()=>agir('clore')}>J’ai vérifié sur Vinted · ne pas renvoyer</button>}
     {erreur&&<p role="alert"><strong>Dernière tentative : </strong>{erreur}</p>}
     <button type="button" disabled={occupe||busy.current} onClick={lire}>Actualiser la file</button>
-  </details>;
+  </div>;
 }

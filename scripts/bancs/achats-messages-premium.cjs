@@ -263,16 +263,22 @@ const capturer = async (pg, nom, vp) => {
         if (tel) dit(!l.petits.length, `${T} aucune cible tactile < 44 px (liste)`, l.petits.slice(0, 8).join(' | '));
         await pg.selectOption('#vrm-sel-compte', UID);
         await pg.getByRole('button',{name:'Favoris reçus',exact:true}).click();
+        await pg.getByRole('button',{name:'Envoyer un message aux favoris',exact:true}).click();
         await pg.locator('.vrm-favoris-rows article').first().waitFor();
         dit(await pg.locator('.vrm-favoris-rows article').count()===1, `${T} la liste des favoris captés est raccordée au compte`);
         await pg.locator('.vrm-favoris-rows input[type=checkbox]').check();
+        await pg.getByRole('button',{name:/^Continuer/}).click();
         dit(await pg.getByRole('textbox',{name:'Ton message',exact:true}).count()===1, `${T} sélectionner un favori ouvre la préparation du message`);
         if(!tel){
           await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
+          await pg.getByRole('button',{name:'Continuer',exact:true}).click();
+          await pg.getByRole('button',{name:'Aléatoire',exact:true}).click();
+          dit(await pg.getByLabel('Maximum (minutes)',{exact:true}).count()===1,`${T} étape « Envoi » : temps aléatoire proposé`);
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'5.226'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} ancien code : blocage expliqué sans message`);
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>window.controleOuverture=t}}));
+          await pg.getByRole('button',{name:'← Retour',exact:true}).click();await pg.getByRole('button',{name:'← Retour',exact:true}).click();
           await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
           await pg.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
@@ -287,18 +293,20 @@ const capturer = async (pg, nom, vp) => {
           await pg.evaluate(()=>window.dispatchEvent(new Event('focus')));
           await pg.waitForFunction(()=>!document.querySelector('.vrm-favoris-check input:checked'));
           await pg.getByRole('checkbox',{name:/Sélectionner Camille/}).check();
-
+          await pg.getByRole('button',{name:/^Continuer/}).click();await pg.getByRole('button',{name:'Continuer',exact:true}).click();
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
           await pg.getByRole('status').filter({hasText:'1 envoyé(s)'}).waitFor().catch(async e=>{await pg.screenshot({path:path.join(SHOTS,'favoris-echec.png'),fullPage:true});console.log(await pg.locator('.vrm-favoris-liste').innerText());throw e;});
           dit(await pg.evaluate(()=>window.favorisExec?.length===1&&window.favorisExec[0].uid==='111'&&window.favorisExec[0].body.jeton==='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),`${T} le lancement passe une seule autorisation au pont du compte choisi`);
         }else{
+          await pg.getByRole('textbox',{name:'Ton message',exact:true}).fill('Merci pour ton favori !');
+          await pg.getByRole('button',{name:'Continuer',exact:true}).click();
           await pg.getByRole('button',{name:'Lancer les envois sélectionnés',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'extension'}).waitFor();
           dit(await pg.evaluate(()=>!window.favorisExec?.length),`${T} téléphone sans extension : explication et aucun lancement`);
         }
-        await pg.locator('.vrm-favoris-liste').getByRole('button',{name:'Masquer',exact:true}).click();
+        await pg.locator('[data-favoris-feuille]').getByRole('button',{name:'Fermer',exact:true}).click();
         await pg.getByRole('button',{name:'Conversations',exact:true}).click();
-        dit(await pg.locator('.vrm-favoris-rows').count()===0, `${T} masquer la liste rend la place aux conversations`);
+        dit(await pg.locator('.vrm-favoris-rows article:visible').count()===0, `${T} masquer la liste rend la place aux conversations`);
         await pg.selectOption('#vrm-sel-compte', '*');
         await pg.click('[data-conv="301"]');
         await pg.waitForFunction(() => document.querySelector('.vrm-chat-panel [data-offre]'), null, { timeout: 8000 }).catch(() => {});

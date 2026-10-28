@@ -1,17 +1,27 @@
 import {preparerMessageFavori} from './favorisVinted.js';
-const BASE={message:'',pourcentage:null,intervalleMinutes:6};
+const BASE={message:'',pourcentage:null,intervalleMinutes:6,intervalleMaxMinutes:null};
 function identite({uid,owner,ownerActuel}) {
   if(!owner||ownerActuel()!==owner||!/^\d{1,20}$/.test(String(uid||'')))throw Error('Le compte et la session doivent être confirmés.');
   return `vrm_favoris_reglages_${uid}`;
 }
-export function validerReglagesFavoris({message='',pourcentage=null,intervalleMinutes}) {
+// Temps entre deux messages : fixe (intervalleMaxMinutes null) ou tiré au
+// hasard par le SERVEUR entre le minimum et le maximum (28 oct., sa demande :
+// « le temps aléatoire comme pour les republications »). Le plafond de 10
+// messages sur 60 minutes reste prioritaire, quel que soit le tirage.
+export function validerReglagesFavoris({message='',pourcentage=null,intervalleMinutes,intervalleMaxMinutes=null}) {
   if(typeof message!=='string')throw Error('Le message doit être du texte.');
   const intervalle=String(intervalleMinutes??'').trim();
   if(!/^\d{1,6}$/.test(intervalle)||Number(intervalle)<1||Number(intervalle)>1440)throw Error('Choisis un intervalle entier entre 1 et 1 440 minutes.');
+  const maxTexte=String(intervalleMaxMinutes??'').trim();let max=null;
+  if(maxTexte){
+    if(!/^\d{1,6}$/.test(maxTexte)||Number(maxTexte)<1||Number(maxTexte)>1440)throw Error('Choisis un maximum entier entre 1 et 1 440 minutes.');
+    if(Number(maxTexte)<Number(intervalle))throw Error('Le maximum doit être au moins égal au minimum.');
+    if(Number(maxTexte)>Number(intervalle))max=Number(maxTexte);
+  }
   const m=preparerMessageFavori(message,pourcentage);
   if(m.erreur)throw Error(m.erreur);
   if(!m.message)throw Error('Ajoute un message ou une réduction avant d’enregistrer.');
-  return {version:1,message:message.trim(),pourcentage:m.pourcentage,intervalleMinutes:Number(intervalle),envoisActifs:false};
+  return {version:1,message:message.trim(),pourcentage:m.pourcentage,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,envoisActifs:false};
 }
 export async function lireReglagesFavoris(opts) {
   const id=identite(opts),{owner,ownerActuel,base,headers,fetcher=fetch}=opts;
@@ -22,7 +32,7 @@ export async function lireReglagesFavoris(opts) {
   if(!Array.isArray(rows)||rows.length>1||rows.some(x=>x?.owner!==owner||x.id!==id))throw Error('Les réglages ne confirment pas le compte attendu.');
   if(!rows.length)return {...BASE,enregistres:false};
   const d=rows[0].data;
-  if(d?.version!==1||d.envoisActifs!==false||typeof d.message!=='string'||!(d.pourcentage===null||Number.isInteger(d.pourcentage))||!Number.isInteger(d.intervalleMinutes))throw Error('Le format des réglages enregistrés doit être vérifié avant de les remplacer.');
+  if(d?.version!==1||d.envoisActifs!==false||typeof d.message!=='string'||!(d.pourcentage===null||Number.isInteger(d.pourcentage))||!Number.isInteger(d.intervalleMinutes)||!(d.intervalleMaxMinutes==null||Number.isInteger(d.intervalleMaxMinutes)))throw Error('Le format des réglages enregistrés doit être vérifié avant de les remplacer.');
   return {...validerReglagesFavoris(d),enregistres:true};
 }
 export async function sauverReglagesFavoris(opts,reglages) {

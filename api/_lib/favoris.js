@@ -75,7 +75,7 @@ export async function routeFavoris(req,res){
             targets=resoudreCiblesFavoris({...opts,conversations,parametresAilleurs});
           }
         }
-        const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,maintenant,lot});
+        const lot=randomUUID();decision=d=>lancerFile(d,{owner,targets,message,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
