@@ -7,6 +7,21 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — la COULEUR, et la barre de progression (5.259) :** Julien : « ça a laissé
+> l'annonce en brouillon » (N°72) puis « 400 : Erreurs trouvées ». Mesuré : le brouillon de VRM ne différait
+> d'un brouillon accepté par Vinted que par `color_ids: []` — Vinted RANGE un brouillon sans couleur mais
+> REFUSE sa mise en ligne. ⇒ `idsCouleurVinted` lit `color_ids`, `colors[].id`, `color1_id`/`color2_id` ;
+> `itemPourRecreer` exige la couleur (modèle ou codes, sinon lue chez Vinted par `apprendreRecetteVinted`,
+> même avec un modèle) — inconnue ⇒ `couleur-absente`, RIEN supprimé ni créé ; `publierBrouillon` et
+> `refaireBrouillon` refusent un brouillon sans couleur avant d'envoyer ; `raisonRefusVinted` nomme les
+> champs de `errors[]` (plus seulement « Erreurs trouvées »), diag `vinted_refus_champs_*`,
+> `recette_sans_couleur_<clés>`. Barre : l'extension annonce chaque étape (`maj · repub` : photos n/N,
+> enregistrement, suppression, brouillon, attente, en-ligne ; direct : photos, creation, suppression) ;
+> `RepublierVinted` dessine une barre d'ensemble (`data-republier-total`) et une par paire en cours
+> (`data-republier-progression`, `progressionRepub`) ; `lecturesPartagees` ne se vide pas sur ces
+> évènements. Preuves : `audit-recreer.cjs` (92 ; 10 rouges sur la 5.258), banc `republier.cjs` (barre).
+> N°72 : le brouillon 10574536209 est dans ses brouillons Vinted, SANS couleur — à finir sur Vinted.
+
 > **28 octobre (nuit) — le coffre ne perd plus la sauvegarde d'un passage (5.256) :** l'archivage du dressing (à
 > chaque visite Vinted) et Republier / En ligne → brouillon lisent-fusionnent-réécrivent la MÊME ligne
 > `coffre_{uid}_{id}`. Reproduit : une lecture lente de l'archivage, rendue APRÈS l'écriture du passage, faisait

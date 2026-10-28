@@ -109,7 +109,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.258.0';
+const EXT_ATTENDUE = '5.259.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11840,6 +11840,22 @@ const ACTIONS_REPUB = {
   versBrouillon: { titre: 'Repasser en brouillon', etapes: [['choix', '1. Choisir'], ['modif', '2. Modifier'], ['envoi', '3. Passer en brouillon']], lancer: 'Passer en brouillon', fait: '✓ en brouillon', faits: 'passée en brouillon', confirme: () => `seront retirées de la vente et rangées dans mes brouillons Vinted, comme dans l'aperçu.` },
   enLigne: { titre: 'Mettre des brouillons en ligne', etapes: [['choix', '1. Choisir'], ['envoi', '2. Mettre en ligne']], lancer: 'Mettre en ligne', fait: '✓ en ligne', faits: 'mise en ligne', confirme: () => `seront mis en ligne sur mon compte Vinted, tels que je les ai enregistrés.` },
 };
+// Les étapes d'une recréation, dans l'ordre (annoncées par l'extension 5.259).
+const ETAPES_REPUB = {
+  brouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'ancienne annonce"], ['brouillon', 'Création du brouillon'], ['attente', 'Petite pause avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
+  versBrouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'annonce"], ['brouillon', 'Création du brouillon']],
+  direct: [['photos', 'Envoi des photos'], ['creation', 'Création de la nouvelle annonce'], ['suppression', "Retrait de l'ancienne annonce"]],
+};
+function progressionRepub(p, action, viaB) {
+  const liste = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct);
+  if (!p || !p.etape) return { etape: '', part: 0.03, texte: 'Préparation…' };
+  const i = liste.findIndex((x) => x[0] === p.etape);
+  if (i < 0) return { etape: p.etape, part: 0.05, texte: 'En cours…' };
+  const dedans = p.etape === 'photos' && p.total > 0 ? Math.min(1, p.fait / p.total) : 0;
+  const part = Math.min(0.97, (i + dedans) / liste.length);
+  const quoi = p.etape === 'photos' && p.total > 0 ? `Envoi de la photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}` : liste[i][1];
+  return { etape: p.etape, part, texte: `Étape ${i + 1} sur ${liste.length} · ${quoi}…` };
+}
 function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, action = 'recreer' }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
   // (28 oct., sa demande) Seules les paires du compte Vinted OUVERT DANS CHROME
@@ -11878,6 +11894,15 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [ok, setOk] = useState(false);
   const [mode, setMode] = useState('idle');          // idle | run | pause | fini
   const [st, setSt] = useState({});                  // id → { etat, raison, ancien, nouveau }
+  // (28 oct., sa demande : « une barre de progression ») L'étape en cours de
+  // chaque paire, annoncée par l'extension (`maj · repub`, 5.259). Rien n'en est
+  // déduit : le résultat reste celui que rend l'extension à la fin.
+  const [prog, setProg] = useState({});              // id → { etape, fait, total }
+  useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'repub' && d.id) setProg((p) => ({ ...p, [String(d.id)]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total: Number(d.total) || 0 } })); };
+    window.addEventListener('vrm:ext', f);
+    return () => window.removeEventListener('vrm:ext', f);
+  }, []);
   const [tri, setTri] = useState('anciennes');       // anciennes | vues | favoris
   const [arret, setArret] = useState('');            // un refus qui vaut pour toute la file
   const [ordre, setOrdre] = useState(null);          // null = l'ordre de sa sélection
@@ -12181,8 +12206,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <button type="button" data-republier-melanger onClick={melanger} style={btn(false)}>Mélanger</button>
                 {ordre && <button type="button" data-republier-ordre-selection onClick={() => setOrdre(null)} style={btn(false)}>Ordre de ma sélection</button>}
               </div>}
-              {aFaire.map((a, i) => { const s = st[a.id] || {}; return (
-                <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+              {aFaire.map((a, i) => { const s = st[a.id] || {}; return (<React.Fragment key={a.id}>
+                <div data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                   <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
                   {!s.etat && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : Number.isFinite(plan[a.id]) ? `+${duree(plan[a.id])}` : ''}</span>}
@@ -12193,8 +12218,30 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   <span style={{ flexShrink: 0, maxWidth: '55%', textAlign: 'right', color: (s.etat === 'echec' || s.etat === 'double' || s.etat === 'incertain' || s.etat === 'a-refaire') ? C.warn : s.etat === 'fait' ? C.text : C.muted, fontWeight: s.etat ? 600 : 400 }}>{s.etat === 'fait' ? (s.refait ? `brouillon refait${s.raison ? ' · ' + s.raison : ''}` : A.fait) : s.etat === 'encours' ? 'en cours…' : s.etat === 'echec' ? `pas faite · ${s.raison}` : s.etat ? `⚠ ${s.raison}` : (mode === 'idle' ? '' : 'en attente')}</span>
                   {s.etat === 'a-refaire' && refaire && mode !== 'run' && <button type="button" data-republier-refaire={a.id} onClick={() => refaireLigne(a)} style={{ ...btn(true), flexShrink: 0 }}>Refaire le brouillon</button>}
                 </div>
-              ); })}
+                {s.etat === 'encours' && recree && (() => { const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
+                  <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 10px 10px 36px', borderBottom: `1px solid ${C.border}` }}>
+                    <div role="progressbar" aria-label={`Paire ${i + 1} : ${pe.texte}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pe.part * 100)} style={{ height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(4, Math.round(pe.part * 100))}%`, height: '100%', background: C.accent, transition: 'width .3s ease' }} />
+                    </div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{pe.texte}</div>
+                  </div>
+                ); })()}
+              </React.Fragment>); })}
             </div>
+            {mode !== 'idle' && aFaire.length > 0 && (() => {
+              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours'; }).length;
+              const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
+              const partEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk).part : 0;
+              const part = Math.min(1, (finies + partEnCours) / aFaire.length);
+              return (
+                <div data-republier-total={`${finies}/${aFaire.length}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div role="progressbar" aria-label={`${finies} sur ${aFaire.length} terminées`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(part * 100)} style={{ height: 10, borderRadius: 5, background: C.border, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.round(part * 100)}%`, height: '100%', background: C.accent, transition: 'width .4s ease' }} />
+                  </div>
+                  <div style={{ fontSize: 12.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{finies} sur {aFaire.length} terminée{finies > 1 ? 's' : ''}{enCours ? ` · paire ${aFaire.indexOf(enCours) + 1} en cours` : ''}</div>
+                </div>
+              );
+            })()}
             {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} {A.faits}{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{nRefaire ? ` · ${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : ''}{nDouble ? ` · ${nDouble} à vérifier sur Vinted` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}{mode === 'run' && prochaine ? (() => { const r = Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)); return <span data-republier-prochaine={prochaine.s}> · prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span>; })() : ''}</div>}
           </>}
         </div>
