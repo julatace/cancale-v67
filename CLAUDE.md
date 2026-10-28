@@ -190,6 +190,11 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — le nombre max sur les ÉTAGÈRES À BACS :** « fais pareil pour les étagères à bacs ».
+> Une plaque « max 1 » en façade, en haut de chaque case (un bac par case), taille dans la pièce ; pas sur une case
+> sans plateau dessous (son bac tomberait). Sonde `maxCases`. Banc `stock-finitions.cjs` XII (+2 par taille ; plaques
+> retirées ⇒ 4 rouges).
+
 > **28 octobre (nuit, fin) — le nombre max sur les PORTANTS :** « fais pareil pour les portants ». Un cintre porte UN
 > vêtement : la plaque « max N » est par BARRE (N = ses cintres où la barre existe), au-dessus de la barre, en façade,
 > taille dans la pièce ; barre raccourcie ⇒ N baisse ; barre absente partout ⇒ pas de plaque. Sonde `maxCases`
