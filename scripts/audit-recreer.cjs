@@ -28,7 +28,7 @@ const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', descr
 const PHOTOS = ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'];
 const PHOTOS_D = ['https://images1.vinted.net/t/b/f800/1.jpeg', 'https://images1.vinted.net/t/b/f800/2.jpeg'];
 
-function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null } = {}) {
+function monter({ connecte = '111', comptes = null, coffre = true, modele = true, codes = null, photo = 200, photoSansId = false, creation = 200, creationSansId = false, suppression = 200, src, cdn = null, descDetails = null, lettreCoffre = null, brouillon = 200, brouillonSansId = false, completion = 200, extra = null, coffreEcritureKO = false, retardLecture = null, lecture = null, completionCorps = null } = {}) {
   const lignes = { main: { capturedAt: nowISO(), vinted_annonce_numeros: { '9101': { numero: '41' } } }, vinted_item_details: {} };
   if (coffre) lignes['coffre_111_9101'] = { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'Nickel, boîte d’origine', photos: PHOTOS };
   if (modele) lignes['vrm_vinted_modele'] = { '9101': { corps: MODELE, at: nowISO(), uid: '111' } };
@@ -40,10 +40,11 @@ function monter({ connecte = '111', comptes = null, coffre = true, modele = true
   let n = 500;
   return faireFond({ src, lignes, connecte, comptes, retardLecture: retardLecture || (() => 0), ecritureKO: (id) => coffreEcritureKO && /^coffre_/.test(id), cdn: cdn || (() => ({ status: 200 })),
     vinted: (e) => {
+      if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin) && lecture) return lecture;
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: photo, body: photoSansId ? { ok: true } : { id: ++n } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/items\/?$/.test(e.chemin)) return { status: creation, body: creationSansId ? { code: 0 } : { item: { id: 77001 } } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/?$/.test(e.chemin)) return { status: typeof brouillon === 'function' ? brouillon() : brouillon, body: brouillonSansId ? { code: 0 } : { draft: { id: 88001 } } };
-      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: typeof completion === 'function' ? completion() : completion, body: { code: 0 } };
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) return { status: typeof completion === 'function' ? completion() : completion, body: completionCorps || { code: 0 } };
       if (e.methode === 'POST' && /\/api\/v2\/items\/9101\/delete$/.test(e.chemin)) return { status: suppression, body: {} };
       return { status: 404, body: {} };
     } });
@@ -127,7 +128,41 @@ const zero = (j) => j.vinted.length === 0;
   { const { f, r } = await run({ coffre: false });
     dit(zero(f.j) && r.code === 'coffre-absent', "aucune photo sauvegardée : aucune requête", `n=${f.j.vinted.length} code=${r.code}`); }
   { const { f, r } = await run({ modele: false });
-    dit(zero(f.j) && r.code === 'recette-absente' && /Modifier/.test(r.raison || ''), "recette inconnue (ni modèle ni codes) : aucune requête, et le geste qui l'apprend", `n=${f.j.vinted.length} code=${r.code}`); }
+    const lus = de(f.j, /\/api\/v2\/item_upload\/items\/9101$/, 'GET');
+    dit(f.j.vinted.length === 1 && lus.length === 1 && r.code === 'recette-absente', "recette inconnue, Vinted refuse de la donner : UNE lecture, rien d'autre, et c'est dit", `n=${f.j.vinted.length} code=${r.code} raison=${r.raison}`); }
+  // G3 — (28 oct., vu chez Julien) sans modèle ni codes : la recette est LUE chez
+  //      Vinted (comme sa page « Modifier ») et la republication aboutit, sans geste.
+  { const { f, r } = await run({ modele: false, lecture: { status: 200, body: { item: { id: 9101, description: 'Nickel, boîte d’origine', catalog_id: 88, brand_id: 9, brand: 'Dr. Martens', color_ids: [1], item_attributes: [{ code: 'size', ids: [55] }, { code: 'status', ids: [2] }], package_size_id: 2 } } } });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
+    const codes = ((f.lignes.vinted_item_details || {})['9101'] || {}).codes || {};
+    dit(r.etape === 'fait' && it.catalog_id === 88 && it.package_size_id === 2 && codes.catalog_id === 88, "sans modèle ni codes : la recette est lue chez Vinted, gardée, et la republication aboutit", JSON.stringify({ e: r.etape, code: r.code, raison: r.raison, c: it.catalog_id, rangee: codes.catalog_id })); }
+  { const { f, r } = await run({ modele: false, lecture: { status: 200, body: { item: { id: 9101, title: 'x', size_id: 3 } } } });
+    dit(creations(f.j).length === 0 && suppressions(f.j).length === 0 && r.code === 'recette-absente', "réponse sans la recette sous une forme connue : rien n'est créé ni supprimé (jamais deviné)", JSON.stringify({ code: r.code })); }
+  // C1 — (28 oct., N°72 restée en brouillon) Vinted range un brouillon SANS
+  //      couleur mais REFUSE de le mettre en ligne (« 400 : Erreurs trouvées »).
+  //      Couleur inconnue partout ⇒ rien n'est supprimé ni créé, et c'est dit.
+  for (const via of [false, true]) {
+    const { f, r } = await run({ modele: false, viaBrouillon: via, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 88, brand_id: 9, item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
+    dit(suppressions(f.j).length === 0 && creations(f.j).length === 0 && de(f.j, /\/item_upload\/drafts/).length === 0 && photosP(f.j).length === 0 && r.code === 'couleur-absente' && /couleur/.test(r.raison || ''), `couleur inconnue (${via ? 'par brouillon' : 'directe'}) : rien n'est supprimé ni créé, la couleur est nommée`, JSON.stringify({ s: suppressions(f.j).length, c: creations(f.j).length, code: r.code })); }
+  // C2 — la couleur sous `color1_id` (objet) est lue, et part dans le brouillon ET sa mise en ligne.
+  { const { f, r } = await run({ modele: false, viaBrouillon: true, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 88, brand_id: 9, color1_id: { id: 1, title: 'Noir' }, item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
+    let cb = {}, cc = {}; try { cb = JSON.parse(de(f.j, /\/item_upload\/drafts\/?$/)[0].corps).draft; cc = JSON.parse(de(f.j, /\/completion$/)[0].corps).draft; } catch (_) {}
+    dit(r.etape === 'fait' && JSON.stringify(cb.color_ids) === '[1]' && JSON.stringify(cc.color_ids) === '[1]', "couleur lue sous color1_id : brouillon et mise en ligne la portent, la republication aboutit", JSON.stringify({ e: r.etape, code: r.code, b: cb.color_ids, c: cc.color_ids, raison: r.raison })); }
+  // C3 — un modèle SANS couleur : la couleur est lue chez Vinted, jamais envoyée vide.
+  { const sansCouleur = JSON.stringify({ item: { ...JSON.parse(MODELE).item, color_ids: [] } });
+    const { f, r } = await run({ extra: { vrm_vinted_modele: { '9101': { corps: sansCouleur, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }], package_size_id: 1 } } } });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
+    dit(r.etape === 'fait' && JSON.stringify(it.color_ids) === '[7]', "modèle sans couleur : elle est lue chez Vinted, l'annonce part avec", JSON.stringify({ e: r.etape, code: r.code, c: it.color_ids })); }
+  // C4 — la barre de progression : chaque étape est annoncée à l'app, dans l'ordre.
+  { const { f, r } = await run({ viaBrouillon: true });
+    const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101').map((e) => e.etape);
+    const ordre = [...new Set(et)].join(',');
+    dit(r.etape === 'fait' && ordre === 'photos,enregistrement,suppression,brouillon,attente,en-ligne', "les étapes (photos, enregistrement, suppression, brouillon, pause, mise en ligne) sont annoncées à l'app, dans l'ordre", ordre);
+    const ph = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape === 'photos');
+    dit(ph.length === 2 && ph[1].fait === 1 && ph[1].total === 2, "l'envoi des photos dit « photo n sur N »", JSON.stringify(ph)); }
+  { const { f } = await run();
+    const ordre = [...new Set(f.j.evts.filter((e) => e && e.quoi === 'repub').map((e) => e.etape))].join(',');
+    dit(ordre === 'photos,creation,suppression', "chemin direct : photos, création, suppression", ordre); }
   // G — sans modèle, avec les codes rangés de sa fiche : la recette vient d'eux.
   { const { f, r } = await run({ modele: false, codes: { catalog_id: 77, brand_id: 9, brand: 'Nike', color_ids: [3], item_attributes: [{ code: 'size', ids: [60] }], package_size_id: 2 } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).item; } catch (_) {}
@@ -212,7 +247,7 @@ const zero = (j) => j.vinted.length === 0;
   const dressing = (ids) => ({ harvest_111_listings: { capturedAt: nowISO(), payload: { items: ids.map((x) => ({ id: x, is_draft: true })) } } });
   const pubB = async (opts = {}) => {
     const extra = { ...(opts.dressing === false ? {} : dressing(['10432342904'])), ...(opts.ligne === false ? {} : { vinted_brouillon_10432342904: { id: '10432342904', uid: opts.uid || '111', corps: opts.corps || CORPS_B(), etat: 'brouillon' } }) };
-    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: opts.completion || 200 });
+    const f = monter({ src: process.env.BG_SRC || undefined, extra, completion: opts.completion || 200, completionCorps: opts.completionCorps || null });
     if (typeof f.ctx.publierBrouillon !== 'function') return { f, r: { absent: true } };
     let r = {}; try { r = await f.ctx.publierBrouillon({ cmd: 'publierBrouillon', uid: '111', draftId: '10432342904', confirme: opts.confirme !== false }); } catch (e) { r = { erreur: e.message }; }
     return { f, r };
@@ -233,6 +268,10 @@ const zero = (j) => j.vinted.length === 0;
     dit(zero(f.j) && r.code === 'confirmation', "sans confirmation : aucune requête", `code=${r.code}`); }
   { const { f, r } = await pubB({ completion: 422 });
     dit(r.etape === 'echec' && f.lignes.vinted_brouillon_10432342904.etat === 'brouillon', "mise en ligne refusée : le brouillon reste un brouillon, c'est dit", `etape=${r.etape}`); }
+  { const { f, r } = await pubB({ corps: CORPS_B({ color_ids: [] }) });
+    dit(zero(f.j) && r.code === 'incomplet' && /couleur/.test(r.raison || ''), "brouillon sans couleur : refusé AVANT d'envoyer (Vinted le refuserait), la couleur est nommée", `n=${f.j.vinted.length} ${r.raison || ''}`); }
+  { const { r } = await pubB({ completion: 400, completionCorps: { code: 99, message: 'Erreurs trouvées', message_code: 'validation_error', errors: [{ field: 'color_ids', value: 'Choisis une couleur' }] } });
+    dit(r.etape === 'echec' && /couleur/.test(r.raison || '') && /Choisis une couleur/.test(r.raison || ''), "un refus de Vinted dit QUEL champ il réclame (plus seulement « Erreurs trouvées »)", r.raison || ''); }
   // O — le brouillon qu'il enregistre sur Vinted est appris (corps accepté, id).
   { const f = monter({ src: process.env.BG_SRC || undefined });
     let ok1 = false, ok2 = true;

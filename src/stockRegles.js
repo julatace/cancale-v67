@@ -170,6 +170,64 @@ export const retirerDeCase = (slots, key, num) => {
   if (reste.length) out[key] = reste; else delete out[key];
   return { slots: out, descendus: pile.slice(i + 1) };
 };
+// ── LES PLANCHES, COLONNE PAR COLONNE (28 oct.) ─────────────────────────────
+// Julien : « rends les planches réglables colonne par colonne », puis « fais
+// pareil pour les planches de la vue 3D ». Une forme pour « Mes meubles » et la
+// pièce 3D : un NOMBRE r = une planche sur toute la largeur sous la rangée r
+// (1 = celle du haut), une chaîne « r:c » = un morceau sous la rangée r, colonne
+// c (1 = la gauche). Le bas du meuble en est toujours une.
+export const planchesCases = (planches, cols, rows) => {
+  const c = Math.max(1, +cols || 1), r = Math.max(1, +rows || 1), out = new Set();
+  arr(planches).forEach((x) => {
+    if (typeof x === 'number' || /^\d+$/.test(String(x))) { const n = +x; if (Number.isInteger(n) && n >= 1 && n < r) for (let k = 1; k <= c; k++) out.add(n + ':' + k); return; }
+    const mm = /^(\d+):(\d+)$/.exec(String(x)); if (!mm) return;
+    const n = +mm[1], k = +mm[2]; if (n >= 1 && n < r && k >= 1 && k <= c) out.add(n + ':' + k);
+  });
+  return out;
+};
+export const planchesRangees = (set, cols, rows) => {
+  const c = Math.max(1, +cols || 1), r = Math.max(1, +rows || 1), out = [];
+  for (let n = 1; n < r; n++) {
+    const ks = []; for (let k = 1; k <= c; k++) if (set.has(n + ':' + k)) ks.push(k);
+    if (ks.length === c) out.push(n); else ks.forEach((k) => out.push(n + ':' + k));
+  }
+  return out;
+};
+// Une étagère de la pièce 3D (métal ou bois, pas à bacs) : SANS réglage, tous
+// ses plateaux sont là (comme avant). Rend null pour un meuble sans plateaux
+// réglables (table, bacs, portant, mur de boîtes).
+export const plateauxReglables = (ft) => !!(ft && ft.build === 'metal' && !ft.bacs && modeCase(ft) === 'pile');
+export const plateauxMeuble = (it, ft) => {
+  if (!plateauxReglables(ft)) return null;
+  const nr = Math.max(1, (it && it.rows) || ft.rows || 1), nc = Math.max(1, (it && it.cols) || ft.cols || 1);
+  const p = it && Array.isArray(it.planches) ? it.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1);
+  return planchesCases(p, nc, nr);
+};
+// GRAVITÉ SUR UN PLATEAU QUI MANQUE : dans une colonne, les cases qui ne sont
+// séparées par AUCUN plateau forment une seule hauteur — les boîtes de la case du
+// dessus tombent dans celle du dessous tant qu'elle a de la place. On ne déplace
+// que des boîtes, jamais un numéro ; aucune n'est perdue (une case trop pleine
+// garde le surplus). Index 0 de chaque case = la boîte du bas.
+export const tasserPlateaux = (slots, nr, nc, cases, cap) => {
+  const out = {}; const s = slots || {};
+  for (const k in s) { const a = nettoie(s[k]); if (a.length) out[k] = a; }
+  if (!cases) return out;
+  const C = Math.max(1, cap || 1);
+  for (let c = 0; c < nc; c++) {
+    const bornes = [0];
+    for (let r = 1; r < nr; r++) if (cases.has(r + ':' + (c + 1))) bornes.push(r);
+    bornes.push(nr);
+    for (let b = 0; b < bornes.length - 1; b++) {
+      const haut = bornes[b], bas = bornes[b + 1] - 1;
+      if (haut === bas) continue;
+      const tout = [];
+      for (let r = bas; r >= haut; r--) { tout.push(...(out[r + '_' + c] || [])); delete out[r + '_' + c]; }
+      let r = bas;
+      while (tout.length && r >= haut) { const part = r === haut ? tout.splice(0) : tout.splice(0, C); out[r + '_' + c] = part; r--; }
+    }
+  }
+  return out;
+};
 // CARTONS AU SOL : `nums` est rempli colonne par colonne, de bas en haut
 // (`rows` cartons par colonne). Une place vide dans une colonne s'écrit '' —
 // elle garde les autres colonnes à leur place.

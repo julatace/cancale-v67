@@ -7,6 +7,21 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **28 octobre (nuit, fin) — la COULEUR, et la barre de progression (5.259) :** Julien : « ça a laissé
+> l'annonce en brouillon » (N°72) puis « 400 : Erreurs trouvées ». Mesuré : le brouillon de VRM ne différait
+> d'un brouillon accepté par Vinted que par `color_ids: []` — Vinted RANGE un brouillon sans couleur mais
+> REFUSE sa mise en ligne. ⇒ `idsCouleurVinted` lit `color_ids`, `colors[].id`, `color1_id`/`color2_id` ;
+> `itemPourRecreer` exige la couleur (modèle ou codes, sinon lue chez Vinted par `apprendreRecetteVinted`,
+> même avec un modèle) — inconnue ⇒ `couleur-absente`, RIEN supprimé ni créé ; `publierBrouillon` et
+> `refaireBrouillon` refusent un brouillon sans couleur avant d'envoyer ; `raisonRefusVinted` nomme les
+> champs de `errors[]` (plus seulement « Erreurs trouvées »), diag `vinted_refus_champs_*`,
+> `recette_sans_couleur_<clés>`. Barre : l'extension annonce chaque étape (`maj · repub` : photos n/N,
+> enregistrement, suppression, brouillon, attente, en-ligne ; direct : photos, creation, suppression) ;
+> `RepublierVinted` dessine une barre d'ensemble (`data-republier-total`) et une par paire en cours
+> (`data-republier-progression`, `progressionRepub`) ; `lecturesPartagees` ne se vide pas sur ces
+> évènements. Preuves : `audit-recreer.cjs` (92 ; 10 rouges sur la 5.258), banc `republier.cjs` (barre).
+> N°72 : le brouillon 10574536209 est dans ses brouillons Vinted, SANS couleur — à finir sur Vinted.
+
 > **28 octobre (nuit) — le coffre ne perd plus la sauvegarde d'un passage (5.256) :** l'archivage du dressing (à
 > chaque visite Vinted) et Republier / En ligne → brouillon lisent-fusionnent-réécrivent la MÊME ligne
 > `coffre_{uid}_{id}`. Reproduit : une lecture lente de l'archivage, rendue APRÈS l'écriture du passage, faisait
@@ -57,6 +72,16 @@
 > vente : un brouillon n'est jamais en ligne. Le §3 « recréer PUIS supprimer » vaut toujours pour Republier (en ligne →
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
+
+> **28 octobre (nuit, fin) — les PLATEAUX de la pièce 3D, colonne par colonne :** Julien : « fais pareil pour les
+> planches de la vue 3D ». Étagère métal ou bois (pas à bacs, pas la table) : `it.planches`, même forme que « Mes
+> meubles » (règle déplacée dans `src/stockRegles.js` : `planchesCases`, `planchesRangees`, `plateauxMeuble`,
+> `tasserPlateaux`). ABSENT ⇒ tous les plateaux (comme avant). Sans plateau sous une case, ses boîtes tombent dans la
+> case du dessous tant qu'elle a de la place (`graviteCases(…, it)`, et `updateItem` tasse toute écriture) ; aucune
+> boîte perdue, aucun numéro changé. Réglage : Aménager → toucher l'étagère → « Plateaux, colonne par colonne »
+> (`ChoixPlanches plateau`, le même dessin que « Mes meubles »). La 3D dessine les morceaux (`buildMetal`, sonde
+> `plateaux`) et ne montre plus de place libre au-dessus d'un plateau qui manque. Ajouter un niveau (en haut) décale
+> les plateaux réglés. Banc `stock-finitions.cjs` IX (390/1512 ; `tasserPlateaux` neutralisé ⇒ 4 rouges).
 
 > **28 octobre (nuit, suite) — les planches COLONNE PAR COLONNE :** Julien : « rends les planches réglables
 > colonne par colonne ». `m.planches` garde un NOMBRE pour une planche pleine largeur (forme d'avant, lue telle

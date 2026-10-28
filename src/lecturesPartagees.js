@@ -121,7 +121,9 @@ export function installerLecturesPartagees(base) {
     if (window.__vrmLecturesPartagees) return window.__vrmLecturesPartagees;
     const lp = creerLecturesPartagees(window.fetch.bind(window), base);
     window.fetch = lp.fetch;
-    window.addEventListener('vrm:ext', lp.invalider);
+    // Une étape de recréation (`maj · repub`, la barre de progression) ne change
+    // aucune donnée lue : elle ne vide pas le partage.
+    window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'repub') return; lp.invalider(); });
     window.__vrmLecturesPartagees = lp;
     return lp;
   } catch (_) { return null; }

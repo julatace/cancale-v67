@@ -5,6 +5,7 @@
 // PROPS (mesuré : les seuls identifiants de niveau module qu'il utilise) — pas
 // d'import circulaire avec App.jsx. Rendu derrière <Suspense> côté App.
 import React, { useState, useEffect, useRef } from 'react';
+import { plateauxMeuble } from './stockRegles.js';
 
 function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
   const mountRef = React.useRef(null);
@@ -338,13 +339,23 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       // (17 oct.) ÉTAGÈRE MÉTAL : quatre montants en cornière, des plateaux, des
       // barres en croix au dos et sur les côtés — l'étagère de garage. En bois :
       // deux joues pleines et des plateaux épais, sans croix.
-      const buildMetal = (w, d, ht, base, rows, bois) => {
-        const g = new THREE.Group(); const n = Math.max(1, rows || 4);
+      // (28 oct.) `plateaux` (Set « r:c », src/stockRegles.js) : un plateau entre
+      // deux niveaux peut ne couvrir que certaines colonnes. Le bas et le haut
+      // sont toujours là. null ⇒ tous les plateaux (comme avant).
+      const buildMetal = (w, d, ht, base, rows, bois, cols, plateaux) => {
+        const g = new THREE.Group(); const n = Math.max(1, rows || 4), nc = Math.max(1, cols || 1);
+        // Les morceaux d'un plateau d'index i (0 = le sol, n = le haut) : [x0, x1] en fraction de la largeur.
+        const morceaux = (i) => {
+          if (!plateaux || i === 0 || i === n) return [[0, 1]];
+          const r = n - i, out = []; let deb = null;
+          for (let c = 1; c <= nc + 1; c++) { const on = c <= nc && plateaux.has(r + ':' + c); if (on && deb == null) deb = c - 1; if (!on && deb != null) { out.push([deb / nc, (c - 1) / nc]); deb = null; } }
+          return out;
+        };
         if (bois) {
           const m = woodMat(base), t = 0.04;
           [-w / 2 + t / 2, w / 2 - t / 2].forEach(px => { const s = box(t, ht, d, m); s.position.set(px, ht / 2, 0); g.add(s); });
           const back = box(w, ht, 0.015, woodMat(shade(base, -10))); back.position.set(0, ht / 2, -d / 2 + 0.008); g.add(back);
-          for (let i = 0; i <= n; i++) { const yy = Math.min(ht - 0.015, Math.max(0.015, (i / n) * ht)); const sh = box(w - 2 * t, 0.03, d - 0.02, m); sh.position.set(0, yy, 0.005); g.add(sh); }
+          for (let i = 0; i <= n; i++) { const yy = Math.min(ht - 0.015, Math.max(0.015, (i / n) * ht)); morceaux(i).forEach(([a, b]) => { const lw = (w - 2 * t) * (b - a); const sh = box(lw, 0.03, d - 0.02, m); sh.position.set(-w / 2 + t + (w - 2 * t) * (a + b) / 2, yy, 0.005); sh.userData.plateau = true; g.add(sh); }); }
           return g;
         }
         const acier = new THREE.MeshStandardMaterial({ color: base, metalness: 0.65, roughness: 0.38 });
@@ -353,8 +364,11 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const m = box(p, ht, p, acier); m.position.set(sx * (w / 2 - p / 2), ht / 2, sz * (d / 2 - p / 2)); g.add(m); });
         for (let i = 0; i <= n; i++) {
           const yy = Math.min(ht - 0.012, Math.max(0.03, (i / n) * ht));
-          const sh = box(w - 0.01, 0.022, d - 0.01, plat); sh.position.set(0, yy, 0); g.add(sh);
-          const lip = box(w, 0.04, 0.012, acier); lip.position.set(0, yy, d / 2 - 0.006); g.add(lip);   // le bord plié du plateau
+          morceaux(i).forEach(([a, b]) => {
+            const lw = (w - 0.01) * (b - a), cx = -w / 2 + 0.005 + (w - 0.01) * (a + b) / 2;
+            const sh = box(lw, 0.022, d - 0.01, plat); sh.position.set(cx, yy, 0); sh.userData.plateau = true; g.add(sh);
+            const lip = box(lw, 0.04, 0.012, acier); lip.position.set(cx, yy, d / 2 - 0.006); g.add(lip);   // le bord plié du plateau
+          });
         }
         // barres en croix (dos + côtés), entre deux plateaux sur deux
         const barre = (x1, y1, z1, x2, y2, z2) => { const L = Math.hypot(x2 - x1, y2 - y1, z2 - z1); const c = cyl(0.007, 0.007, L, acier, 6); c.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2); c.lookAt(x2, y2, z2); c.rotateX(Math.PI / 2); g.add(c); };
@@ -673,7 +687,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           switch (shape) {
             case 'commode': g = buildCommode(w, d, ht, base, it.rows); break;
             case 'etagere': g = buildEtagere(w, d, ht, base, it.rows); break;
-            case 'metal': g = buildMetal(w, d, ht, base, nr, !!(FURN_TYPES[it.type] || {}).bois); break;
+            case 'metal': g = buildMetal(w, d, ht, base, nr, !!(FURN_TYPES[it.type] || {}).bois, nc, Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null); break;
             case 'portant': g = buildPortant(w, d, ht, base, nc, it.slots); break;
             case 'armoire': g = buildArmoire(w, d, ht, base); break;
             case 'penderie': g = buildPenderie(w, d, ht, base); break;
@@ -774,7 +788,11 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
               const cbY = estTable ? ht + 0.04 : Math.max(0, ht - (r + 1) * cellH) + 0.025;   // dessus du plateau
               const z = estTable ? 0 : d / 2 - bd / 2 - 0.015;
               arr.slice(0, cap).forEach((num, i) => { const m = makeColis(num, bw, bh, bd); m.userData = { cell: key, num, idx: i }; m.position.set(cx, cbY + bh / 2 + i * pas, z); g.add(m); });
-              if (arr.length < cap) { const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bh / 2 + arr.length * pas, z); g.add(gh); }
+              // Pas de place libre fantôme au-dessus d'un plateau qui MANQUE tant que
+              // la case du dessous a de la place : une boîte posée là tomberait.
+              const plx = !estTable && Array.isArray(it.planches) ? plateauxMeuble(it, FURN_TYPES[it.type] || {}) : null;
+              const tombe = plx && r < rows - 1 && !plx.has((r + 1) + ':' + (c + 1)) && ((it.slots || {})[(r + 1) + '_' + c] || []).filter(Boolean).length < cap;
+              if (arr.length < cap && !tombe) { const gh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), ghostM); gh.userData = { cell: key, ghost: true }; gh.position.set(cx, cbY + bh / 2 + arr.length * pas, z); g.add(gh); }
             }
           } else if (physique === 'cintre') {
             // le portant dessine lui-même ses cintres
@@ -1369,6 +1387,12 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             if (!m) return null; m.updateWorldMatrix(true, false);
             const c = new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).project(camera), r = renderer.domElement.getBoundingClientRect();
             return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height, yMonde: new THREE.Vector3().setFromMatrixPosition(m.matrixWorld).y };
+          },
+          // Les plateaux d'une étagère : [{ y, w }] (hauteur dans le meuble, largeur).
+          plateaux: (itemId) => {
+            const g = furnGroup.children.find((o) => o.userData && o.userData.itemId === itemId); if (!g) return null;
+            const out = []; g.traverse((o) => { if (o.isMesh && o.userData && o.userData.plateau && o.geometry && o.geometry.parameters) out.push({ y: +o.position.y.toFixed(3), w: +o.geometry.parameters.width.toFixed(3) }); });
+            return out;
           },
           etiquettes: () => ({ visibles: etiqVisibles, total: etiqTotal, puces: etiqRects.filter(r => r.puce).length, px: PX_ETIQ, rects: etiqRects.map(r => ({ ...r })) }),
           contour: (quel) => { const c = contours[quel]; return c && c.visible ? { x: c.position.x, y: c.position.y, z: c.position.z, sx: c.scale.x, sy: c.scale.y, sz: c.scale.z } : null; },
