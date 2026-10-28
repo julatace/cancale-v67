@@ -434,7 +434,7 @@ const vente = (to) => { n++; return { method: 'POST', query: {}, headers: { 'x-v
   await essaie('12', async () => {
     const source = fs.readFileSync(path.join(RACINE, 'scripts', 'gmail-forwarder.gs'), 'utf8');
     const corpsFwd = (source.match(/function forwardVintedEmails\(\)[\s\S]*?\n}\n/) || [''])[0];
-    const iF = corpsFwd.indexOf('sendQueuedInvoices();'), iP = corpsFwd.indexOf('envoyerPreuvesAdresse();');
+    const iF = corpsFwd.indexOf('sendQueuedInvoices('), iP = corpsFwd.indexOf('envoyerPreuvesAdresse();');
     dit(iF > 0 && iP > 0 && iF < iP, 'REVUE : la boîte VRM envoie les factures AVANT les liens (quota partagé)', `factures@${iF} liens@${iP}`);
     const appels = [], envoyes = [];
     const s = { Logger: { log() {} }, JSON, PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k === 'EMAIL_INBOUND_SECRET' ? 'cle' : null) }) },

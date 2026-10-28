@@ -157,7 +157,7 @@ function forwardVintedEmails() {
   // par modeScript. Aucune facture des autres utilisateurs n'est ajoutée ici.
   // (22 oct., revue) Les factures PASSENT AVANT les liens : elles partagent le
   // quota d'envoi de cette boîte, et une facture compte plus qu'un lien.
-  const factures=sendQueuedInvoices();
+  const factures=sendQueuedInvoices(verrou);
   if(factures && factures.aVerifier)bilan.facturesAVerifier=factures.aVerifier;
   // Les liens de confirmation d'adresse demandés par les vendeurs (22 oct.).
   envoyerPreuvesAdresse();
@@ -186,10 +186,11 @@ function nettoyerTraites() {
 // (ou s'il clique « Envoyer » manuellement sur une facture). Ce script
 // les envoie depuis cette boîte Gmail puis les marque 'sent'.
 // ════════════════════════════════════════════════════════════════════
-function sendQueuedInvoices() {
+function sendQueuedInvoices(verrouExistant) {
   const bilan={aVerifier:0};
   if (!secretVRM()) { Logger.log('Factures : pas de clé secrète — rien à envoyer.'); return bilan; }
-  const verrou=LockService.getScriptLock(),propre=!verrou.hasLock();
+  const verrou=verrouExistant||LockService.getScriptLock(),propre=!verrouExistant;
+  if(verrouExistant&&(typeof verrouExistant.hasLock!=='function'||!verrouExistant.hasLock())){Logger.log('Factures : le verrou du passage n’est pas confirmé.');return bilan;}
   if(propre&&!verrou.tryLock(1000)){Logger.log('Factures : un passage est déjà en cours.');return bilan;}
   try {
   let r;

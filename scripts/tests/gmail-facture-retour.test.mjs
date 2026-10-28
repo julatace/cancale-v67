@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 
 const source=fs.readFileSync(process.env.VRM_GMAIL_SOURCE||new URL('../gmail-forwarder.gs',import.meta.url),'utf8');
 function envoyer({illisible=false,panne=false,ack=false,erreurEnvoi=false,erreurJournal=false,erreurApresEnvoi=false,occupe=false,recus=0,confirmesAnciens=false}={}) {
-  const messages=[],accuses=[],logs=[],proprietes=new Map([['EMAIL_INBOUND_SECRET','fictive']]);let tenu=false;
+  const messages=[],accuses=[],logs=[],proprietes=new Map([['EMAIL_INBOUND_SECRET','fictive']]);let tenu=false,acquisitions=0,liberations=0;
   for(let i=0;i<recus;i++)proprietes.set('VRM_FACTURE_ENVOI_test'+i,JSON.stringify({etat:confirmesAnciens?'confirme':'prepare',at:Date.now()-91*86400000}));
   const document={id:'fictive',number:'TEST',buyerEmail:'client@example.test',html:'facture',retourB64:'JVBERi0=',retourNom:'retour.pdf'};
   const service=mode=>{
@@ -15,13 +15,13 @@ function envoyer({illisible=false,panne=false,ack=false,erreurEnvoi=false,erreur
   };
   const ctx=vm.createContext({Logger:{log:v=>logs.push(v)},
     PropertiesService:{getScriptProperties:()=>({getProperty:k=>proprietes.get(k),getProperties:()=>Object.fromEntries(proprietes),setProperty:(k,v)=>{if(erreurJournal||(erreurApresEnvoi&&JSON.parse(v).etat==='envoye'))throw Error('quota propriétés');proprietes.set(k,v);},deleteProperty:k=>proprietes.delete(k)})},
-    LockService:{getScriptLock:()=>({hasLock:()=>tenu,tryLock:()=>{if(occupe)return false;tenu=true;return true;},releaseLock:()=>{tenu=false;}})},
+    LockService:{getScriptLock:()=>({hasLock:()=>tenu,tryLock:()=>{acquisitions++;if(occupe)return false;tenu=true;return true;},releaseLock:()=>{liberations++;tenu=false;}})},
     Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,v)=>[...crypto.createHash('sha256').update(v).digest()],base64Decode:()=>{if(illisible)throw Error('décodage');return [37,80,68,70];},newBlob:(bytes,mime,nom)=>({bytes,mime,nom})},
     GmailApp:{sendEmail:(...args)=>{messages.push(args);if(erreurEnvoi)throw Error('résultat inconnu');}},
   });
   vm.runInContext(source,ctx);ctx.appVRM=service;
   const bilan=ctx.sendQueuedInvoices();
-  return {messages,accuses,logs,proprietes,document,bilan,relancer:()=>ctx.sendQueuedInvoices()};
+  return {messages,accuses,logs,proprietes,document,bilan,verrous:()=>({acquisitions,liberations}),relancerAvecVerrou:()=>ctx.sendQueuedInvoices({hasLock:()=>true,releaseLock:()=>{throw Error('Ne pas libérer le verrou du passage');}}),relancer:()=>ctx.sendQueuedInvoices()};
 }
 test('la facture contient le formulaire exact avant son accusé d’envoi',()=>{
   const r=envoyer();assert.equal(r.messages.length,1);assert.deepEqual(r.accuses,['facture-envoyee']);
@@ -59,4 +59,8 @@ test('journal borné : les incertains restent, seuls les confirmés anciens sont
  assert.equal([...plein.proprietes.keys()].filter(k=>k.startsWith('VRM_FACTURE_ENVOI_')).length,1000);
  const ancien=envoyer({recus:1000,confirmesAnciens:true});assert.equal(ancien.messages.length,1);
  assert.equal([...ancien.proprietes.keys()].filter(k=>k.startsWith('VRM_FACTURE_ENVOI_')).length,1);
+});
+
+test('le passage transmet son verrou : pas de seconde acquisition ni de libération du parent',()=>{
+ const r=envoyer({ack:true});assert.deepEqual(r.verrous(),{acquisitions:1,liberations:1});r.relancerAvecVerrou();assert.deepEqual(r.verrous(),{acquisitions:1,liberations:1});assert.equal(r.messages.length,1);assert.equal(r.accuses.length,2);
 });
