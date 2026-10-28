@@ -6,7 +6,7 @@
 // d'import circulaire avec App.jsx. Rendu derrière <Suspense> côté App.
 import React, { useState, useEffect, useRef } from 'react';
 
-function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES }) {
+function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellTap, onPileTap, onMove, colorOf, emojiOf, h3dOf, storedCount, depot, sortie, vueDessus, cibles, fallback, viseurRef, C, Icon, load, save, FURN_TYPES, GARAGE_AMBIANCES, photoByNum, venduNums, chargerPhoto, cleNum }) {
   const mountRef = React.useRef(null);
   const st = React.useRef({});
   const dataRef = React.useRef({ items });
@@ -297,15 +297,43 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         x.fillStyle = '#131313'; x.font = `900 ${Math.round(lh * 0.56)}px system-ui,"Arial Black",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(num).slice(0, 4), S / 2, ly + lh * 0.58);
         const t = new THREE.CanvasTexture(c); try { t.colorSpace = THREE.SRGBColorSpace; } catch (_) {} t.anisotropy = 4; return t;
       };
+      // (28 oct.) LA VRAIE PHOTO SUR LE CARTON + HALO des paires vendues.
+      // `cleN` normalise le numéro comme l'app (prop `cleNum`) pour retrouver la
+      // photo et l'état « vendu ». `vendusMats` = matières à faire pulser dans la
+      // boucle. Un échec de photo laisse la face numérotée (aucune régression).
+      const vendusMats = [];
+      const texLoader = new THREE.TextureLoader();
+      const reduceMotion = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+      const cleN = (v) => { try { return cleNum ? cleNum(v) : String(v == null ? '' : v); } catch (_) { return String(v == null ? '' : v); } };
       const makeColis = (num, bw, bh, bd) => {
         let cc = colisCache.get(num);
         if (!cc) {
+          const n = cleN(num);
+          const purl = (photoByNum && n) ? photoByNum[n] : null;
           const frontMat = new THREE.MeshStandardMaterial({ map: colisFrontTex(num), roughness: 0.9 });
           const topMat = new THREE.MeshStandardMaterial({ map: colisTopTex(num), roughness: 0.92 });
           const kraft = kraftMat();
           // ordre BoxGeometry : +X, -X, +Y(dessus), -Y, +Z(avant), -Z → n° avant + dessus, kraft uni ailleurs
           cc = [kraft, kraft, topMat, kraft, frontMat, kraft];
           colisCache.set(num, cc);
+          if (purl && chargerPhoto) {
+            // Octets ramenés par NOTRE proxy même-origine → blob → texture. On
+            // garde le kraft+numéro tant que la photo n'est pas là, et pour
+            // toujours si elle échoue.
+            Promise.resolve(chargerPhoto(purl)).then((blobUrl) => {
+              if (!blobUrl) return;
+              texLoader.load(blobUrl, (tex) => {
+                try { tex.colorSpace = THREE.SRGBColorSpace; } catch (_) {}
+                try { tex.anisotropy = 8; } catch (_) {}
+                frontMat.map = tex; frontMat.needsUpdate = true;      // la face avant porte la photo ; le dessus garde le N°
+                try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+              }, undefined, () => { try { URL.revokeObjectURL(blobUrl); } catch (_) {} });
+            }).catch(() => {});
+          }
+          if (venduNums && n && venduNums.has(n)) {
+            // VENDUE : halo fluo (émissif) sur les matières de CE numéro.
+            [frontMat, topMat].forEach((m) => { try { m.emissive = new THREE.Color('#3D7BFF'); m.emissiveIntensity = 0.4; vendusMats.push(m); } catch (_) {} });
+          }
         }
         const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), cc);
         b.castShadow = true; b.receiveShadow = true; return b;
@@ -1188,7 +1216,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         etiqVisibles = posees.filter(p => !p.puce).length; etiqTotal = etiqs.length; etiqRects = posees;
         try { el.dataset.etiquettes = etiqVisibles + '/' + etiqTotal; } catch (_) {}
       };
-      let raf; const animate = () => { controls.update(); try { placerEtiquettes(); } catch (_) {} renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
+      let raf; const animate = () => { controls.update(); try { placerEtiquettes(); } catch (_) {} if (vendusMats.length) { const p = reduceMotion ? 0.5 : (0.3 + 0.45 * (0.5 + 0.5 * Math.sin(performance.now() / 320))); for (let i = 0; i < vendusMats.length; i++) vendusMats[i].emissiveIntensity = p; } renderer.render(scene, camera); raf = requestAnimationFrame(animate); }; animate();
       const onResize = () => {
         const w = el.clientWidth || W, h = el.clientHeight || H;
         renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
