@@ -292,7 +292,8 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const acc = r.execs.find((x) => x.method === 'PUT');
       dit(acc && acc.endpoint === '/api/v2/transactions/9001/offer_requests/77/accept' && acc.uid === '111', 'puis envoie EXACTEMENT l’acceptation de CETTE offre, au nom de SON compte', JSON.stringify(acc));
       // 3. faire une offre
-      await r.pg.getByText('Proposer un autre prix',{exact:true}).click();
+      dit(await r.pg.locator('[data-offre=attente]').count()===0, 'une acceptation confirmée ne redevient pas en attente après une ancienne capture');
+      dit((await r.pg.locator('[role=status]').allTextContents()).some(t=>t.includes('paiement')), 'accepter le prix ne prétend pas confirmer le paiement');
       await r.pg.fill('input[aria-label="Prix de l\'offre"]', '50');
       await r.pg.getByRole('button', { name: 'Envoyer l\'offre' }).click();
       await r.pg.waitForTimeout(900);

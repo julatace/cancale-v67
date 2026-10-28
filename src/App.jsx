@@ -1,3 +1,4 @@
+import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees} from './offresVinted.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
 import FiabiliteVentes from './FiabiliteVentes.jsx';
@@ -6517,8 +6518,7 @@ const normalizeConversationMessages = (conversation) => {
         const deviseBrute=e.price?.currency_code||e.price?.currency;
         const devise=typeof deviseBrute==='string'&&/^[A-Z]{3}$/.test(deviseBrute)?deviseBrute:null;
         const sens=e.user_id!=null&&oppId!=null?(String(e.user_id)===String(oppId)?'recue':'envoyee'):'inconnu';
-        const titre=typeof e.status_title==='string'?e.status_title.trim().slice(0,120):'';
-        const statut=titre&&!/^[a-z]+(?:_[a-z]+)+$/.test(titre)?titre:e.current===false?'Offre précédente':e.status===10?'En attente':'Statut non disponible';
+        const statut=etatOffreVinted(e).libelle;
         return {kind:'offer',body:'',offre:{montant,devise,sens,statut},ts,links};
       }
     }
@@ -6534,31 +6534,7 @@ const normalizeConversationMessages = (conversation) => {
 // libellé tranché, un montant lisible, et son identité (transaction + offre).
 // Une forme inattendue ⇒ `null` : jamais un bouton « Accepter » sur une offre
 // qu'on ne sait pas lire.
-const offreEnAttenteDe = (conversation) => {
-  try {
-    const c = conversation || {};
-    const opp = c.opposite_user && c.opposite_user.id != null ? c.opposite_user.id : null;
-    let derniere = null;
-    for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
-      if (!m || m.entity_type !== 'offer_request_message') continue;
-      const e = m.entity || {};
-      if(opp!=null && (e.user_id==null || String(e.user_id)!==String(opp)))continue;
-      if (e.current === false || e.status !== 10) continue;
-      if (/accept|refus|reject|expir|annul|cancel|retir/i.test(String(e.status_title || ''))) continue;
-      const px = e.price && (e.price.amount != null ? e.price.amount : e.price);
-      const prix = Number(String(px == null ? '' : px).replace(',', '.'));
-      if (!isFinite(prix) || prix <= 0 || e.transaction_id == null || e.offer_request_id == null) continue;
-      // (22 oct.) L'heure de l'offre, lue comme le fil (`normalizeConversationMessages`) :
-      // sert à reconnaître la même offre arrivée aussi par email (`memeOffre`).
-      // Illisible ⇒ `null` (jamais une heure inventée).
-      const brut = m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at;
-      const nb = Number(brut);
-      const ts = brut == null || brut === '' ? null : (Number.isFinite(nb) ? (nb < 1e12 ? nb * 1000 : nb) : (Date.parse(brut) || null));
-      derniere = { prix, tx: String(e.transaction_id), oid: String(e.offer_request_id), ts: ts != null && Number.isFinite(ts) ? ts : null };
-    }
-    return derniere;
-  } catch (_) { return null; }
-};
+const offreEnAttenteDe = (conversation) => offreVintedEnAttente(conversation);
 
 // ── Pont vers l'extension VRM (v3.4+) ───────────────────────────────────────
 // Permet d'EXÉCUTER une action Vinted (répondre, faire une offre…) depuis le
@@ -36310,6 +36286,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [convMax, setConvMax] = useState(40);
   const [prixOffre, setPrixOffre] = useState('');
   const [offreBusy, setOffreBusy] = useState(false);
+  const verrouOffre=useRef(false),offresConfirmees=useRef(new Map()),filOffreActuel=useRef(null);
+  filOffreActuel.current=openConv;
+  const filAvecOffres=(c,acc)=>appliquerOffresConfirmees(c,acc?.vinted_user_id,offresConfirmees.current);
   const [offreMsg, setOffreMsg] = useState(null);
   const bordRef = React.useRef(null); const bordCtx = React.useRef(null);
   // Formats de bordereaux mémorisés : { [empreinte dimensions] : {xr,yr} }.
@@ -39535,12 +39514,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setReplyText('');setReplyErr(null);setReplyBusy(false);setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
     setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
-    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:res.conversation,messages:normalizeConversationMessages(res.conversation)}):o);
+    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
   };
   const actualiserConversation=async()=>{
     const oc=openConv;if(!oc || oc.loading)return;
     const res=await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
-    setOpenConv(o=>o?.request===oc.request?({...o,error:res.ok?null:res.error,source:res.source,conversation:res.ok?res.conversation:o.conversation,messages:res.ok?normalizeConversationMessages(res.conversation):o.messages}):o);
+    setOpenConv(o=>o?.request===oc.request?({...o,error:res.ok?null:res.error,source:res.source,conversation:res.ok?filAvecOffres(res.conversation,oc.acc):o.conversation,messages:res.ok?normalizeConversationMessages(filAvecOffres(res.conversation,oc.acc)):o.messages}):o);
   };
 
   // Envoi d'une réponse via l'extension (depuis le navigateur = ton IP, sans
@@ -39572,7 +39551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (!arrete && h?.conversation) setOpenConv(prev=>{
               if (prev?.request!==openConv.request) return prev;
               const conversation=fusionnerConversation(prev.conversation,h.conversation);
-              return conversation?{...prev,conversation,messages:normalizeConversationMessages(conversation),source:'harvest'}:prev;
+              return conversation?{...prev,conversation:filAvecOffres(conversation,prev.acc),messages:normalizeConversationMessages(filAvecOffres(conversation,prev.acc)),source:'harvest'}:prev;
             });
           }
         }
@@ -39602,10 +39581,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Julien, 3 octobre : « la messagerie intégrée avec la possibilité de
   // répondre et de faire l'offre ». Toujours sur SON clic, par l'extension, au
   // nom du compte connecté dans Chrome (garde stricte, 20 actions/heure, une
-  // requête à la fois). Accepter vend la paire à ce prix : on demande d'abord.
+  // requête à la fois). Accepter fixe le prix, sans confirmer le paiement.
   const actionOffre = async (quoi, off) => {
     const oc = openConv;
-    if (!oc || !oc.acc || offreBusy) return;
+    if (!oc || !oc.acc || offreBusy || verrouOffre.current) return;
+    verrouOffre.current=true;
+    try {
     let method = 'PUT', endpoint = '', body = null, p = 0;
     if (quoi === 'accept' || quoi === 'reject') {
       if (!off) return;
@@ -39619,18 +39600,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       method = 'POST'; endpoint = `/api/v2/transactions/${tx}/offers`; body = { offer: { price: String(p), currency: 'EUR' } };
     }
     if(conversationRequest.current!==oc.request)return;
+    if(off){const actuelle=offreEnAttenteDe(filOffreActuel.current?.conversation);if(!actuelle||cleOffreVinted(oc.acc.vinted_user_id,actuelle)!==cleOffreVinted(oc.acc.vinted_user_id,off)||actuelle.prix!==off.prix){setOffreMsg({err:'Cette offre a changé pendant la confirmation. Vérifie la conversation avant de continuer.'});return;}}
+    if(off&&offresConfirmees.current.has(cleOffreVinted(oc.acc.vinted_user_id,off))){setOffreMsg({err:'Cette offre a déjà été traitée. Actualise la conversation.'});return;}
     setOffreBusy(true); setOffreMsg(null);
     const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body, confirme: quoi === 'accept' });
     if(conversationRequest.current!==oc.request)return;
     setOffreBusy(false);
     if (r && r.ok) {
-      setOffreMsg({ ok: quoi === 'accept' ? 'Offre acceptée sur Vinted.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
+      if(off&&(quoi==='accept'||quoi==='reject')){offresConfirmees.current.set(cleOffreVinted(oc.acc.vinted_user_id,off),quoi==='accept'?20:30);setOpenConv(o=>{if(o?.request!==oc.request)return o;const c=filAvecOffres(o.conversation,oc.acc);return {...o,conversation:c,messages:normalizeConversationMessages(c)};});}
+      setOffreMsg({ ok: quoi === 'accept' ? 'Prix accepté sur Vinted. Le paiement de la vente n’est pas confirmé par cette acceptation.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
       setPrixOffre('');
       const res = await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
-      if (res.ok) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: res.conversation, messages: normalizeConversationMessages(res.conversation) }) : o);
+      if (res.ok) setOpenConv(o => o?.request===oc.request ? ({ ...o, conversation: filAvecOffres(res.conversation,oc.acc), messages: normalizeConversationMessages(filAvecOffres(res.conversation,oc.acc)) }) : o);
     } else {
       setOffreMsg({ err: (r && (r.error || (r.status ? 'HTTP ' + r.status : ''))) || "Vinted n'a pas répondu." });
     }
+    } catch {if(conversationRequest.current===oc.request)setOffreMsg({err:'Réponse non confirmée. Actualise la conversation sur Vinted avant de réessayer pour éviter un doublon.'});}
+    finally {verrouOffre.current=false;if(conversationRequest.current===oc.request)setOffreBusy(false);}
   };
 
   const accName = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
@@ -41889,7 +41875,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const sep = j && j!==jPrec ? <div className="vrm-chat-jour" data-jour-sep={j} style={{color:C.muted,background:C.card2||C.card}}>{libelleJour(m.ts)}</div> : null;
                 return <React.Fragment key={i}>{sep}{(
                 m.kind==='offer'
-                  ? <div className="vrm-chat-offer-event" data-offer-side={m.offre.sens}>
+                  ? <div className="vrm-chat-offer-event" data-offer-status={/accept/i.test(m.offre.statut)?"acceptee":/refus/i.test(m.offre.statut)?"refusee":"autre"} data-offer-side={m.offre.sens}>
                       <div><span>{m.offre.sens==='recue'?'Offre reçue':m.offre.sens==='envoyee'?'Offre envoyée':'Offre'}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
                       <div><small>{m.offre.statut}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
                     </div>
@@ -45653,7 +45639,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // ⇒ `null` : aucune pastille.
           const offreDeConv = (c) => {
             if (openConv && openConv.conversation && openConv.convId===c.id && String(openConv.acc?.vinted_user_id||'')===uidC(c)) return offreEnAttenteDe(openConv.conversation);
-            return offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
+            const offre=offresConv instanceof Map ? (offresConv.get(`${uidC(c)}_${c.id}`) || null) : null;
+            return offre&&offresConfirmees.current.has(cleOffreVinted(uidC(c),offre))?null:offre;
           };
           const nOffres = liste.filter(c=>offreDeConv(c)).length;
           // (27 oct.) Offres ≥ au prix mini posé sur l'annonce (par identité, l'item_id,
