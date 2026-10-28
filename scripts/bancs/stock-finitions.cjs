@@ -51,8 +51,12 @@ const PLAN_PILE = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wall
 const PLAN_PLATEAUX = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 'm1', type: 'metal', name: 'Étagère réglable', x: 2, y: 0.1, w: 1.2, h: 0.5, rows: 5, cols: 2, h3d: 1.25, slots: { '1_0': ['601'], '1_1': ['602'] } },
 ] }], active: 'r1' };
+// X. Table 2 places, un plateau dessous (rows 3 = dessus + plateau + sol) : N°701 dessus, N°702 et N°703 sur le plateau du dessous.
+const PLAN_TABLE = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 't1', type: 'table', name: 'Table à étagère', x: 2, y: 2, w: 2, h: 1, rows: 3, cols: 2, h3d: 0.5, slots: { '0_0': ['701'], '1_0': ['702'], '1_1': ['703'] } },
+] }], active: 'r1' };
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
-const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602'], at: Date.now() };
+const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
 
 let ko = 0;
@@ -331,6 +335,36 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const m2 = item(q, 'm1');
       dit(JSON.stringify(m2.slots['4_0']) === '["601"]' && JSON.stringify(m2.slots['4_1']) === '["602"]', t + ' : sans plateau, les boîtes descendent tout en bas, numéros inchangés', JSON.stringify(m2.slots));
       await pg.screenshot({ path: path.join(CAPT, 'stock-plateaux-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── X. LES PLATEAUX SOUS UNE TABLE, PLACE PAR PLACE ─────────────────────
+    if (fait('X')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('X. table ' + vp.width, async () => {
+      const t = 'X. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_TABLE);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const pl0 = await sonde(pg, 'plateaux', 't1');
+      dit(pl0 && pl0.length === 1 && pl0[0].w > 1.5, t + ' : sans réglage, le plateau sous la table est plein', JSON.stringify(pl0));
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
+      const p = await sonde(pg, 'project', 't1', { cell: '0_0', num: '701' });
+      if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
+      await pg.waitForSelector('[data-plateaux-3d]', { timeout: 8000, state: 'attached' });
+      dit(await pg.evaluate(() => (document.querySelector('[data-reglage="sous-table"] b') || {}).textContent === '2'), t + ' : « Niveaux sous la table » dit 2 (le plateau et le sol)');
+      await pg.evaluate(() => { const d = document.querySelector('[data-plateaux-3d]'); d.open = true; });
+      dit(await pg.evaluate(() => !!document.querySelector('[data-plateaux-3d] [data-plateau-fixe="1"]') && !document.querySelector('[data-plateaux-3d] [data-planche-case-choix="1:1"]')), t + ' : le dessus de la table ne s\'enlève pas');
+      await cliquerSel(pg, '[data-plateaux-3d] [data-planche-case-choix="2:1"]');
+      const q = await attendrePlan(pg, (x) => Array.isArray(item(x, 't1').planches));
+      const m = item(q, 't1');
+      dit(JSON.stringify(m.planches) === '[1,"2:2"]', t + ' : le plateau sous la table n\'est retiré que sous la place 1', JSON.stringify(m.planches));
+      dit(JSON.stringify(m.slots['2_0']) === '["702"]' && JSON.stringify(m.slots['1_1']) === '["703"]' && JSON.stringify(m.slots['0_0']) === '["701"]', t + ' : N°702 tombe au sol, N°703 reste sur son plateau, N°701 reste sur la table', JSON.stringify(m.slots));
+      await pg.waitForTimeout(1200);
+      const pl1 = await sonde(pg, 'plateaux', 't1');
+      dit(pl1 && pl1.length === 1 && pl1[0].w < 1.0, t + ' : la 3D dessine un plateau de moitié sous la table', JSON.stringify(pl1));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-table-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
