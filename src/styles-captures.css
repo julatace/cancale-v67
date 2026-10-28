@@ -200,3 +200,6 @@
 .vrm-chat-offer-event[data-offer-status="acceptee"]{border-inline-start:3px solid #367664;background:linear-gradient(110deg,rgba(54,118,100,.08),var(--vrm-surface));}
 .vrm-chat-offer-event[data-offer-status="refusee"]{border-inline-start:3px solid #9a746b;}
 .vrm-chat-offer-event>div{flex-wrap:wrap;}
+.vrm-chat-retour{font-size:12px;line-height:1.5;padding:8px 10px;border:1px solid var(--vrm-line);border-radius:9px;background:var(--vrm-surface);margin-bottom:8px;overflow-wrap:anywhere;}
+.vrm-chat-retour button{display:block;margin-top:6px;max-width:100%;white-space:normal;text-align:left;}
+.vrm-chat-send:disabled{opacity:.55;cursor:not-allowed;}
