@@ -19199,7 +19199,11 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
       { cle: 'encours', lib: 'En cours', val: passu ? null : enCours.length },
       { cle: 'finalisees', lib: 'Expédiées', val: passu ? null : exp.length },
       { cle: 'ca', lib: 'CA payé', val: caVal, brut: caVal == null ? null : (aPayee ? ca : 0), sub: plusieursEbay ? (vue === '*' ? `${comptesEbay.length} comptes` : nomCompteEbay(comptesEbay.find((c) => c.ref === vue) || {})) : null },
-    ]} note={jamais ? "Aucune vente eBay lue pour l'instant : relie ton compte dans « Compte » et synchronise — tes commandes, leur expédition et leur suivi arriveront ici." : passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici." : null}/>;
+    ]} note={jamais ? "Aucune vente eBay lue pour l'instant : relie ton compte dans « Compte » et synchronise — tes commandes, leur expédition et leur suivi arriveront ici." : passu ? `Je n'ai pas pu lire les ventes ${illisibles.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illisibles.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : !orders.length ? ((Array.isArray(comptesEbay) && comptesEbay.length)
+      // (28 oct.) Compte relié et ventes LUES, aucune : « relie ton compte » lui
+      // demandait un geste déjà fait (shcanc0 est relié).
+      ? "Aucune vente eBay pour l'instant : tes commandes, leur expédition et leur suivi arriveront ici dès la première."
+      : "Pas encore de vente eBay. Relie ton compte dans « Compte » et synchronise : tes commandes, leur expédition et leur suivi arrivent ici.") : null}/>;
   })();
   if (!orders.length && !cible) return wrap(<>{head}{kpi}</>);
   const euro = formaterMontantEbay;
@@ -20493,7 +20497,7 @@ const URL_ITEM_EBAY = (id) => /^\d{1,19}$/.test(String(id || '')) ? `https://www
 // « Terminée dans la fenêtre » : une fin illisible est GARDÉE (eBay l'a mise
 // dans sa liste des 60 jours — mieux vaut un blanc qu'un faux).
 const dansFenetreInactives = (fin, maintenant) => { const t = Date.parse(fin || ''); return !Number.isFinite(t) || t >= maintenant - INACTIVES_JOURS * 86400000; };
-function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku }) {
+function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku, retraitsAuto = null }) {
   const E = EBAY_SKIN;
   // undefined en cours · null registre illisible · { lignes: [{compte, ligne}] }
   const [lu, setLu] = React.useState(undefined);
@@ -20574,10 +20578,16 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
     const surVinted = !!(n && enLigneVinted && paires.some((p) => cleNum(p.num) === n));
     const verifManque = !!(n && !vendue && (ventesPasSu || ventesEnCours));
     if (n && !vendue && ventesPasSu) attenteVerif++;
-    const relancer = !l._ancienne && !vendue && !deja && !relancee && !memeEnLigne && !verifManque;
+    // (28 oct.) Retirée d'eBay PAR VRM parce que la paire s'est vendue sur Vinted
+    // (son journal `ebay_retraits_auto`, par l'identifiant de l'annonce) : vue sur
+    // ses vraies données « pas reliée · Remettre en vente » — le contraire de ce
+    // que VRM venait de faire. Journal illisible ⇒ rien n'est dit (pas su).
+    const retraitAuto = retraitsAuto && typeof retraitsAuto.get === 'function' ? retraitsAuto.get(String(l.itemId)) : null;
+    const relancer = !l._ancienne && !vendue && !retraitAuto && !deja && !relancee && !memeEnLigne && !verifManque;
     const url = URL_ITEM_EBAY(l.itemId);
     const prix = Number(String(l.price || '').replace(',', '.'));
     const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
+      : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur Vinted — ne la remets pas en vente`
       : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
       : relancee ? 'déjà remise en vente sur eBay'
       : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
@@ -20587,6 +20597,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         data-inactive-compte={l._compte || ''}
         {...(l._ancienne ? { 'data-inactive-ancienne': '1' } : {})}
         {...(vendue ? { 'data-inactive-vendue': vendue } : {})}
+        {...(retraitAuto ? { 'data-inactive-retrait-auto': '1' } : {})}
         {...(memeEnLigne || relancee || deja ? { 'data-inactive-deja': memeEnLigne ? 'a-relire' : relancee ? 'relancee' : (deja.etat || 'en-vente') } : {})}
         {...(surVinted ? { 'data-inactive-vinted': 'en-ligne' } : {})}
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0 10px', alignItems: 'center', padding: '6px 0', borderTop: `1px solid ${E.border}` }}>
@@ -21587,7 +21598,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {/* (23 octobre) Les annonces terminées SANS vente — lecture seule. */}
     <EbayInactives comptesEbay={comptesEbay} tick={inactivesTick} vue={vueSeule ? vue : '*'} connected={connected}
       ventes={ventesConnues} dejaSurEbay={dejaSurEbay} surEbay={surEbayIds} annoncesLuesA={annoncesLuesA} dejaDit={dits}
-      paires={paires} enLigne={enLigne} onSku={setInactivesSku} />
+      paires={paires} enLigne={enLigne} onSku={setInactivesSku}
+      retraitsAuto={Array.isArray(journalAuto) ? new Map(journalAuto.filter((x) => x && x.itemId != null).map((x) => [String(x.itemId), x])) : null} />
   </>);
   // (16 octobre, revue) « Vendre une paire » vient EN PREMIER, avant les
   // alertes : c'est le geste qu'on vient faire ici. `outils` ne garde que la suite.
