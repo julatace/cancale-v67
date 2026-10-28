@@ -6,7 +6,7 @@ const tests=[
  'isolation-comptes','confidentialite','securite-reception-push','capacite-securite',
  'inscription-parcours','recuperation-auth','liaison-oauth','collecte-email',
  'reception-email','suivi-donnees','parcours-vendeur','favoris-progression','favoris-automatisation','gmail-facture-retour','lbc-photos','lbc-identite-transaction',
- 'lbc-attribution-historique','favoris-preuves','favoris-historique','favoris-contexte','offres-vinted','messages-offres-historique',
+ 'lbc-attribution-historique','favoris-preuves','favoris-historique','favoris-contexte','offres-vinted','messages-offres-historique','reponse-vinted',
 ];
 const controles=[
  ['Téléchargements Gmail','python3',['scripts/pack-reception-gmail.py','--check']],

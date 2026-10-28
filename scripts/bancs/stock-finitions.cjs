@@ -59,8 +59,16 @@ const PLAN_TABLE = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wal
 const PLAN_PORTANT = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
   { id: 'p1', type: 'cintres', name: 'Portant', x: 2, y: 2, w: 0.8, h: 0.5, rows: 2, cols: 3, h3d: 1.15, slots: { '0_0': ['801'], '0_1': ['802'], '1_1': ['803'] } },
 ] }], active: 'r1' };
+// XII. Étagère à bacs 3 niveaux × 2 cases : N°901 et N°902 en haut, N°903 au milieu (sous le 902).
+const PLAN_BACS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'b1', type: 'bacs', name: 'Bacs', x: 2, y: 0.1, w: 1.2, h: 0.45, rows: 3, cols: 2, h3d: 1.25, slots: { '0_0': ['901'], '0_1': ['902'], '1_1': ['903'] } },
+] }], active: 'r1' };
+// XIII. Étagère BOIS 4 niveaux × 2 cases : N°611 au 2ᵉ niveau, colonne 1.
+const PLAN_BOIS = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [
+  { id: 'w1', type: 'bois', name: 'Étagère bois', x: 2, y: 0.1, w: 1.2, h: 0.45, rows: 4, cols: 2, h3d: 1.2, slots: { '1_0': ['611'], '1_1': ['612'] } },
+] }], active: 'r1' };
 const FICHES = { a700: { numero: '700', title: 'Paire test 700 taille 42', numberedAt: 7 } };
-const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703', '801', '802', '803'], at: Date.now() };
+const PRESENTS = { nums: ['700', '401', '402', '501', '801', '601', '602', '701', '702', '703', '801', '802', '803', '901', '902', '903', '611', '612'], at: Date.now() };
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: new Date().toISOString() }];
 
 let ko = 0;
@@ -398,6 +406,63 @@ const chevRect = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
       const pl1 = await sonde(pg, 'plateaux', 'p1');
       dit(pl1 && pl1.length === 2 && Math.min(...pl1.map(v => v.w)) < Math.max(...pl1.map(v => v.w)) * 0.8, t + ' : la 3D dessine une barre du haut raccourcie', JSON.stringify(pl1));
       await pg.screenshot({ path: path.join(CAPT, 'stock-portant-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XII. LES PLATEAUX D'UNE ÉTAGÈRE À BACS, COLONNE PAR COLONNE ─────────
+    if (fait('XII')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XII. bacs ' + vp.width, async () => {
+      const t = 'XII. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_BACS);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const pl0 = await sonde(pg, 'plateaux', 'b1');
+      dit(pl0 && pl0.length === 4 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 4 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
+      const p = await sonde(pg, 'project', 'b1', { cell: '0_0', num: '901' });
+      if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
+      await pg.waitForSelector('[data-plateaux-3d]', { timeout: 8000, state: 'attached' });
+      await pg.evaluate(() => { const d = document.querySelector('[data-plateaux-3d]'); d.open = true; });
+      dit(await pg.evaluate(() => /bac descend/.test((document.querySelector('[data-plateaux-3d]') || {}).textContent || '')), t + ' : l\'explication parle du bac');
+      await cliquerSel(pg, '[data-plateaux-3d] [data-planche-case-choix="1:1"]');
+      const q = await attendrePlan(pg, (x) => Array.isArray(item(x, 'b1').planches));
+      const m = item(q, 'b1');
+      dit(JSON.stringify(m.planches) === '["1:2",2]', t + ' : le plateau n\'est retiré que sous la colonne 1', JSON.stringify(m.planches));
+      dit(JSON.stringify(m.slots['1_0']) === '["901"]' && !m.slots['0_0'] && JSON.stringify(m.slots['0_1']) === '["902"]' && JSON.stringify(m.slots['1_1']) === '["903"]', t + ' : le bac N°901 descend d\'un niveau, N°902 et N°903 ne bougent pas', JSON.stringify(m.slots));
+      await pg.waitForTimeout(1200);
+      const pl1 = await sonde(pg, 'plateaux', 'b1');
+      dit(pl1 && pl1.length === 4 && pl1.filter((x) => x.w < 0.7).length === 1, t + ' : la 3D dessine un plateau de moitié', JSON.stringify(pl1));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-bacs-' + vp.width + '.png') });
+      const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
+      dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));
+      await ctx.close();
+    });
+
+    // ── XIII. LES PLATEAUX D'UNE ÉTAGÈRE EN BOIS ────────────────────────────
+    if (fait('XIII')) for (const vp of [{ width: 1512, height: 950 }, { width: 390, height: 844 }]) await essaie('XIII. bois ' + vp.width, async () => {
+      const t = 'XIII. ' + vp.width + ' px';
+      const { ctx, pg, errs } = await ouvrir(b, vp, PLAN_BOIS);
+      dit(await attendre3D(pg), t + ' : la 3D se monte');
+      const pl0 = await sonde(pg, 'plateaux', 'w1');
+      dit(pl0 && pl0.length === 5 && pl0.every((x) => x.w > 1.0), t + ' : sans réglage, les 5 plateaux sont pleins (comme avant)', JSON.stringify(pl0));
+      await cliquerSel(pg, '[data-mode-stock="amenager"]'); await pg.waitForTimeout(400);
+      await pg.evaluate(() => document.querySelector('[data-stock3d]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(900);
+      const p = await sonde(pg, 'project', 'w1', { cell: '1_0', num: '611' });
+      if (vp.width < 600) await pg.touchscreen.tap(p.x, p.y); else await pg.mouse.click(p.x, p.y);
+      await pg.waitForSelector('[data-plateaux-3d]', { timeout: 8000, state: 'attached' });
+      await pg.evaluate(() => { const d = document.querySelector('[data-plateaux-3d]'); d.open = true; });
+      await cliquerSel(pg, '[data-plateaux-3d] [data-planche-case-choix="2:1"]');
+      const q = await attendrePlan(pg, (x) => Array.isArray(item(x, 'w1').planches));
+      const m = item(q, 'w1');
+      dit(JSON.stringify(m.planches) === '[1,"2:2",3]', t + ' : le plateau n\'est retiré que sous la colonne 1', JSON.stringify(m.planches));
+      dit(JSON.stringify(m.slots['2_0']) === '["611"]' && !m.slots['1_0'] && JSON.stringify(m.slots['1_1']) === '["612"]', t + ' : N°611 descend d\'un niveau, N°612 ne bouge pas', JSON.stringify(m.slots));
+      await pg.waitForTimeout(1200);
+      const pl1 = await sonde(pg, 'plateaux', 'w1');
+      dit(pl1 && pl1.length === 5 && pl1.filter((x) => x.w < 0.7).length === 1, t + ' : la 3D dessine un plateau de bois de moitié', JSON.stringify(pl1));
+      await pg.screenshot({ path: path.join(CAPT, 'stock-bois-' + vp.width + '.png') });
       const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
       dit(x.sw <= x.cw + 1, t + ' : aucun débordement', `${x.sw} > ${x.cw}`);
       dit(errs.length === 0, t + ' : aucune erreur d’app', errs.join(' | ').slice(0, 200));

@@ -1,3 +1,4 @@
+import {retourReponseVinted,cleReponseVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees} from './offresVinted.js';
 import {etatSourceMemoire} from './suiviComptes.js';
 import {empreinteColis,controlePreparation} from './preparationColis.js';
@@ -27897,7 +27898,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 {plateauxReglables(ft) && nr > (ft.build === 'table' ? 2 : 1) && (
                   <details data-plateaux-3d="" style={{ flex: '1 1 100%' }}>
                     <summary className="vrm-repli" style={{ fontSize: 13, fontWeight: 700 }}>{ft.build === 'table' ? 'Plateaux sous la table, place par place' : ft.build === 'portant' ? 'Barres, cintre par cintre' : 'Plateaux, colonne par colonne'}</summary>
-                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>{ft.build === 'portant' ? 'Sans barre à un cintre, son vêtement descend sur la barre du dessous si elle est libre. Aucun numéro ne change. La barre du bas reste toujours là.' : <>Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu'elle a de la place. Aucun numéro ne change.{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</>}</div>
+                    <div style={{ fontSize: 12, color: C.muted, margin: '4px 0 8px' }}>{ft.build === 'portant' ? 'Sans barre à un cintre, son vêtement descend sur la barre du dessous si elle est libre. Aucun numéro ne change. La barre du bas reste toujours là.' : <>{ft.bacs ? 'Sans plateau sous une case, son bac descend dans la case du dessous si elle est vide. Aucun numéro ne change.' : 'Sans plateau sous une case, ses boîtes tombent dans la case du dessous tant qu\'elle a de la place. Aucun numéro ne change.'}{ft.build === 'table' ? ' Le dessus de la table reste toujours là.' : ''}</>}</div>
                     <div style={{ textAlign: 'center' }}>
                       <ChoixPlanches plateau fixe={ft.build === 'table' ? 1 : 0} cols={nc} rows={nr} planches={Array.isArray(selItem.planches) ? selItem.planches : Array.from({ length: nr - 1 }, (_, i) => i + 1)} setPlanches={(v) => { const u = planchesCases(v, nc, nr); if (ft.build === 'table') for (let c = 1; c <= nc; c++) u.add('1:' + c); updateItem(selItem.id, { planches: planchesRangees(u, nc, nr) }); }} />
                     </div>
@@ -36346,6 +36347,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replyErr, setReplyErr] = useState(null);
+  const verrouReponse=useRef(false);
+  const [replyNotice,setReplyNotice]=useState(''),[reponsesIncertaines,setReponsesIncertaines]=useState({});
   // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
   const [convMax, setConvMax] = useState(40);
   const [prixOffre, setPrixOffre] = useState('');
@@ -39575,7 +39578,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(!conv?._acc || conv.id==null)return;
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current;
-    setReplyText('');setReplyErr(null);setReplyBusy(false);setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
+    setReplyText('');setReplyErr(null);setReplyNotice('');setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
     setOpenConv({request,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
@@ -39626,19 +39629,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   },[curSub,cleComptes,openConv?.request]);
 
   const sendReply = async () => {
-    const oc = openConv; const text = replyText.trim();
-    if(!oc || !oc.acc || !oc.convId || !text || replyBusy || oc.conversation?.allow_reply===false)return;
+    const oc=openConv,text=replyText.trim();
+    if(!oc?.acc||!oc.convId||!text||replyBusy||verrouReponse.current||oc.conversation?.allow_reply===false)return;
+    const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
+    if(reponsesIncertaines[cle])return;
     if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
-    setReplyBusy(true); setReplyErr(null);
-    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method:'POST', endpoint:`/api/v2/conversations/${oc.convId}/replies`, body:{ reply:{ body:text, photo_temp_uuids:null, is_personal_data_sharing_check_skipped:false } } });
+    verrouReponse.current=true;setReplyBusy(true);setReplyErr(null);setReplyNotice('');
+    let retour;
+    try{
+      const r=await vmrExec({uid:oc.acc.vinted_user_id,method:'POST',endpoint:`/api/v2/conversations/${oc.convId}/replies`,body:{reply:{body:text,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}}});
+      retour=retourReponseVinted(r);
+    }catch{retour=retourReponseVinted(null);}
+    finally{verrouReponse.current=false;setReplyBusy(false);}
+    if(retour.etat==='incertain')setReponsesIncertaines(v=>({...v,[cle]:true}));
     if(conversationRequest.current!==oc.request)return;
-    setReplyBusy(false);
-    if (r && r.ok) {
-      setReplyText('');
-      setOpenConv(o=>o?.request===oc.request?({...o,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}] }):o);
-    } else {
-      setReplyErr((r && (r.error || (r.status ? 'HTTP '+r.status : ''))) || "Échec de l'envoi");
-    }
+    if(retour.etat==='confirme'){
+      setReplyText(v=>v.trim()===text?'':v);setReplyNotice(retour.texte);
+      setOpenConv(o=>o?.request===oc.request?({...o,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}]}):o);
+    }else setReplyErr(retour.texte);
+  };
+  const autoriserNouvelleReponse=async()=>{
+    const oc=openConv;if(!oc?.acc)return;
+    const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
+    if(!await askConfirm({title:'Autoriser un nouvel envoi ?',desc:'Vérifie d’abord sur Vinted que le message n’est pas déjà présent. Cette action ne vérifie pas la réception et ne renvoie rien.',ok:'Autoriser',cancel:'Annuler'}))return;
+    if(conversationRequest.current!==oc.request)return;
+    setReponsesIncertaines(v=>{const n={...v};delete n[cle];return n;});setReplyErr(null);setReplyNotice('Nouvel envoi autorisé. Relis ton texte avant de l’envoyer.');
   };
 
   // ── LES GESTES D'OFFRE, DEPUIS L'APP (5.135) ────────────────────────────────
@@ -42024,7 +42039,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 })()}
                 {openConv.conversation?.allow_reply===false && <div role="status" style={{fontSize:12,color:C.muted,marginBottom:8}}>Vinted ne permet pas de répondre dans cette conversation.</div>}
                 {msgRelais && !ro && <EtatRelaisConv vinted={msgRelaisVinted}/>}
-                {replyErr && <div style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
+                {replyNotice&&<div className="vrm-chat-retour" role="status">{replyNotice}</div>}
+                {reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]&&<div className="vrm-chat-retour" role="alert">Envoi précédent à vérifier sur Vinted. Aucun nouvel envoi automatique. <a href={lienVinted} target="_blank" rel="noreferrer">Vérifier sur Vinted ↗</a><button type="button" onClick={autoriserNouvelleReponse}>Autoriser un nouvel envoi après vérification</button></div>}
+                {replyErr && <div role="alert" style={{fontSize:12,color:C.danger,marginBottom:8,lineHeight:1.35}}>{replyErr}</div>}
                 {/* (16 oct.) Sans extension ici (téléphone), VRM ne peut pas
                     envoyer : un champ de saisie inutilisable n'y a pas sa place.
                     Le seul geste qui marche — répondre sur Vinted — prend la
@@ -42043,7 +42060,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <div className="vrm-chat-compose">
                   <textarea aria-label="Réponse à la conversation" disabled={ro} value={replyText} onChange={e=>setReplyText(e.target.value)} rows={1} placeholder={ro?'Lecture seule sur ce compte':'Écrire une réponse…'} onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendReply(); } }} style={{border:`1px solid ${C.border}`,background:C.bg,color:C.text}}/>
-                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'…':'Envoyer'}</button>
+                  <button type="button" className="vrm-chat-send" onClick={sendReply} disabled={!!reponsesIncertaines[cleReponseVinted(openConv.acc?.vinted_user_id,openConv.convId)]||ro||replyBusy||!replyText.trim()||!msgPeutAgir||openConv.conversation?.allow_reply===false} style={{background:(ro||replyBusy||!replyText.trim())?C.border:C.accent,color:(ro||replyBusy||!replyText.trim())?C.muted:(C.onAccent||'#fff')}}>{replyBusy?'Envoi…':'Envoyer'}</button>
                 </div>
                 </>)}
               </div>

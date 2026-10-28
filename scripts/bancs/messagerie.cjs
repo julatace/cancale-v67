@@ -165,7 +165,9 @@ const PONT = ({ version, filExt, fils }) => {
       window.__exec && window.__exec(JSON.stringify({ uid: d.uid, method: d.method, endpoint: d.endpoint, body: d.body }));
       const idc = (/\/conversations\/(\d+)$/.exec(d.endpoint || '') || [])[1];
       const data = d.method === 'GET' ? { conversation: (fils && fils[idc]) || filExt } : {};
-      setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: true, status: 200, data }), 50);
+      const reponse=/\/replies$/.test(d.endpoint||'');
+      const panne=reponse&&window.__reponseMode==='panne';
+      setTimeout(() => post({ __vmr: 'result', reqId: d.reqId, ok: !panne, status: panne?500:200, data }), reponse?600:50);
     }
   });
   post({ __vmr: 'ready', version });
@@ -301,6 +303,27 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(of && of.endpoint === '/api/v2/transactions/9001/offers' && of.body && of.body.offer && of.body.offer.price === '50', 'faire une offre envoie le prix saisi sur la bonne transaction', JSON.stringify(of));
       const txt = await r.pg.evaluate(() => document.body.innerText);
       dit(/Offre de 50,00 € envoyée/.test(txt), 'et le dit');
+      // Réponses : double clic, texte édité pendant l'attente et retour incertain.
+      const champ=r.pg.getByRole('textbox',{name:'Réponse à la conversation'});
+      await champ.fill('Premier message synthétique');
+      const avantReponses=r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length;
+      await r.pg.locator('.vrm-chat-send').evaluate(b=>{b.click();b.click();});
+      await champ.fill('Brouillon suivant conservé');
+      await r.pg.waitForTimeout(850);
+      dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===avantReponses+1,'double clic : une seule réponse envoyée');
+      dit(await champ.inputValue()==='Brouillon suivant conservé','le texte modifié pendant l’envoi n’est pas effacé');
+      dit((await r.pg.locator('[role=status]').allTextContents()).some(t=>t.includes('Message envoyé sur Vinted')),'une réponse confirmée a un retour visible');
+      await r.pg.evaluate(()=>window.__reponseMode='panne');
+      await r.pg.locator('.vrm-chat-send').click();await r.pg.waitForTimeout(850);
+      dit(await champ.inputValue()==='Brouillon suivant conservé','une réponse incertaine conserve le texte');
+      dit(await r.pg.locator('.vrm-chat-send').isDisabled(),'une réponse incertaine bloque le renvoi');
+      const compteIncertain=r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length;
+      await champ.press('Enter');await r.pg.waitForTimeout(100);
+      dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===compteIncertain,'Entrée ne contourne pas le blocage incertain');
+      await r.pg.getByRole('button',{name:'Autoriser un nouvel envoi après vérification'}).click();
+      await r.pg.locator('div[style*="z-index: 2000"] button',{hasText:'Autoriser'}).click();
+      dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===compteIncertain,'autoriser un renvoi n’envoie aucun message');
+      await r.pg.evaluate(()=>window.__reponseMode='normal');
       // 4. un fil pas encore capté : lu par l'extension
       await r.pg.keyboard.press('Escape');
       await r.pg.evaluate(() => { const o = [...document.querySelectorAll('div')].find((d) => d.style && d.style.position === 'fixed' && d.style.zIndex === '1000'); if (o) o.click(); });

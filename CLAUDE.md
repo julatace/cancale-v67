@@ -123,6 +123,19 @@
 > en ligne). Marché : Crosslist supprime puis recrée, Relister for Vinted recrée puis supprime (pages d'éditeurs).
 > `EXT_CAPACITES.versbrouillon = '5.253.0'`. Preuve : `audit-recreer.cjs` P (59 ; 7 rouges sur la 5.252).
 
+> **28 octobre (nuit, fin) — l'étagère EN BOIS, et « fais pour tout » :** l'étagère bois (`build: 'metal'`, `bois`)
+> avait déjà les plateaux réglables (IX) ; le banc `stock-finitions.cjs` XIII le prouve sur elle (plateau de bois
+> dessiné en morceaux, la boîte descend). Tous les meubles à étages de la palette l'ont donc : métal, bois, bacs,
+> portant, table. Pas les « Boîtes au sol » (aucun plateau) ni les anciens types cachés (grille, commode, étagère
+> d'avant, casiers, armoire : physique « colonne », toute la colonne tombe déjà — y poser des plateaux changerait
+> la physique de sa pièce réelle sans qu'il l'ait demandé).
+
+> **28 octobre (nuit, fin) — les ÉTAGÈRES À BACS aussi :** Julien : « fais pareil pour les étagères à bacs ».
+> `plateauxReglables` inclut l'étagère à bacs (`ft.bacs`, build métal) : « Plateaux, colonne par colonne »
+> (`ChoixPlanches`) ; sans plateau sous une case, son bac descend dans la case du dessous si elle est vide
+> (`tasserPlateaux`, cap 1) ; numéros inchangés. 3D : `buildMetal` dessine les morceaux, aucun bac fantôme
+> au-dessus d'un plateau qui manque. Banc `stock-finitions.cjs` XII (390/1512 ; règle d'avant ⇒ 2 rouges).
+
 > **28 octobre (nuit, fin) — les PORTANTS aussi :** Julien : « fais pareil pour les portants ». Un portant à cintres
 > peut avoir plusieurs BARRES (stepper « Barres », `data-reglage="barres"`, ~80 cm par barre, refusé au-delà du
 > plafond ; la barre ajoutée l'est en haut) et « Barres, cintre par cintre » (`ChoixPlanches`). `"r:c"` = la barre de
