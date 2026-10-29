@@ -6,8 +6,8 @@ const s=fs.readFileSync('src/App.jsx','utf8');
 const b=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
 try{
 const p=await b.newPage();await p.route('http://vrm.test/**',r=>r.fulfill({body:'<html></html>',contentType:'text/html'}));
-await p.route('**/pdf.worker.min.js',r=>r.fulfill({body:fs.readFileSync(require('path').join(process.env.VRM_PDFJS_DIR,'pdf.worker.min.js')),contentType:'application/javascript'}));
-await p.goto('http://vrm.test/');await p.addScriptTag({content:fs.readFileSync(require('path').join(process.env.VRM_PDFJS_DIR,'pdf.min.js'),'utf8')});
+await p.route('**/pdf.worker.min.js',r=>r.fulfill({body:fs.readFileSync(require('path').join((process.env.VRM_PDFJS_DIR||require('path').join(__dirname,'..','..','public','pdfjs-3.11.174')),'pdf.worker.min.js')),contentType:'application/javascript'}));
+await p.goto('http://vrm.test/');await p.addScriptTag({content:fs.readFileSync(require('path').join((process.env.VRM_PDFJS_DIR||require('path').join(__dirname,'..','..','public','pdfjs-3.11.174')),'pdf.min.js'),'utf8')});
 await p.evaluate(()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='http://vrm.test/pdf.worker.min.js';window.chargerPdfjs=async()=>pdfjsLib;});
 for(const name of ['trouverZoneBlanche','espaceBlancBordereau'])await p.addScriptTag({content:s.match(new RegExp('const '+name+' = [\\s\\S]*?\\n};'))[0]+`;window.${name}=${name};`});
 for(const rot of [0,90,180,270]){

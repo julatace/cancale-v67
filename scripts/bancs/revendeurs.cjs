@@ -249,15 +249,15 @@ async function brancher(p){
   await p.waitForFunction(()=>document.querySelectorAll('.vrm-sale-row').length===2);
   check(await p.getByLabel('Rechercher dans les ventes Vinted').inputValue()==='', 'réinitialiser retrouve toutes les ventes');
   await p.goto(base+'/?tab=plat_ebay');
-  const photo=p.getByRole('button',{name:'Agrandir la photo de Paire eBay',exact:true});
+  const photo=p.getByRole('button',{name:/^Agrandir la photo de Paire eBay/}).first();
   // (20 oct.) La photo agrandissable vit dans la vente ouverte (ventes « une ligne »).
   await p.getByRole('button',{name:/Ouvrir les actions : Paire eBay/}).first().click();
   await photo.click();
-  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
+  check(await p.getByRole('dialog',{name:'Photo de Paire eBay · 2 articles',exact:true}).isVisible(), 'photo de vente agrandie dans une fenêtre dédiée');
   await p.waitForFunction(()=>{const i=document.querySelector('.vrm-photo-panel img');return i&&i.complete&&i.naturalWidth>0;});
-  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).locator('img').getAttribute('alt')==='Paire eBay', 'image agrandie chargée avec le nom exact de la paire');
+  check(await p.getByRole('dialog',{name:'Photo de Paire eBay · 2 articles',exact:true}).locator('img').getAttribute('alt')==='Paire eBay · 2 articles', 'image agrandie chargée avec le nom exact de la paire');
   await p.keyboard.press('Escape');
-  check(await p.getByRole('dialog',{name:'Photo de Paire eBay',exact:true}).count()===0, 'Échap ferme la photo');
+  check(await p.getByRole('dialog',{name:'Photo de Paire eBay · 2 articles',exact:true}).count()===0, 'Échap ferme la photo');
   check(await photo.evaluate(e=>e===document.activeElement), 'fermeture de photo rend le focus à la miniature');
   // La photo fermée retire son entrée d'historique (« retour » ferme d'abord la
   // feuille, 18 oct.) : on laisse ce retour se faire avant de changer d'adresse —

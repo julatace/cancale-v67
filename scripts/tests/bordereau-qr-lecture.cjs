@@ -13,9 +13,9 @@ const qr=qrcode(0,'M');qr.addData(contenu);qr.make();
  try{
   const page=await nav.newPage();
   await page.route('http://vrm.test/**',r=>r.fulfill({body:'<html></html>',contentType:'text/html'}));
-  await page.route('**/pdf.worker.min.js',r=>r.fulfill({body:fs.readFileSync(path.join(process.env.VRM_PDFJS_DIR,'pdf.worker.min.js')),contentType:'application/javascript'}));
+  await page.route('**/pdf.worker.min.js',r=>r.fulfill({body:fs.readFileSync(path.join((process.env.VRM_PDFJS_DIR||require('path').join(__dirname,'..','..','public','pdfjs-3.11.174')),'pdf.worker.min.js')),contentType:'application/javascript'}));
   await page.goto('http://vrm.test/');
-  await page.addScriptTag({content:fs.readFileSync(path.join(process.env.VRM_PDFJS_DIR,'pdf.min.js'),'utf8')});
+  await page.addScriptTag({content:fs.readFileSync(path.join((process.env.VRM_PDFJS_DIR||require('path').join(__dirname,'..','..','public','pdfjs-3.11.174')),'pdf.min.js'),'utf8')});
   await page.addScriptTag({content:fs.readFileSync(lecteur,'utf8')});
   await page.evaluate(()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='http://vrm.test/pdf.worker.min.js';window.chargerPdfjs=async()=>pdfjsLib;});
   for(const nom of ['trouverZoneBlanche','espaceBlancBordereau'])await page.addScriptTag({content:extrait(nom)+`;window.${nom}=${nom};`});

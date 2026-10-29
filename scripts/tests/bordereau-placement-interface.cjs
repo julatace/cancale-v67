@@ -8,10 +8,10 @@ const fs=require('fs'),path=require('path'),assert=require('assert/strict'),PL=r
  try{
  const p=await b.newPage({viewport:{width:1000,height:900}});const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.route('http://vrm.test/**',r=>r.fulfill({body:'<div id="root"></div>',contentType:'text/html'}));
- await p.route('**/pdf.worker.min.js',r=>r.fulfill({body:fs.readFileSync(path.join(process.env.VRM_PDFJS_DIR,'pdf.worker.min.js')),contentType:'application/javascript'}));
+ await p.route('**/pdf.worker.min.js',r=>r.fulfill({body:fs.readFileSync(path.join((process.env.VRM_PDFJS_DIR||require('path').join(__dirname,'..','..','public','pdfjs-3.11.174')),'pdf.worker.min.js')),contentType:'application/javascript'}));
  await p.goto('http://vrm.test/');
  for(const file of ['react/umd/react.development.js','react-dom/umd/react-dom.development.js','pdf-lib/dist/pdf-lib.min.js'])await p.addScriptTag({path:path.resolve('node_modules',file)});
- await p.addScriptTag({path:path.join(process.env.VRM_PDFJS_DIR,'pdf.min.js')});
+ await p.addScriptTag({path:path.join((process.env.VRM_PDFJS_DIR||require('path').join(__dirname,'..','..','public','pdfjs-3.11.174')),'pdf.min.js')});
  await p.addStyleTag({content:fs.readFileSync('src/styles-reglages.css','utf8')});
  await p.evaluate(()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='http://vrm.test/pdf.worker.min.js';window.chargerPdfjs=async()=>pdfjsLib;window.C={card:'#fff',text:'#123',muted:'#456'};window.createPortal=ReactDOM.createPortal;window.FermeAuRetour=()=>null;});
  for(const name of ['trouverZoneBlanche','espaceBlancBordereau','drawBordereauStamp','dessinerPdf'])await p.addScriptTag({content:code.match(new RegExp('const '+name+' = [\\s\\S]*?\\n};'))[0]+`;window.${name}=${name};`});
