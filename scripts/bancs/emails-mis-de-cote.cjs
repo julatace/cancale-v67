@@ -244,6 +244,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         dit(!!p2 && /1 email conservé/.test(p2.texte) && /Julien, banc/.test(p2.texte) && !p2.suggestions.includes(JULIEN),
           'l’adresse déclarée, son email mis de côté lui est proposé (la liste relue)', p2 && p2.texte.replace(/\n/g, ' ').slice(-260));
         const avant = appels.length;
+        await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/À rattacher/}).click();
         const moi = pg.locator('button', { hasText: "C'est à moi" }).first();
         if (await moi.count()) { await moi.click(); await pg.waitForTimeout(1500); }
         const post = appels.slice(avant).find((a) => a.m === 'POST');
