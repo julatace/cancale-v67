@@ -115,7 +115,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.274.0';
+const EXT_ATTENDUE = '5.275.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -12004,11 +12004,15 @@ function texteSecoursPhotos(p) {
   if (p && p.renvoi) return `Vinted a refusé les photos${n} : VRM va les renvoyer`;
   return `Vinted a refusé les photos : nouvel essai${n}`;
 }
+function texteSecoursTaille(p) {
+  if (p && p.envoye) return `Vinted a refusé la taille : VRM a retrouvé la taille « ${p.taille || '?'} » dans la grille de Vinted — nouvel essai`;
+  return 'Vinted a refusé la taille : VRM cherche la taille de la paire dans la grille de Vinted';
+}
 function majProgRepub(p, d) {
   const id = String(d.id); const cur = p[id] || {};
   if (d.pause) return { ...p, [id]: { ...cur, pause: { quoi: String(d.pause), jusqua: Number(d.jusqua) || 0, ms: Number(d.ms) || 0 } } };
   const total = Number(d.total) || 0;
-  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total, renvoi: !!d.renvoi, essai: Number(d.essai) || 0, essais: Number(d.essais) || 0, envoye: !!d.envoye, nPhotos: d.etape === 'photos' && total > 0 ? total : (cur.nPhotos || 0) } };
+  return { ...p, [id]: { etape: String(d.etape || ''), fait: Number(d.fait) || 0, total, renvoi: !!d.renvoi, essai: Number(d.essai) || 0, essais: Number(d.essais) || 0, envoye: !!d.envoye, taille: typeof d.taille === 'string' ? d.taille.slice(0, 20) : '', nPhotos: d.etape === 'photos' && total > 0 ? total : (cur.nPhotos || 0) } };
 }
 function texteAttente(p, now) {
   const pa = p && p.pause;
@@ -12024,7 +12028,7 @@ function texteAttente(p, now) {
 function DetailEtapes({ p, liste, issue, now }) {
   if (!Array.isArray(liste) || !liste.length) return null;
   const e = p && p.etape;
-  let i = e === 'secours-photos' ? liste.findIndex((x) => x[0] === 'en-ligne') : liste.findIndex((x) => x[0] === e);
+  let i = (e === 'secours-photos' || e === 'secours-taille') ? liste.findIndex((x) => x[0] === 'en-ligne') : liste.findIndex((x) => x[0] === e);
   if (issue === 'fait') i = liste.length;
   const att = texteAttente(p, now);
   return (
@@ -12035,6 +12039,7 @@ function DetailEtapes({ p, liste, issue, now }) {
         if (etat === 'encours') {
           if (cle === 'photos' && p && p.total > 0) detail = `photo ${Math.min(p.fait + 1, p.total)} sur ${p.total}`;
           if (e === 'secours-photos') detail = texteSecoursPhotos(p);
+          if (e === 'secours-taille') detail = texteSecoursTaille(p);
           if (att) detail = detail ? `${detail} · ${att}` : att;
         }
         if (etat === 'fait' && cle === 'photos' && p && p.nPhotos > 0) detail = `${p.nPhotos} photo${p.nPhotos > 1 ? 's' : ''}`;
@@ -12081,6 +12086,7 @@ function SuiviGeste({ ids, liste, label }) {
 function progressionRepub(p, action, viaB, listeImposee) {
   const liste = listeImposee || (action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : (viaB ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct));
   if (!p || !p.etape) return { etape: '', part: 0.03, texte: 'Préparation…' };
+  if (p.etape === 'secours-taille') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.6 / liste.length), texte: texteSecoursTaille(p) + '…' }; }
   if (p.etape === 'secours-photos') { const j = liste.findIndex((x) => x[0] === 'en-ligne'); return { etape: p.etape, part: Math.min(0.97, Math.max(0, j) / liste.length + 0.5 / liste.length), texte: texteSecoursPhotos(p) + '…' }; }
   const i = liste.findIndex((x) => x[0] === p.etape);
   if (i < 0) return { etape: p.etape, part: 0.05, texte: 'En cours…' };
