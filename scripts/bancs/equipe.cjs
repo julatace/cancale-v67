@@ -461,9 +461,10 @@ const MONTANTS = /€|\b42[.,]00\b|\b55[.,]00\b|\b99[.,]00\b|\b25[.,]00\b|281|2\
 async function ouvrirEquipe(pg, L) {
   const onglet = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
   if (await onglet.count()) { await onglet.first().click(); await pg.waitForTimeout(1500); }
-  if (L < 600) {
+  // (29 oct.) « Équipe » est une ligne à ouvrir aux deux tailles (plus seulement au téléphone).
+  {
     const l = pg.locator('[data-sous-ouvrir="equipe"]');
-    if (await l.count()) { await l.first().click(); await pg.waitForTimeout(800); }
+    if (await l.count() && await l.first().isVisible()) { await l.first().click(); await pg.waitForTimeout(800); }
   }
   await pg.waitForTimeout(800);
 }

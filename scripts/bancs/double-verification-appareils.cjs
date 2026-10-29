@@ -169,7 +169,8 @@ async function passerLeCode(pg, code) {
 async function ouvrirPanneau(pg, taille) {
   await pg.goto(`http://localhost:${PORT}/?tab=settings&vue=compte`, { waitUntil: 'domcontentloaded' });
   await attendre(pg, '[data-sous-ouvrir="double"], [data-mfa-panneau]', 20000);
-  if (taille === 390) { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l) { await l.click(); } }
+  // (29 oct.) Le panneau est une ligne à ouvrir aux deux tailles (plus seulement au téléphone).
+  { const l = await pg.$('[data-sous-ouvrir="double"]'); if (l && await l.isVisible()) { await l.click(); } }
   return attendre(pg, '[data-mfa-panneau="inactive"], [data-mfa-panneau="active"], [data-mfa-panneau="passu"]', 20000);
 }
 const message = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-mfa-message]'); return e ? e.getAttribute('data-mfa-message') + ' : ' + e.innerText.slice(0, 110) : ''; });

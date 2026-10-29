@@ -9378,11 +9378,15 @@ const typeBordereau = (PL, doc) => {
 };
 const nomTypeBordereau = (t) => (TYPES_BORDEREAU.find(([k]) => k === t) || [, 'Autre mise en page'])[1];
 
-// Le lecteur de PDF des APERÇUS (pdf.js), chargé au premier aperçu demandé —
-// jamais avant, et seulement pour dessiner : l'impression n'en a pas besoin.
-// Version figée (pdfjs-dist 3.11.174, Mozilla, licence Apache 2.0).
+// Le lecteur de PDF (pdf.js), chargé au premier usage — jamais avant. Version
+// figée (pdfjs-dist 3.11.174, Mozilla, licence Apache 2.0, public/pdfjs-*/LICENSE.txt).
+// ⚠️ (29 oct.) Il ne sert plus seulement aux aperçus : depuis le 28 oct.
+// l'IMPRESSION d'un bordereau numéroté vérifie l'espace blanc du N° avec lui
+// (`espaceBlancBordereau`), et refuse d'imprimer s'il ne se charge pas. Chargé
+// depuis jsdelivr, un bloqueur ou un réseau qui coupe ce site empêchait donc
+// d'imprimer tout bordereau. Il est servi par VRM lui-même (mêmes fichiers).
 const PDFJS_V = '3.11.174';
-const PDFJS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/build/`;
+const PDFJS_BASE = `/pdfjs-${PDFJS_V}/`;
 let _pdfjs = null;
 const chargerPdfjs = () => _pdfjs || (_pdfjs = new Promise((ok, ko) => {
   try {
