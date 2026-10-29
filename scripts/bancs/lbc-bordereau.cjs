@@ -29,6 +29,25 @@ const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = 4338;
+// 28 oct. (77633d91, choix de Julien) : le tampon ne se pose plus qu'après avoir
+// VÉRIFIÉ l'espace blanc, rendu par pdf.js (cdn.jsdelivr.net, chargé au clic).
+// Le banc sert la MÊME version en local (déterminisme), sinon « Placement du
+// numéro non vérifié : pdf.js » et rien n'est ouvert. BANC_PDFJS_DIR, sinon
+// pdfjs-dist téléchargé une fois depuis npm dans le dossier temporaire.
+const os = require('os'), { execFileSync } = require('child_process');
+const PDFJS_V = '3.11.174';
+function dossierPdfjs() {
+  if (process.env.BANC_PDFJS_DIR && fs.existsSync(path.join(process.env.BANC_PDFJS_DIR, 'pdf.min.js'))) return process.env.BANC_PDFJS_DIR;
+  const base = path.join(os.tmpdir(), 'vrm-banc-pdfjs-' + PDFJS_V);
+  const build = path.join(base, 'package', 'build');
+  if (fs.existsSync(path.join(build, 'pdf.min.js'))) return build;
+  fs.mkdirSync(base, { recursive: true });
+  const tgz = path.join(base, 'pdfjs.tgz');
+  execFileSync('curl', ['-sSL', '-m', '180', '-o', tgz, `https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-${PDFJS_V}.tgz`]);
+  execFileSync('tar', ['-xzf', tgz, '-C', base]);
+  return build;
+}
+const PDFJS = dossierPdfjs();
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -84,6 +103,12 @@ async function rendre(b, version) {
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.addInitScript(PONT, { version, pdf: PDF_B64 });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+  // Posée APRÈS le fourre-tout : Playwright essaie la dernière route d'abord.
+  await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
+    const f = path.join(PDFJS, path.basename(new URL(r.request().url()).pathname));
+    if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
+    return r.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(f) });
+  });
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });

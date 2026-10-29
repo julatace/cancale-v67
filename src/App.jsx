@@ -50933,6 +50933,9 @@ function MessagesLeboncoin() {
   );
 }
 
+const CarteEcranLbc = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
+const SousEcranLbc = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
+const TitreEcranLbc = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51368,9 +51371,14 @@ function LeboncoinScreen() {
   // (16 oct.) Mise en page dans l'identité de l'app : cartes blanches à ombre
   // douce, titres courts, une colonne plus large sur ordinateur (elle faisait
   // 600 px et tout s'empilait en pavés).
-  const Card = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
-  const Titre = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
-  const Sous = ({ children }) => <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
+  // ⚠️ (29 oct.) Ces deux formes vivent HORS du composant : définies ici, chaque
+  //    rendu de l'écran en faisait un NOUVEAU type, et React REMONTAIT toutes les
+  //    cartes — un défilement suffisait (mesuré au banc : le bouton « Publier »
+  //    remplacé sous le doigt, sa raison « depuis ton ordinateur » effacée, le N°
+  //    tapé dans « Relier » perdu). Même leçon que la fenêtre du Stock (§ planches).
+  const Card = CarteEcranLbc;
+  const Titre = TitreEcranLbc;
+  const Sous = SousEcranLbc;
   // ── L'AGENT QUI CONSEILLE (26 oct., parité avec eBay — Julien : « une vraie
   //    expérience ») : « À faire sur Leboncoin » range les actions du plus
   //    urgent au moins, sur les signaux DÉJÀ calculés dans `data` (§11, aucun
@@ -51819,6 +51827,9 @@ function LeboncoinScreen() {
                 </div>
                 );
               };
+              // Appelé comme une FONCTION (pas `<Groupe/>`) : un composant défini
+              // dans le rendu est un type neuf à chaque fois, React remontait les
+              // cartes à chaque rafraîchissement (29 oct., banc lbc-publier-app H).
               const Groupe = ({ titre, liste, note, ton }) => (<>
                 {groupes > 1 && <div className="vrm-apub-groupe"><span className="vrm-apub-groupe-titre" style={ton ? { color: C.warn } : undefined}>{titre}</span><span className="vrm-apub-groupe-n">{liste.length}</span></div>}
                 {note ? <div className="vrm-apub-groupe-note">{note}</div> : null}
@@ -51826,9 +51837,9 @@ function LeboncoinScreen() {
                 {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
               </>);
               return (<>
-                {nues.length > 0 && <Groupe titre="Aucune photo" ton liste={nues} note={<>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</>} />}
-                {pretes.length > 0 && <Groupe titre="Prêtes" liste={pretes} />}
-                {maigres.length > 0 && <Groupe titre="Une seule photo" liste={maigres} note={<>Une annonce Leboncoin avec une seule photo se vend mal. <b>Vinted ne donne les autres que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et elles arrivent ici toutes seules.</>} />}
+                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</> })}
+                {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Une annonce Leboncoin avec une seule photo se vend mal. <b>Vinted ne donne les autres que sur la page de l'annonce</b> : ouvre-la une fois sur ton ordinateur et elles arrivent ici toutes seules.</> })}
               </>);
             })()}
           </>)}
