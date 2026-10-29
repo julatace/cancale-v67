@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.270.0';
+const CODE_VERSION = '5.271.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2939,6 +2939,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // corps, pour le mettre en ligne depuis VRM (`noterBrouillonVinted`).
     if (msg.draftId) noterBrouillonVinted(msg.draftId, msg.status, msg.corps, domain, sender);
     else noterDiag('brouillon_forme_inconnue');
+  } else if (msg.kind === 'brouillonPublie') {
+    // 29 oct. : un brouillon mis en ligne sur Vinted (2xx de `…/completion`),
+    // à la main ou ailleurs — VRM ne le garde plus « à mettre en ligne ».
+    if (msg.draftId) noterBrouillonPublie(msg.draftId, msg.status, domain, sender);
   } else if (msg.kind === 'fiche') {
     // 22 oct. : la description et les codes qu'il vient d'ENREGISTRER sur Vinted
     // (2xx, identifiant de l'adresse ou de la réponse) — voir `noterFicheVinted`.
@@ -8205,6 +8209,25 @@ async function noterBrouillonVinted(draftId, status, corps, domain, sender) {
   if (r.d.id != null && String(r.d.id) !== id) { noterDiag('brouillon_id_contredit'); return false; }
   const ok = await rangerBrouillon(id, { uid: String(uid), corps, titre: r.titre, prix: r.prix, nPhotos: r.nPhotos, etat: 'brouillon' });
   noterDiag(ok ? 'brouillon_vu' : 'brouillon_ecriture_ratee');
+  if (ok) { try { notifierApp({ type: 'maj', quoi: 'brouillons', uid: String(uid) }); } catch (_) {} }
+  return ok;
+}
+async function noterBrouillonPublie(draftId, status, domain, sender) {
+  const id = String(draftId || '');
+  const st = Number(status);
+  if (!/^\d{4,15}$/.test(id) || !(st >= 200 && st < 300)) { noterDiag('brouillon_publie_forme'); return false; }
+  const url = String((sender && sender.tab && sender.tab.url) || (sender && sender.url) || '');
+  if (url && !/^https:\/\/([a-z0-9-]+\.)*vinted\.[a-z.]+\//i.test(url)) { noterDiag('brouillon_publie_onglet_refuse'); return false; }
+  let uid = null; try { uid = await activeUidForDomain(domain || 'www.vinted.fr'); } catch (_) { uid = null; }
+  if (!uid) { noterDiag('brouillon_publie_sans_compte'); return false; }
+  if (await compteNonCapte(uid)) return false;
+  let rows; try { rows = await sbGet(`app_data?id=eq.vinted_brouillon_${id}&select=data`); } catch (_) { rows = null; }
+  if (rows === null) { noterDiag('brouillon_publie_lecture_ratee'); return false; }
+  const cur = (rows && rows[0] && rows[0].data) || null;
+  if (cur && cur.uid && String(cur.uid) !== String(uid)) { noterDiag('brouillon_publie_autre_compte'); return false; }
+  const ok = await rangerBrouillon(id, { uid: String(uid), etat: 'publie', publieLe: (cur && cur.publieLe) || new Date().toISOString(), itemId: id });
+  if (ok && cur && cur.ancienId) { try { await majVersBrouillon(String(uid), String(cur.ancienId), { etat: 'fait', publie: true }); } catch (_) {} }
+  noterDiag(ok ? 'brouillon_publie_vu' : 'brouillon_publie_ecriture_ratee');
   if (ok) { try { notifierApp({ type: 'maj', quoi: 'brouillons', uid: String(uid) }); } catch (_) {} }
   return ok;
 }

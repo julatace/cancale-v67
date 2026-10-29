@@ -466,6 +466,10 @@ function clocheFavorisNative(activer=false,origine){
   // qui permet ensuite de le mettre en ligne depuis VRM sans rien deviner.
   // Lecture de ce que la page vient de faire : zéro requête de plus (§3).
   const RE_BROUILLON = /^\/api\/v\d+\/item_upload\/drafts(?:\/(\d{4,15}))?\/?$/;
+  // (29 oct., « elle n'a pas capté que j'avais fait passer un brouillon en ligne
+  // à la main ») La mise en ligne d'un brouillon sur Vinted : `POST …/drafts/{id}/
+  // completion` (vu dans ses requêtes). 2xx ⇒ ce brouillon est EN LIGNE.
+  const RE_BROUILLON_FIN = /^\/api\/v\d+\/item_upload\/drafts\/(\d{4,15})\/completion\/?$/;
   const noteBrouillon = (method, url, status, lireTexte, corps) => {
     try {
       const mt = String(method || '').toUpperCase();
@@ -474,6 +478,8 @@ function clocheFavorisNative(activer=false,origine){
       if (!(st >= 200 && st < 300)) return;
       let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
       if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname)) return;
+      const fin = RE_BROUILLON_FIN.exec(U.pathname);
+      if (fin) { if (mt === 'POST') post({ kind: 'brouillonPublie', draftId: fin[1], status: st }); return; }
       const m = RE_BROUILLON.exec(U.pathname);
       const t = corpsTexte(corps);
       if (!m || !t) return;

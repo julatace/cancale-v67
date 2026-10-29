@@ -112,7 +112,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.270.0';
+const EXT_ATTENDUE = '5.271.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -11726,8 +11726,12 @@ function etatARefaire(x, maintenant = Date.now()) {
   return null;
 }
 const REFAIRE_SELECT = 'id,uid:data->>uid,photo:data->photos->>0,etat:data->versBrouillon->>etat,titre:data->versBrouillon->>titre,prix:data->versBrouillon->>prix,at:data->versBrouillon->>at,majAt:data->versBrouillon->>majAt,supprime:data->versBrouillon->>supprime,publier:data->versBrouillon->>publier,peut:data->versBrouillon->>peutExister,draftId:data->versBrouillon->>draftId';
-function useBrouillonsARefaire(actif) {
+function useBrouillonsARefaire(actif, presentes) {
   const [rows, setRows] = useState(undefined);      // undefined = lecture · null = pas su · [] = lu
+  // (29 oct., « elle n'a pas capté que j'avais fait passer un brouillon en ligne
+  // à la main ») Ses brouillons Vinted (`vinted_brouillon_*`, scalaires) : un
+  // AUTRE brouillon de la même ancienne annonce déjà mis en ligne règle la ligne.
+  const [brs, setBrs] = useState(null);
   const [tick, setTick] = useState(0);
   const [ecartes, setEcartes] = useState(() => { const v = load(BROUILLONS_REFAIRE_ECARTES, {}); return v && typeof v === 'object' ? v : {}; });
   useEffect(() => onCloudReady(() => setEcartes((e) => (e && Object.keys(e).length) ? e : (() => { const v = load(BROUILLONS_REFAIRE_ECARTES, {}); return v && typeof v === 'object' ? v : {}; })())), []);
@@ -11737,7 +11741,9 @@ function useBrouillonsARefaire(actif) {
     (async () => {
       let r = null;
       try { r = await lireTout(`id=like.coffre_*&data->versBrouillon->>etat=in.(a-refaire,a-publier,mise-en-ligne-incertaine,enregistre,supprime,suppression-incertaine,brouillon-range)&select=${REFAIRE_SELECT}`, { strict: true }); } catch (_) { r = null; }
-      if (vivant) setRows(Array.isArray(r) ? r : null);
+      let b = null;
+      try { b = await lireTout('id=like.vinted_brouillon_*&select=id,anc:meta->>ancienId,etat:meta->>etat,it:meta->>itemId', { strict: true }); } catch (_) { b = null; }
+      if (vivant) { setRows(Array.isArray(r) ? r : null); setBrs(Array.isArray(b) ? b : null); }
     })();
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'brouillons') setTick((t) => t + 1); };
     window.addEventListener('vrm:ext', f);
@@ -11745,12 +11751,21 @@ function useBrouillonsARefaire(actif) {
   }, [actif, tick]);
   const liste = React.useMemo(() => {
     if (!Array.isArray(rows)) return rows;
-    const out = []; const regles = [];
+    const out = []; const regles = []; const enLigne = [];
+    const enVente = presentes instanceof Set ? presentes : new Set();
+    const publieParAncien = new Set();
+    for (const b of (brs || [])) {
+      const id = String(b.id || '').replace(/^vinted_brouillon_/, '');
+      if (b.anc && (b.etat === 'publie' || enVente.has(id) || (b.it && enVente.has(String(b.it))))) publieParAncien.add(String(b.anc));
+    }
     for (const x of rows) {
       const m = /^coffre_(\d+)_(\d{4,15})$/.exec(String(x.id || ''));
       if (!m) continue;
       const quoi = etatARefaire(x);
       if (!quoi) continue;
+      // Déjà en ligne sur Vinted (lu dans son dressing, par IDENTITÉ : l'id du
+      // brouillon, ou un autre brouillon de la même ancienne annonce) : réglé.
+      if ((x.draftId && enVente.has(String(x.draftId))) || publieParAncien.has(m[2])) { enLigne.push({ cle: String(x.id), titre: String(x.titre || '').trim() }); continue; }
       const e = Date.parse(ecartes[x.id] || ''), maj = Date.parse(x.majAt || x.at || '');
       // Réglé à la main, rien de neuf depuis : gardé à part (« Revoir »), jamais perdu.
       const dest = (isFinite(e) && !(isFinite(maj) && maj > e)) ? regles : out;
@@ -11759,8 +11774,9 @@ function useBrouillonsARefaire(actif) {
     }
     out.sort((a, b) => (b.at || 0) - (a.at || 0));
     out.regles = regles;
+    out.enLigne = enLigne;
     return out;
-  }, [rows, ecartes]);
+  }, [rows, ecartes, brs, presentes]);
   const revoir = (cle) => setEcartes((e) => { const u = { ...e }; delete u[cle]; save(BROUILLONS_REFAIRE_ECARTES, u); return u; });
   const ecarter = (cle) => setEcartes((e) => { const u = { ...e, [cle]: new Date().toISOString() }; save(BROUILLONS_REFAIRE_ECARTES, u); return u; });
   return { liste, ecarter, revoir, relire: () => setTick((t) => t + 1) };
@@ -11798,6 +11814,7 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
         {liste === undefined && <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>}
         {liste === null && <div data-refaire-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire ce qui reste à refaire — rien n'est perdu, réessaie dans un moment.</div>}
         {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : chaque passage par brouillon est allé au bout.'}</div>}
+        {Array.isArray(liste) && Array.isArray(liste.enLigne) && liste.enLigne.length > 0 && <div data-refaire-en-ligne={liste.enLigne.length} style={{ fontSize: 13, color: C.muted }}>{liste.enLigne.length === 1 ? `« ${liste.enLigne[0].titre || 'Une annonce'} » est déjà en ligne sur Vinted (mise en ligne à la main ou par un autre brouillon) : plus rien à refaire.` : `${liste.enLigne.length} annonces sont déjà en ligne sur Vinted (mises en ligne à la main ou par un autre brouillon) : plus rien à refaire.`}</div>}
         {regles.length > 0 && <div data-refaire-regles={regles.length} style={{ fontSize: 13, color: C.muted, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div>{regles.length === 1 ? 'Tu as marqué un passage « C’est réglé » :' : `Tu as marqué ${regles.length} passages « C’est réglé » :`}</div>
           {regles.map((b) => <button key={b.cle} type="button" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)} style={{ textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 13, fontWeight: 600, background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>Le remettre dans la liste : {b.titre}</button>)}
@@ -11871,7 +11888,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
                 {e && e.etape && e.etape !== 'envoi' && e.etape !== 'fait' && <div data-brouillon-raison style={{ fontSize: 12.5, color: C.warn || C.muted }}>{e.raison || 'pas fait'}</div>}
                 {!e && publie && <div style={{ fontSize: 12.5, color: C.muted }}>Mis en ligne par VRM — ton dressing le montrera à la prochaine lecture.</div>}
                 {!e && it._etat === 'incomplet' && <div style={{ fontSize: 12.5, color: C.muted }}>Il lui manque {[!String((i && i.titre) || '').trim() && 'un titre', !(Number(i && i.prix) > 0) && 'un prix', !(Number(i && i.nph) > 0) && 'des photos'].filter(Boolean).join(', ')} — finis-le sur Vinted.</div>}
-                {!e && it._etat === 'inconnu' && <div style={{ fontSize: 12.5, color: C.muted }}>VRM n'a pas encore son contenu : ouvre-le sur Vinted et enregistre-le une fois.</div>}
+                {!e && it._etat === 'inconnu' && <div data-brouillon-capter style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>L'extension n'a pas encore vu ce brouillon (il a été fait avant elle, ou ailleurs). Pour qu'elle le capte : <b>1.</b> « Ouvrir sur Vinted » ci-dessous, <b>2.</b> sur Vinted, « Enregistrer le brouillon » sans rien changer. Il arrive ici tout de suite, prêt à mettre en ligne.</div>}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                 {complet && brouillonOk && (!e || (e.etape !== 'fait' && e.etape !== 'incertain')) && <button type="button" data-brouillon-publier disabled={e && e.etape === 'envoi'} onClick={() => mettre(it)} style={{ ...lien, border: 'none', background: C.accent, color: '#fff' }}>Mettre en ligne</button>}
@@ -12050,8 +12067,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [tMode, setTMode] = useState('aucun');
   const [tVal, setTVal] = useState('');
   const [tChe, setTChe] = useState('');
-  const [pBase, setPBase] = useState('pct');
-  const [pDelta, setPDelta] = useState('-10');
+  const [pBase, setPBase] = useState('aucun');   // (29 oct.) rien ne baisse sans son clic
+  const [pDelta, setPDelta] = useState('');
   const [pCommun, setPCommun] = useState('');
   const [pArr, setPArr] = useState('aucun');
   const [pFin, setPFin] = useState('aucune');
@@ -12313,22 +12330,30 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
-              <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} style={champ}>
-                <option value="aucun">Ne pas changer le prix</option>
-                <option value="pct">Baisser / monter d'un pourcentage</option>
-                <option value="fixe">Baisser / monter d'un montant (€)</option>
-                <option value="commun">Mettre toutes au même prix</option>
-              </select>
-              {(pBase === 'pct' || pBase === 'fixe') && <input data-republier-delta value={pDelta} onChange={(ev) => setPDelta(ev.target.value)} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. -10 (= −10 %)' : 'ex. -5 (= −5 €)'} style={{ ...champ, maxWidth: 240 }} />}
-              {pBase === 'commun' && <input data-republier-commun value={pCommun} onChange={(ev) => setPCommun(ev.target.value)} inputMode="decimal" placeholder="Prix (€)" style={{ ...champ, maxWidth: 200 }} />}
-              {pBase !== 'aucun' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <select value={pArr} onChange={(ev) => setPArr(ev.target.value)} style={{ ...champ, flex: '1 1 150px' }}>
-                  <option value="aucun">Sans arrondi</option><option value="euro">Arrondi à l'euro</option><option value="5">Arrondi à 5 €</option><option value="10">Arrondi à 10 €</option>
+              {/* (29 oct., « les réductions je ne comprends rien du tout ») Un geste
+                  par bouton : garder le prix, ou baisser de 5, 10, 15, 20 %. Le reste
+                  (autre %, en €, même prix pour toutes) est replié dans « Autre ». */}
+              <div data-republier-reductions style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[['aucun', 'Garder le prix'], ['-5', '−5 %'], ['-10', '−10 %'], ['-15', '−15 %'], ['-20', '−20 %'], ['autre', 'Autre…']].map(([v, l]) => {
+                  const actif = v === 'aucun' ? pBase === 'aucun' : v === 'autre' ? (pBase === 'fixe' || pBase === 'commun' || (pBase === 'pct' && !['-5', '-10', '-15', '-20'].includes(String(pDelta).trim()))) : (pBase === 'pct' && String(pDelta).trim() === v);
+                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer', border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : C.card, color: actif ? C.card : C.text }}>{l}</button>;
+                })}
+              </div>
+              {pBase !== 'aucun' && !(pBase === 'pct' && ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) && <div data-republier-autre style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} style={{ ...champ, flex: '1 1 200px' }}>
+                  <option value="pct">Baisser d'un pourcentage</option>
+                  <option value="fixe">Baisser d'un montant en €</option>
+                  <option value="commun">Mettre toutes au même prix</option>
                 </select>
-                <select value={pFin} onChange={(ev) => setPFin(ev.target.value)} style={{ ...champ, flex: '1 1 150px' }}>
-                  <option value="aucune">Sans terminaison</option><option value="00">finir en ,00</option><option value="50">finir en ,50</option><option value="90">finir en ,90</option><option value="99">finir en ,99</option>
-                </select>
+                {(pBase === 'pct' || pBase === 'fixe') && <input data-republier-delta value={String(pDelta).replace(/^-/, '')} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9.,]/g, ''); setPDelta(v ? '-' + v : ''); }} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. 12 (= −12 %)' : 'ex. 5 (= −5 €)'} style={{ ...champ, maxWidth: 200 }} />}
+                {pBase === 'commun' && <input data-republier-commun value={pCommun} onChange={(ev) => setPCommun(ev.target.value)} inputMode="decimal" placeholder="Prix (€)" style={{ ...champ, maxWidth: 200 }} />}
               </div>}
+              {pBase !== 'aucun' && <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13.5, color: C.text, minHeight: 44, cursor: 'pointer' }}>
+                <input type="checkbox" data-republier-arrondi checked={pArr === 'euro'} onChange={(ev) => { setPArr(ev.target.checked ? 'euro' : 'aucun'); setPFin('aucune'); }} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
+                <span>Arrondir à l'euro (ex. 44,10 € → 44 €)</span>
+              </label>}
+              {(() => { const a = choisies[0]; if (!a || a.prix == null) return null; const x = apercu(a);
+                return <div data-republier-exemple style={{ fontSize: 13, color: C.text }}>{pBase === 'aucun' ? <>Les prix ne changent pas. Exemple : {a.numero ? `N°${a.numero}` : 'la première'} reste à {prixCourt(a.prix)}.</> : <>Exemple : {a.numero ? `N°${a.numero}` : 'la première'} passe de {prixCourt(a.prix)} à <b>{prixCourt(x.prix != null ? x.prix : a.prix)}</b>{x.plancher ? ' (ramené au prix d\u2019achat)' : ''}. Le nouveau prix de chaque paire est écrit dans la liste juste en dessous.</>}</div>; })()}
               <div style={{ fontSize: 12, color: C.muted }}>Jamais sous le prix d'achat de la paire.</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -36541,7 +36566,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const [listings, setListings] = useState({ loading:false, items:null });
   const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne', accounts);
-  const brRefaire = useBrouillonsARefaire(curSub === 'annonces' || actionsOpen || refaireOpen || !!repubAction);
+  // (29 oct.) Les annonces présentes (en ligne, à confirmer, masquées) : un
+  // brouillon qui y figure a été mis en ligne, à la main ou par VRM.
+  const presentesIds = React.useMemo(() => { const st = new Set(); for (const l of [listings.items, listings.aConfirmer, listings.masquees]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) st.add(String(it.id)); return st; }, [listings.items, listings.aConfirmer, listings.masquees]);
+  const brRefaire = useBrouillonsARefaire(curSub === 'annonces' || actionsOpen || refaireOpen || !!repubAction, presentesIds);
   const nRefaire = Array.isArray(brRefaire.liste) ? brRefaire.liste.length : 0;
   // (28 oct.) Refaire UN brouillon raté, sur son clic confirmé : l'extension relit
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
