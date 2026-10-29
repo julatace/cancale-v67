@@ -9,6 +9,7 @@
 > déjà ; ce sont les balayages de famille (Stock, recherche, porte-monnaie, profils, suivis, relevés…) qui le ramassaient.
 > Preuve : `audit-comptes-supprimes.cjs` (13 ; 3 rouges sur l'avant ; `--prouve` 4 rouges). ⚠️ Non mesuré : sa vraie base
 > (pas de connecteur VRM). Un email (bordereau, suivi) de ce compte n'est pas relié à un compte : il reste.
+
 > **29 octobre — TOUT ce que Vinted exige est vérifié AVANT la mise en ligne (5.276) :** Julien : « il ne doit pas y avoir
 > d'erreur possible », « que toutes les catégories obligatoires soient remplies avant de valider la mise en ligne ».
 > `champsManquantsAvant` (une règle pour Mettre en ligne un brouillon, Refaire, Republier par brouillon et direct) : titre, prix,
