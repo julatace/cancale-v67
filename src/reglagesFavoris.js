@@ -11,9 +11,10 @@ function identite({uid,owner,ownerActuel}) {
 export function validerReglagesFavoris({message='',pourcentage=null,intervalleMinutes,intervalleMaxMinutes=null}) {
   if(typeof message!=='string')throw Error('Le message doit être du texte.');
   const intervalle=String(intervalleMinutes??'').trim();
-  if(!/^\d{1,6}$/.test(intervalle)||Number(intervalle)<1||Number(intervalle)>1440)throw Error('Choisis un intervalle entier entre 1 et 1 440 minutes.');
+  // 0 = « comme Vintex » (6 à 10 s, tiré par le serveur) ; sinon des minutes entières.
+  if(!/^\d{1,6}$/.test(intervalle)||Number(intervalle)>1440)throw Error('Choisis un intervalle entier entre 0 et 1 440 minutes (0 = comme Vintex).');
   const maxTexte=String(intervalleMaxMinutes??'').trim();let max=null;
-  if(maxTexte){
+  if(maxTexte&&Number(intervalle)>0){
     if(!/^\d{1,6}$/.test(maxTexte)||Number(maxTexte)<1||Number(maxTexte)>1440)throw Error('Choisis un maximum entier entre 1 et 1 440 minutes.');
     if(Number(maxTexte)<Number(intervalle))throw Error('Le maximum doit être au moins égal au minimum.');
     if(Number(maxTexte)>Number(intervalle))max=Number(maxTexte);

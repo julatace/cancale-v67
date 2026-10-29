@@ -1,5 +1,23 @@
 # VRM — dossier de passation
 
+> **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
+> vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
+> mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
+> **203 100 €** (188 700 € ne vaut plus ; dépassé 2 ans de suite ⇒ sortie au 1er janvier suivant) ; franchise de TVA **85 000 €**
+> (dépassé ⇒ TVA au 1er janvier suivant) et seuil majoré **93 500 €** (⇒ TVA dès le jour du dépassement) ; versement libératoire
+> +1 %, payé avec les cotisations au même rythme, RFR N-2 < 29 579 € (personne seule), option avant le 30 sept. pour l'année
+> suivante ; l'URSSAF ne propose que mensuel ou trimestriel (pas d'annuel). Règle pure `src/microEntreprise.js` (`SEUILS_MICRO` par
+> année — une année sans chiffres vérifiés ⇒ la jauge se tait ; `jaugeSeuils` sur la ligne publiée `vinted_urssaf_mois`, « au
+> moins » si une plateforme pas lue ou des ventes sans date, N-1 jugé seulement comme MINIMUM, projection après 60 j et jamais sur
+> un partiel ; `calendrierUrssaf` : le mois M se déclare ET se paie du 1er au dernier jour de M+1, trimestres 30/04 · 31/07 · 31/10
+> · 31/01 ; `optionsMicro`). `MicroEntreprise` (App.jsx) remplace la carte du taux : « Ton profil URSSAF » (rythme — UN réglage
+> `vinted_urssaf_freq`, la carte du mois n'a plus son propre choix et le suit, `useFreqUrssaf` — ; versement libératoire DEMANDÉ
+> dans `vrm_micro_options`, synchronisé, `null` = « À confirmer », jamais deviné ; ACRE ; taux détaillé ligne par ligne, un taux
+> posé à la main n'est jamais réécrit), « Ton calendrier » (3 échéances, ✓ si notée), « Tes seuils {année} » (deux jauges, ambre
+> seulement si proche/dépassé). Le mot « encaissé » reste interdit à l'écran (`audit-urssaf`) : « Reçu en 2026 ». Preuves :
+> `audit-micro-entreprise.cjs` (20 ; 7 mutations rouges), banc `suivi-urssaf.cjs` section M (profil, question VL, « Non » rangé,
+> rythme partagé ; 390/1512). ⚠️ Non mesuré : sa vraie base ; le CA de l'année n'est que ce que VRM a capté (plateformes reliées).
+
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
 > « activité automatisée » après une republication de VRM. Mesuré (extension VRM Observateur, lecture seule, 266 requêtes
 > de Vintex sur 2 articles) : Vintex fait TOUT depuis l'onglet vinted.fr (cookies du site, `x-csrf-token` de la page,
@@ -35,6 +53,34 @@
 > l'annonce est posé dès le brouillon. Preuve : `audit-recreer.cjs` §N (144 ; 5 rouges sur la 5.278). Reste différent :
 > l'espacement entre deux paires est celui qu'il règle (Vintex : ~12 s) ; non mesuré : un vrai Chrome qui endort le
 > service worker pendant l'attente (le réveil par alarme est au plus 30 s en retard).
+
+> **29 octobre — plus de saisie « N° + Entrée », et la carte reste claire :** Julien : « enlève N°+entrée sur
+> chaque onglet, il y a déjà la barre de recherche » et « la carte est en sombre quand on met le mode sombre, je
+> veux que ça ne change pas la couleur de la carte ». `SaisieNumeroPlateforme` (Ventes, Colis, Annonces Vinted,
+> Leboncoin, eBay) est RETIRÉE avec ses écoutes de chiffres (`chercherNum*`, `DEMANDE_NUM_PLAT`) et son CSS ; la
+> recherche par numéro reste la loupe (« Tout sur le N° ») et le Stock garde la sienne. La carte de la communauté
+> et la mini-carte des points relais gardent le style CLAIR (`positron`) en mode sombre ; le reste de l'écran suit
+> le thème. Bancs `pave-vinted.cjs` et `pave-plateformes.cjs` réécrits (aucune saisie, un chiffre + Entrée ne
+> change ni l'écran ni la section) : 8 et 4 rouges sur main ; `communaute.cjs` exige `positron` en sombre.
+
+> ⚠️⚠️ **29 octobre — MESSAGES AUX FAVORIS « COMME VINTEX » (5.280), sa demande : « je veux que tu copie vintex, c'est simple et
+> efficace ».** Mesuré dans son rapport Observateur (Vintex, favoris) : tout part de l'onglet vinted.fr ; par favori
+> `POST /api/v2/conversations {initiator,item_id,opposite_user_id}` → 3,2–6 s → `GET /api/v2/transactions/{tx}` → 0,3–0,8 s →
+> `POST …/transactions/{tx}/offers {offer:{currency,price:"45.00"}}` (une VRAIE offre Vinted) → 0,4–0,55 s → `POST
+> …/conversations/{id}/replies` → 6 à 9,6 s avant le favori suivant. `executerMessageFavori` fait pareil par `vintedPage`
+> (sans onglet ⇒ `onglet_vinted`, RIEN n'est envoyé), `PAUSES_FAVORI`, `prixDeTransaction` (réponse jamais vue : lue
+> défensivement, prix illisible ⇒ pas d'offre, le message part), `prixOffreFavori` (jamais ≥ prix, jamais < 1 €) ; le fil
+> n'est relu que si la réponse de création ne suffit pas aux contrôles. GARDÉ : autorisation serveur à usage unique,
+> vérification, identité, historique, plafond 10/60 min, une action consommée (l'offre n'en compte pas une de plus).
+> Rythme « Comme Vintex » (`intervalleMinutes: 0` ⇒ `delaiFavori` tire 6–9,6 s côté serveur, `DELAI_VINTEX_MS`) ; l'app
+> sonde la file à 3 s. **Republication** : la grille des tailles n'est PLUS JAMAIS lue pendant une republication (Vintex
+> ne la lit pas) — seulement le cache 24 h (`cacheSeul`, sinon la phrase et `tailles_cache_absent`) ; plafond
+> `REPUB_PAR_JOUR` **50** (il en a republié 50 avec Vintex) ; espacement par défaut « Comme Vintex » (8–16 s,
+> `REPUB_ESP_VINTEX`). Preuves : `audit-favoris-vintex.cjs` (17 ; `--prouve` 2 rouges sur origin/main : création depuis
+> le fond, pas de transaction ni d'offre), `audit-recreer.cjs` (144, grille jamais demandée), tests favoris (420, 51,
+> 105, 84). ⚠️ Restent différents, dits : `is_personal_data_sharing_check_skipped` à false (valeur de Vintex inconnue),
+> en-têtes de Vintex jamais vus, plafond 10/h gardé. **Geste de Julien** : installer la 5.280, laisser un onglet
+> vinted.fr ouvert sur le bon compte pendant les messages et la republication.
 
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
 > `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il

@@ -152,17 +152,6 @@
 .vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state { max-width: none; min-width: max-content; flex-shrink: 0; white-space: nowrap; }
 .vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state[data-ton=action] .vrm-ebay-sale-status { color: var(--av-warn) !important; }
 
-/* ── Le pavé numérique sur Leboncoin et eBay (27 octobre) ──────────────────
-   Une ligne discrète sous les onglets (ordinateur seulement) ; la paire
-   trouvée porte un contour d'accent quelques secondes. */
-.vrm-app-shell .vrm-main .vrm-num-plat { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px 0; font-size: 12px; color: var(--vrm-muted); }
-.vrm-app-shell .vrm-main .vrm-num-plat-champ { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--vrm-ink); }
-.vrm-app-shell .vrm-main .vrm-num-plat-champ input { width: 110px; min-height: 36px; box-sizing: border-box; padding: 6px 10px; border: 1px solid var(--vrm-line); border-radius: 8px; background: var(--vrm-surface, transparent); color: var(--vrm-ink); font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
-.vrm-app-shell .vrm-main .vrm-num-plat-msg[data-num-plat-msg=ok] { color: var(--vrm-ink); font-weight: 600; }
-.vrm-app-shell [data-num-trouve] { outline: 2px solid var(--vrm-accent, #2458E6); outline-offset: -2px; border-radius: 10px; }
-/* (27 oct.) Dans une barre d'outils (Annonces) : pas de marge, le N° à côté de la recherche ; l'invite se tait (le champ dit « + Entrée »), le résultat s'écrit à côté. */
-.vrm-app-shell .vrm-main .vrm-num-plat.vrm-num-plat-barre { padding: 0; }
-.vrm-app-shell .vrm-main .vrm-num-plat.vrm-num-plat-barre .vrm-num-plat-msg:empty { display: none; }
 .vrm-fiche-vente-acces{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border-bottom:1px solid #91a3a44d;font-size:12px;}
 .vrm-fiche-vente-acces span{flex:1 1 180px;opacity:.75;}
 .vrm-fiche-vente-acces button{min-height:44px;padding:7px 12px;border:1px solid #91a3a477;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}

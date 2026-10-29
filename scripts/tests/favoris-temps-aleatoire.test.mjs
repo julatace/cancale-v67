@@ -2,7 +2,7 @@
 // SERVEUR entre le minimum et le maximum choisis, le plafond 10/60 min passe
 // avant. Données inventées, aucune requête.
 import assert from 'node:assert/strict';
-import {lancerFile,reserverFile,terminerFile,delaiFavori,RefusFavoris} from '../../api/_lib/favoris-file.js';
+import {lancerFile,reserverFile,terminerFile,consommerFile,delaiFavori,RefusFavoris} from '../../api/_lib/favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};
 const cibles=k=>Array.from({length:k},(_,i)=>({itemId:String(100+i),recipientId:String(200+i),notificationId:'n'+i,initiator:'x'}));
@@ -33,4 +33,13 @@ assert.throws(()=>lancerFile(null,{owner:'o',targets:cibles(1),message:'B',inter
 d=lancerFile(null,{owner:'o',targets:cibles(10),message:'B',intervalleMinutes:1,intervalleMax:2,maintenant:t0}).data;
 d.tentatives=Array.from({length:10},(_,i)=>t0-10*60000+i);
 ok(reserverFile(d,{owner:'o',maintenant:t0,jeton:'z'}).valeur.travail===undefined,'10 messages dans l’heure : on attend, quel que soit le tirage');
+// 29 oct. (5.280), « comme Vintex » : 0 minute = 6 à 9,6 s entre deux favoris (mesuré).
+for(let i=0;i<200;i++){const v=delaiFavori(0,null,'v-'+i);ok(v>=6000&&v<=9600,'comme Vintex : 6 à 9,6 s');}
+ok(validerReglagesFavoris({message:'Bonjour',intervalleMinutes:'0'}).intervalleMinutes===0,'0 = comme Vintex, accepté');
+assert.throws(()=>lancerFile(null,{owner:'o',targets:cibles(2),message:'B',intervalleMinutes:0,intervalleMax:3,maintenant:t0}),RefusFavoris);n++;
+d=lancerFile(null,{owner:'o',targets:cibles(2),message:'B',intervalleMinutes:0,maintenant:t0,pourcentage:10}).data;
+{const r=reserverFile(d,{owner:'o',maintenant:t0,jeton:'vx'});ok(r.data.enCours.delai>=6000&&r.data.enCours.delai<=9600,'la file tire 6 à 9,6 s');
+ const c=consommerFile(r.data,{owner:'o',jeton:'vx',maintenant:t0+10});ok(c.valeur.travail.pourcentage===10,'la réduction part vers l’extension (offre native)');}
+d=lancerFile(null,{owner:'o',targets:cibles(2),message:'B',intervalleMinutes:6,maintenant:t0}).data;
+{const r=reserverFile(d,{owner:'o',maintenant:t0,jeton:'vy'});const c=consommerFile(r.data,{owner:'o',jeton:'vy',maintenant:t0+10});ok(!('pourcentage' in c.valeur.travail),'sans réduction : aucune offre demandée');}
 console.log(n+' contrôles du temps aléatoire réussis');

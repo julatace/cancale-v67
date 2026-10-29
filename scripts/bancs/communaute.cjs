@@ -570,7 +570,8 @@ async function partie019(nav) {
       dit(geo.haut < geo.vh * 0.6, 'téléphone : la carte est dans le premier écran, pas sous la barre du bas', JSON.stringify(geo));
       dit(geo.cv != null && Math.abs(geo.cv - (geo.l - 2)) <= 2, 'téléphone : le dessin remplit la carte (pas grossi, pas de bande grise)', JSON.stringify(geo));
       await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 20000 }).catch(() => {});
-      dit(OFM.styles.includes('dark') && await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap', 'sombre : le style OpenFreeMap « dark » est demandé et dessiné', JSON.stringify(OFM.styles));
+      // (29 oct.) Julien : la carte garde ses couleurs claires en mode sombre.
+      dit(OFM.styles.includes('positron') && !OFM.styles.includes('dark') && await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap', 'sombre : la carte reste CLAIRE (style « positron », jamais « dark »)', JSON.stringify(OFM.styles));
       const pin = await pg.$eval('[data-cm-pin]', (b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); });
       dit(pin >= 44, 'téléphone : une épingle fait 44 px au doigt', String(pin));
       const nAttr = await pg.$$eval('.vrm-cm-carte .maplibregl-ctrl-attrib', (e) => e.length);
@@ -688,14 +689,15 @@ async function partie019(nav) {
     }
 
     console.log('\n── les deux autres combinaisons : 1512 px sombre, 390 px clair');
-    for (const [largeur, sombre, style] of [[1512, true, 'dark'], [390, false, 'positron']]) {
+    // (29 oct.) La carte reste claire en mode sombre (décision de Julien) : « positron » partout.
+    for (const [largeur, sombre, style] of [[1512, true, 'positron'], [390, false, 'positron']]) {
       await essaie(`rendu ${largeur} ${sombre ? 'sombre' : 'clair'}`, async () => {
         reset();
         B.profils[Bu] = { pid: uuid(), pseudo: 'Bruno', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, cree_le: '2026-10-20T00:00:00Z' };
         OFM.styles = []; OFM.tuiles = 0;
         const { ctx, pg } = await ouvrir(nav, { qui: A, largeur, sombre });
         await pg.waitForSelector('[data-cm-fond="openfreemap"]', { timeout: 20000 }).catch(() => {});
-        dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap' && OFM.styles.includes(style) && OFM.tuiles > 0, `${largeur} px ${sombre ? 'sombre' : 'clair'} : le style « ${style} » est demandé et dessiné`, JSON.stringify({ styles: OFM.styles, tuiles: OFM.tuiles }));
+        dit(await attr(pg, '[data-cm-carte]', 'data-cm-fond') === 'openfreemap' && OFM.styles.includes(style) && !OFM.styles.includes('dark') && OFM.tuiles > 0, `${largeur} px ${sombre ? 'sombre' : 'clair'} : le style « ${style} » est demandé et dessiné (jamais « dark »)`, JSON.stringify({ styles: OFM.styles, tuiles: OFM.tuiles }));
         const l = await pg.evaluate(() => document.documentElement.scrollWidth);
         dit(l <= largeur, `${largeur} px : aucun débordement horizontal`, String(l));
         const pin = await pg.$eval('[data-cm-pin]', (b) => { const r = b.getBoundingClientRect(); const c = b.closest('.vrm-cm-carte').getBoundingClientRect(); return { dedans: r.left >= c.left && r.right <= c.right && r.top >= c.top && r.bottom <= c.bottom, t: Math.round(Math.min(r.width, r.height)) }; }).catch(() => null);
