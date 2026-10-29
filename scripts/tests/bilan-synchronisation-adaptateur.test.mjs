@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {articlesVendusAilleurs} from '../../src/bilanSynchronisation.js';
+const s=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
+const debut=s.indexOf('  const chargerRetraitsMulti = async () => {');
+const bloc=s.slice(debut,s.indexOf('  const sourcesBilan',debut));
+let lectures=0,etranger=false,retarder=false,fin;const AUTH={user:{id:'vendeur-a'}};
+const ad={id:'900',account:'lbc-a',status:'active',ref:'7',subject:'Même titre pour tous',url:'https://www.leboncoin.fr/ad/chaussures/900'};
+const numero={numero:'7'};
+const dependances={AUTH,numeros:{'11':numero},lireTout:async q=>{assert.ok(q.includes('owner=eq.vendeur-a')&&!q.includes('select=*'));lectures++;if(retarder)await new Promise(r=>fin=r);return [{id:'lbc_listings',owner:etranger?'vendeur-b':'vendeur-a',items:{900:ad}},{id:'lbc_ventes',owner:'vendeur-a',ventes:{}},{id:'lbc_accounts',owner:'vendeur-a',accounts:{'lbc-a':{id:'lbc-a',sessionAt:'2026-10-29'}}}];},lireEbayTous:async base=>base==='ebay_orders'?{items:[{orderId:'o1',lineItems:[{legacyItemId:'800',sku:'VRM-7'}]}],lignes:[{compte:{ref:'principal'},ligne:{complet:true,capturedAt:1234}}]}:{items:[],lignes:[{compte:{ref:'principal'},ligne:{complet:true,capturedAt:1234}}]},load:()=>({}),comptesLbcProuves:()=>new Set(),comptesLbcSession:a=>new Set(Object.keys(a)),idCompteLbcApp:String,annoncesLbcVendues:()=>new Set(),numeroLbcIdentite:(v,items)=>items[v.itemId]?.ref||'',annonceLbcEnVente:a=>a.status==='active',etatAnnonceLeboncoin:a=>({etat:a.status}),lienAnnonceLeboncoin:a=>a.url,lbcAnnulee:()=>false,numEbayLu:()=>null,commandeEbayEngagee:()=>true,numLigneEbay:()=> '7',listings:{items:[{id:'11',title:'Même titre pour tous',_acc:{vinted_user_id:'123'}}],lues:{'123':1234}},sales:{items:[]},txnPret:true,accounts:[{vinted_user_id:'123'}],venduesVinted:new Set(),acctOffOf:()=>false,blockedAccts:new Set(),accNameOf:()=> 'Vinted Alice',txnItem:{},classifyOrderStatus:()=> 'completed'};
+const lire=new Function(...Object.keys(dependances),bloc+';return chargerRetraitsMulti;')(...Object.values(dependances));
+let data=await lire();assert.equal(lectures,1);assert.ok(data.ventes.some(v=>v.plateforme==='eBay'));let lignes=articlesVendusAilleurs(data).lignes;assert.equal(lignes.length,2);assert.ok(lignes.some(x=>x.plateforme==='Leboncoin'&&x.id==='900'&&x.onglet==='leboncoin'));assert.ok(lignes.some(x=>x.plateforme==='Vinted'&&x.id==='11'));
+etranger=true;data=await lire();assert.ok(data.manques.includes('Leboncoin non relu'));assert.ok(!data.annonces.some(x=>x.plateforme==='Leboncoin'));
+retarder=true;const attente=lire();await new Promise(r=>setTimeout(r,0));AUTH.user.id='vendeur-b';fin();await assert.rejects(attente,/Session modifiée/);
+console.log('Adaptateur réel : sources eBay.items, liens Leboncoin, propriétaire et changement de session vérifiés');
