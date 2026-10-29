@@ -76,6 +76,7 @@ import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
@@ -678,6 +679,9 @@ const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 // 16 à 45 lectures en double par écran ouvert) — règle et garde-fous dans
 // `src/lecturesPartagees.js` (un échec n'est jamais gardé, une écriture vide tout).
 installerLecturesPartagees(SUPABASE_URL);
+// (29 oct.) « Retire tout de ce compte » : aucune ligne d'un compte supprimé
+// pour de bon ne sort d'une lecture (src/comptesSupprimes.js).
+installerFiltreSupprimes(SUPABASE_URL);
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -2489,7 +2493,7 @@ const fetchVintedAccounts = async () => {
       // (29 oct.) Gardé sur l'appareil pour le Stock (`comptesStockEcartes`) :
       // un compte supprimé pour de bon n'y revient jamais. Seulement sur une
       // lecture RÉUSSIE (« pas su » n'efface pas la dernière liste connue).
-      if (blk.ok && Array.isArray(b)) { try { localStorage.setItem('vrm_comptes_supprimes', JSON.stringify([...blocked])); } catch (_) {} } } catch (_) {}
+      if (blk.ok && Array.isArray(b)) { try { localStorage.setItem(CLE_SUPPRIMES, JSON.stringify([...blocked])); } catch (_) {} } } catch (_) {}
     if (blocked.size) {
       const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
@@ -3340,7 +3344,9 @@ const lireTout = async (query, opts = {}) => {
     out.push(...lot);
     if (lot.length < PAGE_SB) break;
   }
-  return out;
+  // (29 oct.) Les lignes d'un compte supprimé pour de bon sortent APRÈS la
+  // pagination (une page raccourcie l'aurait arrêtée trop tôt).
+  return sansComptesSupprimes(out);
 };
 
 // ── UNE LIGNE MOISSONNÉE N'EST TÉLÉCHARGÉE QU'UNE FOIS ────────────────────
@@ -28538,7 +28544,7 @@ const comptesStockEcartes = () => {
   // (`vrm_blocked_accounts`, shop_cancale) sont écartés même avant que la
   // liste des comptes liés soit lue.
   let supprimes = new Set();
-  try { const a = JSON.parse(localStorage.getItem('vrm_comptes_supprimes') || '[]'); if (Array.isArray(a)) supprimes = new Set(a.map(String)); } catch (_) {}
+  supprimes = lireSupprimes();
   let lies = null;
   try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a) && a.length) lies = new Set(a.map((x) => String(x && x.vinted_user_id || '')).filter(Boolean)); } catch (_) {}
   return (f) => { const u = f && f.accountId != null ? String(f.accountId) : ''; if (!u) return false; return masques.has(u) || retires.has(u) || supprimes.has(u) || (lies ? !lies.has(u) : false); };
