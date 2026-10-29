@@ -1,22 +1,24 @@
-import React,{useState} from 'react';
+import React,{useState,useEffect} from 'react';
 import {ADRESSE_COLLECTRICE} from '../api/_lib/proprietaire-email.js';
 import {etapesTransfert} from './receptionEmail.js';
 const services={gmail:{nom:'Gmail',url:'https://mail.google.com/mail/u/0/#settings/fwdandpop',etapes:'Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert.'},outlook:{nom:'Outlook',url:'https://outlook.live.com/mail/0/options/mail/forwarding',etapes:'Paramètres → Courrier → Transfert, ou crée une règle pour les emails Vinted et des transporteurs.'},icloud:{nom:'iCloud',url:'https://www.icloud.com/mail/',etapes:'Réglages Mail → Règles : crée une règle de transfert pour les emails Vinted et des transporteurs.'},autre:{nom:'Autre messagerie',etapes:'Dans les paramètres de ta messagerie, crée une règle de transfert ciblant Vinted et les transporteurs.'}};
 const libelles={fait:'Confirmé', 'non-requis':'Non requis', 'a-faire':'À faire',attente:'En attente',externe:'Dans ta messagerie',inconnu:'Non vérifié',preparation:'Lien en préparation'};
-export default function ConfigurerTransfert({adresses=[],preuves,onComptes,onDeclarer,onConfirmer,onActualiser}){
+export default function ConfigurerTransfert({adresses=[],preuves,onComptes,onDeclarer,onConfirmer,onActualiser,ouvert=false,adresseInitiale,onChoixAdresse}){
  const [choix,setChoix]=useState(''),[service,setService]=useState('gmail'),[copie,setCopie]=useState(''),[busy,setBusy]=useState(false),[etape,setEtape]=useState(null),[retour,setRetour]=useState('');
+ useEffect(()=>{if(adresseInitiale){setChoix(adresseInitiale);setEtape(null);setCopie('');setRetour('');}},[adresseInitiale]);
  const a=adresses.find(a=>a.adresse===choix),etapes=etapesTransfert(a,preuves);
  const active=etape??Math.max(0,etapes.findIndex(e=>!['fait','non-requis'].includes(e.etat)));
  const s=services[service],unique=a?.comptes?.length===1;
  const agir=async(fn)=>{if(busy)return;setBusy(true);setRetour('');try{const ok=await fn();if(ok===false)throw Error();const relu=await onActualiser?.();setRetour(relu===false?'Demande acceptée, mais le suivi n’a pas pu être actualisé. Réessaie la lecture.':'Demande traitée. Les étapes reflètent le dernier suivi reçu.');}catch(_){setRetour('La demande n’a pas abouti. Réessaie : aucune étape n’est marquée confirmée.');}finally{setBusy(false);}};
- return <details className="vrm-reception-parcours"><summary>Configurer un transfert · étape par étape</summary><div className="vrm-reception-parcours-corps">
+ const Conteneur=ouvert?'section':'details';
+ return <Conteneur className="vrm-reception-parcours">{ouvert?<h3>Configurer le transfert d’un compte</h3>:<summary>Configurer un transfert · étape par étape</summary>}<div className="vrm-reception-parcours-corps">
  <p>Choisis une adresse personnelle. Le nom du compte reste visible pendant sa configuration.</p>
- <label>Compte et adresse<select value={choix} disabled={busy} onChange={e=>{setChoix(e.target.value);setEtape(null);setCopie('');setRetour('');}}><option value="">Choisir mon adresse</option>{adresses.map(a=><option key={a.adresse} value={a.adresse}>{a.comptes?.length===1?a.comptes[0].nom+' · ':''}{a.adresse}</option>)}</select></label>
+ <label>Compte et adresse<select value={choix} disabled={busy} onChange={e=>{setChoix(e.target.value);onChoixAdresse?.(e.target.value);setEtape(null);setCopie('');setRetour('');}}><option value="">Choisir mon adresse</option>{adresses.map(a=><option key={a.adresse} value={a.adresse}>{a.comptes?.length===1?a.comptes[0].nom+' · ':''}{a.adresse}</option>)}</select></label>
  {!a&&<p>Ton adresse n’apparaît pas ? Associe-la à ton compte Vinted dans « Comptes liés ».</p>}
  {!a&&<button type="button" onClick={onComptes}>Ouvrir mes comptes Vinted</button>}
  {a&&<>
  <div className="vrm-transfert-identite"><strong>{unique?a.comptes[0].nom:'Compte à associer'}</strong><small>{a.adresse}</small></div>
- <nav className="vrm-transfert-etapes" aria-label="Étapes du transfert">{etapes.map((e,i)=><button type="button" key={e.id} disabled={busy} aria-current={active===i?'step':undefined} onClick={()=>{setEtape(i);setRetour('');}} data-etape-transfert={e.id} data-etat={e.etat}><span>{i+1}</span><b>{e.titre}</b><small>{libelles[e.etat]}</small></button>)}</nav>
+ <nav className="vrm-transfert-etapes" aria-label="Étapes du transfert">{etapes.map((e,i)=><button type="button" key={e.id} disabled={busy} aria-current={active===i?'step':undefined} aria-label={`${i+1}. ${e.titre} · ${libelles[e.etat]}`} title={e.titre} onClick={()=>{setEtape(i);setRetour('');}} data-etape-transfert={e.id} data-etat={e.etat}><span>{i+1}</span><b>{e.titre}</b><small>{libelles[e.etat]}</small></button>)}</nav>
  <section className="vrm-transfert-etape-active" aria-label={etapes[active].titre}>
  <h4>{active+1}. {etapes[active].titre}</h4>
  {active===0&&(unique?<p>Le compte {a.comptes[0].nom} est associé à cette adresse.</p>:<><p>{a.comptes?.length>1?'Plusieurs comptes utilisent cette adresse : corrige le doublon.':'Dans Comptes liés, renseigne l’adresse où Vinted écrit à ce compte.'}</p><button type="button" onClick={onComptes}>Associer le bon compte</button></>)}
@@ -28,5 +30,5 @@ export default function ConfigurerTransfert({adresses=[],preuves,onComptes,onDec
  </section>
  <div className="vrm-transfert-navigation"><button type="button" disabled={busy||active===0} onClick={()=>setEtape(active-1)}>← Précédent</button><button type="button" disabled={busy||active===4} onClick={()=>setEtape(active+1)}>Étape suivante →</button></div>
  </>}
- </div></details>;
+ </div></Conteneur>;
 }
