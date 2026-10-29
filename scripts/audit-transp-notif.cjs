@@ -23,6 +23,14 @@
 //   N9  (n° 20) les bornes : le relais répond dans son budget, le cron ne lit,
 //       n'écrit et ne sonne plus rien après sa réponse ;
 //   N10 (n° 21) la garde des 72 h juge la date de l'évènement qui fait l'état.
+// Tour 2 (revue du 29 oct.) :
+//   N11 (n° 15) l'e-mail « retiré » et le transporteur en même temps : un seul
+//       « retiré », et l'e-mail d'un AUTRE colis n'efface pas la clé posée ;
+//   N12 (n° 16) le suivi Vinted « disponible » et le transporteur en même
+//       temps : une seule notification ;
+//   N13 (n° 18) un ancien n° dont la 1re lecture rate est relu après son recul ;
+//   N14 (n° 17) Mondial Relay : la même arrivée lue par le serveur (sans lieu)
+//       puis par l'extension (avec lieu) ne sonne qu'une fois.
 // `--prouve` : réaffaiblit chaque règle, chaque mutation doit rendre ROUGE.
 // `--seul=N1,N3` : seulement ces scénarios. §6.1 : lancé depuis l'arbre d'avant
 // (AUDIT_RACINE, ou copié dedans), il est rouge.
@@ -33,7 +41,10 @@ const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 
 const MUTATIONS = {
   'arrivee-cle-unique': ['N1', 'api/_lib/transporteurs.js', "    if (estNouvelleArrivee(avant, apres)) return { etat: e, etape: 'relais', jour, fait: `${fait}|${occ}`, categorie: 'colis', cle: `relais-${k}-r${empreinte(occ)}`, prefixesSilence: [], nouvelleArrivee: true };\n", ''],
-  'change-sans-lieu': ['N1', 'api/_lib/transporteurs.js', "export const clefEtat = (t) => (t && t.etat ? `${t.etat}|${t.detail || ''}|${t.etat === 'disponible' ? lieuNorm(t) : ''}` : '');", "export const clefEtat = (t) => (t && t.etat ? `${t.etat}|${t.detail || ''}|` : '');"],
+  // (tour 2 n° 17) Le lieu d'une arrivée « disponible → disponible » se compare
+  // désormais dans `etatAChange` (seulement s'il est connu des deux côtés) :
+  // c'est LÀ que vit la règle « un autre point relais, même détail, sonne ».
+  'change-sans-lieu': ['N1', 'api/_lib/transporteurs.js', '    return !!(a && b && a !== b);', '    return false;'],
   'pas-su-consomme': ['N2', 'api/_lib/transporteurs-lecture.js', "  if (r.raison === 'pas-su') return r;\n", ''],
   'transp-ignore-vinted': ['N3', 'api/_lib/transporteurs-notif.js', '    if (c.vinted) exactes.push(c.vinted);\n', ''],
   'vinted-ignore-transp': ['N3', 'api/_lib/suivi-vinted.js', "    const bloquantes = [c.transp, ...(numero && etape !== 'track' ? [`${etape}-${numero}`] : [])].filter(Boolean);", '    const bloquantes = [];'],
@@ -49,19 +60,33 @@ const MUTATIONS = {
   'cron-sans-arret': ['N9', 'api/ship-reminders.js', '  finally { clearTimeout(minuteur); arret.abort(); }', '  finally { clearTimeout(minuteur); }'],
   '72h-dernier-chrono': ['N10', 'api/_lib/transporteurs.js', "etatAt: (dApres || evs[iR]).at, dernierAt: dernier.at });", 'etatAt: dernier.at, dernierAt: dernier.at });'],
   '72h-dernier-vg': ['N10', 'api/_lib/transporteurs.js', "etatAt: /^(?:returned|return_returned)$/.test(d.group) ? isoDe(d.ms) : (isoDe(debut.ms) || base.etatAt), dernierAt: base.etatAt });", 'etatAt: base.etatAt, dernierAt: base.etatAt });'],
+  // (29 oct., tour 2) — N11 à N14 : les courses et les relectures de la revue.
+  'email-sans-reverif': ['N11', 'api/email-inbound.js', '    if (cles.some((k) => ks.includes(k))) return undefined;\n', ''],
+  'email-ecrase': ['N11', 'api/email-inbound.js', '    return { ...(d || {}), keys: [...ecrites.filter((k) => !ks.includes(k)), ...enPlus, ...ks].slice(0, 300) };', '    return { ...(d || {}), keys: [...ecrites, ...enPlus].slice(0, 300) };'],
+  'vinted-relais-aveugle': ['N12', 'api/_lib/suivi-vinted.js', '      deja = keys.some((k) => prefixes.some((p) => k.startsWith(p)) || (cleCode && k === cleCode));', '      deja = false;'],
+  'fermeture-jamais-relue': ['N13', 'api/_lib/transporteurs.js', 'export const jamaisLueAvecSucces = (t) => !!t && !t.lu', 'export const jamaisLueAvecSucces = (t) => false && !t.lu'],
+  // Deux gardes indépendantes (l'état n'a pas changé · la même occurrence) : les
+  // retirer ENSEMBLE refait le défaut ; chacune seule est rattrapée par l'autre.
+  'enrichissement-sonne': ['N14', [['api/_lib/transporteurs.js', '  return !lx || !ly || lx === ly;\n}', '  return lx === ly;\n}'], ['api/_lib/transporteurs.js', '    return !!(a && b && a !== b);', '    return a !== b;']]],
 };
 const ARG_PROUVE = process.argv.find((x) => x.startsWith('--prouve'));
 if (ARG_PROUVE) {
   let ok = 0;
   const seules = ARG_PROUVE.includes('=') ? ARG_PROUVE.split('=')[1].split(',') : null;
   const choisies = Object.entries(MUTATIONS).filter(([nom]) => !seules || seules.includes(nom));
-  for (const [nom, [scen, f, de, vers]] of choisies) {
+  for (const [nom, def] of choisies) {
+    const scen = def[0];
+    const changes = Array.isArray(def[1]) ? def[1] : [def.slice(1)];
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-tn-'));
     for (const x of ['api', 'src', 'package.json']) fs.cpSync(path.join(R, x), path.join(t, x), { recursive: true });
     fs.symlinkSync(fs.realpathSync(path.join(R, 'node_modules')), path.join(t, 'node_modules'));
-    const src = fs.readFileSync(path.join(t, f), 'utf8');
-    if (src.split(de).length !== 2) { console.log(`❌ mutation ${nom} : ancre ${src.includes(de) ? 'pas unique' : 'introuvable'} dans ${f}`); fs.rmSync(t, { recursive: true, force: true }); continue; }
-    fs.writeFileSync(path.join(t, f), src.replace(de, vers));
+    let ancreKo = '';
+    for (const [f, de, vers] of changes) {
+      const src = fs.readFileSync(path.join(t, f), 'utf8');
+      if (src.split(de).length !== 2) { ancreKo = `ancre ${src.includes(de) ? 'pas unique' : 'introuvable'} dans ${f}`; break; }
+      fs.writeFileSync(path.join(t, f), src.replace(de, vers));
+    }
+    if (ancreKo) { console.log(`❌ mutation ${nom} : ${ancreKo}`); fs.rmSync(t, { recursive: true, force: true }); continue; }
     const r = spawnSync(process.execPath, [__filename, `--seul=${scen}`], { env: { ...process.env, AUDIT_RACINE: t }, encoding: 'utf8', timeout: 300000 });
     const rouges = (String(r.stdout || '').match(/^❌/gm) || []).length;
     const tombe = r.status !== 0 && rouges > 0;
@@ -480,6 +505,110 @@ const vieillir = (owner, id, h = 3) => { const k = `${owner}|${id}`; const d = b
     H.carrier = () => rep(cpXml(N2, [cpEv('AB', h(48), 'Colis disponible dans le point relais', { office: 'VANNES - FR - TABAC A' }), cpEv('R', h(2), "Retour à l'expéditeur", { office: 'VANNES - FR - TABAC A' })]), 200, 'text/xml');
     await C5();
     dit(pushes.filter((p) => /repart/.test(p.title || '')).length === 1, 'l\'autre sens : un retour d\'il y a 2 h sonne', pushes.map((p) => p.title).join(' | ') || 'aucune');
+  });
+
+  // ══ TOUR 2 (29 oct.) — LES COURSES ENTRE VOIES, LES RELECTURES ══════════
+  const attendre = async (f, n = 500) => { for (let i = 0; i < n && !f(); i++) await new Promise((r) => setTimeout(r, 10)); return f(); };
+  const inbound = await importer('api/email-inbound.js');
+  const routePush = (await importer('api/push.js')).default;
+  const email = async (subject, text, mid) => { const r = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: { 'x-vrm-email-key': 'cle-banc-suivi' }, body: { from: 'shipping@relay.vinted.com', to: 'boite@banc.test', subject, text, html: '', attachments: [], messageId: mid } }, r); return r; };
+  const prepDispoVg = (N, code) => {
+    base.set(`${A}|vrm_email_owners`, { adresses: { 'boite@banc.test': { owner: A } } });
+    base.set(`${A}|email_track_vinted_${N}`, { suivi: N, carrier: 'vinted', status: 'available', sens: 'entrant', subject: `Ton colis est arrivé à la consigne #${N}`, receivedAt: iso(h(30)), emailAt: iso(h(30)), arriveLe: iso(h(30)), code });
+    base.set(`${A}|transp_vinted_${N}`, { v: 1, suivi: N, carrier: 'vinted', etat: 'disponible', etatAt: iso(h(29)), lu: iso(h(3)), essai: iso(h(3)), essaiRes: 'ok', essais: 0, lieuNom: 'Consigne Test', arrivees: [] });
+  };
+  const vgRetire = () => rep(vgJson([{ group: 'delivered', state: 'delivery', ms: h(0.2), message: 'Delivered' }, { group: 'ready_for_pickup', ms: h(29), message: 'Ready (Consigne Test)', address: '1 rue Test, 56000 Vannes' }]), 200);
+
+  // ══ N11 — L'E-MAIL « RETIRÉ » PENDANT LE PASSAGE DU TRANSPORTEUR (n° 15) ══
+  if (veut('N11')) await essaie('N11 · e-mail et transporteur, même retrait', async () => {
+    const N = 'VGS1234567890501';
+    reset(); await oublis(); prepDispoVg(N, 'C11111');
+    let lacher; const tenu = new Promise((r) => { lacher = r; }); let appele = false;
+    H.carrier = async () => { appele = true; await tenu; return vgRetire(); };
+    const pas = C5();
+    await attendre(() => appele);
+    const g = gate(/lire:.*id=eq\.push_dedup/, { apres: true });
+    const em = email(`Ton colis a été récupéré #${N}`, 'Bonjour,\nTon colis a été récupéré par le destinataire.', '<n11@banc>');
+    await attendre(() => g.vu);
+    lacher(); await pas;
+    g.ouvrir(); await em;
+    const retires = pushes.filter((p) => /retir|récup|livr/i.test(p.title || ''));
+    dit(g.vu && appele && retires.length === 1, 'l\'e-mail « retiré » lu pendant que le transporteur annonce « retiré » : UN seul « retiré »', `${retires.length} notification(s)`);
+    // Un e-mail sur un AUTRE colis, écrit depuis une lecture d'avant le passage, n'efface pas la clé du transporteur.
+    const M = 'VGS1234567890503';
+    reset(); await oublis(); prepDispoVg(N, 'C22222');
+    let lacher2; const tenu2 = new Promise((r) => { lacher2 = r; }); let appele2 = false;
+    H.carrier = async () => { appele2 = true; await tenu2; return vgRetire(); };
+    const pas2 = C5();
+    await attendre(() => appele2);
+    const g2 = gate(/lire:.*id=eq\.push_dedup/, { apres: true });
+    const em2 = email(`Ton colis a été récupéré #${M}`, 'Bonjour,\nTon colis a été récupéré par le destinataire.', '<n11b@banc>');
+    await attendre(() => g2.vu);
+    lacher2(); await pas2;
+    g2.ouvrir(); await em2;
+    const keys = (base.get(`${A}|push_dedup`) || {}).keys || [];
+    const p0 = pushes.length;
+    await email(`Ton colis a été récupéré #${N}`, 'Bonjour,\nTon colis a été récupéré par le destinataire.', '<n11c@banc>');
+    const encore = pushes.slice(p0).filter((p) => (p.tag || '').includes(N) || /retir|récup/i.test(p.title || ''));
+    dit(keys.some((k) => k.includes(N)) && encore.length === 0, 'l\'e-mail d\'un AUTRE colis n\'efface pas la clé posée par le transporteur', `clé ${keys.some((k) => k.includes(N)) ? 'présente' : 'EFFACÉE'}, puis le « retiré » de ce colis sonne ${encore.length} fois de plus`);
+    // L'autre sens : un e-mail « retiré » seul sonne.
+    reset(); await oublis(); prepDispoVg(N, 'C33333');
+    await email(`Ton colis a été récupéré #${N}`, 'Bonjour,\nTon colis a été récupéré par le destinataire.', '<n11d@banc>');
+    dit(pushes.filter((p) => /retir|récup|livr/i.test(p.title || '')).length === 1, 'l\'autre sens : l\'e-mail « retiré » seul sonne une fois', pushes.map((p) => p.title).join(' | ') || 'aucune');
+  });
+
+  // ══ N12 — LE SUIVI VINTED ET LE TRANSPORTEUR, LA MÊME ARRIVÉE (n° 16) ═════
+  if (veut('N12')) await essaie('N12 · suivi Vinted « disponible » et transporteur', async () => {
+    const N = 'VGS1234567890601', TX = '30000000601';
+    reset(); await oublis();
+    H.comptes = [{ owner: A, vinted_user_id: '111' }];
+    base.set(`${A}|harvest_111_orders_purchased`, { payload: { my_orders: [{ transaction_id: Number(TX), title: 'Baskets banc', status: 'Colis déposé au point relais' }] } });
+    base.set(`${A}|harvest_111_suivi_${TX}`, { v: 1, tx: TX, source: 'journey', capturedAt: iso(h(0.3)), etapes: [{ t: 'Ton colis est disponible au point relais', at: iso(h(0.5)) }], dernier: { t: 'Ton colis est disponible au point relais', at: iso(h(0.5)), code: 'x' }, transporteur: 'Vinted Go', suivi: N, forme: {} });
+    H.carrier = () => rep(vgJson([{ group: 'ready_for_pickup', ms: h(0.5), message: 'Ready (Consigne Test)', address: '1 rue Test, 56000 Vannes' }, { group: 'in_transit', ms: h(20), message: 'In transit' }], { expiration_time: iso(now + 5 * 86400000) }), 200);
+    const g = gate(/lire:.*id=eq\.panel_colis_relais/, { apres: true });
+    const vinted = (async () => { const r = faireRes(); await routePush({ method: 'POST', query: {}, headers: AUTH_A, body: { action: 'suivi', tx: TX, uid: '111' } }, r); return r; })();
+    await attendre(() => g.vu);
+    await C5();
+    g.ouvrir(); await vinted;
+    dit(g.vu && pushes.length === 1, 'suivi Vinted et transporteur, la même arrivée, en même temps : UNE notification', `${pushes.length} · ${pushes.map((p) => p.title).join(' | ')}`);
+  });
+
+  // ══ N13 — UN ANCIEN N° DONT LA 1RE LECTURE RATE EST RELU (n° 18) ══════════
+  if (veut('N13')) await essaie('N13 · fermeture relue après un raté', async () => {
+    const N = 'XW000000909TS';
+    reset(); await oublis();
+    base.set(`${A}|email_track_chronopost_${N}`, lignEmail(N, 'chronopost', { status: 'available', subject: 'Votre colis est disponible', t0: iso(h(40 * 24)), lieu: 'Tabac test 56000 Vannes' }));
+    let n = 0;
+    H.carrier = () => { n++; if (n === 1) return rep('', 503, 'text/plain'); return rep(cpXml(N, [cpEv('AB', h(39 * 24), 'Colis disponible dans le point relais'), cpEv('D', h(38 * 24), 'Livraison effectuée', { infos: { 'Type de retrait': 'Relais' } })]), 200, 'text/xml'); };
+    await C5();
+    vieillir(A, `transp_chronopost_${N}`, 24); await oublis();
+    await C5();
+    const l2 = base.get(`${A}|transp_chronopost_${N}`) || {};
+    dit(n >= 2 && l2.etat === 'retire', 'un ancien n° dont la 1re lecture a raté (503) est relu après son recul', `${n} lecture(s), état ${l2.etat || '—'} (${l2.essaiRes})`);
+    dit(pushes.length === 0, 'et il ne sonne pas (un ancien colis, fermeture)', pushes.map((p) => p.title).join(' | ') || 'aucune');
+    // L'autre sens : un n° qui a raté 5 fois n'est plus relu.
+    const t5 = { lu: null, etat: null, fini: false, essaiRes: 'passu', essais: T.FERMETURE_ESSAIS_MAX || 5 };
+    dit(T.jamaisLueAvecSucces(t5) === false && T.jamaisLueAvecSucces({ ...t5, essais: 1 }) === true, 'l\'autre sens : au bout de 5 essais ratés, il n\'est plus relu', `5 → ${T.jamaisLueAvecSucces(t5)}, 1 → ${T.jamaisLueAvecSucces({ ...t5, essais: 1 })}`);
+  });
+
+  // ══ N14 — MONDIAL RELAY : _mvc PUIS .be, LA MÊME ARRIVÉE (n° 17) ══════════
+  if (veut('N14')) await essaie('N14 · même arrivée Mondial Relay, deux voies', async () => {
+    const N = '30000004', CP = '35000';
+    reset(); await oublis();
+    base.set(`${A}|email_track_mondialrelay_${N}`, { suivi: N, carrier: 'mondialrelay', status: 'available', sens: 'entrant', subject: 'Votre colis est disponible', receivedAt: iso(h(3)), emailAt: iso(h(3)), arriveLe: iso(h(3)), lieu: 'Tabac test 35000 Rennes' });
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(h(2))).map((x) => [x.type, x.value]));
+    const ET = ["Colis en préparation chez l'expéditeur", 'Colis remis à Mondial Relay', "Colis sur l'agence de livraison", 'Colis disponible au point de retrait', 'Colis livré au destinataire'];
+    const frag = `<div><ul class="timeline suivi">${ET.map((e, i) => `<li${i < 4 ? ' class="validate"' : ''}><p>${e}</p></li>`).join('')}</ul><div class="infos-account"><div><p>${p.day}/${p.month}/${p.year}</p></div><div class="detail-infos"><div class="step-suivi"><div class="c"><p class="center">${p.hour}:${p.minute}</p></div><div class="d"><p>5 jours restants pour retirer le colis en Point Relais</p></div></div></div></div><script>var numeroExpedition = '${N}';</script><script>dataLayer.push({ 'CodePostal' : '${CP}' });</script></div>`;
+    H.carrier = () => rep({ Success: true, ModelState: [], Message: frag, Action: 'ReplaceDiv', Data: false }, 200);
+    await C5();
+    const p1 = pushes.length;
+    const isoLocal = `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}.316`;
+    const be = JSON.stringify({ Expedition: { Numero: N, DestinataireCodePostal: CP, DeliveryMode: '24R', SuiviParEtapes: { 4: { Evenement: { Date: isoLocal } } }, Evenements: [{ Date: isoLocal, Libelle: '5 jours restants pour retirer le colis en Point Relais ', DetailPointRelais: { Adresse: { Libelle: 'TABAC TEST', CodePostal: CP, Ville: 'RENNES' } } }] } });
+    await new Promise((r) => setTimeout(r, 20));
+    const c4 = await C4({ v: 1, carrier: 'mondialrelay', suivi: N, cp: CP, voie: 'mr-be', statut: 200, ctype: 'application/json', corps: be, at: new Date().toISOString(), source: 'extension' });
+    const l = base.get(`${A}|transp_mondialrelay_${N}`) || {};
+    dit(p1 === 1 && pushes.length === 1, 'la même arrivée Mondial Relay (serveur sans lieu, puis extension avec lieu) ne sonne qu\'une fois', `serveur ${p1}, extension ${pushes.length - p1} de plus · C4 ${c4.code}`);
+    dit(/tabac/i.test(String(l.lieuNom || l.lieu || '')), 'et le lieu apporté par l\'extension est gardé (un enrichissement)', `lieu « ${l.lieuNom || l.lieu || ''} »`);
   });
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ tout est vert');

@@ -218,8 +218,12 @@ const arriveeDe = (b, k) => {
 // fermeture ; sinon la sélection jugée sur ce n° seul, sans le rythme.
 export function raisonDu(b, carrier, suivi, maintenant = Date.now()) {
   const k = normaliserSuivi(suivi);
-  if (b.transp instanceof Map && b.transp.has(k)) return 'actif';
-  const c = T.suivisAInterroger({ lignes: b.lignes, transp: new Map(), manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, maintenant, seul: k, max: 1, parTransporteur: 1 });
+  const t = b.transp instanceof Map ? b.transp.get(k) : null;
+  // (tour 2 n° 18) Une ligne dont aucune lecture n'a réussi reste une
+  // « fermeture » (silencieuse) : le rythme et le plafond d'essais ignorés ici.
+  if (t && !T.jamaisLueAvecSucces({ ...t, essais: 0 })) return 'actif';
+  const vue = new Map(t ? [[k, { ...t, essai: null, essais: 0 }]] : []);
+  const c = T.suivisAInterroger({ lignes: b.lignes, transp: vue, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, maintenant, seul: k, max: 1, parTransporteur: 1 });
   const it = c.find((x) => x.suivi === k && x.carrier === carrier);
   return it ? it.raison : null;
 }
@@ -319,6 +323,14 @@ export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, si
 // base au moment de sonner ne consomme plus le changement, le passage suivant
 // reprend la notification (`reprendreNotifs`). Un nouvel état remplace une
 // notification encore en attente de l'état d'avant (elle ne vaut plus).
+// (tour 2 n° 2) Après un « code postal inconnu » de Mondial Relay : reste-t-il un
+// code postal PROUVÉ à essayer pour ce n° (la règle `codePostalPourMondialRelay`,
+// sur la ligne à jour) ? La carte dit alors « VRM cherche », jamais un geste.
+function cpEncoreAEssayer(b, k, ap) {
+  if (!b || !ap || ap.essaiRes !== 'cp-inconnu') return false;
+  const r = T.codePostalPourMondialRelay({ suivi: k, transp: { ...ap, cp: '' }, lignes: b.lignes.filter((l) => suiviDeLigne(l) === k), manuels: b.manuels, relaisLieux: relaisDe(b)(k), prouves: b.prouves || [], maintenant: Date.now() });
+  return !!r && r.source === 'essai' && r.cp !== (ap.cpRefuse || '');
+}
 async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, maintenant = Date.now(), silence = false, cp = '', cpSource = '', cpEssaye = '', voie = '', signal = null } = {}) {
   const id = T.cleTransp(item.carrier, item.suivi);
   let avant = null, apres = null;
@@ -328,6 +340,7 @@ async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, mai
     if (signal && signal.aborted) return undefined;
     avant = d ? { ...d } : null;
     apres = T.ligneApresEssai(d, lu, { carrier: item.carrier, suivi: item.suivi, voie: voie || (source === 'serveur' ? T.VOIE_SERVEUR : T.VOIE_DE)[item.carrier], source, statut, maintenant, cp, cpSource, cpEssaye });
+    if (item.carrier === 'mondialrelay') apres.cpCherche = cpEncoreAEssayer(b, normaliserSuivi(item.suivi), apres);
     if (apres.essaiRes === 'ok' && T.etatAChange(avant, apres)) {
       delete apres.notif; delete apres.notifEnAttente;
       const ch = T.changementANotifier(avant, apres, { maintenant, silence, arriveeMs });
@@ -404,6 +417,19 @@ async function leverPause(b, carrier) {
   await modifierCas(T.ID_PAUSE, (d) => T.pauseLevee(d, carrier), 6, { owner: PROPRIETAIRE_NEUTRE });
 }
 
+// Les places de chaque transporteur : les `max` premiers de la sélection (déjà
+// triée), les anciens n° (« fermeture ») bornés à `maxFermeture`.
+export function placesParTransporteur(items, max, maxFermeture = MAX_FERMETURE) {
+  const out = { chronopost: 0, vinted: 0, mondialrelay: 0 };
+  let n = 0, f = 0;
+  for (const it of items || []) {
+    if (n >= max) break;
+    if (it.raison === 'fermeture') { if (f >= maxFermeture) continue; f++; }
+    out[it.carrier] = (out[it.carrier] || 0) + 1;
+    n++;
+  }
+  return out;
+}
 // ── UN PASSAGE (C5, et le cron) ──────────────────────────────────────────────
 // Rend { ok, raison?, lus: [{carrier, suivi, res, etat, change}], besoinNavigateur, pause }.
 // `signal` : l'arrêt (le cron qui a déjà répondu) — plus aucune lecture, aucune
@@ -419,7 +445,14 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   if (!(signal && signal.aborted)) await reprendreNotifs(b, { signal });
   const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50, seul: suivi, force: !!(suivi && force) });
   const lus = [];
-  let nFermeture = 0, nLus = 0;
+  let nFermeture = 0;
+  // (tour 2 n° 3) LES PLACES SE RÉSERVENT PAR TRANSPORTEUR, dans l'ordre de la
+  // sélection (`ordreAInterroger` : le « dernier jour » d'abord, les anciens n°
+  // en dernier). Avant, les trois files se disputaient un compteur commun : les
+  // files rapides (Chronopost, Vinted Go) prenaient les places avec de vieux n°
+  // pendant que le colis urgent de Mondial Relay attendait — lu au 6e passage.
+  const places = placesParTransporteur(items, max, MAX_FERMETURE);
+  const nLusC = { chronopost: 0, vinted: 0, mondialrelay: 0 };
   // Chaque transporteur suit SA file ; les trois se lisent en parallèle — par le
   // SERVEUR, Mondial Relay compris (voie `mr-fr-mvc`). `besoinNavigateur` ne
   // reçoit un n° que sur REFUS du transporteur (ou pendant sa pause).
@@ -428,7 +461,7 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   const traiterServeur = async (carrier) => {
     for (const it of parC[carrier]) {
       if (signal && signal.aborted) break;
-      if (nLus >= max) break;
+      if (nLusC[carrier] >= (places[carrier] || 0)) break;
       // Un élément ne part que s'il reste de quoi le finir (revue n° 20).
       if (Date.now() + _delaiMs + _ecartMs + MARGE_RANGEMENT_MS > fin) break;
       if (it.raison === 'fermeture') { if (nFermeture >= MAX_FERMETURE) continue; }
@@ -454,12 +487,12 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
       if (pauseEnCours(b.pause, carrier)) continue;   // l'extension le lit à sa place (besoinNavigateur, plus bas)
       // Le bail : un autre passage le lit déjà, ou vient de le relire (revue n° 17).
       if (!(await prendreBail(b, it, Date.now()))) continue;
-      nLus++;
+      nLusC[carrier]++;
       if (it.raison === 'fermeture') nFermeture++;
       const rep = await lireTransporteur(carrier, it.suivi, { cp, fin, signal });
       // Pas lu (pause posée par un autre passage, borne atteinte, arrêt) : le
       // bail tombe de lui-même (30 s), rien n'est rangé, rien ne compte.
-      if (rep.echec === 'pause' || rep.echec === 'budget') { nLus--; if (it.raison === 'fermeture') nFermeture--; if (rep.echec === 'pause') b.pause = pauseConnue(b.pause); continue; }
+      if (rep.echec === 'pause' || rep.echec === 'budget') { nLusC[carrier]--; if (it.raison === 'fermeture') nFermeture--; if (rep.echec === 'pause') b.pause = pauseConnue(b.pause); continue; }
       if (signal && signal.aborted) break;
       if (rep.echec) {
         const r = await rangerEssai(b, it, { res: 'passu' }, { maintenant: Date.now(), voie: T.VOIE_SERVEUR[carrier] });
@@ -503,7 +536,13 @@ export async function transpALire({ maintenant = null } = {}) {
 // ── C4 : LA RÉPONSE BRUTE RELAYÉE PAR L'EXTENSION ───────────────────────────
 // Le corps est JUGÉ ici (la même fonction que nos propres lectures) ; il n'est
 // jamais une adresse à suivre. Rend { status, corps }.
-export const ENVOI_MAX = 80 * 1024;
+// (tour 2 n° 11) La borne d'ENVOI suit la plus grande lecture permise : un
+// fragment Mondial Relay se lit sur 192 Ko (`CORPS_MAX_MR`), comme le serveur —
+// avant, la route refusait (413) au-delà de 80 Ko et le corps renvoyé tronqué
+// finissait en « forme » : un colis retiré restait « à retirer ». Le corps est
+// ensuite borné PAR TRANSPORTEUR (`corpsMaxDe`).
+export const ENVOI_MAX = CORPS_MAX_MR + 64 * 1024;
+export const corpsMaxDe = (carrier) => (carrier === 'mondialrelay' ? CORPS_MAX_MR : CORPS_MAX);
 export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
   const x = body && typeof body === 'object' ? body : null;
   if (!x || x.v !== 1) return { status: 400, corps: { error: 'forme' } };
@@ -513,7 +552,7 @@ export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
   if (!T.FORME_SUIVI[carrier].test(suivi)) return { status: 400, corps: { error: 'suivi' } };
   if (T.VOIES[String(x.voie || '')] !== carrier) return { status: 400, corps: { error: 'voie' } };
   if (typeof x.corps !== 'string') return { status: 400, corps: { error: 'forme' } };
-  if (Buffer.byteLength(x.corps, 'utf8') > CORPS_MAX) return { status: 413, corps: { error: 'trop-gros' } };
+  if (Buffer.byteLength(x.corps, 'utf8') > corpsMaxDe(carrier)) return { status: 413, corps: { error: 'trop-gros' } };
   const statut = Number(x.statut);
   if (!Number.isInteger(statut) || statut < 0 || statut > 999) return { status: 400, corps: { error: 'forme' } };
   const ctype = typeof x.ctype === 'string' ? x.ctype.slice(0, 200) : '';

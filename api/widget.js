@@ -8,7 +8,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
-import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
+import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -405,7 +405,8 @@ async function colisEmailDepuis(pub, retires, today, lu) {
     if (cle && retires.has(cle)) continue;                           // coché « J'ai retiré »
     if (cle && vus.has(cle)) continue;                               // l'app l'a vu (un rappel réécrit la ligne)
     const arr = Date.parse(x.a || '') || recu;
-    if (sortiParSuivis([suiviDeLigne(x)], fins, arr)) continue;        // retiré, ou reparti depuis son arrivée (même n°)
+    const ar = arriveesDeLigne({ ...x, s: 'available' });           // (tour 2 n° 14) une borne n'est jamais une arrivée
+    if (sortiParSuivis([suiviDeLigne(x)], fins, ar.arrivee, { borne: ar.borne })) continue;        // retiré, ou reparti depuis son arrivée (même n°)
     const e = etatRetrait({ limite: x.l || null, arriveeMs: arr, transporteur: x.c || '' }, Date.now(), today);
     if (e.etat === 'a_retirer') { n++; const k = suiviDeLigne(x); if (k) comptes.add(k); }
   }

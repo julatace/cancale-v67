@@ -43,7 +43,7 @@ export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
 // l'extension (C3, `aLireParNavigateur`) par la voie `VOIE_DE` : pour Mondial
 // Relay la MÊME route `_mvc`, lue depuis le navigateur de Julien (son adresse
 // IP, que Mondial Relay ne refuse pas comme celle du serveur) — une requête,
-// sans jeton ni page à charger (l'extension 5.281 ne passe de `mr-be` à
+// sans jeton ni page à charger (l'extension 5.290 ne passe de `mr-be` à
 // `mr-fr-mvc` qu'en repli, jamais l'inverse : annoncer `mr-be` lui ferait
 // d'abord charger la page .be puis l'API protégée par Cloudflare). En C4,
 // l'extension relaie l'une OU l'autre voie Mondial Relay (`VOIES`) : `mr-fr-mvc`
@@ -90,8 +90,20 @@ export function carrierLisible(carrier, suivi) {
   else if (/chrono|shop2shop|pickup/.test(c)) k = 'chronopost';
   else if (/vinted/.test(c)) k = 'vinted';
   if (!k || !FORME_SUIVI[k].test(n)) return null;
+  // (29 oct., tour 2 n° 19) Un n° de forme CHRONOPOST stricte (2 lettres, 9
+  // chiffres, 2 lettres) n'est jamais lu chez Vinted Go : la forme Vinted Go
+  // `[0-9A-Z]{13}` la couvre, et un e-mail `shipping@relay.vinted.com` est rangé
+  // « vinted » par DÉFAUT (api/email-inbound.js) — ce n'est pas une preuve. Vinted
+  // Go répondait 404 vide, relancé sans fin, et Chronopost n'était jamais lu.
+  if (k === 'vinted' && FORME_CHRONO_STRICTE.test(n)) return null;
   return k;
 }
+export const FORME_CHRONO_STRICTE = /^[A-Z]{2}\d{9}[A-Z]{2}$/;
+// Le transporteur d'un n° vu sur PLUSIEURS lignes : une règle, jamais l'ordre des
+// lignes (PostgREST ne le garantit pas). Un transporteur NOMMÉ (Mondial Relay,
+// Chronopost) l'emporte sur « vinted » (le défaut d'un e-mail shipping@).
+const RANG_CARRIER = { mondialrelay: 2, chronopost: 2, vinted: 1 };
+export const carrierPrefere = (a, b) => (!a ? b : !b ? a : ((RANG_CARRIER[b] || 0) > (RANG_CARRIER[a] || 0) ? b : a));
 // Les transporteurs qu'on ne lit pas, et qu'on NOMME une fois (§1.4).
 export function carrierNonLu(carrier) {
   const c = String(carrier || '').toLowerCase();
@@ -589,7 +601,7 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
     // nouvelle arrivée (un autre point, ou le retour au point après « a quitté
     // le point relais ») se reconnaît à son occurrence, pas au n° seul.
     const ar = Array.isArray(a.arrivees) ? a.arrivees.filter((x) => typeof x === 'string').slice(-5) : [];
-    if (out.etat === 'disponible') { const o = occurrenceArrivee(out); if (o && !ar.includes(o)) ar.push(o); }
+    if (out.etat === 'disponible') { const o = occurrenceArrivee(out); if (o && !ar.some((x) => memeOccurrence(x, o))) ar.push(o); }
     out.arrivees = ar.slice(-5);
   } else if (res !== 'cp-inconnu') {
     out.essais = (Number(a.essais) || 0) + 1;
@@ -613,7 +625,7 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
 
 // ── LES SCALAIRES LUS PAR LES LECTEURS (app, cron, widget, e-mails) ──────────
 // Jamais `select=data` (§4.4) : les évènements restent dans la ligne.
-export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,fini:meta->>fini';
+export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,cpCherche:meta->>cpCherche,fini:meta->>fini';
 // (29 oct., revue n° 8) PLUS DE FENÊTRE DE 45 JOURS CHEZ LES LECTEURS. Une ligne
 // « fini » (retiré, rendu) qui sortait de la fenêtre redonnait l'état d'AVANT la
 // lecture : un colis retiré ressortait « à vérifier — trop long » au 46e jour,
@@ -634,7 +646,7 @@ export function ligneTranspDeMeta(x) {
     limite: /^\d{4}-\d{2}-\d{2}$/.test(String(x.limite || '')) ? String(x.limite) : null, limiteSure: bool(x.limiteSure), limiteAt: msDe(x.limiteAt) != null ? new Date(msDe(x.limiteAt)).toISOString() : null,
     lu: x.lu || null, source: x.source || '', essai: x.essai || null, essaiRes: RESULTATS.includes(x.essaiRes) ? x.essaiRes : null, essaiSource: String(x.essaiSource || ''),
     essais: Number(x.essais) || 0, cp: /^\d{5}$/.test(String(x.cp || '')) ? String(x.cp) : '', cpSource: String(x.cpSource || ''),
-    cpEssayes: String(x.cpEssayes || ''), cpJour: String(x.cpJour || ''), cpRefuse: /^\d{5}$/.test(String(x.cpRefuse || '')) ? String(x.cpRefuse) : '', cpRefuseSource: String(x.cpRefuseSource || ''), fini: bool(x.fini),
+    cpEssayes: String(x.cpEssayes || ''), cpJour: String(x.cpJour || ''), cpRefuse: /^\d{5}$/.test(String(x.cpRefuse || '')) ? String(x.cpRefuse) : '', cpRefuseSource: String(x.cpRefuseSource || ''), cpCherche: bool(x.cpCherche), fini: bool(x.fini),
   };
 }
 
@@ -745,8 +757,8 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
   const par = new Map();   // n° → { carrier, lignes, entrant, sortant, dernierMs, manuel, vinted }
   const ajoute = (k, carrier, o) => {
     if (!k) return null;
-    const e = par.get(k) || { k, carrier: null, lignes: [], entrant: false, sortant: false, dernierMs: null, manuels: [], vinted: false };
-    if (carrier && !e.carrier) e.carrier = carrier;
+    const e = par.get(k) || { k, carrier: null, lignes: [], entrant: false, sortant: false, dernierMs: null, manuels: [], vinted: false, dispoMs: null, limiteMs: null };
+    e.carrier = carrierPrefere(e.carrier, carrier);
     Object.assign(e, o || {});
     par.set(k, e);
     return e;
@@ -764,6 +776,14 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     else if (sens === 'entrant' || st === 'available') e.entrant = true;
     const ms = msDe(l.emailAt != null ? l.emailAt : l.ea) ?? msDe(l.receivedAt != null ? l.receivedAt : l.r);
     if (ms != null && (e.dernierMs == null || ms > e.dernierMs)) e.dernierMs = ms;
+    // (tour 2 n° 3) L'arrivée la plus ancienne et la limite la plus proche d'un
+    // colis « disponible » : le tri des urgents (le « dernier jour » d'abord).
+    if (st === 'available') {
+      const am = msDe(l.arriveLe != null ? l.arriveLe : l.a) ?? ms;
+      if (am != null && (e.dispoMs == null || am < e.dispoMs)) e.dispoMs = am;
+      const lm = msDe(l.limite != null ? l.limite : l.l);
+      if (lm != null && (e.limiteMs == null || lm < e.limiteMs)) e.limiteMs = lm;
+    }
   }
   for (const m of manuels) {
     if (!m) continue;
@@ -807,7 +827,11 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     let raison;
     if (seulN && force) raison = 'page';
     else if (recent && !finEmail) raison = 'actif';
-    else if (!t && !finEmail && avecFermeture) raison = 'fermeture';   // un ancien n° jamais fermé : lu UNE fois
+    // Un ancien n° jamais fermé : lu UNE fois — et, si cette lecture a RATÉ (le
+    // transporteur n'a pas répondu, a refusé, forme inattendue), relu à son recul
+    // jusqu'à une première lecture réussie (tour 2 n° 18 : un hoquet unique
+    // consommait la seule lecture prévue), `FERMETURE_ESSAIS_MAX` essais au plus.
+    else if ((!t || jamaisLueAvecSucces(t)) && !finEmail && avecFermeture) raison = 'fermeture';
     else continue;
     let quand = raison === 'page' ? (msDe(t && t.essai) != null ? msDe(t.essai) + RELECTURE_PAGE_MS : 0) : prochainEssai(t);
     // Un code postal APPRIS depuis (saisi, lu dans un e-mail) : le n° redevient
@@ -823,9 +847,15 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     if (!(quand <= maintenant)) continue;
     const dispo = (t && t.etat === 'disponible') || e.lignes.some((l) => (l.status != null ? l.status : l.s) === 'available');
     const prio = raison === 'page' ? 0 : raison === 'fermeture' ? 3 : dispo ? 1 : 2;
-    items.push({ carrier: e.carrier, suivi: e.k, cp, cpSource, raison, prio, quand });
+    // (tour 2 n° 3) Un colis disponible : la limite la plus proche d'abord (celle
+    // lue chez le transporteur, sinon celle de l'e-mail), puis l'arrivée la plus
+    // ancienne — le colis du « dernier jour » n'attend plus derrière les autres.
+    const lT = t && t.limite ? msDe(t.limite) : null;
+    const limiteMs = lT != null ? lT : e.limiteMs;
+    const arriveeMs = e.dispoMs != null ? e.dispoMs : (t && t.etat === 'disponible' ? msDe(t.etatAt) : null);
+    items.push({ carrier: e.carrier, suivi: e.k, cp, cpSource, raison, prio, quand, limiteMs: limiteMs != null ? limiteMs : Infinity, arriveeMs: arriveeMs != null ? arriveeMs : Infinity });
   }
-  items.sort((a, b) => (a.prio - b.prio) || (a.quand - b.quand) || a.suivi.localeCompare(b.suivi));
+  items.sort(ordreAInterroger);
   for (const it of items) {
     if (out.length >= max) break;
     parC[it.carrier] = parC[it.carrier] || 0;
@@ -835,6 +865,22 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
   }
   return out;
 }
+// L'ordre de lecture (une règle pour la sélection et le passage) : la page
+// demandée, puis les colis DISPONIBLES (limite la plus proche, arrivée la plus
+// ancienne), puis les autres actifs, puis les anciens n° (« fermeture ») — jamais
+// avant un colis actif, quel que soit le transporteur.
+export function ordreAInterroger(a, b) {
+  return (a.prio - b.prio)
+    || (a.prio === 1 ? ((a.limiteMs ?? Infinity) - (b.limiteMs ?? Infinity) || (a.arriveeMs ?? Infinity) - (b.arriveeMs ?? Infinity)) || 0 : 0)
+    || (a.quand - b.quand) || a.suivi.localeCompare(b.suivi);
+}
+// Une ligne `transp_` dont AUCUNE lecture n'a réussi (pas d'état, pas de `lu`),
+// dont le dernier essai a raté sans rien conclure, et pas trop souvent (tour 2
+// n° 18). « introuvable », « expiré », « code postal inconnu » ont leur propre règle.
+export const FERMETURE_ESSAIS_MAX = 5;
+export const jamaisLueAvecSucces = (t) => !!t && !t.lu && !t.etat && !t.fini
+  && (t.essaiRes === 'passu' || t.essaiRes === 'bloque' || t.essaiRes === 'forme')
+  && (Number(t.essais) || 0) < FERMETURE_ESSAIS_MAX;
 // Le transporteur d'un n° par sa forme (le même que suivi-colis.js, sans
 // l'importer : pas de cycle).
 function transporteurDeFormeT(n) {
@@ -918,15 +964,36 @@ export function occurrenceArrivee(t) {
 // lecture) et pour ce qui sonne : l'état, son détail, et, pour une arrivée, son
 // LIEU (un autre point relais avec le même détail n'atteignait pas le notifieur).
 export const clefEtat = (t) => (t && t.etat ? `${t.etat}|${t.detail || ''}|${t.etat === 'disponible' ? lieuNorm(t) : ''}` : '');
-export const etatAChange = (avant, apres) => !!(apres && apres.etat) && clefEtat(avant) !== clefEtat(apres);
+// (29 oct., tour 2 n° 17) UNE ARRIVÉE QUI NE FAIT QUE S'ENRICHIR N'EST PAS UN
+// CHANGEMENT. La route `_mvc` (le serveur) ne porte pas le lieu et date à la
+// minute ; l'API .be (relayée par l'extension en repli) porte le lieu et date à
+// la seconde : la MÊME arrivée lue par les deux voies passait pour une nouvelle
+// et sonnait deux fois. Le lieu ne se compare que s'il est connu des DEUX côtés.
+export const etatAChange = (avant, apres) => {
+  if (!(apres && apres.etat)) return false;
+  if (avant && avant.etat === 'disponible' && apres.etat === 'disponible' && (avant.detail || '') === (apres.detail || '')) {
+    const a = lieuNorm(avant), b = lieuNorm(apres);
+    return !!(a && b && a !== b);
+  }
+  return clefEtat(avant) !== clefEtat(apres);
+};
+// Deux occurrences d'arrivée (« lieu|date ») sont la MÊME : même minute (la
+// précision de `_mvc`), et même lieu quand les deux le portent.
+export function memeOccurrence(x, y) {
+  if (x === y) return true;
+  const [lx, dx] = String(x || '').split('|'), [ly, dy] = String(y || '').split('|');
+  const mx = msDe(dx), my = msDe(dy);
+  if (mx == null || my == null || Math.floor(mx / 60000) !== Math.floor(my / 60000)) return false;
+  return !lx || !ly || lx === ly;
+}
 // Une NOUVELLE arrivée : une arrivée a déjà été vue sur ce n° (une autre
 // occurrence), ou la ligne d'avant dit qu'il a quitté un point relais.
 function estNouvelleArrivee(a, apres) {
   if (!a) return false;
   const occ = occurrenceArrivee(apres);
   const vues = Array.isArray(a.arrivees) ? a.arrivees : [];
-  if (vues.some((x) => x && x !== occ)) return true;
-  if (a.etat === 'disponible' && occurrenceArrivee(a) && occurrenceArrivee(a) !== occ) return true;
+  if (vues.some((x) => x && !memeOccurrence(x, occ))) return true;
+  if (a.etat === 'disponible' && occurrenceArrivee(a) && !memeOccurrence(occurrenceArrivee(a), occ)) return true;
   return a.etat === 'incident' && a.detail === 'quitte_relais';
 }
 // Ce qu'un CHANGEMENT d'état doit dire (un libellé qui change sans changer
@@ -1001,6 +1068,15 @@ export function texteNotifTransp(t, ch) {
   return { title: `🚚 ${nom} : ton colis est en route`, body: `« ${propre(t.libelle, 120)} » · ${n}` };
 }
 
+// La phrase dite UNE fois en tête de liste pour les colis Mondial Relay dont le
+// code postal du point relais manque (tour 2 n° 2) : `cherche` (le serveur
+// essaie seul un code postal prouvé) et `inconnu` (plus rien à essayer : le geste).
+export function texteCodePostalMr({ cherche = 0, inconnu = 0 } = {}) {
+  const out = [];
+  if (cherche > 0) out.push(`Mondial Relay : VRM cherche le code postal du point relais (${cherche} colis) — il essaie seul les codes postaux de tes points relais, rien à faire.`);
+  if (inconnu > 0) out.push(`Mondial Relay : code postal du point relais inconnu (${inconnu} colis) — ajoute ce n° avec son code postal dans « N° de suivi ajoutés » (Achats → À retirer).`);
+  return out;
+}
 // ══ CE QUE DIT LA CARTE D'UN COLIS (l'app) ═══════════════════════════════════
 const ageCourt = (ms) => { if (!Number.isFinite(ms) || ms < 0) return ''; const m = Math.round(ms / 60000); if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`; const h = Math.round(m / 60); if (h < 36) return `il y a ${h} h`; return `il y a ${Math.round(h / 24)} j`; };
 const AMBRE = new Set(['retour_expediteur', 'incident', 'inconnu']);
@@ -1029,7 +1105,14 @@ export function ligneTransporteur(t, carrier, maintenant = Date.now()) {
   // (29 oct., revue n° 7) Un code postal SAISI que Mondial Relay refuse : la carte
   // le nomme (« ne correspond peut-être pas »), jamais « ne trouve pas ce n° ».
   if (t.essaiRes === 'cp-inconnu' && t.cpRefuse && t.cpRefuseSource === 'manuel') return { etatAffiche: 'cp-inconnu', texte: `${nom} ne trouve pas ce n° avec le code postal ${t.cpRefuse} — il ne correspond peut-être pas : corrige-le dans « N° de suivi ajoutés » (Achats → À retirer)`, consequence: '', ambre: false, age: null };
-  if (t.essaiRes === 'cp-inconnu') return { etatAffiche: 'cp-inconnu', texte: `${nom} : code postal du point relais inconnu — ajoute ce n° avec son code postal dans « N° de suivi ajoutés » (Achats → À retirer)`, consequence: '', ambre: false, age: null };
+  // (29 oct., tour 2 n° 2) Le code postal du point relais pas encore trouvé : la
+  // carte le dit EN COURT — la cause et le geste se disent UNE fois en tête de
+  // liste (`texteCodePostalMr`, §7). Le serveur sait s'il lui reste un code postal
+  // prouvé à ESSAYER (`cpCherche`) : alors il cherche seul, rien à faire — avant,
+  // chaque carte demandait de saisir un code postal que le serveur allait essayer.
+  if (t.essaiRes === 'cp-inconnu') return t.cpCherche
+    ? { etatAffiche: 'cp-cherche', texte: `${nom} : VRM cherche le code postal du point relais`, consequence: '', ambre: false, age: null }
+    : { etatAffiche: 'cp-inconnu', texte: `${nom} : code postal du point relais inconnu`, consequence: '', ambre: false, age: null };
   if (t.essaiRes === 'expire') return { etatAffiche: 'expire', texte: `${nom} ne garde plus ce suivi`, consequence: '', ambre: false, age: null };
   if (t.essaiRes === 'introuvable') return { etatAffiche: 'introuvable', texte: `${nom} ne trouve pas ce n° (pas encore enregistré ?)`, consequence: '', ambre: false, age: null };
   // Un REFUS (403, défi, HTML) n'est pas « n'a pas répondu » : on le dit tel quel.

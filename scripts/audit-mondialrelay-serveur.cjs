@@ -45,13 +45,13 @@ const MUTATIONS = {
   'libelle-livraison-inconnu': ['api/_lib/transporteurs.js', "[/^colis en route vers le point de (?:retrait|livraison)\\b/, 'route'],", "[/^colis en route vers le point de retrait\\b/, 'route'],"],
   'retire-sans-arrivee': ['api/_lib/transporteurs.js', "etat: (k >= 4 || arr) ? 'retire' : 'livre'", "etat: 'retire'"],
   'refus-carte-muet': ['api/_lib/transporteurs.js', "  if (t.essaiRes === 'bloque') return { etatAffiche: 'passu', texte: `${nom} refuse la lecture depuis le serveur pour l'instant — VRM réessaie plus tard`, consequence: '', ambre: false, age: null };\n", ''],
-  // (fusion) C4 ACCEPTE `mr-fr-mvc` (l'extension 5.281 la lit depuis le navigateur) :
+  // (fusion) C4 ACCEPTE `mr-fr-mvc` (l'extension 5.290 la lit depuis le navigateur) :
   // la retirer de `VOIES`, juger son corps comme du .be, ou accepter n'importe
   // quelle voie, doit rendre ROUGE.
   'c4-mvc-refusee': ['api/_lib/transporteurs.js', "export const VOIES = { 'mr-fr-mvc': 'mondialrelay', 'mr-be': 'mondialrelay',", "export const VOIES = { 'mr-be': 'mondialrelay',"],
   'c4-voie-ignoree': ['api/_lib/transporteurs-lecture.js', '  let lu = T.lireReponse(carrier, statut, ctype, x.corps, { suivi, cp, voie });', "  let lu = T.lireReponse(carrier, statut, ctype, x.corps, { suivi, cp, voie: 'mr-be' });"],
   'c4-voie-inconnue-acceptee': ['api/_lib/transporteurs-lecture.js', "  if (T.VOIES[String(x.voie || '')] !== carrier) return { status: 400, corps: { error: 'voie' } };", ''],
-  // (fusion) C3 annonce `mr-fr-mvc` (la voie que l'extension 5.281 lit d'abord).
+  // (fusion) C3 annonce `mr-fr-mvc` (la voie que l'extension 5.290 lit d'abord).
   'c3-voie-be': ['api/_lib/transporteurs.js', "export const VOIE_DE = { mondialrelay: 'mr-fr-mvc',", "export const VOIE_DE = { mondialrelay: 'mr-be',"],
   'mr-toujours-navigateur': ['api/_lib/transporteurs.js', "    if (!(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;", "    if (it.carrier !== 'mondialrelay' && !(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;"],
   'recul-serveur-retarde-extension': ['api/_lib/transporteurs.js', "vue.set(k, refusServeur(t) ? { ...t, essai: null } : t);", "vue.set(k, t);"],
@@ -392,7 +392,7 @@ const ligneDe = (n) => base.get(`${A}|transp_mondialrelay_${n}`) || null;
     const vTransp = ((/const EXT_CAPACITES\s*=\s*\{[^}]*\btransp:\s*'([0-9.]+)'/.exec(src)) || [])[1] || '?';
     const etat = { ext: 'absente', tel: true };
     const ctx = { React, C: { muted: '#777', warn: '#a60', text: '#111', border: '#ccc', card: '#fff' }, extSait: () => etat.ext, useSansSouris: () => etat.tel, vmrExtPresent: () => !etat.tel,
-      normaliserSuivi, carrierLisible: T.carrierLisible, carrierNonLu: T.carrierNonLu, ligneTransporteur: T.ligneTransporteur, nomTransporteur: T.nomTransporteur, LECTURE_SERVEUR_TRANSP: T.LECTURE_SERVEUR_TRANSP, EXT_CAPACITES: { transp: vTransp }, Map, Set, Array, String, Number, Math, Object };
+      normaliserSuivi, carrierLisible: T.carrierLisible, carrierNonLu: T.carrierNonLu, ligneTransporteur: T.ligneTransporteur, nomTransporteur: T.nomTransporteur, LECTURE_SERVEUR_TRANSP: T.LECTURE_SERVEUR_TRANSP, EXT_CAPACITES: { transp: vTransp }, __vmrEtat: null, texteCodePostalMr: T.texteCodePostalMr, Map, Set, Array, String, Number, Math, Object };
     vm.createContext(ctx); vm.runInContext(js, ctx);
     const rend = (el) => RDS.renderToStaticMarkup(el);
     const colis = [{ carrier: 'Mondial Relay', suivi: N1 }];

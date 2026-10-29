@@ -327,7 +327,23 @@ export function leverGarde(e, l, maintenant = Date.now(), aujourdhui = null) {
   if (l.limiteVers) { const j = joursAvantLimite(l.limiteVers, aujourdhui || jourParis(maintenant)); if (j == null || j < 0) return e; }
   return { ...e, etat: 'a_retirer', gardeLevee: true };
 }
-export const sortiParSuivi = (ligne, fins, arriveeMs = null) => sortiParSuivis([suiviDeLigne(ligne)], fins, arriveeMs);
+// (29 oct., tour 2 n° 14) UNE LIGNE D'E-MAIL SE JUGE SUR SON ARRIVÉE, SELON SA
+// SÛRETÉ — la règle des achats Vinted (n° 1 du tour 1), pour toutes les lignes :
+// une arrivée SÛRE (l'e-mail d'arrivée, `arriveLe`) est l'arrivée ; une date tirée
+// d'un « TR : », d'un rappel ou d'un sujet inconnu n'est qu'une BORNE (le colis
+// était déjà là) — un retour ou un départ du point relais avant elle compte. Avant,
+// l'app et le rappel du matin prenaient la borne pour l'arrivée : un colis
+// reparti restait « à retirer » (le widget, lui, le sortait — deux nombres).
+// L'arrivée passée en 3e argument est IGNORÉE (la règle la calcule elle-même :
+// un propriétaire, §11).
+export function arriveesDeLigne(l) {
+  if (!l) return { arrivee: null, borne: null };
+  const v = (a, b) => (l[a] != null ? l[a] : l[b]);
+  const a = arriveeColisEmail({ arriveLe: v('arriveLe', 'a'), status: v('status', 's'), receivedAt: v('receivedAt', 'r'), subject: v('subject', 'sj') });
+  return { arrivee: a && a.sur === 'oui' ? a.ms : null, borne: a ? a.ms : null };
+}
+export const sortiParSuivi = (ligne, fins) => { const a = arriveesDeLigne(ligne); return sortiParSuivis([suiviDeLigne(ligne)], fins, a.arrivee, { borne: a.borne }); };
+export const incidentDeLigne = (ligne, fins) => { const a = arriveesDeLigne(ligne); return incidentDeSuivis([suiviDeLigne(ligne)], fins, a.arrivee, { borne: a.borne }); };
 
 // ── LE TRANSPORTEUR D'UN N° TAPÉ À LA MAIN : PAR SA FORME ────────────────────
 // Mesuré sur ses 193 n° : 8 chiffres = Mondial Relay (117) ; 2 lettres + 9
@@ -511,7 +527,8 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
     if (finisS.has('e:' + k)) continue;
     const arr = arriveeColisEmail({ arriveLe: l.arriveLe != null ? l.arriveLe : l.a, status: 'available', receivedAt: l.receivedAt != null ? l.receivedAt : l.r, subject: l.subject != null ? l.subject : l.sj });
     const arriveeMs = arr ? arr.ms : null;
-    if (sortiParSuivis([k], fins, arriveeMs)) continue;
+    // (tour 2 n° 14) Une borne n'est jamais une arrivée : la règle de l'app.
+    if (sortiParSuivis([k], fins, arr && arr.sur === 'oui' ? arr.ms : null, { borne: arriveeMs })) continue;
     // (revue du 23 oct., n° 3) La commande reliée par IDENTITÉ (code de retrait,
     // n° de suivi) dit-elle le colis fini ? `finParCommande` rend 'retire',
     // 'reparti', null (rien de terminal) ou undefined (pas su) — « pas su » ne

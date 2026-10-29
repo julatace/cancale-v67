@@ -266,6 +266,19 @@ export function urgenceTri(e) {
 export function retirerPublie(pub, maintenant = Date.now(), aujourdhui = null, sorti = null, leve = null) {
   if (!pub || typeof pub !== 'object' || !Array.isArray(pub.colis)) return null;
   let n = 0, aVerifier = Number.isFinite(pub.aVerifier) ? pub.aVerifier : 0, urgents = 0, sortis = 0, nonRelus = 0, devenusAVerifier = 0;
+  // (29 oct., tour 2 n° 7) LES « À VÉRIFIER » PUBLIÉS AVEC LEUR IDENTITÉ (`verif`,
+  // la forme de `colis`) : relus par la même règle (`sorti`) — un colis que le
+  // transporteur dit retiré ou reparti depuis sort aussi de « à vérifier », sans
+  // attendre la prochaine ouverture de l'app. Une photo d'avant (sans `verif`) :
+  // le nombre publié, tel quel.
+  if (Array.isArray(pub.verif) && typeof sorti === 'function') {
+    aVerifier = 0;
+    for (const c of pub.verif) {
+      const cle = Array.isArray(c) && typeof c[3] === 'string' ? c[3] : '';
+      if (cle && sorti(cle, c) === true) { sortis++; continue; }
+      aVerifier++;
+    }
+  }
   for (const c of pub.colis) {
     if (!Array.isArray(c)) return null;
     const cle = typeof c[3] === 'string' ? c[3] : '';
