@@ -1,5 +1,30 @@
 # VRM — dossier de passation
 
+> **29 octobre (soir) — audit sécurité + séparation, notifications d'action, bancs remis à la forme (branche
+> `claude/site-improvements-060ub8`) :** (1) **Notifications** : un e-mail « Action requise : problème avec la commande »
+> (litige ouvert sur une vente) et « Retourne ta commande d'ici le … » (retour d'achat à renvoyer) sonnent une fois
+> (`pushOnce(…,'action')`) ; « Demande de remboursement » du support = accusé, gardé sans action. Banc `emails-action.cjs`
+> (10 rouges sur l'avant). (2) **Sécurité** : `api/vinted-connect` exige que Vinted CONFIRME le jeton (`users/current`)
+> et que son compte soit celui annoncé (401/403, rien écrit) — l'index unique global `vinted_user_id` laissait un jeton
+> fabriqué bloquer le compte d'un autre vendeur (banc `routes-ecriture` §7) ; secret du cron comparé en temps constant ;
+> `api/relais` borne lat/lon. RLS d'`app_data`/`vinted_accounts`, stockage, fonctions SECURITY DEFINER, routes : aucune
+> fuite entre vendeurs trouvée (audits SQL verts sur Postgres 16). ⚠️ À lui : le compte VRM d'essai `3171e8bb…` (2 oct.)
+> porte une copie des 10 lignes moissonnées du compte Vinted 3175765377 — le supprimer est SA décision. (3) **pdf.js
+> servi par VRM** (`public/pdfjs-3.11.174/`, licence Apache) : l'impression des bordereaux (`espaceBlancBordereau`) ne
+> dépend plus de jsDelivr. (4) **Comptes supprimés** : le filtre de `comptesSupprimes.js` cachait aussi les lignes à la
+> purge et aux deux effacements (plus rien n'était vidé) ⇒ ces lectures portent `vrmVoirSupprimes` (banc
+> `compte-supprime`, 2 rouges avant). (5) **Ma journée** : « Bilan des données lues » et « Vendus ailleurs » passent SOUS la
+> grille (côte à côte au-dessus de 1024 px, en tête ailleurs) — la journée tient sans défiler (`journee-widgets`,
+> `revendeurs`). (6) Une cinquantaine de bancs étaient rouges d'avoir suivi en retard les décisions récentes : Réglages
+> en sous-écrans aux DEUX tailles (28 oct.), phrases rangées derrière ⓘ sur téléphone (27 oct. : jugées dans
+> `textContent`), « sans X » retiré du reçu (#798), confirmation à `Z_CONFIRMATION`, porte de banc, Chromium
+> `/opt/pw-browsers/chromium`. Remis à la forme sans affaiblir la règle. ⚠️ **Laissés rouges, arbitrage de Julien** :
+> `annonces-ventes-brouillon` (la 1ʳᵉ annonce descend à 808 px sur ordinateur, 952 au téléphone, sous quatre blocs
+> ajoutés le 29 oct. : bilan, annonces à compléter, astuce des numéros, acceptation auto ; la recherche de Messages sous
+> le bilan) ; `mobile`/`stats-premium` « navigation lisible » (libellés à 9 px, son choix du 19 oct.) ; `session` G/P
+> (limite de Chrome 153). (7) **Découpage d'App.jsx** : 7 écrans en morceaux chargés à la demande (Stock, Réglages,
+> Compta Pro, Leboncoin, Annonces eBay, Factures, Comptes Vinted) — voir plus bas si fusionné.
+
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
 > `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,
