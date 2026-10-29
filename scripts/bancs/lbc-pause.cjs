@@ -67,6 +67,7 @@ const rows = [
   { id: 'lbc_accounts', data: { accounts: { [MON]: { id: MON, name: 'Totomondu', sessionAt: auj.toISOString(), source: 'session:messagerie' } } } },
   { id: 'lbc_ventes', data: { ventes: {} } },
 ];
+const ECRITS = [];
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -124,7 +125,7 @@ async function ouvrir(b, vp, pont) {
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (route.request().method() !== 'GET') return j([]);
+    if (route.request().method() !== 'GET') { try { ECRITS.push({ u, corps: route.request().postData() || '' }); } catch (_) {} return j([]); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -264,6 +265,30 @@ const cliquer = (pg, texte) => pg.evaluate((tx) => { const b = [...document.quer
         dit(m6 && m6[1] === '2', 'Ma journée : 2 à retirer de Leboncoin (la N°14 aussi, sans preuve) — la MÊME règle (§11)', m6 ? m6[0] : 'absent');
         await o5.ctx.close();
       } finally { posted.data.updatedAt = ilYa(3); }
+
+      // (29 oct.) LA N°18 RÉELLE : vendue sur Vinted (la transaction le PROUVE),
+      // l'annonce Vinted encore OUVERTE dans le dressing (Vinted ne la ferme pas
+      // toujours), rien marqué à la main. Avant : rien nulle part (ni l'écran
+      // Leboncoin, ni Ma journée). La preuve prime sur l'état de l'annonce.
+      console.log(`── ${vp.width} px · vendue prouvée par la transaction, annonce Vinted encore ouverte, rien marqué à la main`);
+      const a18 = LISTINGS.payload.items.find((x) => x.id === 5001);
+      a18.is_closed = false;
+      ECRITS.length = 0;
+      try {
+        const o6 = await ouvrir(b, vp, { mode: 'ok', suite: 'fait' });
+        const v7 = await lire(o6.pg);
+        dit(v7.retirer.includes('3290000001'), 'écran Leboncoin : la N°18 « à retirer » même si Vinted la montre encore ouverte', JSON.stringify(v7.retirer));
+        await o6.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await o6.pg.waitForFunction(() => /à retirer de Leboncoin/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+        const t7 = await o6.pg.evaluate(() => document.body.innerText);
+        const m7 = /(\d+) à retirer de Leboncoin[^\n]*/.exec(t7);
+        dit(m7 && m7[1] === '1' && /N°18/.test(m7[0]), 'Ma journée : « 1 à retirer de Leboncoin — N°18 … » sans aucune marque à la main', m7 ? m7[0] : 'absent');
+        await o6.pg.waitForTimeout(800);
+        const pub = ECRITS.filter((e) => /"id":"lbc_a_retirer"/.test(e.corps)).map((e) => { try { const d = JSON.parse(e.corps); return (Array.isArray(d) ? d[0] : d).data; } catch (_) { return null; } }).filter(Boolean).pop();
+        dit(!!pub && Array.isArray(pub.liste) && pub.liste.length === 1 && pub.liste[0].numero === '18' && pub.liste[0].lbcId === '3290000001', 'le résumé pour le logo VRM sur leboncoin.fr est publié (N°18, son annonce)', JSON.stringify(pub && pub.liste));
+        dit(o6.errs.length === 0, 'aucune erreur', o6.errs.join(' | ').slice(0, 120));
+        await o6.ctx.close();
+      } finally { a18.is_closed = true; }
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
   finally { if (b) await b.close(); srv.close(); }

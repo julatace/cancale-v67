@@ -9808,6 +9808,31 @@ async function loginDe(uid, opts) {
 // Trois états partout : une information qu'on n'a pas est `null` (« pas su »),
 // jamais un « oui » ni un « non » inventé.
 const BASCULE_VISIBLE_MS = 7 * 86400000;
+// ── « À RETIRER DE LEBONCOIN » SUR LE LOGO VRM (29 oct.) ─────────────────────
+// Julien : « VRM ne m'a pas dit de la supprimer ». L'app CALCULE (une règle :
+// vendue PROUVÉE sur Vinted, aucune autre annonce Vinted du N° en ligne, une de
+// SES annonces Leboncoin en vente qui le porte par identité) et PUBLIE
+// `lbc_a_retirer` ; la carte du logo sur leboncoin.fr le LIT (§11). Relu au plus
+// toutes les 5 min, jamais plus d'1,2 s d'attente pour la carte ; lecture ratée
+// ⇒ la dernière connue, sinon rien (pas su ≠ rien à retirer : la carte se tait).
+const LBC_A_RETIRER_RELU_MS = 5 * 60e3;
+async function lbcARetirerPourCarte() {
+  let c = null;
+  try { c = (await chrome.storage.local.get('vrmLbcARetirer')).vrmLbcARetirer || null; } catch (_) { c = null; }
+  if (!c || !(Date.now() - Number(c.lu || 0) < LBC_A_RETIRER_RELU_MS)) {
+    const lire = (async () => {
+      const rows = await sbGet('app_data?id=eq.lbc_a_retirer&select=a:data');
+      if (rows === null) return null;
+      const d = rows[0] && rows[0].a;
+      const v = { lu: Date.now(), data: d && typeof d === 'object' && Array.isArray(d.liste) ? { at: String(d.at || ''), liste: d.liste.slice(0, 30) } : null };
+      try { await chrome.storage.local.set({ vrmLbcARetirer: v }); } catch (_) {}
+      return v;
+    })();
+    const r = await avecDelai(lire, 1200, null).catch(() => null);
+    if (r) c = r;
+  }
+  return c && c.data ? c.data : null;
+}
 async function etatSite(url,tabId) {
   const plateforme = plateformeDe(url);
   let version = ''; try { version = chrome.runtime.getManifest().version; } catch (_) {}
@@ -9846,7 +9871,10 @@ async function etatSite(url,tabId) {
   const b = local.vrmBascule;
   const bascule = b && Date.now() - Number(b.at || 0) < BASCULE_VISIBLE_MS ? b : null;
   const transport=plateforme==='leboncoin'?(local.vrmLbcTransport?.[tabId]||null):null;
-  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte };
+  // (29 oct.) Les paires vendues ailleurs, encore en ligne ici : ce que VRM a
+  // calculé et publié (`lbc_a_retirer`) — la carte le dit, sans rien recalculer.
+  const aRetirer = plateforme === 'leboncoin' && vrm && vrm.connecte ? await lbcARetirerPourCarte().catch(() => null) : null;
+  return { ok: true, plateforme, capte, mesure, version, code: CODE_VERSION, vrm, site, flux, bascule,transport, vcCapte, aRetirer };
 }
 
 // L'état que l'app interroge toutes les 20 s : ZÉRO requête Vinted (cookie,
@@ -13615,14 +13643,18 @@ async function buildLbcData() {
   // (sinon on alerterait sur des annonces Leboncoin sans rapport).
   {
     const keysOnline = new Set();
+    // (29 oct.) Une annonce PROUVÉE vendue ne garde pas son N° « en ligne » (la
+    // preuve prime sur l'état de l'annonce, 13 sept.) — la même règle que l'app
+    // (`aRetirerDeLbcVinted`, §11) : c'est ce qui cachait la N°18.
     for (const o of online) {
+      if (vendus.has(o.id)) continue;
       const e = numeros[o.id]; const num = e && e.numero;
       for (const k of vintedKeys(o, num)) keysOnline.add(k);
     }
     // Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
     for (const [u, l] of enl.aConfirmer) {
       if (off.has(String(u))) continue;
-      for (const it of l) { const e = numeros[String(it.id)]; for (const k of vintedKeys({ raw: it }, e && e.numero)) keysOnline.add(k); }
+      for (const it of l) { if (vendus.has(String(it.id))) continue; const e = numeros[String(it.id)]; for (const k of vintedKeys({ raw: it }, e && e.numero)) keysOnline.add(k); }
     }
     // Numéros connus de VRM (toutes annonces numérotées, en ligne ou non).
     const keysKnown = new Set();

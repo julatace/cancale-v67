@@ -49777,17 +49777,83 @@ function numerosLbcSortis(items, liens, vendues, preuve) {
     if (!ad || ad.id == null) continue;
     if (annonceLbcEnVente(ad, vendues)) { clesAnnonceLbc(ad, liens).forEach((k) => vivants.add(k)); continue; }
     if (vendues && vendues.has(String(ad.id))) continue;
-    const quoi = lbcSortieDe(ad);
+    // (29 oct.) Une suppression ACCEPTÉE par Leboncoin (2xx, vue sur la page ou
+    // demandée depuis VRM) sort l'annonce comme une absence prouvée — avec la
+    // MÊME exigence de preuve pour la paire (une autre annonce peut la porter).
+    const quoi = lbcSortieDe(ad) || (ad.supprimeeAt ? 'supprimee' : null);
     if (!quoi) continue;
     const k = numeroLbcIdentite({ itemId: ad.id }, items, liens);
     if (!k) continue;
     if (ad.account || ad.lbcUser) comptesSortis.add(String(ad.account || ad.lbcUser));
-    if (!sorties.has(k)) sorties.set(k, { quoi, at: quoi === 'pause' ? ad.pauseAt : ad.plusVueAt, id: String(ad.id) });
+    if (!sorties.has(k)) sorties.set(k, { quoi, at: quoi === 'pause' ? ad.pauseAt : quoi === 'supprimee' ? ad.supprimeeAt : ad.plusVueAt, id: String(ad.id) });
   }
   for (const k of vivants) sorties.delete(k);
   const prouves = new Set(sorties.size && lbcListesCompletesDepuis(preuve, comptesSortis) ? sorties.keys() : []);
   return { prouves, sorties };
 }
+// ── VENDUE SUR VINTED ⇒ À RETIRER DE LEBONCOIN : UNE RÈGLE (29 oct.) ──────────
+// Julien : « J'ai vendu une paire sur Vinted et VRM ne m'a pas dit de la
+// supprimer ». MESURÉ (lecture seule, sa base) : la N°18 (Shox TL), vendue sur
+// Vinted le 18 octobre (transaction → annonce, finalisée), est restée en ligne
+// sur Leboncoin jusqu'à ce qu'il la supprime lui-même le 28. Deux causes :
+//   · Ma journée et le tableau de bord ne comptaient que les ventes marquées À
+//     LA MAIN (`vinted_annonces_vendues`) ou vues par email — jamais la PREUVE
+//     par la transaction (`lirePreuvesVenteVinted`) ;
+//   · l'écran Leboncoin sautait une paire dont le N° était encore porté par une
+//     annonce Vinted « en ligne » — or Vinted ne ferme pas toujours une annonce
+//     vendue : la preuve de vente PRIME sur l'état de l'annonce (13 sept.).
+// La règle, une seule pour tous les lecteurs (§11) : un N° est « à retirer de
+// Leboncoin » quand une annonce Vinted qui le porte est PROUVÉE vendue, qu'AUCUNE
+// annonce Vinted en ligne et non vendue ne le porte (sinon la paire est revenue),
+// et qu'une annonce Leboncoin EN VENTE le porte par IDENTITÉ (`numeroLbcIdentite` :
+// lien posé à la main, référence VRM — jamais le « nXXX » d'un titre), ou qu'il a
+// été marqué publié depuis cette annonce Vinted et que Leboncoin ne l'a pas
+// montré parti. `vendus === null` (pas su) ⇒ `null`, aucune alerte inventée.
+// Le résumé « à retirer de Leboncoin » publié pour le logo VRM sur leboncoin.fr :
+// l'app CALCULE (`aRetirerDeLbcVinted`), l'extension CONSOMME (§11). Écrit
+// seulement quand il change, ou toutes les 6 h (pour dater la mesure) ; jamais
+// sur une lecture incomplète (l'appelant le garde).
+async function publierLbcARetirer(liste) {
+  if (!AUTH.user) return;
+  const propre = (liste || []).slice(0, 30).map((r) => ({ numero: String(r.numero || ''), lbcId: /^\d{5,15}$/.test(String(r.lbcId || '')) ? String(r.lbcId) : '', titre: String(r.titre || '').slice(0, 80), url: /^https:\/\/(?:www\.)?leboncoin\.fr\//.test(String(r.url || '')) ? String(r.url) : '' }));
+  const empreinte = JSON.stringify(propre);
+  const memo = load('vrm_lbc_a_retirer_pub', null);
+  if (memo && memo.e === empreinte && Date.now() - Number(memo.at || 0) < 6 * 3600e3) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(withOwner({ id: 'lbc_a_retirer', data: { v: 1, at: new Date().toISOString(), liste: propre } })) });
+    if (r.ok) save('vrm_lbc_a_retirer_pub', { e: empreinte, at: Date.now() });
+  } catch (_) {}
+}
+// <lbc-a-retirer-regle>
+function aRetirerDeLbcVinted({ posted, numeros, enLigne, vendus, itemsLbc, liens, vendusLbc, sortis }) {
+  if (!(vendus && typeof vendus.has === 'function')) return null;
+  const nums = numeros || {};
+  const vivants = new Set(), vendusN = new Map();
+  for (const id of (enLigne || [])) { if (vendus.has(String(id))) continue; const k = cleNum((nums[String(id)] || {}).numero); if (k) vivants.add(k); }
+  for (const id of Object.keys(nums)) { if (!vendus.has(String(id))) continue; const k = cleNum((nums[id] || {}).numero); if (k && !vendusN.has(k)) vendusN.set(k, String(id)); }
+  const out = new Map();
+  for (const ad of Object.values(itemsLbc || {})) {
+    if (!ad || ad.id == null) continue;
+    const k = numeroLbcIdentite({ itemId: ad.id }, itemsLbc, liens);
+    if (!k) continue;
+    if (!annonceLbcEnVente(ad, vendusLbc)) continue;
+    if (vivants.has(k) || !vendusN.has(k) || out.has(k)) continue;
+    const prix = Number(ad.price);
+    out.set(k, { numero: k, lbcId: String(ad.id), titre: String(ad.subject || ad.title || ''), url: String(ad.url || ''), vinted: vendusN.get(k), prix: isFinite(prix) && prix > 0 ? prix : null });
+  }
+  for (const pid of (posted || [])) {
+    const p = String(pid);
+    if (!/^\d+$/.test(p) || !vendus.has(p)) continue;
+    const k = cleNum((nums[p] || {}).numero);
+    // L'annonce Leboncoin reliée partie (supprimée, plus vue, en pause) ne suffit
+    // pas : une AUTRE peut porter la paire (22 oct.) — seule la preuve (`sortis` :
+    // liste complète de chacun de ses comptes après la marque) la retire.
+    if (k && (vivants.has(k) || out.has(k) || (sortis && sortis.has(k)))) continue;
+    out.set(k || ('pid:' + p), { numero: k || '', lbcId: '', titre: String((nums[p] || {}).title || ''), url: '', vinted: p, prix: null });
+  }
+  return [...out.values()].sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
+}
+// </lbc-a-retirer-regle>
 // Une annonce pas revue depuis plus de 7 jours : on ne sait pas si elle est
 // encore sur Leboncoin. On ne demande pas « quelle paire ? » pour elle (relier
 // une annonce morte à une paire vivante), on dit le geste qui tranche. Sans date
@@ -50777,14 +50843,18 @@ function LeboncoinScreen() {
     }
     queue.sort((a, b) => triNum(a.numero, b.numero));
 
+    // (29 oct.) Une annonce PROUVÉE vendue ne garde pas son N° « en ligne » : c'est
+    // ce qui cachait la N°18 (vendue le 18, annonce encore ouverte sur Vinted).
+    const keysOnline = new Set(); online.forEach(o => { if (!vendus.has(String(o.id))) vKeys(o.id, o.title).forEach(k => keysOnline.add(k)); });
+    for (const [u, l] of enl.aConfirmer) if (!offAcc.has(String(u))) for (const it of l) if (!vendus.has(String(it.id))) vKeys(String(it.id), it.title).forEach(k => keysOnline.add(k));
     const removals = [];
-    const etatDe = (oid) => etatVinted[String(oid)] || (vendus.has(String(oid)) ? 'vendue' : 'inconnue');
-    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if (onlineIds.has(pid) || aConfirmerIds.has(pid)) continue; const e = numeros[pid] || {}; const kN = e.numero ? cleNum(e.numero) : ''; if (kN && numsSortis.has(kN)) continue; const so = kN ? numsSortiesDoute.get(kN) : null; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid), ...(so ? { sortie: so.quoi } : {}) }); }
+    // (29 oct.) La preuve de vente PRIME sur l'état de l'annonce (13 sept.) : Vinted
+    // ne ferme pas toujours une annonce vendue.
+    const etatDe = (oid) => (vendus.has(String(oid)) ? 'vendue' : (etatVinted[String(oid)] || 'inconnue'));
+    for (const pid of posted) { if (!/^\d+$/.test(pid)) continue; if ((onlineIds.has(pid) && !vendus.has(pid)) || (aConfirmerIds.has(pid) && !vendus.has(pid))) continue; const e = numeros[pid] || {}; const kN = e.numero ? cleNum(e.numero) : ''; if (kN && numsSortis.has(kN)) continue; if (kN && keysOnline.has(kN)) continue; /* (29 oct.) republiée : une AUTRE annonce Vinted en ligne porte ce N° — la paire est là */ const so = kN ? numsSortiesDoute.get(kN) : null; removals.push({ numero: String(e.numero || '?'), title: e.title || '', etat: etatDe(pid), ...(so ? { sortie: so.quoi } : {}) }); }
     // Détection auto : annonce LBC active dont la paire n'est plus en ligne sur
     // Vinted = vendue → à retirer. Uniquement si la paire est connue de VRM.
     // ⚠️ Une paire « à confirmer » n'est pas « plus en ligne » : on ne sait pas.
-    const keysOnline = new Set(); online.forEach(o => vKeys(o.id, o.title).forEach(k => keysOnline.add(k)));
-    for (const [u, l] of enl.aConfirmer) if (!offAcc.has(String(u))) for (const it of l) vKeys(String(it.id), it.title).forEach(k => keysOnline.add(k));
     const keysKnown = new Set();
     for (const id in numeros) { const e = numeros[id] || {}; if (e.numero) keysKnown.add(cleNum(e.numero)); const m = numFrom(e.title); if (m) keysKnown.add(cleNum(m)); }
     const unlinked = [];
@@ -50811,6 +50881,18 @@ function LeboncoinScreen() {
       for (let i = removals.length - 1; i >= 0; i--) {
         const r = removals[i];
         if (!r.lbc && r.numero !== '?' && vuesLbc.has(cleNum(r.numero))) removals.splice(i, 1);
+      }
+    }
+    // (29 oct.) « Vendue sur Vinted — à retirer de Leboncoin » : LA règle partagée
+    // (`aRetirerDeLbcVinted`, §11) — la même que Ma journée, le tableau de bord
+    // et le logo VRM sur leboncoin.fr. Preuve illisible ⇒ on garde ce qui précède
+    // (aucune vente prouvée n'y figure de toute façon).
+    {
+      const ar = aRetirerDeLbcVinted({ posted, numeros, enLigne: new Set([...onlineIds, ...aConfirmerIds]), vendus: preuveKO ? null : vendus, itemsLbc: lbcRows === null ? null : lbcItems, liens, vendusLbc: ventesLbcKO ? null : vendusLbc, sortis: numsSortis });
+      if (ar) {
+        const kAr = new Set(ar.map((r) => cleNum(r.numero)).filter(Boolean));
+        for (let i = removals.length - 1; i >= 0; i--) { const r = removals[i]; if (r.etat === 'vendue' || kAr.has(cleNum(r.numero))) removals.splice(i, 1); }
+        for (const r of ar) { const so = !r.lbcId && r.numero ? numsSortiesDoute.get(cleNum(r.numero)) : null; removals.push({ numero: r.numero || '?', title: r.titre, lbc: !!r.lbcId, url: r.url, etat: 'vendue', id: r.lbcId, prix: r.prix, ...(so ? { sortie: so.quoi } : {}) }); }
       }
     }
     // ── CROISEMENT eBay → LEBONCOIN (26 oct.) : une paire VENDUE SUR eBAY et
@@ -51153,7 +51235,7 @@ function LeboncoinScreen() {
             <div key={i} data-lbc-retirer={r.id || r.numero} data-lbc-retirer-sortie={r.sortie || undefined} style={{ fontSize: 12.5, color: C.text, padding: '3px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
               <span><b>N°{r.numero}</b> · {r.title || '—'}
               {r.url ? <> · <a href={r.url} target="_blank" rel="noreferrer" style={{ color: coul, fontWeight: 700 }}>voir sur Leboncoin</a></> : null}
-              {r.sortie ? <span style={{ color: C.muted }}> · {r.sortie === 'pause' ? "l'annonce reliée est en pause depuis VRM" : "l'annonce reliée n'est plus dans ta liste"}</span> : null}</span>
+              {r.sortie ? <span style={{ color: C.muted }}> · {r.sortie === 'pause' ? "l'annonce reliée est en pause depuis VRM" : r.sortie === 'supprimee' ? "l'annonce reliée a été supprimée de Leboncoin" : "l'annonce reliée n'est plus dans ta liste"}</span> : null}</span>
               {pausable && pe === 'ok' && r.lbc && r.id ? (
                 <button type="button" data-lbc-pause={r.id} disabled={!!pauseEnVol} onClick={() => mettreEnPause(r)}
                   style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
@@ -56822,25 +56904,39 @@ function AppCoeur() {
       // (22 oct.) Une paire dont l'annonce Leboncoin est SORTIE (plus vue dans une
       // liste complète de son compte, ou mise en pause depuis VRM) n'a plus rien
       // à retirer : la MÊME règle que l'écran Leboncoin (`numerosLbcSortis`, §11).
-      // Les annonces ne sont lues que s'il y a quelque chose à retirer ; illisibles
-      // ⇒ on garde le compte (pas su ≠ retirée).
-      if(lbcRemovePids.length){
-        try{
-          const ls=await lbcListingsSession();
-          const items=ls?ls.items:null;
-          if(lbcItemsLu===undefined) lbcItemsLu=items||null;
-          if(items){
-            // La preuve, comme l'écran Leboncoin : ses comptes (session vue ou
-            // vente prouvée), la date de chaque liste complète, la marque
-            // « publiée ». Comptes ou ventes illisibles ⇒ pas de preuve.
-            let preuve=null;
-            if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
-            const {prouves:sortis}=numerosLbcSortis(items, load('vrm_lbc_liens',{})||{}, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve);
-            sortisN=sortis;
-            lbcRemoveCount=lbcRemovePids.filter(pid=>{ const k=cleNum((nums[pid]||{}).numero); return !(k && sortis.has(k)); }).length;
-          }
-        }catch(_){}
-      }
+      // ⚠️⚠️ (29 oct.) « VENDUE SUR VINTED » SE PROUVE PAR LA TRANSACTION. Ce compte
+      // ne lisait que les ventes marquées À LA MAIN ou vues par email
+      // (`soldIdsN`) : la N°18, vendue le 18 octobre sur Vinted, n'a jamais été
+      // annoncée ici, et Julien l'a retirée de Leboncoin lui-même dix jours plus
+      // tard. LA règle (`aRetirerDeLbcVinted`) — la même que l'écran Leboncoin et
+      // le logo VRM sur leboncoin.fr. Preuve illisible ⇒ seules ses marques à la
+      // main comptent, et rien n'est publié pour le logo (pas su ≠ rien).
+      let lbcARetirer=null;
+      try{
+        const ls=await lbcListingsSession();
+        const items=ls?ls.items:null;
+        if(lbcItemsLu===undefined) lbcItemsLu=items||null;
+        const liensR=load('vrm_lbc_liens',{})||{};
+        let sortis=null;
+        if(items){
+          // La preuve, comme l'écran Leboncoin : ses comptes (session vue ou
+          // vente prouvée), la date de chaque liste complète, la marque
+          // « publiée ». Comptes ou ventes illisibles ⇒ pas de preuve.
+          let preuve=null;
+          if(ventesLbcLu){ try{ const ra=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`,{headers:sbAuth()}); if(ra.ok){ const rows=await ra.json(); if(Array.isArray(rows)){ const accs=(rows[0]&&rows[0].data&&rows[0].data.accounts)||{}; preuve={lectures:ls.lectures||{}, comptes:new Set([...comptesLbcProuves(ventesLbcLu,items),...comptesLbcSession(accs)]), depuis:postedDepuis}; } } }catch(_){} }
+          sortis=numerosLbcSortis(items, liensR, ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, preuve).prouves;
+          sortisN=sortis;
+        }
+        const aJuger=(postedIds||[]).some(x=>/^\d+$/.test(String(x))) || Object.values(items||{}).some(ad=>ad&&(ad.ref||ad.customRef||liensR[String(ad.id)]!=null));
+        if(aJuger){
+          const preuveN=await lirePreuvesVenteVinted().catch(()=>null);
+          const vendusR=preuveN&&preuveN.vendus?new Set([...preuveN.vendus,...soldIdsN]):(soldIdsN.size?soldIdsN:null);
+          lbcARetirer=aRetirerDeLbcVinted({posted:postedIds, numeros:nums, enLigne:lbcOnlineIds, vendus:vendusR, itemsLbc:items, liens:liensR, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis});
+          const toutesLues=[...lusParCompte.values()].every(v=>v&&v[2]&&Array.isArray(v[2].items));
+          if(lbcARetirer && preuveN && items && ventesLbcLu && toutesLues) publierLbcARetirer(lbcARetirer).catch(()=>{});
+        } else if(items && ventesLbcLu) publierLbcARetirer([]).catch(()=>{});
+        if(lbcARetirer){ lbcRemovePids=lbcARetirer.map(r=>r.vinted).filter(Boolean); lbcRemoveCount=lbcARetirer.length; }
+      }catch(_){}
       // eBay : ventes PAYÉES pas encore expédiées — le MÊME to-do qu'un colis
       // Vinted (« tout centralisé dans VRM », §11). Lu sur les commandes captées
       // (scope fulfillment, déjà accordé — aucune reconnexion). Une lecture
@@ -56960,7 +57056,7 @@ function AppCoeur() {
       if(toShipCount>0)  items.push({icon:'⏰', ic:'truck', text:`${toShipCount} vente${toShipCount>1?'s':''} à expédier`, n:toShipCount, tab:'cat_bord'});
       if(ebayShipCount>0) items.push({icon:'📮', ic:'truck', text:`${ebayShipCount} vente${ebayShipCount>1?'s':''} eBay à expédier`, n:ebayShipCount, tab:'plat_ebay', jr:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true});
-      if(lbcRemoveCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true});
+      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true}); }
       if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
