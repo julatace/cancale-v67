@@ -235,3 +235,12 @@
 .vrm-favoris-compte-rendu li[data-favoris-envoi=envoye] b{color:var(--vrm-ink);}.vrm-favoris-compte-rendu li[data-favoris-envoi=refuse] b,.vrm-favoris-compte-rendu li[data-favoris-envoi=incertain] b{color:var(--vrm-warn,#a86a12);}
 .vrm-favoris-feuille .vrm-favoris-automatisation{margin-top:0;}
 .vrm-favoris-badge.is-vendu{background:var(--vrm-card2);color:var(--vrm-ink);font-weight:600;}.vrm-favoris-vendu-action{font-size:11px;color:var(--vrm-muted);}
+/* Lecture opérationnelle : détails techniques repliés, montants et gestes proches. */
+.vrm-sync-comptes{border:1px solid var(--vrm-line);border-radius:10px;padding:9px 11px;margin:10px 0;font-size:12px;background:var(--vrm-surface);}
+.vrm-sync-comptes summary{cursor:pointer;min-height:28px;font-weight:650;}.vrm-sync-comptes>p{color:var(--vrm-muted);line-height:1.5;}
+.vrm-sync-lignes article{display:grid;grid-template-columns:minmax(90px,.8fr) repeat(2,minmax(0,1fr));gap:12px;border-top:1px solid var(--vrm-line);padding:10px 0;}
+.vrm-sync-lignes article>strong{overflow-wrap:anywhere;}.vrm-sync-lignes article>div{display:flex;flex-direction:column;gap:3px;min-width:0;}.vrm-sync-lignes time,.vrm-sync-lignes small{color:var(--vrm-muted);line-height:1.45;}
+.vrm-chat-negociation-etat{padding:7px 14px;border-bottom:1px solid var(--vrm-line);font-size:12px;flex-shrink:0;}.vrm-chat-negociation-etat b{display:block;}.vrm-chat-negociation-etat small{display:block;color:var(--vrm-muted);line-height:1.4;}
+.vrm-chat-offre-reperes{display:grid;grid-template-columns:36px repeat(2,minmax(0,1fr));gap:9px;align-items:center;margin-bottom:8px;}.vrm-chat-offre-photo{width:36px;height:44px;display:grid;place-items:center;border-radius:6px;overflow:hidden;background:var(--vrm-surface);}.vrm-chat-offre-photo img{width:100%;height:100%;object-fit:cover;}.vrm-chat-offre-reperes small{display:block;font-size:10px;color:var(--vrm-muted);}.vrm-chat-offre-reperes b{font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.vrm-chat-offre-traiter{display:block!important;}.vrm-chat-offre-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;margin-top:7px;}.vrm-chat-offre-actions button{min-width:0;max-width:100%;padding:7px 4px!important;font-size:11px!important;white-space:normal;overflow-wrap:anywhere;min-height:44px;}
+@media(max-width:600px){.vrm-sync-lignes article{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.vrm-sync-lignes article>strong{grid-column:1/-1;}.vrm-inbox-filters{flex-wrap:wrap;}}

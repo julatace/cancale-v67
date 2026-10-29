@@ -5,7 +5,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  const racine=path.resolve(__dirname,'../..');const bundle=await build({stdin:{resolveDir:racine,loader:'jsx',contents:`
  import React from'react';import{createRoot}from'react-dom/client';import Favoris from'./src/FavorisVinted.jsx';
  const root=createRoot(document.getElementById('root'));window.pages=0;window.envois=0;window.ouvertures=[];Object.defineProperty(navigator,'clipboard',{value:{writeText:async t=>window.controleCopie=t},configurable:true});
- const note=i=>({id:'n'+i,body:'Camille '+i+' a ajouté ton article à ses favoris.',actor:{login:'Camille '+i},link:'/items/'+(100+i)+'/conversation/new',user_id:200+i,created_at:new Date(Date.now()-7*3600000).toISOString(),is_read:true});
+ const dateNotification=new Date(Date.now()-7*3600000).toISOString();const note=i=>({id:'n'+i,body:'Camille '+i+' a ajouté ton article à ses favoris.',actor:{login:'Camille '+i},link:'/items/'+(100+i)+'/conversation/new',user_id:200+i,created_at:dateNotification,is_read:true});
  window.fetch=async(url,opts={})=>{const ok=x=>({ok:true,json:async()=>x});
  if(url.startsWith('/api/compte')&&opts.method==='POST'){if(window.retarderLancement)await new Promise(r=>window.finLancement=r);return{ok:false,json:async()=>({message:'Le destinataire n’est pas confirmé.',code:'favoris_preuve_absente',diagnostic:{notifications:4,liensExacts:0,selection:1,owner:'secret-prive',pairesNatives:987654321}})};}
  if(opts.method==='POST'&&url.includes('on_conflict=owner,id'))return ok([JSON.parse(opts.body)]);
@@ -39,6 +39,8 @@ const {build}=require('esbuild'),{chromium}=require('playwright');
  check(await p.evaluate(()=>window.envois===0),'le reçu de vérification ne lance aucun message');
  await ouvrir.click();await p.evaluate(()=>window.accuserOuverture({ok:true,data:{ouvert:true,preuve:'non_confirmee'}}));await p.getByText('Capture non confirmée',{exact:true}).waitFor();
  check(await p.getByText('Lien enregistré',{exact:true}).count()===0,'ouvrir un onglet sans preuve ne donne pas de faux statut positif');
+ check(await p.locator('.vrm-favoris-diagnostic').evaluate(e=>!e.open),'technical assistance is collapsed initially');
+ await p.getByText('Assistance technique · favoris',{exact:true}).click();
  await p.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
  const diagnostic=await p.evaluate(()=>window.controleCopie);check(diagnostic.includes('VRM-favoris-controle-v1')&&!['owner-test','Camille','https:','notificationId'].some(s=>diagnostic.includes(s)),'contrôle copiable sans données privées');
 

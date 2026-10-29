@@ -2,7 +2,7 @@ import React from 'react';
 import {lireDiagnosticFavoris} from './diagnosticFavoris.js';
 import {rapportAssistanceFavoris,bilanOuvertureFavori} from './favorisOuverture.js';
 
-export default function DiagnosticFavoris({uid, owner, ownerActuel, base, headers, controle=null, controleEnvoi=null}) {
+export default function DiagnosticFavoris({uid, owner, ownerActuel, base, headers, controle=null, controleEnvoi=null,copierControle=null}) {
   const [etat, setEtat] = React.useState({});
   const requete = React.useRef(0);
   React.useEffect(() => { requete.current++; setEtat({}); return () => { requete.current++; }; }, [uid, owner]);
@@ -24,6 +24,7 @@ export default function DiagnosticFavoris({uid, owner, ownerActuel, base, header
   };
   return <details className="vrm-favoris-diagnostic"><summary>Assistance technique · favoris</summary>
     <p role="status">{bilan}</p>
+    {copierControle&&<button type="button" onClick={copierControle}>Copier le contrôle</button>}
     <p>Le rapport ci-dessous réunit la dernière vérification sur Vinted et la structure des données captées. Après « Vérifier un favori », copie ce rapport pour transmettre aussi le résultat de l’ouverture.</p>
     <p>Ce contrôle technique ne déclenche aucune action sur Vinted. Il contient les noms et types des champs ainsi que des statuts techniques, sans pseudo, message, lien ou identifiant personnel.</p>
     {!uid&&<p>Choisis le compte Vinted à vérifier dans le sélecteur de compte.</p>}
