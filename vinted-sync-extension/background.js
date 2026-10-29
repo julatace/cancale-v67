@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.276.0';
+const CODE_VERSION = '5.277.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7759,8 +7759,9 @@ function tailleRefusee(rc) {
   return errs.some((e) => e && (/^(size|size_id)\b/i.test(String(e.field || e.name || '')) || /champ taille/i.test(String(e.value || e.message || ''))));
 }
 const TEXTE_TAILLE_REFUSEE = " Vinted ne reconnaît plus la taille enregistrée pour cette catégorie : ouvre le brouillon sur Vinted (Mes brouillons → Modifier), choisis la taille, puis « Publier ». VRM ne pose une taille que si Vinted en propose une au libellé exact de ta paire.";
+const TEXTE_PHOTOS_REFUSEES = " Vinted refuse les photos de ce brouillon : ouvre-le sur Vinted (Mes brouillons → Modifier), rajoute les photos, puis « Publier ». VRM ne les renvoie pas tout seul (jamais d'essais en rafale).";
 function gesteRefus(rc, corps) {
-  if (!tailleRefusee(rc)) return '';
+  if (!tailleRefusee(rc)) return (typeof photosRefusees === 'function' && photosRefusees(rc)) ? TEXTE_PHOTOS_REFUSEES : '';
   const pourquoi = rc && rc.tailleRaison ? ` VRM a cherché la bonne taille : ${rc.tailleRaison}.` : '';
   if (pourquoi) return pourquoi + TEXTE_TAILLE_REFUSEE;
   try {
