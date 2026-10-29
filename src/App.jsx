@@ -38,7 +38,7 @@ import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
-import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe} from './microEntreprise.js';
+import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -1722,7 +1722,7 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
-  'vrm_vc_etiquettes',
+  'vrm_vc_etiquettes','vrm_lbc_dates',
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
   'vinted_extracols','vinted_colors','vinted_invoices',
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
@@ -5945,6 +5945,27 @@ const indexDeclarations = (reg) => {
   return idx;
 };
 const moisDeclare = (reg, ym) => !!(reg && typeof reg === 'object' && reg[ym] && Array.isArray(reg[ym].ids));
+// ── DATER UNE VENTE LEBONCOIN À LA MAIN (29 octobre) ── La date d'une vente
+// Leboncoin ne vit que dans la liste v3 de « Mes transactions » ; une vente
+// ouverte autrement reste « à dater » et n'entre dans AUCUNE déclaration. Il peut
+// la recopier depuis Leboncoin : `vrm_lbc_dates` = { [txId]: 'AAAA-MM-JJ' }
+// (synchronisée). Une date LUE par l'extension gagne toujours sur la saisie ; la
+// ligne porte `dateSaisie` (dite à l'écran). Une seule fonction, appliquée là où
+// les ventes Leboncoin entrent dans un calcul (§11).
+const lireDatesLbc = () => { const v = load('vrm_lbc_dates', {}); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; };
+const DATE_LBC_OK = /^\d{4}-\d{2}-\d{2}$/;
+const avecDatesLbc = (ventes, dates) => {
+  if (!Array.isArray(ventes) || !dates || typeof dates !== 'object') return ventes || [];
+  let change = false;
+  const out = ventes.map((v) => {
+    if (!v || v.dateVente || !v.txId) return v;
+    const d = dates[String(v.txId)];
+    if (typeof d !== 'string' || !DATE_LBC_OK.test(d) || !Date.parse(d + 'T12:00:00')) return v;
+    change = true;
+    return { ...v, dateVente: d + 'T12:00:00', dateSaisie: true };
+  });
+  return change ? out : ventes;
+};
 const lireDeclarations = () => { const v = load('vrm_urssaf_declare', {}); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; };
 const ventesDeclarables = ({ vinted, lbc, ebay, masquee, exclu, versements, declare } = {}) => {
   const lignes = [], aDater = [], ecartees = [], vus = new Set();
@@ -32121,8 +32142,43 @@ const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
 // Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
 // Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
 const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
+// Dater une vente Leboncoin à la main (29 oct.) : la date se recopie depuis
+// « Mes transactions » sur leboncoin.fr. Une date lue par l'extension gagne
+// toujours ; une date dans l'avenir ou avant 2015 est refusée.
+function DaterVentesLbc({ ventes, dates }) {
+  const liste = (ventes || []).filter((v) => v && v.isSeller === true && v.txId && !v.dateVente && !lbcAnnulee(v) && lbcFinalisee(v));
+  const [saisie, setSaisie] = React.useState({});
+  const [msg, setMsg] = React.useState(null);
+  if (!liste.length) return null;
+  const auj = new Date(); const max = `${auj.getFullYear()}-${String(auj.getMonth() + 1).padStart(2, '0')}-${String(auj.getDate()).padStart(2, '0')}`;
+  const poser = (tx, d) => {
+    if (d && (!DATE_LBC_OK.test(d) || d > max || d < '2015-01-01')) { setMsg({ tx, t: 'Une date entre 2015 et aujourd\'hui.' }); return; }
+    const u = { ...(dates || {}) }; if (d) u[String(tx)] = d; else delete u[String(tx)];
+    save('vrm_lbc_dates', u); setMsg(null);
+  };
+  const eur = (v) => v.price != null && isFinite(Number(v.price)) ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')} €` : '—';
+  return (
+    <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
+      <div style={{ fontWeight: 600 }}>Dater tes ventes Leboncoin</div>
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>Recopie la date de vente affichée dans « Mes transactions » sur leboncoin.fr : la vente compte alors dans son mois (CA, déclaration URSSAF).</div>
+      {liste.map((v) => {
+        const tx = String(v.txId), cur = (dates || {})[tx] || '';
+        const val = saisie[tx] != null ? saisie[tx] : cur;
+        return (
+          <div key={tx} data-dater-lbc-tx={tx} data-dater-lbc-date={cur} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+            <span style={{ flex: '1 1 180px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || 'Vente Leboncoin'} · {eur(v)}</span>
+            <input type="date" aria-label={`Date de vente de ${v.title || 'cette vente'}`} max={max} min="2015-01-01" value={val} onChange={(e) => setSaisie((x) => ({ ...x, [tx]: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 16, minHeight: 44, background: C.bg, color: C.text, fontFamily: 'inherit' }}/>
+            <button type="button" data-dater-lbc-ok={tx} disabled={!val || val === cur} onClick={() => poser(tx, val)} style={{ border: 'none', borderRadius: 10, background: C.accent, color: C.onAccent || '#fff', padding: '8px 14px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!val || val === cur) ? 0.5 : 1, fontFamily: 'inherit' }}>Enregistrer</button>
+            {cur ? <button type="button" data-dater-lbc-retirer={tx} onClick={() => { setSaisie((x) => ({ ...x, [tx]: '' })); poser(tx, ''); }} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, padding: '8px 12px', minHeight: 44, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Retirer</button> : null}
+            {msg && msg.tx === tx ? <div role="alert" style={{ flexBasis: '100%', fontSize: 12, color: C.warn }}>{msg.t}</div> : null}
+          </div>);
+      })}
+    </div>
+  );
+}
 function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const { ventes, ko } = useVentesCoque();
+  const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode', p); } catch (_) {} };
   const [versements, setVersements] = React.useState(undefined);
@@ -32138,7 +32194,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vf = ventesFaites({ vinted: ventes, lbc, ebay, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)) });
     const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
@@ -32159,7 +32215,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const attente = lbcCoqueLu === undefined || ebayCommandes === undefined;
     return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
   const cur = lignes ? lignes[0] : null;
   const partiel = calc.etat === 'lu' && (calc.manque.length > 0 || calc.attente);
@@ -32226,10 +32282,11 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {!calc.manque.length && calc.attente && <div>Leboncoin ou eBay se lit encore : chaque montant est un minimum pour l'instant.</div>}
               {versements === null && <div>Les dates de versement Vinted sont illisibles : la colonne « reçu » attend, plutôt que d'afficher des zéros.</div>}
               {calc.aDater.length > 0 && <div>{calc.aDater.length} vente{calc.aDater.length > 1 ? 's' : ''} finalisée{calc.aDater.length > 1 ? 's' : ''} sans date de versement ({fmt(aDaterEur)}) : dans aucune période « reçu » tant que la date n'est pas captée.</div>}
-              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période.</div>}
+              {calc.venduSansDate > 0 && <div>{calc.venduSansDate} vente{calc.venduSansDate > 1 ? 's' : ''} Leboncoin sans date de vente : dans aucune période — tu peux la dater ci-dessous.</div>}
               {calc.venduEbayEcartees > 0 && <div data-ca-ebay-ecartees={calc.venduEbayEcartees}>{calc.venduEbayEcartees} commande{calc.venduEbayEcartees > 1 ? 's' : ''} eBay écartée{calc.venduEbayEcartees > 1 ? 's' : ''} : le montant que tu reçois (frais eBay retirés, port non compté) n'est pas lisible ou n'est pas en euros.</div>}
             </div>
           )}
+          {lbcCoqueLu === true ? <DaterVentesLbc ventes={(lbcVentes && lbcVentes.ventes) || []} dates={datesLbc}/> : null}
         </>)}
       </div>
     </Card>
@@ -32396,6 +32453,7 @@ const telechargerFichier = (contenu, nom, type) => {
 };
 function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const { ventes, ko } = useVentesCoque();
+  const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [versements, setVersements] = React.useState(undefined);
   React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
   // Le profil fiscal : relu à l'ouverture, et suivi quand la carte « Profil
@@ -32456,7 +32514,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), versements: versements || {} });
     const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
@@ -32467,7 +32525,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     ];
     return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick]);
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc]);
   const recap = calc.etat === 'lu' ? recapEReporting({ lignes: calc.decl.lignes, aDater: versements ? calc.decl.aDater : [], ym, ymDe: ymDeTs, manque: calc.manque, attente: calc.attente, versementsLus: versements !== null }) : null;
 
   const fx = (data && data.facturx) || {};
@@ -32962,7 +33020,33 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
       </Card>
     );
   }
-  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}</div>);
+  // ── 4. Ta déclaration de revenus (et la CFE) ──
+  const dr = declarationRevenus({ ligne, now, liberatoire: vl });
+  const cfe = rappelCfe(now);
+  const impots = (
+    <Card style={sCarte}>
+      <div data-micro-impots={dr ? 'lu' : 'passu'} data-micro-impots-annee={dr ? String(dr.annee) : ''} data-micro-impots-ca={dr ? String(dr.ca) : ''} data-micro-impots-cases={dr ? dr.cases.join(',') : ''}>
+        <div style={sTitre}>Ta déclaration de revenus</div>
+        {!dr ? <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Le montant se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div> : (<>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+            {dr.enCours ? <>Revenus {dr.annee}, à déclarer au printemps {dr.annee + 1} — pour l'instant :</> : <>Revenus {dr.annee}, à déclarer ce printemps (déclaration 2042-C-PRO) :</>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+            <b className="vrm-display" style={{ fontSize: 22, color: C.text }}>{dr.partiel ? 'au moins ' : ''}{eurMicro(dr.ca)}</b>
+            <span style={{ fontSize: 13, color: C.text }}>{dr.liberatoire ? <>case <b>{dr.cases[0]}</b></> : <>case <b>5KO</b> sans versement libératoire, <b>5TA</b> avec</>}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+            {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
+              : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71 % de la vente de marchandises.</>}
+            {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
+            {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
+          </div>
+        </>)}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 12.5, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : l'avis est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Exonérée l'année de création de ton entreprise.</div> : null}
+      </div>
+    </Card>
+  );
+  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}{impots}</div>);
 }
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
@@ -35037,6 +35121,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false }) {
+  const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const [facturesVentes,setFacturesVentes]=useState([]);
   useEffect(()=>{if(only && only!=='ventes')return;let stop=false;fetchProInvoices({metadata:true}).then(rows=>{if(!stop)setFacturesVentes(rows);});return()=>{stop=true;};},[only]);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
@@ -37450,10 +37535,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: acctOffOf, versements, declare: declUrssaf });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declUrssaf]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, declUrssaf]);
   // ⚠️⚠️ CE QUE LISENT LES DEUX RAPPORTS (mensuel, annuel) — revue du 6 octobre.
   // Dates de versement illisibles ⇒ `declarables` vaut `null`, et c'est juste
   // pour Ma journée et la publication (elles ne disent rien de « reçu »). Mais
@@ -37469,15 +37554,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (declarables) return { lignes: declarables.lignes, aDater: declarables.aDater, vinted: 'lu' };
     if (lbcLu === undefined || ebayCmd === undefined) return { lignes: [], aDater: [], vinted: 'encours' };
     try {
-      const r = ventesDeclarables({ lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], declare: declUrssaf });
+      const r = ventesDeclarables({ lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], declare: declUrssaf });
       return { lignes: r.lignes, aDater: r.aDater, vinted: 'passu' };
     } catch (_) { return { lignes: [], aDater: [], vinted: 'passu' }; }
-  }, [declarables, lbcLu, lbcVentes, ebayCmd, declUrssaf]);
+  }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf]);
   // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
   // « Vendu ce mois » et la colonne VENDU du graphique.
-  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], cachee: isHidden }),
+  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], cachee: isHidden }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd]);
+    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc]);
   // VENDU sur une période (aujourd'hui, ce mois) — sur `vendus`, la même liste
   // que le graphique : la carte et la colonne du jour ne peuvent pas diverger.
   const bilanVentes = React.useCallback((depuisTs, jusquaTs) => {
@@ -41708,7 +41793,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? lbcVentes.ventes : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], exclu: acctOffOf, versements: versements || {}, declare: declUrssaf }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).
@@ -43383,6 +43468,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (16 oct.) Au-delà de deux comptes, le nombre : neuf identifiants à la suite
         // remplissaient la carte sur iPhone. Les noms restent dans `data-recu-sans`
         // et dans l'infobulle.
+        // (29 oct.) LES COTISATIONS À METTRE DE CÔTÉ — micro seulement. La base
+        // est le CA DÉCLARÉ de ce mois (`l.ym`, les mêmes lignes que Compta et la
+        // publication, §11) : l'argent reçu ce mois mais déjà déclaré ailleurs
+        // n'y est pas. Au même taux (`aPayerUrssaf`, arrondi une fois). Un compte
+        // pas lu ou des ventes sans date ⇒ « au moins ». Pas su ⇒ rien.
+        const caDeclMois = declarables ? declarables.lignes.reduce((x, l) => (l && l.ym === ymIci) ? x + l.eur : x, 0) : null;
+        const cotisMois = urssafConcerne() && caDeclMois != null && caDeclMois > 0 ? aPayerUrssaf(caDeclMois, tauxUrssaf()) : null;
+        const cotisAuMoins = !!(declarables && (nomsVentesKO.length || (declarables.aDater || []).length));
         const recuSans = declarables && nomsVentesKO.length ? `sans ${nomsVentesKO.length > 2 ? `${nomsVentesKO.length} comptes` : nomsVentesKO.join(', ')} (ventes pas lues) · ` : '';
         const caDeclareAilleurs = recuDeclareAilleurs.reduce((a, l) => a + l.eur, 0);
         const moisDeclAilleurs = [...new Set(recuDeclareAilleurs.map(l => l.ym))].sort().map(ym => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); }).join(', ');
@@ -43526,6 +43619,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{minWidth:0}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>Reçu en {moisNom}</div>
                 {declarables === null && <div className="vrm-day-note" style={{color:C.muted}}>dates de versement illisibles pour l'instant</div>}
+                {cotisMois != null && <div data-cotis-mois={Math.round(cotisMois*100)} data-cotis-aumoins={cotisAuMoins?'1':''} className="vrm-day-note" style={{color:C.muted}}>≈ {cotisAuMoins ? 'au moins ' : ''}{cotisMois.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} € de cotisations<span className="vrm-cotis-long"> à mettre de côté ({load('vinted_urssaf_freq','trimestriel')==='mensuel' ? 'à payer le mois prochain' : 'à payer après la fin du trimestre'})</span></div>}
               </div>
               <span className="vrm-display vrm-day-recu-n" style={{color:C.text}}>{declarables === undefined ? '…' : recuMois == null ? '—' : `${Math.round(recuMois).toLocaleString('fr-FR')} €`}</span>
             </div>
@@ -56574,6 +56668,7 @@ function AppCoeur() {
   // (revue du 5 octobre) : une vente masquée d'un ✕, un compte écarté, une
   // nouvelle vente rangée par l'extension, et MINUIT (une PWA reste ouverte).
   const [masquesTick, setMasquesTick] = useState(0);
+  const [datesLbcTick] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);   // une date Leboncoin saisie : le vendu se recalcule
   useEffect(() => {
     const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setMasquesTick(t => t + 1); };
     window.addEventListener('vrm:save', f);
@@ -56639,7 +56734,7 @@ function AppCoeur() {
       const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
-      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], cachee });
+      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], cachee });
       const r = resumeVendu(v.lignes);
       const loginDe = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
       const venduManque = [
@@ -56652,7 +56747,7 @@ function AppCoeur() {
         venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts]);
+  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo

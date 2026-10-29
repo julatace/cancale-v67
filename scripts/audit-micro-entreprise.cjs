@@ -16,6 +16,9 @@ if (mut === 'partiel-ignore') muter('return { ca: r2(ca), mois, partiel: raisons
 if (mut === 'mois-meme') muter('const ouvre = new Date(ps.getFullYear(), ps.getMonth() + 1, 1);\n      const limite = new Date(ps.getFullYear(), ps.getMonth() + 2, 0);', 'const ouvre = new Date(ps.getFullYear(), ps.getMonth(), 1);\n      const limite = new Date(ps.getFullYear(), ps.getMonth() + 1, 0);');
 if (mut === 'vl-devine') muter("const lib = o.liberatoire === 'oui' || o.liberatoire === 'non' ? o.liberatoire : null;", "const lib = o.liberatoire === 'non' ? 'non' : 'oui';");
 if (mut === 'projection-proche') muter("(tvaEtat === 'ok' || tvaEtat === 'proche')", "tvaEtat === 'ok'");
+if (mut === 'cases-devinees') muter("cases: CASES_IMPOT[liberatoire] || ['5KO', '5TA'],", "cases: CASES_IMPOT[liberatoire] || ['5KO'],");
+if (mut === 'annee-courante') muter('const annee = now.getMonth() < 6 ? now.getFullYear() - 1 : now.getFullYear();', 'const annee = now.getFullYear();');
+if (mut === 'case-vl') muter("oui: ['5TA']", "oui: ['5KO']");
 if (mut === 'projection-partielle') muter('(!cur.partiel && jours >= 60', '(jours >= 60');
 const tmp = path.join(os.tmpdir(), `micro-${process.pid}.mjs`);
 fs.writeFileSync(tmp, src);
@@ -61,6 +64,16 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
   // options
   dit(M.optionsMicro(null).liberatoire === null && M.optionsMicro({ liberatoire: 'peut-être' }).liberatoire === null, 'versement libératoire pas répondu ⇒ null (jamais deviné)');
   dit(M.optionsMicro({ liberatoire: 'oui', acre: true }).liberatoire === 'oui' && M.optionsMicro({ liberatoire: 'oui', acre: true }).acre === true, 'réponse rangée relue telle quelle');
+  // déclaration de revenus (2042-C-PRO 2026 vérifiée : 5TA avec VL, 5KO sans)
+  const LI = L([['2025-11', 400], ['2025-12', 600], ['2026-01', 1000], ['2026-09', 300]]);
+  const dP = M.declarationRevenus({ ligne: LI, now: new Date(2026, 4, 10, 12), liberatoire: 'non' });
+  dit(dP && dP.annee === 2025 && dP.ca === 1000 && !dP.enCours && dP.cases.join() === '5KO', 'au printemps : l\'année passée (1 000 €), case 5KO sans versement libératoire', JSON.stringify(dP));
+  const dA = M.declarationRevenus({ ligne: LI, now, liberatoire: 'oui' });
+  dit(dA && dA.annee === 2026 && dA.ca === 1300 && dA.enCours && dA.cases.join() === '5TA', 'en octobre : l\'année en cours (1 300 €), case 5TA avec versement libératoire', JSON.stringify(dA));
+  dit(M.declarationRevenus({ ligne: LI, now, liberatoire: null }).cases.join() === '5KO,5TA', 'versement libératoire pas répondu ⇒ les deux cases, jamais devinée');
+  dit(M.declarationRevenus({ ligne: null, now }) === null, 'sans ligne publiée ⇒ pas su (jamais 0)');
+  dit(M.declarationRevenus({ ligne: L([['2026-09', 300]], { sources: { Vinted: 'lu', eBay: 'pasSu' } }), now }).partiel === true, 'une plateforme pas lue ⇒ « au moins »');
+  dit(M.rappelCfe(new Date(2026, 10, 20)) && M.rappelCfe(new Date(2026, 11, 15)) && !M.rappelCfe(new Date(2026, 11, 16)) && !M.rappelCfe(now), 'rappel CFE du 1er novembre au 15 décembre seulement');
   fs.unlinkSync(tmp);
   console.log(ko ? `❌ audit-micro-entreprise : ${ko}/${n} rouge(s)` : `✅ audit-micro-entreprise : ${n} contrôles verts`);
   process.exit(ko ? 1 : 0);
