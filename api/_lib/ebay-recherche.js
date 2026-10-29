@@ -169,7 +169,7 @@ export function lireQuotaReponse(j) {
   return null;
 }
 
-export function creerRechercheEbay({ jetonApplication, modifierDonnee, origine = 'https://api.ebay.com', fetcher = (...a) => globalThis.fetch(...a), maintenant = () => Date.now() }) {
+export function creerRechercheEbay({ jetonApplication, oublierJetonApplication = () => {}, modifierDonnee, origine = 'https://api.ebay.com', fetcher = (...a) => globalThis.fetch(...a), maintenant = () => Date.now() }) {
   async function quotaEbay(jeton) {
     const t = maintenant();
     if (_quota && t - _quota.at < 10 * 60 * 1000) return _quota.v;
@@ -204,6 +204,7 @@ export function creerRechercheEbay({ jetonApplication, modifierDonnee, origine =
     } catch (_) {
       return { status: 502, body: { ok: false, reason: 'ebay', appels, error: 'Je n’ai pas pu chercher sur eBay (pas de réponse) — ce n’est pas « aucun résultat ». Réessaie dans un moment.' } };
     }
+    if (r.status === 401) oublierJetonApplication();
     let j = null; try { j = JSON.parse(txt); } catch (_) { j = null; }
     const res = r.ok ? reduireResultats(j, c) : null;
     if (!res) return { status: 502, body: { ok: false, reason: 'ebay', appels, error: `Je n’ai pas pu chercher sur eBay (${r.ok ? 'réponse illisible' : 'eBay a répondu ' + r.status}) — ce n’est pas « aucun résultat ». Réessaie dans un moment.` } };

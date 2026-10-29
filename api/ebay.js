@@ -31,7 +31,7 @@ import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -1905,7 +1905,7 @@ const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOri
   marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
 });
 
-const rechercheEbay = creerRechercheEbay({ jetonApplication, modifierDonnee });
+const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 
 async function handleApp(req, res) {
   if (req.method === 'GET') {

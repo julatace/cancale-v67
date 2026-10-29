@@ -70,6 +70,7 @@ global.fetch = async (url, opts = {}) => {
       if (mode.browse === 'html') return new Response('<html>maintenance</html>', { status: 200, headers: { 'content-type': 'text/html' } });
       if (mode.browse === 'vide') return rep({ href: u, total: 0, limit: 30, offset: 0 });
       if (mode.browse === 'reseau') throw new Error('ECONNRESET');
+      if (mode.browse === '401') return rep({ errors: [{ errorId: 1001, message: 'Invalid access token' }] }, 401);
       return rep({ href: u, total: 4, limit: 30, offset: 0, itemSummaries: ITEMS() });
     }
     if (u.includes('/developer/analytics/v1_beta/rate_limit')) return rep({ rateLimits: [{ apiContext: 'buy', apiName: 'browse', resources: [{ name: 'buy.browse', rates: [{ count: 120, limit: 5000, remaining: 4880, reset: '2026-10-30T07:00:00.000Z', timeWindow: 86400 }] }] }] });
@@ -199,6 +200,14 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
     dit(j === null, 'F. clés refusées par eBay ⇒ pas de jeton (null), jamais une chaîne vide', String(j));
   });
 
+  await essaie('F. jeton refusé par Browse (401)', async () => {
+    lignes = []; mode = { browse: '401' };
+    await app(JWT_J, criteres);
+    mode = {};
+    const r = await app(JWT_J, criteres);
+    const tok = r.journal.filter((x) => x.ou === 'ebay' && /oauth2\/token/.test(x.u));
+    dit(r.code === 200 && tok.length === 1, 'F. après un 401 de Browse, le jeton d\'application est redemandé (pas gardé)', 'code ' + r.code + ', jetons demandés : ' + tok.length);
+  });
   await essaie('G. réponse vide', async () => {
     lignes = []; mode = { browse: 'vide' };
     const r = await app(JWT_J, criteres);

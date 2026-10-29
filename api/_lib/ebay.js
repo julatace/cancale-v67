@@ -82,6 +82,8 @@ async function appToken() {
 // gardé par l'instance jusqu'à 5 min avant son expiration — ce n'est la donnée
 // d'aucun vendeur. `null` = eBay n'en a pas donné (clés refusées, réseau).
 let _jetonApp = null;
+// eBay a refusé le jeton gardé (401) : on l'oublie, le prochain appel en redemande un.
+function oublierJetonApplication() { _jetonApp = null; }
 async function jetonApplication(maintenant = Date.now()) {
   if (_jetonApp && _jetonApp.expire > maintenant + 5 * 60 * 1000) return _jetonApp.jeton;
   try {
@@ -669,6 +671,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, oublierJetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };
