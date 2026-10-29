@@ -36,7 +36,7 @@ export function offreVintedEnAttente(c = {}) {
     // Une capture plus pauvre ne réouvre pas une offre dont la fin est connue.
     if (
       avant &&
-      ["acceptee", "refusee", "terminee"].includes(
+      ["acceptee", "refusee", "terminee", "precedente"].includes(
         etatOffreVinted(avant.entity).etat,
       ) &&
       e.status === 10
