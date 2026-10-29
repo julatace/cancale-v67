@@ -33,8 +33,11 @@ jobs:
       - name: Vérifier réception multi-comptes, favoris et inscription
         run: |
           node scripts/tests/reception-synthese-interface.cjs
+          node scripts/tests/synchronisation-vinted-interface.cjs
+          node scripts/tests/favoris-historique-interface.cjs
           node scripts/tests/favoris-automatisation-interface.cjs
           node scripts/bancs/inscription-fiable.cjs
+          VRM_MESSAGES_LIVE_ONLY=1 node scripts/bancs/messagerie.cjs
       - name: Préparer le moteur PDF de contrôle
         run: |
           mkdir -p "$RUNNER_TEMP/vrm-pdfjs"

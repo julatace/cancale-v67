@@ -1,3 +1,5 @@
+import SynchronisationVinted from './SynchronisationVinted.jsx';
+import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees} from './offresVinted.js';
 import {etatSourceMemoire} from './suiviComptes.js';
@@ -5145,20 +5147,22 @@ const fetchHarvestConversation = async (uid, convId) => {
 let _resumeConvSansAuteur = false;
 const RESUME_CONV_BASE = 'id=like.harvest_%25_conv_%25&select=id,tx:data->payload->conversation->transaction->>id,item:data->payload->conversation->transaction->>item_id,st:data->payload->conversation->transaction->>status,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,ph:data->payload->conversation->transaction->item_photo->>url,opp:data->payload->conversation->opposite_user->>id';
 const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts';
-const fetchResumesConversations = async () => {
+const fetchResumesConversations = async (uid=null) => {
   try {
+    if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
+    const base=uid==null?RESUME_CONV_BASE:RESUME_CONV_BASE.replace('id=like.harvest_%25_conv_%25',`id=like.harvest_${uid}_conv_%25`);
     let rows = null;
     if (!_resumeConvSansAuteur) {
-      rows = await lireTout(RESUME_CONV_BASE + RESUME_CONV_AUTEUR, { strict: true });
+      rows = await lireTout(base + RESUME_CONV_AUTEUR, { strict: true });
       if (rows === null) _resumeConvSansAuteur = true;
     }
-    if (rows === null) rows = await lireTout(RESUME_CONV_BASE, { strict: true });
+    if (rows === null) rows = await lireTout(base, { strict: true });
     if (rows === null) return null;
     const mr = messagesRetires();
     const out = new Map();
     for (const r of rows) {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
-      if (!m || mr.has(m[1])) continue;
+      if (!m || (uid!=null&&m[1]!==String(uid)) || mr.has(m[1])) continue;
       out.set(`${m[1]}_${m[2]}`, r);
     }
     return out;
@@ -5181,15 +5185,17 @@ const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeU
 // (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
 // `description` d'une conversation de la boîte est le dernier message, pas la paire.
 const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages';
-const fetchOffresConversations = async () => {
+const fetchOffresConversations = async (uid=null) => {
   try {
-    const rows = await lireTout(`id=like.harvest_%25_conv_%25&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
+    if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
+    const filtre=uid==null?'id=like.harvest_%25_conv_%25':`id=like.harvest_${uid}_conv_%25`;
+    const rows = await lireTout(`${filtre}&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
     if (rows === null) return null;
     const mr = messagesRetires();
     const out = new Map();
     for (const r of rows) {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
-      if (!m || mr.has(m[1])) continue;
+      if (!m || (uid!=null&&m[1]!==String(uid)) || mr.has(m[1])) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
       if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null });
     }
@@ -36397,7 +36403,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Le résumé de chaque conversation captée (paire, état, dernier auteur) — trois
   // états : `undefined` en cours · `null` pas su · Map (19 octobre).
   const [resumesConv, setResumesConv] = useState(undefined);
-  const resumesConvAt = useRef(0);
+  const resumesConvAt = useRef(0),resumesRevision=useRef(0);
   // Les offres en attente des conversations captées (`fetchOffresConversations`) :
   // `undefined` en cours · `null` pas su · Map lue.
   const [offresConv, setOffresConv] = useState(undefined);
@@ -36414,10 +36420,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [replyErr, setReplyErr] = useState(null);
   const verrouReponse=useRef(false),brouillonsReponse=useRef(null);
   if(!brouillonsReponse.current)brouillonsReponse.current=creerBrouillonsReponses(()=>AUTH.user?.id||'');
-  const [replyNotice,setReplyNotice]=useState(''),[reponsesIncertaines,setReponsesIncertaines]=useState({});
+  const [replyNotice,setReplyNotice]=useState(''),[reponsesIncertaines,setReponsesIncertaines]=useState({}),[capturesRepondues,setCapturesRepondues]=useState({});
   // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
   const [convMax, setConvMax] = useState(40);
   const [prixOffre, setPrixOffre] = useState('');
+  const [contreOffreOuverte,setContreOffreOuverte]=useState(false);
+  const prixOffreRef=useRef(null);
   const [offreBusy, setOffreBusy] = useState(false);
   const verrouOffre=useRef(false),offresConfirmees=useRef(new Map()),filOffreActuel=useRef(null);
   filOffreActuel.current=openConv;
@@ -39043,9 +39051,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (curSub!=='messages' || !accounts.length || !convs.items) return;
     if (resumesConv && Date.now()-resumesConvAt.current < 60000) return;
     let fini = false;
-    resumesConvAt.current = Date.now();
-    fetchResumesConversations().then(m => { if (!fini) setResumesConv(prev => m || (prev instanceof Map ? prev : null)); });
-    fetchOffresConversations().then(m => { if (!fini) setOffresConv(m); });
+    resumesConvAt.current = Date.now();const revision=++resumesRevision.current;
+    fetchResumesConversations().then(m => { if (!fini&&revision===resumesRevision.current) setResumesConv(prev => m || (prev instanceof Map ? prev : null)); });
+    fetchOffresConversations().then(m => { if (!fini&&revision===resumesRevision.current) setOffresConv(m); });
     return () => { fini = true; };
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
@@ -39683,8 +39691,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     conversationOrigin.current=document.activeElement;
     const request=++conversationRequest.current;
     const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
-    setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setOffreMsg(null);setOffreBusy(false);
-    setOpenConv({request,owner,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
+    setReplyText(brouillon);setReplyErr(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);setOffreBusy(false);
+    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
     const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
     setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
   };
@@ -39703,6 +39711,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const d = e?.detail;
       if (d?.type !== 'maj' || d.quoi !== 'messages' || !accounts.some(a=>String(a.vinted_user_id)===String(d.uid))) return;
       const uid=String(d.uid);
+      _rowCache.delete(`h:${uid}:inbox`);
       const precedente=captures.get(uid);
       captures.set(uid,{uid,conv:!d.conv || precedente?.conv===null?null:new Set([...(precedente?.conv || []),String(d.conv)])});
       clearTimeout(timer);
@@ -39716,6 +39725,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const acc = accounts.find(a=>String(a.vinted_user_id)===capture.uid);
               setConvs(prev=>({...prev,loading:false,error:false,items:[...(prev.items||[]).filter(c=>String(c._acc?.vinted_user_id)!==capture.uid),...h.conversations.map(c=>({...c,_acc:acc}))].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0))}));
               delete _acctCache.convs;
+            }
+          }
+          if(curSub==='messages'){
+            const revision=++resumesRevision.current;
+            const [resumes,offres]=await Promise.all([fetchResumesConversations(capture.uid),fetchOffresConversations(capture.uid)]);
+            if(!arrete&&revision===resumesRevision.current){
+              const fusion=(ancien,nouveau)=>{const m=new Map(ancien instanceof Map?ancien:[]);for(const k of m.keys())if(k.startsWith(capture.uid+'_'))m.delete(k);if(nouveau instanceof Map)for(const [k,v] of nouveau)m.set(k,v);return m;};
+              setResumesConv(p=>fusion(p,resumes));setOffresConv(p=>fusion(p,offres));
             }
           }
           if (openConv && String(openConv.acc?.vinted_user_id)===capture.uid && (capture.conv===null || capture.conv.has(String(openConv.convId)))) {
@@ -39749,6 +39766,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     finally{verrouReponse.current=false;setReplyBusy(false);}
     if(oc.owner!==(AUTH.user?.id||''))return;
     if(retour.etat==='confirme'){
+      const boite=(convs.items||[]).find(c=>String(c.id)===String(oc.convId)&&String(c._acc?.vinted_user_id)===String(oc.acc.vinted_user_id));
+      setCapturesRepondues(v=>({...v,[oc.owner+':'+cle]:boite?.updated_at||oc.inboxUpdatedAt}));
       brouillonsReponse.current.confirmer(oc.owner,oc.acc.vinted_user_id,oc.convId,text);
       const actuel=filOffreActuel.current;
       if(actuel?.owner===oc.owner&&String(actuel.acc?.vinted_user_id)===String(oc.acc.vinted_user_id)&&String(actuel.convId)===String(oc.convId)){
@@ -39841,14 +39860,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { tx, item, etat, prix: prixV, devise, prixDe: vente && prixV != null ? 'vente' : prixV != null ? 'annonce' : null, num, photo, titre, url: (t && t.item_url) || (ann && ann.url) || null, r };
   };
   // Qui a écrit le dernier message — seulement si le résumé capté porte BIEN le
-  // dernier message de la boîte (même instant, à 2 min près) : un résumé plus
+  // dernier message de la boîte (même instant, à une seconde près) : un résumé plus
   // ancien dirait l'auteur d'un AUTRE message. Sinon `null` (rien n'est écrit).
-  const auteurDernier = (c, p) => {
-    const r = p && p.r; if (!r || r.der == null || r.der === '' || r.opp == null) return null;
-    const a = Date.parse(r.derTs || ''), b = Date.parse(c.updated_at || '');
-    if (!a || !b || Math.abs(a - b) > 120000) return null;
-    return String(r.der) === String(r.opp) ? 'eux' : 'toi';
-  };
+  const auteurDernier = (c,p) => auteurDernierConfirme(c,p?.r);
 
   // ── LEBONCOIN ET eBAY DANS LE BÉNÉFICE (19 oct.) — `ventesAutresBenefice`,
   // par IDENTITÉ seulement (SKU eBay, lien/référence Leboncoin). Les annonces
@@ -42027,6 +42041,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label="Actualiser la conversation" onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
             </div>
+            {!openConv.loading&&!openConv.error&&(()=>{const suivi=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
             {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accent}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
               {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
@@ -42121,6 +42136,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const itemF = openConv.conversation && openConv.conversation.transaction && openConv.conversation.transaction.item_id;
                   const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
                   const auDessusMini = !!(off && isFinite(minF) && minF>0 && off.prix >= minF);
+                  const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
                   const etat = msgRelais ? 'ok' : extSait('messagerie');
                   if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
@@ -42133,17 +42149,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                   return (
                     <div className="vrm-chat-offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
+                      {off&&<div className="vrm-chat-offre-reperes"><span className="vrm-chat-offre-photo">{pc?.photo?<PhotoVinted src={pc.photo} alt="Article de l’offre"/>:<Icon name="image" size={20}/>}</span><div><small>{pc?.prixDe==='vente'?'Prix de vente':'Prix affiché'}</small><b>{pc?.prix!=null?prix(pc.prix,pc.devise):'Non disponible'}</b></div><div><small>Ton minimum</small><b>{Number.isFinite(minF)&&minF>0?fmtE(minF):'Non défini'}</b></div></div>}
                       {off && (
-                        <div className="vrm-chat-offre-l" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined}>
+                        <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined}>
                           <span className="vrm-chat-offre-t" style={{color:C.text}}><small className="vrm-chat-offre-label">{auDessusMini?`Offre ≥ ton mini (${prixCourt(minF)}) · à accepter`:'Offre reçue · à traiter'}</small><b data-montant="">{fmtE(off.prix)}</b></span>
-                          <button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1,fontWeight:auDessusMini?700:undefined}}>{auDessusMini?`✓ Accepter ${fmtE(off.prix)}`:'Accepter'}</button>
-                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button>
+                          <div className="vrm-chat-offre-actions"><button type="button" className="vrm-chat-btn vrm-chat-btn-p" disabled={offreBusy||ro} onClick={()=>actionOffre('accept', off)} style={{background:ro?C.border:C.accent,color:ro?C.muted:(C.onAccent||'#fff'),opacity:offreBusy?0.6:1,fontWeight:auDessusMini?700:undefined}}>{auDessusMini?'✓ Accepter':'Accepter'}</button>
+                          <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro} onClick={()=>actionOffre('reject', off)} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:offreBusy?0.6:1}}>Refuser</button><button type="button" className="vrm-chat-btn" disabled={!tx||ro||offreBusy} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text}} onClick={()=>{setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>Contre-proposer</button></div>
                         </div>
                       )}
                       {tx && (
-                        <details className="vrm-chat-negociation" open={!off||!!prixOffre}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
+                        <details className="vrm-chat-negociation" open={!off||!!prixOffre||contreOffreOuverte}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
                           <span className="vrm-chat-offre-k" style={{color:C.muted}}>Ton prix</span>
-                          <input className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                          <input ref={prixOffreRef} className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
                             style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
                           <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div></details>
@@ -45787,6 +45804,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         {!dansPlateforme && <ScreenHead icon="chat" title="Messages" />}
         <NoAcc/>
+        <SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})}/>
         <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
           <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
           <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>
@@ -45840,6 +45858,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return offre&&offresConfirmees.current.has(cleOffreVinted(uidC(c),offre))?null:offre;
           };
           const nOffres = liste.filter(c=>offreDeConv(c)).length;
+          const reponseAttendue=c=>reponseAttendueVinted(c,paireDeConv(uidC(c),c.id,null)?.r,capturesRepondues[(AUTH.user?.id||'')+':'+cleReponseVinted(uidC(c),c.id)]);
+          const aRepondre=liste.filter(reponseAttendue);
+          const offresARepondre=aRepondre.filter(c=>offreDeConv(c)).length;
           // (27 oct.) Offres ≥ au prix mini posé sur l'annonce (par identité, l'item_id,
           // §5) : on les surface pour les accepter en 1 tap, sans ouvrir chaque fil.
           // Rien n'est accepté tout seul — c'est le tap dans le fil qui vend (§3).
@@ -45861,7 +45882,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // plus récentes — l'ordre d'avant, à l'intérieur de chaque groupe.
           // (19 oct.) Dans chaque groupe, une offre en attente passe devant : elle
           // expire, et y répondre décide d'une vente.
-          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
+          const tri=liste.filter(c=>messageFilter==='all'||(messageFilter==='repondre'?reponseAttendue(c):messageFilter==='offres'?!!offreDeConv(c):c.unread)).sort((a,b)=>(prioMsg ? (uidC(b)===prioMsg)-(uidC(a)===prioMsg) : 0) || ((!!offreDeConv(b))-(!!offreDeConv(a))) || (new Date(b.updated_at||0)-new Date(a.updated_at||0)));
           const roListe = prioMsg ? liste.filter(c=>uidC(c)!==prioMsg) : [];
           const nonLusRo = roListe.filter(c=>c.unread).length;
           const nomActif = prioMsg ? msgNomActif() : '';
@@ -45900,6 +45921,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div className="vrm-msg-bar">
                 <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
+                  <button type="button" data-a-repondre={aRepondre.length} aria-pressed={messageFilter==='repondre'} onClick={()=>{setMessageFilter('repondre');setConvMax(40);}}>À répondre <span>{aRepondre.length}</span></button>
                   <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
                   {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres reçues <span>{nOffres}</span></button>}
                 </div>
@@ -45908,6 +45930,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
               </div>
+              {messageFilter==='repondre'&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
               {messageFilter==='offres' && tri.length===0 && <p className="vrm-inbox-feedback">Plus aucune offre en attente dans cette sélection.</p>}
               {nonLusAilleurs>0 && (
@@ -45997,7 +46020,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span className="vrm-msg-extrait" style={{color:c.unread?C.text:C.muted}}>{auteur==='toi'?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{c.description||''}</span>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
-                          {offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
+                          {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
                           {c.unread && <span className="vrm-msg-dot" aria-label="non lu" style={{background:ro?C.muted:C.accent}}/>}
                         </span>
                       </span>
