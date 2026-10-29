@@ -71,7 +71,7 @@
 > (sans onglet ⇒ `onglet_vinted`, RIEN n'est envoyé), `PAUSES_FAVORI`, `prixDeTransaction` (réponse jamais vue : lue
 > défensivement, prix illisible ⇒ pas d'offre, le message part), `prixOffreFavori` (jamais ≥ prix, jamais < 1 €) ; le fil
 > n'est relu que si la réponse de création ne suffit pas aux contrôles. GARDÉ : autorisation serveur à usage unique,
-> vérification, identité, historique, plafond 10/60 min, une action consommée (l'offre n'en compte pas une de plus).
+> vérification, identité, historique, une action consommée (l'offre n'en compte pas une de plus).
 > Rythme « Comme Vintex » (`intervalleMinutes: 0` ⇒ `delaiFavori` tire 6–9,6 s côté serveur, `DELAI_VINTEX_MS`) ; l'app
 > sonde la file à 3 s. **Republication** : la grille des tailles n'est PLUS JAMAIS lue pendant une republication (Vintex
 > ne la lit pas) — seulement le cache 24 h (`cacheSeul`, sinon la phrase et `tailles_cache_absent`) ; plafond
@@ -79,7 +79,9 @@
 > `REPUB_ESP_VINTEX`). Preuves : `audit-favoris-vintex.cjs` (17 ; `--prouve` 2 rouges sur origin/main : création depuis
 > le fond, pas de transaction ni d'offre), `audit-recreer.cjs` (144, grille jamais demandée), tests favoris (420, 51,
 > 105, 84). ⚠️ Restent différents, dits : `is_personal_data_sharing_check_skipped` à false (valeur de Vintex inconnue),
-> en-têtes de Vintex jamais vus, plafond 10/h gardé. **Geste de Julien** : installer la 5.280, laisser un onglet
+> en-têtes de Vintex jamais vus. **Suite, « oui enlève le »** : le plafond de 10 messages / 60 min de la file
+> (`favoris-file.js`, `reserverFile`/`vueFile`) est RETIRÉ, sa décision ; seul reste le plafond de 20 actions/h de
+> l'extension (§3, jamais retiré : chaque message en consomme une). Tests favoris mis à jour (15, 420). **Geste de Julien** : installer la 5.280, laisser un onglet
 > vinted.fr ouvert sur le bon compte pendant les messages et la republication.
 
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
