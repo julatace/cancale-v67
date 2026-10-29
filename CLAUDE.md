@@ -65,6 +65,65 @@
 > Preuves : `audit-rappel-echeance.cjs` (9 ; mutations seuil/declare/passu rouges), banc `suivi-urssaf.cjs` S (mutation
 > « pas d'enchaînement » ⇒ 4 KO).
 
+> **29 octobre (revue) — « TA CLÉ PHOTOROOM » : dix défauts reproduits, corrigés :** (1) « Vérifier » sans réponse de
+> Photoroom (coupure, 5xx, forme inconnue) n'écrit plus RIEN : la dernière réponse connue reste (un REFUS restait sinon
+> effacé, et le Studio reproposait le détourage), la route dit `sansReponse` et la carte nomme la dernière vérification ;
+> (2) Studio : une opération (détourage local ou Photoroom, rangement, retrait) reste liée à SA paire — changer de paire
+> pendant un détourage affichait la photo de la N°42 sous « N°43 » et la téléchargeait « VRM-43 » ; (3) la copie EN CLAIR
+> est recherchée et effacée à CHAQUE ouverture tant qu'elle existe (un DELETE raté n'était jamais retenté), « maintenant
+> chiffrée » n'est dit que si la base a confirmé l'effacement ; une clé en clair PLUS RÉCENTE (ancienne app restée
+> ouverte) ou un coffre illisible : elle remplace celle du coffre ; (4) clé du vendeur pas lue ⇒ 503 `cle-pas-su`, jamais
+> un repli sur la clé du serveur (§2.9 : avec `PHOTOROOM_POUR=tous`, le hoquet dépensait la clé de Julien) ; le Studio
+> n'attribue plus à Photoroom un refus de VRM (`source`) ; (5) « acceptée » exige un JSON `images|credits` en objet —
+> un 200 de portail/proxy vaut « pas su » (forme notée dans les journaux, jamais une valeur) ; (6) « en clair » dit SA
+> cause (`cause` : rangement raté · coffre absent) et ne prétend plus que Photoroom a été interrogé ; (7) vérification et
+> migration en comparer-et-échanger (`data.rev`, PATCH filtré ; création seule `INSERT` puis annulation de NOTRE ligne si
+> l'ancienne a disparu entre-temps) : une clé RETIRÉE ou REMPLACÉE pendant une vérification ne revient plus ; (8) « une
+> photo déjà détourée n'est jamais repayée » → « …et gardée par VRM n'est pas repayée » ; (9) « sans formule API » ⇒ pas
+> de bouton dans le Studio, la raison dite une fois ; (10) ⚠️ **la carte n'est PLUS dans Paramètres → Mon compte**
+> (décision du 17 oct. « ne le mets pas dans les paramètres » ; la demande du 29 n'en parlait pas) : elle vit sur l'écran
+> Vestiaire Collective, et `detourage-reglage.cjs` refuse la CARTE (`data-photoroom-cle`) dans les deux onglets des
+> Paramètres, pas un mot. Preuves : `audit-photoroom-cle.cjs` **88 contrôles** (33 rouges sur 321dcad, 58 sur
+> origin/main ; 10 mutations sur 10 rouges, script de mutations hors dépôt) ; bancs
+> `photoroom-carte.cjs` 140 (24 rouges sur 321dcad, 76 sur origin/main, mutation « maintenant chiffrée sans effacement »
+> rouge), `studio-photo.cjs` (+ course et sans formule API : 6 rouges sur 321dcad, mutation « toujours la même paire »
+> rouge), `detourage-reglage.cjs` (2 rouges sur 321dcad — vert sur origin/main, où la carte n'était pas dans les Paramètres : le
+> défaut venait du chantier ; mutation « carte remise sous un autre titre » rouge). Preuves refaites à la reprise (après la
+> limite d'utilisation) : build, audit, trois bancs, arbres d'avant (`a0d43bde` = origin/main d'alors, `321dcad`), 10 mutations.
+> Le banc `detourage.cjs` exigeait l'ANCIEN repli (« clé vendeur pas lue ⇒ clé du serveur, 403 ») : il exige maintenant 503
+> `cle-pas-su` et zéro appel à Photoroom (rouge sur 321dcad et origin/main, rouge sous la mutation « pas su lu aucune »).
+> Rouges hérités d'origin/main, pas touchés : `audit-politique-hotes` (vinted.fr dans 2 fichiers), `audit-pont-session`,
+> `audit-preuve-vente`, banc `reglages-premium` (chevrons à 1512 px).
+> ⚠️ Non mesuré : la vraie réponse de `v2/account`, le `DELETE … return=representation` filtré sur `data->>at` et le
+> `PATCH` filtré sur `data->>rev` contre SA PostgREST (formes documentées, jamais envoyées d'ici) ; l'extension ne
+> connaît pas `cle-pas-su` (elle garde la photo d'origine et réessaie photo par photo — pas touchée ici). **Geste de
+> Julien** : dire s'il veut AUSSI la carte dans Paramètres → Mon compte (retirée par prudence) ; sa clé se range depuis
+> l'écran Vestiaire Collective.
+
+> **29 octobre — « TA CLÉ PHOTOROOM » : chaque vendeur range SA clé (chiffrée), carte refaite, bouton dans Studio photo :**
+> Julien : « fais un meilleur visuel pour la clé API Photoroom des personnes qui utilisent VRM ». Mode `photoroom` de
+> `/api/compte` (`api/_lib/photoroom-cle.js`, toujours 12 fonctions) : GET = état (`aucune` · `posee` · `illisible` ·
+> `en-clair` sans coffre · 503 pas su), POST `poser` (vérifiée chez Photoroom par `GET image-api.photoroom.com/v2/account`,
+> qui ne consomme aucune image — 401/403 ⇒ refusée, RIEN rangé ; 402 ⇒ « sans formule API » ; muet ⇒ rangée « pas encore
+> vérifiée »), `verifier`, `retirer` (`confirme: true` exigé). La clé va dans `app_data.photoroom_cle`, CHIFFRÉE (coffre
+> commun `api/_lib/coffre.js`, AES-256-GCM, `VRM_COFFRE_CLE` ou dérivée de `SUPABASE_SERVICE_KEY` ; Super PDP y passe, même
+> format) ; sans coffre, rien n'est rangé ; aucune réponse ne la contient (4 derniers caractères seulement). Une clé d'avant
+> en clair (`vrm_photoroom_cle`, lisible par le navigateur — **1 ligne en production, mesurée le 29 oct.**) est chiffrée puis
+> effacée à la première lecture. `api/_lib/detourage.js` lit le coffre (puis l'ancienne ligne en repli) : avec SA clé, son
+> compte paie, sans plafond ; sans clé à lui, comme avant (§2.9). App : `ClePhotoroom` (`src/photoroomCle.js`) sur
+> l'écran Vestiaire (⚠️ plus dans Mon compte depuis la revue, voir au-dessus) — trois états (`data-photoroom-cle`), ce que ça coûte (son compte, à la photo,
+> ~0,02 $ relevé le 4 oct.), où elle sert (Vestiaire, Studio photo ; Leboncoin/eBay gardent leurs photos d'origine), le lien
+> vers Photoroom. ⚠️ Ce n'est PAS le réglage « détourer avant de publier » refusé le 17 oct. (`detourage-reglage.cjs` exige
+> toujours son absence, Mon compte compris). **Studio photo** : « Détourer avec Photoroom » seulement si SA clé est lue et
+> pas refusée ; la photo part à `/api/ai?mode=detourage` avec sa session (jamais à Photoroom depuis le navigateur). Retirés :
+> `lireClePhotoroom`/`sauverClePhotoroom` (lecture/écriture EN CLAIR côté navigateur). Preuves : `audit-photoroom-cle.cjs`
+> (44 ; 33 rouges sur origin/main ; 7 mutations rouges), banc `photoroom-carte.cjs` (390 tactile + 1512, clair et sombre, 110 ;
+> 41 rouges sur le build d'origin/main ; mutations « Retirer sans confirmer » et « pas su lu aucune » rouges),
+> `studio-photo.cjs` (+ scénario clé rangée ; 4 rouges sur l'avant ; mutation « bouton sans clé » rouge).
+> ⚠️ Non mesuré : la vraie réponse de `v2/account` (forme tirée de la doc indexée de Photoroom) ; une clé « sandbox » ;
+> la carte sur un vrai iPhone. **Geste de Julien** : ouvrir l'écran Vestiaire Collective → « Ta clé Photoroom » (sa clé
+> d'avant se chiffre toute seule), puis « Vérifier chez Photoroom ».
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
