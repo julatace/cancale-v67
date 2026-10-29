@@ -11,7 +11,7 @@
 > session, pas défaite). « connu pour 1 vente » ; la facturation
 > électronique renvoie à « Ton entreprise (Comptabilité → Avancé) » (« Profil fiscal » n'existait plus) ; le « ⓘ » du résultat ne
 > dit plus que le bénéfice est « juste en dessous » (il est en haut). Réglages → Organisation dit à quoi sert l'écran. Aucun chiffre
-> ne change. Preuves : `compta-simple.cjs` (133 contrôles) **26 rouges sur le code d'avant** (la branche avant cette revue), 0 après ;
+> ne change. Preuves : `compta-simple.cjs` (131 contrôles) **24 rouges sur le code d'avant** (la branche avant cette revue), 0 après ;
 > mutation (dépenses après la micro + tableau vide + « juste en dessous ») ⇒ 8 rouges ; `facturx.cjs` suit le nouveau geste.
 > ⚠️ Non mesuré : sa vraie base dans l'app. Geste de Julien : aucun (répondre une fois « versement libératoire » referme le bloc).
 
