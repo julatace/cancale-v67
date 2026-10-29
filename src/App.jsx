@@ -1705,6 +1705,11 @@ const ENTREPRISE_VIDE = {
 // rester à `false` dans la ligne `main`. (Une 5.128, la sienne, n'a que
 // l'interrupteur local : aucune annonce en ligne n'a de plancher — mesuré —
 // donc elle n'accepte rien.)
+// (29 oct., décision de Julien) « On ne doit plus pouvoir masquer » une vente.
+// `vinted_sales_hidden` n'est plus lu nulle part : la ligne reste en base,
+// ignorée, et une vente masquée d'avant compte de nouveau partout (Ventes,
+// Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
+const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   'vrm_vc_etiquettes',
   'vinted_catalog','vinted_sales','vinted_garage_grid','vinted_blocked',
@@ -2479,7 +2484,11 @@ const fetchVintedAccounts = async () => {
     // temps »). On les retire ici ET on supprime la ligne re-créée dans la table
     // (best-effort) pour que ça reste propre à chaque chargement.
     let blocked = new Set();
-    try { const b = blk.ok ? await blk.json() : []; ((b[0] && b[0].data && b[0].data.uids) || []).forEach(u => blocked.add(String(u))); } catch (_) {}
+    try { const b = blk.ok ? await blk.json() : []; ((b[0] && b[0].data && b[0].data.uids) || []).forEach(u => blocked.add(String(u)));
+      // (29 oct.) Gardé sur l'appareil pour le Stock (`comptesStockEcartes`) :
+      // un compte supprimé pour de bon n'y revient jamais. Seulement sur une
+      // lecture RÉUSSIE (« pas su » n'efface pas la dernière liste connue).
+      if (blk.ok && Array.isArray(b)) { try { localStorage.setItem('vrm_comptes_supprimes', JSON.stringify([...blocked])); } catch (_) {} } } catch (_) {}
     if (blocked.size) {
       const reappeared = list.filter(a => blocked.has(String(a.vinted_user_id)));
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
@@ -8277,7 +8286,11 @@ const autresPresents = () => {
 // ou Leboncoin (un N° qu'aucune fiche Vinted ne porte). Les fiches Vinted
 // reçoivent les autres plateformes de leur N°.
 const fichesStockToutes = (fiches) => {
-  const vint = Object.values(fiches || {}).filter(Boolean);
+  // (29 oct.) La vue 3D (« Ma pièce », sa liste « À ranger ») passe par la
+  // MÊME règle des comptes écartés que « Mes meubles » et « En photos » (§11) :
+  // elle ne l'appliquait pas, et les fiches de shop_cancale y revenaient.
+  const horsCompte = comptesStockEcartes();
+  const vint = Object.values(fiches || {}).filter((f) => f && !horsCompte(f));
   const autres = autresPresents(); const parCle = new Map(autres.map((a) => [cleNum(a.numero), a]));
   const cles = new Set();
   const out = vint.map((f) => { const k = cleNum(f.numero); if (!k) return f; cles.add(k); const a = parCle.get(k); return { ...f, plateformes: a ? [...(a.vinted ? ['vinted'] : []), ...(a.plateformes || [])] : ['vinted'] }; });
@@ -28474,9 +28487,15 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
 const comptesStockEcartes = () => {
   const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
   const retires = annoncesRetirees();
+  // (29 oct.) Julien : « j'avais demandé de supprimer les annonces et elles
+  // réapparaissent dans le stock » — les comptes supprimés DÉFINITIVEMENT
+  // (`vrm_blocked_accounts`, shop_cancale) sont écartés même avant que la
+  // liste des comptes liés soit lue.
+  let supprimes = new Set();
+  try { const a = JSON.parse(localStorage.getItem('vrm_comptes_supprimes') || '[]'); if (Array.isArray(a)) supprimes = new Set(a.map(String)); } catch (_) {}
   let lies = null;
   try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a) && a.length) lies = new Set(a.map((x) => String(x && x.vinted_user_id || '')).filter(Boolean)); } catch (_) {}
-  return (f) => { const u = f && f.accountId != null ? String(f.accountId) : ''; if (!u) return false; return masques.has(u) || retires.has(u) || (lies ? !lies.has(u) : false); };
+  return (f) => { const u = f && f.accountId != null ? String(f.accountId) : ''; if (!u) return false; return masques.has(u) || retires.has(u) || supprimes.has(u) || (lies ? !lies.has(u) : false); };
 };
 
 function StockPhotos() {
@@ -31965,7 +31984,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
     if (!Array.isArray(ventes)) return { etat: 'passu' };
-    const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+    const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
@@ -32283,7 +32302,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
     if (!Array.isArray(ventes)) return { etat: 'passu' };
-    const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+    const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
@@ -34822,7 +34841,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setNumeros(load('vinted_annonce_numeros', {}));
     setUsedNumeros(load('vinted_used_numeros', []));
     setSaleOv(load('vinted_sale_overrides', {}));
-    setHiddenSales(new Set((load('vinted_sales_hidden', []) || []).map(String)));
+    setHiddenSales(new Set(VENTES_MASQUEES_AUCUNE().map(String)));
     setCloudReady(true);
   }), []);
   const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
@@ -35333,7 +35352,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [showQR, setShowQR] = useState(false);
   const saveQR = (arr) => { setQuickReplies(arr); save('vinted_quick_replies', arr); };
   // Ventes masquées de la compta (par n° de transaction). Réversible.
-  const [hiddenSales, setHiddenSales] = useState(() => new Set((load('vinted_sales_hidden', []) || []).map(String)));
+  const [hiddenSales, setHiddenSales] = useState(() => new Set(VENTES_MASQUEES_AUCUNE().map(String)));
   // Comptes entiers exclus de la compta (par vinted_user_id).
   const [hiddenAccts, setHiddenAccts] = useState(() => new Set((load('vinted_accounts_hidden', []) || []).map(String)));
   // Comptes masqués/rallumés DEPUIS LE PANNEAU de l'extension (ligne dédiée
@@ -35492,9 +35511,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     [accounts]);
   const acctOffOf = (o) => acctOff(o?._acc?.vinted_user_id);
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
-  const toggleHidden = (tid) => {
-    setHiddenSales(prev => { const n = new Set(prev); const k = String(tid); if (n.has(k)) n.delete(k); else n.add(k); save('vinted_sales_hidden', [...n]); return n; });
-  };
+  const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
@@ -43390,13 +43407,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {isLotTitle(o.title) && (
                   <button className="vrm-icon-control" type="button" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot" style={{flexShrink:0,border:'none',background:C.purple||C.blue||C.accent,color:'#fff',borderRadius:8,padding:'8px 10px',cursor:'pointer',fontSize:15}}><Icon name="box" size={16}/></button>
                 )}
-                {hidden ? (
-                  <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Réafficher dans la compta" aria-label="Réafficher" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.blue||C.accent,cursor:'pointer',fontSize:13,padding:'6px 8px'}}>↩︎</button>
-                ) : st==='cancelled' ? (
-                  <button className="vrm-icon-control" type="button" onClick={async ()=>{ if(await askConfirm(`Supprimer cette annulation${num?` (N°${num})`:''} ?\n\nElle disparaît de ta liste et de ta compta.${num?`\nElle garde son numéro : pense à « remettre le N° » avant si tu republies l'article.`:''}\n\n(Tu peux la retrouver avec « Voir masquées ».)`)) toggleHidden(o.transaction_id); }} title="Supprimer cette annulation / ce litige" aria-label="Supprimer" style={{flexShrink:0,border:`1px solid ${C.danger}`,borderRadius:8,background:`${C.danger}12`,color:C.danger,cursor:'pointer',fontSize:13,padding:'6px 9px',fontWeight:600,fontFamily:'inherit'}}><Icon name="trash" size={16}/></button>
-                ) : (
-                  <button className="vrm-icon-control" type="button" onClick={()=>toggleHidden(o.transaction_id)} title="Masquer de la compta" aria-label="Masquer" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,padding:'6px 8px'}}><Icon name="eyeOff" size={16}/></button>
-                )}
                 </div>
                </div>
                {/* La barre de progression a été retirée : la pastille de statut
@@ -46870,10 +46880,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         ) : null; })()}
                       </div>
-                      <button type="button" onClick={async ()=>{
-                        if (b) { if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b); }
-                        else if (o && o.transaction_id!=null && await askConfirm('Masquer ce colis ? (il disparaît de la liste)')) toggleHidden(o.transaction_id);
-                      }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:8,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
+                      {b && <button type="button" onClick={async ()=>{
+                        if(await askConfirm('Masquer ce bordereau ? (il disparaît de la liste)')) hideBord(b);
+                      }} title="Masquer" aria-label="Masquer" className="vrm-icon-control vrm-colis-masquer" style={{alignSelf:'flex-start',flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',width:32,height:32,margin:'-6px -6px 0 0',display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:8,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>}
                     </div>
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
@@ -54406,12 +54415,12 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
 // (`fetchHarvestOrders`) ; l'identité est le n° de transaction (§5).
 // « Pas su » ≠ « rien » : tant que la lecture n'est pas revenue, on le dit.
 function EcranMasques({ comptes, ordi }) {
-  const [onglet, setOnglet] = useState('ventes');
-  const [vMasq, setVMasq] = useState(() => (load('vinted_sales_hidden', []) || []).map(String));
+  const [onglet, setOnglet] = useState('achats');   // (29 oct.) une vente ne se masque plus
+  const [vMasq, setVMasq] = useState(() => VENTES_MASQUEES_AUCUNE().map(String));
   const [aMasq, setAMasq] = useState(() => [...achatsMasques()]);
   const [det, setDet] = useState(undefined); // undefined = en cours · null = pas su · {tx: commande}
   useEffect(() => onCloudReady(() => {
-    setVMasq((cur) => cur.length ? cur : (load('vinted_sales_hidden', []) || []).map(String));
+    setVMasq((cur) => cur.length ? cur : VENTES_MASQUEES_AUCUNE().map(String));
     setAMasq((cur) => cur.length ? cur : [...achatsMasques()]);
   }), []);
   useEffect(() => { let stop = false; (async () => {
@@ -54436,9 +54445,9 @@ function EcranMasques({ comptes, ordi }) {
   const eur = (o) => { const v = o && (o.price && o.price.amount != null ? Number(o.price.amount) : null); return v != null && isFinite(v) ? v.toFixed(2).replace('.', ',') + ' €' : ''; };
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <ScreenHead icon="eyeOff" title="Masqués" desc="Les ventes et achats que tu as retirés de la compta — réaffiche-les d'un clic."/>
+      <ScreenHead icon="eyeOff" title="Masqués" desc="Les achats que tu as retirés de la compta — réaffiche-les d'un clic."/>
       <div className="vrm-rangee" style={{ display: 'flex', gap: 6 }}>
-        {[['ventes', `Ventes masquées (${vMasq.length})`], ['achats', `Achats masqués (${aMasq.length})`]].map(([k, lib]) => (
+        {[['achats', `Achats masqués (${aMasq.length})`]].map(([k, lib]) => (
           <button key={k} type="button" onClick={() => setOnglet(k)} aria-pressed={onglet === k}
             style={{ border: `1px solid ${onglet === k ? C.text : C.border}`, borderRadius: 999, padding: '6px 13px', background: onglet === k ? C.text : 'transparent', color: onglet === k ? C.bg : C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', flexShrink: 0 }}>{lib}</button>
         ))}
@@ -55700,7 +55709,7 @@ function AppCoeur() {
       // deux côtés → le compteur du tableau de bord == la liste des annonces.
       // Ventes masquées à la main (✕ sur une ligne de vente) : elles ne comptent
       // plus dans l'onglet Ventes, elles ne doivent pas compter ici non plus.
-      const hiddenTx=new Set((load('vinted_sales_hidden',[])||[]).map(String));
+      const hiddenTx=new Set(VENTES_MASQUEES_AUCUNE().map(String));
       const soldIds=new Set([
         ...((load('vinted_annonces_vendues',[])||[]).map(String)),
         ...((load('vinted_annonces_email_sold',[])||[]).map(String)),
@@ -55989,7 +55998,7 @@ function AppCoeur() {
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
     if (!Array.isArray(ventesCoque)) return liveStats;
     try {
-      const hTx = new Set((load('vinted_sales_hidden', []) || []).map(String));
+      const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
       const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
@@ -56123,7 +56132,7 @@ function AppCoeur() {
       // onglets ne montraient pas.
       const offAcc=new Set([...(load('vinted_accounts_blocked',[])||[]), ...(load('vinted_accounts_hidden',[])||[])].map(String));
       const shipDoneN=load('vinted_ship_done',{})||{};
-      const ventesMasqueesN=new Set((load('vinted_sales_hidden',[])||[]).map(String));
+      const ventesMasqueesN=new Set(VENTES_MASQUEES_AUCUNE().map(String));
       const soldIdsN=new Set([...(load('vinted_annonces_vendues',[])||[]), ...(load('vinted_annonces_email_sold',[])||[])].map(String));
       // ⚠️ VITESSE (3 octobre) : trois lectures PAR compte, faites l'une après
       // l'autre — 27 allers-retours en file pour neuf comptes, à chaque

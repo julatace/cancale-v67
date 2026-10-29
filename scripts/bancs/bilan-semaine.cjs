@@ -169,7 +169,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
   const attendu = (o) => {
     const v = V[o], vinted = [];
     for (const [uid, x] of Object.entries(v.ventes)) for (const ord of x.orders) vinted.push({ ...ord, _acc: { vinted_user_id: uid } });
-    const masq = new Set(v.main.vinted_sales_hidden || []);
+    const masq = new Set();   // (29 oct., décision de Julien) une vente ne se masque plus : la liste rangée est ignorée
     const r = ctx.ventesFaites({ vinted, lbc: Object.values(v.lbc), ebay: v.ebay, cachee: (x) => masq.has(String(x.transaction_id)) });
     let n = 0, eur = 0; const deb = Date.parse('2026-09-27T22:00:00Z'), fin = Date.parse('2026-10-04T22:00:00Z');
     for (const l of r.lignes) if (l.ts >= deb && l.ts < fin) { n++; eur += l.eur; }
@@ -189,7 +189,7 @@ const res = () => ({ code: null, corps: null, status(n) { this.code = n; return 
     dit(a.length === 1 && b.length === 1, 'un bilan pour A sur l’appareil de A, un pour B sur celui de B', `A=${a.length} B=${b.length} · code ${r.code}`);
     const ea = attendu('A'), eb = attendu('B');
     const ca = (a[0] && a[0].body) || '', cb = (b[0] && b[0].body) || '';
-    dit(ca.includes(`${ea.n} vente`) && ca.includes(euros(ea.eur)), `A : ${ea.n} ventes · ${euros(ea.eur)} — les nombres de la règle de l’APP (ventesFaites), masquée et hors semaine écartées`, ca.split('\n')[0]);
+    dit(ca.includes(`${ea.n} vente`) && ca.includes(euros(ea.eur)), `A : ${ea.n} ventes · ${euros(ea.eur)} — les nombres de la règle de l’APP (ventesFaites), hors semaine écartée, la vente « masquée » d'avant COMPTÉE`, ca.split('\n')[0]);
     dit(cb.includes(`${eb.n} vente`) && cb.includes(euros(eb.eur)), `B : ${eb.n} ventes · ${euros(eb.eur)} (Vinted + eBay)`, cb.split('\n')[0]);
     dit(!ca.includes('777') && !ca.includes('88') && !cb.includes('41'), 'jamais les montants de l’autre vendeur');
     dit(ca.includes(`Reçu : ${euros(ea.recu)}`) && cb.includes(`Reçu : ${euros(eb.recu)}`), `reçu : ${euros(ea.recu)} pour A, ${euros(eb.recu)} pour B — la règle de l’APP (ventesDeclarables, date de VERSEMENT)`, (ca.split('\n')[1] || '') + ' / ' + (cb.split('\n')[1] || ''));
