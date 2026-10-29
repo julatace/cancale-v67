@@ -152,4 +152,11 @@ eg(
   diagnosticConnexion({ uid: "1", owner: "a", extension: null }).titre,
   "Extension non joignable",
 );
+eg(
+  bilanAnnonce(
+    { id: "1", title: "Ordi", price: 20 },
+    { id: "1", price: null, priceInput: "1e2" },
+  ).manque.includes("Prix"),
+  true,
+);
 console.log(n + " contrôles articles et comparaison réussis");

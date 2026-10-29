@@ -7,3 +7,10 @@ test('codes natifs acceptés et refusés restent lisibles sans libellé',()=>{as
 test('seule une offre reçue et identifiée sans ambiguïté est actionnable',()=>{assert.equal(offreVintedEnAttente(conversation(message())).prix,45);for(const c of [conversation(message(20)),conversation(message(30)),conversation(message(10,{user_id:1})),conversation(message(10,{transaction_id:8})),conversation(message(10,{current:false})),conversation(message(),message(10,{offer_request_id:8})),{messages:[message()]}])assert.equal(offreVintedEnAttente(c),null);});
 test('une copie ancienne ne rouvre pas une offre déjà acceptée',()=>assert.equal(offreVintedEnAttente(conversation(message(20),message())),null));
 test('une confirmation locale reste limitée au compte et aux identifiants exacts',()=>{const preuves=new Map([[cleOffreVinted(1,{tx:9,oid:7}),20]]);assert.equal(offreVintedEnAttente(appliquerOffresConfirmees(conversation(message()),1,preuves)),null);assert.ok(offreVintedEnAttente(appliquerOffresConfirmees(conversation(message()),2,preuves)));assert.equal(appliquerOffresConfirmees(conversation(message(30)),1,preuves).messages[0].entity.status,30);assert.ok(offreVintedEnAttente(appliquerOffresConfirmees(conversation(message(10,{offer_request_id:8})),1,preuves)));});
+test('attendre une acceptation ou ne pas être accepté ne signifie pas accepté',()=>{
+ assert.equal(etatOffreVinted({status:10,status_title:'En attente d’acceptation'}).etat,'attente');
+ for(const status_title of ['Non acceptée','En attente d’acceptation','Pas encore accepté'])assert.notEqual(etatOffreVinted({status_title}).etat,'acceptee');
+ assert.equal(etatOffreVinted({status_title:'Offre acceptée'}).etat,'acceptee');
+ assert.equal(etatOffreVinted({status_title:'Offre refusée'}).etat,'refusee');
+ assert.equal(etatOffreVinted({status:10,status_title:'Offre expirée'}).etat,'terminee');
+});
