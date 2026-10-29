@@ -1,5 +1,26 @@
 # VRM — dossier de passation
 
+> **29 octobre — eBay → Achats : CHERCHER, et un FIL (sa demande : « le côté achat ne sert à rien ; fais la recherche
+> comme pour Vinted, avec un feed ; tout dépend si ça utilise beaucoup de données ») :** action `chercher` d'`api/ebay.js`
+> (toujours 12 fonctions ; logique `api/_lib/ebay-recherche.js`) : API Browse `item_summary/search`, EBAY_FR, jeton
+> D'APPLICATION (`jetonApplication`, client_credentials — jamais celui du vendeur, aucun compte eBay relié nécessaire),
+> session exigée (401), 30 annonces, plus récentes d'abord, filtres achat immédiat · livrable en France · état · prix max ;
+> le budget se juge PORT COMPRIS (port « calculé » = inconnu, jamais gratuit), mots exclus, photo `i.ebayimg.com` seule.
+> Plafond VRM **200 recherches/jour/vendeur** (`ebay_recherches_jour`, compté AVANT l'appel, compare-et-échange ;
+> illisible ⇒ 503, rien ne part ; atteint ⇒ 429, le fil s'arrête et le dit). Plafond d'eBay : 5 000/jour pour TOUTE
+> l'application (doc d'eBay, non mesuré) — le restant réel est rendu si eBay le dit (`rate_limit`). Octets reçus
+> d'eBay / envoyés à l'appareil mesurés et affichés. eBay muet ou illisible ⇒ 502 « pas pu chercher », jamais « aucun
+> résultat ». **Le fil = les « veilles » de l'espace Organisation (§11, la même liste)**, 10 actives au plus (`metier.js`
+> refuse la 11ᵉ ; mesuré : 1 veille en base), + pointure / achat immédiat / livraison en France (défauts pour une
+> recherche d'avant). Relu à l'ouverture de l'onglet puis au plus toutes les 15 min, page visible, une à une ; « nouveau »
+> par itemId depuis la dernière visite (cet appareil). Repère du MODÈLE (`moyennesParModele` sur ses ventes, ≥ 3), dit
+> « le modèle, pas cette paire ». Rien n'est acheté : « Voir sur eBay ↗ ». Les achats gagnés (WonList) restent, repliés,
+> lus à l'ouverture seulement. Preuves : `audit-ebay-recherche.cjs` (42 ; **31 rouges sur origin/main** ; 6 mutations
+> rouges) · banc `ebay-achats-recherche.cjs` (390 tactile + 1512 sombre ; **18 rouges sur le build d'origin/main** ;
+> mutations « relecture sans borne » et « tout est nouveau » rouges). ⚠️ **Non mesuré** : aucun appel réel à eBay
+> (formes de la doc Browse/OAuth/Analytics) ; la pointure part dans les mots-clés (« 42.5 »). **Geste de Julien** : rien —
+> l'onglet marche avec les clés eBay déjà posées.
+
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
 > `data-micro-repli`) et s'ouvre d'elle-même si quelque chose demande son attention (versement libératoire pas répondu,

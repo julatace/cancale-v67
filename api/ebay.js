@@ -30,7 +30,8 @@ import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
-import { keysReady, canConsent, ruName, authUrl, appToken, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+import { creerRechercheEbay } from './_lib/ebay-recherche.js';
+import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
@@ -1904,6 +1905,8 @@ const apresVenteEbay=creerApresVenteEbay({accessToken:jetonDe,tradingCall,apiOri
   marquerCommandeAnnulee:async(orderId,ctx)=>{let vu=false;const r=await modifierDonnee(ligneDe('ebay_orders',ctx),ctx.owner,(d)=>{const n=annulerCommandeRangee(d,orderId);vu=!!n;return n;});return r===true?vu:(r===null?null:false);},
 });
 
+const rechercheEbay = creerRechercheEbay({ jetonApplication, modifierDonnee });
+
 async function handleApp(req, res) {
   if (req.method === 'GET') {
     res.status(200).json({ ok: true, ready: keysReady(), canConsent: canConsent(), env: 'production' });
@@ -1946,6 +1949,15 @@ async function handleApp(req, res) {
       const nonce = crypto.randomBytes(16).toString('hex');
       res.setHeader('Set-Cookie', cookieEtat(nonce, Math.round(ETAT_VALIDITE_MS / 1000)));
       res.status(200).json({ ok: true, url: authUrl(signerEtat(owner, nonce, ajout), { ajout }) });
+      return;
+    }
+    // (29 octobre) CHERCHER des paires à acheter : l'API Browse avec le jeton
+    // d'APPLICATION de VRM (jamais celui du vendeur) — aucun compte eBay relié
+    // n'est nécessaire. Session exigée plus haut (401 sinon) ; un plafond par
+    // vendeur et par jour, compté en base AVANT l'appel. Lecture seule.
+    if (action === 'chercher') {
+      const r = await rechercheEbay.chercher(b, owner);
+      res.status(r.status).json(r.body);
       return;
     }
     if (action === 'apptoken') {

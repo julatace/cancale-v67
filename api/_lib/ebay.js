@@ -77,6 +77,27 @@ async function appToken() {
   return { ok: true, status: 200, works: true, expires_in: j.expires_in || null };
 }
 
+// (29 octobre) Le jeton D'APPLICATION pour chercher (Browse API) : les clés de
+// VRM, jamais le jeton d'un vendeur. Un seul jeton pour l'application entière,
+// gardé par l'instance jusqu'à 5 min avant son expiration — ce n'est la donnée
+// d'aucun vendeur. `null` = eBay n'en a pas donné (clés refusées, réseau).
+let _jetonApp = null;
+async function jetonApplication(maintenant = Date.now()) {
+  if (_jetonApp && _jetonApp.expire > maintenant + 5 * 60 * 1000) return _jetonApp.jeton;
+  try {
+    const r = await fetch(EBAY_TOKEN_URL, {
+      method: 'POST',
+      headers: { Authorization: basicAuth(), 'content-type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&scope=${encodeURIComponent('https://api.ebay.com/oauth/api_scope')}`,
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || typeof j.access_token !== 'string' || !j.access_token) return null;
+    const s = Number(j.expires_in);
+    _jetonApp = { jeton: j.access_token, expire: maintenant + (Number.isFinite(s) && s > 0 ? s : 3600) * 1000 };
+    return _jetonApp.jeton;
+  } catch (_) { return null; }
+}
+
 // ── À QUI APPARTIENT UNE LIGNE eBAY ? (5 octobre, chaque vendeur son eBay) ────
 // Julien : « tout doit être adaptable en fonction de la personne en face ».
 // Jusqu'ici `ebay_tokens` et les lignes `ebay_*` étaient celles de
@@ -648,6 +669,6 @@ function seuilTropBas(accepte, prix) {
   return 2 * Math.round(accepte * 100) < Math.round(prix * 100);
 }
 
-export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
+export { SCOPES, appId, certId, ruName, keysReady, canConsent, authUrl, appToken, jetonApplication, exchangeCode, hasRefresh, readRefresh, lireRefresh, accessToken, storeData, portee, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   COMPTES_ID, CLE_COMPTE, suffixeCompte, cleCompteDe, identiteEbay, lireComptes, normaliserRegistre, modifierComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte,
   MONTANT_MAX, montantOk, valideRegleOffre, seuilTropBas };

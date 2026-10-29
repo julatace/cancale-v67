@@ -16,11 +16,18 @@ export function repartir(total,poids){
 }
 export const etatReservation=(r,now)=>r.etat==='active'&&Date.parse(r.expire)<=Date.parse(now)?'expiree':r.etat;
 // La même validation sert à la création et à la modification d’une recherche.
+// (29 octobre) Les recherches enregistrées ALIMENTENT le fil eBay (eBay →
+// Achats) : trois critères de plus, facultatifs — une recherche d'avant les
+// reçoit par défaut (pas de pointure, achat immédiat, livraison en France).
+// Et au plus `MAX_VEILLES_ACTIVES` relues : chacune coûte un appel à eBay.
+export const MAX_VEILLES_ACTIVES=10;
+const pointureVeille=v=>{if(v==null||v==='')return '';const s=texte(String(v),6,true);exige(!s||/^\d{2}([.,]5)?$/.test(s),'Pointure attendue : deux chiffres, et « ,5 » au besoin (42 ou 42,5).');return s;};
 export function criteresVeille(p){
- const minimum=p.minimum===null?null:entier(p.minimum),maximum=entier(p.maximum,1);
+ const minimum=p.minimum===null||p.minimum===undefined?null:entier(p.minimum),maximum=entier(p.maximum,1);
  exige(minimum===null||minimum<=maximum,'Le minimum dépasse le budget.');
- return {titre:texte(p.titre),mots:texte(p.mots,200),exclus:texte(p.exclus||'',200,true),categorie:texte(p.categorie||'',80,true),etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous'])};
+ return {titre:texte(p.titre),mots:texte(p.mots,200),exclus:texte(p.exclus||'',200,true),categorie:texte(p.categorie||'',80,true),etatArticle:choix(p.etatArticle,['tous','neuf','occasion']),minimum,maximum,pays:choix(p.pays,['FR','BE','DE','ES','IT','tous']),pointure:pointureVeille(p.pointure),achatImmediat:p.achatImmediat!==false,livraisonFR:p.livraisonFR!==false};
 }
+const placeVeille=d=>exige(d.veilles.filter(x=>x.etat==='preparee').length<MAX_VEILLES_ACTIVES,`${MAX_VEILLES_ACTIVES} recherches actives au plus (chacune coûte un appel à eBay) : archive-en une d’abord.`);
 export function echeanceActive(section,x,maintenant){
  const active=section==='missions'?['attribuee','en_cours','bloquee'].includes(x.etat):section==='reservations'?etatReservation(x,maintenant)==='active':section==='dossiers'?x.etat!=='clos':false;
  const at=active?Date.parse(section==='reservations'?x.expire:x.echeance):NaN,now=Date.parse(maintenant);
@@ -94,7 +101,7 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   x.mouvements.push({...commun,nature,quantite:n,motif,avant:x.stock,apres:suivant});x.stock=suivant;break;
  }
  case 'veille.creer':{
-  ajoute(d.veilles,{...commun,...criteresVeille(p),version:1,etat:'preparee',evenements:[]});break;
+  placeVeille(d);ajoute(d.veilles,{...commun,...criteresVeille(p),version:1,etat:'preparee',evenements:[]});break;
  }
  case 'veille.modifier':{
   const x=trouve(d.veilles,p.cible);exige(x.etat==='preparee','Restaure cette recherche avant de la modifier.');
@@ -103,11 +110,11 @@ export function appliquer(source,commande,{acteur,maintenant,equipe=[],membre=nu
   const avant=criteresVeille(x),apres=criteresVeille(p);(x.evenements??=[]).push({...commun,nature:'modification',avant,apres});Object.assign(x,apres,{version:(x.version||1)+1,modifie:maintenant});break;
  }
  case 'veille.dupliquer':{
-  const x=trouve(d.veilles,p.cible);ajoute(d.veilles,{...commun,...criteresVeille(x),titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
+  const x=trouve(d.veilles,p.cible);placeVeille(d);ajoute(d.veilles,{...commun,...criteresVeille(x),titre:texte(p.titre),version:1,etat:'preparee',evenements:[],origine:x.id});break;
  }
  case 'veille.archiver':
  case 'veille.restaurer':{
-  const x=trouve(d.veilles,p.cible),archiver=type==='veille.archiver';exige(x.etat===(archiver?'preparee':'archivee'),'Cette recherche a déjà changé d’état.');
+  const x=trouve(d.veilles,p.cible),archiver=type==='veille.archiver';exige(x.etat===(archiver?'preparee':'archivee'),'Cette recherche a déjà changé d’état.');if(!archiver)placeVeille(d);
   exige((x.evenements||[]).length<100,'Historique de cette recherche plein.');
   (x.evenements??=[]).push({...commun,nature:archiver?'archivage':'restauration'});x.etat=archiver?'archivee':'preparee';break;
  }
