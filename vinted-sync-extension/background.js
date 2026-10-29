@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.279.0';
+const CODE_VERSION = '5.280.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7827,12 +7827,14 @@ function choisirTaille(options, libelle) {
   if (ids.length > 1) return { raison: `Vinted propose plusieurs tailles « ${String(libelle).slice(0, 12)} » pour cette catégorie — VRM ne choisit pas entre elles` };
   return { raison: `Vinted ne propose pas de taille « ${String(libelle).slice(0, 12)} » pour cette catégorie` };
 }
-async function grilleTailles(uid, acc, catalogId) {
+async function grilleTailles(uid, acc, catalogId, opts = {}) {
   const cat = String(Number(catalogId) || '');
   if (!cat || cat === '0') return { raison: "la catégorie de l'annonce est inconnue" };
   let st = null; try { st = (await chrome.storage.local.get(TAILLES_VU))[TAILLES_VU] || null; } catch (_) {}
   const c = st && st[cat];
   if (c && Array.isArray(c.options) && Number(c.at) > Date.now() - 24 * 3600000) return { options: c.options, requis: Array.isArray(c.requis) ? c.requis : [], sansTaille: !!c.sansTaille, codes: Array.isArray(c.codes) ? c.codes : [] };
+  // 5.280 : la republication ne la lit JAMAIS chez Vinted (Vintex ne l'appelle pas) — seulement le cache.
+  if (opts.cacheSeul) { noterDiag('tailles_cache_absent'); return { raison: 'grille des tailles pas lue (comme Vintex, VRM ne la demande pas pendant une republication)' }; }
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await vintedPage(acc, 'POST', '/api/v2/item_upload/attributes', { attributes: [{ code: 'category', value: [Number(cat)] }] }, { timeoutMs: 20000 });
@@ -7889,7 +7891,7 @@ const NOM_CHAMP_VINTED = { size: 'la taille', condition: "l'état", status: "l'�
 // est trouvée au libellé exact ; le reste n'est jamais deviné : il est NOMMÉ.
 // Rend la liste de ce qui manque (vide = tout est là). `idsPaire` = l'ancienne
 // annonce / le brouillon (pour lire la taille de la paire).
-async function champsManquantsAvant(uid, acc, it, idsPaire) {
+async function champsManquantsAvant(uid, acc, it, idsPaire, opts = {}) {
   const manque = [];
   const attrs = Array.isArray(it.item_attributes) ? it.item_attributes : [];
   const a = (code) => attrs.find((x) => x && x.code === code && Array.isArray(x.ids) && x.ids.length);
@@ -7902,7 +7904,7 @@ async function champsManquantsAvant(uid, acc, it, idsPaire) {
   if (!idsCouleurVinted(it).length) manque.push('la couleur');
   if (!(Number(it.package_size_id) > 0)) manque.push('la taille du colis');
   if (Number(it.catalog_id) > 0) {
-    const g = await grilleTailles(uid, acc, it.catalog_id);
+    const g = await grilleTailles(uid, acc, it.catalog_id, opts);
     if (g.codes && g.codes.includes('condition') && !a('condition') && !a('status')) manque.push("l'état");
     if (g.options && g.options.length) {
       const sz = a('size'); const ids = sz ? sz.ids.map(Number) : [];
@@ -8378,7 +8380,7 @@ function raisonSansPage(r) {
 }
 // (29 oct.) Quelques paires par jour et par compte, au début (sa décision avec
 // le modèle de Vintex). Fenêtre glissante de 24 h dans `chrome.storage.local`.
-const REPUB_PAR_JOUR = 10;
+const REPUB_PAR_JOUR = 50;   // 5.280 : il a republié 50 paires par jour avec Vintex sans aucune restriction (29 oct.)
 async function repubAujourdhui(uid) {
   try { const m = (await chrome.storage.local.get('vrmRepubJour')).vrmRepubJour || {}; const t = Date.now(); return (Array.isArray(m[uid]) ? m[uid] : []).filter((x) => typeof x === 'number' && t - x < 86400000); } catch (_) { return []; }
 }
@@ -8577,7 +8579,7 @@ async function publierBrouillon(msg) {
   // (29 oct.) Tout ce que Vinted exige est vérifié AVANT d'envoyer : la taille
   // fausse est corrigée au libellé exact de la paire ; le reste est nommé.
   { const avant2 = JSON.stringify(r.d.item_attributes || []);
-    const manque2 = await champsManquantsAvant(uid, acc, r.d, [b.ancienId, id]);
+    const manque2 = await champsManquantsAvant(uid, acc, r.d, [b.ancienId, id], { cacheSeul: true });
     if (!manque2.length && JSON.stringify(r.d.item_attributes || []) !== avant2) { try { await rangerBrouillon(id, { corps: JSON.stringify({ ...JSON.parse(b.corps), draft: r.d }) }); } catch (_) {} }
     if (manque2.length) return { accepte: false, code: 'incomplet', raison: `Vinted refuserait ce brouillon : il manque ${manque2.join(', ')}. Finis-le sur Vinted (Mes brouillons → « Modifier »), puis réessaie. Rien n'a été touché.` }; }
   // (28 oct.) Un brouillon fait par VRM AVANT la 5.261 peut porter la même photo
@@ -8776,7 +8778,7 @@ async function refaireBrouillon(msg) {
       return { accepte: true, etape: 'fait', brouillon: true, draftId, raison: 'le brouillon est rangé sur Vinted.' + pourquoi };
     }
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId });
-    { const manque3 = await champsManquantsAvant(uid, acc, corpsC.draft, [id, draftId]);
+    { const manque3 = await champsManquantsAvant(uid, acc, corpsC.draft, [id, draftId], { cacheSeul: true });
       if (manque3.length) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'est PAS mis en ligne : Vinted le refuserait, il manque ${manque3.join(', ')}. Finis-le sur Vinted (Mes brouillons → « Modifier »).` }; }
       try { await rangerBrouillon(draftId, { corps: JSON.stringify(corpsC) }); } catch (_) {} }
     // Mise en ligne DANS la même place de la file Vinted (publierBrouillon prend
@@ -9017,7 +9019,7 @@ async function recreerVinted(msg) {
   {
     const it0 = { ...(essai.item || {}), assigned_photos: [{ id: 1 }] };
     const avant = JSON.stringify(it0.item_attributes || []);
-    const manqueA = await champsManquantsAvant(uid, acc, it0, [id]);
+    const manqueA = await champsManquantsAvant(uid, acc, it0, [id], { cacheSeul: true });
     if (manqueA.length) {
       noterDiag('recreer_avant_bloque');
       return { accepte: false, code: 'incomplet', raison: `Vinted refuserait cette annonce : il manque ${manqueA.join(', ')}. Rien n'a été touché : ton annonce est toujours en ligne. Sur Vinted → « Modifier » → complète → « Enregistrer », puis relance.` };
@@ -9559,34 +9561,110 @@ async function executerMessageFavori(uid,acc,body){
   etape('autorisation');
   if(!body||!id(body.itemId)||!id(body.recipientId)||String(uid)===body.recipientId||typeof body.initiator!=='string'||!body.initiator||body.initiator.length>80||typeof body.message!=='string'||!body.message.trim()||body.message.length>2000)return rep('refuse',400);
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
-  // Native three-field format observed in the seller's browser. No guessed
-  // create-and-send format, no auto retry even on a failed transport response.
+  // 5.280 (29 oct., « copie ce que fait Vintex comme pour les repu ») — MESURÉ
+  // avec VRM Observateur sur 9 favoris envoyés par Vintex (aucun refusé) : tout
+  // part de l'ONGLET vinted.fr (cookies du site, jeton csrf de la page, aucun
+  // `Authorization`), dans cet ordre et à ce rythme :
+  //   conversation → 3,2–6,0 s → GET /transactions/{tx} → 0,3–0,8 s →
+  //   POST /transactions/{tx}/offers {offer:{currency, price}} → 0,4–0,5 s →
+  //   POST /conversations/{id}/replies.
+  // VRM partait du service worker (Bearer) et relisait le fil. Désormais : la
+  // page, la transaction comme Vintex, la VRAIE offre de Vinted quand une
+  // réduction est choisie, et le fil n'est relu que si la réponse de création
+  // ne suffit pas à vérifier le destinataire et l'historique. Sans onglet Vinted
+  // ouvert sur ce compte, RIEN ne part.
+  const pg=await pageVintedPour(acc);
+  if(pg.refus)return rep('refuse',0,'onglet_vinted');
   etape('conversation');
-  const creation=await vintedSend(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{sansRejeu:true,timeoutMs:12000});
+  const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
+  if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
   if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
-  const convId=String(creation.json?.conversation?.id||'');
+  const cc=creation.json?.conversation;
+  const convId=String(cc?.id||'');
   if(!id(convId))return rep('incertain',creation.status,'creation_non_confirmee');
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   try{
     const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
     if(!r.ok)return rep('refuse',r.status,'autorisation_expiree');const j=await r.json();if(!j.ok||!j.autorise||String(j.uid)!==String(uid))return rep('refuse');
   }catch{return rep('refuse');} // no reply has been sent yet
+  await pauseFavori('transaction');
   etape('verification');
-  const lu=await vintedGet(acc,`/api/v2/conversations/${convId}`,{timeoutMs:12000}),c=lu.json?.conversation;
+  // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant).
+  let c=cc,lu={status:creation.status};
+  if(!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
-  const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||'');
-  if(!lu.ok||String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
+  const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
+  if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
   etape('historique');
   if(!Array.isArray(c.messages))return rep('refuse',lu.status,'historique_non_verifie');
   if(c.messages.some(m=>['message','offer_request_message','offer_request','offer','user_message','reply','text_message'].includes(m?.entity_type)))return rep('ignore',lu.status,'conversation_deja_contactee');
   const systemes=['offer_request_message','offer_request','offer','transaction','transaction_status','status_message','system','system_message','action','event'];
   if(c.messages.some(m=>!m||!systemes.includes(m.entity_type))||Number(c.pagination?.total_pages)>1||Number(lu.json?.pagination?.total_pages)>1||lu.json?.has_more===true||c.has_more===true||c.has_more_messages===true||Number(c.message_count)>0||Number(c.total_messages)>c.messages.length)return rep('refuse',lu.status,'historique_non_verifie');
-  const arret=await gardeStricte(uid,acc); // second write also consumes an action
+  // La transaction, comme Vintex (elle porte le prix de l'annonce pour l'offre).
+  const tx=String(c?.transaction?.id||cc?.transaction?.id||'');
+  let prixAnnonce=null,devise='EUR';
+  if(id(tx)){
+    const t=await vintedPage(acc,'GET',`/api/v2/transactions/${tx}`,null,{timeoutMs:12000});
+    if(t.sansPage)return rep('refuse',0,'onglet_vinted');
+    const tr=t.ok?(t.json?.transaction||t.json):null;
+    const artTx=String(tr?.item_id||tr?.item?.id||tr?.offer?.item_id||'');
+    if(t.ok&&artTx&&artTx!==body.itemId)return rep('refuse',t.status,'identite_non_confirmee');
+    const pr=prixDeTransaction(tr);if(pr){prixAnnonce=pr.montant;devise=pr.devise;}
+  }else noterDiag('favori_sans_transaction');
+  const arret=await gardeStricte(uid,acc); // le message (et son offre) consomment UNE action
   if(arret)return rep('refuse');
+  // L'offre native de Vinted : seulement si une réduction est choisie ET le prix lu.
+  const pct=Number(body.pourcentage);
+  if(id(tx)&&Number.isInteger(pct)&&pct>=1&&pct<=99){
+    const prix=prixOffreFavori(prixAnnonce,pct);
+    if(prix){
+      await pauseFavori('offre');
+      if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
+      etape('offre');
+      const o=await vintedPage(acc,'POST',`/api/v2/transactions/${tx}/offers`,{offer:{currency:devise,price:prix}},{timeoutMs:12000});
+      if(o.sansPage)return rep('refuse',0,'onglet_vinted');
+      noterDiag(o.ok?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
+    }else noterDiag('favori_offre_prix_inconnu');
+  }
+  await pauseFavori('reponse');
+  if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
-  const r=await vintedSend(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:body.message,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{sansRejeu:true,timeoutMs:12000});
+  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:body.message,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
+  if(r.sansPage)return rep('incertain',0,'reponse_inconnue');
   if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
+}
+// Mesuré sur Vintex (29 oct., 9 favoris) : création → transaction 3,2–6,0 s ;
+// transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
+const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550] };
+function pauseFavori(quoi) {
+  const p = PAUSES_FAVORI[quoi] || [400, 800];
+  const ms = Math.round(p[0] + Math.random() * (p[1] - p[0]));
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['favori:' + quoi, ms]); } catch (_) {}
+  return new Promise((ok) => setTimeout(ok, ms));
+}
+// La réponse de création suffit-elle à vérifier le fil (destinataire, article, historique) ?
+function filVerifiable(c) {
+  return !!(c && c.id != null && c.opposite_user && c.opposite_user.id != null && Array.isArray(c.messages)
+    && (c.transaction && (c.transaction.item_id != null || (c.transaction.item && c.transaction.item.id != null)) || (c.item && c.item.id != null) || c.item_id != null));
+}
+// Le prix de l'annonce lu dans la transaction (forme jamais vue d'ici : lue défensivement).
+function prixDeTransaction(tr) {
+  if (!tr || typeof tr !== 'object') return null;
+  const cands = [tr.item && tr.item.price, tr.offer && tr.offer.original_price, tr.item_price, tr.price, tr.offer && tr.offer.price];
+  for (const v of cands) {
+    const m = v && typeof v === 'object' ? Number(v.amount) : Number(v);
+    if (isFinite(m) && m > 0) return { montant: m, devise: (v && typeof v === 'object' && /^[A-Z]{3}$/.test(String(v.currency_code || ''))) ? v.currency_code : (/^[A-Z]{3}$/.test(String(tr.currency || '')) ? tr.currency : 'EUR') };
+  }
+  return null;
+}
+// Le prix de l'offre, au centime, comme Vinted l'écrit (« 45.00 ») ; jamais ≥ au prix, jamais sous 1 €.
+function prixOffreFavori(montant, pct) {
+  const m = Number(montant);
+  if (!(isFinite(m) && m > 0) || !(pct >= 1 && pct <= 99)) return null;
+  const cents = Math.round(m * 100 * (100 - pct) / 100);
+  if (cents < 100 || cents >= Math.round(m * 100)) return null;
+  return (cents / 100).toFixed(2);
 }
 let _fileVinted = Promise.resolve();
 function avecVinted(fn) {

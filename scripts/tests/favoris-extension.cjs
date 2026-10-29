@@ -27,6 +27,9 @@ function contexte(options={}){
   }
   return {ok:status>=200&&status<300,status,json:async()=>j,headers:{get:()=>null}};
  };
+ // 5.280 : les requêtes partent de la page Vinted (comme Vintex) — même faux réseau, sans onglet si demandé.
+ f.ctx.pageVintedPour=async()=>options.sansOnglet?{refus:'onglet'}:{tabId:1};
+ f.ctx.vintedPage=async(acc,m,endpoint,body)=>{if(options.sansOnglet)return {ok:false,status:0,json:null,sansPage:'onglet'};let r;try{r=await f.ctx.fetch('https://www.vinted.fr'+endpoint,{method:m,body:body==null?undefined:JSON.stringify(body)});}catch{return {ok:false,status:0,json:null};}let json=null;try{json=await r.json();}catch{}return {ok:r.ok,status:r.status,json};};
  return {...f,appels,evenements,envoyer:()=>f.envoyer({uid:UID,method:'POST',endpoint:'/vrm/favoris',body:{jeton}})};
 }
 (async()=>{
@@ -51,6 +54,7 @@ function contexte(options={}){
  c=contexte();r=await c.versExt({type:'favorisExec',uid:UID,endpoint:'/vrm/favoris',body:{jeton}});check(r.ok&&r.data.resultat==='envoye','le canal Chrome adressé exécute l’opération autorisée');
  c=contexte();r=await c.versExt({type:'favorisExec',uid:UID,endpoint:'/api/v2/conversations/301/replies',body:{jeton}});check(!r.ok&&c.appels.length===0,'le canal direct ne devient pas un relais générique');
  c=contexte();r=await c.versExt({type:'favorisEtat'},'https://evil.invalid');check(!r.ok&&c.appels.length===0,'origine étrangère refusée aussi pour la santé directe');
+ c=contexte({sansOnglet:true});r=await c.envoyer();check(!r.ok&&r.data.raison==='onglet_vinted','sans onglet Vinted : refus expliqué');check(!c.appels.some(x=>x.url.startsWith('https://www.vinted.fr/')),'sans onglet Vinted : aucun appel Vinted');
  c=contexte({sessionAbsente:true});r=await c.envoyer();check(r.data.raison==='session_extension','session extension absente expliquée');check(c.appels.length===0,'aucun appel Vinted sans session extension');
  c=contexte();r=await c.ctx.executerPourApp({uid:UID,method:'POST',endpoint:'/vrm/favoris',body:{jeton}},{origin:'https://vrm.center.imposteur.invalid'});
  check(!r.ok&&c.appels.length===0,'origine étrangère : aucun grant, aucun Vinted');
