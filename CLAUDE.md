@@ -1,5 +1,15 @@
 # VRM — dossier de passation
 
+> **29 octobre — shop_cancale : TOUT est retiré, ventes comprises (sa décision) :** Julien : « en vrai retire tout de ce
+> compte » (après lui avoir dit que ses ventes sortaient alors de son CA déclaré). Un compte supprimé pour de bon
+> (`vrm_blocked_accounts`, rangé sur l'appareil `vrm_comptes_supprimes`) ne sort plus d'AUCUNE lecture :
+> `src/comptesSupprimes.js` filtre `fetch` (toute ligne `harvest_{uid}_…` de ce compte, lectures GET non paginées) et
+> `lireTout` filtre après la pagination (une page raccourcie l'aurait arrêtée). Rien n'est effacé en base ; « pas su »
+> (liste illisible) ne retire rien ; les écritures passent (purge, suppression). Les écrans par compte lié l'excluaient
+> déjà ; ce sont les balayages de famille (Stock, recherche, porte-monnaie, profils, suivis, relevés…) qui le ramassaient.
+> Preuve : `audit-comptes-supprimes.cjs` (13 ; 3 rouges sur l'avant ; `--prouve` 4 rouges). ⚠️ Non mesuré : sa vraie base
+> (pas de connecteur VRM). Un email (bordereau, suivi) de ce compte n'est pas relié à un compte : il reste.
+
 > **29 octobre — TOUT ce que Vinted exige est vérifié AVANT la mise en ligne (5.276) :** Julien : « il ne doit pas y avoir
 > d'erreur possible », « que toutes les catégories obligatoires soient remplies avant de valider la mise en ligne ».
 > `champsManquantsAvant` (une règle pour Mettre en ligne un brouillon, Refaire, Republier par brouillon et direct) : titre, prix,
