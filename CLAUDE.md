@@ -36,6 +36,14 @@
 > CHACUN de ses comptes Leboncoin (la liste complète fait sortir les annonces disparues) ; pour un chiffre de favoris, ouvrir
 > « Statistiques » de l'annonce ; s'il veut que VRM sache écrire à ses abonnés, utiliser UNE fois à la main le geste de
 > Leboncoin qui cible les abonnés (s'il lui est proposé) : l'extension en relèvera la forme pour la passe suivante.
+> **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
+> worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.
+> Deux identités d’offre contradictoires pour le même message font refuser la fusion.
+> `suiviNegociationVinted` exclut une offre d’une autre transaction explicitement identifiée ;
+> le sélecteur et le résumé ne réactivent plus « précédente » via un doublon.
+> `offres-fusion.test.mjs` exécute les deux versions. Archives 5.286 générées.
+> Rien n’a été envoyé à un compte marchand. Voir `docs/offres-etats-stables.md`.
+
 > **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
 > trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
 > planification pendant un réveil effaçait une paire) ; un job resté « en cours » (Chrome a tué le service worker)
