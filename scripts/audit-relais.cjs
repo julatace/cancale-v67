@@ -17,7 +17,7 @@
 //    · ligne d'un AUTRE vendeur : rien ;
 //    · compte du cookie ≠ compte visé : refusée, et la raison nomme le compte
 //      ouvert (« Chrome est connecté sur X ») ;
-//    · le plafond de 20 actions/heure tient ;
+//    · le plafond de 50 actions/heure tient ;
 //    · accepter une offre sans confirmation : refusé ;
 //    · lecture de la file ratée : rien n'est exécuté ;
 //    · sans session VRM : AUCUNE requête, même vers notre base.
@@ -203,14 +203,14 @@ const replies = (f) => f.j.vinted.filter((v) => v.methode === 'POST' && /\/repli
     dit(f.table[bord.id].data.etat === 'refuse' && /Chrome est connecté sur compte_deux/.test(rb.raison || ''), 'bordereau : refusé, la raison nomme le compte ouvert', JSON.stringify(rb));
   });
 
-  console.log('── 7. Le plafond de 20 actions/heure tient');
+  console.log('── 7. Le plafond de 50 actions/heure tient');
   await essaie('plafond', async () => {
     const t = Date.now();
-    const actions = { [UID]: Array.from({ length: 19 }, (_, i) => t - 60000 - i * 1000) };
+    const actions = { [UID]: Array.from({ length: 49 }, (_, i) => t - 60000 - i * 1000) };
     const rows = [cmdRow('exec', replyArgs(5601)), cmdRow('exec', replyArgs(5602)), cmdRow('exec', replyArgs(5603))];
     const f = monter({ rel: rows, actions });
     await tick(f);
-    dit(replies(f) === 1, '19 actions déjà dans l\'heure : 1 seule réponse part sur 3', `réponses=${replies(f)}`);
+    dit(replies(f) === 1, '49 actions déjà dans l\'heure : 1 seule réponse part sur 3', `réponses=${replies(f)}`);
     const codes = rows.map((r) => (f.table[r.id].data.resultat || {}).code || f.table[r.id].data.etat);
     dit(codes.filter((c) => c === 'plafond').length === 2, 'les deux autres : refusées « plafond »', codes.join(','));
   });

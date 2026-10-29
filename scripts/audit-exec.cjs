@@ -3,7 +3,7 @@
 //
 //  Mesuré le 2 octobre : le message `exec` du pont ne vérifiait que « /api/ ».
 //  Ni l'origine (tous les autres messages du pont la vérifient), ni le compte
-//  connecté dans Chrome (`garde`), ni le plafond de 20 actions/h, ni la méthode :
+//  connecté dans Chrome (`garde`), ni le plafond de 50 actions/h, ni la méthode :
 //  un `DELETE /api/v2/items/{id}` — la suppression d'annonce que §3 refuse —
 //  serait parti depuis n'importe quel script de la page.
 //
@@ -111,8 +111,8 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
   await essaie('plafond', async () => {
     const { envois, envoyer } = faireCtx();
     let dernier = null;
-    for (let i = 0; i < 21; i++) dernier = await envoyer(REPONSE);
-    dit(envois.length === 20 && dernier && dernier.code === 'plafond', 'la 21ᵉ action dans l\'heure est refusée (plafond de 20/h)', `${envois.length} envoi(s), dernière réponse ${JSON.stringify(dernier)}`);
+    for (let i = 0; i < 51; i++) dernier = await envoyer(REPONSE);
+    dit(envois.length === 50 && dernier && dernier.code === 'plafond', 'la 51ᵉ action dans l\'heure est refusée (plafond de 50/h)', `${envois.length} envoi(s), dernière réponse ${JSON.stringify(dernier)}`);
   });
   // ── 5.135 : la messagerie intégrée (3 octobre) ────────────────────────────
   await essaie('les gestes d\'offre depuis l\'app', async () => {

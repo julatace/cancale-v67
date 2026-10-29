@@ -72,6 +72,7 @@ const suppressions = (j) => de(j, /\/items\/\d+\/delete$/);
 async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
+  if (typeof opts.avant === 'function') opts.avant(f);
   let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, differer: opts.differer, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
@@ -638,6 +639,20 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit(r.etape === 'attente' && fin && fin.fin && fin.fin.refaire === true && de(f.j, /completion$/).length === 1, "mise en ligne planifiée refusée : un seul envoi, le brouillon reste « à mettre en ligne » et l'app le sait", JSON.stringify(fin && fin.fin && { e: fin.fin.etape, r: fin.fin.refaire })); }
   { const { f, r } = await run({ differer: true, versBrouillon: true });
     dit(r.etape === 'fait' && r.brouillon === true && !Object.keys(f.store.vrmRepubAttente || {}).length, "En ligne → brouillon : rien n'est planifié (aucune mise en ligne)", `etape=${r.etape}`); }
+
+  // Q — (29 oct.) « il a laissé en brouillon : pas plus de 15 actions par heure ».
+  //     La paire réserve ses 3 gestes d'un coup AVANT le premier ; la mise en ligne
+  //     planifiée n'est jamais refusée par le plafond (l'ancienne est déjà supprimée).
+  { const deja = (k) => (f) => { f.store.vrmActions = { '111': Array.from({ length: k }, () => Date.now() - 60000) }; };
+    const { f, r } = await run({ differer: true, avant: deja(42) });
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) f.store.vrmRepubAttente['9101'].du = 0;
+    try { await f.ctx.miseEnLigneTick(); } catch (_) {}
+    const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
+    const n = ((f.store.vrmActions || {})['111'] || []).length;
+    dit(r.etape === 'attente' && fin && fin.fin && fin.fin.etape === 'fait' && seqV(f.j) === 'LPPBSLM', "42 actions déjà dans l'heure : la paire part ET sa mise en ligne planifiée aboutit (jamais laissée en brouillon par le plafond)", `etape=${r.etape} fin=${JSON.stringify(fin && fin.fin && { e: fin.fin.etape, r: fin.fin.raison })} seq=${seqV(f.j)}`);
+    dit(n === 45, "une republication compte 3 actions (brouillon, suppression, mise en ligne), pas 5", `actions=${n}`); }
+  { const { f, r } = await run({ differer: true, avant: (f) => { f.store.vrmActions = { '111': Array.from({ length: 43 }, () => Date.now() - 60000) }; } });
+    dit(r.accepte === false && r.code === 'plafond-bordereaux' && zero(f.j), "plus de place pour toute la paire : RIEN ne part (l'annonce reste en ligne), et c'est dit", `code=${r.code} seq=${seqV(f.j)} ${r.raison || ''}`); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique

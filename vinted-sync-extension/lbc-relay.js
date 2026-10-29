@@ -3,7 +3,7 @@
   if(window.__vrmLbcRelayLoaded)return;window.__vrmLbcRelayLoaded=true;
   const vus=new Set();
   const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.281.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.283.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;

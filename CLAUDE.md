@@ -53,6 +53,24 @@
 > `audit-micro-entreprise.cjs` (20 ; 7 mutations rouges), banc `suivi-urssaf.cjs` section M (profil, question VL, « Non » rangé,
 > rythme partagé ; 390/1512). ⚠️ Non mesuré : sa vraie base ; le CA de l'année n'est que ce que VRM a capté (plateformes reliées).
 
+> ⚠️⚠️ **29 octobre — PLAFOND D'ACTIONS PASSÉ DE 20 À 50 PAR HEURE ET PAR COMPTE (5.283), SA DÉCISION :** Julien :
+> « augmente la limite à 50 par heure comme vintex » (après la 5.282, qui disait 5 republications/h au plus). Ce chiffre
+> n'est pas mesuré chez Vinted : c'est son choix, le risque de blocage lui a été dit. `ACTIONS_MAX_HEURE` = **50** ; la
+> réserve des gestes sur clic (`RESERVE_GESTES` = 5) reste ⇒ les commandes de l'app (Republier, bordereaux) s'arrêtent à
+> **45** = **15 republications par heure et par compte** (3 actions chacune). Inchangés : compte de l'onglet, une requête à
+> la fois, pause Vinted (429/403), `REPUB_PAR_JOUR` 50, budget de LECTURE (20/h). Tests mis au nouveau chiffre :
+> `audit-exec`, `audit-relais` §7, `audit-compteurs-concurrents`, `audit-tout-generer`, `audit-recreer` §Q (tous verts).
+> Ne PAS le redescendre à 20 sans qu'il le demande.
+
+> **29 octobre — « il a laissé en brouillon : pas plus de 15 actions par heure » (5.282) :** une republication comptait
+> **5** actions (garde de départ, brouillon, suppression, garde de la mise en ligne, mise en ligne) ; avec la mise en ligne
+> planifiée (5.279), d'autres paires passaient entre-temps et la mise en ligne était REFUSÉE par la borne des commandes de
+> l'app (15/h) — l'ancienne annonce déjà supprimée, il ne restait qu'un brouillon. Désormais la paire RÉSERVE ses 3 gestes
+> (2 pour « En ligne → brouillon ») d'un coup avant le premier (`gardeStricte({actions})`, `compterAction(…, n)`) ; plus
+> de place ⇒ rien ne part, l'annonce reste en ligne, c'est dit ; la mise en ligne ne revérifie que le compte et la pause.
+> Le plafond (20/h, 15 pour l'app) n'a PAS bougé (§3) : 5 republications par heure et par compte au plus. Preuve :
+> `audit-recreer.cjs` §Q (147 ; 2 rouges sur origin/main : « brouillon-a-refaire … 15 actions »).
+
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
 > « activité automatisée » après une republication de VRM. Mesuré (extension VRM Observateur, lecture seule, 266 requêtes
 > de Vintex sur 2 articles) : Vintex fait TOUT depuis l'onglet vinted.fr (cookies du site, `x-csrf-token` de la page,
@@ -1321,8 +1339,8 @@ traduction des messages · mode équipe — les fonctions payantes selon la règ
 
 
 **Garde-fous de l'extension, à ne jamais retirer** : agir uniquement au nom du
-**compte connecté dans l'onglet** (`garde`), plafond de **20 actions/heure par
-compte**, plafond par visite, requêtes **une par une** en attendant la réponse.
+**compte connecté dans l'onglet** (`garde`), plafond de **50 actions/heure par
+compte** (20 jusqu'au 29 octobre, monté à 50 sur sa décision), plafond par visite, requêtes **une par une** en attendant la réponse.
 
 ---
 
