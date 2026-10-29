@@ -19,6 +19,15 @@
 > **Geste de Julien** : faire suivre les emails Vinted de ses AUTRES comptes vers son adresse VRM (Réglages → Mes adresses
 > de réception) — sinon leurs achats n'auront jamais de reçu.
 
+> **29 octobre — rattraper les mois d'un coup, et un rappel 3 jours avant l'échéance :** « Noter mes N mois à la suite »
+> (Suivi URSSAF, dès 2 mois « pas notée »/« à déclarer ») ouvre le rapport sur le plus ancien ; « Enregistrer » ouvre
+> le suivant (`SERIE_DECLARATION`, `allerMoisSuivantSerie` : même formulaire, mêmes gardes) ; « Pas encore déclaré — mois
+> suivant » passe sans rien noter ; « Arrêter » ; 30 min sans geste ⇒ série oubliée. Cron du matin :
+> `rappelAvantEcheance` (api/_lib/rappel-urssaf.js) — 3 jours ou moins avant la date limite, période pas notée, une fois
+> par échéance (`urssaf_reminder_dedup.veille`), même texte et montant que le 1er ; réglages/mémo illisibles ⇒ rien.
+> Preuves : `audit-rappel-echeance.cjs` (9 ; mutations seuil/declare/passu rouges), banc `suivi-urssaf.cjs` S (mutation
+> « pas d'enchaînement » ⇒ 4 KO).
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
