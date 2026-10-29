@@ -90,6 +90,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     // 27 oct. : le corps envoyé (non énumérable aussi) — pour les audits qui
     // doivent vérifier CE qui part (ex. le prix baissé d'une republication).
     Object.defineProperty(entree, 'corps', { value: opts && opts.body, enumerable: false });
+    // 29 oct. : les en-têtes envoyés (non énumérables) — Republier part de la page, sans `Authorization`.
+    Object.defineProperty(entree, 'entetes', { value: (opts && opts.headers) || {}, enumerable: false });
+    Object.defineProperty(entree, 'credentials', { value: opts && opts.credentials, enumerable: false });
     j.vinted.push(entree);
     j.enVol++; j.maxEnVol = Math.max(j.maxEnVol, j.enVol);
     await new Promise((r) => setTimeout(r, 3));

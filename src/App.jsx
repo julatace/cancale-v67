@@ -121,7 +121,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.276.0';
+const EXT_ATTENDUE = '5.277.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -516,7 +516,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 //    « l'extension relève le suivi » plus tôt viserait une extension qui ne le
 //    fait pas — un faux dans l'autre sens (revue du 24 oct. ; corrigé le
 //    26 oct. avec la session extension, qui a relu l'historique).
-const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0' };
+const EXT_CAPACITES = { favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -12070,10 +12070,12 @@ const ACTIONS_REPUB = {
 };
 // Les étapes d'une recréation, dans l'ordre (annoncées par l'extension 5.259).
 const ETAPES_REPUB = {
-  brouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'ancienne annonce"], ['brouillon', 'Création du brouillon'], ['attente', 'Pause (au hasard) avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
-  versBrouillon: [['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['suppression', "Retrait de l'annonce"], ['brouillon', 'Création du brouillon']],
+  // 29 oct. (5.277, « comme Vintex ») : lecture, photos, brouillon, PUIS suppression, pause de 1 à 3 min, mise en ligne.
+  brouillon: [['lecture', "Lecture de l'annonce"], ['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['brouillon', 'Création du brouillon'], ['suppression', "Retrait de l'ancienne annonce"], ['attente', 'Pause de 1 à 3 min avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
+  versBrouillon: [['lecture', "Lecture de l'annonce"], ['photos', 'Envoi des photos'], ['enregistrement', 'Enregistrement dans VRM'], ['brouillon', 'Création du brouillon'], ['suppression', "Retrait de l'annonce"]],
+  // L'extension 5.277 passe TOUJOURS par un brouillon : « direct » ne sert plus qu'aux extensions d'avant.
   direct: [['photos', 'Envoi des photos'], ['creation', 'Création de la nouvelle annonce'], ['suppression', "Retrait de l'ancienne annonce"]],
-  refaire: [['photos', 'Envoi des photos'], ['brouillon', 'Création du brouillon'], ['attente', 'Pause (au hasard) avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
+  refaire: [['photos', 'Envoi des photos'], ['brouillon', 'Création du brouillon'], ['attente', 'Pause de 1 à 3 min avant la mise en ligne'], ['en-ligne', 'Mise en ligne']],
   publier: [['en-ligne', 'Mise en ligne']],
 };
 // (28 oct., « c'est trop long et on ne suit pas vraiment l'avancée ») Les pauses
@@ -12483,7 +12485,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <input type="checkbox" data-republier-via-brouillon disabled={!brouillonOk} checked={viaBrouillon && !!brouillonOk} onChange={(ev) => setViaBrouillon(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
                 <span>Passer par un brouillon Vinted, puis le mettre en ligne</span>
               </label>
-              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? 'Comme les autres outils : chaque annonce est d’abord enregistrée dans VRM, puis supprimée, rangée en brouillon sur Vinted, et mise en ligne ensuite. Entre chaque geste (chaque photo, le brouillon, la mise en ligne), VRM attend un temps tiré au hasard — compte une à deux minutes par annonce. Si Vinted ne répond pas clairement à la suppression, VRM s’arrête (jamais deux fois en ligne). Si le brouillon ou sa mise en ligne échoue, rien n’est perdu : le brouillon est dans tes brouillons, ou tout est enregistré dans VRM.' : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{brouillonOk ? (viaBrouillon ? (extSait('republierpage') === 'ok' ? 'Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome (laisse-le ouvert, connecté sur le bon compte). Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard. Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.' : `L’extension VRM installée ici fait encore l’ancienne republication (depuis son fond, avec des renvois automatiques) — mets-la à jour en ${EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr, comme le site.`) : 'L’annonce est créée directement en ligne.') : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
             </div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Prix</span>
@@ -12573,7 +12575,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
-                <span style={{ flex: '1 1 200px' }}>Ordre de passage{ordre ? ' (réglé)' : ' : celui de ta sélection'}.{action === 'recreer' ? ' Chaque paire est recréée puis supprimée, dans cet ordre.' : ''}</span>
+                <span style={{ flex: '1 1 200px' }}>Ordre de passage{ordre ? ' (réglé)' : ' : celui de ta sélection'}.{action === 'recreer' ? ' Chaque paire passe en brouillon, puis l’ancienne est supprimée, dans cet ordre.' : ''}</span>
                 <button type="button" data-republier-melanger onClick={melanger} style={btn(false)}>Mélanger</button>
                 {ordre && <button type="button" data-republier-ordre-selection onClick={() => setOrdre(null)} style={btn(false)}>Ordre de ma sélection</button>}
               </div>}
