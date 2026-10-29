@@ -2069,6 +2069,19 @@ async function handleApp(req, res) {
       return;
     }
     const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
+    // (29 oct.) L'AGENT eBAY QUI DEMANDE : une publication lancée par l'agent
+    // n'est JAMAIS sans le oui de Julien — le serveur l'exige (`confirme:true`,
+    // posé par la confirmation de l'écran), puis la garde ordinaire de publish
+    // (SKU, déjà en vente / programmée relue chez eBay, prix, livraison gérée
+    // par eBay). Elle est inscrite au journal des actions (« Publiée par
+    // l'agent ») : un résultat incertain se relit avant tout nouvel essai.
+    if (action === 'publish' && b.agent === true) {
+      if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'L\'agent ne publie qu\'après ton oui — rien n\'a été publié.' }); return; }
+      const num = b.item && b.item.numero != null ? String(b.item.numero).slice(0, 16) : '';
+      const r = await avecMarche(marche||MARCHE_DEFAUT, () => executerAvecJournal({ action: 'agentpublie', b: { listingId: num ? 'VRM-' + num : '' }, execute: () => ACTIONS.publish(ctx), modifier: fn => modifierDonnee(ligneDe('ebay_agent_journal', ctx), owner, fn) }));
+      res.status(r.status).json(r.body);
+      return;
+    }
     const r = await avecMarche(marche||MARCHE_DEFAUT, () => commerciales.has(action) && b.confirme===true
       ? executerAvecJournal({action,b,execute:()=>ACTIONS[action](ctx),modifier:fn=>modifierDonnee(ligneDe('ebay_agent_journal',ctx),owner,fn)})
       : ACTIONS[action](ctx));
