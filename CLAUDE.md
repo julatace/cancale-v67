@@ -1,5 +1,29 @@
 # VRM — dossier de passation
 
+> **29 octobre — TOUT ce que Vinted exige est vérifié AVANT la mise en ligne (5.276) :** Julien : « il ne doit pas y avoir
+> d'erreur possible », « que toutes les catégories obligatoires soient remplies avant de valider la mise en ligne ».
+> `champsManquantsAvant` (une règle pour Mettre en ligne un brouillon, Refaire, Republier par brouillon et direct) : titre, prix,
+> photos, catégorie, description ≥ 5, couleur, taille du colis ; l'état si la grille de la catégorie en a un ; la taille (code
+> présent dans la grille, sinon celle de la PAIRE au libellé exact, posée) ; tout attribut que la réponse marque obligatoire
+> (`required`/`is_required`/`mandatory` — drapeau jamais vu, absent ⇒ rien d'exigé). Il manque quelque chose ⇒ RIEN n'est envoyé
+> (Republier : avant photos, suppression et création — l'annonce reste en ligne), le champ est NOMMÉ avec le geste. Grille
+> illisible ⇒ les champs connus seuls, et le secours après refus (5.275) reste. Lecture de la grille APRÈS le verrou. Preuve :
+> `audit-recreer.cjs` (132 ; 10 rouges sur la 5.275). ⚠️ Vinted peut encore refuser pour une règle qu'il ne publie pas : la
+> réponse le dit, rien n'est perdu.
+
+> **29 octobre — Republier GARDE la taille de la paire : VRM la retrouve dans la grille de Vinted (5.275) :** Julien : « VRM doit
+> pouvoir regarder la taille, garder toutes les infos de l'article ». Sur un refus `size` (Mise en ligne d'un brouillon, Refaire,
+> Republier par brouillon, création directe), `secoursTaille` lit la grille de la catégorie (`POST /api/v2/item_upload/attributes`
+> `{attributes:[{code:'category',value:[cat]}]}`, requête MESURÉE dans ses navigateurs, 200 ; la RÉPONSE jamais vue : lue
+> défensivement — nœud `code: 'size'` ou clé `sizes`, options `{id, title}` —, forme gardée `tailles_reponse_forme`, grille
+> gardée 24 h par catégorie `vrmTaillesVinted`), prend la taille de la PAIRE par identité (`coffre_{uid}_{ancienId}.size`, sinon
+> le `size` de l'annonce dans son dressing — jamais le titre), ne pose qu'UNE option au libellé EXACT (« 38 » = « 38 », « EU 38 »,
+> « 38 EU » ; « 38,5 » ≠ « 38 »), garde les autres attributs (état…), UN nouvel essai, brouillon enregistré à jour. Deux options
+> au même libellé, aucune, taille inconnue, grille illisible ⇒ rien posé et la phrase dit pourquoi + le geste Vinted. Barre :
+> étape `secours-taille`. Preuve : `audit-recreer.cjs` (122 ; 7 rouges sur la 5.274 ; mutation « libellé par sous-chaîne » ⇒ 2
+> rouges). ⚠️ Non mesuré : la vraie forme de la réponse des attributs (si elle n'est pas lue, la phrase le dit et la forme est
+> rangée dans `panel_diag_capture` pour la passe suivante).
+
 > **29 octobre — « les photos sont déjà là, pourquoi Vinted les refuse ? » (5.274) :** MESURÉ : sur ses brouillons faits par
 > VRM, Vinted refuse les photos à la mise en ligne ; le nouvel essai avec les MÊMES photos n'a jamais passé (0 sur 5), les photos
 > RENVOYÉES ont passé 5 fois sur 5. Cause pas encore mesurée (les numéros de photo que VRM rattache au brouillon). ⇒
