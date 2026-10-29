@@ -83,7 +83,9 @@ export default async function handler(req, res) {
   const lat = req.query && req.query.lat, lon = req.query && req.query.lon;
   try {
     // Depuis la position : on retrouve d'abord le nom de la ville.
-    if (!city && lat && lon) { city = (await cityFromLatLon(lat, lon)) || ''; }
+    // (29 oct.) Seulement des nombres : rien d'autre ne part dans l'adresse de Nominatim.
+    const la = Number(lat), lo = Number(lon);
+    if (!city && Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) { city = (await cityFromLatLon(la, lo)) || ''; }
     if (!city) { res.status(200).json({ city: '', points: [], error: 'ville_introuvable' }); return; }
     const g = await geocodeCity(city);
     if (!g) { res.status(200).json({ city, points: [], error: 'ville_introuvable' }); return; }

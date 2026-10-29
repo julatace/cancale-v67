@@ -38,7 +38,9 @@ const lectures = []; // URL des lectures de vinted_accounts
 let appelsVinted = 0;
 const VENDEUR = '11111111-1111-4111-8111-111111111111';
 const SESSION = { authorization: 'Bearer aa.bb.cc' };   // un jeton inventé, reconnu par la fausse base
-function poserFetch({ vintedRefuse }) {
+let vintedMent = false;
+function poserFetch({ vintedRefuse, ment = false }) {
+  vintedMent = ment;
   ecrites.length = 0; lectures.length = 0; appelsVinted = 0;
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
@@ -53,9 +55,17 @@ function poserFetch({ vintedRefuse }) {
     // ── Vinted ────────────────────────────────────────────────────────────
     if (/\/web\/api\/auth\/refresh$/.test(u)) {
       if (vintedRefuse) return new Response('refused', { status: 401 });
-      return J({ access_token: 'ACC_FRAIS', refresh_token: 'REF_FRAIS' });
+      return J({ access_token: jwtExpire(3600), refresh_token: 'REF_FRAIS' });
     }
-    if (/\/api\/v2\/users\/current$/.test(u)) return J({ user: { login: 'moncompte', id: 7 } });
+    // (29 oct.) Le vrai Vinted ne répond users/current qu'à un jeton qu'il a SIGNÉ,
+    // et rend le compte de CE jeton : un jeton fabriqué (signature « y ») est refusé.
+    if (/\/api\/v2\/users\/current$/.test(u)) {
+      const h = opts.headers || {}; const jeton = String(h.Authorization || '').replace(/^Bearer /, '');
+      if (vintedRefuse || !/\.SIGNE$/.test(jeton)) return new Response('refused', { status: 401 });
+      let id = null; try { id = JSON.parse(Buffer.from(jeton.split('.')[1], 'base64url').toString()).account_id; } catch (_) {}
+      if (vintedMent) id = 999;
+      return J({ user: { login: 'moncompte', id } });
+    }
 
     // ── Supabase ────────────────────────────────────────────────────────────
     if (/\/rest\/v1\/vinted_accounts/.test(u)) {
@@ -76,9 +86,9 @@ function poserFetch({ vintedRefuse }) {
   };
 }
 // Fabrique un access_token JWT dont l'exp est `decalage` secondes par rapport à maintenant.
-function jwtExpire(decalage) {
-  const payload = Buffer.from(JSON.stringify({ account_id: 42, exp: Math.floor(Date.now() / 1000) + decalage })).toString('base64url');
-  return 'x.' + payload + '.y';
+function jwtExpire(decalage, signe = true, compte = 42) {
+  const payload = Buffer.from(JSON.stringify({ account_id: compte, exp: Math.floor(Date.now() / 1000) + decalage })).toString('base64url');
+  return 'x.' + payload + (signe ? '.SIGNE' : '.y');
 }
 const faireRes = () => {
   const r = { code: null, corps: null };
@@ -114,7 +124,7 @@ const faireRes = () => {
     const res = faireRes();
     await refresh.default({ method: 'GET', query: {}, headers: SESSION }, res);
     const patchs = ecrites.filter(e => e.method === 'PATCH');
-    dit(patchs.length === 1 && patchs[0].body.access_token === 'ACC_FRAIS',
+    dit(patchs.length === 1 && patchs[0].body.access_token === jwtExpire(3600),
       'vinted-refresh : refresh accepté → le jeton frais est bien persisté',
       'patchs=' + patchs.length + ' acc=' + (patchs[0] && patchs[0].body.access_token));
   }
@@ -167,6 +177,29 @@ const faireRes = () => {
     dit(posts.length === 1 && posts[0].body[0] && posts[0].body[0].owner === VENDEUR,
       'vinted-connect : le compte collé est rangé chez le vendeur de la SESSION (pas chez le propriétaire de l\'installation)',
       'owner=' + (posts[0] && posts[0].body[0] && posts[0].body[0].owner));
+  }
+
+  // ── 7. (29 oct.) Un jeton FABRIQUÉ au nom du compte Vinted d'un autre ──────
+  // Décodé sans être vérifié, il passait sans appeler Vinted : la ligne était
+  // créée chez l'appelant, et l'unicité globale (migration 023) bloquait ensuite
+  // le vrai titulaire. Vinted doit confirmer CE compte avant toute écriture.
+  poserFetch({ vintedRefuse: false });
+  {
+    const res = faireRes();
+    await connect.default({ method: 'POST', query: {}, headers: SESSION, body: { accessToken: jwtExpire(3600 * 24 * 365, false, 555) } }, res);
+    const posts = ecrites.filter(e => e.method === 'POST');
+    dit(posts.length === 0 && res.code === 401,
+      'vinted-connect : jeton fabriqué (non signé, exp lointain) au nom du compte 555 → refusé, AUCUNE ligne créée',
+      `HTTP ${res.code} · POST ${posts.length} ${posts.length ? JSON.stringify(posts[0].body) : ''}`);
+  }
+  poserFetch({ vintedRefuse: false, ment: true });
+  {
+    const res = faireRes();
+    await connect.default({ method: 'POST', query: {}, headers: SESSION, body: { accessToken: jwtExpire(3600) } }, res);
+    const posts = ecrites.filter(e => e.method === 'POST');
+    dit(posts.length === 0 && res.code === 403,
+      'vinted-connect : Vinted rend un AUTRE compte que celui du jeton → refusé, rien écrit',
+      `HTTP ${res.code} · POST ${posts.length}`);
   }
 
   console.log(ko

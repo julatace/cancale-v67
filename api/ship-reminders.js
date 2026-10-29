@@ -21,6 +21,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
@@ -733,7 +734,9 @@ export default async function handler(req, res) {
   res.setHeader?.('Cache-Control','no-store');
   if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
   const auth = req.headers?.authorization || '';
-  if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+  // (29 oct.) Comparaison en temps constant, comme cleValide / memeToken.
+  const _a = createHash('sha256').update(String(auth)).digest(), _b = createHash('sha256').update(`Bearer ${secret}`).digest();
+  if (!timingSafeEqual(_a, _b)) { res.status(401).json({error:'clé invalide'});return; }
 
 
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre

@@ -168,9 +168,23 @@ export default async function handler(req, res) {
       return;
     }
 
-    // 3) Profil (pseudo) — best-effort, ne bloque pas la connexion si indisponible.
+    // 3) Profil : Vinted doit CONFIRMER que ce jeton est bien celui de ce compte.
+    // ⚠️ (29 oct., audit de sécurité) Le jeton n'est décodé qu'ici, jamais vérifié :
+    // un jeton fabriqué (« account_id » de quelqu'un d'autre, « exp » lointain)
+    // passait sans appeler Vinted, et la ligne était créée chez l'appelant. Avec
+    // l'unicité GLOBALE de vinted_user_id (migration 023), le vrai titulaire ne
+    // pouvait plus lier son compte (« déjà pris »). Rien n'est écrit tant que
+    // Vinted n'a pas rendu CE compte (users/current, même identifiant).
     const profile = await fetchProfile({ host, accessToken: tokens.access_token, anonId, csrfToken });
-    const login = profile?.login || null;
+    if (!profile || profile.id == null) {
+      res.status(401).json({ error: 'Vinted n\'a pas confirmé ce token. Reconnecte-toi sur vinted.fr, puis recopie le token via l\'extension.' });
+      return;
+    }
+    if (String(profile.id) !== vintedUserId) {
+      res.status(403).json({ error: 'Ce token n\'est pas celui du compte qu\'il annonce : rien n\'a été enregistré.' });
+      return;
+    }
+    const login = profile.login || null;
 
     // 4) Upsert Supabase.
     const nowIso = new Date().toISOString();
