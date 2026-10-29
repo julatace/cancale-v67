@@ -941,6 +941,41 @@ function contratSuivi(a) {
     }
   };
   cherche(a, '', 0);
+  // (29 oct.) LE TRANSPORTEUR COURANT. Le suivi d'un achat (`journey_summary`)
+  // nomme ses transporteurs par un CODE (`current_carrier.code`, `carriers[].code`,
+  // `is_current`) et jamais par un nom : `transporteur` restait `null` sur ses
+  // 7 suivis rangés (mesuré), et un n° Vinted Go sans e-mail n'était jamais lu
+  // chez le transporteur. On prend `current_carrier`, sinon l'UNIQUE entrée de
+  // `carriers[]` marquée `is_current: true` (deux ⇒ aucune : pas deviné), et SON
+  // n° (`tracking_code`) avec lui — un trajet à deux transporteurs ne mêle
+  // jamais le code de l'un au n° de l'autre. Le code n'est gardé que s'il a la
+  // forme d'un code machine (lettre d'abord, sans espace) ; s'il n'y a pas de n°
+  // dans cet objet, on garde le n° trouvé ailleurs et on ne nomme personne.
+  const courant = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object' || Array.isArray(v)) return null;
+    for (const k of Object.keys(v)) {
+      const x = v[k];
+      if (/^current_carrier$/i.test(k) && x && typeof x === 'object' && !Array.isArray(x)) return x;
+      if (/^carriers$/i.test(k) && Array.isArray(x)) {
+        const c = x.filter((e) => e && typeof e === 'object' && !Array.isArray(e) && e.is_current === true);
+        if (c.length === 1) return c[0];
+      }
+    }
+    for (const k of Object.keys(v)) {
+      const x = v[k];
+      if (Array.isArray(x)) { for (const y of x) { const r = courant(y, prof + 1); if (r) return r; } continue; }
+      const r = courant(x, prof + 1); if (r) return r;
+    }
+    return null;
+  };
+  const cc = courant(a, 0);
+  if (cc) {
+    let nom = null;
+    for (const k of ['name', 'title', 'label']) { const x = cc[k]; if (typeof x === 'string' && x.trim() && !/^\d+$/.test(x.trim())) { nom = x.trim().slice(0, 80); break; } }
+    const code = typeof cc.code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{1,39}$/.test(cc.code.trim()) ? cc.code.trim() : null;
+    const n = suiviNumero(cc.tracking_code != null ? cc.tracking_code : cc.tracking_number);
+    if ((nom || code) && n) { transporteur = nom || code; suivi = n; }
+  }
   return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
 }
 // </suivi-regle>

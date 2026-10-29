@@ -71,6 +71,12 @@ const MUTATIONS = {
   corpsMr: ['const TRANSP_CORPS_MAX_MR = 196608;', 'const TRANSP_CORPS_MAX_MR = 65536;'],
   // (29 oct.) un 413 d'un serveur encore borné : plus de renvoi au contrat d'origine
   renvoi413: ["  if (status === 413 && (premier.octetsCorps > TRANSP_CORPS_MAX || premier.octetsEnvoi > TRANSP_ENVOI_MAX)) {", "  if (false) {"],
+  // (29 oct., tour 2) Vinted Go : la forme d'avant, sans les 12 chiffres du serveur
+  vg12: ['  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13}|\\d{12})$/,', '  vinted: /^(?:\\d{16}|VGS\\d{13}|[0-9A-Z]{13})$/,'],
+  // (29 oct., tour 2) le transporteur courant du suivi Vinted n'est plus lu
+  courant: ['  const cc = courant(a, 0);', '  const cc = null;'],
+  // (29 oct., tour 2) le n° pris ailleurs que chez le transporteur courant
+  paire: ['    if ((nom || code) && n) { transporteur = nom || code; suivi = n; }', '    if (nom || code) transporteur = nom || code;'],
 };
 
 const argv = process.argv;
@@ -630,6 +636,74 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     const g = monter({ items: [ITEM.cp], vrm: { brut: () => ({ status: 413, body: { error: 'trop-gros' } }) } });
     await tick(g);
     dit(g.brut.length === 1, "l'autre sens : un 413 sur un envoi qui tenait déjà dans le contrat n'est pas renvoyé", String(g.brut.length));
+  });
+
+  // ── 16. DE BOUT EN BOUT : CE QUE C3 ANNONCE, CE NAVIGATEUR LE LIT (tour 2) ─
+  // Vinted Go à 12 chiffres : le serveur le confiait (C3) et l'extension le
+  // refusait en silence (`transp_item_refuse`). On passe par la VRAIE règle de
+  // sélection du serveur (`suivisAInterroger`), puis par `itemTranspValide` et
+  // un passage réel : un n° annoncé est un n° LU.
+  await essaie('C3 lu de bout en bout', async () => {
+    let T = null;
+    try { T = await import(path.join(__dirname, '..', 'api', '_lib', 'transporteurs.js')); } catch (e) { dit(false, 'la règle du serveur se charge', e && e.message); return; }
+    const maintenant = Date.now(), recu = new Date(maintenant - 3600000).toISOString();
+    const lignes = [
+      { suivi: '100000000023', carrier: 'Vinted Go', status: 'available', emailAt: recu, receivedAt: recu },
+      { suivi: 'VGS0000000000002', carrier: 'Vinted Go', status: 'available', emailAt: recu, receivedAt: recu },
+      { suivi: '12345678901234', carrier: 'Chronopost', status: 'available', emailAt: recu, receivedAt: recu },
+    ];
+    let c3 = [];
+    try { c3 = T.suivisAInterroger({ lignes, maintenant, max: 6 }) || []; } catch (e) { dit(false, 'la sélection du serveur s\'exécute', e && e.message); return; }
+    const voieDe = T.VOIE_DE || T.VOIE_SERVEUR || { mondialrelay: 'mr-fr-mvc', chronopost: 'cp-ws2', vinted: 'vg-v3' };
+    const items = c3.map((x) => ({ carrier: x.carrier, suivi: x.suivi, cp: x.cp || null, voie: voieDe[x.carrier] }));
+    const vg12 = items.find((x) => x.suivi === '100000000023');
+    dit(!!vg12 && vg12.carrier === 'vinted', 'le serveur annonce bien un Vinted Go à 12 chiffres (C3)', JSON.stringify(items));
+    const g0 = monter();
+    const refuses = items.filter((x) => !(typeof g0.ctx.itemTranspValide === 'function' && g0.ctx.itemTranspValide(x)));
+    dit(items.length >= 3 && !refuses.length, 'chaque n° que C3 annonce est accepté par `itemTranspValide`', JSON.stringify(refuses));
+    if (!vg12) return;
+    const f = monter({ items: [vg12] });
+    await tick(f);
+    dit(JSON.stringify(urls(f)) === JSON.stringify([URL_VG('100000000023')]) && f.brut.length === 1, 'et il est LU chez Vinted Go, à l\'adresse exacte, puis relayé (C4)', JSON.stringify({ u: urls(f), d: f.j.diags }));
+    const g = monter();
+    const adresse = 'https://vintedgo.com/fr/tracking/100000000023';
+    await g.envoyer({ from: 'vrm-transp', action: 'transpVu' }, { tab: { id: 33, url: adresse }, url: adresse, frameId: 0 });
+    const c5 = g.j.vrmApi.filter((x) => x.mode === 'transp');
+    dit(c5.length === 1 && c5[0].corps && c5[0].corps.suivi === '100000000023', 'sa page de suivi Vinted Go ouverte le fait lire tout de suite (C5)', JSON.stringify(c5.map((x) => x.corps)));
+  });
+
+  // ── 17. LE SUIVI VINTED NOMME SON TRANSPORTEUR (tour 2) ────────────────────
+  // Mesuré sur sa base : `journey_summary.current_carrier.code`, `carriers[].code`
+  // et `is_current` existent, et ses 7 suivis rangés avaient `transporteur: null`
+  // ⇒ un n° Vinted Go trouvé là, sans e-mail, n'était lu par PERSONNE chez le
+  // transporteur. Le code et son n° viennent du MÊME objet (le transporteur
+  // courant). Valeurs inventées (le code réel « vinted_go » n'est pas mesuré).
+  await essaie('suivi Vinted : le transporteur courant', async () => {
+    const f = monter();
+    if (typeof f.ctx.contratSuivi !== 'function') { dit(false, '`contratSuivi` existe dans le fond'); return; }
+    const d = (h) => new Date(Date.now() - h * 3600000).toISOString();
+    const etapes = [{ title: 'Disponible pour retrait', status: 'available_for_pickup', date: d(2) }, { title: 'En transit', status: 'in_transit', date: d(30) }];
+    const VG16 = '1792000000000001';
+    const j1 = { journey_summary: {
+      carriers: [{ code: 'mondial_relay', priority: 0, is_current: false, tracking_code: '12345678', network_party_type: 'carrier' },
+        { code: 'vinted_go', priority: 1, is_current: true, tracking_code: VG16, network_party_type: 'carrier' }],
+      current_carrier: { code: 'vinted_go', priority: 1, is_current: true, tracking_code: VG16, tracking_url: 'https://vintedgo.com/fr/tracking/' + VG16 },
+      details: etapes } };
+    const r1 = f.ctx.contratSuivi(j1) || {};
+    dit(r1.transporteur === 'vinted_go' && r1.suivi === VG16, '`current_carrier` : son code ET son n° (jamais le n° de l\'autre trajet)', JSON.stringify({ t: r1.transporteur, s: r1.suivi }));
+    const j2 = { journey_summary: { carriers: [{ code: 'mondial_relay', is_current: false, tracking_code: '12345678' }, { code: 'vinted_go', is_current: true, tracking_code: VG16 }], details: etapes } };
+    const r2 = f.ctx.contratSuivi(j2) || {};
+    dit(r2.transporteur === 'vinted_go' && r2.suivi === VG16, 'sans `current_carrier` : l\'unique entrée `is_current` de `carriers[]`', JSON.stringify({ t: r2.transporteur, s: r2.suivi }));
+    const j3 = { journey_summary: { carriers: [{ code: 'mondial_relay', is_current: true, tracking_code: '12345678' }, { code: 'vinted_go', is_current: true, tracking_code: VG16 }], details: etapes } };
+    const r3 = f.ctx.contratSuivi(j3) || {};
+    dit(r3.transporteur == null, 'deux entrées « courantes » : aucun transporteur deviné', JSON.stringify({ t: r3.transporteur }));
+    const j4 = { journey_summary: { current_carrier: { code: 'vinted go !', tracking_code: VG16 }, details: etapes } };
+    const r4 = f.ctx.contratSuivi(j4) || {};
+    dit(r4.transporteur == null, 'un code qui n\'a pas la forme d\'un code machine n\'est pas pris', JSON.stringify({ t: r4.transporteur }));
+    let T = null;
+    try { T = await import(path.join(__dirname, '..', 'api', '_lib', 'transporteurs.js')); } catch (e) { dit(false, 'la règle du serveur se charge', e && e.message); return; }
+    const sel = T.suivisAInterroger({ vinted: [{ suivi: r1.suivi, transporteur: r1.transporteur, cap: d(1) }], maintenant: Date.now() }) || [];
+    dit(sel.length === 1 && sel[0].carrier === 'vinted' && sel[0].suivi === VG16, 'et le serveur le lit chez Vinted Go (sa règle `suivisAInterroger`, sans e-mail)', JSON.stringify(sel));
   });
 
   // ── 12. L'ÉTAT DIT AU NAVIGATEUR (C9, nav.indispo) ──────────────────────────
