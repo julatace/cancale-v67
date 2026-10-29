@@ -1,6 +1,7 @@
 import React from 'react';
 import {lireSynchronisationVinted} from './synchronisationVinted.js';
-export default function SynchronisationVinted({comptes,owner,ownerActuel,lire}){
+export default function SynchronisationVinted({comptes,owner,ownerActuel,lire,connexion,ecouter,verifier,relire}){
+ const [,maj]=React.useReducer(n=>n+1,0);React.useEffect(()=>ecouter?.(maj),[ecouter]);
  const [etat,setEtat]=React.useState({}),generation=React.useRef(0),busy=React.useRef(false),ouvert=React.useRef(false),recharger=React.useRef(null);
  const source=React.useRef({comptes,owner,ownerActuel,lire});source.current={comptes,owner,ownerActuel,lire};
  const cle=JSON.stringify([owner,comptes.map(c=>String(c.uid)).sort()]);
@@ -12,9 +13,11 @@ export default function SynchronisationVinted({comptes,owner,ownerActuel,lire}){
  if(!owner||!comptes.length)return null;
  return <details className="vrm-sync-comptes" onToggle={e=>{ouvert.current=e.currentTarget.open;if(ouvert.current)recharger.current?.();}}><summary>Synchronisation par compte{vue.charge?' · vérification…':vue.items?` · ${vue.items.length} compte${vue.items.length>1?'s':''}${aVerifier?` · ${aVerifier} lecture${aVerifier>1?'s':''} à vérifier`:''}`:vue.erreur?' · lecture indisponible':''}</summary>
   <p>Dates des captures reçues, pas des derniers messages. Une lecture ne garantit pas que tout l’historique a été récupéré.</p>
+  {verifier&&<button type="button" onClick={()=>{verifier();maj();}}>Vérifier la connexion de l’extension</button>}
+  {relire&&<button type="button" onClick={relire}>Relire les données des comptes</button>}
   <button type="button" disabled={vue.charge} onClick={charger}>Actualiser l’état</button>
   {vue.erreur&&<p role="alert">{vue.erreur}</p>}
-  <div className="vrm-sync-lignes">{vue.items?.map(c=><article key={c.uid}><strong>{comptes.find(x=>String(x.uid)===c.uid)?.nom||'Compte Vinted'}</strong>{['messages','favoris'].map(type=><div key={type}><b>{type==='messages'?'Messages':'Favoris'}</b><span>{c[type].libelle}</span><time dateTime={c[type].date?new Date(c[type].date).toISOString():undefined}>{c[type].date?new Date(c[type].date).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Date indisponible'}</time>{c[type].action&&<small>{c[type].action}</small>}</div>)}</article>)}</div>
+  <div className="vrm-sync-lignes">{vue.items?.map(c=><article key={c.uid}><strong>{comptes.find(x=>String(x.uid)===c.uid)?.nom||'Compte Vinted'}</strong>{connexion&&<div><b>{connexion(c.uid).titre}</b>{connexion(c.uid).action&&<small>{connexion(c.uid).action}</small>}{connexion(c.uid).action&&<a href="https://www.vinted.fr" target="_blank" rel="noreferrer">Ouvrir Vinted ↗</a>}</div>}{['messages','favoris'].map(type=><div key={type}><b>{type==='messages'?'Messages':'Favoris'}</b><span>{c[type].libelle}</span><time dateTime={c[type].date?new Date(c[type].date).toISOString():undefined}>{c[type].date?new Date(c[type].date).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Date indisponible'}</time>{c[type].action&&<small>{c[type].action}</small>}</div>)}</article>)}</div>
   <a href="https://www.vinted.fr" target="_blank" rel="noreferrer">Ouvrir Vinted pour compléter une lecture ↗</a>
  </details>;
 }

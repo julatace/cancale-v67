@@ -1,3 +1,5 @@
+import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
+import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted} from './suiviMessagerieVinted.js';
@@ -1764,6 +1766,7 @@ const SYNC_KEYS = [
   // (titre/description/prix préparés, avec l'historique des versions). Synchronisé
   // pour retrouver son travail sur un autre appareil.
   'vinted_annonce_drafts',
+  'vinted_prix_historique',
   // Factures PRO — plusieurs micro-entreprises. `vinted_entreprises` = liste des
   // entités [{id, companyName, companyType, companyAddress, siret, footer}] ;
   // `vinted_entreprise_active` = id de l'entité utilisée pour les nouvelles
@@ -11207,6 +11210,9 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   const prix0 = (it && it.price && typeof it.price === 'object') ? it.price.amount : (it && it.price);
   const [title, setTitle] = useState(draft && draft.title != null ? draft.title : (it.title || ''));
   const [price, setPrice] = useState(() => { const p = draft && draft.price != null ? draft.price : prix0; return p == null ? '' : String(p); });
+  const [desc,setDesc]=useState(draft?.desc??it.desc??it.description??'');
+  const [dimensions,setDimensions]=useState(draft?.dimensions||'');
+  const [caracteristiques,setCaracteristiques]=useState(draft?.caracteristiques||[it.brand,it.size].filter(Boolean).join(' · '));
   const [done, setDone] = useState(false);
   const photos = ((draft && draft.photos && draft.photos.length) ? draft.photos
     : (Array.isArray(it.photosDetail) && it.photosDetail.length ? it.photosDetail
@@ -11250,7 +11256,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   if (!prixOk) manques.push('le prix');
   if (!photos.length) manques.push('au moins une photo');
   const photoReglages = { commun: rCommun, parPhoto: rParPhoto };
-  const enregistrer = () => { onSave({ title: String(title).trim(), price: prixOk ? prixNum : null, photos, photoReglages, id: it.id }); setDone(true); setTimeout(onClose, 700); };
+  const enregistrer = () => { onSave({ title: String(title).trim(), desc:desc.trim(), dimensions:dimensions.trim(), caracteristiques:caracteristiques.trim(), price: prixOk ? prixNum : null, photos, photoReglages, id: it.id }); setDone(true); setTimeout(onClose, 700); };
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
   const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500, marginBottom: 4 };
   return (
@@ -11317,6 +11323,10 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             <textarea value={title} onChange={ev => setTitle(ev.target.value)} rows={2} data-atelier-titre style={{ ...champ, resize: 'vertical' }} /></label>
           <label style={{ display: 'block' }}><span style={maj}>Prix (€)</span>
             <input value={price} onChange={ev => setPrice(ev.target.value)} inputMode="decimal" data-atelier-prix style={{ ...champ, maxWidth: 160 }} /></label>
+          <label style={{display:'block'}}><span style={maj}>Description</span><textarea aria-label="Description du brouillon" value={desc} onChange={ev=>setDesc(ev.target.value)} rows={4} style={champ}/></label>
+          <label style={{display:'block'}}><span style={maj}>Caractéristiques (marque, modèle, état…)</span><input aria-label="Caractéristiques du brouillon" value={caracteristiques} onChange={ev=>setCaracteristiques(ev.target.value)} style={champ}/></label>
+          <label style={{display:'block'}}><span style={maj}>Dimensions — si utile, avec l’unité</span><input aria-label="Dimensions du brouillon" value={dimensions} onChange={ev=>setDimensions(ev.target.value)} placeholder="Ex. 30 × 20 × 10 cm" style={champ}/></label>
+          <p style={{fontSize:12,color:C.muted}}>Ces informations sont préparées dans VRM. Pour ajouter des photos ou renseigner les champs du catalogue Vinted, <a href={'https://www.vinted.fr/items/'+it.id+'/edit'} target="_blank" rel="noreferrer">compléter l’annonce sur Vinted ↗</a>.</p>
           {manques.length > 0 && <div data-atelier-manque style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>À compléter avant de publier : {manques.join(', ')}.</div>}
           {draft && <div style={{ fontSize: 11.5, color: C.muted }}>Dernier brouillon{draft.updatedAt ? ` le ${new Date(draft.updatedAt).toLocaleDateString('fr-FR')}` : ''}{draft.versions && draft.versions.length ? ` · ${draft.versions.length} version${draft.versions.length > 1 ? 's' : ''} gardée${draft.versions.length > 1 ? 's' : ''}` : ''}.</div>}
           <button type="button" data-atelier-enregistrer onClick={enregistrer} disabled={done}
@@ -35152,17 +35162,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // FUSIONNE (une clé éditée pendant le chargement n'est jamais écrasée, §5.49).
   const [drafts, setDrafts] = useState(() => { const d = load('vinted_annonce_drafts', {}); return d && typeof d === 'object' && !Array.isArray(d) ? d : {}; });
   React.useEffect(() => onCloudReady(() => setDrafts(local => { const nu = load('vinted_annonce_drafts', {}) || {}; return { ...nu, ...(local || {}) }; })), []);
+  const [prixHistorique,setPrixHistorique]=useState(()=>load('vinted_prix_historique',[])||[]);
+  React.useEffect(()=>onCloudReady(()=>setPrixHistorique(local=>[...new Map([...(load('vinted_prix_historique',[])||[]),...local].map(r=>[[r.uid,r.item,r.at].join(':'),r])).values()])),[]);
+  const noterPrix=(a,r)=>{if(r.ancien==null||r.nouveau==null||r.ancien===r.nouveau)return;setPrixHistorique(prev=>{const next=[...prev,{uid:String(a.uid),item:String(a.id),avant:r.ancien,apres:r.nouveau,at:new Date().toISOString()}];save('vinted_prix_historique',next);return next;});};
   const [atelier, setAtelier] = useState(null); // id de l'annonce en préparation, ou null
   // Enregistre/complète un brouillon sans jamais perdre l'ancienne version (§31).
   // `patch` ne remplace que ce qu'il porte ; le reste (et surtout le N°) est gardé.
   const saveDraft = (key, patch) => {
     const k = String(key || '').trim(); if (!k) return;
     setDrafts(prev => {
-      const cur = prev[k] || {};
+      const precedent = prev[k] || {};
+      const autreArticle = patch.id != null && precedent.id != null && String(patch.id)!==String(precedent.id);
+      const cur = autreArticle ? {} : precedent;
+      const archive = autreArticle ? {['article:'+precedent.id]:precedent} : {};
       const avant = (cur.title != null || cur.price != null || cur.desc != null)
         ? [{ title: cur.title, price: cur.price, desc: cur.desc, at: cur.updatedAt }] : [];
       const versions = [...avant, ...(Array.isArray(cur.versions) ? cur.versions : [])].slice(0, 10);
-      const next = { ...prev, [k]: { ...cur, ...patch, numero: cur.numero || k, versions, updatedAt: new Date().toISOString() } };
+      const next = { ...prev, ...archive, [k]: { ...cur, ...patch, numero: cur.numero || k, versions, updatedAt: new Date().toISOString() } };
       save('vinted_annonce_drafts', next); return next;
     });
   };
@@ -35214,10 +35230,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // 4) En ligne
     if (it) { const age = listedAgeDays(it); steps.push({ icon:'🟢', label:'En ligne', detail:[prix(it.price,it.currency)||null, age!=null?`depuis ${age} j`:null, it.views!=null?`👁 ${it.views}`:null, it.favourites!=null?`❤️ ${it.favourites}`:null].filter(Boolean).join(' · '), done:true }); }
     // 5) Vente
-    const sold = (sales.items||[]).find(o=>{ const ee=effEntry(o); return ee && num && String(ee.numero)===String(num); });
+    const sold = (sales.items||[]).find(o=>it?.id&&String(txnItem[String(o.transaction_id)]||'')===String(it.id)&&String(o._acc?.vinted_user_id||'')===String(it._acc?.vinted_user_id||''));
     if (sold) { const st=classifyOrderStatus(sold.status); const sp=sold.price?.amount!=null?Number(sold.price.amount):null; steps.push({ icon: st==='cancelled'?'✖️':'💸', label: st==='cancelled'?'Vente annulée':(st==='completed'?'Vendue':'Vente en cours'), detail:[sp!=null?`${sp.toFixed(0)} €`:null, sold.date?`le ${new Date(sold.date).toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:st==='completed' }); }
     // 6) Bordereau / expédition
-    const bord = bordForItem(it ? it.id : null, num);
+    const bord = bordForItem(it ? it.id : null, null);
     if (bord) steps.push({ icon:'📮', label:'Bordereau reçu — à expédier', detail: bord.dateLimite?`avant le ${bord.dateLimite}`:'', done:true });
     return steps;
   };
@@ -35604,9 +35620,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Sur un appel RÉEL (force) : on marque bloqué si Vinted REFUSE le compte, on
   // débloque dès qu'un appel repasse. Une session expirée ne masque rien : les
   // annonces viennent de la moisson de l'extension, pas du jeton.
+  const [syncReponses,setSyncReponses]=useState({});
   const noteAcctLive = (uid, res, force) => {
     if (!force || !uid) return;
     const k = String(uid);
+    setSyncReponses(prev=>({...prev,[k]:res.ok?null:res.error===401||/\b401\b/.test(String(res.error||''))?'expiree':'incomplete'}));
     setBlockedAccts(prev => {
       const n = new Set(prev); const was = n.has(k);
       if (!res.ok && isBanni(res.error)) n.add(k);
@@ -43443,10 +43461,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             nommés au rendu — y compris quand la liste vient du cache. */}
         {nomsVentesKO.length>0 && (
           <div data-ventes-ko={nomsVentesKO.length} style={{fontSize:12,fontWeight:500,color:C.warn,background:`${C.warn}12`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'8px 12px',marginBottom:12,lineHeight:1.4}}>
-            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — session expirée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
+            ⚠️ {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} ({nomsVentesKO.join(', ')}) — lecture non confirmée. Ouvre ce compte sur vinted.fr (l'extension le recapte) ou reconnecte-le, puis « Synchroniser ».
           </div>
         )}
         {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
+        <ComparaisonComptesVinted rows={comparerComptes({comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)})),ventes:sales.items||[],stock:(listings.items||[]).filter(it=>!acctOffOf(it)&&!blockedAccts.has(String(it._acc?.vinted_user_id))&&!soldManual.has(String(it.id))&&!annoncesVendues.has(String(it.id))),dansPeriode:o=>dansPeriode(o,periode),finalisee:o=>classifyOrderStatus(o.status)==='completed',masquee:isHidden,meta:effEntry,aFaire:o=>aExpedier(o)&&!isShipDone(o)})} periode={libellePeriode(periode)} disponible={Array.isArray(sales.items)&&!sales.loading&&!sales.error&&!(sales.failedUids||[]).some(u=>!acctOff(u))} stockDisponible={Array.isArray(listings.items)&&!listings.loading&&!listings.error&&!listings.incomplet} charger={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
@@ -45314,6 +45333,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             dit déjà où l'on est : pas de second titre. */}
         {!dansPlateforme && <ScreenHead icon="tag" title="Annonces en ligne" />}
         <NoAcc/>
+        <AnnoncesACompleter items={annBase} numeros={numeros} drafts={drafts} ouvrir={setAtelier} charger={()=>loadListings(true)} charge={listings.loading} PhotoVinted={PhotoVinted} incomplet={!Array.isArray(listings.items)||!!listings.error||!!listings.incomplet}/>
         {astuceNum && listings.items?.length>0 && (
           <div data-astuce-numeros style={{display:'flex',gap:10,alignItems:'flex-start',background:`${C.accent}0e`,border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px',margin:'0 0 12px',fontSize:12.5,lineHeight:1.5,color:C.muted}}>
             <span aria-hidden="true" style={{fontSize:15,lineHeight:1.3}}>🔢</span>
@@ -46214,7 +46234,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='messages' && (<>
         {!dansPlateforme && <ScreenHead icon="chat" title="Messages" />}
         <NoAcc/>
-        <SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})}/>
+        <SynchronisationVinted comptes={accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)}))} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} connexion={uid=>diagnosticConnexion({uid,owner:AUTH.user?.id,extension:__vmrEtat,reponse:syncReponses[String(uid)]})} ecouter={onVmrExt} verifier={()=>sonderPonts()} relire={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
           <button type="button" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
           <button type="button" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><span aria-hidden="true">♡</span>Favoris reçus</button>
@@ -48824,7 +48844,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              téléverse lui-même sur Vinted. Aucune modif auto (refus tenu). ── */}
       {photoEdit && <PhotoEditor refPhoto={photoEdit.refPhoto} refTitle={photoEdit.refTitle} onClose={()=>setPhotoEdit(null)} toast={toast} />}
       {atelier!=null && (()=>{ const it=(listings.items||[]).find(x=>String(x.id)===String(atelier)); if(!it) return null; const e=numeros[atelier]||{}; const k=String((e&&e.numero)||atelier); return (
-        <AtelierBrouillon it={it} e={e} k={k} draft={drafts[k]} onSave={(p)=>saveDraft(k,p)} onClose={()=>setAtelier(null)} />
+        <AtelierBrouillon it={it} e={e} k={k} draft={String(drafts[k]?.id)===String(it.id)?drafts[k]:null} onSave={(p)=>saveDraft(k,p)} onClose={()=>setAtelier(null)} />
       ); })()}
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
@@ -48886,8 +48906,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (la nouvelle n'est donc jamais numérotée à neuf) ; l'ancienne fiche reste
         // (elle porte l'historique, sa suppression est notée : plus présente).
         const reporterNumero = (ancienId, nouvelId) => setNumeros(prev => {
-          const e = prev[ancienId]; if (!e || !nouvelId || prev[nouvelId]) return prev;
-          const u = { ...prev, [nouvelId]: { ...e, recreeDe: String(ancienId), recreeAt: new Date().toISOString() } };
+          const e = prev[ancienId], cible=prev[nouvelId]||{}; if (!e || !nouvelId || (cible.numero&&String(cible.numero)!==String(e.numero))) return prev;
+          const u = { ...prev, [nouvelId]: { ...e, ...cible, numero:cible.numero||e.numero, recreeDe: String(ancienId), recreeAt: new Date().toISOString() } };
           save('vinted_annonce_numeros', u); return u;
         });
         const publierR = async (a, v) => {
@@ -48903,9 +48923,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // prix et le titre EXACTS de l'aperçu ; jamais sous le prix d'achat.
         const publierModif = async (a, v) => {
           if(!a.uid) return { etat:'echec', raison:'compte introuvable' };
+          const ownerPrix=AUTH.user?.id;
           const r=await vmrCmdSuivi({ cmd:'republierVinted', uid:a.uid, id:a.id, prix:v.prix!=null?v.prix:undefined, titre:v.titre!=null?v.titre:undefined, plancher:a.floor, confirme:true }, 60000);
           if (r.sansReponse) return { etat:'incertain', code:'sans-reponse', raison:TEXTE_SANS_REPONSE };
-          if (r && r.accepte && r.etape==='fait') return { etat:'fait', nouveau:r.nouveau };
+          if (r && r.accepte && r.etape==='fait') { if(ownerPrix&&AUTH.user?.id===ownerPrix)noterPrix(a,r); return { etat:'fait', nouveau:r.nouveau }; }
           return { etat:'echec', code:(r&&r.code)||'', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
         };
         // (28 oct., 5.252) En ligne → brouillon : la même recréation, arrêtée au
@@ -49008,6 +49029,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" onClick={()=>setPassportFor(null)} style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'16px 18px'}}>
+              <HistoriqueArticle key={String(AUTH.user?.id)+':'+it?.id} item={it?.id} uid={it?._acc?.vinted_user_id} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} lire={q=>lireTout(q,{strict:true})} numeros={numeros} prix={prixHistorique}/>
               {steps.length===0 ? <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Pas encore d'historique pour cet article.</div> : (
                 <div style={{position:'relative',paddingLeft:8}}>
                   {steps.map((s,i)=>(
