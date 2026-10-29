@@ -13,12 +13,14 @@
 > `useRelectureTransporteurs`. L'extension n'est qu'un SECOURS (C3 : ce que le transporteur refuse au serveur ; C4 : la
 > réponse brute, jugée par la MÊME fonction serveur ; `transpTick`, `transp-page.js`). Version : la « 5.217 » du chantier
 > était déjà PUBLIÉE par `main` avec un autre contenu, et la 5.280 prise par `main` pendant la fusion ⇒ **5.281.0** (`EXT_ATTENDUE`, `EXT_CAPACITES.transp`,
-> `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`, zips). ⚠️⚠️ **21 défauts reproduits par deux relecteurs le 24 oct.
-> ne sont PAS encore corrigés** (dont : retour/incident ignoré sur un achat Vinted sans arrivée ; colis email en transit
-> qui disparaît sur un retour transporteur ; nouvelle arrivée qui ne sonne pas ; pause Chronopost par vendeur), plus côté
-> extension : Chronopost à 14 caractères refusé (`\d{14}[0-9A-Z]` contre `[0-9A-Z]?` au serveur), `mr-be` jamais tenté en
-> repli de `mr-fr-mvc`, corps tronqué à 64 Ko (serveur 192 Ko). Un correcteur travaille dans `v29-colis-ext`. Ne pas
-> présenter ce suivi comme fiable avant. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
+> `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`, zips). ⚠️⚠️ **Le 29 oct. au soir, `main` a publié 5.281, 5.283 et
+> 5.284 sans ce code** : à l'intégration, monter l'extension (≥ 5.285, jamais servie) ET `EXT_CAPACITES.transp` ensemble
+> (`audit-coherence`, `audit-extension-zip` le disent rouge d'ici là). Des 21 défauts reproduits le 24 oct., **les n° 1 à 11
+> (règles, états, écran) sont corrigés** — « Statut chez le transporteur, tour 1 » en fin de dossier ; **les n° 12 à 21
+> (notifications : nouvelle arrivée qui ne sonne pas, `push_dedup` raté, doublons suivi Vinted / transporteur, pause
+> Chronopost par vendeur, bornes de temps, garde des 72 h…) restent OUVERTS**. Côté extension (Chronopost 14 caractères,
+> `mr-be` en repli de `mr-fr-mvc`, corps 192 Ko, conversations UUID, achats au point relais lus d'abord) : branche
+> `v29-colis-ext`. Ne pas présenter les notifications de ce suivi comme fiables avant. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
 > (`audit-politique-hotes` 1, `audit-preuve-vente` 18 — déjà là) ; `audit-statut-transporteurs` (`--prouve` 29/29),
 > `audit-mondialrelay-serveur` (24/24), `audit-transp-ext` (11/11) verts, rouges sur `main` (24 · 6 · 54) ; banc
 > `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
@@ -14843,3 +14845,50 @@ DEPUIS ce conteneur cette fois (curl 200), alors que §8 le disait bloqué : la
 connexion Vercel de la session, elle, ne voyait pas l'équipe du projet (404 sur
 `list_deployments`/`web_fetch_vercel_url`) — vérifier d'abord par `curl` l'endpoint
 public `/api/sante`, sans supposer l'un ou l'autre.
+
+### Statut chez le transporteur, tour 1 : un colis sorti l'est PARTOUT (29 octobre)
+Plainte de Julien : un colis que le transporteur dit retiré, livré ou reparti
+restait « à retirer » (Achats, Ma journée, widget, rappels), et un achat Vinted
+sans code s'affichait à côté de son propre e-mail. Règles (une, un propriétaire) :
+- **Arrivée SÛRE ≠ borne** (`etatColisVinted` : `arriveeSure`, `borneMs`) : la
+  capture des achats n'est jamais l'arrivée d'un retour ; `sortiParSuivis(…, {borne})`
+  (retour/incident comptent sans arrivée sûre ; un statut inconnu après la borne).
+  La publication `vrm_colis_retirer.colis` porte `[limite, arrivée, transporteur,
+  clé, sûre 1/0, n° d'un achat Vinted, limiteAt]` + `enVerification` ; le widget
+  relit avec la même règle (`issueDesFins` : incident ⇒ « à vérifier », jamais
+  « sorti » ; un n° que le transporteur seul dit disponible depuis la photo est
+  compté ; `pickupAuMoins` si des achats sont en vérification).
+- **Un colis qui sort de « à retirer » atterrit ailleurs** : e-mail resté « en
+  transit » ou n° ajouté à la main, que le transporteur dit reparti/incident ⇒
+  « repartis » / « à vérifier ». Repartis : 30 jours (`repartiAffichable`), toutes
+  sources. **Un n°, une carte** : un achat sans code au n° d'un e-mail connu ne
+  s'affiche pas deux fois. Achat sans code NI n° à côté d'un e-mail sans commande
+  ⇒ « en cours de vérification » (Achats + une ligne de Ma journée), hors total.
+- **Plus de fenêtre de 45 j** chez les lecteurs (app, widget, cron) : une ligne
+  finie se lit toujours. **Mondial Relay** : route/prise en charge APRÈS
+  « N jours restants » ⇒ `incident/quitte_relais` ; une limite « vers le » passée
+  ne lève jamais la garde ; `introuvable` à un code postal saisi non prouvé ⇒
+  `cp-inconnu` + `cpRefuse` (corrigé ⇒ relu tout de suite ; un n° fermé ainsi
+  sous l'ancienne règle se relit). **Vinted Go** : retour seulement sur les
+  valeurs relevées (`return_cancelled` n'est pas un retour), `limiteAt` (l'heure
+  d'`expiration_time`) jusqu'à la carte, `etatRetrait` (heure passée ⇒ délai
+  dépassé le jour même) et le rappel (« avant 10 h 34 ») ; n° à 12 chiffres lisible.
+- **Rappel du matin** : les n° que le transporteur seul dit disponibles (ligne
+  synthétique, comme l'app), sauf commande cochée « Je l'ai retiré »
+  (`vinted_pickup_done`, reliée par le n°). Plus jamais « sans doute reparti ».
+- **« Sans doute reparti » retiré partout** (Achats, Ma journée, notifications) : mesuré
+  le 29, les 5 colis ainsi nommés avaient TOUS été retirés ; « à vérifier », et seuls le
+  transporteur ou Vinted disent « reparti ».
+- Preuves : `audit-statut-transporteurs.cjs` §9 (**23 rouges sur 8f62e6f2**,
+  `--prouve` 49/49) ; banc `transporteurs.cjs` §E (390 + 1512, **29 rouges sur le
+  build de 8f62e6f2**, constat d compris) ; `node scripts/prouve-banc-transporteurs.cjs`
+  (9 mutations de l'app — borne d'arrivée, « nulle part », une carte, en vérification,
+  limite sur la carte et dans la publication, 30 jours, fenêtre de 45 j, « sans doute »
+  — chacune rouge sur SON contrôle, build et banc lancés dans une copie de l'arbre).
+- **À faire côté extension (v29-colis-ext) pour le constat c** : le n° de suivi d'un
+  achat au point relais (`journey_summary`, `harvest_{uid}_suivi_{tx}`) doit être lu
+  AVANT de relire les achats en route ; tant qu'il manque, l'app range l'achat « en
+  cours de vérification » (hors total) — jamais relié par lieu, date ou titre.
+- ⚠️ **Non mesuré** : la vraie forme d'un `return_*` Vinted Go autre que ceux
+  relevés ; une vraie séquence Mondial Relay « re-livré » ; aucun appel réel aux
+  transporteurs n'a été fait pour ces corrections (formes de `mesures.json`).
