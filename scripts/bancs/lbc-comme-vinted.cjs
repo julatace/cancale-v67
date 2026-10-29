@@ -69,7 +69,7 @@ const rows = [
   { id: 'lbc_listings', data: { items: ITEMS, lectures: { [MON]: { at: ilYa(0.01), total: 3, n: 3 } } } },
   { id: 'lbc_accounts', data: { accounts: { [MON]: { id: MON, name: 'Totomondu', type: 'particulier', sessionAt: auj.toISOString(), source: 'session:messagerie' } } } },
   { id: 'lbc_ventes', data: { ventes: VENTES } },
-  { id: 'lbc_messages', data: { compteurs: { [MON]: { unread: 3, at: auj.toISOString() } }, comptes: { [MON]: { name: 'Totomondu', pro: false, at: auj.toISOString() } } } },
+  { id: 'lbc_messages', data: { compteurs: { [MON]: { unread: 3, at: auj.toISOString() } }, comptes: { [MON]: { name: 'Totomondu', pro: false, at: auj.toISOString() }, 'faf3aaaa-0000-4000-8000-000000000002': { name: 'SHOPCANCALE', pro: true, at: auj.toISOString() }, 'faf3aaaa-0000-4000-8000-000000000003': { name: 'Autre boutique', pro: false, at: auj.toISOString() } } } },
 ];
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
@@ -178,6 +178,10 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       const z0 = await o2.pg.evaluate(() => ({ zone: (document.querySelector('[data-messages-lbc-zone]') || { getAttribute: () => null }).getAttribute('data-messages-lbc-zone'), boutons: [...document.querySelectorAll('.vrm-messages-sections button')].map((x) => x.textContent.trim()), conv: (document.querySelector('[data-messages-lbc]') || { getAttribute: () => null }).getAttribute('data-messages-lbc') }));
       dit(z0.zone === 'conversations' && z0.boutons.length === 2 && /Conversations/.test(z0.boutons[0]) && /Favoris reçus/.test(z0.boutons[1]), 'deux zones, comme Vinted : Conversations · Favoris reçus', JSON.stringify(z0));
       dit(z0.conv === '3', 'Conversations : le nombre de non-lus relevé', z0.conv);
+      // §7 : deux comptes jamais lus ⇒ le geste « connecte-toi une fois » est dit
+      // UNE fois sous la liste, pas sur chaque ligne ; chaque compte reste nommé.
+      const g0 = await o2.pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); const t = e ? e.innerText : ''; return { n: (t.match(/connecte-toi une fois/g) || []).length, shop: /SHOPCANCALE/.test(t), autre: /Autre boutique/.test(t), tirets: [...document.querySelectorAll('[data-compte-lbc]')].length }; });
+      dit(g0.n === 1 && g0.shop && g0.autre && g0.tirets === 3, 'Messages : deux comptes pas encore lus — le geste est dit UNE fois, chaque compte reste nommé', JSON.stringify(g0));
       await o2.pg.click('[data-lbc-zone-favoris]').catch(() => {});
       await o2.pg.waitForSelector('[data-favoris-lbc]', { timeout: 10000 }).catch(() => {});
       await o2.pg.waitForTimeout(400);
@@ -185,6 +189,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       dit(f && f.lignes.join() === '3290000001:9,3290000002:4,3290000005:passu', 'Favoris reçus : SES annonces EN VENTE sur Leboncoin, triées par favoris (pas celle vendue sur Leboncoin)', f && f.lignes.join());
       dit(f && /jamais qui/i.test(f.t) && /écrire à personne/.test(f.t), '… la phrase dit que Leboncoin ne donne pas QUI, et que VRM n’écrit à personne', f && f.t.slice(0, 160));
       dit(f && !/\b0 ♡/.test(f.t) && /—/.test(f.t), '… un nombre jamais relevé s’écrit « — », pas 0', f && f.t.replace(/\n/g, ' · ').slice(0, 200));
+      dit(f && (f.t.match(/ouvre (?:ses|les) statistiques/gi) || []).length === 1, '… le geste « ouvre ses statistiques » est dit UNE fois (pas sur chaque annonce pas relevée)', f && String((f.t.match(/ouvre (?:ses|les) statistiques/gi) || []).length));
       const d2 = await deborde(o2.pg);
       dit(d2.sw <= d2.cw + 1, 'aucun débordement (messages)', `${d2.sw}/${d2.cw}`);
       dit(o2.errs.length === 0, 'aucune erreur d’app (messages)', o2.errs.join(' | ').slice(0, 160));

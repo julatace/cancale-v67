@@ -51018,7 +51018,7 @@ function ConversationsLeboncoin() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}{l.type ? <span style={{ fontWeight: 400, color: C.muted }}>{' · ' + l.type}</span> : null}</div>
               <div style={{ fontSize: 11.5, color: C.muted, marginTop: 1 }}>
-                {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu — connecte-toi une fois à ce compte sur leboncoin.fr'}
+                {l.c ? <>mis à jour {age(l.c.at)}{vieux ? ' — ouvre leboncoin.fr sur ce compte pour le mettre à jour' : ''}</> : 'pas encore lu'}
               </div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right', opacity: vieux ? 0.55 : 1 }}>
@@ -51027,6 +51027,9 @@ function ConversationsLeboncoin() {
           </div>
         );
       })}
+      {/* Un compte « pas encore lu » : le geste est dit UNE fois, sous la liste
+          (§7) — pas sur chaque ligne. */}
+      {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension, et son nombre de messages arrivera ici.</div> : null}
       {ouvrir}
       <div style={{ fontSize: 11, color: C.muted, marginTop: 10, lineHeight: 1.5 }}>On répond sur Leboncoin : Leboncoin ne donne à VRM que le nombre de non-lus, pas les messages.</div>
     </div>
@@ -51088,7 +51091,7 @@ function FavorisLeboncoin() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || 'Annonce'}</div>
                 <div style={{ fontSize: 11.5, color: C.muted }}>
-                  {f != null ? <>{Number.isFinite(st.vues) ? `${st.vues} vue${st.vues > 1 ? 's' : ''} · ` : ''}{Number.isFinite(st.messages) ? `${st.messages} message${st.messages > 1 ? 's' : ''} · ` : ''}relevé {st.au ? `le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}</> : 'pas encore relevé — ouvre ses statistiques sur Leboncoin'}
+                  {f != null ? <>{Number.isFinite(st.vues) ? `${st.vues} vue${st.vues > 1 ? 's' : ''} · ` : ''}{Number.isFinite(st.messages) ? `${st.messages} message${st.messages > 1 ? 's' : ''} · ` : ''}relevé {st.au ? `le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}</> : 'pas encore relevé'}
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
