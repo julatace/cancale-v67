@@ -404,6 +404,102 @@ async function navigateur() {
       dit(!errs.length, 'D : aucune erreur d\'app', errs[0]);
       await ctx.close();
     });
+    // ── E. Tour 1 du 29 octobre (revue n° 1, 2, 3, 5, 8, 10 ; constats a, b) ──
+    //    Une base À PART (les colis de A à D n'y sont pas), aux deux tailles.
+    const RELAIS_ST = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
+    const achatE = (tx, conv, title) => ({ transaction_id: tx, conversation_id: conv, title, price: { amount: '45', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: j(3) });
+    const suiviV = (tx, suivi, transporteur) => ({ id: `harvest_111_suivi_${tx}`, data: { v: 1, tx: String(tx), source: 'journey', capturedAt: j(0.05), transporteur, suivi, etapes: [], forme: {}, dernier: null } });
+    const LIM_AT = new Date(Date.parse(dans(1) + 'T09:34:00Z')).toISOString();   // 10 h 34 à Paris (heure d'hiver)
+    const ROWS_E = () => [
+      { id: 'main', data: { vrm_colis_collected: ['XW000000076TS'] } },
+      { id: 'panel_colis_relais', data: {} },
+      { id: 'harvest_111_orders_purchased', data: { capturedAt: j(0.05), payload: { my_orders: [
+        achatE(9701, 7701, 'Achat V1 reparti chez le transporteur'),
+        achatE(9703, 7703, 'Achat V3 Vinted Go'),
+        achatE(9706, 7706, 'Achat au même n° que son e-mail'),
+        achatE(9707, 7707, 'Achat sans aucune identité'),
+      ] } } },
+      // n° 1 : arrivée = la capture (il y a 1 h) ; le transporteur dit reparti il y a 2 jours.
+      suiviV(9701, 'XW000000071TS', 'Chronopost'),
+      transp('chronopost', 'XW000000071TS', { etat: 'retour_expediteur', etatAt: j(2), libelle: 'Retour à l\'expéditeur', lu: j(0.02) }),
+      // n° 2 : un e-mail resté « en transit », le transporteur dit « a quitté le point relais ».
+      track('email_track_chronopost_XW000000072TS', { carrier: 'chronopost', suivi: 'XW000000072TS', status: 'transit', statusLabel: 'En cours de livraison', subject: 'Information sur votre colis XW000000072TS', code: null, lieu: null, receivedAt: j(2), emailAt: j(2), arriveLe: null, limite: null }),
+      transp('chronopost', 'XW000000072TS', { etat: 'incident', detail: 'quitte_relais', etatAt: j(0.5), libelle: 'Colis sorti du point relais', lu: j(0.02) }),
+      // n° 2 : un n° ajouté à la main, que le transporteur dit reparti.
+      { id: 'colis_suivi_mondialrelay_12345671', data: { suivi: '12345671', transporteur: 'mondialrelay', codePostal: '99999', at: j(4) } },
+      transp('mondialrelay', '12345671', { etat: 'retour_expediteur', etatAt: j(1), libelle: 'Colis en retour vers l\'expéditeur', lu: j(0.02), cp: '99999' }),
+      // n° 3 : une lecture « disponible » récente dont la limite DÉDUITE est passée ⇒ la garde reste.
+      track('email_track_mondialrelay_12345672', { carrier: 'mondialrelay', suivi: '12345672', subject: 'Votre colis 12345672 est disponible 📦', code: '727272', lieu: BAR, receivedAt: j(6.5), emailAt: j(6.5), arriveLe: j(6.5), limite: null }),
+      transp('mondialrelay', '12345672', { etat: 'disponible', etatAt: j(6.4), libelle: 'Colis disponible au Point Relais', lu: new Date(NOW - H).toISOString(), limite: dans(-1), limiteSure: false }),
+      // n° 5 : un achat Vinted dont Vinted Go donne la limite ET l'heure.
+      suiviV(9703, '1234567890123403', 'Vinted Go'),
+      transp('vinted', '1234567890123403', { etat: 'disponible', etatAt: j(1), libelle: 'Ton colis t\'attend', lieuNom: 'Consigne Banc', lu: j(0.02), limite: dans(1), limiteSure: true, limiteAt: LIM_AT }),
+      // n° 8 : retiré il y a 60 jours (ligne finie) — jamais revenu « à vérifier ».
+      track('email_track_mondialrelay_12345673', { carrier: 'mondialrelay', suivi: '12345673', subject: 'Votre colis 12345673 est disponible 📦', code: '737373', lieu: BAR, receivedAt: j(70), emailAt: j(70), arriveLe: j(70), limite: null }),
+      transp('mondialrelay', '12345673', { etat: 'retire', etatAt: j(60), libelle: 'Colis livré au destinataire', lu: j(60), essai: j(60), fini: true }),
+      // n° 10 : reparti il y a 40 jours (transporteur seul) ⇒ plus montré ; il y a 10 jours ⇒ montré.
+      track('email_track_mondialrelay_12345675', { carrier: 'mondialrelay', suivi: '12345675', subject: 'Votre colis 12345675 est disponible 📦', code: '757575', lieu: BAR, receivedAt: j(45), emailAt: j(45), arriveLe: j(45), limite: null }),
+      transp('mondialrelay', '12345675', { etat: 'retour_expediteur', etatAt: j(40), libelle: 'Colis en retour vers l\'expéditeur', lu: j(0.02) }),
+      track('email_track_mondialrelay_12345676', { carrier: 'mondialrelay', suivi: '12345676', subject: 'Votre colis 12345676 est disponible 📦', code: '767600', lieu: BAR, receivedAt: j(12), emailAt: j(12), arriveLe: j(12), limite: null }),
+      transp('mondialrelay', '12345676', { etat: 'retour_expediteur', etatAt: j(10), libelle: 'Colis en retour vers l\'expéditeur', lu: j(0.02) }),
+      // constat a : le même n° vu par Vinted (sans code) qu'un e-mail coché « retiré » ⇒ UNE carte (aucune).
+      track('email_track_chronopost_XW000000076TS', { carrier: 'chronopost', suivi: 'XW000000076TS', subject: 'Votre colis est disponible dans votre Relais Pickup', code: '767676', lieu: RELAIS }),
+      suiviV(9706, 'XW000000076TS', 'Chronopost'),
+      // un vrai colis à retirer (e-mail avec code), d'un compte qui n'a aucune commande reliée.
+      track('email_track_chronopost_XW000000077TS', { carrier: 'chronopost', suivi: 'XW000000077TS', subject: 'Votre colis est disponible dans votre Relais Pickup', code: '777700', lieu: RELAIS, limite: dans(3) }),
+    ];
+    const lireE = (pg) => pg.evaluate(() => {
+      const conv = (el) => [...el.querySelectorAll('a[href*="/inbox/"]')].map((a) => (a.getAttribute('href') || '').split('/inbox/')[1]);
+      const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => { const s = c.querySelector('[data-colis-suivi]'); const lt = c.querySelector('[data-colis-limite-transp]'); return { suivi: s ? s.getAttribute('data-colis-suivi') : null, conv: conv(c), t: c.innerText, limTransp: lt ? lt.getAttribute('data-colis-limite') : null, limTxt: lt ? lt.innerText : '' }; });
+      return {
+        cartes, total: (document.querySelector('[data-achats-onglet="attente"]') || { getAttribute: () => null }).getAttribute('data-n'),
+        verif: [...document.querySelectorAll('[data-a-verifier] [data-oublie]')].map((x) => x.getAttribute('data-colis-suivi')),
+        verifV: [...document.querySelectorAll('[data-a-verifier] [data-a-verifier-vinted]')].map((x) => x.getAttribute('data-a-verifier-vinted')),
+        repS: [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => x.getAttribute('data-reparti-suivi')),
+        repT: [...document.querySelectorAll('[data-repartis] [data-reparti-tx]')].map((x) => x.getAttribute('data-reparti-tx')),
+        enVerif: [...document.querySelectorAll('[data-en-verification-tx]')].map((x) => x.getAttribute('data-en-verification-tx')),
+        verifTxt: (document.querySelector('[data-a-verifier]') || { innerText: '' }).innerText,
+        texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
+      };
+    });
+    for (const [nom, vp, sombre] of tailles) {
+      await essaie(`E ${nom}`, async () => {
+        const ROWS = ROWS_E();
+        const { ctx, pg, errs } = await preparer(b, vp, sombre, { rows: ROWS });
+        await ouvrirAchats(pg, errs);
+        const r = await lireE(pg);
+        const parConv = (c) => r.cartes.find((x) => x.conv.includes(String(c)));
+        const partout = (n) => [...r.cartes.map((c) => c.suivi), ...r.verif, ...r.repS].includes(n);
+        dit(!parConv(7701) && r.repT.includes('9701'), `E ${nom} n° 1 : un achat Vinted (arrivée = la capture d'il y a 1 h) que le transporteur dit reparti il y a 2 j ⇒ « repartis », plus « à retirer »`, `repartis=${r.repT.join(',')} · carte=${!!parConv(7701)}`);
+        dit(r.verif.includes('XW000000072TS'), `E ${nom} n° 2 : un e-mail resté « en transit », le transporteur dit « a quitté le point relais » ⇒ « à vérifier » (jamais nulle part)`, `à vérifier=${r.verif.join(',')}`);
+        dit(r.repS.includes('12345671'), `E ${nom} n° 2 : un n° ajouté à la main que le transporteur dit reparti ⇒ « repartis »`, `repartis=${r.repS.join(',')}`);
+        dit(!r.cartes.some((c) => c.suivi === '12345672') && r.verif.includes('12345672'), `E ${nom} n° 3 : une limite déduite (« vers le ») déjà passée ⇒ la garde n'est pas levée (« à vérifier »)`, `à vérifier=${r.verif.join(',')}`);
+        const v3 = parConv(7703);
+        dit(!!v3 && v3.limTransp === dans(1) && /10 h 34/.test(v3.limTxt), `E ${nom} n° 5 et n° 11 : un achat Vinted porte la limite du transporteur, avec son heure`, v3 ? `${v3.limTransp} « ${v3.limTxt} »` : 'pas de carte');
+        // constat d (29 oct.) : « à vérifier » ne conclut JAMAIS « sans doute reparti » — mesuré,
+        // les 5 colis ainsi nommés avaient tous été retirés. Seuls le transporteur ou Vinted le disent.
+        dit(r.verif.length > 0 && !/sans doute|repartis? chez le vendeur/i.test(r.verifTxt), `E ${nom} constat d : le bloc « à vérifier » ne dit jamais « sans doute reparti »`, r.verifTxt.replace(/\s+/g, ' ').slice(0, 140));
+        dit(!partout('12345673'), `E ${nom} n° 8 : retiré il y a 60 jours (ligne finie, ancienne) ⇒ nulle part (ni « à retirer », ni « à vérifier »)`, `à vérifier=${r.verif.join(',')}`);
+        dit(!r.repS.includes('12345675') && r.repS.includes('12345676'), `E ${nom} n° 10 : reparti il y a 40 j ⇒ plus montré ; il y a 10 j ⇒ montré`, `repartis=${r.repS.join(',')}`);
+        dit(!parConv(7706) && !r.enVerif.includes('9706'), `E ${nom} constat a : un achat Vinted sans code au même n° qu'un e-mail (coché « retiré ») ⇒ aucune seconde carte`, `carte=${!!parConv(7706)}`);
+        dit(!parConv(7707) && r.enVerif.includes('9707'), `E ${nom} constat b : un achat sans aucune identité, à côté d'un colis d'e-mail sans commande ⇒ « en cours de vérification », pas « à retirer »`, `en vérif=${r.enVerif.join(',')}`);
+        dit(r.total === '2' && r.cartes.some((c) => c.suivi === 'XW000000077TS'), `E ${nom} : « À retirer » compte 2 (le colis d'e-mail et l'achat Vinted Go)`, `data-n=${r.total} · ${r.cartes.map((c) => c.suivi || c.conv.join('/')).join(' · ')}`);
+        const pub = await publication(pg);
+        const cV3 = pub && Array.isArray(pub.colis) ? pub.colis.find((c) => c[3] === 'v:111:9703') : null;
+        dit(!!cV3 && cV3[0] === dans(1) && cV3[6] === LIM_AT && pub.enVerification === 1, `E ${nom} : la publication porte la limite et l'heure de l'achat Vinted Go, et « en cours de vérification » = 1`, JSON.stringify(cV3) + ` enVérif=${pub && pub.enVerification}`);
+        const w = await widgetPickup(ROWS, pub);
+        dit(w.pickup === 2 && w.corps && w.corps.pickupAuMoins === true, `E ${nom} : le widget dit 2, « au moins » (un achat en vérification)`, `pickup=${w.pickup} auMoins=${w.corps && w.corps.pickupAuMoins}`);
+        dit(!r.deborde, `E ${nom} : rien ne déborde`);
+        dit(!errs.length, `E ${nom} : aucune erreur d'app`, errs[0]);
+        if (vp.width < 600) {
+          await ouvrirJournee(pg, errs);
+          const tu = await pg.evaluate(() => { const x = document.querySelector('[data-tuile="retirer"]'); const jb = document.querySelector('[data-job="retrait-en-verification"]'); const jv = document.querySelector('[data-job="retrait-a-verifier"]'); return x ? { n: x.getAttribute('data-n'), jn: jb ? jb.getAttribute('data-n') : null, jt: jb ? jb.innerText : '', jv: jv ? jv.innerText : null } : null; });
+          dit(tu && tu.jv != null && !/sans doute|repartis? chez le vendeur/i.test(tu.jv), `E ${nom} constat d : Ma journée dit « à vérifier », jamais « sans doute reparti »`, tu && String(tu.jv).replace(/\s+/g, ' ').slice(0, 140));
+          dit(tu && tu.n === '2' && tu.jn === '1' && /en cours de vérification/.test(tu.jt), `E ${nom} : Ma journée dit 2 à retirer, et DIT (une ligne) l'achat en cours de vérification — jamais un total présenté complet`, tu && `${tu.n} · ${tu.jn} · ${tu.jt.replace(/\s+/g, ' ').slice(0, 160)}`);
+        }
+        await ctx.close();
+      });
+    }
   } finally { await b.close(); }
 }
 

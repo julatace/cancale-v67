@@ -198,6 +198,9 @@ const lire = (pg) => pg.evaluate(() => {
   const etat = document.querySelector('[data-suivi-vinted-etat]');
   return {
     cartes, total: onglet ? onglet.getAttribute('data-n') : null,
+    // (29 oct.) les achats « en cours de vérification » (aucune identité, n°
+    // jamais cherché, à côté d'un colis d'e-mail sans commande) : hors total.
+    enVerif: [...document.querySelectorAll('[data-en-verification-tx]')].map((x) => ({ tx: x.getAttribute('data-en-verification-tx'), t: x.innerText, suivre: x.querySelectorAll('a[data-suivre-colis]').length, nv: x.querySelectorAll('[data-nouvelle-vinted]').length })),
     nNouvelles: [...document.querySelectorAll('[data-nouvelle-vinted]')].map((x) => x.getAttribute('data-nouvelle-vinted')),
     etatSuivi: etat ? etat.getAttribute('data-suivi-vinted-etat') : null, etatSuiviTexte: etat ? etat.innerText : '',
     texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -226,12 +229,18 @@ async function navigateur() {
         dit(!!vgo, `${nom} : un « disponible » dont le n° n'est QUE dans le sujet est montré AVEC son n°`, r.cartes.map((c) => c.suivi).join(' · '));
         dit(!parConv('7603').length, `${nom} : l'achat 9603 sort aussi : un « retiré » à SON n° (relevé par Vinted) est arrivé sous une autre clé`);
         const a1 = parConv('7601')[0], a2 = parConv('7602')[0];
-        dit(!!a1 && !!a2, `${nom} : les deux achats au même titre sont montrés, chacun sa carte`);
+        // (29 oct.) 9602 : aucun code, aucune ligne de suivi relevée (son n° n'a
+        // jamais été cherché), à côté d'un colis d'e-mail du même compte qu'aucune
+        // commande ne réclame (30000051) — peut-être le MÊME colis : il n'est pas
+        // compté une seconde fois, il est dit « en cours de vérification ». Jamais
+        // fusionné par le titre avec 9601 (qui garde sa carte).
+        const v2 = r.enVerif.find((x) => x.tx === '9602');
+        dit(!!a1 && !a2 && !!v2 && !r.enVerif.some((x) => x.tx === '9601'), `${nom} : les deux achats au même titre restent distincts — 9601 a sa carte, 9602 (n° jamais cherché) est « en cours de vérification »`, `carte9602=${!!a2} · vérif=${r.enVerif.map((x) => x.tx).join(',')}`);
         dit(a1 && a1.nv.length === 1 && a1.nv[0] === NV_9601, `${nom} : « Vinted : « … » » sur la carte de SON achat (9601), le texte tel quel`, a1 && a1.nv.join(' | '));
         // (revue du 24 oct., n° 15) `capturedAt` est l'heure du RELEVÉ (la ligne
         // n'est réécrite que si l'étape change) : jamais « lu il y a ».
         dit(a1 && /\(relevé il y a /.test(a1.t) && !/\(lu il y a /.test(a1.t), `${nom} : l'âge sous la nouvelle Vinted dit « relevé il y a », pas « lu il y a »`, a1 && (a1.t.match(/\((?:lu|relevé) il y a [^)]*\)/) || [''])[0]);
-        dit(a2 && a2.nv.length === 0 && !r.nNouvelles.includes(NV_AUTRE), `${nom} : JAMAIS sur l'achat au même titre (9602), ni la ligne d'un autre compte`, a2 && a2.nv.join(' | '));
+        dit(v2 && v2.nv === 0 && !v2.t.includes(NV_AUTRE) && !r.nNouvelles.includes(NV_AUTRE), `${nom} : JAMAIS sur l'achat au même titre (9602), ni la ligne d'un autre compte`, v2 && v2.t.slice(0, 120));
         const e64 = parSuivi('30000064')[0];
         dit(e64 && e64.nv.length === 1 && e64.nv[0] === NV_9604 && r.nNouvelles.filter((x) => x === NV_9604).length === 1, `${nom} : l'e-mail relié à la commande 9604 par le CODE de retrait porte SA nouvelle, une fois`, e64 && e64.nv.join(' | '));
         const s51 = parSuivi('30000051')[0];
@@ -244,10 +253,10 @@ async function navigateur() {
         dit(bv && bv.site === 'transporteur' && bv.href === 'https://vintedgo.com/fr/tracking/VGS12345678061' && /Suivre sur le site du transporteur/.test(bv.t), `${nom} : Vinted Go : « Suivre sur le site du transporteur ↗ », sa page de suivi, n° pré-rempli`, bv && bv.href);
         const ba1 = a1 && a1.suivre[0];
         dit(ba1 && /numeroExpedition=30000057$/.test(ba1.href), `${nom} : l'achat suivi par Vinted a son bouton, sans code postal (aucun lieu lu)`, ba1 && ba1.href);
-        dit(a2 && a2.suivre.length === 0, `${nom} : l'achat au même titre n'emprunte pas le n° d'un autre`);
+        dit(v2 && v2.suivre === 0 && !/30000057|30000058/.test(v2.t), `${nom} : l'achat au même titre n'emprunte pas le n° d'un autre`);
         const tous = r.cartes.flatMap((c) => c.suivre);
         dit(tous.length >= 4 && tous.every((x) => x.h >= 43.5), `${nom} : chaque « Suivre » fait au moins 44 px`, tous.map((x) => Math.round(x.h)).join(','));
-        dit(r.total === '5', `${nom} : « À retirer » compte 5 (3 e-mails + 2 achats) — les retirés n'y sont pas`, `data-n=${r.total}`);
+        dit(r.total === '4', `${nom} : « À retirer » compte 4 (3 e-mails + 1 achat ; 9602 en vérification, hors total) — les retirés n'y sont pas`, `data-n=${r.total}`);
         dit(r.etatSuivi === 'absente' && /Suivre le colis/.test(r.etatSuiviTexte), `${nom} : 1 achat sans suivi relevé : c'est DIT, avec le geste qui marche sans extension`, `${r.etatSuivi} · ${r.etatSuiviTexte.slice(0, 120)}`);
         dit(!r.deborde, `${nom} : rien ne déborde`);
         if (sombre) dit(/rgb\((\d{1,2}), (\d{1,2}), (\d{1,2})\)/.test(r.bg), `${nom} : le fond est sombre`, r.bg);

@@ -378,7 +378,10 @@ function chargeApp(noms, injecte) {
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
     dit(/^📍 Dernier jour pour retirer /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && d.url === '/?tab=cat_achats', '« 📍 Dernier jour pour retirer <lieu> », le n° dans le texte, ouvre Achats', `${d.title} | ${d.body}`);
     const v = p1.find((p) => p.tag === 'retrait-a_verifier-09440000000022') || {};
-    dit(/^Colis à vérifier — sans doute reparti : n°09440000000022/.test(v.title || '') && !/perdu/i.test(`${v.title} ${v.body}`), '« Colis à vérifier — sans doute reparti : n°… », jamais « perdu »', v.title);
+    // (29 oct.) « sans doute reparti » ne s'écrit plus : un délai dépassé ne prouve
+    // rien (mesuré le 29 : 5 « sans doute repartis » sur 5 avaient été RETIRÉS) —
+    // seul le transporteur ou Vinted dit « reparti ». Jamais « perdu » non plus.
+    dit(/^Colis à vérifier : n°09440000000022/.test(v.title || '') && !/perdu|sans doute reparti/i.test(`${v.title} ${v.body}`), '« Colis à vérifier : n°… », jamais « perdu » ni « sans doute reparti » (le délai ne prouve rien)', v.title);
     const lect = lus.filter((u) => /email_track_|colis_retrait_dedup|id=eq\.main/.test(u) && !/select=owner(&|$)/.test(u));
     dit(lect.length > 0 && lect.every((u) => /owner=eq\./.test(u)), 'cron : toutes les lectures du rappel portent owner=eq.<vendeur>', lect.filter((u) => !/owner=eq\./.test(u)).slice(0, 2).join(' | '));
     dit(!JSON.stringify((r1.corps && r1.corps.bilans) || r1.corps || {}).match(/30000021|Bar Test/), 'cron : la réponse ne contient ni n° ni lieu (des nombres)');

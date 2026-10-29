@@ -35,7 +35,7 @@ import { sbCle } from './_lib/cle.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
-import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta, dansFenetreLecteurs } from './_lib/suivi-colis.js';
+import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
@@ -277,15 +277,19 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
 // pour rien ». Au cron du matin (10 h à Paris), pour CE vendeur :
 //   · « 📍 Dernier jour pour retirer … » quand la date limite LUE dans l'e-mail
 //     est aujourd'hui (heure de Paris) ;
-//   · « Colis à vérifier — sans doute reparti : n°… » le jour où un colis passe
-//     sa date limite ou la garde de son transporteur.
+//   · « Colis à vérifier : n°… » le jour où un colis passe sa date limite ou la
+//     garde de son transporteur (29 oct. : plus « sans doute reparti » — seul le
+//     transporteur ou Vinted le disent).
 // LA règle de l'app (api/_lib/suivi-colis.js → `etatRetrait`, `gardeDe`, §11).
 // Une fois par colis et par état : mémo `colis_retrait_dedup` lu en TROIS états
 // (illisible ⇒ rien), écrit AVANT l'envoi et confirmé. Préférence « colis »
 // coupée ⇒ rien ; abonnement coupé ⇒ rien (`sendPushToAll`) ; une lecture ratée
 // (lignes de suivi, réglages, bordereaux) ⇒ rien. Jamais un colis retiré,
 // reparti, coché « J'ai retiré », qu'il envoie, ou que l'app a dit fini.
-const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer'];
+// (29 oct.) + `vinted_pickup_done` : un colis que SEUL le transporteur dit
+// disponible (aucun e-mail) n'est jamais rappelé si sa commande Vinted, reliée
+// par son n° de suivi, est cochée « Je l'ai retiré » (la règle de l'app).
+const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer', 'vinted_pickup_done'];
 const MEMO_RETRAIT_J = 60;
 async function rappelsColisRetrait(maintenant = Date.now()) {
   const deja = await getRow('colis_retrait_dedup');
@@ -304,7 +308,9 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
     fetchPaginated(scoped(`app_data?id=like.transp_*&select=${SELECT_TRANSP_META}`)),
   ]);
   if (!Array.isArray(lignes) || m === undefined || !Array.isArray(bords) || !Array.isArray(transp0)) return 'lecture ratée — rien envoyé';
-  const transp = transp0.map(ligneTranspDeMeta).filter((t) => t && dansFenetreLecteurs(t, maintenant));
+  // (29 oct.) Toutes les lignes, quel que soit leur âge : une ligne finie qu'on
+  // ne lirait plus ferait revenir un colis RETIRÉ (rien lu ≠ pas fini).
+  const transp = transp0.map(ligneTranspDeMeta).filter(Boolean);
   const mm = objet(m);
   const pub = objet(mm.vrm_colis_retirer);
   const today = parisDate(0);
@@ -312,6 +318,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
     lignes, collectes: Array.isArray(mm.vrm_colis_collected) ? mm.vrm_colis_collected : [],
     envoyes: bords.map((b) => b && b.suivi).filter(Boolean), finis: Array.isArray(pub.finis) ? pub.finis : [],
     maintenant, aujourdhui: today, transp,
+    cocheTx: new Set(Object.keys(objet(mm.vinted_pickup_done)).map(String)),
   };
   // (revue du 23 oct., n° 3) LA FIN D'UN ACHAT, LUE ICI — pas seulement dans la
   // publication de l'app (`finis`) : absente (app pas ouverte depuis) ou plus
@@ -343,7 +350,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
     achats = a;
     for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
   }
-  const liste = rappelsRetraitDuJour({ ...entree,
+  const liste = rappelsRetraitDuJour({ ...entree, liens,
     finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
   const envoyes = objet(deja && deja.envoyes);
   const nouveaux = liste.filter((x) => !envoyes[x.cle]);

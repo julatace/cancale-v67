@@ -315,10 +315,12 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
         await poserPause(carrier, rep, Date.now());
         b.pause = T.pauseApresRefus(b.pause, carrier, { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
       } else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') await leverPause(b, carrier);
-      // Un code postal ESSAYÉ (pas encore prouvé pour CE colis) : « pas de colis »
-      // pour ce couple ne veut pas dire « n° inconnu » — on note l'essai, sans
-      // compter d'échec (sinon trois mauvais essais fermeraient le n° pour toujours).
-      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };
+      // Un code postal pas encore PROUVÉ pour CE colis (essayé, donné par la page,
+      // ou SAISI à la main — revue n° 7) : « pas de colis » pour ce couple ne veut
+      // pas dire « n° inconnu » — on note le code postal refusé, sans compter
+      // d'échec (sinon trois refus fermeraient le n° pour toujours). La règle :
+      // `resultatMondialRelay` (api/_lib/transporteurs.js, la même qu'en C4).
+      if (carrier === 'mondialrelay') lu = T.resultatMondialRelay(lu, { cp, cpSource, cpEssaye, transp: b.transp.get(it.suivi) });
       const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture', voie: T.VOIE_SERVEUR[carrier], cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye });
       lus.push({ carrier, suivi: it.suivi, res: r.res, etat: r.etat, change: r.change });
     }
@@ -375,12 +377,10 @@ export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
   if (carrier === 'mondialrelay') {
     const connu = T.codePostalPourMondialRelay({ suivi, transp: t, lignes: b.lignes.filter((l) => suiviDeLigne(l) === suivi), manuels: b.manuels, relaisLieux: relaisDe(b)(suivi), prouves: [], maintenant: now, essai: false });
     if (connu && connu.cp === cp) cpSource = connu.source;
-    else {
-      // Un code postal ESSAYÉ (pas encore prouvé pour CE colis) : « pas de colis »
-      // ne veut pas dire « n° inconnu » — on note l'essai, sans compter d'échec.
-      cpSource = 'essai'; cpEssaye = cp;
-      if (lu.res === 'introuvable' || lu.res === 'forme') lu = { res: 'cp-inconnu' };
-    }
+    else { cpSource = 'essai'; cpEssaye = cp; }
+    // Pas encore prouvé pour CE colis : « pas de colis » ne veut pas dire « n°
+    // inconnu » (la règle du serveur, `resultatMondialRelay`, revue n° 7).
+    lu = T.resultatMondialRelay(lu, { cp, cpSource, cpEssaye, transp: t });
   }
   const r = await rangerEssai(b, { carrier, suivi }, lu, { source, statut, maintenant: now, cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye, voie });
   if (r.ecrit === null) return { status: 503, corps: { error: 'pas-su' } };

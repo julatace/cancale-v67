@@ -65,7 +65,12 @@ export const nomTransporteur = (c) => NOM_TRANSPORTEUR[String(c || '')] || 'Le t
 export const FORME_SUIVI = {
   mondialrelay: /^\d{8}$/,
   chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z]?)$/,
-  vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13})$/,
+  // (29 oct., limite 1 du diagnostic) + 12 chiffres : deux de ses e-mails Vinted Go
+  // en portent (…0362, …5192) et c'est la forme que la page de suivi de Vinted Go
+  // donne en exemple (« par ex. 100000000023 », mesures.json). Seulement pour une
+  // ligne dont le transporteur rangé est Vinted (`carrierLisible`) : 12 chiffres
+  // seuls ne désignent aucun transporteur (`transporteurDeFormeT`).
+  vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13}|\d{12})$/,
 };
 export const ETATS = ['en_route', 'disponible', 'retire', 'livre', 'retour_expediteur', 'incident', 'inconnu'];
 export const RESULTATS = ['ok', 'introuvable', 'expire', 'bloque', 'forme', 'passu', 'cp-inconnu'];
@@ -142,6 +147,15 @@ export function isoParisVersUtc(s) {
   t = local - decalageParis(t);
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
+// (29 oct.) L'HEURE de Paris d'un instant (« 11 h 34 ») — l'heure de la limite
+// d'un Vinted Go (`expiration_time`), dite sur la carte et dans les rappels.
+const _fmtHeure = (() => { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (_) { return null; } })();
+export function heureParis(v) {
+  const ms = typeof v === 'number' ? v : msDe(v);
+  if (!Number.isFinite(ms) || !_fmtHeure) return '';
+  const p = {}; for (const x of _fmtHeure.formatToParts(new Date(ms))) p[x.type] = x.value;
+  return p.hour && p.minute ? `${p.hour} h ${p.minute}` : '';
+}
 // Le jour de PARIS d'un instant (« AAAA-MM-JJ »).
 export function jourParis(ms) {
   if (!Number.isFinite(ms)) return null;
@@ -155,7 +169,7 @@ function refus(statut, ctype, corps, { mr = false } = {}) {
   if (s >= 200 && s < 300 && estHtml(ctype, corps)) return 'bloque';
   return null;
 }
-const rendu = (res, x = {}) => ({ res, etat: null, detail: null, etatAt: null, libelle: '', lieuNom: '', lieuVille: '', lieuCp: '', limite: null, limiteSure: false, cpRendu: '', forme: '', evenements: [], ...x });
+const rendu = (res, x = {}) => ({ res, etat: null, detail: null, etatAt: null, libelle: '', lieuNom: '', lieuVille: '', lieuCp: '', limite: null, limiteSure: false, limiteAt: null, cpRendu: '', forme: '', evenements: [], ...x });
 // Les évènements gardés (pour le diagnostic) : les 20 plus récents, du plus
 // ancien au plus récent, bornés.
 const garderEvenements = (evs) => evs.slice(-20).map((e) => ({ at: e.at || null, code: propre(e.code, 24), libelle: propre(e.libelle, 160), lieu: propre(e.lieu, 120), cp: /^\d{5}$/.test(String(e.cp || '')) ? String(e.cp) : '' }));
@@ -260,6 +274,17 @@ export function lireReponseChronopost(statut, ctype, corps, { suivi = '' } = {})
 }
 
 // ══ VINTED GO — carrier.vintedgo.com /public/v3/tracking_events (JSON) ══════
+// (29 oct., revue n° 9) LE RETOUR, SEULEMENT SUR LES VALEURS RELEVÉES (le JS de
+// la page de suivi, mesures.json : « retour = return → in_transit →
+// ready_for_pickup → returned (state 'return') »). Jamais tout `group` qui
+// commence par « return » : `return_cancelled` (le retour ANNULÉ) se lisait
+// « repart chez l'expéditeur » et le colis partait dans « repartis ». Les autres
+// `return_*` (annulé, perdu, détruit, redirigé…) ne prouvent pas un retour :
+// en dernier ⇒ « inconnu » (à vérifier après l'arrivée), jamais « reparti ».
+// Un `return_cancelled` PLUS RÉCENT qu'un évènement de retour l'annule.
+export const VG_RETOUR_GROUPES = new Set(['return', 'return_in_transit', 'return_ready_for_pickup', 'return_return', 'return_returned', 'returned']);
+const VG_GROUPES_DE_ROUTE = new Set(['created', 'shipped', 'in_transit', 'ready_for_pickup', 'delivered']);
+const estRetourVg = (e) => VG_RETOUR_GROUPES.has(e.group) || (e.state === 'return' && VG_GROUPES_DE_ROUTE.has(e.group));
 export const VG_GROUPES = {
   created: 'prepare', shipped: 'route', in_transit: 'route', ready_for_pickup: 'disponible', delivered: 'retire',
   lost: 'incident', disposed: 'incident', cancelled: 'incident', empty_locker_found: 'incident',
@@ -287,8 +312,11 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
   const base = { evenements, libelle: propre(d.libelle, 160), etatAt: isoDe(d.ms) };
   const nomPoint = () => { for (const e of evs) { const m = /\(([^()]{2,60})\)\s*$/.exec(e.libelle); if (m) return propre(m[1], 80); } return ''; };
   const lieuDe = (adr) => { const a = String(adr || ''); const m = /(?:^|,\s*)(\d{5})\s+([^,]+)/.exec(a); return { lieuCp: m ? m[1] : '', lieuVille: m ? propre(m[2], 60) : '' }; };
-  // 1. Un retour n'importe où : repart chez l'expéditeur (« returned » : rendu).
-  if (evs.some((e) => e.state === 'return' || /^return/.test(e.group) || e.group === 'returned')) {
+  // 1. Un retour (valeurs relevées) : repart chez l'expéditeur (« returned » :
+  //    rendu) — sauf un retour ANNULÉ depuis (`return_cancelled` plus récent).
+  const iRetour = evs.findIndex(estRetourVg);                       // le plus récent (evs : du plus récent au plus ancien)
+  const iAnnule = evs.findIndex((e) => e.group === 'return_cancelled');
+  if (iRetour >= 0 && !(iAnnule >= 0 && iAnnule < iRetour)) {
     return rendu('ok', { ...base, etat: 'retour_expediteur', detail: /^(?:returned|return_returned)$/.test(d.group) ? 'rendu' : null });
   }
   const pret = evs.find((e) => e.group === 'ready_for_pickup');
@@ -300,7 +328,10 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
     // reste présente après le retrait : mesuré, « 4 jours restants » sur un
     // colis retiré).
     const exp = msDe(j.meta && j.meta.expiration_time);
-    return rendu('ok', { ...base, etat: 'disponible', lieuNom: nomPoint(), ...lieuDe(d.lieu), limite: exp ? jourParis(exp) : null, limiteSure: !!exp });
+    // (29 oct., revue n° 11) + l'HEURE (`limiteAt`) : « 2026-10-28T09:34:00Z »
+    // expire à 11 h 34 à Paris — le jour seul faisait dire « à retirer
+    // aujourd'hui » à 7 h pour un colis qui part à 11 h 34. Le jour reste la clé.
+    return rendu('ok', { ...base, etat: 'disponible', lieuNom: nomPoint(), ...lieuDe(d.lieu), limite: exp ? jourParis(exp) : null, limiteSure: !!exp, limiteAt: exp ? isoDe(exp) : null });
   }
   const sens = VG_GROUPES[d.group];
   if (d.state === 'dispose' || sens === 'incident') return rendu('ok', { ...base, etat: 'incident', detail: d.group === 'lost' ? 'perdu' : null });
@@ -331,6 +362,17 @@ export const MR_LIBELLES = [
   [/^colis livre\b/, 'livre'],
 ];
 const classeMr = (lib) => { const t = normLibelle(lib); for (const [re, c] of MR_LIBELLES) { const m = re.exec(t); if (m) return { c, jours: m[1] ? Number(m[1]) : null }; } return null; };
+// (29 oct., revue n° 3) Le premier évènement de PRISE EN CHARGE ou de ROUTE daté
+// APRÈS le dernier évènement d'arrivée (« N jours restants », « disponible au
+// point de retrait ») : le colis a quitté le point relais — « a quitté le point
+// relais sans être retiré » (`incident`/`quitte_relais`), jamais « disponible ».
+// Mesuré : « 5 jours restants » le 18/10 puis « Colis en route vers le point de
+// livraison » le 21/10 restait « disponible — à retirer vers le 23/10 ». Un
+// nouveau « N jours restants » plus tard (re-livré) refait « disponible ».
+function apresArriveeMr(evs, arr) {
+  if (!arr || !Number.isFinite(arr.ms)) return null;
+  return evs.find((e) => Number.isFinite(e.ms) && e.ms > arr.ms && ['route', 'prepare'].includes((classeMr(e.libelle) || {}).c)) || null;
+}
 const lieuMr = (dpr) => {
   const a = dpr && typeof dpr === 'object' && dpr.Adresse && typeof dpr.Adresse === 'object' ? dpr.Adresse : null;
   if (!a) return { lieuNom: '', lieuVille: '', lieuCp: '' };
@@ -375,6 +417,10 @@ export function lireReponseMondialRelay(statut, ctype, corps, { suivi = '', cp =
   if (k === 4) {
     const arr = [...evs].reverse().find((e) => (classeMr(e.libelle) || {}).c === 'disponible');
     const lieu = lieuMr((arr && arr.dpr) || (etapes['4'] && etapes['4'].Evenement && etapes['4'].Evenement.DetailPointRelais));
+    // (29 oct., revue n° 3) Une prise en charge ou une route APRÈS l'arrivée : il
+    // a quitté le point relais (la règle de Chronopost, TT après AB).
+    const parti = apresArriveeMr(evs, arr);
+    if (parti) return rendu('ok', { ...base, ...lieu, etat: 'incident', detail: 'quitte_relais', etatAt: parti.at, libelle: propre(parti.libelle, 160) });
     const at = (arr && arr.at) || dateEtape(4) || base.etatAt;
     // La limite est DÉDUITE (date de l'évènement + N jours), jamais affirmée :
     // `limiteSure:false`, dite « vers le ».
@@ -465,6 +511,9 @@ export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', c
     return rendu('ok', { ...base, etat: (k >= 4 || arr) ? 'retire' : 'livre', etatAt: (livre && livre.at) || base.etatAt, libelle: propre((livre || dernier).libelle, 160) });
   }
   if (k === 4) {
+    // (29 oct., revue n° 3) Prise en charge ou route APRÈS l'arrivée : parti du point relais.
+    const parti = apresArriveeMr(evs, arr);
+    if (parti) return rendu('ok', { ...base, etat: 'incident', detail: 'quitte_relais', etatAt: parti.at, libelle: propre(parti.libelle, 160) });
     const at = (arr && arr.at) || base.etatAt;
     // La limite est DÉDUITE (date de l'évènement + N jours), jamais affirmée.
     const jours = arr ? classeMr(arr.libelle).jours : null;
@@ -499,7 +548,9 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
   delete out.rev;
   if (res === 'ok') {
     out.essais = 0;
-    for (const k of ['etat', 'detail', 'etatAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'limite', 'limiteSure']) out[k] = lu[k] === undefined ? null : lu[k];
+    for (const k of ['etat', 'detail', 'etatAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'limite', 'limiteSure', 'limiteAt']) out[k] = lu[k] === undefined ? null : lu[k];
+    if (msDe(out.limiteAt) == null) out.limiteAt = null;
+    out.cpRefuse = ''; out.cpRefuseSource = '';
     // Une voie qui ne porte pas le lieu (Mondial Relay `mr-fr-mvc`) : la ligne
     // garde celui qu'elle avait, jamais effacé par un blanc.
     if (lu.lieuNonLu) for (const k of ['lieuNom', 'lieuVille', 'lieuCp']) out[k] = a[k] == null ? '' : a[k];
@@ -513,6 +564,12 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
   } else if (res !== 'cp-inconnu') {
     out.essais = (Number(a.essais) || 0) + 1;
     if (lu && lu.forme) out.forme = propre(lu.forme, 500);
+  } else {
+    // (29 oct., revue n° 7) Le code postal que Mondial Relay a refusé pour CE n°
+    // (`resultatMondialRelay`) : la carte le nomme, et un AUTRE code postal (saisi,
+    // appris) fait relire tout de suite (`suivisAInterroger`).
+    out.cpRefuse = /^\d{5}$/.test(String((lu && lu.cpRefuse) || '')) ? String(lu.cpRefuse) : (a.cpRefuse || '');
+    out.cpRefuseSource = out.cpRefuse ? String((lu && lu.cpRefuseSource) || a.cpRefuseSource || '').slice(0, 20) : '';
   }
   if (cpEssaye && /^\d{5}$/.test(cpEssaye)) {
     const jour = jourParis(maintenant);
@@ -526,9 +583,13 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
 
 // ── LES SCALAIRES LUS PAR LES LECTEURS (app, cron, widget, e-mails) ──────────
 // Jamais `select=data` (§4.4) : les évènements restent dans la ligne.
-export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,limite:meta->>limite,limiteSure:meta->>limiteSure,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,fini:meta->>fini';
-// La fenêtre de lecture : pas fini, ou lu depuis moins de 45 jours.
-export const FENETRE_LECTEURS_J = 45;
+export const SELECT_TRANSP_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,libelle:meta->>libelle,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,lieuCp:meta->>lieuCp,limite:meta->>limite,limiteSure:meta->>limiteSure,limiteAt:meta->>limiteAt,lu:meta->>lu,source:meta->>source,essai:meta->>essai,essaiRes:meta->>essaiRes,essaiSource:meta->>essaiSource,essais:meta->>essais,cp:meta->>cp,cpSource:meta->>cpSource,cpEssayes:meta->>cpEssayes,cpJour:meta->>cpJour,cpRefuse:meta->>cpRefuse,cpRefuseSource:meta->>cpRefuseSource,fini:meta->>fini';
+// (29 oct., revue n° 8) PLUS DE FENÊTRE DE 45 JOURS CHEZ LES LECTEURS. Une ligne
+// « fini » (retiré, rendu) qui sortait de la fenêtre redonnait l'état d'AVANT la
+// lecture : un colis retiré ressortait « à vérifier — trop long » au 46e jour,
+// sans aucun nouvel évènement. « Rien lu » ne redonne jamais l'état d'avant :
+// l'app, le widget et le cron lisent TOUTES les lignes (scalaires, §4.4 — ce
+// qu'ils lisaient déjà : la fenêtre ne s'appliquait qu'après la lecture).
 export function ligneTranspDeMeta(x) {
   if (!x || typeof x !== 'object') return null;
   const m = /^transp_(mondialrelay|chronopost|vinted)_([A-Z0-9]+)$/.exec(String(x.id || ''));
@@ -540,13 +601,12 @@ export function ligneTranspDeMeta(x) {
   return {
     id: x.id, suivi, carrier: m[1], etat, detail: x.detail || null, etatAt: x.etatAt || null, libelle: String(x.libelle || ''),
     lieuNom: String(x.lieuNom || ''), lieuVille: String(x.lieuVille || ''), lieuCp: String(x.lieuCp || ''),
-    limite: /^\d{4}-\d{2}-\d{2}$/.test(String(x.limite || '')) ? String(x.limite) : null, limiteSure: bool(x.limiteSure),
+    limite: /^\d{4}-\d{2}-\d{2}$/.test(String(x.limite || '')) ? String(x.limite) : null, limiteSure: bool(x.limiteSure), limiteAt: msDe(x.limiteAt) != null ? new Date(msDe(x.limiteAt)).toISOString() : null,
     lu: x.lu || null, source: x.source || '', essai: x.essai || null, essaiRes: RESULTATS.includes(x.essaiRes) ? x.essaiRes : null, essaiSource: String(x.essaiSource || ''),
     essais: Number(x.essais) || 0, cp: /^\d{5}$/.test(String(x.cp || '')) ? String(x.cp) : '', cpSource: String(x.cpSource || ''),
-    cpEssayes: String(x.cpEssayes || ''), cpJour: String(x.cpJour || ''), fini: bool(x.fini),
+    cpEssayes: String(x.cpEssayes || ''), cpJour: String(x.cpJour || ''), cpRefuse: /^\d{5}$/.test(String(x.cpRefuse || '')) ? String(x.cpRefuse) : '', cpRefuseSource: String(x.cpRefuseSource || ''), fini: bool(x.fini),
   };
 }
-export const dansFenetreLecteurs = (t, maintenant = Date.now()) => !!t && (!t.fini || (msDe(t.lu || t.essai) != null && maintenant - msDe(t.lu || t.essai) < FENETRE_LECTEURS_J * 86400000));
 
 // ══ QUELS N° INTERROGER (§1.5, §1.6) ═════════════════════════════════════════
 // Le SENS d'une ligne d'e-mail (venu de l'app, §11) : 'sortant' · 'entrant' · null.
@@ -621,6 +681,25 @@ export function codePostalPourMondialRelay({ suivi, transp = null, lignes = [], 
   const libre = [...new Set(prouves.filter((c) => /^\d{5}$/.test(String(c)) && c !== CP_SIEGE_MR))].find((c) => !essayes.includes(c));
   return libre ? { cp: libre, source: 'essai' } : null;
 }
+// (29 oct., revue n° 7) « PAS DE COLIS POUR CE COUPLE N° / CODE POSTAL » NE PROUVE
+// RIEN TANT QUE CE CODE POSTAL N'EST PAS PROUVÉ POUR CE COLIS. Mondial Relay répond
+// la même chose (« erreur de saisie ») à un n° inconnu et à un code postal faux :
+// avant, un code postal SAISI faux (35000) donnait trois « introuvable », le n°
+// était déclaré fini, et le corriger (56000) ne relançait plus jamais la lecture.
+// Une règle pour le serveur et la réponse relayée par l'extension (C4) :
+//   · `introuvable` avec un code postal pas encore prouvé pour ce n° (une lecture
+//     réussie à ce code postal, `transp.cp`) ⇒ `cp-inconnu`, le code postal
+//     refusé noté (`cpRefuse`, et sa source) — aucun échec compté ;
+//   · un code postal ESSAYÉ (`essai`, `page`) : `introuvable` ou `forme` ⇒ pareil ;
+//   · `introuvable` au code postal PROUVÉ : un vrai « introuvable » (compté).
+export function resultatMondialRelay(lu, { cp = '', cpSource = '', cpEssaye = '', transp = null } = {}) {
+  if (!lu || !cp) return lu;
+  const essaye = !!cpEssaye || cpSource === 'essai' || cpSource === 'page';
+  const prouve = !!(transp && transp.cp && transp.cp === cp);
+  if (lu.res === 'introuvable' && (essaye || !prouve)) return { res: 'cp-inconnu', cpRefuse: cp, cpRefuseSource: cpSource || (essaye ? 'essai' : '') };
+  if (lu.res === 'forme' && essaye && !prouve) return { res: 'cp-inconnu', cpRefuse: cp, cpRefuseSource: cpSource || 'essai' };
+  return lu;
+}
 // Les n° à interroger. Entrées (scalaires) :
 //   lignes   — les lignes `email_track_*` (relues, `relireLigneMeta`) ;
 //   transp   — Map(n° → ligne `transp_`) ;
@@ -682,7 +761,16 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     // JAMAIS un n° sortant (bordereau ou sens), jamais un sens « pas su ».
     if (envoyesN.has(e.k) || e.sortant || !e.entrant) continue;
     const t = transp instanceof Map ? transp.get(e.k) : null;
-    if (t && t.fini) continue;
+    // Mondial Relay : le code postal d'abord — un n° fermé par trois « introuvable »
+    // sous l'ancienne règle, jamais prouvé à un code postal, se relit quand un
+    // AUTRE code postal est connu (saisi, appris), une fois par 6 h (revue n° 7).
+    let cp = '', cpSource = '';
+    if (e.carrier === 'mondialrelay') {
+      const r = codePostalPourMondialRelay({ suivi: e.k, transp: t, lignes: e.lignes, manuels: e.manuels, relaisLieux: relaisDe ? (relaisDe(e.k) || []) : [], prouves, maintenant });
+      if (r) { cp = r.cp; cpSource = r.source; }
+    }
+    const mrRelisible = !!(t && t.fini && e.carrier === 'mondialrelay' && t.essaiRes === 'introuvable' && !t.cp && cp && cp !== (t.cpRefuse || ''));
+    if (t && t.fini && !mrRelisible) continue;
     // Les fins écrites dans les e-mails (retiré, reparti) ferment aussi le n°.
     const finEmail = e.lignes.some((l) => { const st = l.status != null ? l.status : l.s; return st === 'delivered' || st === 'retour'; });
     const recent = (e.dernierMs != null && maintenant - e.dernierMs < FENETRE_ACTIFS_J * 86400000) || (t && msDe(t.etatAt) != null && maintenant - msDe(t.etatAt) < FENETRE_ACTIFS_J * 86400000);
@@ -691,14 +779,17 @@ export function suivisAInterroger({ lignes = [], transp = new Map(), manuels = [
     else if (recent && !finEmail) raison = 'actif';
     else if (!t && !finEmail && avecFermeture) raison = 'fermeture';   // un ancien n° jamais fermé : lu UNE fois
     else continue;
-    let cp = '', cpSource = '';
-    if (e.carrier === 'mondialrelay') {
-      const r = codePostalPourMondialRelay({ suivi: e.k, transp: t, lignes: e.lignes, manuels: e.manuels, relaisLieux: relaisDe ? (relaisDe(e.k) || []) : [], prouves, maintenant });
-      if (r) { cp = r.cp; cpSource = r.source; }
-    }
     let quand = raison === 'page' ? (msDe(t && t.essai) != null ? msDe(t.essai) + RELECTURE_PAGE_MS : 0) : prochainEssai(t);
-    // Un code postal APPRIS depuis (saisi, lu dans un e-mail) : le n° redevient lisible tout de suite.
-    if (t && t.essaiRes === 'cp-inconnu' && cp && cpSource !== 'essai') quand = 0;
+    // Un code postal APPRIS depuis (saisi, lu dans un e-mail) : le n° redevient
+    // lisible tout de suite — sauf le code postal que Mondial Relay vient de
+    // refuser pour CE n° (`cpRefuse`, revue n° 7 : il attend son rythme). Un
+    // ESSAI pas encore tenté aujourd'hui (un code postal prouvé depuis, chez un
+    // autre colis) part aussi tout de suite (au plus 2 par n° et par jour).
+    if (t && t.essaiRes === 'cp-inconnu' && cp && cp !== (t.cpRefuse || '')) {
+      const essayesAuj = t.cpJour === jourParis(maintenant) ? String(t.cpEssayes || '').split(',').filter(Boolean) : [];
+      if (cpSource !== 'essai' || !essayesAuj.includes(cp)) quand = 0;
+    }
+    if (mrRelisible) { const e0 = msDe(t.essai); quand = e0 != null ? e0 + CP_INCONNU_MS : 0; }
     if (!(quand <= maintenant)) continue;
     const dispo = (t && t.etat === 'disponible') || e.lignes.some((l) => (l.status != null ? l.status : l.s) === 'available');
     const prio = raison === 'page' ? 0 : raison === 'fermeture' ? 3 : dispo ? 1 : 2;
@@ -820,7 +911,8 @@ export function texteNotifTransp(t, ch) {
   const n = `n°${t.suivi}`;
   if (ch.etat === 'disponible') {
     const lim = jjmm(t.limite);
-    const limTxt = lim ? ` — à retirer ${t.limiteSure ? "jusqu'au" : 'vers le'} ${lim}` : '';
+    const h = t.limiteSure ? heureParis(t.limiteAt) : '';
+    const limTxt = lim ? ` — à retirer ${t.limiteSure ? "jusqu'au" : 'vers le'} ${lim}${h ? ` à ${h}` : ''}` : '';
     return { title: `📍 ${nom} : disponible au point relais`, body: `${lieu || n}${limTxt}${lieu ? ` · ${n}` : ''}${t.detail === 'autre_point' ? ' · un autre point relais que prévu' : ''}` };
   }
   if (ch.etat === 'incident' && t.detail === 'quitte_relais') return { title: `⚠️ ${nom} : ton colis a quitté le point relais sans être retiré`, body: `Ne te déplace pas : ${n}${lieu ? ` (${lieu})` : ''}.` };
@@ -850,13 +942,16 @@ export function ligneTransporteur(t, carrier, maintenant = Date.now()) {
     let consequence = '';
     if (t.etat === 'retire') consequence = `retiré${quand ? ` le ${quand}` : ''}${lieu ? ` au point ${lieu}` : ''}`;
     else if (t.etat === 'livre') consequence = `livré${quand ? ` le ${quand}` : ''}`;
-    else if (t.etat === 'disponible') consequence = `disponible${lieu ? ` au point ${lieu}` : ''}${t.limite ? ` — à retirer ${t.limiteSure ? "jusqu'au" : 'vers le'} ${jjmm(t.limite)}` : ''}`;
+    else if (t.etat === 'disponible') consequence = `disponible${lieu ? ` au point ${lieu}` : ''}${t.limite ? ` — à retirer ${t.limiteSure ? "jusqu'au" : 'vers le'} ${jjmm(t.limite)}${t.limiteSure && heureParis(t.limiteAt) ? ` à ${heureParis(t.limiteAt)}` : ''}` : ''}`;
     else if (t.etat === 'retour_expediteur') consequence = t.detail === 'rendu' ? "rendu à l'expéditeur — ne te déplace pas" : "repart chez l'expéditeur — ne te déplace pas";
     else if (t.etat === 'incident') consequence = t.detail === 'quitte_relais' ? 'a quitté le point relais sans être retiré — ne te déplace pas' : 'un problème signalé — vérifie avant de te déplacer';
     else if (t.etat === 'inconnu') consequence = 'statut que VRM ne connaît pas encore — vérifie avant de te déplacer';
     else if (t.etat === 'en_route') consequence = t.detail === 'prepare' ? "pas encore remis au transporteur" : (t.detail === 'retarde' ? 'en route, retardé' : 'en route');
     return { etatAffiche: 'lu', texte: `${nom} : « ${propre(t.libelle, 120) || '—'} » · lu ${ageCourt(age)}${dernierRate ? ' (la lecture suivante n’a pas abouti)' : ''}`, consequence, ambre: AMBRE.has(t.etat), age };
   }
+  // (29 oct., revue n° 7) Un code postal SAISI que Mondial Relay refuse : la carte
+  // le nomme (« ne correspond peut-être pas »), jamais « ne trouve pas ce n° ».
+  if (t.essaiRes === 'cp-inconnu' && t.cpRefuse && t.cpRefuseSource === 'manuel') return { etatAffiche: 'cp-inconnu', texte: `${nom} ne trouve pas ce n° avec le code postal ${t.cpRefuse} — il ne correspond peut-être pas : corrige-le dans « N° de suivi ajoutés » (Achats → À retirer)`, consequence: '', ambre: false, age: null };
   if (t.essaiRes === 'cp-inconnu') return { etatAffiche: 'cp-inconnu', texte: `${nom} : code postal du point relais inconnu — ajoute ce n° avec son code postal dans « N° de suivi ajoutés » (Achats → À retirer)`, consequence: '', ambre: false, age: null };
   if (t.essaiRes === 'expire') return { etatAffiche: 'expire', texte: `${nom} ne garde plus ce suivi`, consequence: '', ambre: false, age: null };
   if (t.essaiRes === 'introuvable') return { etatAffiche: 'introuvable', texte: `${nom} ne trouve pas ce n° (pas encore enregistré ?)`, consequence: '', ambre: false, age: null };

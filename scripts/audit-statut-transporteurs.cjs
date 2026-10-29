@@ -50,7 +50,8 @@ const MUTATIONS = {
   'mvc-entetes-retires': ['api/_lib/transporteurs-lecture.js', "  mondialrelay: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },", ''],
   'mr-serveur-eteint': ['api/_lib/transporteurs.js', 'export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: true });', 'export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: false });'],
   'c3-mr-toujours': ['api/_lib/transporteurs.js', '    if (!(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;', "    if (it.carrier !== 'mondialrelay' && !(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;"],
-  'essai-cp-compte-echec': ['api/_lib/transporteurs-lecture.js', "      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };", ''],
+  // (29 oct.) La règle du code postal vit dans `resultatMondialRelay` (serveur ET C4).
+  'essai-cp-compte-echec': ['api/_lib/transporteurs-lecture.js', "      if (carrier === 'mondialrelay') lu = T.resultatMondialRelay(lu, { cp, cpSource, cpEssaye, transp: b.transp.get(it.suivi) });", ''],
   // (fusion) C3 annonce à l'extension la route `_mvc` (`mr-fr-mvc`) : la seule
   // que l'extension 5.281 lit d'abord (de `mr-be`, elle ne passe à `_mvc` qu'en repli).
   'c3-voie-be': ['api/_lib/transporteurs.js', "export const VOIE_DE = { mondialrelay: 'mr-fr-mvc',", "export const VOIE_DE = { mondialrelay: 'mr-be',"],
@@ -61,6 +62,27 @@ const MUTATIONS = {
   // ── Le widget suit la règle de l'app (§11, trouvé au banc `transporteurs.cjs`) ──
   'widget-transp-dispo-ignore': ['api/widget.js', '      return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;', '      return dispoSuivi.has(k) ? false : true;'],
   'widget-garde-non-levee': ['api/widget.js', ', leveDepuisTransp(suivisLus));', ');'],
+  // ── (29 oct.) Tour 1 du chantier « règles, états, écran » (section 9) ──
+  'vg-retour-annule': ['api/_lib/transporteurs.js', "const estRetourVg = (e) => VG_RETOUR_GROUPES.has(e.group) || (e.state === 'return' && VG_GROUPES_DE_ROUTE.has(e.group));", "const estRetourVg = (e) => e.state === 'return' || /^return/.test(e.group) || e.group === 'returned';"],
+  'vg-heure-jetee': ['api/_lib/transporteurs.js', 'limiteSure: !!exp, limiteAt: exp ? isoDe(exp) : null });', 'limiteSure: !!exp, limiteAt: null });'],
+  'heure-limite-ignoree': ['api/_lib/retrait-colis.js', "if (maintenant >= atMs) return { etat: 'delai_depasse', jours: j, heurePassee: true", "if (false) return { etat: 'delai_depasse', jours: j, heurePassee: true"],
+  'rappel-sans-heure': ['api/_lib/suivi-colis.js', "  const heure = x.limiteAt ? heureParis(x.limiteAt) : '';", "  const heure = '';"],
+  'mr-route-apres-arrivee': ['api/_lib/transporteurs.js', 'function apresArriveeMr(evs, arr) {\n  if (!arr || !Number.isFinite(arr.ms)) return null;', 'function apresArriveeMr(evs, arr) {\n  return null;'],
+  'garde-vers-passee': ['api/_lib/suivi-colis.js', '  if (l.limiteVers) { const j = joursAvantLimite(l.limiteVers, aujourdhui || jourParis(maintenant)); if (j == null || j < 0) return e; }', ''],
+  'mr-cp-saisi-introuvable': ['api/_lib/transporteurs.js', "  if (lu.res === 'introuvable' && (essaye || !prouve)) return", "  if (lu.res === 'introuvable' && essaye) return"],
+  'mr-fini-jamais-relu': ['api/_lib/transporteurs.js', '  const mrRelisible = !!(t && t.fini &&', '  const mrRelisible = false && !!(t && t.fini &&'],
+  'widget-fenetre-45j': ['api/widget.js', '  const transp = Array.isArray(transp0) ? transp0.map(ligneTranspDeMeta).filter(Boolean) : null;', '  const transp = Array.isArray(transp0) ? transp0.map(ligneTranspDeMeta).filter((t) => t && (!t.fini || Date.now() - Date.parse(t.lu || t.essai || 0) < 45 * 86400000)) : null;'],
+  'cron-fenetre-45j': ['api/ship-reminders.js', '  const transp = transp0.map(ligneTranspDeMeta).filter(Boolean);', '  const transp = transp0.map(ligneTranspDeMeta).filter((t) => t && (!t.fini || Date.now() - Date.parse(t.lu || t.essai || 0) < 45 * 86400000));'],
+  'widget-incident-sorti': ['api/widget.js', "  return so === 'retire' || so === 'reparti' ? true : (so === 'a_verifier' ? 'a_verifier' : null);", '  return so ? true : null;'],
+  'widget-dispo-apres-photo': ['api/widget.js', "    if (!t || t.etat !== 'disponible') continue;", '    if (true) continue;'],
+  'widget-en-verification': ['api/widget.js', ' || pubRetirer.enVerification > 0,', ','],
+  'widget-borne-arrivee': ['api/widget.js', '  const so = sortiParSuivis(ks, fins, c && c[4] === 0 ? null : arr, { borne: arr });', '  const so = sortiParSuivis(ks, fins, arr);'],
+  'rappel-synthetique': ['api/_lib/suivi-colis.js', '      const syn = ligneDuTransporteur(t, maintenant); if (syn) lignes.push(syn);', ''],
+  'rappel-coche-ignoree': ['api/_lib/suivi-colis.js', '      if (nLignes.has(k) || envoyesN.has(k) || cocheN.has(k)) continue;', '      if (nLignes.has(k) || envoyesN.has(k)) continue;'],
+  'cron-coche-non-lue': ['api/ship-reminders.js', "const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer', 'vinted_pickup_done'];", "const MAIN_RETRAIT = ['vrm_colis_collected', 'vrm_colis_retirer'];"],
+  'repartis-sans-coupure': ['api/_lib/suivi-colis.js', 'export const repartiAffichable = (ms, maintenant = Date.now()) => !Number.isFinite(ms) || maintenant - ms <= REPARTIS_AGE_MAX_J * 86400000;', 'export const repartiAffichable = () => true;'],
+  'vg-12-chiffres': ['api/_lib/transporteurs.js', '|[0-9A-Z]{13}|\\d{12})$/,', '|[0-9A-Z]{13})$/,'],
+  'borne-inconnu': ['api/_lib/suivi-colis.js', ' || (!connue && borne != null && i.at >= borne)', ''],
 };
 const ARG_PROUVE = process.argv.find((x) => x.startsWith('--prouve'));
 if (ARG_PROUVE) {
@@ -641,6 +663,142 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(appels.some((x) => x.host === 'www.mondialrelay.fr') && lm && lm.etat === 'disponible' && lm.voie === 'mr-fr-mvc', 'le cron du matin : la ligne Mondial Relay est lue et rangée par le serveur', lm ? `${lm.etat} ${lm.voie}` : `code=${res.code}`);
   });
 
+  // ══ 9. TOUR 1 DU 29 OCTOBRE : RÈGLES, ÉTATS, LECTEURS (revue n° 1-11) ════
+  // Chaque contrôle est rouge sur 8f62e6f2 et sous SA mutation (`--prouve`).
+  let RC = null;
+  await essaie('n° 9 : Vinted Go, le retour seulement sur les valeurs relevées', async () => {
+    const lire = (evs) => T.lireReponseVintedGo(200, 'application/json', vgJson(evs), { suivi: '1234567890123456' });
+    const r1 = lire([{ group: 'return_cancelled', ms: NOW - H }, { group: 'ready_for_pickup', ms: NOW - 30 * H, message: 'Prêt (Consigne TEST)' }]);
+    dit(r1.res === 'ok' && r1.etat !== 'retour_expediteur', 'n° 9 : `return_cancelled` (le retour ANNULÉ) en dernier ⇒ jamais « repart chez l\'expéditeur »', r1.etat);
+    const r2 = lire([{ group: 'return_cancelled', ms: NOW - H }, { group: 'return_in_transit', ms: NOW - 5 * H }, { group: 'ready_for_pickup', ms: NOW - 50 * H }]);
+    dit(r2.etat !== 'retour_expediteur', 'n° 9 : un retour ANNULÉ depuis (`return_cancelled` plus récent) ⇒ plus « reparti »', r2.etat);
+    const r3 = lire([{ group: 'return_in_transit', ms: NOW - H }, { group: 'ready_for_pickup', ms: NOW - 50 * H }]);
+    dit(r3.etat === 'retour_expediteur', 'n° 9, l\'autre sens : `return_in_transit` ⇒ repart chez l\'expéditeur', r3.etat);
+  });
+  await essaie('n° 11 : l\'HEURE de la limite Vinted Go (`expiration_time`)', async () => {
+    RC = await importer('api/_lib/retrait-colis.js');
+    const exp = '2026-10-28T09:34:00Z';                                  // 10 h 34 à Paris (heure d'hiver)
+    const r = T.lireReponseVintedGo(200, 'application/json', vgJson([{ group: 'ready_for_pickup', ms: Date.parse('2026-10-26T08:00:00Z'), message: 'Prêt (Consigne TEST)' }], { expiration_time: exp }), { suivi: '1234567890123456' });
+    dit(r.limite === '2026-10-28' && r.limiteAt === '2026-10-28T09:34:00.000Z', 'n° 11 : la limite garde son HEURE (`limiteAt`) ; le jour reste la clé', `${r.limite} ${r.limiteAt}`);
+    const ap = T.ligneApresEssai(null, r, { carrier: 'vinted', suivi: '1234567890123456', voie: 'vg', maintenant: Date.parse('2026-10-27T08:00:00Z') });
+    const scal = Object.fromEntries(Object.entries(ap).filter(([, v]) => v == null || typeof v !== 'object').map(([k, v]) => [k, v == null ? null : String(v)]));
+    const meta = T.ligneTranspDeMeta({ id: 'transp_vinted_1234567890123456', ...scal });
+    dit(!!meta && meta.limiteAt === '2026-10-28T09:34:00.000Z' && /limiteAt:meta->>limiteAt/.test(T.SELECT_TRANSP_META), 'n° 11 : rangée et relue en scalaire (`SELECT_TRANSP_META`)', meta && meta.limiteAt);
+    const e9 = RC.etatRetrait({ limite: '2026-10-28', limiteAt: exp, transporteur: 'vinted' }, Date.parse('2026-10-28T08:00:00Z'), '2026-10-28');
+    const e11 = RC.etatRetrait({ limite: '2026-10-28', limiteAt: exp, transporteur: 'vinted' }, Date.parse('2026-10-28T10:00:00Z'), '2026-10-28');
+    dit(e9.etat === 'a_retirer' && e11.etat === 'delai_depasse' && e11.heurePassee === true, 'n° 11 : à 9 h « à retirer » ; à 11 h (après 10 h 34) délai passé, LE JOUR MÊME', `${e9.etat} · ${e11.etat}`);
+    const pub = RC.retirerPublie({ at: Date.parse('2026-10-28T07:00:00Z'), colis: [['2026-10-28', Date.parse('2026-10-26T08:00:00Z'), 'vinted', 'e:1234567890123456', 1, '', exp]] }, Date.parse('2026-10-28T10:00:00Z'), '2026-10-28');
+    dit(pub && pub.n === 0 && pub.aVerifier === 1, 'n° 11 : la photo publiée porte l\'heure (7e champ) — le widget la relit', pub && `n=${pub.n} aVérifier=${pub.aVerifier}`);
+    const tx = S.texteRappelRetrait({ etat: 'dernier', suivi: '1234567890123456', transporteur: 'vinted', limite: '2026-10-28', limiteAt: exp, lieu: 'Consigne TEST' });
+    dit(/avant 10 h 34/.test(tx.body), 'n° 11 : le rappel « dernier jour » dit l\'heure (« avant 10 h 34 »)', tx.body);
+  });
+  await essaie('n° 3 : Mondial Relay, une route APRÈS l\'arrivée ⇒ parti du point relais', async () => {
+    const t18 = NOW - 6 * 24 * H, t21 = NOW - 3 * 24 * H;
+    const evs = [{ ms: t18 - 48 * H, libelle: 'Colis remis &#224; Mondial Relay' }, { ms: t18, libelle: '5 jours restants pour retirer le colis en Point Relais' }, { ms: t21, libelle: 'Colis en route vers le point de livraison' }];
+    const mvc = T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', mvcJson('12345678', '99999', 4, evs), { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc' });
+    dit(mvc.res === 'ok' && mvc.etat === 'incident' && mvc.detail === 'quitte_relais', 'n° 3 : « 5 jours restants » le 18, « en route vers le point de livraison » le 21 ⇒ a quitté le point relais (jamais « disponible »)', `${mvc.etat}/${mvc.detail}`);
+    const be = T.lireReponseMondialRelay(200, 'application/json', mrBe('12345678', '99999', 4, evs.map((e) => ({ ...e, libelle: e.libelle.replace('&#224;', 'à'), dpr: /restants/.test(e.libelle) }))), { suivi: '12345678', cp: '99999' });
+    dit(be.res === 'ok' && be.etat === 'incident' && be.detail === 'quitte_relais', 'n° 3 : la même règle pour l\'API .be', `${be.etat}/${be.detail}`);
+    const re = T.lireReponse('mondialrelay', 200, 'application/json; charset=utf-8', mvcJson('12345678', '99999', 4, [...evs, { ms: t21 + 30 * H, libelle: '4 jours restants pour retirer le colis en Point Relais' }]), { suivi: '12345678', cp: '99999', voie: 'mr-fr-mvc' });
+    dit(re.etat === 'disponible', 'n° 3, l\'autre sens : re-livré (un « N jours restants » plus récent) ⇒ disponible', re.etat);
+    const g1 = S.leverGarde({ etat: 'trop_long', age: 6, garde: 5 }, { transpDispoLu: NOW - H, limiteVers: T.jourParis(NOW - 24 * H) }, NOW);
+    const g2 = S.leverGarde({ etat: 'trop_long', age: 6, garde: 5 }, { transpDispoLu: NOW - H, limiteVers: T.jourParis(NOW + 48 * H) }, NOW);
+    dit(g1.etat === 'trop_long' && g2.etat === 'a_retirer', 'n° 3 : une limite DÉDUITE (« vers le ») déjà passée ne lève jamais la garde (à venir : levée)', `${g1.etat} · ${g2.etat}`);
+  });
+  await essaie('n° 7 : un code postal saisi faux ne ferme jamais le n°', async () => {
+    resetBase(); await oublis();
+    base.set(`${A}|colis_suivi_mondialrelay_12345678`, { suivi: '12345678', transporteur: 'mondialrelay', codePostal: '35000', at: iso(NOW - 24 * H) });
+    transporteur = repond();
+    await passage({});
+    const l1 = ligneT('mondialrelay', '12345678') || {};
+    dit(l1.essaiRes === 'cp-inconnu' && !l1.fini && !(Number(l1.essais) > 0) && l1.cpRefuse === '35000', 'n° 7 : « introuvable » avec un code postal SAISI, jamais prouvé ⇒ « code postal inconnu » (le code refusé noté), aucun échec compté', `${l1.essaiRes} essais=${l1.essais} fini=${l1.fini} cpRefuse=${l1.cpRefuse}`);
+    const carte = T.ligneTransporteur(T.ligneTranspDeMeta({ id: 'transp_mondialrelay_12345678', ...Object.fromEntries(Object.entries(l1).filter(([, v]) => v == null || typeof v !== 'object').map(([k, v]) => [k, v == null ? null : String(v)])) }), 'mondialrelay', NOW);
+    dit(/35000/.test(carte.texte), 'n° 7 : la carte nomme le code postal refusé', carte.texte);
+    base.set(`${A}|colis_suivi_mondialrelay_12345678`, { suivi: '12345678', transporteur: 'mondialrelay', codePostal: '99999', at: iso(NOW - 24 * H) });
+    appels.length = 0;
+    await passage({});
+    const l2 = ligneT('mondialrelay', '12345678') || {};
+    dit(appels.some((x) => x.host === 'www.mondialrelay.fr') && l2.etat === 'disponible', 'n° 7 : le code postal corrigé (99999) ⇒ relu tout de suite, « disponible »', `${l2.etat} appels=${appels.length}`);
+    // Une ligne fermée par trois « introuvable » sous l'ancienne règle (jamais
+    // prouvée à un code postal) : un code postal saisi depuis la fait relire.
+    resetBase(); await oublis();
+    base.set(`${A}|colis_suivi_mondialrelay_12345678`, { suivi: '12345678', transporteur: 'mondialrelay', codePostal: '99999', at: iso(NOW - 24 * H) });
+    base.set(`${A}|transp_mondialrelay_12345678`, { v: 1, rev: 1, carrier: 'mondialrelay', suivi: '12345678', essai: iso(NOW - 10 * 24 * H), essaiRes: 'introuvable', essais: 3, fini: true, voie: 'mr-fr-mvc' });
+    transporteur = repond();
+    await passage({});
+    const l3 = ligneT('mondialrelay', '12345678') || {};
+    dit(l3.etat === 'disponible' && !l3.fini, 'n° 7 : un n° fermé par trois « introuvable » sans code postal prouvé se relit avec le code postal saisi', `${l3.etat} fini=${l3.fini}`);
+  });
+  const mainRetrait = (o = {}) => ({ vrm_widget_token: '', vinted_pickup_done: {}, vinted_ship_done: {}, vinted_bords_shipped: {}, vinted_sales_hidden: [], vinted_bords_hidden: {}, vrm_colis_collected: [], ...o });
+  const widget = async () => { const w = (await importer('api/widget.js')).default; const res = faireRes(); await w({ method: 'GET', headers: {}, query: {} }, res); return res.corps || {}; };
+  await essaie('n° 8 : une ligne « fini » ancienne reste lue (widget)', async () => {
+    resetBase(); await oublis();
+    base.set(`${A}|main`, mainRetrait({ vrm_colis_retirer: { total: 1, aVerifier: 0, urgents: 0, at: NOW, colis: [['2099-01-01', NOW - 70 * 24 * H, 'mondialrelay', 'e:12345678', 1, '']], vus: ['12345678'], vusTx: [] } }));
+    base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr({ status: 'available', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville', limite: '2099-01-01', receivedAt: iso(NOW - 70 * 24 * H) }));
+    base.set(`${A}|transp_mondialrelay_12345678`, { v: 1, rev: 1, carrier: 'mondialrelay', suivi: '12345678', etat: 'retire', etatAt: iso(NOW - 60 * 24 * H), lu: iso(NOW - 60 * 24 * H), essai: iso(NOW - 60 * 24 * H), essaiRes: 'ok', voie: 'mr-fr-mvc', fini: true });
+    const r = await widget();
+    dit(r.pickup === 0, 'n° 8 : retiré il y a 60 jours (ligne finie, lue il y a 60 j) ⇒ jamais revenu « à retirer » au widget', `pickup=${r.pickup} aVérifier=${r.pickupAVerifier}`);
+  });
+  await essaie('n° 4 : le widget suit les fins du transporteur après la photo', async () => {
+    resetBase(); await oublis();
+    base.set(`${A}|main`, mainRetrait({ vrm_colis_retirer: { total: 1, aVerifier: 0, urgents: 0, at: NOW - 3 * H, colis: [['', NOW - 24 * H, 'chronopost', 'e:XW000000031TS', 1, '']], vus: ['XW000000031TS'], vusTx: [] } }));
+    base.set(`${A}|transp_chronopost_XW000000031TS`, { v: 1, rev: 1, carrier: 'chronopost', suivi: 'XW000000031TS', etat: 'incident', detail: 'quitte_relais', etatAt: iso(NOW - H), lu: iso(NOW - H), essai: iso(NOW - H), essaiRes: 'ok', voie: 'cp-ws2', fini: false });
+    const a = await widget();
+    dit(a.pickup === 0 && a.pickupAVerifier === 1 && a.pickupSortis === 0, 'n° 4 : un incident APRÈS la photo ⇒ « à vérifier », jamais « sorti »', `pickup=${a.pickup} aVérifier=${a.pickupAVerifier} sortis=${a.pickupSortis}`);
+    resetBase(); await oublis();
+    base.set(`${A}|main`, mainRetrait({ vrm_colis_retirer: { total: 0, aVerifier: 0, urgents: 0, at: NOW - 3 * H, colis: [], vus: [], vusTx: [] } }));
+    base.set(`${A}|transp_chronopost_XW000000061TS`, { v: 1, rev: 1, carrier: 'chronopost', suivi: 'XW000000061TS', etat: 'disponible', etatAt: iso(NOW - H), lu: iso(NOW - H / 2), essai: iso(NOW - H / 2), essaiRes: 'ok', voie: 'cp-ws2', limite: T.jourParis(NOW + 3 * 24 * H), limiteSure: true, fini: false });
+    const b = await widget();
+    dit(b.pickup === 1, 'n° 4 : un n° que le transporteur SEUL dit disponible depuis la photo (aucun e-mail) ⇒ compté', `pickup=${b.pickup} nouveaux=${b.pickupNouveaux}`);
+    // Les achats Vinted LUS (un résumé capté) : rien d'autre ne fait dire « au moins ».
+    const enVerif = async (n) => {
+      resetBase(); await oublis();
+      base.set(`${A}|main`, mainRetrait({ vrm_colis_retirer: { total: 0, aVerifier: 0, urgents: 0, enVerification: n, at: NOW - 3 * H, colis: [], vus: [], vusTx: [] } }));
+      base.set(`${A}|harvest_111_orders_purchased`, { capturedAt: iso(NOW - H), resume: { txns: [], at: iso(NOW - H) }, payload: { my_orders: [] } });
+      return widget();
+    };
+    const c = await enVerif(2), c0 = await enVerif(0);
+    dit(c.pickupAuMoins === true && c.pickupEnVerification === 2 && c0.pickupAuMoins === false, 'n° 4 : des achats « en cours de vérification » (ni code ni n°) ⇒ « au moins », jamais un total présenté complet (sans eux : complet)', `auMoins=${c.pickupAuMoins} enVérif=${c.pickupEnVerification} · sans : auMoins=${c0.pickupAuMoins}`);
+  });
+  await essaie('n° 1 : l\'arrivée d\'un achat Vinted est une BORNE, jamais l\'arrivée', async () => {
+    const fins = S.finsDesLignes([], { transp: [{ suivi: 'XW000000041TS', carrier: 'chronopost', etat: 'retour_expediteur', etatAt: iso(NOW - 48 * H) }] });
+    dit(S.sortiParSuivis(['XW000000041TS'], fins, null, { borne: NOW - H }) === 'reparti', 'n° 1 : arrivée inconnue, borne = la capture ⇒ un retour d\'il y a 2 j compte (reparti)');
+    const finsI = S.finsDesLignes([], { transp: [{ suivi: 'XW000000042TS', carrier: 'chronopost', etat: 'inconnu', etatAt: iso(NOW - 2 * H) }] });
+    dit(S.sortiParSuivis(['XW000000042TS'], finsI, null, { borne: NOW - 5 * H }) === 'a_verifier' && S.sortiParSuivis(['XW000000042TS'], finsI, null, { borne: NOW - H }) == null, 'n° 1 : un statut inconnu compte s\'il suit la borne, pas avant');
+    resetBase(); await oublis();
+    base.set(`${A}|main`, mainRetrait({ vrm_colis_retirer: { total: 1, aVerifier: 0, urgents: 0, at: NOW - H, colis: [['', NOW - 2 * H, 'chronopost', 'v:111:9001', 0, 'XW000000041TS']], vus: [], vusTx: ['9001'] } }));
+    base.set(`${A}|transp_chronopost_XW000000041TS`, { v: 1, rev: 1, carrier: 'chronopost', suivi: 'XW000000041TS', etat: 'retour_expediteur', etatAt: iso(NOW - 48 * H), lu: iso(NOW - H), essai: iso(NOW - H), essaiRes: 'ok', voie: 'cp-ws2', fini: true });
+    const r = await widget();
+    dit(r.pickup === 0 && r.pickupSortis === 1, 'n° 1 : achat Vinted publié avec une arrivée BORNE (la capture) ; le transporteur dit reparti avant ⇒ sorti au widget', `pickup=${r.pickup} sortis=${r.pickupSortis}`);
+  });
+  await essaie('n° 6 et n° 8 : le rappel du matin (la vraie route)', async () => {
+    const cron = (await importer('api/ship-reminders.js')).default;
+    const tourne = async () => { pushes.length = 0; const res = faireRes(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, res); return pushes.filter((p) => /Dernier jour|à vérifier/.test(p.title || '')); };
+    const auj = T.jourParis(NOW);
+    const synth = (coche) => {
+      resetBase();
+      base.set(`${A}|main`, mainRetrait({ vinted_pickup_done: coche ? { 9001: true } : {} }));
+      base.set(`${A}|colis_suivi_chronopost_XW000000051TS`, { suivi: 'XW000000051TS', transporteur: 'chronopost', tx: '9001', at: iso(NOW - 24 * H) });
+      base.set(`${A}|transp_chronopost_XW000000051TS`, { v: 1, rev: 1, carrier: 'chronopost', suivi: 'XW000000051TS', etat: 'disponible', etatAt: iso(NOW - 20 * H), lu: iso(NOW - H), essai: iso(NOW - H), essaiRes: 'ok', voie: 'cp-ws2', limite: auj, limiteSure: true, fini: false });
+    };
+    await oublis(); synth(false); transporteur = () => null;
+    const p1 = await tourne();
+    dit(p1.length === 1 && /XW000000051TS/.test(p1[0].body || ''), 'n° 6 : un n° ajouté à la main, que le TRANSPORTEUR SEUL dit disponible, dernier jour aujourd\'hui ⇒ le rappel part', p1.map((p) => p.title).join(' · ') || 'aucun');
+    await oublis(); synth(true); transporteur = () => null;
+    const p2 = await tourne();
+    dit(p2.length === 0, 'n° 6 : sa commande cochée « Je l\'ai retiré » (reliée par le n°) ⇒ aucun rappel', p2.map((p) => p.title).join(' · ') || 'aucun');
+    resetBase(); await oublis(); transporteur = () => null;
+    base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr({ status: 'available', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville', limite: auj, receivedAt: iso(NOW - 70 * 24 * H) }));
+    base.set(`${A}|transp_mondialrelay_12345678`, { v: 1, rev: 1, carrier: 'mondialrelay', suivi: '12345678', etat: 'retire', etatAt: iso(NOW - 60 * 24 * H), lu: iso(NOW - 60 * 24 * H), essai: iso(NOW - 60 * 24 * H), essaiRes: 'ok', voie: 'mr-fr-mvc', fini: true });
+    const p3 = await tourne();
+    dit(p3.length === 0, 'n° 8 : retiré il y a 60 jours (ligne finie) ⇒ aucun « dernier jour » le matin', p3.map((p) => p.title).join(' · ') || 'aucun');
+  });
+  await essaie('n° 10 et constat e', async () => {
+    dit(S.repartiAffichable(NOW - 10 * 24 * H, NOW) === true && S.repartiAffichable(NOW - 40 * 24 * H, NOW) === false && S.repartiAffichable(NaN, NOW) === true, 'n° 10 : un colis reparti se montre 30 jours (date inconnue : montré)');
+    dit(T.carrierLisible('vinted', '123456789012') === 'vinted' && !S.transporteurDeForme('123456789012'), 'constat e : 12 chiffres = un n° Vinted Go lisible (ligne Vinted), jamais un transporteur deviné par la forme seule', `${T.carrierLisible('vinted', '123456789012')} · ${S.transporteurDeForme('123456789012')}`);
+    const t = S.texteRappelRetrait({ etat: 'a_verifier', raison: 'trop_long', garde: 5, suivi: '12345678', transporteur: 'mondialrelay', lieu: 'TABAC TEST' });
+    dit(/à vérifier/.test(t.title) && !/sans doute|reparti\b(?! ?\.)/i.test(t.title) && !/sans doute/i.test(t.body), 'constat : « à vérifier », jamais « sans doute reparti »', `${t.title} — ${t.body}`);
+  });
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s).` : '\n✅ Le statut lu chez les transporteurs suit la règle (serveur, secours, pause, échos, fins, notifications).');
   process.exit(ko ? 1 : 0);
 })();
