@@ -1,3 +1,9 @@
+// Banc : PLUS DE SAISIE « N° + Entrée » SUR VENTES, COLIS, ACHATS, ANNONCES (29 octobre).
+// Julien : « enlève N°+entrée sur chaque onglet, il y a déjà la barre de
+// recherche ». Il vérifie : aucune saisie N° rendue, un chiffre tapé hors d'un
+// champ ne déplace pas le focus et ne change pas d'onglet, un chiffre tapé dans
+// la recherche y reste, aucune écriture, aucune erreur de page. Données INVENTÉES.
+// (Avant le 29 oct. : banc du pavé numérique, ajouté le 27.)
 // Banc : LE PAVÉ NUMÉRIQUE SUR VENTES ET COLIS (Vinted, 27 octobre). Julien :
 // « fais pareil pour le pavé numérique sur Colis et Ventes ». Données INVENTÉES.
 // Il JOUE le clavier, sur ordinateur :
@@ -153,104 +159,49 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
       console.log('\n── Ventes, 1512 px');
       await allerA(pg, 'cat_ventes', '.vrm-ventes-liste .vrm-sale-row[data-tx="501"]');
       await essaie('Ventes', async () => {
-        dit(!!(await pg.$('[data-num-plat="ventes"] [data-num-plat-saisie]')), 'la saisie N° est sur Ventes');
-        await tape(pg, '51'); let e = await etat(pg);
-        dit(e.focus && e.valeur === '51', 'deux chiffres tapés n’importe où remplissent la saisie', JSON.stringify(e));
-        await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(e.trouve.includes('501') && e.ton === 'ok', 'N°51 + Entrée : sa vente est montrée', JSON.stringify(e));
-        // Un filtre qui la cache : « Finalisées ».
-        await pg.click('.vrm-filtres button:has-text("Finalisées")', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '51'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(e.trouve.includes('501'), 'cachée par le filtre « Finalisées » : le filtre se lève et la vente est montrée', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '52'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(e.trouve.includes('502'), 'au-delà des 60 premières : « Voir plus » s’ouvre et la vente est montrée', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await verrNumEteint(pg, '53'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        const filtre = await pg.$eval('.vrm-filtres button[aria-pressed="true"]', (x) => x.textContent).catch(() => '');
-        dit(e.trouve.includes('503') && /Annul/.test(filtre), 'Verr Num éteint, N°53 (annulée) : « Annulées » s’ouvre et la vente est montrée', JSON.stringify({ e, filtre }));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '999'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!e.trouve.length && /999/.test(e.msg) && e.ton === 'info', 'N°999 : aucune vente, et c’est dit', JSON.stringify(e));
-        await pg.keyboard.press('Escape'); e = await etat(pg);
-        dit(e.valeur === '' && !e.focus, 'Échap vide la saisie et la quitte', JSON.stringify(e));
-        // Un chiffre tapé DANS la recherche des ventes y reste.
+        dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Ventes');
+        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
+        await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
+        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
+        dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
         await pg.click('input[aria-label="Rechercher dans les ventes Vinted"]'); await pg.keyboard.press('7');
-        const r = await pg.$eval('input[aria-label="Rechercher dans les ventes Vinted"]', (x) => x.value); e = await etat(pg);
-        dit(r === '7' && e.valeur === '', 'un chiffre tapé dans la recherche des ventes y reste', JSON.stringify({ r, v: e.valeur }));
+        const v = await pg.$eval('input[aria-label="Rechercher dans les ventes Vinted"]', (x) => x.value);
+        dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
         await pg.fill('input[aria-label="Rechercher dans les ventes Vinted"]', '');
       });
       console.log('\n── Colis, 1512 px');
       await allerA(pg, 'cat_bord', '[data-bord-card][data-tx-colis="501"]');
       await essaie('Colis', async () => {
-        dit(!!(await pg.$('[data-num-plat="colis"] [data-num-plat-saisie]')), 'la saisie N° est sur Colis');
-        // (27 oct.) « Générer le bordereau » grisé débordait sur « J'ai le PDF » (vu à 1512 px).
-        const gestes = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis="501"] .vrm-colis-actions button')].filter((b) => b.offsetParent).map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim().slice(0, 20), l: r.left, r: r.right, deb: b.scrollWidth > b.clientWidth + 1 }; }));
-        const chevauche = gestes.some((g, i) => g.deb || gestes.some((h, j) => j !== i && g.l < h.r - 1 && h.l < g.r - 1 && Math.abs(g.l - h.l) > 1));
-        dit(gestes.length >= 2 && !chevauche, 'les gestes d’un colis ne se chevauchent pas (« Générer le bordereau » tient dans sa colonne)', JSON.stringify(gestes));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '51'); await pg.keyboard.press('Enter'); let e = await attendTrouve(pg);
-        dit(e.trouve.includes('501') && /envoyer/.test(e.msg), 'N°51 + Entrée : son colis à envoyer est montré', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        const avant = !!(await pg.$('[data-bord-card][data-tx-colis="504"]'));
-        await verrNumEteint(pg, '54'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!avant && e.trouve.includes('504') && /posté/.test(e.msg), 'N°54 marqué « posté » (caché) : remontré et montré, Verr Num éteint', JSON.stringify({ avant, e }));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '44'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(e.trouve.includes('07-001') && /eBay/.test(e.msg), 'N°44 : le colis eBay à poster est montré', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '52'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!e.trouve.length && /pas dans tes colis/.test(e.msg) && /Vendue/.test(e.msg), 'N°52 (finalisée) : pas à envoyer, et son état est dit', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '999'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!e.trouve.length && /999/.test(e.msg), 'N°999 : rien, et c’est dit', JSON.stringify(e));
-        dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+)(,|$)/.test(x)).length, 'aucune écriture en base venue du pavé', ECRITURES.join(' | ').slice(0, 300));
-        dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
+        dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Colis');
+        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
+        await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
+        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
+        dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
       console.log('\n── Achats, 1512 px');
       await allerA(pg, 'cat_achats', '[data-achats-onglet]');
       await essaie('Achats', async () => {
-        dit(!!(await pg.$('[data-num-plat="achats"] [data-num-plat-saisie]')), 'la saisie N° est sur Achats');
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '41'); await pg.keyboard.press('Enter'); let e = await attendTrouve(pg);
-        const onglet = await pg.$eval('[data-achats-onglet][aria-pressed="true"]', (x) => x.getAttribute('data-achats-onglet')).catch(() => '');
-        dit(e.trouve.includes('801') && onglet === 'all', 'N°41 (relié depuis l’annonce) : « Tous » s’ouvre et son achat est montré, au-delà des 60 premiers', JSON.stringify({ e, onglet }));
-        await pg.waitForTimeout(1500);
-        const pos = await pg.evaluate(() => { const x = document.querySelector('.vrm-buy-row[data-achat-tx="801"]'); if (!x) return null; const r = x.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), h: innerHeight }; });
-        dit(!!pos && pos.haut >= 0 && pos.bas <= pos.h, 'l’achat trouvé est amené à l’écran', JSON.stringify(pos));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await verrNumEteint(pg, '52'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(e.trouve.includes('802'), 'Verr Num éteint, N°52 (relié depuis la vente) : son achat est montré', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '42'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!e.trouve.length && /Aucun achat n'est relié/.test(e.msg), 'N°42 (aucun achat relié) : rien n’est deviné, et c’est dit', JSON.stringify(e));
+        dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Achats');
+        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
+        await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
+        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
+        dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
       console.log('\n── Annonces, 1512 px');
       await allerA(pg, 'cat_annonces', '[data-carte-annonce="9101"]');
       await essaie('Annonces', async () => {
-        dit(!!(await pg.$('[data-num-plat="annonces"] [data-num-plat-saisie]')), 'la saisie N° est sur Annonces');
-        await pg.click('.vrm-stock-views button:has-text("Sans numéro")', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
-        const cache = !(await pg.$('[data-carte-annonce="9101"]'));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '41'); await pg.keyboard.press('Enter'); let e = await attendTrouve(pg);
-        dit(cache && e.trouve.includes('9101') && /en ligne/.test(e.msg), 'N°41 caché par « Sans numéro » : la vue se lève et son annonce est montrée', JSON.stringify({ cache, e }));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '51'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!e.trouve.length && /plus en ligne/.test(e.msg), 'N°51 (vendue) : plus en ligne, et sa vente est nommée', JSON.stringify(e));
-        await pg.evaluate(() => document.activeElement && document.activeElement.blur());
-        await tape(pg, '999'); await pg.keyboard.press('Enter'); e = await attendTrouve(pg);
-        dit(!e.trouve.length && /999/.test(e.msg), 'N°999 : rien, et c’est dit', JSON.stringify(e));
-        dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'toujours aucune écriture venue du pavé', ECRITURES.join(' | ').slice(0, 300));
-        dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
+        dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Annonces');
+        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
+        await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
+        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
+        dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
+        await pg.click('input[aria-label="Rechercher une annonce"]'); await pg.keyboard.press('7');
+        const v = await pg.$eval('input[aria-label="Rechercher une annonce"]', (x) => x.value);
+        dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
+        await pg.fill('input[aria-label="Rechercher une annonce"]', '');
       });
-      await ctx.close();
-    }
-    {
-      const { ctx, pg } = await ouvrir(b, { width: 390, height: 844 });
-      console.log('\n── téléphone, 390 px');
-      await allerA(pg, 'cat_bord', '[data-bord-card]');
-      dit(!(await pg.$('[data-num-plat]')), 'au téléphone, pas de saisie N° (pas de pavé)');
+      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
+      dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();
     }
   } catch (e) { dit(false, 'banc', String(e.message || e).slice(0, 200)); }

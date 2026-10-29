@@ -4757,7 +4757,8 @@ function OsmMap({ points, height = 230, selected, onSelect }) {
   // immobile, centré sur le même point et à la même échelle que les épingles
   // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
   // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
-  const sombreCarte = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+  // (29 oct.) La carte garde ses couleurs claires en mode sombre (décision de Julien, comme la communauté).
+  const sombreCarte = false;
   return (
     <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1a1f27' : '#eaeef2' }}>
       <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
@@ -17521,89 +17522,6 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-// ── (27 oct.) LE PAVÉ NUMÉRIQUE SUR LEBONCOIN ET eBAY — Julien : « fais pareil
-// pour le pavé numérique sur Leboncoin et eBay » (comme le Stock, 26 oct.).
-// Sur ordinateur, un chiffre tapé n'importe où dans l'espace Leboncoin ou eBay
-// ouvre la saisie ; N° + Entrée MONTRE la paire sur ce site : sa vente d'abord,
-// sinon son annonce en ligne, sinon (Leboncoin) sa carte « à publier ». Une
-// LECTURE : rien n'est publié, retiré, ni modifié, aucun numéro ne change. La
-// paire se trouve par IDENTITÉ seulement (SKU, référence VRM, lien posé à la
-// main — les règles de chaque écran, §5) ; un N° qui ne désigne rien le dit.
-// Verr Num éteint : la touche du pavé arrive en « Clear »/« End » ; on lit aussi
-// `e.code` (`Numpad5`), comme le Stock.
-const DEMANDE_NUM_PLAT = { plateforme: '', section: '', q: '', at: 0 };
-const chiffrePave = (e) => /^[0-9]$/.test(e.key) ? e.key : ((/^Numpad([0-9])$/.exec(e.code || '') || [])[1] || '');
-function SaisieNumeroPlateforme({ plateforme, chercher, onSection = () => {}, nom = '', invite = '', barre = false }) {
-  const sansSouris = useSansSouris();
-  const champ = React.useRef(null);
-  const [v, setV] = React.useState('');
-  const [msg, setMsg] = React.useState(null);   // { texte, ton: 'ok' | 'info' }
-  const [occupe, setOccupe] = React.useState(false);
-  const enCours = React.useRef(0);
-  React.useEffect(() => {
-    if (sansSouris) return;
-    const surTouche = (e) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
-      const t = e.target, tag = (t && t.tagName) || '';
-      if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
-      // Une feuille ou une vente ouverte (un dialogue VISIBLE) garde son clavier.
-      if ([...document.querySelectorAll('[role="dialog"]')].some((d) => !d.closest('[hidden]') && d.getBoundingClientRect().height > 0)) return;
-      const ch = chiffrePave(e); if (!ch) return;
-      const el = champ.current; if (!el) return;
-      e.preventDefault(); el.focus(); setV(ch); setMsg(null);
-    };
-    // En CAPTURE : Verr Num éteint, la touche 4 du pavé arrive en « ArrowLeft »,
-    // que la coque prend pour « site précédent ». Pris ici d'abord (et
-    // `preventDefault`), le chiffre va à la saisie et l'onglet ne bouge pas.
-    window.addEventListener('keydown', surTouche, true);
-    return () => window.removeEventListener('keydown', surTouche, true);
-  }, [sansSouris]);
-  if (sansSouris) return null;
-  const montrer = (sel, n = 0) => {
-    const el = typeof sel === 'function' ? sel() : document.querySelector(sel);
-    if (el) {
-      try { el.scrollIntoView({ block: 'center', behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth' }); } catch (_) {}
-      document.querySelectorAll('[data-num-trouve]').forEach((x) => x.removeAttribute('data-num-trouve'));
-      el.setAttribute('data-num-trouve', '1');
-      setTimeout(() => el.removeAttribute('data-num-trouve'), 3500);
-      return Promise.resolve(true);
-    }
-    if (n >= 25) return Promise.resolve(false);
-    return new Promise((r) => setTimeout(() => r(montrer(sel, n + 1)), 200));
-  };
-  const valider = async () => {
-    const brut = String(v || '').trim(); const cle = cleNum(brut);
-    if (!cle) { setMsg({ texte: 'Tape un numéro, puis Entrée.', ton: 'info' }); return; }
-    const id = ++enCours.current; setOccupe(true);
-    document.querySelectorAll('[data-num-trouve]').forEach((x) => x.removeAttribute('data-num-trouve'));
-    let r = null; try { r = await chercher(cle); } catch (_) { r = null; }
-    if (id !== enCours.current) return;
-    setOccupe(false);
-    if (!r) { setMsg({ texte: 'Je n’ai pas pu lire tes données — réessaie dans un instant.', ton: 'info' }); return; }
-    if (!r.section) { setMsg({ texte: r.texte, ton: 'info' }); return; }
-    Object.assign(DEMANDE_NUM_PLAT, { plateforme, section: r.section, q: r.q || '', at: Date.now() });
-    onSection(r.section);
-    window.dispatchEvent(new Event('vrm:num-plat'));
-    const vu = await montrer(r.sel);
-    if (id !== enCours.current) return;
-    setMsg(vu ? { texte: r.texte, ton: 'ok' } : { texte: r.texteSiAbsent || r.texte, ton: 'info' });
-    if (vu) setV('');
-  };
-  return (
-    <div className={barre ? 'vrm-num-plat vrm-num-plat-barre' : 'vrm-num-plat'} data-num-plat={plateforme}>
-      <label className="vrm-num-plat-champ"><span>N°</span>
-        <input ref={champ} data-num-plat-saisie="" value={v} inputMode="numeric" autoComplete="off" placeholder="+ Entrée"
-          aria-label={`Numéro : Entrée pour trouver la paire ${nom || (plateforme === 'ebay' ? 'sur eBay' : 'sur Leboncoin')}`}
-          onChange={(e) => { setV(e.target.value); setMsg(null); }}
-          onKeyDown={(e) => {
-            // Verr Num éteint, DANS le champ : « ArrowDown » + Numpad2 ne tape rien ; on pose le chiffre.
-            const ch = chiffrePave(e); if (ch && ch !== e.key) { e.preventDefault(); e.stopPropagation(); setV((x) => x + ch); setMsg(null); return; }
-            if (e.key === 'Enter') { e.preventDefault(); valider(); } else if (e.key === 'Escape') { e.preventDefault(); setV(''); setMsg(null); e.currentTarget.blur(); } }}/>
-      </label>
-      <span role="status" className="vrm-num-plat-msg" data-num-plat-msg={msg ? msg.ton : undefined}>{occupe ? 'Je cherche…' : (msg ? msg.texte : (barre ? '' : (invite || 'Tape un N° au clavier : je montre la paire sur ce site.')))}</span>
-    </div>
-  );
-}
 function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '' }) {
   return <LigneVenteCompacte {...(data || {})} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
@@ -22314,12 +22232,6 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const [annMax, setAnnMax] = React.useState(60);
   const qAnn = React.useDeferredValue(q);
   React.useEffect(() => { setAnnMax(60); }, [qAnn, filtreAnn]);
-  // (27 oct.) Le pavé numérique de l'espace eBay pose « n°41 » dans la recherche
-  // (la liste est paginée à 60 : sans ça la carte peut être hors de la tranche).
-  React.useEffect(() => {
-    const lire = () => { const d = DEMANDE_NUM_PLAT; if (d.plateforme === 'ebay' && d.section === 'annonces' && d.q && Date.now() - d.at < 5000) { setQ(d.q); setFiltreAnn('toutes'); d.at = 0; } };
-    lire(); window.addEventListener('vrm:num-plat', lire); return () => window.removeEventListener('vrm:num-plat', lire);
-  }, []);
   const [eligibles, setEligibles] = React.useState(undefined);       // offre : undefined · null · { ids:Set, complet }
   const [retraits, setRetraits] = React.useState({});                // itemId → '…' (en cours) | message
   // Retrait automatique (proposition 8) : l'interrupteur, et ce qui a été retiré
@@ -42058,14 +41970,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // en suivant chaque identifiant libre de son rendu). Une valeur oubliée ici
   // ferait garder une ligne périmée : tout ce que `rendre` lit dans l'écran
   // doit passer par `preparerLigneVente` ou par `actionsVentes`.
-  // ── (27 oct.) LE PAVÉ NUMÉRIQUE SUR VENTES ET COLIS — Julien : « fais pareil
-  // pour le pavé numérique sur Colis et Ventes ». Même saisie que Leboncoin et
-  // eBay (`SaisieNumeroPlateforme`) : N° + Entrée MONTRE la vente / le colis,
-  // en lecture seule. Le N° est celui que la ligne affiche elle-même (Ventes :
-  // `effEntry(o).numero`, celui de `preparerLigneVente` ; Colis : `numForBord`, sinon la fiche de
-  // la vente) — aucune autre règle, jamais le titre (§5). Si la vente est cachée
-  // par un filtre, une recherche, la période ou « Voir plus », on la remontre
-  // (un geste qui ne trouve pas ce qu'il cherche à cause d'un filtre ment).
   // (27 oct.) Les articles partis sortent tout seuls du Stock (`sortirPartisDuStock`).
   // Seulement quand tout est lu : ventes de tous les comptes, annonces, nuage.
   useEffect(() => {
@@ -42112,68 +42016,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef]);
-  const chercherNumVente = async (cle) => {
-    if (!Array.isArray(sales.items)) return null;   // pas encore lu : « pas su »
-    const tous = sales.items.filter(o => o && o.transaction_id != null && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc);
-    if (!tous.length) return { texte: `Aucune vente Vinted ne porte le N°${cle}.` };
-    const o = tous[0], tx = String(o.transaction_id);
-    if (!ventesAffichees.some(x => String(x.transaction_id) === tx)) {
-      const st = classifyOrderStatus(o.status);
-      setOrdSearch(''); setPeriode(null);
-      if (isHidden(o)) setShowHidden(true);
-      setVFilter(st === 'cancelled' && !venteQuiRevient(o) ? 'annulees' : 'all');
-    }
-    const sel = () => { const el = document.querySelector(`.vrm-ventes-liste .vrm-sale-row[data-tx="${tx}"]`); if (!el) setVentesMax(n => n + 120); return el; };
-    const plus = tous.length > 1 ? ` · ${tous.length} ventes portent ce N°, voici la plus récente` : '';
-    return { section: 'ventes', sel, texte: `N°${cle} — ${venteStage(o).label}${plus}`, texteSiAbsent: `La vente N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
-  };
-  // (27 oct.) Même pavé sur Achats et Annonces. Achats : un achat porte un N°
-  // seulement s'il a été RELIÉ à une paire (sur son clic : `buyFromId` posé par
-  // Annonces ou par une vente) — jamais deviné. Annonces : la carte dont la fiche
-  // porte ce N°, en ligne sur Vinted.
-  const chercherNumAchat = async (cle) => {
-    if (!Array.isArray(buys.items)) return null;
-    const txs = new Set();
-    for (const k in numeros) { const e = numeros[k]; if (e && e.buyFromId && cleNum(e.numero || '') === cle) txs.add(String(e.buyFromId)); }
-    for (const o of (sales.items || [])) { const ov = o && o.transaction_id != null ? saleOv[String(o.transaction_id)] : null; if (ov && ov.buyFromId && cleNum(effEntry(o)?.numero || '') === cle) txs.add(String(ov.buyFromId)); }
-    if (!txs.size) return { texte: `Aucun achat n'est relié au N°${cle} — tu relies un achat depuis la carte de l'annonce ou depuis sa vente.` };
-    const o = buysBase.filter(b => txs.has(String(b.transaction_id))).sort(parDateDesc)[0];
-    if (!o) return { texte: `L'achat relié au N°${cle} n'est pas dans tes achats captés (compte écarté ou plus relu).` };
-    const tx = String(o.transaction_id);
-    if (!achatsAffiches.some(x => String(x.o.transaction_id) === tx)) { setAFilter('all'); setOrdSearch(''); setPeriode(null); }
-    const sel = () => { const el = document.querySelector(`.vrm-buy-row[data-achat-tx="${tx}"]`); if (!el) setAchatsMax(n => n + 120); return el; };
-    return { section: 'achats', sel, texte: `N°${cle} — acheté le ${o.date ? new Date(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '?'}, ${achatStage(o, trackForBuy(o)).label}`, texteSiAbsent: `L'achat du N°${cle} existe, mais je n'ai pas pu l'afficher dans la liste.` };
-  };
-  const chercherNumAnnonce = async (cle) => {
-    if (!Array.isArray(listings.items)) return null;
-    const it = annBase.find(x => cleNum(numeros[x.id]?.numero || '') === cle);
-    if (it) {
-      if (!annShown.some(x => x.id === it.id)) { setAnnSearch(''); setAnnSort('oldest'); }
-      return { section: 'annonces', sel: `[data-carte-annonce="${it.id}"]`, texte: `N°${cle} — en ligne sur Vinted`, texteSiAbsent: `L'annonce N°${cle} est en ligne, mais je n'ai pas pu l'afficher dans la liste.` };
-    }
-    const v = (sales.items || []).filter(o => o && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc)[0];
-    if (v) return { texte: `N°${cle} n'est plus en ligne — sa vente : ${venteStage(v).label}. Elle est dans Ventes.` };
-    if (Object.values(numeros).some(e => e && cleNum(e.numero || '') === cle)) return { texte: `N°${cle} n'est pas en ligne sur Vinted en ce moment (retirée, ou à confirmer).` };
-    return { texte: `Aucune annonce ne porte le N°${cle}.` };
-  };
-  const chercherNumColis = async (cle) => {
-    if (!Array.isArray(sales.items)) return null;
-    const numEx = (e) => (e.b ? numForBord(e.b) : '') || (e.o ? (effEntry(e.o)?.numero || '') : '');
-    const ex = expeditions().filter(e => cleNum(numEx(e)) === cle);
-    if (ex.length) {
-      const e = ex[0];
-      const poste = !!(e.o ? isShipDone(e.o) : isBordShippedManual(e.b));
-      if (poste && !voirPostes) setVoirPostes(true);
-      if (e.o && !matchOrd(e.o)) setOrdSearch('');
-      const plus = ex.length > 1 ? ` · ${ex.length} colis portent ce N°` : '';
-      return { section: 'bordereaux', sel: `[data-bord-card][data-tx-colis="${e.txn}"]`, texte: `N°${cle} — ${poste ? 'marqué « posté »' : 'à envoyer'}${plus}` };
-    }
-    const xe = colisEb && colisEb.aPoster ? colisEb.aPoster.find(x => x.ordre && cleNum(numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') === cle) : null;
-    if (xe) return { section: 'bordereaux', sel: `[data-colis-ebay-cmd="${xe.orderId}"]`, texte: `N°${cle} — vente eBay à poster` };
-    const v = sales.items.filter(o => o && cleNum(effEntry(o)?.numero || '') === cle).sort(parDateDesc)[0];
-    if (v) return { texte: `N°${cle} n'est pas dans tes colis à envoyer — sa vente : ${venteStage(v).label}. Elle est dans Ventes.` };
-    return { texte: `Aucun colis ni vente Vinted ne porte le N°${cle}.` };
-  };
   const preparerLigneVente = (o) => {
     const tx = String(o.transaction_id);
     const e = effEntry(o); const num = e?.numero;
@@ -43705,7 +43547,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {curSub==='ventes' && (<>
         {!dansPlateforme && <ScreenHead icon="cash" title="Ventes" desc="Tout ce que tu as vendu : bénéfice par article, expédition, et tes documents comptables."/>}
-        <SaisieNumeroPlateforme plateforme="ventes" nom="dans tes ventes" invite="Tape un N° au clavier : je montre sa vente." chercher={chercherNumVente}/>
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -44515,7 +44356,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {curSub==='achats' && (<div className="vrm-achats">
         {/* (26 oct.) Dans l'espace Vinted, l'onglet « Achats » sélectionné dit déjà le titre : pas deux fois (§7). */}
         {!dansPlateforme && <ScreenHead icon="bag" title="Achats" desc="Tes achats Vinted : ce qui est en route, ce qui t'attend en point relais avec son code de retrait, et le prix payé pour chaque article."/>}
-        <SaisieNumeroPlateforme plateforme="achats" nom="dans tes achats" invite="Tape un N° au clavier : je montre l'achat relié à cette paire." chercher={chercherNumAchat}/>
         <NoAcc/>
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -45712,8 +45552,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
             {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
             <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
-            {/* (27 oct.) Le pavé numérique : dans la barre, pas une ligne de plus avant la grille. */}
-            <SaisieNumeroPlateforme barre plateforme="annonces" nom="dans tes annonces" chercher={chercherNumAnnonce}/>
             <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
               style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
               <option value="oldest">Les plus anciennes</option>
@@ -46830,7 +46668,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Bordereaux (ventes non annulées avec un numéro, à imprimer) ── */}
       {curSub==='bordereaux' && (<>
         <ScreenHead icon="doc" title="Colis" desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."/>
-        <SaisieNumeroPlateforme plateforme="colis" nom="dans tes colis" invite="Tape un N° au clavier : je montre son colis." chercher={chercherNumColis}/>
         {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
             capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
             message partout). */}
@@ -57554,19 +57391,6 @@ function AppCoeur() {
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
           <PlatSubNav sub={platSub} setSub={setPlatSub} sections={[['ventes','Ventes'],['achats','Achats'],['annonces','Annonces'],['messages','Messages'],['colis','Colis']]}/>
-          <SaisieNumeroPlateforme plateforme="leboncoin" onSection={setPlatSub} chercher={async (cle) => {
-            const brut = await lbcAnnoncesSession(); if (brut == null) return null;
-            // Les annonces captées, indexées par leur identifiant (la forme que lit `numeroLbcIdentite`).
-            const items = Array.isArray(brut) ? Object.fromEntries(brut.filter((a) => a && a.id != null).map((a) => [String(a.id), a])) : brut;
-            const liens = load('vrm_lbc_liens', {}) || {};
-            const ventes = (lbcVentes.ventes || []).filter((o) => o && o.isSeller === true && numeroLbcIdentite(o, items, liens) === cle);
-            if (ventes.length) { const o = ventes.find((x) => !lbcAnnulee(x)) || ventes[0];
-              return { section: 'ventes', sel: `[data-lbc-vente="${String(o.txId).replace(/"/g, '')}"]`, texte: `N°${cle} : vendue sur Leboncoin${lbcAnnulee(o) ? ' (annulée)' : ''} — ${o.stepLabel || o.title || ''}`.replace(/ — $/, '') }; }
-            const vendues = new Set((lbcVentes.ventes || []).filter((o) => o && o.isSeller === true && !lbcAnnulee(o) && o.itemId != null).map((o) => String(o.itemId)));
-            const ad = Object.values(items || {}).find((a) => a && annonceLbcEnVente(a, vendues) && numeroLbcIdentite({ itemId: a.id }, items, liens) === cle);
-            if (ad) return { section: 'annonces', sel: `[data-lbc-catalog-id="${String(ad.id).replace(/"/g, '')}"]`, texte: `N°${cle} : en ligne sur Leboncoin.`, texteSiAbsent: `N°${cle} est en ligne sur Leboncoin, mais pas dans « Mes annonces » : ouvre-la depuis Leboncoin.` };
-            return { section: 'annonces', sel: () => [...document.querySelectorAll('[data-apub]')].find((e) => cleNum(e.getAttribute('data-apub')) === cle), texte: `N°${cle} : pas encore sur Leboncoin — la voici dans « à publier ».`, texteSiAbsent: `N°${cle} : aucune vente ni annonce Leboncoin, et elle n'est pas dans « à publier ».` };
-          }}/>
           {platSub==='messages'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<MessagesLeboncoin/>}</div>}
           {platSub==='ventes'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<>
             {(() => { const ar = lbcArgent(lbcVentes); const vide = !(lbcVentes.ventes||[]).length && !lbcVentes.inconnues; const lu = !!lbcVentes.maj;
@@ -57610,19 +57434,6 @@ function AppCoeur() {
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           <div><PlatSubNav sub={platSub} setSub={sub=>{setEbayCible(null);setPlatSub(sub);}} sections={[['ventes','Ventes'],['annonces','Annonces'],['messages','Messages'],['offres','Offres'],['agent','À traiter'],['promo','Promotion'],['achats','Achats'],['compte','Compte']]} dark/></div>
-          <SaisieNumeroPlateforme plateforme="ebay" onSection={(sec) => { setEbayCible(null); setPlatSub(sec); }} chercher={async (cle) => {
-            if (!Array.isArray(comptesEbay)) return null;
-            const [cmd, ann] = await Promise.all([lireEbayTous('ebay_orders', 'orders:data->orders', 'orders', comptesEbay), lireEbayTous('ebay_listings', 'items:data->items', 'items', comptesEbay)]);
-            if (!cmd || !ann) return null;
-            const ventes = cmd.items.filter((o) => (o.lineItems || []).some((li) => cleNum(numLigneEbay(o, li) || '') === cle));
-            if (ventes.length) { const o = ventes.find((x) => commandeEbayEngagee(x)) || ventes[0];
-              if (ebayVueEff !== '*' && (o._compte || 'principal') !== ebayVueEff) setEbayVue('*');
-              return { section: 'ventes', sel: `[data-ebay-vente="${String(o.orderId).replace(/"/g, '')}"]`, texte: `N°${cle} : vendue sur eBay — ${etatCommandeEbay(o).label}.` }; }
-            const a = ann.items.find((it) => cleNum(numEbayLu(it.sku, it.itemId, null, it.depuis) || '') === cle);
-            if (a) { if (ebayVueEff !== '*' && (a._compte || 'principal') !== ebayVueEff) setEbayVue('*');
-              return { section: 'annonces', q: 'n°' + cle, sel: `[data-ebay-annonce="${String(a.itemId).replace(/"/g, '')}"]`, texte: `N°${cle} : en ligne sur eBay.` }; }
-            return { texte: `N°${cle} : ni vendue ni en ligne sur eBay${cmd.illisibles.length || ann.illisibles.length ? ' (un compte eBay n’a pas pu être lu)' : ''}.` };
-          }}/>
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
               (un seul compte : rien ne change). La même forme que la liste des
               comptes Vinted (§11). Il ne change que ce qu'on VOIT. */}

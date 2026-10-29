@@ -66,6 +66,11 @@ function AvatarProfil({profil,grand=false}) {
 // marqueur lui-même ferait traîner ou décaler les épingles quand on déplace la
 // carte. Le porteur bouge, le bouton (taille, survol, pouls) vit dedans.
 const CENTRE_FRANCE = [2.4, 46.6];
+// (29 oct.) Julien : « la carte est en sombre quand on met le mode sombre de
+// l'appli, je veux que ça ne change pas la couleur de la carte ». Le fond reste
+// le style CLAIR (positron) quel que soit le thème ; le reste de l'écran suit
+// le mode sombre.
+const CARTE_TOUJOURS_CLAIRE = true;
 const FOND_ATTENTE = { clair: '#F2F3F0', sombre: '#0C0C0C' }; // le fond des styles : pas d'éclair au chargement
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), ml = useRef(null), marqueurs = useRef([]), attrib = useRef(null);
@@ -470,7 +475,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
       <p className="vrm-cm-note">La carte n’a pas pu se charger (réseau). Voici la même communauté en liste.</p>
       <ul className="vrm-cm-liste">{cells.map((c) => <li key={c.cle}><div><b>{c.villes.join(' · ')}</b><small>{c.personnes.length} revendeur{c.personnes.length > 1 ? 's' : ''}</small></div>
         <button type="button" onClick={() => setCellsOuvertes([c])}>Voir</button></li>)}</ul>
-    </div> : <Carte cells={cells} moi={moi} sombre={sombre} onCellules={setCellsOuvertes} onEchec={() => setEnListe(true)} />}
+    </div> : <Carte cells={cells} moi={moi} sombre={CARTE_TOUJOURS_CLAIRE ? false : sombre} onCellules={setCellsOuvertes} onEchec={() => setEnListe(true)} />}
     {blocGroupes}
     {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
 

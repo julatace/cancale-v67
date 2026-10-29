@@ -36,6 +36,15 @@
 > l'espacement entre deux paires est celui qu'il règle (Vintex : ~12 s) ; non mesuré : un vrai Chrome qui endort le
 > service worker pendant l'attente (le réveil par alarme est au plus 30 s en retard).
 
+> **29 octobre — plus de saisie « N° + Entrée », et la carte reste claire :** Julien : « enlève N°+entrée sur
+> chaque onglet, il y a déjà la barre de recherche » et « la carte est en sombre quand on met le mode sombre, je
+> veux que ça ne change pas la couleur de la carte ». `SaisieNumeroPlateforme` (Ventes, Colis, Annonces Vinted,
+> Leboncoin, eBay) est RETIRÉE avec ses écoutes de chiffres (`chercherNum*`, `DEMANDE_NUM_PLAT`) et son CSS ; la
+> recherche par numéro reste la loupe (« Tout sur le N° ») et le Stock garde la sienne. La carte de la communauté
+> et la mini-carte des points relais gardent le style CLAIR (`positron`) en mode sombre ; le reste de l'écran suit
+> le thème. Bancs `pave-vinted.cjs` et `pave-plateformes.cjs` réécrits (aucune saisie, un chiffre + Entrée ne
+> change ni l'écran ni la section) : 8 et 4 rouges sur main ; `communaute.cjs` exige `positron` en sombre.
+
 > **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
 > `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il
 > est tapé, sinon `ca` (VRM au moment de noter) ; un champ **`paye`** (cotisations payées, facultatif) dans le formulaire du
