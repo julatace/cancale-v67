@@ -124,10 +124,14 @@ async function partieRendu() {
     await pg.route('**://*.vinted.com/**', (r) => r.abort());
     await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(3500);
+    // Depuis le 28 oct. (877201b2, Julien) le journal vit dans le sous-écran
+    // « État des connexions », replié sous « Incidents et détails pour l'assistance ».
+    await pg.locator('[data-sous-ouvrir="connexions"]').click().catch(() => {});
+    await pg.waitForTimeout(1500);
     // Une VRAIE erreur de la page, levée hors de React (un gestionnaire qui casse).
     await pg.evaluate(() => { setTimeout(() => { throw new Error('plantage de banc pour sophie@exemple.fr tx 98765432100'); }, 0); });
     await pg.waitForTimeout(4500);
-    const bloc = await pg.evaluate(() => { const el = document.querySelector('[data-plantages]'); return el ? el.innerText.replace(/\s+/g, ' ') : null; });
+    const bloc = await pg.evaluate(() => { const el = document.querySelector('[data-plantages]'); if (!el) return null; const d = el.closest('details'); if (d) d.open = true; return el.innerText.replace(/\s+/g, ' '); });
     await ctx.close();
     return { ecrits, bloc };
   };

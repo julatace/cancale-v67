@@ -55425,7 +55425,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
     <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Données des emails</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>Cette date est celle des données enregistrées, pas une preuve que chaque transfert fonctionne. Le suivi détaillé est dans « Réception des emails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
-      {Array.isArray(plantages)&&plantages.length>0&&<p>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
+      {Array.isArray(plantages)&&plantages.length>0&&<p data-plantages={plantages.length}>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
     </details>}
     <details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Version de l’application</summary><p>{BUILD_ID==='inconnue'?'Version non vérifiée.':`Compilation du ${BUILD_ID}.`}</p><button type="button" onClick={()=>{if(window.__vrmForceUpdate)window.__vrmForceUpdate();else window.location.reload();}}>Recharger la dernière version</button></details>
   </div>;
