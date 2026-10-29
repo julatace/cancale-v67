@@ -22444,16 +22444,28 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
   // Les incertaines ne comptent que tant que les annonces eBay n'ont pas été
   // relues APRÈS (lecture la plus ancienne de tous les comptes).
   const incertains = React.useMemo(() => new Set(Object.entries(incertainsV).filter(([, at]) => !(Number(etat.luesA) > Number(at))).map(([k]) => k)), [incertainsV, etat.luesA]);
+  // Les paires qu'il vient de publier : « déjà sur eBay » tout de suite, sans
+  // attendre que la relecture de ses annonces les montre (sinon elles seraient
+  // reproposées le temps d'un aller-retour).
+  const [publieesV, setPublieesV] = React.useState({});
+  const dejaSurEbayEff = React.useMemo(() => {
+    const d = etat.dejaSurEbay;
+    if (!(d instanceof Map)) return d;
+    const fraiches = Object.entries(publieesV).filter(([, at]) => !(Number(etat.luesA) > Number(at)));
+    if (!fraiches.length) return d;
+    const m = new Map(d); for (const [k] of fraiches) if (!m.get(k)) m.set(k, { etat: 'publiee' });
+    return m;
+  }, [etat.dejaSurEbay, publieesV, etat.luesA]);
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [etat.fiches]);
   const prop = React.useMemo(() => {
     if (comptesStatut === undefined) return { etat: 'en-cours' };
     if (comptesStatut === null) return { etat: 'pas-su', pasSu: ['tes comptes eBay'] };
     if (!relies.length) return { etat: 'sans-ebay' };
     if (deviseCompte !== 'EUR') return { etat: 'devise' };
-    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
+    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: dejaSurEbayEff, jumelles: etat.jumelles,
       achatDe: (p) => prixAchatDe(etat.fiches[p.id], buyByNum), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
       incertains, publieesAujourdhui: jour.publiees, cle: cleNum });
-  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, etat.dejaSurEbay, etat.jumelles, etat.fiches, buyByNum, incertains, jour.publiees]);
+  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, dejaSurEbayEff, etat.jumelles, etat.fiches, buyByNum, incertains, jour.publiees]);
   React.useEffect(() => { if (prop.etat === 'lu') publierResumeAgent(prop); }, [prop]);
   // ── LA PRÉPARATION : une par une, les proposées seulement, sur le compte choisi ──
   const [preps, setPreps] = React.useState({});      // cle → { etat:'prepare' } | résultat de preparerAnnonceAgent
@@ -22515,6 +22527,8 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
     }
     setResultats((m) => ({ ...m, ...res }));
     if (incertaine) { save(AGENT_CLE_INCERTAINS, incert); setIncertainsV(incert); }
+    { const maint = Date.now(), pub = Object.keys(res).filter((k) => res[k].etat === 'publiee' || res[k].etat === 'deja');
+      if (pub.length) setPublieesV((m) => ({ ...m, ...Object.fromEntries(pub.map((k) => [k, maint])) })); }
     const j2 = ecrireJourAgent({ publiees: lireJourAgent().publiees + publiees }); setJour(j2);
     for (const k of Object.keys(res)) for (const c of [..._prepAgentEbay.keys()]) if (c.split('|')[1] === k) _prepAgentEbay.delete(c);
     const parts = [`${publiees} publiée${publiees > 1 ? 's' : ''}`];
