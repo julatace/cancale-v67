@@ -1,5 +1,20 @@
 # VRM — dossier de passation
 
+> **29 octobre (revue 2) — Comptabilité : cinq défauts des relecteurs, corrigés :** (1) la carte URSSAF renvoyait une vente
+> Leboncoin à dater vers « Chiffre d'affaires par période », carte renommée « Vendu et reçu » : une source (`TITRE_CARTE_CA`) pour
+> le titre, le sommaire et la phrase, singulier accordé ; (2) **une période déjà notée « déclarée »** gardait « dans 4 j · à payer
+> 37,20 € » (37,20 € écrit 3 fois, deux « prochaines échéances » sur l'écran) : la carte ne lui donne plus ni montant ni compte à
+> rebours, elle nomme la SUIVANTE (`nextUrssafDeadline` au lendemain de l'échéance faite, jours comptés depuis aujourd'hui) et dit
+> « septembre : déclaration notée ✓ » ; son montant reste dans la ligne du suivi ; l'en-tête du suivi ne garde son total que sur
+> plusieurs mois ; (3) **« Tes dépenses » se démontait à l'arrivée du nuage** (une dépense en cours de saisie perdait le focus et les
+> touches suivantes — régression de la revue 1) : `StatutFiscal` rend six places fixes, les dépenses toujours à la 4ᵉ ; (4)
+> Organisation ouverte depuis Réglages disait « GESTION » et son ancienne accroche : surtitre « Réglages », la phrase de Réglages
+> sous le titre (`src/operations/description.js`, une source), roue du rail mise en avant ; (5) le banc partait de Ventes au bout
+> de 3,5 s : il attend la publication du bénéfice. En plus : « Comment c'est calculé » du bénéfice replié (la couverture reste sur
+> la ligne « brut »). Laissé, décision de l'autre session : « Ta micro-entreprise » s'ouvre tant que le versement libératoire n'est
+> pas tranché. Preuves : `compta-simple.cjs` **164 contrôles, 25 rouges sur la branche d'avant**, 0 après ; mutation (dépenses à la
+> racine + ancien nom) ⇒ 4 rouges (D et E). Aucun chiffre ne change. ⚠️ Non mesuré : sa vraie base. Geste de Julien : aucun.
+
 > **29 octobre (revue) — Comptabilité simple sur SA configuration :** mesuré (lecture seule) : sa ligne `main` est en micro,
 > mensuel, **sans `vrm_micro_options`** — « Ta micro-entreprise » s'ouvre donc d'elle-même (règle de l'autre session, gardée) et
 > poussait « Tes dépenses » à 3 768 px du haut au téléphone (plus loin qu'avant). **Les dépenses passent juste après la carte URSSAF
