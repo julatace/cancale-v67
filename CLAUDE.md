@@ -1,5 +1,31 @@
 # VRM — dossier de passation
 
+> **29 octobre — COMPTABILITÉ SIMPLE :** Julien : « pour la compta, améliore tout, mets de côté la facturation électronique et
+> fais quelque chose de simple ». **Aucune règle de calcul ne change (§11) : seul l'ordre change.** En haut, ce qu'il regarde :
+> Vendu et reçu (`CaParPeriodeCarte`) → Bénéfice (`BeneficeCompta`) → URSSAF (`StatutFiscal` : la carte du mois et la prochaine
+> échéance, puis le « Suivi de tes déclarations URSSAF » de l'autre session, gardé tel quel, puis « Ta micro-entreprise » REPLIÉE
+> — ouverte d'elle-même seulement s'il y a une chose à trancher : versement libératoire pas dit, seuil de TVA ou plafond proche ;
+> elle ne se referme pas sous son doigt quand il répond) → Dépenses (les montants, « Ajouter une dépense », les abonnements). En
+> bas, **« Avancé », replié** (`data-compta-avance`) : résultat de l'année, récap mensuel, packs, ton entreprise, factures,
+> facturation électronique (Super PDP) — rien n'est supprimé, le sommaire y mène et l'ouvre. La tuile « Bénéfice — · saisis tes
+> prix d'achat » de la carte URSSAF est retirée : le bénéfice a sa carte juste au-dessus (§7, une notion une fois). Preuves : banc
+> `compta-simple.cjs` (port 9311, données inventées, 390 tactile clair + 1512 sombre ; 107 contrôles) — **53 rouges sur
+> origin/main**, et les mêmes chiffres sur les deux codes (vendu 60 €, reçu 60 €, bénéfice net −2,93 €, à payer 37,20 €,
+> dépenses du mois 25,49 €, résultat 321,52 €) ; 5 mutations rouges (« Avancé » ouvert d'office · micro-entreprise toujours
+> repliée · refermée sous le doigt · Organisation remise au menu · « Bénéfice — » redit). ⚠️ Non mesuré : sa vraie base. Geste
+> de Julien : aucun.
+
+> **29 octobre — ORGANISATION RETIRÉE DU MENU :** Julien : « on ne comprend pas à quoi ça sert, ça doit être utile sinon ça n'a
+> rien à faire ici ». **Mesuré (lecture seule, `vrm_operations_v1`)** : en dix jours, UN élément — une recherche eBay préparée,
+> jamais lancée (elle reste dans eBay → Achats) — et zéro mission, réservation, lot, consommable, réception ou dossier ; les
+> missions supposent une équipe, et la migration 016 n'est pas appliquée. Ce qui l'attend aujourd'hui est Ma journée, ses retours
+> sont dans Colis : un écran qui les redirait serait une seconde règle (§11). **Décision : hors du menu** (Gestion au téléphone,
+> rail à l'ordinateur) ; l'écran, ses données, `?tab=organisation` et « Mes missions » de l'équipe restent ; on y entre par
+> **Réglages → Stock et rangement → Organisation** (`data-reglage-organisation`). Preuves : banc `compta-simple.cjs` section C ;
+> `scripts/tests/operations-navigation.cjs` suit le nouveau chemin (rouge sur origin/main). ⚠️ `revendeurs.cjs`, qui porte ce
+> test, meurt déjà sur origin/main (« actions quotidiennes en haut », filtres eBay) : le bloc a été prouvé posé au début du banc.
+> Geste de Julien : aucun — s'il veut l'écran, Réglages → Stock et rangement → Organisation.
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
