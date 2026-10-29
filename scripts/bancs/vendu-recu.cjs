@@ -234,6 +234,7 @@ const lire = (pg) => pg.evaluate(() => {
       dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche', errs.join(' | ').slice(0, 160));
       dit(lu.venduMois === String(attendu.venduMois), 'le VENDU reste juste (il ne dépend pas des versements)', `${lu.venduMois}`);
       dit(lu.recuMois === '', 'aucun montant « reçu » inventé', `rendu « ${lu.recuMois} »`);
+      dit(!lu.texte.includes('cotisations à mettre de côté'), 'versements illisibles : aucune cotisation à mettre de côté inventée');
       const recus = Object.values(lu.jours).map((j) => j.recu);
       dit(recus.length === 7 && recus.every((r) => r === ''), 'aucune barre « reçu » — jamais des zéros', recus.slice(-3).join(','));
       await ctx.close();
@@ -245,6 +246,13 @@ const lire = (pg) => pg.evaluate(() => {
       const rj = lu.jours[cle(il(0))] || {};
       dit(rj.recu === String(attendu.jour(0).recu + 5500), 'la barre REÇU du jour compte la vente versée aujourd’hui', `${rj.recu} · attendu ${attendu.jour(0).recu + 5500}`);
       dit(lu.recuMois === String(attendu.recuMois + 5500), '« Reçu en {mois} » = argent VERSÉ ce mois, y compris une vente déclarée le mois d’avant (même chiffre que les barres)', `rendu ${lu.recuMois} · attendu ${attendu.recuMois + 5500}`);
+      // (29 oct.) Cotisations à mettre de côté : sur le CA DÉCLARÉ de ce mois (sans la vente déjà déclarée le mois d'avant).
+      const cot = await pg.evaluate(() => { const e = document.querySelector('[data-cotis-mois]'); return e ? Number(e.getAttribute('data-cotis-mois')) : null; });
+      const okTaux = [12.4, 13.4, 13.5].some((t) => cot === Math.round(attendu.recuMois * t / 100));
+      const avecAilleurs = [12.4, 13.4, 13.5].some((t) => cot === Math.round((attendu.recuMois + 5500) * t / 100));
+      dit(cot != null && okTaux && !avecAilleurs, 'micro : « cotisations à mettre de côté » sur le CA déclaré du mois, sans la vente déclarée ailleurs', `${cot} · base ${attendu.recuMois}`);
+      // Sur téléphone, Ma journée cache ses phrases (27 oct.) : ce chiffre-là reste visible.
+      dit(cot == null || await pg.locator('[data-cotis-mois]').first().isVisible(), 'les cotisations à mettre de côté se voient (aussi sur téléphone)');
       if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'journee-recu-declaree.png') });
       // La carte URSSAF (dans Comptabilité depuis le 17 octobre) lit ce que Ventes vient de publier.
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
@@ -318,7 +326,9 @@ const lire = (pg) => pg.evaluate(() => {
       await pg.evaluate(() => { localStorage.setItem('vinted_sales_hidden', JSON.stringify(['9101'])); window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k: 'vinted_sales_hidden' } })); });
       await pg.waitForTimeout(800);
       const apres = await lire(pg);
-      dit(Number(apres.dashJour) === avant - 5000, 'masquer une vente du jour la retire aussitôt de « Aujourd’hui »', `${avant} → ${apres.dashJour} (attendu ${avant - 5000})`);
+      // (29 oct., décision de Julien : « on ne doit plus pouvoir les masquer ») `vinted_sales_hidden` n'est plus lu :
+      // une ancienne liste de ventes masquées ne retire plus rien du vendu.
+      dit(Number(apres.dashJour) === avant, 'une vente « masquée » d’avant compte de nouveau : le vendu du jour ne bouge pas', `${avant} → ${apres.dashJour}`);
       await ctx.close();
     });
     await essaie('nouvelle vente', async () => {
