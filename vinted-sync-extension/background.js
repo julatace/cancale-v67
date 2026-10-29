@@ -7054,13 +7054,14 @@ if (CAP.alarms) {
 // ne fait que la LIRE, depuis le navigateur de Julien, et la RELAYER telle quelle.
 // L'extension n'interprète rien : ni « retiré », ni « disponible », ni « reparti ».
 //
-// ⚠️⚠️ MONDIAL RELAY N'EST LU QUE D'ICI (mesuré le 24 oct. à 11:19 UTC depuis
-//    dub1, User-Agent honnête : la page .be répond, son API `/api/tracking`
-//    répond 403 HTML — Cloudflare). Le serveur ne se fait jamais passer pour un
-//    navigateur : il donne les n° Mondial Relay dont il connaît le code postal,
-//    et ce navigateur les lit, avec SON User-Agent (jamais changé) et SES
-//    cookies. Chronopost (ws.chronopost.fr) et Vinted Go (carrier.vintedgo.com)
-//    ne passent ici que si le serveur les rend dans C3.
+// ⚠️⚠️ CE NAVIGATEUR N'EST QU'UN SECOURS. Le SERVEUR lit lui-même Chronopost
+//    (`cp-ws2`), Vinted Go (`vg-v3`) et Mondial Relay par la route `_mvc` de
+//    mondialrelay.fr (`mr-fr-mvc`, n° + code postal du relais — mesuré le 24 et
+//    le 29 oct. depuis dub1, User-Agent honnête, 15 lectures sur 15 en 200).
+//    Ce que le transporteur REFUSE au serveur arrive ici par C3 ; ce navigateur
+//    le lit avec SON User-Agent (jamais changé) et SES cookies, puis relaie la
+//    réponse brute. Pour Mondial Relay, C3 annonce `mr-fr-mvc` : la `.be` (page
+//    puis API, `mr-be`) n'est que son REPLI — et réciproquement (29 oct.).
 //
 // LES GARDE-FOUS — aucun n'est celui de Vinted, et aucun ne le touche :
 //   · session VRM exigée, sinon AUCUNE requête (ni VRM, ni transporteur) ;
@@ -7071,7 +7072,8 @@ if (CAP.alarms) {
 //     seul point d'appel réseau (`appelTransp`) ; une redirection n'est pas
 //     suivie (`redirect: 'error'`) : aucune autre adresse, jamais ;
 //   · une requête à la fois (`unTranspALaFois`), 2 s d'écart FIXE (jamais
-//     aléatoire), 10 s de délai, corps lu sur 64 Ko au plus ;
+//     aléatoire), 10 s de délai, corps lu au plus sur ce que le SERVEUR lit
+//     lui-même (Mondial Relay 192 Ko, les autres 64 Ko — `corpsMaxTransp`) ;
 //   · un budget PROPRE : 12 requêtes par heure et par transporteur
 //     (`vrmTranspCompte`) — jamais `requeteVinted`, `gardeLecture`,
 //     `compterLecture` ni `compterAction` : un transporteur n'est pas Vinted, une
@@ -7082,8 +7084,9 @@ if (CAP.alarms) {
 //     ou de XML, et 401 de Mondial Relay : 30 min, 1 h, 2 h, 6 h, 24 h (le palier
 //     monte si le transporteur refuse encore dans les 24 h qui suivent), ou
 //     `Retry-After` s'il est plus long ; elle tombe à la première lecture réussie.
-//     Chronopost et Vinted Go ont une voie chacun ; Mondial Relay en a deux (.be,
-//     puis le repli .fr), pour qu'un refus de l'une n'éteigne pas l'autre.
+//     Chronopost et Vinted Go ont une voie chacun ; Mondial Relay en a deux
+//     (`mr-fr-mvc` et `mr-be`, chacune REPLI de l'autre — `TRANSP_REPLIS`),
+//     pour qu'un refus de l'une n'éteigne pas l'autre.
 // ⚠️ Le `Referer` de la page .be n'est PAS envoyé : c'est un en-tête interdit à
 //    `fetch`, et un `referrer` d'une autre origine est remplacé par le
 //    navigateur. On ne le fabrique pas (`declarativeNetRequest` demanderait une
@@ -7101,27 +7104,56 @@ const TRANSP_VOIES = {
 const TRANSP_CARRIERS = ['mondialrelay', 'chronopost', 'vinted'];
 // La FORME d'un n° par transporteur (celles mesurées chez lui) — c'est elle qui
 // borne ce qui entre dans une adresse.
+// ⚠️⚠️ (29 octobre) LA MÊME QUE CELLE DU SERVEUR (`FORME_SUIVI`, api/_lib/
+//    transporteurs.js — §11) : le serveur annonce en C3 ce qu'il a lui-même jugé
+//    lisible. Chronopost acceptait ici `\d{14}[0-9A-Z]` (15 caractères exigés)
+//    quand le serveur dit `\d{14}[0-9A-Z]?` : un n° de 14 chiffres que le
+//    serveur confiait à ce navigateur était refusé en silence
+//    (`transp_item_refuse`), jamais lu. `audit-transp-ext` compare les SORTIES
+//    des deux règles sur les mêmes n° ; la liste blanche des adresses en DÉRIVE
+//    (une forme, un seul endroit).
 const TRANSP_FORME = {
   mondialrelay: /^\d{8}$/,
-  chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z])$/,
+  chronopost: /^(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z]?)$/,
   vinted: /^(?:\d{16}|VGS\d{13}|[0-9A-Z]{13})$/,
 };
 const TRANSP_CP = /^\d{5}$/;
 const MR_BE_PAGE = 'https://www.mondialrelay.be/fr-be/suivi-de-colis/';
+// Le corps d'une forme, sans ses ancres (`^…$`), pour l'insérer dans une adresse.
+const formeSansAncres = (re) => re.source.replace(/^\^/, '').replace(/\$$/, '');
 const TRANSP_URL_PERMISES = [
   /^https:\/\/www\.mondialrelay\.be\/fr-be\/suivi-de-colis\/$/,
-  /^https:\/\/www\.mondialrelay\.be\/api\/tracking\?shipment=\d{8}&postcode=\d{5}&brand=&codePays=$/,
-  /^https:\/\/www\.mondialrelay\.fr\/_mvc\/fr-FR\/SuiviExpedition\/RechercherJsonResponsive\?NumeroExpedition=\d{8}&CodePostal=\d{5}$/,
-  /^https:\/\/ws\.chronopost\.fr\/tracking-cxf\/TrackingServiceWS\/trackSkybillV2\?language=fr_FR&skybillNumber=(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{14}[0-9A-Z])$/,
-  /^https:\/\/carrier\.vintedgo\.com\/public\/v3\/tracking_events\/(?:\d{16}|VGS\d{13}|[0-9A-Z]{13})$/,
+  new RegExp(`^https:\\/\\/www\\.mondialrelay\\.be\\/api\\/tracking\\?shipment=(?:${formeSansAncres(TRANSP_FORME.mondialrelay)})&postcode=\\d{5}&brand=&codePays=$`),
+  new RegExp(`^https:\\/\\/www\\.mondialrelay\\.fr\\/_mvc\\/fr-FR\\/SuiviExpedition\\/RechercherJsonResponsive\\?NumeroExpedition=(?:${formeSansAncres(TRANSP_FORME.mondialrelay)})&CodePostal=\\d{5}$`),
+  new RegExp(`^https:\\/\\/ws\\.chronopost\\.fr\\/tracking-cxf\\/TrackingServiceWS\\/trackSkybillV2\\?language=fr_FR&skybillNumber=(?:${formeSansAncres(TRANSP_FORME.chronopost)})$`),
+  new RegExp(`^https:\\/\\/carrier\\.vintedgo\\.com\\/public\\/v3\\/tracking_events\\/(?:${formeSansAncres(TRANSP_FORME.vinted)})$`),
 ];
 const urlTranspPermise = (u) => TRANSP_URL_PERMISES.some((re) => re.test(String(u || '')));
 const TRANSP_MAX_HEURE = 12;            // requêtes par heure ET par transporteur
 const TRANSP_MAX_PAR_PASSAGE = 6;       // le contrat C3 n'en donne pas plus
 const TRANSP_ECART_MS = 2000;           // écart FIXE entre deux requêtes
 const TRANSP_DELAI_MS = 10000;
-const TRANSP_CORPS_MAX = 65536;         // octets du corps relayé
-const TRANSP_ENVOI_MAX = 80 * 1024;     // octets du POST vers VRM (C4)
+const TRANSP_CORPS_MAX = 65536;         // octets du corps relayé (Chronopost, Vinted Go : `CORPS_MAX` du serveur)
+const TRANSP_ENVOI_MAX = 80 * 1024;     // octets du POST vers VRM (C4, contrat d'origine : corps ≤ 64 Ko)
+// ⚠️⚠️ (29 octobre) MONDIAL RELAY : LE MÊME PLAFOND QUE LE SERVEUR. Le serveur
+//    lit la réponse `_mvc` sur 192 Ko (`CORPS_MAX_MR`, api/_lib/transporteurs-
+//    lecture.js : ~45 Ko pour 14 évènements). Ce navigateur la COUPAIT à 64 Ko :
+//    au-delà, un JSON tronqué, que le serveur ne peut que ranger « forme ».
+//    Lu et relayé sur 192 Ko ; le POST monte à 256 Ko pour Mondial Relay. Un
+//    serveur dont C4 est encore borné à 64 Ko répond 413 : le corps est alors
+//    renvoyé UNE fois, borné au contrat d'origine (comme avant, « forme »).
+//    `audit-transp-ext` compare ces valeurs à celles du serveur.
+const TRANSP_CORPS_MAX_MR = 196608;     // `CORPS_MAX_MR` du serveur (192 Ko)
+const TRANSP_ENVOI_MAX_MR = TRANSP_CORPS_MAX_MR + 64 * 1024;
+const corpsMaxTransp = (carrier) => (carrier === 'mondialrelay' ? TRANSP_CORPS_MAX_MR : TRANSP_CORPS_MAX);
+const envoiMaxTransp = (carrier) => (carrier === 'mondialrelay' ? TRANSP_ENVOI_MAX_MR : TRANSP_ENVOI_MAX);
+// Les REPLIS par voie : Mondial Relay a deux routes, chacune essayée quand
+// l'autre est refusée (403, 429, défi, HTML, 401), en pause, ou sans jeton —
+// dans le MÊME budget (12 par heure et par transporteur) et la MÊME file (une
+// requête à la fois). C3 annonce `mr-fr-mvc` (la route que le serveur lit) :
+// avant le 29 octobre, `mr-be` n'était tenté qu'en repli de… `mr-be`, donc
+// jamais, et un `_mvc` refusé à ce navigateur restait « bloqué » sans repli.
+const TRANSP_REPLIS = { 'mr-fr-mvc': ['mr-be'], 'mr-be': ['mr-fr-mvc'] };
 const TRANSP_TICK_MIN_MS = 5 * 60000;   // au plus un C3 toutes les 5 min
 const TRANSP_VU_MS = 5 * 60000;         // une page de suivi : un même n° au plus 1 fois / 5 min
 const TRANSP_ROUTE_ABSENTE_MS = 6 * 3600000;
@@ -7292,7 +7324,7 @@ async function appelTransp(url, init, voie) {
   try {
     const r = await fetch(url, Object.assign({}, init, { signal: ctrl.signal, redirect: 'error', cache: 'no-store' }));
     const entete = (k) => { try { return (r.headers && r.headers.get(k)) || ''; } catch (_) { return ''; } };
-    const corps = await lireCorpsBorne(r, TRANSP_CORPS_MAX);
+    const corps = await lireCorpsBorne(r, corpsMaxTransp(v.carrier));
     return { statut: Number(r.status) || 0, ctype: entete('content-type'), corps: String(corps || ''), cfMitigated: entete('cf-mitigated'), retryAfter: entete('retry-after') };
   } catch (_) {
     noterDiag(`transp_reseau_${v.carrier}`);
@@ -7382,21 +7414,35 @@ async function appelVrmTransp(mode, jeton, corps) {
   } catch (_) { return { status: 0, j: null }; } finally { clearTimeout(t); }
 }
 // C4 : la réponse brute, telle quelle (bornée), au serveur qui la juge.
-async function relayerTransp(it, voie, rep, source, jeton) {
+// `corpsMax` / `envoiMax` : le plafond du corps relayé et du POST (celui du
+// transporteur, puis — sur un 413 d'un serveur encore borné — le contrat d'origine).
+function corpsC4(it, voie, rep, source, corpsMax, envoiMax) {
   const enc = new TextEncoder();
-  let corps = String((rep && rep.corps) || '');
-  const corpsDe = (octets) => new TextDecoder('utf-8').decode(enc.encode(corps).subarray(0, octets), { stream: true });
-  if (enc.encode(corps).byteLength > TRANSP_CORPS_MAX) corps = corpsDe(TRANSP_CORPS_MAX);
+  const brut = String((rep && rep.corps) || '');
+  let corps = brut;
+  const corpsDe = (octets) => new TextDecoder('utf-8').decode(enc.encode(brut).subarray(0, octets), { stream: true });
+  if (enc.encode(corps).byteLength > corpsMax) corps = corpsDe(corpsMax);
   const fabriquer = () => JSON.stringify(Object.assign({ v: 1, carrier: it.carrier, suivi: it.suivi },
     it.carrier === 'mondialrelay' ? { cp: it.cp } : {},
     { voie, statut: Number(rep && rep.statut) || 0, ctype: String((rep && rep.ctype) || '').slice(0, 120), corps, at: new Date().toISOString(), source }));
   let body = fabriquer();
-  for (let i = 0; i < 6 && enc.encode(body).byteLength > TRANSP_ENVOI_MAX; i++) {
-    const trop = enc.encode(body).byteLength - TRANSP_ENVOI_MAX;
+  for (let i = 0; i < 6 && enc.encode(body).byteLength > envoiMax; i++) {
+    const trop = enc.encode(body).byteLength - envoiMax;
     corps = corpsDe(Math.max(0, enc.encode(corps).byteLength - trop - 256));
     body = fabriquer();
   }
-  const { status, j } = await appelVrmTransp('transp-brut', jeton, body);
+  return { body, octetsCorps: enc.encode(corps).byteLength, octetsEnvoi: enc.encode(body).byteLength };
+}
+async function relayerTransp(it, voie, rep, source, jeton) {
+  const premier = corpsC4(it, voie, rep, source, corpsMaxTransp(it.carrier), envoiMaxTransp(it.carrier));
+  let { status, j } = await appelVrmTransp('transp-brut', jeton, premier.body);
+  // Un serveur dont C4 est encore borné au contrat d'origine (corps ≤ 64 Ko,
+  // POST ≤ 80 Ko) refuse un corps Mondial Relay plus gros (413) : renvoyé UNE
+  // fois, borné comme avant — jamais pour un envoi qui tenait déjà dans ce contrat.
+  if (status === 413 && (premier.octetsCorps > TRANSP_CORPS_MAX || premier.octetsEnvoi > TRANSP_ENVOI_MAX)) {
+    noterDiag('transp_envoi_413_borne');
+    ({ status, j } = await appelVrmTransp('transp-brut', jeton, corpsC4(it, voie, rep, source, TRANSP_CORPS_MAX, TRANSP_ENVOI_MAX).body));
+  }
   if (status === 200 && j && j.ok) {
     if (rep && rep.statut >= 200 && rep.statut < 300) noterDiag(`transp_lu_${it.carrier}`);
     if (j.change === true) notifierApp({ type: 'maj', quoi: 'transp', carrier: it.carrier, suivi: it.suivi });
@@ -7406,9 +7452,10 @@ async function relayerTransp(it, voie, rep, source, jeton) {
   noterDiag(`transp_envoi_ko_${status || 'reseau'}`);
   return { relaye: false, status };
 }
-// UN N°, LU DEPUIS CE NAVIGATEUR puis relayé. Mondial Relay : la voie .be, puis
-// le repli .fr si la .be refuse (et seulement alors). On ne relaie QUE la
-// dernière réponse obtenue.
+// UN N°, LU DEPUIS CE NAVIGATEUR puis relayé. Mondial Relay : la voie annoncée
+// par C3 (`mr-fr-mvc`), puis son repli (`mr-be`, page puis API) si elle est
+// refusée, en pause ou sans jeton (et seulement alors) — `TRANSP_REPLIS`. On ne
+// relaie QUE la dernière réponse obtenue.
 async function lireTransporteurNavigateur(item, source) {
   const it = itemTranspValide(item);
   if (!it) { noterDiag('transp_item_refuse'); return { lu: false, raison: 'item' }; }
@@ -7420,7 +7467,7 @@ async function lireTransporteurNavigateur(item, source) {
   if (!tok || !tok.access_token) return { lu: false, raison: 'session' };
   return unTranspALaFois(async () => {
     const refusees = await voiesRefusees();
-    const voies = [it.voie].concat(it.voie === 'mr-be' ? ['mr-fr-mvc'] : [])
+    const voies = [it.voie].concat(TRANSP_REPLIS[it.voie] || [])
       .filter((v) => permis[v] === true && !(refusees && Date.now() - Number(refusees[v] || 0) < TRANSP_VOIE_REFUSEE_MS));
     if (!voies.length) { noterDiag(permis[it.voie] === true ? 'transp_voie_refusee' : 'transp_sans_permission'); return { lu: false, raison: 'voie' }; }
     let dernier = null;
