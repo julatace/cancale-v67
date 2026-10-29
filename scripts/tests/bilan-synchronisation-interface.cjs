@@ -11,9 +11,9 @@ const { build } = require("esbuild"),
       loader: "jsx",
       contents: `
 import React from'react';import{createRoot}from'react-dom/client';import Bilan from'./src/BilanSynchronisation.jsx';import Retraits from'./src/VendusAilleurs.jsx';
-window.owner='a';window.mode='ok';window.prix=20;window.n=1;window.ko=false;window.nav='';window.lectures=0;const root=createRoot(document.getElementById('root'));
+window.owner='a';window.montage=0;window.mode='ok';window.prix=20;window.n=1;window.ko=false;window.nav='';window.lectures=0;const root=createRoot(document.getElementById('root'));
 const annonce={id:'555',numero:'7',plateforme:'eBay',compte:'Compte Alice',titre:'Ordinateur',active:true,capture:'2026-10-01T00:00:00Z',onglet:'ebay_annonces'};
-window.afficher=()=>root.render(<><Bilan owner={window.owner} onNav={k=>window.nav=k} sources={[{id:'ventes',libelle:'Ventes',onglet:'cat_ventes',comptes:[{uid:'123',nom:window.owner==='a'?'Alice':'Nouveau compte'}],items:Array.from({length:window.n},(_,i)=>({id:String(i),compte:'123',titre:'Article '+i,valeurs:[i===0?window.prix:10]})),echecs:window.ko?['123']:[]}]}/><Retraits owner={window.owner} ownerActuel={()=>window.owner} onNav={k=>window.nav=k} charger={async()=>{window.lectures++;if(window.mode==='lent')await new Promise(r=>window.fin=r);if(window.mode==='erreur')throw Error('Échec');return {numeros:{'11':{numero:'7'}},ventes:[{id:'11',numero:'7',plateforme:'Vinted',engagee:true}],annonces:window.mode==='absent'?[]:[{...annonce,active:window.mode!=='inactif'}],manques:window.mode==='absent'?['eBay incomplet']:[]};}}/></>);window.afficher();`,
+window.afficher=()=>root.render(<><Bilan owner={window.owner} onNav={k=>window.nav=k} sources={[{id:'ventes',libelle:'Ventes',onglet:'cat_ventes',comptes:[{uid:'123',nom:window.owner==='a'?'Alice':'Nouveau compte'}],items:Array.from({length:window.n},(_,i)=>({id:String(i),compte:'123',titre:'Article '+i,valeurs:[i===0?window.prix:10]})),echecs:window.ko?['123']:[]}]}/><Retraits key={window.montage} owner={window.owner} ownerActuel={()=>window.owner} onNav={k=>window.nav=k} charger={async()=>{window.lectures++;if(window.mode==='lent')await new Promise(r=>window.fin=r);if(window.mode==='erreur')throw Error('Échec');return {numeros:{'11':{numero:'7'}},ventes:[{id:'11',numero:'7',plateforme:'Vinted',engagee:true}],annonces:window.mode==='absent'?[]:[{...annonce,active:window.mode!=='inactif'}],manques:window.mode==='absent'?['eBay incomplet']:[]};}}/></>);window.afficher();`,
     },
     bundle: true,
     write: false,
@@ -96,6 +96,15 @@ window.afficher=()=>root.render(<><Bilan owner={window.owner} onNav={k=>window.n
       check(
         (await p.getByText("N°7 · Ordinateur").count()) === 1,
         "partial absent listing does not clear alert",
+      );
+      await p.evaluate(() => {
+        window.montage++;
+        window.afficher();
+      });
+      await p.locator("[data-vendus-ailleurs]>summary").click();
+      check(
+        await p.getByText("N°7 · Ordinateur").isVisible(),
+        "unconfirmed alert survives navigation",
       );
       await p.evaluate(() => (window.mode = "erreur"));
       await p.getByRole("button", { name: "Revérifier les annonces" }).click();

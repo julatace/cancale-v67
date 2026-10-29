@@ -25,7 +25,9 @@ export default function VendusAilleurs({
   React.useEffect(() => {
     gen.current++;
     setVue(retrouver(owner));
-    return ()=>{gen.current++;};
+    return () => {
+      gen.current++;
+    };
   }, [owner]);
   const lire = async () => {
     const precedents = vue.owner === owner ? vue.lignes || [] : [];
@@ -49,7 +51,7 @@ export default function VendusAilleurs({
         const cle = (a) => [a.plateforme, a.compte, a.id].join(":");
         const resultat = {
           owner,
-          ...data,
+          manques: data.manques || [],
           ...calcul,
           lignes,
           confirmes: precedents.filter(
