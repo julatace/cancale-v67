@@ -15,14 +15,37 @@
 > était déjà PUBLIÉE par `main` avec un autre contenu, et la 5.280 prise par `main` pendant la fusion ⇒ **5.281.0** (`EXT_ATTENDUE`, `EXT_CAPACITES.transp`,
 > `CODE_VERSION`, `CAPTEUR_VERSION`, `relaisVersion`, zips). ⚠️⚠️ **21 défauts reproduits par deux relecteurs le 24 oct.
 > ne sont PAS encore corrigés** (dont : retour/incident ignoré sur un achat Vinted sans arrivée ; colis email en transit
-> qui disparaît sur un retour transporteur ; nouvelle arrivée qui ne sonne pas ; pause Chronopost par vendeur), plus côté
-> extension : Chronopost à 14 caractères refusé (`\d{14}[0-9A-Z]` contre `[0-9A-Z]?` au serveur), `mr-be` jamais tenté en
-> repli de `mr-fr-mvc`, corps tronqué à 64 Ko (serveur 192 Ko). Un correcteur travaille dans `v29-colis-ext`. Ne pas
-> présenter ce suivi comme fiable avant. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
+> qui disparaît sur un retour transporteur ; nouvelle arrivée qui ne sonne pas ; pause Chronopost par vendeur). Les trois
+> écarts côté extension sont corrigés dans `v29-colis-ext` (bloc suivant). Ne pas présenter ce suivi comme fiable avant. Preuves de la fusion : 174 audits (sans les 5 Postgres), mêmes rouges que `main`
 > (`audit-politique-hotes` 1, `audit-preuve-vente` 18 — déjà là) ; `audit-statut-transporteurs` (`--prouve` 29/29),
 > `audit-mondialrelay-serveur` (24/24), `audit-transp-ext` (11/11) verts, rouges sur `main` (24 · 6 · 54) ; banc
 > `transporteurs` vert (49 rouges sur le build de `main`) ; bancs colis, widget, rappels, notifications, popup, badge, pont,
 > premierjour verts.
+
+> **29 octobre — `v29-colis-ext` : l'extension (5.281, version inchangée) suit le serveur, et mesure la route des messages :**
+> (1) **Transporteurs (secours)** : `TRANSP_FORME` reprend la forme du serveur (`FORME_SUIVI` : Chronopost
+> `XX123456789XX` ou `\d{14}[0-9A-Z]?`) et la liste blanche d'adresses en dérive ; un refus de `mr-fr-mvc` bascule sur
+> `mr-be` (page puis API), même budget, une requête à la fois, pause posée sur la voie refusée seule ; le corps Mondial
+> Relay est lu jusqu'à 192 Ko (`CORPS_MAX_MR`) et, sur un 413 du serveur, renvoyé UNE fois borné au contrat d'avant
+> (64 Ko / 80 Ko). ⚠️ **Pour le chantier A (serveur)** : C4 (`appliquerReponseBrute`, `CORPS_MAX`) et `api/relais.js`
+> (`ENVOI_MAX` 80 Ko) refusent encore plus de 64 Ko — les 192 Ko ne seront jugés qu'une fois ces deux bornes montées pour
+> Mondial Relay ; et les n° Vinted Go à 12 chiffres (mesure au serveur) relèvent de A. `audit-transp-ext` 113/113,
+> 12 rouges sur 8f62e6f2, `--prouve` 15/15. (2) **Suivi des achats** : `capterSuivisAchats` lit d'abord les achats AU
+> POINT RELAIS (`needs_action` / `AT_RELAY`), jamais lus puis déjà lus, avant les achats en route (`rangSuivi`) — triés
+> par date seule, un colis arrivé passait après 35 achats en route relus toutes les 3 h. `audit-suivi-vinted` section L
+> (2 rouges sur l'avant, mutation `priorite-relais`). Mesuré : aucun n° de suivi dans une conversation, une transaction
+> ou l'escrow (seul `journey_summary` le porte) — rien de neuf à ranger. (3) **Conversations** : la capture reconnaît une
+> conversation chargée par son UUID (le `conversation_id` des commandes), règle ANCRÉE (plus aucun sous-chemin
+> `…/replies`) ; le fond la range sous l'id NUMÉRIQUE de la réponse (sans id numérique, ou un autre id : rien).
+> `<chemin-regle>` partagée page/fond (UUID → `{uuid}`, hex → `{hex}`, nombre → `{id}`). `seen_urls` garde les 400
+> réponses et 600 chemins les plus RÉCENTS (elle gardait les 400 premières clés : un chemin neuf était perdu).
+> ⚠️⚠️ **MESURÉ : depuis le 18 oct., plus AUCUNE requête `/api/v2/conversations/…` ne part de la page d'une conversation**
+> (escrow, bannières, litiges, anti-hameçonnage seulement). On ne devine pas la nouvelle route : sur la page d'une
+> conversation l'extension relève chaque requête vers Vinted (hors `/api/` compris : chemin normalisé, statut, type),
+> la FORME d'une liste de messages (où, combien, clés et types — jamais une valeur), les sockets/flux (hôte, chemin,
+> trames, forme) et les données Next (oui/non), dans `harvest_{uid}_seen_urls.conversation`. **À lire en lecture seule
+> après sa prochaine conversation ouverte avec cette extension** : c'est elle qui dira par où passent les messages.
+> `audit-endpoints-vus` C1-C3 (46 contrôles, 23 rouges sur l'avant, 8 mutations rouges).
 
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août

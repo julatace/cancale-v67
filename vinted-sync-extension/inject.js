@@ -363,11 +363,13 @@ function clocheFavorisNative(activer=false,origine){
     const out = {};
     if (!racine || typeof racine !== 'object') return { racine: typeDe(racine) };
     const tete = Array.isArray(racine) ? { '[]': racine[0] } : racine;
-    for (const k of Object.keys(tete).slice(0, 30)) {
+    // Bornée (30 clés) : le relevé entier doit rester bien sous les 200 000
+    // caractères que le fond accepte, sinon il serait jeté en entier.
+    for (const k of Object.keys(tete).slice(0, 20)) {
       const ck = cleForme(k), v = tete[k];
       out[ck] = typeDe(v);
-      if (v && typeof v === 'object' && !Array.isArray(v)) for (const k2 of Object.keys(v).slice(0, 20)) out[ck + '.' + cleForme(k2)] = typeDe(v[k2]);
-      if (Object.keys(out).length >= 60) break;
+      if (v && typeof v === 'object' && !Array.isArray(v)) for (const k2 of Object.keys(v).slice(0, 10)) { if (Object.keys(out).length >= 30) break; out[ck + '.' + cleForme(k2)] = typeDe(v[k2]); }
+      if (Object.keys(out).length >= 30) break;
     }
     return out;
   };
@@ -496,7 +498,10 @@ function clocheFavorisNative(activer=false,origine){
     const avecChemins = seenDirty && (seenPaths.size || Object.keys(seenRep).length);
     if (!avecChemins && !relConvDirty) return;
     seenDirty = false;
-    const conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
+    let conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
+    // Trop gros pour le fond (il jette au-delà de 200 000 caractères) : on retire
+    // les formes de tête, jamais celles des messages.
+    if (conversation && JSON.stringify(conversation).length > 180000) for (const e of Object.values(conversation.req || {})) delete e.tete;
     relConvDirty = false;
     // Les 300 chemins les PLUS RÉCENTS (l'ordre d'insertion d'un Set : le plus
     // ancien d'abord ; garder les premiers jetait ceux qu'on venait de voir).
