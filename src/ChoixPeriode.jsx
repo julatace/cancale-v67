@@ -23,7 +23,11 @@ import {
 } from './periodeCalendrier.js';
 
 const majuscule = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-export const libelleValeur = (v) => (!v || (!v.from && !v.to)) ? 'Toute la période' : majuscule(v.label || libellePlage(v.from, v.to));
+// Une borne peut arriver en Date ou en chaîne (vue enregistrée, session) :
+// on la relit, et une date illisible vaut « pas de borne » (jamais un jour inventé).
+const versDate = (x) => { if (!x) return null; const d = x instanceof Date ? x : new Date(x); return isNaN(d.getTime()) ? null : d; };
+const normaliser = (v) => (v ? { ...v, from: versDate(v.from), to: versDate(v.to) } : null);
+export const libelleValeur = (brut) => { const v = normaliser(brut); return (!v || (!v.from && !v.to)) ? 'Toute la période' : majuscule(v.label || libellePlage(v.from, v.to)); };
 
 function useEtroit() {
   const q = '(max-width: 767px)';
@@ -71,8 +75,12 @@ function Mois({ annee, mois, sel, survol, setSurvol, toucher, max, auj, entete =
   );
 }
 
-export default function ChoixPeriode({ value, onChange, Retour, Icon, titre = 'Période', data = {} }) {
+export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titre = 'Période', data = {} }) {
+  const value = normaliser(brut);
   const etroit = useEtroit();
+  // Au doigt : 18 mois d'abord ; « Voir les mois d'avant » en ajoute 12 (ses
+  // ventes remontent à 2023 — mesuré le 29 oct.).
+  const [nbMois, setNbMois] = React.useState(18);
   const [ouvert, setOuvert] = React.useState(false);
   const [sel, setSel] = React.useState({ from: null, to: null });
   const [survol, setSurvol] = React.useState(null);
@@ -92,6 +100,8 @@ export default function ChoixPeriode({ value, onChange, Retour, Icon, titre = 'P
     const ref = s.to || auj;
     const droite = { annee: ref.getFullYear(), mois: ref.getMonth() };
     setVue(decalerMois(droite.annee, droite.mois, -1));
+    // Au doigt, la liste remonte au moins jusqu'au mois du début choisi.
+    if (s.from) { const ecart = (auj.getFullYear() - s.from.getFullYear()) * 12 + (auj.getMonth() - s.from.getMonth()) + 1; setNbMois(Math.max(18, Math.min(120, ecart + 1))); } else setNbMois(18);
     try { const r = ev.currentTarget.getBoundingClientRect(); setCote(r.left + 660 > window.innerWidth - 16 ? 'droite' : 'gauche'); } catch (_) {}
     setOuvert(true);
   };
@@ -156,10 +166,16 @@ export default function ChoixPeriode({ value, onChange, Retour, Icon, titre = 'P
           onMouseLeave={() => setSurvol(null)}>
           {corpsRaccourcis}
           <div className="vrm-cal-duo">
-            <button type="button" className="vrm-cal-fleche prec" aria-label="Mois précédent" data-periode-prec onClick={() => setVue((v) => decalerMois(v.annee, v.mois, -1))}>‹</button>
+            <div className="vrm-cal-fleches">
+              <button type="button" className="vrm-cal-fleche an" aria-label="Un an plus tôt" title="Un an plus tôt" data-periode-prec-an onClick={() => setVue((v) => decalerMois(v.annee, v.mois, -12))}>«</button>
+              <button type="button" className="vrm-cal-fleche prec" aria-label="Mois précédent" data-periode-prec onClick={() => setVue((v) => decalerMois(v.annee, v.mois, -1))}>‹</button>
+            </div>
             <Mois annee={vue.annee} mois={vue.mois} entete {...propsMois}/>
             <Mois annee={droite.annee} mois={droite.mois} entete {...propsMois}/>
-            <button type="button" className="vrm-cal-fleche suiv" aria-label="Mois suivant" data-periode-suiv disabled={auBout} onClick={() => setVue((v) => decalerMois(v.annee, v.mois, 1))}>›</button>
+            <div className="vrm-cal-fleches">
+              <button type="button" className="vrm-cal-fleche suiv" aria-label="Mois suivant" data-periode-suiv disabled={auBout} onClick={() => setVue((v) => decalerMois(v.annee, v.mois, 1))}>›</button>
+              <button type="button" className="vrm-cal-fleche an" aria-label="Un an plus tard" title="Un an plus tard" data-periode-suiv-an disabled={auBout} onClick={() => setVue((v) => { const n = decalerMois(v.annee, v.mois, 12); const max = decalerMois(auj.getFullYear(), auj.getMonth(), -1); return (n.annee > max.annee || (n.annee === max.annee && n.mois > max.mois)) ? max : n; })}>»</button>
+            </div>
           </div>
           {pied}
         </div>
@@ -176,7 +192,13 @@ export default function ChoixPeriode({ value, onChange, Retour, Icon, titre = 'P
             {corpsRaccourcis}
             <div className="vrm-cal-jours-tete" aria-hidden="true">{JOURS_INITIALES.map((j, i) => <span key={i}>{j}</span>)}</div>
             <div className="vrm-cal-defile" ref={defile}>
-              {moisDefilants(auj, 18).map((m) => <Mois key={`${m.annee}-${m.mois}`} annee={m.annee} mois={m.mois} {...propsMois}/>)}
+              {nbMois < 120 ? <button type="button" className="vrm-cal-avant" data-periode-avant onClick={() => {
+                // On garde le mois regardé à sa place à l'écran pendant que la liste s'allonge au-dessus.
+                const el = defile.current; const avant = el ? el.scrollHeight - el.scrollTop : 0;
+                setNbMois((n) => Math.min(120, n + 12));
+                requestAnimationFrame(() => { try { if (el) el.scrollTop = el.scrollHeight - avant; } catch (_) {} });
+              }}>Voir les mois d'avant</button> : null}
+              {moisDefilants(auj, nbMois).map((m) => <Mois key={`${m.annee}-${m.mois}`} annee={m.annee} mois={m.mois} {...propsMois}/>)}
             </div>
             {pied}
           </div>

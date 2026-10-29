@@ -10262,18 +10262,24 @@ function Input({label,...p}) {
 // pleines sont à l'encre, les autres au filet : aucune couleur de plus (§7).
 // Un état inconnu de VRM est ÉCRIT tel quel, sans jauge (jamais un niveau
 // deviné) ; aucun état ⇒ « — ». La règle : `etatVinted` (src/carteAnnonce.js).
-function JaugeEtat({ statut }) {
+// Le libellé de la case (« État ») est sur la même ligne que la jauge, le mot
+// en dessous, en entier (il revient à la ligne plutôt que d'être coupé :
+// « Très bo… » se lisait mal, mesuré au rendu).
+function JaugeEtat({ statut, lib }) {
   const e = etatVinted(statut);
   const niv = e && e.niveau;
   return (
     <span className="vrm-fiche-etat-val" data-etat-niveau={niv ? String(niv) : (e ? 'inconnu' : 'aucun')}>
-      {niv ? (
-        <span className="vrm-fiche-jauge" role="img" aria-label={`État ${niv} sur ${NIVEAU_ETAT_MAX}`}>
-          {Array.from({ length: NIVEAU_ETAT_MAX }, (_, i) => (
-            <span key={i} className={i < niv ? 'plein' : ''} style={{ height: 6 + i * 3, background: i < niv ? C.text : C.border }}/>
-          ))}
-        </span>
-      ) : null}
+      <span className="vrm-fiche-etat-haut">
+        {lib}
+        {niv ? (
+          <span className="vrm-fiche-jauge" role="img" aria-label={`État ${niv} sur ${NIVEAU_ETAT_MAX}`} title={`${e.libelle} — ${niv} sur ${NIVEAU_ETAT_MAX}`}>
+            {Array.from({ length: NIVEAU_ETAT_MAX }, (_, i) => (
+              <span key={i} className={i < niv ? 'plein' : ''} style={{ height: 5 + i * 2.5, background: i < niv ? C.text : C.border }}/>
+            ))}
+          </span>
+        ) : null}
+      </span>
       <span className="vrm-fiche-etat-mot" style={{ color: e ? C.text : C.muted }}>{e ? e.libelle : '—'}</span>
     </span>
   );
@@ -16214,44 +16220,55 @@ function EtatActions({ onNav, ordi, sombre }) {
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
   const poserPanneau = ordi ? (x) => x : (x) => createPortal(x, document.body);
+  // (29 oct., « Action c'est plutôt pas mal, tu peux faire mieux ») Les trois
+  // maillons (extension · compte VRM · compte Vinted) en CHAÎNE : un rond par
+  // maillon, reliés par un trait — on voit d'un coup d'œil lequel casse. Mêmes
+  // lignes, même source (`etatActionsExt`) : seule la mise en forme change.
   const Ligne = ({ nom, l }) => (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '5px 0', borderTop: `1px solid ${C.border}` }}>
-      <span style={{ width: 14, flexShrink: 0, textAlign: 'center', fontWeight: 700, color: l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
-      <span style={{ minWidth: 0 }}><b>{nom}</b>{l.t ? <span style={{ color: C.muted }}> — {l.t}</span> : null}</span>
+    <div className="vrm-etat-maillon" data-etat-maillon={l.s === 'oui' ? 'oui' : l.s === 'non' ? 'non' : 'passu'}
+      style={{ '--etat-ton': l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>
+      <span className="vrm-etat-rond" aria-hidden="true">{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
+      <span className="vrm-etat-maillon-texte"><b>{nom}</b>{l.t ? <span className="vrm-etat-maillon-detail"> — {l.t}</span> : null}</span>
     </div>
   );
+  const ton = st.niveau === 'ok' ? 'ok' : aRattraper ? 'attention' : 'neutre';
+  const couleurTon = ton === 'ok' ? C.accent : ton === 'attention' ? C.warn : C.muted;
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" aria-label={st.relais && loginVinted ? `${libelle} · ${loginVinted}` : libelle} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" className="vrm-etat-pastille" aria-label={st.relais && loginVinted ? `${libelle} · ${loginVinted}` : libelle} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 8,
-          padding: court ? '6px 8px' : '6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
+        style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
+          padding: court ? '6px 8px' : '6px 10px 6px 11px', color: ink, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+        <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 5, background: point, flexShrink: 0 }}/>
         <span>{court && st.niveau === 'lecture' ? 'Lecture' : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
-        {!court && st.niveau === 'ok' && loginVinted ? <span style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
+        {!court && st.niveau === 'ok' && loginVinted ? <span className="vrm-etat-compte" style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
+        {!court ? <i className="vrm-etat-chevron" aria-hidden="true"><Icon name="chevron" size={13}/></i> : null}
       </button>
       {/* (23 oct.) Sur téléphone le panneau part dans document.body : posé dans
           l'en-tête (sticky, z-index 50), il restait SOUS la barre du bas (60) en
           paysage et sur iPad. Il tient dans l'écran et défile. Sur ordinateur il
           reste accroché à l'île (pas de barre du bas). */}
       {ouvert && poserPanneau(
-        <div ref={panneauEtat} data-etat-panneau={st.niveau} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
-          style={{ position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
+        <div ref={panneauEtat} className={`vrm-etat-panneau${ordi ? ' ordi' : ''}`} data-etat-panneau={st.niveau} data-etat-ton={ton} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
+          style={{ '--etat-ton': couleurTon, position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
             ...(ordi ? {} : { maxHeight: 'calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', overscrollBehavior: 'contain' }),
-            width: ordi ? 360 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
-            borderRadius: 12, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
-            boxShadow: '0 1px 2px rgba(0,0,0,.10),0 12px 30px rgba(0,0,0,.16)' }}>
-          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
-            {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+            width: ordi ? 380 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
+            borderRadius: 16, padding: '14px 16px', fontSize: 12.5, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
+            boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
+          <div className="vrm-etat-tete" data-etat-tete>
+            <span className="vrm-etat-icone" aria-hidden="true"><Icon name={st.niveau === 'ok' ? 'check' : st.niveau === 'verif' ? 'sync' : 'eye'} size={17}/></span>
+            <div className="vrm-etat-titre">
+              {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+            </div>
           </div>
           {st.niveau === 'ok' && st.relais ? (
-            <div data-etat-relais-texte="" style={{ color: C.muted, marginBottom: 8 }}>
+            <div data-etat-relais-texte="" className="vrm-etat-texte" style={{ color: C.muted }}>
               Générer un bordereau, répondre, faire une offre, publier sur Leboncoin : ta demande part dans ta base, l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute au nom de <b style={{ color: C.text }}>{loginVinted}</b>, avec les mêmes garde-fous que là-bas. Rien n'est dit « fait » avant qu'elle l'ait écrit.
             </div>
           ) : st.niveau === 'ok' ? (
-            <div style={{ color: C.muted, marginBottom: 8 }}>
+            <div className="vrm-etat-texte" style={{ color: C.muted }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
               {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.
@@ -16259,27 +16276,29 @@ function EtatActions({ onNav, ordi, sombre }) {
               {st.exception ? <span data-etat-exception-texte="publication"><br/><b style={{ color: C.text }}>Sauf publier sur Leboncoin</b> : {st.exception.texte}</span> : null}
             </div>
           ) : (
-            <div style={{ color: C.muted, marginBottom: 8 }}>
+            <div className="vrm-etat-texte" style={{ color: C.muted }}>
               Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
               {' '}{code === 'pause' || code === 'plusieurs' ? st.glob.texte
                 : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
             </div>
           )}
-          <Ligne nom="Extension" l={ligneExt}/>
-          {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
-              n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
-          {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
-          {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+          <div className="vrm-etat-chaine" data-etat-chaine>
+            <Ligne nom="Extension" l={ligneExt}/>
+            {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
+                n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
+            {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
+            {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+          </div>
           {/* 20 octobre (Orion iPhone, Safari…) : ce que l'extension dit de CE
               navigateur — les API qui lui manquent, remplacées ou non. Une
               phrase, une fois ; rien sur Chrome (tout y est). */}
-          {(() => { const nv = __vmrEtat && __vmrEtat.nav; const p = !extKo && phraseNavigateur(nv); return p ? <div data-etat-nav={(nv.indispo || []).length ? 'indispo' : 'remplace'} style={{ padding: '5px 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>{p}</div> : null; })()}
+          {(() => { const nv = __vmrEtat && __vmrEtat.nav; const p = !extKo && phraseNavigateur(nv); return p ? <div data-etat-nav={(nv.indispo || []).length ? 'indispo' : 'remplace'} className="vrm-etat-pied" style={{ color: C.muted }}>{p}</div> : null; })()}
           {/* Le constat qui vaut aussi d'un téléphone : quand l'extension (où
               qu'elle tourne) a écrit pour la dernière fois. Elle n'écrit que
               quand tu passes sur Vinted : un long silence n'est pas une panne,
               on le dit sans l'accuser. */}
           <div data-etat-derniere={derniere === undefined ? 'encours' : derniere === null ? 'passu' : derniere === 'aucune' ? 'aucune' : 'lue'}
-            style={{ padding: '5px 0 0', borderTop: `1px solid ${C.border}`, color: C.muted }}>
+            className="vrm-etat-pied" style={{ color: C.muted }}>
             {derniere === undefined ? 'Dernière capture reçue : je regarde…'
               : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
               : derniere === 'aucune' ? 'Aucune capture reçue de ton extension pour l’instant.'
@@ -16297,7 +16316,7 @@ function EtatActions({ onNav, ordi, sombre }) {
                 {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Réglages → Extension){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
           </div>
-          {geste && <div style={{ marginTop: 10 }}>{geste}</div>}
+          {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
         </div>
       )}
     </div>
@@ -45716,7 +45735,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             )}
             {offresAuto && ext!=='ok' && (
-              <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext">{ext==='absente'
+              <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext" style={{color:C.warn}}>{ext==='absente'
                 ? "Rien ne part d'ici : ouvre VRM dans le Chrome (ordinateur) où l'extension est installée."
                 : `Rien ne part : mets l'extension à jour (${EXT_CAPACITES.offresauto.replace(/\.0$/,'')}).`}</div>
             )}
@@ -46422,13 +46441,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const valeur = { fontSize:13.5, fontWeight:650, color:C.text, fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' };
             const mn = e.min==null||String(e.min).trim()===''?null:Number(String(e.min).replace(',','.'));
             const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.'));
-            const geste = { border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:9, padding:'0 12px', minHeight:44, fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, textDecoration:'none', boxSizing:'border-box' };
+            // (29 oct.) Les gestes de la fiche : hauteur posée par la feuille de style
+            // (`.vrm-fiche-geste` : 36 px à la souris, 44 px au doigt — §7).
+            const geste = { border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:9, padding:'0 11px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, textDecoration:'none', boxSizing:'border-box' };
+            // La préparation pour Leboncoin, COURTE sur la carte (§7 : « passe sur
+            // Vinted (ce compte) » écrit sur 40 cartes serait une phrase répétée) ;
+            // le geste est dans l'infobulle.
             const prepa = (() => {
               if (!num) return null;
               const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
-              if (total>0 && capt===0) return 'photos à capter — passe sur Vinted (ce compte)';
-              if (total>0 && capt<total) return `${capt}/${total} photos — passe sur Vinted (ce compte)`;
-              if (total>0 && !descOk) return 'description à capter — passe sur Vinted (ce compte)';
+              if (total>0 && capt===0) return 'photos pas encore captées';
+              if (total>0 && capt<total) return `${capt}/${total} photos captées`;
+              if (total>0 && !descOk) return 'description pas encore captée';
               if (total>0) return 'prête pour Leboncoin';
               return null;
             })();
@@ -46451,14 +46475,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                     {/* L'ÉTAT EN JAUGE, et JUSTE À CÔTÉ le prix d'achat qu'on tape en place. */}
                     <div className="vrm-fiche-duo" data-fiche-duo style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',gap:8}}>
-                      <div className="vrm-fiche-cell" data-fiche-etat style={cell}>
-                        <span style={lib}>État</span>
-                        <JaugeEtat statut={it.condition}/>
+                      <div className="vrm-fiche-cell vrm-fiche-etat" data-fiche-etat style={cell}>
+                        <JaugeEtat statut={it.condition} lib={<span style={lib}>État</span>}/>
                       </div>
-                      <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat style={cell}>
-                        <span style={lib}>Prix d'achat</span>
+                      <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat={achat!=null&&!isNaN(achat)?'connu':'inconnu'} style={cell}>
+                        <span className="vrm-fiche-etat-haut"><span style={lib}>Prix d'achat</span><Icon name="pencil" size={12} style={{color:C.muted,flexShrink:0}}/></span>
                         <EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
-                          titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={valeur}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
+                          titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
                       </div>
                     </div>
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
@@ -46506,17 +46529,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     relié, le stock, Leboncoin (la file et sa préparation), les gestes. */}
                 <div className="vrm-fiche-plus" data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
                   <AchatRelie entry={e} numero={num}/>
-                  <div data-fiche-infos style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8}}>
+                  <div className="vrm-fiche-gestes" data-fiche-gestes style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
                     {num && (
-                      <button type="button" data-fiche-stock={atGarage?'range':'a-ranger'} onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={geste}
+                      <button type="button" className="vrm-fiche-geste" data-fiche-stock={atGarage?'range':'a-ranger'} onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={geste}
                         title={atGarage?`La N°${num} est rangée dans ton stock — la voir`:`La N°${num} n'est pas encore rangée dans ton stock — la ranger`}>
-                        <Icon name="box" size={15}/>{atGarage?'Voir au stock':'Ranger au stock'}
+                        <Icon name="box" size={14}/>{atGarage?'Voir au stock':'Ranger au stock'}
                       </button>
                     )}
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
                       return (
-                        <button key={pl.cle} type="button" data-fiche-place={pl.cle} aria-pressed={on}
+                        <button key={pl.cle} type="button" className="vrm-fiche-geste" data-fiche-place={pl.cle} aria-pressed={on}
                           onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
                           title={!num
                             ? `Mets un N° à cet article d'abord : c'est la référence qui permet de le retrouver ensuite sur ${pl.nom}.`
@@ -46527,15 +46550,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </button>
                       );
                     })}
-                    {!num && <span style={{fontSize:12,color:C.warn}}>il lui faut un N° pour aller sur Leboncoin</span>}
-                    {prepa && <span data-prepa style={{fontSize:12,color:C.muted}}>{prepa}</span>}
+                    <button type="button" className="vrm-fiche-geste" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
+                    <button type="button" className="vrm-fiche-geste" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
+                    <button type="button" className="vrm-fiche-geste" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
+                    {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                   </div>
-                  <div className="vrm-fiche-gestes" data-fiche-gestes style={{display:'flex',flexWrap:'wrap',gap:8}}>
-                    <button type="button" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
-                    <button type="button" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
-                    <button type="button" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
-                    {sugg!=null && sugg < Number(it.price) && <a href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
-                  </div>
+                  {(!num || prepa) && (
+                    <div data-fiche-infos style={{fontSize:12,color:C.muted,lineHeight:1.35}}>
+                      {!num && <span style={{color:C.warn}}>il lui faut un N° pour aller sur Leboncoin</span>}
+                      {prepa && <span data-prepa title={/prête/.test(prepa) ? 'Photos et description captées : elle peut partir sur Leboncoin.' : 'Passe sur Vinted, connecté sur ce compte : l’extension capte les photos et la description.'}>Leboncoin : {prepa}</span>}
+                    </div>
+                  )}
                 </div>
               </div>
             );

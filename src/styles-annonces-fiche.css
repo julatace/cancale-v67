@@ -5,16 +5,19 @@
    produit » du 26-27 oct. (styles-mineral, -gestion, -mobile-studio,
    -annonces-ventes, -annonces-pro). Une classe de plus (`.vrm-fiche`,
    `.vrm-fiches`) suffit à gagner : aucune règle d'avant n'est retirée.
-   · Ordinateur : fiches de ~300 px (4 par rangée à 1512 px au lieu de 5 de
-     236 px) — la photo passe de 236×295 à ~300×375.
+   · Ordinateur : fiches de ~400 px (3 par rangée à 1512 px au lieu de 5 de
+     236 px) — la photo passe de 236×295 à ~400×500.
    · Téléphone : UNE fiche par rangée, la photo carrée sur toute la largeur
      (≈ 360 px affichés au lieu de 174).
    §7 : aucune couleur de plus — l'encre, le filet, le fond ; l'accent reste rare. */
 
 :root body .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches {
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)) !important;
-  gap: 20px !important;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+  gap: 18px !important;
   align-items: start;
+}
+@media (min-width: 1024px) {
+  :root body .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)) !important; gap: 22px !important; }
 }
 
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche {
@@ -62,23 +65,28 @@
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo .vrm-fiche-cell { min-height: 58px; padding: 8px 11px !important; }
 
-/* L'ÉTAT EN JAUGE : cinq barres montantes, comme un signal. */
-.vrm-fiche-etat-val { display: inline-flex; align-items: flex-end; gap: 8px; min-width: 0; }
-.vrm-fiche-jauge { display: inline-flex; align-items: flex-end; gap: 2px; flex-shrink: 0; height: 18px; }
-.vrm-fiche-jauge > span { display: block; width: 5px; border-radius: 2px; }
-.vrm-fiche-etat-mot { font-size: 13px; font-weight: 650; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* L'ÉTAT EN JAUGE : cinq barres montantes, comme un signal ; le libellé de la
+   case et la jauge sur une ligne, le mot EN ENTIER dessous (deux lignes au plus). */
+.vrm-fiche-etat-val { display: flex; flex-direction: column; gap: 4px; min-width: 0; width: 100%; }
+.vrm-fiche-etat-haut { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; width: 100%; }
+.vrm-fiche-jauge { display: inline-flex; align-items: flex-end; gap: 2px; flex-shrink: 0; height: 15px; }
+.vrm-fiche-jauge > span { display: block; width: 4px; border-radius: 1.5px; }
+.vrm-fiche-etat-mot { font-size: 13.5px; font-weight: 650; line-height: 1.2; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo .vrm-fiche-cell { justify-content: flex-start !important; }
 
 /* Ce qui était dans « ⋯ » : à la vue, une bande sous la fiche. */
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus {
   padding: 12px 14px 14px; margin-top: auto;
 }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus > div:first-child[style*="border"] { margin: 0 !important; }
-:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-gestes] > *,
-:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-infos] > button { min-height: 44px !important; }
-
+/* Les gestes : une rangée qui revient à la ligne ; 36 px à la souris, 44 au
+   doigt (§7). Rien n'est caché derrière « ⋯ » (demande du 29 oct.). */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-geste { min-height: 36px !important; }
+@media (pointer: coarse) {
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-geste { min-height: 44px !important; }
+}
 @media (hover: hover) and (pointer: fine) {
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-gestes] > :is(button, a):hover,
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-infos] > button:hover { background: var(--vrm-bg) !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-geste:hover { background: var(--vrm-bg) !important; }
 }
 
 /* Téléphone : UNE fiche par rangée, la photo carrée sur toute la largeur. */
@@ -93,4 +101,65 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche { animation: none !important; }
+}
+
+/* ── LES OFFRES AUTOMATIQUES, en UNE ligne (29 oct.) ──────────────────────
+   Julien : « que ce ne soit pas un bouton comme ça, j'aime pas avec tout le
+   texte, c'est moche ». Une ligne : le nom, l'état en trois mots, ⓘ, et
+   l'interrupteur. Le fonctionnement et le message de refus sont derrière ⓘ.
+   L'accent ne sert qu'à l'interrupteur allumé (§7). */
+.vrm-offres-auto {
+  display: flex; flex-direction: column; margin: 0 0 12px; box-sizing: border-box;
+  border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface); color: var(--vrm-ink);
+}
+.vrm-offres-auto-ligne { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 8px 6px 12px; }
+.vrm-offres-auto-icone {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--vrm-card2); color: var(--vrm-muted);
+}
+.vrm-offres-auto.on .vrm-offres-auto-icone { color: var(--vrm-ink); }
+.vrm-offres-auto-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.vrm-offres-auto-nom { font-size: 13.5px; font-weight: 650; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-offres-auto-statut { font-size: 12px; color: var(--vrm-muted); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-offres-auto-info {
+  flex-shrink: 0; width: 44px; height: 44px; min-height: 44px !important; min-width: 44px !important; padding: 0 !important; margin: 0 !important;
+  border: 0 !important; background: transparent !important; color: var(--vrm-muted); border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  font: 600 12.5px/1 'Inter', system-ui, sans-serif; font-style: italic;
+}
+.vrm-offres-auto-info::before {
+  content: ''; position: absolute; width: 22px; height: 22px; border: 1.5px solid currentColor; border-radius: 50%; box-sizing: border-box;
+}
+.vrm-offres-auto-info { position: relative; }
+.vrm-offres-auto-info[aria-expanded="true"] { color: var(--vrm-ink); }
+@media (hover: hover) and (pointer: fine) { .vrm-offres-auto-info:hover { color: var(--vrm-ink); } }
+.vrm-offres-auto-switch {
+  flex-shrink: 0; position: relative; width: 46px; height: 28px; min-height: 28px !important; padding: 0 !important; margin: 0 4px 0 0 !important;
+  border: 0 !important; border-radius: 999px !important; background: var(--vrm-line) !important; cursor: pointer;
+  transition: background-color .18s ease;
+}
+.vrm-offres-auto-switch::after { content: ''; position: absolute; inset: -8px -2px; } /* 44 px au doigt, sans grossir le dessin */
+.vrm-offres-auto-switch > span {
+  position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .18s cubic-bezier(.23, 1, .32, 1);
+}
+.vrm-offres-auto-switch[aria-checked="true"] { background: var(--vrm-accent) !important; }
+.vrm-offres-auto-switch[aria-checked="true"] > span { transform: translateX(18px); }
+.vrm-offres-auto-detail { border-top: 1px solid var(--vrm-line); padding: 10px 14px 12px; font-size: 12.5px; line-height: 1.5; color: var(--vrm-muted); }
+.vrm-offres-auto-detail p { margin: 0; }
+.vrm-offres-auto-detail b { color: var(--vrm-ink); font-weight: 600; }
+.vrm-offres-auto-refus { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+.vrm-offres-auto-refus label { font-size: 12px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-offres-auto-refus label span { font-weight: 400; color: var(--vrm-muted); }
+.vrm-offres-auto-refus textarea {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--vrm-line); border-radius: 9px; padding: 8px 10px;
+  background: var(--vrm-bg); color: var(--vrm-ink); font: inherit; font-size: 13px; resize: vertical; outline: none;
+}
+.vrm-offres-auto-refus textarea:focus { border-color: var(--vrm-ink); }
+.vrm-offres-auto-ext { border-top: 1px solid var(--vrm-line); padding: 8px 14px 10px; font-size: 12px; line-height: 1.4; }
+@media (max-width: 767px) {
+  .vrm-offres-auto-refus textarea { font-size: 16px; } /* iOS ne zoome pas */
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-offres-auto-switch, .vrm-offres-auto-switch > span { transition: none !important; }
 }

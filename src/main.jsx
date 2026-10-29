@@ -83,6 +83,7 @@ import './styles-disposition.css';
 import './styles-telephone.css';
 import './styles-epure.css';
 import './styles-annonces-fiche.css';
+import './styles-etat-actions.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
