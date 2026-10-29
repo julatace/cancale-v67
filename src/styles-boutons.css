@@ -46,9 +46,9 @@
    ligne avec une spécificité de (0,3,1) et !important. Sans ce doublon, un
    « Annuler » discret y prenait la pastille teintée (vu au rendu, 29 oct.). */
 .vrm-b,
-.vrm-app-shell .vrm-main .vrm-b {
+.vrm-app-shell .vrm-main .vrm-b.vrm-b {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  box-sizing: border-box; min-height: var(--vrm-b-h) !important; max-width: 100%;
+  box-sizing: border-box; min-height: var(--vrm-b-h); max-width: 100%;
   padding: 0 14px; margin: 0;
   border: 0 !important; border-radius: 10px !important; box-shadow: none !important;
   font-family: inherit !important; font-size: 13px; font-weight: 600 !important; line-height: 1.2;
@@ -130,7 +130,7 @@
   background: var(--vrm-b-teinte) !important; border-color: transparent !important;
   border-radius: 10px !important; box-shadow: none !important;
   color: var(--vrm-b-encre) !important; font-weight: 600 !important; font-family: inherit !important;
-  min-height: 36px; text-decoration: none !important;
+  min-height: var(--vrm-b-h); text-decoration: none !important;
 }
 @media (hover: hover) and (pointer: fine) {
   :is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([class]):not([aria-pressed]):not([role]):not(:disabled):is([style*="solid rgb(220, 228, 223)"], [style*="solid rgb(56, 82, 88)"], [style*="background: rgb(234, 240, 236)"], [style*="background: rgb(39, 65, 71)"]):not(:has(div, img)):not([style*="text-align: left"]):not([style*="box-shadow"]):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
@@ -182,3 +182,16 @@
   .vrm-b-principal > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
   .vrm-main:has(.vrm-b-principal)::after, .vrm-main:has(.vrm-b-barre)::after { content: ''; display: block; height: 64px; }
 }
+
+/* ── 4. UN PARCOURS : <Avancement> (App.jsx) ─────────────────────────────── */
+/* Où j'en suis (titre, gras) et combien (à droite), UNE barre, ce qui se passe,
+   ce qui a raté. Couleurs du thème ; l'erreur en ambre (jamais rouge, §7). */
+.vrm-avancement { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-b-teinte); }
+.vrm-avancement-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; font-size: 14px; color: var(--vrm-ink, #213B41); }
+.vrm-avancement-compte { font-size: 12.5px; color: var(--vrm-muted, #53696D); font-variant-numeric: tabular-nums; }
+.vrm-avancement-barre { height: 8px; border-radius: 99px; background: var(--vrm-b-teinte-f); overflow: hidden; }
+.vrm-avancement-barre > span { display: block; height: 100%; border-radius: 99px; background: var(--vrm-accent, #244E54); transition: width .4s cubic-bezier(.23, 1, .32, 1); }
+.vrm-avancement-phrase { font-size: 13px; color: var(--vrm-ink, #213B41); line-height: 1.45; }
+.vrm-avancement-erreur { font-size: 12.5px; color: #965900; line-height: 1.45; }
+:root[data-theme="dark"] .vrm-avancement-erreur { color: #EBC080; }
+@media (prefers-reduced-motion: reduce) { .vrm-avancement-barre > span { transition: none; } }

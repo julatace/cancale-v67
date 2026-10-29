@@ -13844,6 +13844,29 @@ messages écrits dans tous les sens ». TROIS formes, et seulement trois :
 - Un geste rare va dans « ⋯ » ; deux boutons qui font la même chose, c'est un de
   trop ; un bouton grisé garde sa raison (`title` ou une ligne) et n'est jamais
   caché ; pas de rouge (sauf le doublon de N°), pas de vert en dur.
+- **L'action principale d'un écran** : `<ScreenHead … principal={<Bouton
+  variante="primaire">…</Bouton>}>` — en haut à droite sur ordinateur, barre fixe
+  au-dessus de la navigation du bas sur téléphone (`.vrm-b-principal`, la page
+  garde 64 px dessous). Jamais deux primaires sur un écran.
+- **L'ancien `Btn`** passe par les mêmes formes : plein + accent (ou sans couleur)
+  ⇒ primaire, tout le reste (`outline`, `color={C.border}`, `danger`) ⇒ secondaire,
+  `small` ⇒ `.vrm-b-petit` (34 px souris, 44 doigt). Il transmet désormais
+  `title`/`aria-*`. (Avant : `color={C.border}` = texte BLANC sur gris clair.)
+- `--vrm-on-accent` vient du thème (`variablesTheme`, `t.onAccent`) : #FFF en
+  clair, #173A40 en sombre (l'accent sombre est clair).
+- ⚠️ **Spécificité** : sur téléphone `styles-epure.css`/`styles-iphone.css` visent
+  les `<button>` par leur style en ligne à (0,3,1) + `!important`. Chaque règle
+  `.vrm-b-*` est doublée sous `.vrm-app-shell .vrm-main .vrm-b.vrm-b…` (0,4,0) ;
+  une règle ajoutée ici doit suivre ce motif. `min-height` n'est PAS `!important`
+  (un `style={{minHeight:44}}` en ligne doit gagner — banc `republier`, les choix
+  de couleur à 44 px).
+- **Un parcours en plusieurs étapes** (republier, publier, générer en lot, saisie
+  en série) : `<Avancement titre="Paire 2 sur 5" phrase="…" part={0.4}
+  compte={compteAvancement({faites, ratees, restent})} erreur="…">` — UNE barre,
+  où j'en suis en mots, ce qui se passe, combien, ce qui a raté (en ambre). Posé
+  EN HAUT du parcours. Premier appliqué : le total de Republier (il remplace la
+  barre d'ensemble sous la liste ET la ligne de bilan ; `data-republier-total`,
+  `data-republier-bilan`, `data-republier-prochaine` gardés).
 
 ### Le texte : une ligne, le reste derrière ⓘ
 Sur chaque bloc, **au plus UNE ligne visible** (≈ 90 caractères). L'explication

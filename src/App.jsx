@@ -12733,6 +12733,27 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <span>Je confirme : ces {aFaire.length} {action === 'enLigne' ? `brouillon${aFaire.length > 1 ? 's' : ''}` : `annonce${aFaire.length > 1 ? 's' : ''}`} {A.confirme(aFaire.length)}</span>
               </label>
             </>}
+            {/* (29 oct.) Julien : « la barre de progression est incompréhensible ».
+                Avant : une barre par paire, une barre d'ensemble SOUS la liste, et
+                une ligne de bilan encore en dessous — trois indicateurs. Un seul
+                bloc, EN HAUT : où j'en suis, ce qui se passe, combien sont faites,
+                ce qui a raté. Le détail de chaque paire reste sur sa ligne. */}
+            {mode !== 'idle' && aFaire.length > 0 && (() => {
+              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
+              const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
+              const peEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk) : null;
+              const part = Math.min(1, (finies + (peEnCours ? peEnCours.part : 0)) / aFaire.length);
+              const ratees = nEchec + nRefaire + nDouble;
+              const titre = mode === 'fini' ? 'Terminé' : mode === 'pause' ? 'En pause' : enCours ? `Paire ${aFaire.indexOf(enCours) + 1} sur ${aFaire.length}` : `${finies} sur ${aFaire.length}`;
+              const r = mode === 'run' && prochaine ? Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)) : null;
+              const phrase = mode === 'run'
+                ? <>{enCours ? <>{enCours.numero ? `N°${enCours.numero} · ` : ''}{peEnCours ? peEnCours.texte : 'en cours…'}</> : r != null ? <span data-republier-prochaine={prochaine.s}>Prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span> : 'Je prépare la suite…'} — garde cette fenêtre ouverte.</>
+                : mode === 'pause' ? 'Rien ne part tant que tu ne reprends pas.' : null;
+              const erreur = ratees ? <>{[nEchec ? `${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : null, nRefaire ? `${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : null, nDouble ? `${nDouble} à vérifier sur Vinted` : null].filter(Boolean).join(' · ')} : la raison et le geste sont sur sa ligne ci-dessous.</> : null;
+              return <Avancement titre={titre} phrase={phrase} part={part} label={`${finies} sur ${aFaire.length} terminées`} erreur={erreur}
+                data={{ 'data-republier-total': `${finies}/${aFaire.length}` }}
+                compte={<span data-republier-bilan="">{compteAvancement({ faites: nFait, ratees: nEchec + nDouble, restent: aFaire.length - finies, motFait: A.faits, motFaits: A.faits.replace(/^(\S+)/, '$1s') })}{nRefaire ? ` · ${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : ''}</span>} />;
+            })()}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
               {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 12.5, color: C.muted }}>
                 <span style={{ flex: '1 1 200px' }}>Ordre de passage{ordre ? ' (réglé)' : ' : celui de ta sélection'}.{action === 'recreer' ? ' Chaque paire passe en brouillon, puis l’ancienne est supprimée, dans cet ordre.' : ''}</span>
@@ -12758,21 +12779,6 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 ); })()}
               </React.Fragment>); })}
             </div>
-            {mode !== 'idle' && aFaire.length > 0 && (() => {
-              const finies = aFaire.filter((a) => { const e = (st[a.id] || {}).etat; return e && e !== 'encours' && e !== 'planifiee'; }).length;
-              const enCours = aFaire.find((a) => (st[a.id] || {}).etat === 'encours');
-              const partEnCours = enCours && recree ? progressionRepub(prog[String(enCours.id)], action, viaBrouillon && !!brouillonOk).part : 0;
-              const part = Math.min(1, (finies + partEnCours) / aFaire.length);
-              return (
-                <div data-republier-total={`${finies}/${aFaire.length}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div role="progressbar" aria-label={`${finies} sur ${aFaire.length} terminées`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(part * 100)} style={{ height: 10, borderRadius: 5, background: C.border, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.round(part * 100)}%`, height: '100%', background: C.accent, transition: 'width .4s ease' }} />
-                  </div>
-                  <div style={{ fontSize: 12.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{finies} sur {aFaire.length} terminée{finies > 1 ? 's' : ''}{enCours ? ` · paire ${aFaire.indexOf(enCours) + 1} en cours` : ''}</div>
-                </div>
-              );
-            })()}
-            {mode !== 'idle' && <div data-republier-bilan style={{ fontSize: 13, color: C.muted }}>{nFait} {A.faits}{nFait > 1 ? 's' : ''}{nEchec ? ` · ${nEchec} pas faite${nEchec > 1 ? 's' : ''}` : ''}{nRefaire ? ` · ${nRefaire} brouillon${nRefaire > 1 ? 's' : ''} à refaire` : ''}{nDouble ? ` · ${nDouble} à vérifier sur Vinted` : ''}{mode === 'run' ? ' — garde cette fenêtre ouverte' : ''}{mode === 'run' && prochaine ? (() => { const r = Math.max(0, Math.round((prochaine.at - Date.now()) / 1000)); return <span data-republier-prochaine={prochaine.s}> · prochaine paire dans {r >= 60 ? `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s` : `${r} s`}</span>; })() : ''}</div>}
           </>}
         </div>
         <div style={{ display: 'flex', gap: 8, padding: '10px 16px 12px', borderTop: `1px solid ${C.border}`, flexShrink: 0, flexWrap: 'wrap' }}>
@@ -17022,6 +17028,31 @@ function Bouton({ variante = 'secondaire', icone, plein = false, className = '',
   const contenu = <>{icone && ICON_PATHS[icone] ? <Icon name={icone} size={18}/> : null}{children}</>;
   if (href) return <a href={href} className={cls} {...rest}>{contenu}</a>;
   return <button type={type} className={cls} {...rest}>{contenu}</button>;
+}
+// (29 oct.) UN PARCOURS EN PLUSIEURS ÉTAPES se lit toujours pareil — Julien :
+// « pour les republications la barre de progression est incompréhensible ».
+// Quatre choses, dans cet ordre, et une seule barre :
+//   · `titre`  — où j'en suis, en mots (« Paire 2 sur 5 », « En pause », « Terminé ») ;
+//   · `phrase` — ce qui se passe maintenant (une phrase) ;
+//   · `part`   — 0 à 1, la barre (une seule par parcours) ;
+//   · `compte` — combien sont faites / ratées / restent (`compteAvancement`) ;
+//   · `erreur` — ce qui a raté et quoi faire (vide si rien n'a raté).
+// Pas de jargon (« passage », « file », « job »). `data` passe les data-* des bancs.
+function compteAvancement({ faites = 0, ratees = 0, restent = 0, motFait = 'faite', motFaits }) {
+  const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
+  return [pl(faites, motFait, motFaits), ratees ? pl(ratees, 'ratée') : null, restent ? pl(restent, 'restante') : null].filter(Boolean).join(' · ');
+}
+function Avancement({ titre, phrase, part = 0, compte, erreur, label, data, children }) {
+  const pct = Math.max(0, Math.min(100, Math.round((Number(part) || 0) * 100)));
+  return (
+    <div className="vrm-avancement" {...(data || {})}>
+      <div className="vrm-avancement-tete"><b>{titre}</b>{compte ? <span className="vrm-avancement-compte">{compte}</span> : null}</div>
+      <div className="vrm-avancement-barre" role="progressbar" aria-label={label || (typeof titre === 'string' ? titre : 'Avancement')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><span style={{ width: `${Math.max(pct ? 3 : 0, pct)}%` }}/></div>
+      {phrase ? <div className="vrm-avancement-phrase">{phrase}</div> : null}
+      {erreur ? <div className="vrm-avancement-erreur" role="status">{erreur}</div> : null}
+      {children}
+    </div>
+  );
 }
 function Segmente({ label, options, value, onChange, plein = false, disabled = false, className = '', style }) {
   return (
