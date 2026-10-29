@@ -26,6 +26,16 @@
 > grille des tailles (`/item_upload/attributes`, Vintex non) ; VRM renvoie des photos réencodées en JPEG ; Vintex fait les
 > brouillons de plusieurs paires puis leurs mises en ligne, VRM une paire après l'autre.
 
+> **29 octobre (suite, « parfait ») — le suivi URSSAF corrigé et complété :** ⚠️ la 1ʳᵉ version affichait « payé » le champ
+> `montant` du registre — c'est le **CA TAPÉ depuis son espace URSSAF**, pas un paiement. Désormais : déclaré = `montant` s'il
+> est tapé, sinon `ca` (VRM au moment de noter) ; un champ **`paye`** (cotisations payées, facultatif) dans le formulaire du
+> rapport et dans « Compléter » / « Corriger les montants » du suivi (`completerDeclaration` : mois déjà noté exigé, ventes
+> `ids` et date intactes, sur son clic ; `lireMontantSaisi` refuse « 12,345 »). Année : CA déclaré + cotisations payées, sinon
+> estimées (dit). Échéance à ≤ 7 j en ambre, « à régulariser » totalisé avec ses cotisations, export CSV (`suiviUrssafCsv`),
+> rythme suivi au nuage. Le rapport relit le registre sur `vrm:save` (sinon il effaçait une complétion). Preuves :
+> `audit-suivi-urssaf.cjs` (21 ; 15 rouges sur `main` ; `--prouve` 7 rouges), banc `suivi-urssaf.cjs` (390/1512 ; 10 KO sur
+> `main`), `audit-urssaf` admet ce 3ᵉ écrivain (il ne crée rien).
+
 > **29 octobre — un VRAI suivi de ses déclarations URSSAF (Comptabilité) :** Julien : « pour l'URSSAF fait un vrai suivi ».
 > Carte « Suivi de tes déclarations URSSAF » (`SuiviUrssaf`, sous la carte URSSAF, règle pure `suiviUrssaf` +
 > `periodesUrssaf`) : une ligne par période des 12 derniers mois (mois ou trimestre, SON rythme) — échéance, état
