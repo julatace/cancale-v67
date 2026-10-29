@@ -1,5 +1,20 @@
 # VRM — dossier de passation
 
+> **29 octobre — BROUILLON MIS EN LIGNE À LA MAIN, et les RÉDUCTIONS lisibles (5.271) :** Julien : « elle n'a pas capté
+> que j'avais fait passer un brouillon en ligne à la main », « j'ai encore un brouillon qu'elle ne capte pas », « les
+> réductions je ne comprends rien ». MESURÉ (lecture seule) : Sacai 10577417715 et Zoom Fly 10576081722 EN LIGNE dans leur
+> dressing (relu après) mais `coffre_*.versBrouillon.etat = a-publier` ⇒ toujours « à mettre en ligne » ; l'Air Max
+> (brouillon 10576112830) mise en ligne par un AUTRE brouillon de la même ancienne annonce (10576051739, `publie`) ; ses
+> requêtes montrent `POST …/drafts/{id}/completion` (mise en ligne à la main), que `inject.js` ignorait. ⇒ App
+> (`useBrouillonsARefaire(actif, presentes)`) : une ligne est réglée si son brouillon est PRÉSENT (en ligne, à confirmer,
+> masqué) ou si un autre brouillon de la même ancienne annonce est `publie`/présent — par IDENTITÉ, dit une fois
+> (`data-refaire-en-ligne`). Extension : `RE_BROUILLON_FIN` → `brouillonPublie` → `noterBrouillonPublie` (2xx, onglet
+> Vinted, compte du cookie, ligne d'un autre compte refusée) : `etat: publie`, coffre `fait`. Brouillon jamais vu
+> (10563756470 sans titre, 10432342904) : la ligne dit le geste en deux temps (Ouvrir sur Vinted → « Enregistrer le
+> brouillon »). Republier → Prix : boutons « Garder le prix · −5 · −10 · −15 · −20 % · Autre… », « Arrondir à l'euro »,
+> un EXEMPLE écrit (`data-republier-exemple`) ; **par défaut le prix ne change plus** (avant : −10 % d'office). Preuves :
+> banc `republier.cjs` (réductions, brouillons à refaire 9505/9506). ⚠️ Non mesuré : la vraie réponse de `/completion`.
+
 > ⛔ **28 octobre — DÉCISION DE JULIEN : VRM RESTE SUR LA FRANCE.** Question posée : « est-ce que les
 > Américains peuvent utiliser VRM ? » — réponse : pas vraiment (Vinted absent des États-Unis, argent en euros
 > seulement, URSSAF/DAC7, CGV et app en français). Julien : « reste sur la France pour l'instant mais fais ça

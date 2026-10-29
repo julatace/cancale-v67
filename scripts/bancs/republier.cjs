@@ -204,6 +204,10 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-paire="9107"]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-apercu="9102"]').waitFor({ timeout: 3000 });
+        // (29 oct.) rien ne baisse sans son clic : par défaut « Garder le prix ».
+        dit(await pg.locator('[data-republier-reduc="aucun"]').getAttribute('aria-pressed') === 'true' && (await pg.locator('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix')) === '', 'par défaut, le prix ne change pas (« Garder le prix »)');
+        await pg.locator('[data-republier-reduc="-10"]').click();
+        dit(/passe de 49/.test(await pg.locator('[data-republier-exemple]').innerText().catch(() => '')), 'un exemple écrit dit ce que fait la réduction', await pg.locator('[data-republier-exemple]').innerText().catch(() => 'absent'));
         const p1 = await pg.locator('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix');
         const p2 = await pg.locator('[data-republier-apercu="9106"]').getAttribute('data-republier-nouveau-prix');
         dit(p1 === '4410', 'aperçu : −10 % sur 49 € ⇒ 44,10 €', p1);
@@ -339,6 +343,7 @@ const projette = (row, sel) => {
         await action('modifier');
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-reduc="-10"]').click();
         dit(await pg.locator('[data-republier-photos],[data-republier-description],[data-republier-brouillon]').count() === 0, 'modifier sur place : ni photos, ni description, ni brouillon — seulement prix et titre');
         await pg.locator('[data-republier-suivant]').click();
         await lancer();
@@ -445,6 +450,11 @@ const projette = (row, sel) => {
         { id: 'coffre_111_9502', data: { id: '9502', uid: '111', title: 'Fait', photos: [], versBrouillon: vb({ etat: 'fait', titre: 'Déjà fait' }) } },
         { id: 'coffre_111_9503', data: { id: '9503', uid: '111', title: 'Incertaine', photos: [], versBrouillon: vb({ etat: 'mise-en-ligne-incertaine', titre: 'Mise en ligne floue' }) } },
         { id: 'coffre_111_9504', data: { id: '9504', uid: '111', title: 'Interrompu', photos: [], versBrouillon: vb({ etat: 'supprime', titre: 'Passage interrompu' }) } },
+        // (29 oct.) mis en ligne À LA MAIN : le brouillon 9102 est en ligne dans son dressing.
+        { id: 'coffre_111_9505', data: { id: '9505', uid: '111', title: 'Main', photos: [], versBrouillon: vb({ etat: 'a-publier', titre: 'Mis en ligne à la main', draftId: '9102' }) } },
+        // (29 oct.) un AUTRE brouillon de la même ancienne annonce est mis en ligne.
+        { id: 'coffre_111_9506', data: { id: '9506', uid: '111', title: 'Autre', photos: [], versBrouillon: vb({ etat: 'a-publier', titre: 'Par un autre brouillon', draftId: '88806' }) } },
+        { id: 'vinted_brouillon_77706', data: { id: '77706', uid: '111', ancienId: '9506', etat: 'publie', itemId: '77706' } },
       ]);
       const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
       const pg = await ctx.newPage();
@@ -492,6 +502,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
         const lignes = await pg.$$eval('[data-refaire-ligne]', (els) => els.map((e) => e.getAttribute('data-refaire-ligne') + ':' + e.getAttribute('data-refaire-quoi')).sort());
         dit(lignes.join(',') === '9500:a-refaire,9503:a-verifier,9504:interrompu', 'la liste : à refaire, interrompu, à vérifier', lignes.join(','));
+        dit(await pg.locator('[data-refaire-en-ligne]').getAttribute('data-refaire-en-ligne').catch(() => '') === '2', 'un brouillon mis en ligne à la main (ou par un autre brouillon) n\u2019est plus « à refaire », et c\u2019est dit', await pg.locator('[data-refaire-en-ligne]').innerText().catch(() => 'absent'));
         dit(await pg.locator('[data-refaire-ligne="9503"] [data-refaire-bouton]').count() === 0, 'mise en ligne sans réponse claire : AUCUN bouton refaire (elle est peut-être en ligne), « Voir mes brouillons » à la place');
         const hB = await pg.$$eval('[data-refaire-bouton],[data-refaire-regle]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
         dit(hB.length && hB.every((h) => h >= 44), 'chaque bouton fait au moins 44 px', hB.join(','));
