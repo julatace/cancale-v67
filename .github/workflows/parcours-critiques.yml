@@ -30,19 +30,34 @@ jobs:
           node scripts/bancs/recuperation-auth.cjs
           node scripts/tests/recuperation-pannes-interface.cjs
           node scripts/bancs/confidentialite.cjs
-      - name: Vérifier réception multi-comptes, favoris et inscription
-        run: |
-          node scripts/tests/reception-synthese-interface.cjs
-          node scripts/tests/synchronisation-vinted-interface.cjs
-          node scripts/tests/outils-articles-vinted-interface.cjs
-          node scripts/tests/bilan-synchronisation-interface.cjs
-          node scripts/tests/conversation-relecture-interface.cjs
-          node scripts/tests/atelier-brouillon-fiable-interface.cjs
-          node scripts/tests/favoris-historique-interface.cjs
-          node scripts/tests/favoris-automatisation-interface.cjs
-          node scripts/bancs/inscription-fiable.cjs
-          VRM_MESSAGES_LIVE_ONLY=1 node scripts/bancs/messagerie.cjs
-          VRM_MESSAGES_SEARCH_ONLY=1 node scripts/bancs/messagerie.cjs
+      - name: Vérifier le périmètre des numéros Vinted
+        run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
+      - name: Vérifier l’espace emails
+        run: node scripts/tests/espace-emails-interface.cjs
+      - name: Vérifier le guide de transfert
+        run: node scripts/tests/transfert-guide-interface.cjs
+      - name: Vérifier la réception multi-comptes
+        run: node scripts/tests/reception-synthese-interface.cjs
+      - name: Vérifier la synchronisation Vinted
+        run: node scripts/tests/synchronisation-vinted-interface.cjs
+      - name: Vérifier les outils des annonces
+        run: node scripts/tests/outils-articles-vinted-interface.cjs
+      - name: Vérifier le bilan de synchronisation
+        run: node scripts/tests/bilan-synchronisation-interface.cjs
+      - name: Vérifier les relectures de conversation
+        run: node scripts/tests/conversation-relecture-interface.cjs
+      - name: Vérifier les brouillons des annonces
+        run: node scripts/tests/atelier-brouillon-fiable-interface.cjs
+      - name: Vérifier l’historique des favoris
+        run: node scripts/tests/favoris-historique-interface.cjs
+      - name: Vérifier la file des favoris
+        run: node scripts/tests/favoris-automatisation-interface.cjs
+      - name: Vérifier l’inscription
+        run: node scripts/bancs/inscription-fiable.cjs
+      - name: Vérifier les captures de messagerie
+        run: VRM_MESSAGES_LIVE_ONLY=1 node scripts/bancs/messagerie.cjs
+      - name: Vérifier la recherche des messages
+        run: VRM_MESSAGES_SEARCH_ONLY=1 node scripts/bancs/messagerie.cjs
       - name: Préparer le moteur PDF de contrôle
         run: |
           mkdir -p "$RUNNER_TEMP/vrm-pdfjs"

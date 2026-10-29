@@ -1,5 +1,20 @@
 # VRM — dossier de passation
 
+> **29 octobre — revue des écrans Vinted : neuf défauts reproduits, corrigés (app seule) :** la préparation Leboncoin
+> (`etatPrepaLbc`, une règle pour la fiche et l'en-tête) dit l'état COMMUN une fois au-dessus de la grille (« N à recapturer
+> pour Leboncoin ») — la fiche ne garde que ce qui la distingue (« 2/5 photos captées ») ; chez lui ~125 fiches sur 179
+> auraient porté « photos pas encore captées ». Statut des offres auto court et à la ligne (« Allumées · 2 annonces avec
+> mini »), jamais « … ». Plus aucun renvoi à « Gérer l'annonce » (Statistiques → « la case boost de sa fiche »). Raccourcis
+> du calendrier à la ligne dans la feuille (« Cette année » n'est plus hors de l'écran). « CA entre deux dates » somme le CA
+> finalisé PAR JOUR publié par la coque (`caFinaliseParJour`, la population de « Finalisé sur Vinted », §11) au lieu de
+> l'archive vide — « — » tant que pas lu, jamais 0,00 € ; la phrase passe par `phrasePlage` (« en octobre 2026 », « en 2026 »,
+> « du … au … »). « À publier sur Leboncoin » neutre (habillé comme les autres gestes) et absent d'une paire PROUVÉE sur
+> Leboncoin. Feuille du calendrier au doigt : le haut de la zone se cale sur le DÉBUT d'un mois (marge basse ajoutée quand
+> c'est le dernier). `updatePair` compte `fees` : un boost tapé sur une annonce sans N° est gardé. Calendrier sur tablette
+> tactile (`pointer: coarse`, fenêtre à deux mois) : jours, flèches, raccourcis, boutons à 44 px. Preuves : banc `vinted-ui`
+> (+ section T tablette, contrôle R du texte de l'app) **30 rouges sur fd505d59** (le code relu), 0 après ; mutations
+> « préparation sur chaque fiche », « `fees` ignoré », « CA hors plage » ⇒ rouges. ⚠️ Non mesuré : un vrai iPad.
+
 > **29 octobre — ÉCRANS VINTED : grandes photos, état en jauge, calendrier « comme Airbnb », offres auto, pastille (app seule) :**
 > Julien : « augmente la taille des photos », « l'état plus original avec à côté la saisie du prix d'achat », « toutes les infos
 > des 3 petits points », « un calendrier comme Airbnb » pour les périodes, « accepter les offres automatiquement… c'est moche »,
@@ -21,6 +36,13 @@
 > mis à la nouvelle fiche sans les affaiblir : `annonces-carte` (une fiche par rangée au téléphone), `feuilles-coque`
 > (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). Rouges déjà sur origin/main (mêmes lignes, prouvé sur son build) : `stats-premium` 3, `revue-20oct` 12, `capacites` 38, `feuilles-coque`
 > 7 (Tout imprimer, Passeport). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension inchangée. Julien : rien.
+> **29 octobre — 5.287, numéros sur les profils visités :** Julien a précisé que
+> l’affichage semble seulement sur Vinted, l’import dans VRM n’est pas confirmé.
+> `/member/{id}` : aucun numéro renvoyé sans égalité avec le PROFIL du compte
+> connecté ; aucun numéro créé par une visite. Les pastilles sont purgées après
+> navigation et les réponses tardives ignorées ; cache du fond séparé par owner VRM.
+> Huit contrôles UI + trois tests du fond ; ancien affichage reproduit. Pas de
+> nettoyage de stock ni de réattribution. `docs/numeros-profils-vinted.md`.
 
 > **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
 > worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.
