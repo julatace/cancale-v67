@@ -5633,44 +5633,101 @@ const periodesUrssaf = (freq, now = new Date()) => {
   }
   return out;
 };
+// (29 oct., suite « parfait ») Ce que porte une période notée :
+//   `ca`      = le CA que VRM comptait quand il l'a notée ;
+//   `montant` = le CA tel qu'il l'a TAPÉ depuis son espace URSSAF (facultatif) —
+//               c'est LUI le chiffre déclaré quand il est là ;
+//   `paye`    = les cotisations qu'il a PAYÉES (facultatif, ajouté le 29 oct.).
+// ⚠️ `montant` n'est PAS un paiement (le formulaire du rapport le dit : « montant
+// de ta déclaration ») — la première version du suivi l'affichait « payé ».
+const caDeclareDe = (d) => (d && d.montant != null && isFinite(Number(d.montant))) ? Number(d.montant) : (Number(d && d.ca) || 0);
+const payeDe = (d) => (d && d.paye != null && isFinite(Number(d.paye))) ? Number(d.paye) : null;
 const suiviUrssaf = ({ freq, now = new Date(), declare, ligne, taux = tauxUrssaf() } = {}) => {
   if (!declare || typeof declare !== 'object' || Array.isArray(declare)) return null;
   const aujourdhui = _startOfDay(now);
+  const r2 = (x) => Math.round(x * 100) / 100;
   const lignes = [];
   for (const p of periodesUrssaf(freq, now)) {
     const yms = moisPeriodeUrssaf(p);
     const notes = yms.filter((ym) => moisDeclare(declare, ym));
     const finie = aujourdhui > _startOfDay(p.periodEnd);
     const etat = notes.length === yms.length ? 'declaree' : !finie ? 'en_cours' : aujourdhui > _startOfDay(p.dueDate) ? 'en_retard' : 'a_declarer';
+    const joursRestants = Math.round((_startOfDay(p.dueDate) - aujourdhui) / 86400000);
     const calc = montantPeriodeUrssaf(p, ligne, taux);
-    let caDecl = null, montant = null, at = 0, regle = null;
+    let caDecl = null, caTape = false, paye = null, aPayerDecl = null, at = 0, regle = null;
+    const aCompleter = [];   // mois notés sans le CA tapé ou sans les cotisations payées
     if (notes.length) {
-      caDecl = Math.round(notes.reduce((t, ym) => t + (Number(declare[ym].ca) || 0), 0) * 100) / 100;
-      const ms = notes.map((ym) => declare[ym].montant);
-      montant = ms.every((x) => x != null && isFinite(Number(x))) ? Math.round(ms.reduce((t, x) => t + Number(x), 0) * 100) / 100 : null;
+      caDecl = r2(notes.reduce((t, ym) => t + caDeclareDe(declare[ym]), 0));
+      caTape = notes.every((ym) => declare[ym].montant != null && isFinite(Number(declare[ym].montant)));
+      const ps = notes.map((ym) => payeDe(declare[ym]));
+      paye = ps.every((x) => x != null) ? r2(ps.reduce((t, x) => t + x, 0)) : null;
+      aPayerDecl = aPayerUrssaf(caDecl, taux);
       at = Math.max(...notes.map((ym) => Number(declare[ym].at) || 0));
       regle = notes.map((ym) => declare[ym].regle).includes('vente') ? 'vente' : 'versement';
+      for (const ym of notes) if (declare[ym].montant == null || payeDe(declare[ym]) == null) aCompleter.push(ym);
     }
     // L'écart ne se juge que sur une période ENTIÈREMENT notée et un chiffre de
-    // VRM complet (« au moins » ne prouve aucun écart).
-    const ecart = etat === 'declaree' && calc.ca != null && !calc.partiel ? Math.round((calc.ca - caDecl) * 100) / 100 : null;
-    // Une période sans rien (pas de vente comptée, rien noté, finie depuis
-    // longtemps) ne s'affiche pas : du bruit.
-    if (!notes.length && finie && calc.ca === 0 && !calc.partiel) continue;   // rien vendu : rien à déclarer
-    lignes.push({ label: p.label, yms, aNoter: yms.filter((ym) => !moisDeclare(declare, ym)), dueDate: p.dueDate, etat, caCalc: calc.ca, aPayerCalc: calc.apayer, partiel: calc.partiel, caDecl, montant, at, regle, ecart: ecart != null && Math.abs(ecart) >= 1 ? ecart : (ecart != null ? 0 : null) });
+    // VRM complet (« au moins » ne prouve aucun écart). Sous 1 € : 0 (arrondis).
+    const brut = etat === 'declaree' && calc.ca != null && !calc.partiel ? r2(calc.ca - caDecl) : null;
+    const ecart = brut == null ? null : (Math.abs(brut) >= 1 ? brut : 0);
+    // Une période finie sans rien (aucune vente comptée, rien noté) ne s'affiche pas.
+    if (!notes.length && finie && calc.ca === 0 && !calc.partiel) continue;
+    lignes.push({
+      label: p.label, yms, aNoter: yms.filter((ym) => !moisDeclare(declare, ym)), aCompleter,
+      periodEnd: p.periodEnd, dueDate: p.dueDate, joursRestants, etat,
+      urgent: etat === 'a_declarer' && joursRestants <= 7,
+      caCalc: calc.ca, aPayerCalc: calc.apayer, partiel: calc.partiel,
+      caDecl, caTape, paye, aPayerDecl, at, regle, ecart,
+      // Une régularisation (VRM compte PLUS que la déclaration) : ses cotisations.
+      aPayerEcart: ecart != null && ecart > 0 ? aPayerUrssaf(ecart, taux) : null,
+    });
   }
+  // L'année civile : ce qu'il a déclaré (le CA tapé, sinon celui de VRM) et ses
+  // cotisations — payées si toutes notées, sinon ESTIMÉES (et dit).
   const annee = String(now.getFullYear());
-  let caAnnee = 0, montantAnnee = 0, montantsConnus = true, nAnnee = 0;
+  let caAnnee = 0, payeAnnee = 0, payesConnus = true, nAnnee = 0;
   for (const [ym, d] of Object.entries(declare)) {
     if (!d || !Array.isArray(d.ids) || ym.slice(0, 4) !== annee) continue;
-    nAnnee++; caAnnee += Number(d.ca) || 0;
-    if (d.montant != null && isFinite(Number(d.montant))) montantAnnee += Number(d.montant); else montantsConnus = false;
+    nAnnee++; caAnnee += caDeclareDe(d);
+    const x = payeDe(d); if (x != null) payeAnnee += x; else payesConnus = false;
   }
+  const rev = lignes.reverse();
   return {
-    lignes: lignes.reverse(),
-    annee: { annee, n: nAnnee, ca: Math.round(caAnnee * 100) / 100, montant: nAnnee && montantsConnus ? Math.round(montantAnnee * 100) / 100 : null, montantEstime: nAnnee ? aPayerUrssaf(caAnnee, taux) : null },
-    enRetard: lignes.filter((l) => l.etat === 'en_retard').length,
+    lignes: rev,
+    annee: { annee, n: nAnnee, ca: r2(caAnnee), paye: nAnnee && payesConnus ? r2(payeAnnee) : null, estime: nAnnee ? aPayerUrssaf(caAnnee, taux) : null },
+    enRetard: rev.filter((l) => l.etat === 'en_retard').length,
+    // La prochaine échéance à faire (la plus proche, pas notée, période finie).
+    prochaine: rev.filter((l) => l.etat === 'a_declarer').sort((a, b) => a.joursRestants - b.joursRestants)[0] || null,
+    aRegulariser: r2(rev.reduce((t, l) => t + (l.ecart > 0 ? l.ecart : 0), 0)),
+    aCompleter: rev.reduce((t, l) => t + l.aCompleter.length, 0),
   };
+};
+// Compléter une période déjà notée (le CA tapé, les cotisations payées) SANS
+// toucher à ses ventes (`ids`) : la déclaration reste celle qu'il a notée.
+// Registre pas lu ou mois pas noté ⇒ rien n'est écrit (rend false).
+const lireMontantSaisi = (t) => {
+  const s = String(t == null ? '' : t).replace(/[\s\u00a0€]/g, '').replace(',', '.');
+  if (s === '') return null;
+  const n = Number(s);
+  return /^\d+(\.\d{1,2})?$/.test(s) && isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : undefined;
+};
+const completerDeclaration = (ym, { montant, paye } = {}) => {
+  if (!isCloudReady()) return false;
+  const reg = lireDeclarations();
+  const d = reg[ym];
+  if (!d || !Array.isArray(d.ids)) return false;
+  const u = { ...reg, [ym]: { ...d, montant: montant === undefined ? d.montant : montant, paye: paye === undefined ? (d.paye ?? null) : paye, corrigeLe: Date.now() } };
+  save('vrm_urssaf_declare', u);
+  return true;
+};
+// Le suivi en CSV (pour un comptable) — une ligne par période, des faits.
+const suiviUrssafCsv = (suivi) => {
+  const ETAT = { declaree: 'déclarée', a_declarer: 'à déclarer', en_retard: 'pas notée (échéance passée)', en_cours: 'en cours' };
+  const n = (x) => x == null ? '' : Number(x).toFixed(2).replace('.', ',');
+  const d = (x) => x ? new Date(x).toLocaleDateString('fr-FR') : '';
+  const L = [['Période', 'Échéance', 'État', 'Notée le', 'Règle', 'CA déclaré', 'CA tapé depuis l\'URSSAF', 'Cotisations payées', 'Cotisations estimées', 'CA compté par VRM aujourd\'hui', 'Chiffre VRM partiel', 'Écart (VRM − déclaré)']];
+  for (const l of suivi.lignes) L.push([l.label, d(l.dueDate), ETAT[l.etat], d(l.at), l.regle === 'vente' ? 'date de vente' : l.regle ? 'date de versement' : '', n(l.caDecl), l.caDecl == null ? '' : (l.caTape ? 'oui' : 'non'), n(l.paye), n(l.etat === 'declaree' ? l.aPayerDecl : l.aPayerCalc), n(l.caCalc), l.partiel ? 'oui (au moins)' : '', n(l.ecart)]);
+  return L.map((r) => r.map((c) => /[;"\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c)).join(';')).join('\n');
 };
 // ── BÉNÉFICE BRUT ET NET (19 octobre) — UNE règle, deux écrans (§11) ────────
 // L'écran Ventes (`totals`) et Comptabilité (« Ton bénéfice ») passent par ici :
@@ -32760,56 +32817,106 @@ function StatutFiscal({ liveStats, onNav }) {
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
-  const [freq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
+  // Son rythme : synchronisé (§5.49) et suivi s'il le change ailleurs.
+  const [freq, setFreq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
+  React.useEffect(() => onCloudReady(() => setFreq(load('vinted_urssaf_freq', 'trimestriel'))), []);
+  React.useEffect(() => {
+    const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setFreq(load('vinted_urssaf_freq', 'trimestriel')); };
+    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
+  }, []);
   const [ouvert, setOuvert] = React.useState(false);
-  const suivi = React.useMemo(() => regPret ? suiviUrssaf({ freq: load('vinted_urssaf_freq', freq), declare: regLu, ligne: v }) : undefined, [regPret, regLu, v, freq]);
+  const [edit, setEdit] = React.useState(null);   // { ym, montant, paye, erreur? }
+  const suivi = React.useMemo(() => regPret ? suiviUrssaf({ freq, declare: regLu, ligne: v }) : undefined, [regPret, regLu, v, freq]);
   const eur = (n) => n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
   const jour = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const nomMois = (ym) => MOIS_NOMS_FR[Number(String(ym).slice(5)) - 1];
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
+  const ambre = C.warn || C.amber || '#B7791F';
   const titre = <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Suivi de tes déclarations URSSAF</div>;
   if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Lecture de tes déclarations…</div></div></Card>;
   if (suivi === null) return <Card style={{ padding: '14px 16px', marginTop: 12 }}><div data-suivi-urssaf="passu">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Je n'ai pas pu lire tes déclarations notées — rien n'est perdu, rouvre cet écran.</div></div></Card>;
   const lignes = ouvert ? suivi.lignes : suivi.lignes.slice(0, 4);
   const a = suivi.annee;
+  const exporter = () => telechargerFichier(new Blob(['﻿' + suiviUrssafCsv(suivi)], { type: 'text/csv;charset=utf-8' }), `vrm-suivi-urssaf-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+  const ouvrirEdit = (ym) => { const d = (regLu || {})[ym] || {}; setEdit({ ym, montant: d.montant != null ? String(d.montant).replace('.', ',') : '', paye: d.paye != null ? String(d.paye).replace('.', ',') : '' }); };
+  const enregistrer = () => {
+    const m = lireMontantSaisi(edit.montant), p = lireMontantSaisi(edit.paye);
+    if (m === undefined || p === undefined) { setEdit((e) => ({ ...e, erreur: 'Un montant en euros, avec au plus deux chiffres après la virgule (ex. 1 234,50).' })); return; }
+    if (!completerDeclaration(edit.ym, { montant: m, paye: p })) { setEdit((e) => ({ ...e, erreur: "Tes déclarations ne sont pas encore chargées — rien n'est écrit, réessaie dans un instant." })); return; }
+    setEdit(null);
+  };
+  const champ = { border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 16, background: C.bg, color: C.text, width: '100%', maxWidth: 200, minHeight: 44, boxSizing: 'border-box', fontFamily: 'inherit' };
+  const btn = { fontSize: 13, fontWeight: 600, color: C.text, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' };
   return (
     <Card style={{ padding: '14px 16px', marginTop: 12 }}>
-      <div data-suivi-urssaf="lu" data-suivi-retard={String(suivi.enRetard)}>
-        {titre}
-        <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} style={{ fontSize: 13, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
-          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré.</>
-            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.montant != null ? <>cotisations notées <b style={{ color: C.text }}>{eur(a.montant)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.montantEstime)}</b> (estimées : tape le montant de l'URSSAF en notant le mois)</>}</>}
+      <div data-suivi-urssaf="lu" data-suivi-retard={String(suivi.enRetard)} data-suivi-regul={String(suivi.aRegulariser)}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {titre}
+          {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Exporter (CSV)</button> : null}
+        </div>
+        <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+          {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré et payé.</>
+            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
         {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
-        {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les derniers mois.</div> : (
+        {suivi.aRegulariser > 0 ? <div data-suivi-regul-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>À ajouter à ta prochaine déclaration : <b>{eur(suivi.aRegulariser)}</b> de ventes que VRM compte et qui ne sont dans aucune déclaration (≈ {eur(aPayerUrssaf(suivi.aRegulariser, tauxUrssaf()))} de cotisations).</div> : null}
+        {suivi.lignes.length === 0 ? <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>Rien à suivre sur les 12 derniers mois.</div> : (
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
             {lignes.map((l) => {
-              const alerte = l.etat === 'en_retard';
+              const ambreEtat = l.etat === 'en_retard' || l.urgent;
+              const sousEtat = l.etat === 'declaree' && l.at ? ` le ${jour(l.at)}`
+                : l.etat === 'en_cours' ? ` · à déclarer avant le ${jour(l.dueDate)}`
+                : l.etat === 'en_retard' ? ` · échéance passée le ${jour(l.dueDate)}`
+                : l.joursRestants <= 0 ? " · dernier jour aujourd'hui" : l.joursRestants === 1 ? ' · avant demain soir' : ` · avant le ${jour(l.dueDate)} (${l.joursRestants} j)`;
+              const editeIci = edit && l.yms.includes(edit.ym);
               return (
-                <div key={l.label} data-suivi-periode={l.label} data-suivi-etat={l.etat} data-suivi-calc={l.caCalc == null ? '' : String(l.caCalc)} data-suivi-decl={l.caDecl == null ? '' : String(l.caDecl)} data-suivi-ecart={l.ecart == null ? '' : String(l.ecart)}
+                <div key={l.label} data-suivi-periode={l.label} data-suivi-etat={l.etat} data-suivi-urgent={l.urgent ? '1' : ''} data-suivi-calc={l.caCalc == null ? '' : String(l.caCalc)} data-suivi-decl={l.caDecl == null ? '' : String(l.caDecl)} data-suivi-paye={l.paye == null ? '' : String(l.paye)} data-suivi-ecart={l.ecart == null ? '' : String(l.ecart)}
                   style={{ borderTop: `1px solid ${C.border}`, padding: '10px 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>{l.label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: alerte ? (C.warn || C.amber || '#B7791F') : C.muted }}>{ETAT[l.etat]}{l.etat === 'declaree' && l.at ? ` le ${jour(l.at)}` : l.etat === 'en_cours' ? '' : l.etat === 'en_retard' ? ` · échéance passée le ${jour(l.dueDate)}` : ` · avant le ${jour(l.dueDate)}`}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: ambreEtat ? ambre : C.muted }}>{ETAT[l.etat]}{sousEtat}</span>
                   </div>
                   {l.etat === 'declaree' ? (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-                      Déclaré <b style={{ color: C.text }}>{eur(l.caDecl)}</b>{l.regle === 'vente' ? ' (à la date de vente)' : ''} · payé {l.montant != null ? <b style={{ color: C.text }}>{eur(l.montant)}</b> : <span>— (pas noté)</span>}
+                      Déclaré <b style={{ color: C.text }}>{eur(l.caDecl)}</b>{l.caTape ? '' : ' (chiffre de VRM quand tu l\'as notée)'}{l.regle === 'vente' ? ' · à la date de vente' : ''}
+                      {' · '}{l.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(l.paye)}</b></> : <>cotisations ≈ {eur(l.aPayerDecl)} <span>(pas notées)</span></>}
                       {l.ecart ? <div data-suivi-ecart-texte="" style={{ marginTop: 2 }}>{l.ecart < 0
                         ? <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(-l.ecart)}</b> de moins (des ventes déclarées ne sont plus dans VRM : compte retiré, vente annulée). Ta déclaration reste celle-là.</>
-                        : <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(l.ecart)}</b> de plus : des ventes de cette période ne sont dans aucune déclaration — à ajouter à la prochaine (régularisation).</>}</div> : null}
+                        : <>VRM compte aujourd'hui <b style={{ color: C.text }}>{eur(l.ecart)}</b> de plus : des ventes de cette période ne sont dans aucune déclaration — à ajouter à la prochaine (≈ {eur(l.aPayerEcart)} de cotisations).</>}</div> : null}
+                      {l.partiel && l.caCalc != null ? <div style={{ marginTop: 2 }}>VRM compte au moins {eur(l.caCalc)} aujourd'hui (des ventes sans date de versement) : pas d'écart affirmé.</div> : null}
                     </div>
                   ) : (
                     <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-                      {l.caCalc == null ? 'Le montant se calcule dans Ventes (ouvre-le une fois).' : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b>{l.etat === 'en_cours' ? ' (période en cours)' : ''}</>}
+                      {l.caCalc == null ? 'Le montant se calcule dans Ventes (ouvre-le une fois).' : <>Reçu {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.caCalc)}</b> · à payer ≈ {l.partiel ? 'au moins ' : ''}<b style={{ color: C.text }}>{eur(l.aPayerCalc)}</b>{l.etat === 'en_cours' ? ' (pour l\'instant)' : ''}</>}
                       {l.yms.length > 1 && l.aNoter.length < l.yms.length ? <> · noté : {l.yms.length - l.aNoter.length} mois sur {l.yms.length}</> : null}
                     </div>
                   )}
-                  {(l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 ? (
+                  {editeIci ? (
+                    <div data-suivi-edit={edit.ym} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                      {l.yms.length > 1 ? <div style={{ fontSize: 13, color: C.text, fontWeight: 600, textTransform: 'capitalize' }}>{nomMois(edit.ym)}</div> : null}
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: C.muted }}>CA déclaré, tel que sur ton espace URSSAF
+                        <input data-suivi-edit-ca inputMode="decimal" value={edit.montant} onChange={(e) => setEdit((x) => ({ ...x, montant: e.target.value, erreur: null }))} placeholder="ex. 1 234,50" style={champ} /></label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: C.muted }}>Cotisations payées
+                        <input data-suivi-edit-paye inputMode="decimal" value={edit.paye} onChange={(e) => setEdit((x) => ({ ...x, paye: e.target.value, erreur: null }))} placeholder="ex. 153,20" style={champ} /></label>
+                      {edit.erreur ? <div role="alert" style={{ fontSize: 12.5, color: ambre }}>{edit.erreur}</div> : null}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>Enregistrer</button>
+                        <button type="button" onClick={() => setEdit(null)} style={btn}>Annuler</button>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.muted }}>Les ventes de la déclaration ne bougent pas : seuls ces deux chiffres sont gardés. Vide = pas noté.</div>
+                    </div>
+                  ) : null}
+                  {!editeIci && ((l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 || l.aCompleter.length > 0 || (l.etat === 'declaree')) ? (
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-                      <button type="button" data-suivi-noter={l.aNoter[0]} onClick={() => demanderDeclaration(l.aNoter[0], onNav)}
-                        style={{ fontSize: 13, fontWeight: 600, color: C.text, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 14px', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        {l.yms.length > 1 ? `C'est déclaré — noter ${MOIS_NOMS_FR[Number(l.aNoter[0].slice(5)) - 1]}` : "C'est déclaré"}
-                      </button>
+                      {(l.etat === 'a_declarer' || l.etat === 'en_retard') && l.aNoter.length > 0 ? (
+                        <button type="button" data-suivi-noter={l.aNoter[0]} onClick={() => demanderDeclaration(l.aNoter[0], onNav)} style={btn}>
+                          {l.yms.length > 1 ? `C'est déclaré — noter ${nomMois(l.aNoter[0])}` : "C'est déclaré"}
+                        </button>) : null}
+                      {l.aCompleter.length > 0 ? (
+                        <button type="button" data-suivi-completer={l.aCompleter[0]} onClick={() => ouvrirEdit(l.aCompleter[0])} style={btn}>
+                          {l.yms.length > 1 ? `Compléter ${nomMois(l.aCompleter[0])}` : 'Compléter'}
+                        </button>) : l.etat === 'declaree' ? (
+                        <button type="button" className="vrm-lien-action" data-suivi-corriger={l.yms[l.yms.length - 1]} onClick={() => ouvrirEdit(l.yms[l.yms.length - 1])} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 12.5, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>Corriger les montants</button>) : null}
                     </div>
                   ) : null}
                 </div>
@@ -34926,6 +35033,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ⚠️ On ne remplace QUE ce qui n'est pas encore lu (§5.49).
   const [declUrssaf, setDeclUrssaf] = useState(() => isCloudReady() ? lireDeclarations() : null);
   useEffect(() => onCloudReady(() => setDeclUrssaf(v => v == null ? lireDeclarations() : v)), []);
+  // (29 oct.) Une période complétée depuis le suivi de Comptabilité (le CA tapé,
+  // les cotisations payées) : relue ici, sinon le prochain geste du rapport
+  // repartirait de l'ancienne copie et l'effacerait.
+  useEffect(() => {
+    const f = (e) => { if (e && e.detail && e.detail.k === 'vrm_urssaf_declare' && isCloudReady()) setDeclUrssaf(lireDeclarations()); };
+    window.addEventListener('vrm:save', f);
+    return () => window.removeEventListener('vrm:save', f);
+  }, []);
   useEffect(() => {
     let mort = false;
     const lire = () => fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); });
@@ -41521,7 +41636,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { ids, ca: Math.round(ca * 100) / 100 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moisAncienneRegle, ventesComptees, reportMonth, hiddenAccts, panelAcctOff]);
-  const declarerMois = (regle, montantTxt) => {
+  const declarerMois = (regle, montantTxt, payeTxt) => {
     // ⚠️ LA GARDE EST DANS LE GESTE, pas seulement sur le bouton (revue du
     //    6 octobre) : une lecture peut tomber PENDANT que le formulaire est
     //    ouvert. Recalculée ici, sur l'état du moment — jamais une liste
@@ -41533,7 +41648,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ids = regle === 'vente' && ancienneRegle ? ancienneRegle.ids : report.saleLines.map(l => l.id).filter(Boolean);
     const ca = regle === 'vente' && ancienneRegle ? ancienneRegle.ca : Math.round(report.ca * 100) / 100;
     const m = parseFloat(String(montantTxt || '').replace(/\s/g, '').replace(',', '.'));
-    const rec = { ids, n: ids.length, ca, montant: isFinite(m) && m >= 0 ? Math.round(m * 100) / 100 : null, regle: regle === 'vente' ? 'vente' : 'versement', at: Date.now() };
+    const p = lireMontantSaisi(payeTxt);
+    const rec = { ids, n: ids.length, ca, montant: isFinite(m) && m >= 0 ? Math.round(m * 100) / 100 : null, paye: p == null ? null : p, regle: regle === 'vente' ? 'vente' : 'versement', at: Date.now() };
     setDeclUrssaf(prev => { const u = { ...(prev || {}), [reportMonth]: rec }; save('vrm_urssaf_declare', u); return u; });
     setDeclForm(null);
   };
@@ -48137,6 +48253,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {ecart != null && (ecart === 0
                           ? <span style={{color:C.muted}}> C'est le montant de ta déclaration.</span>
                           : <span> Tu as indiqué <b>{fmtE(d.montant)}</b> : <b style={{color:C.warn}}>écart de {fmtE(Math.abs(ecart))}</b> avec les ventes que je retrouve.</span>)}
+                        {payeDe(d)!=null && <span data-decl-paye-lu={String(d.paye)} style={{color:C.muted}}> Cotisations payées : {fmtE(d.paye)}.</span>}
                         {' '}<button type="button" onClick={annulerDeclaration} style={{border:'none',background:'transparent',color:C.muted,textDecoration:'underline',cursor:'pointer',fontSize:11.5,padding:0,fontFamily:'inherit'}}>retirer</button>
                       </div>
                     ) : report.declarePasSu ? (
@@ -48161,9 +48278,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span style={{fontSize:11.5,color:C.muted}}>Montant de ta déclaration, tel qu'il est sur ton espace URSSAF (facultatif — je le compare)</span>
                           <input inputMode="decimal" value={declForm.montant} onChange={e=>setDeclForm(f=>({...f, montant:e.target.value}))} placeholder="ex. 1 234,50" style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',fontSize:16,background:C.bg,color:C.text,maxWidth:200,fontFamily:'inherit'}}/>
                         </label>
+                        <label style={{display:'flex',flexDirection:'column',gap:3}}>
+                          <span style={{fontSize:11.5,color:C.muted}}>Cotisations payées pour ce mois (facultatif — pour ton suivi dans Comptabilité)</span>
+                          <input data-decl-paye inputMode="decimal" value={declForm.paye||''} onChange={e=>setDeclForm(f=>({...f, paye:e.target.value}))} placeholder="ex. 153,20" style={{border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 10px',fontSize:16,background:C.bg,color:C.text,maxWidth:200,fontFamily:'inherit'}}/>
+                        </label>
                         {(report.incomplet || (declForm.refus && !declarables)) && <RaisonDeclBloquee manque={report.incomplet || declForm.refus} refus={!!declForm.refus}/>}
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                          <button type="button" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 14px'}}>Enregistrer</button>
+                          <button type="button" data-decl-enregistrer onClick={()=>declarerMois(declForm.regle, declForm.montant, declForm.paye)} style={{border:'none',borderRadius:8,background:C.accent,color:C.onAccent,cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 14px'}}>Enregistrer</button>
                           <button type="button" onClick={()=>setDeclForm(null)} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,padding:'8px 14px'}}>Annuler</button>
                         </div>
                       </div>
@@ -48171,7 +48292,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{display:'flex',flexDirection:'column',gap:6}}>
                         <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
                           <span style={{flex:'1 1 220px',color:C.muted,fontSize:12}}>Note-le quand tu l'as déclaré : ses ventes ne seront plus recomptées dans un autre mois.</span>
-                          <button type="button" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'' }); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:report.incomplet?'default':'pointer',fontSize:12.5,fontWeight:600,padding:'7px 12px',opacity:report.incomplet?0.5:1}}>J'ai déclaré ce mois</button>
+                          <button type="button" data-decl-ouvrir disabled={!!report.incomplet} onClick={()=>{ if (!report.incomplet) setDeclForm({ regle:'versement', montant:'', paye:'' }); }} style={{border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text,cursor:report.incomplet?'default':'pointer',fontSize:12.5,fontWeight:600,padding:'7px 12px',opacity:report.incomplet?0.5:1}}>J'ai déclaré ce mois</button>
                         </div>
                         {report.incomplet && <RaisonDeclBloquee manque={report.incomplet}/>}
                       </div>

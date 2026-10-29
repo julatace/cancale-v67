@@ -412,7 +412,16 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   // gestes de son clic.
   const ecritures = [...SRC.matchAll(/save\('vrm_urssaf_declare'/g)].map((m) => m.index);
   const dansGeste = (i) => { const avant = SRC.slice(Math.max(0, i - 4000), i); const a = avant.lastIndexOf('const declarerMois = '), b = avant.lastIndexOf('const annulerDeclaration = '); const k = Math.max(a, b); return k >= 0 && !/\n  const (?!declarerMois|annulerDeclaration)\w+ = /.test(avant.slice(k + 10)); };
-  ecritures.length === 2 && ecritures.every(dansGeste)
+  // (29 oct.) Un troisième écrivain : `completerDeclaration` (le suivi de
+  // Comptabilité). Il ne CRÉE jamais une déclaration (mois déjà noté exigé,
+  // ventes intactes) et n'est appelé que depuis le geste « Enregistrer ».
+  const iC = SRC.indexOf('const completerDeclaration = ');
+  const corpsC = iC < 0 ? '' : SRC.slice(iC, SRC.indexOf('\n};\n', iC));
+  const dansCompleter = (i) => iC >= 0 && i > iC && i < iC + corpsC.length;
+  const appels = [...SRC.matchAll(/completerDeclaration\(/g)].map((m) => m.index).filter((i) => i !== iC + 'const '.length);
+  const completerSur = !corpsC || (/if \(!d \|\| !Array\.isArray\(d\.ids\)\) return false/.test(corpsC) && /\.\.\.d,/.test(corpsC) && appels.length === 1 && /const enregistrer = \(\) => \{[^]*$/.test(SRC.slice(Math.max(0, appels[0] - 600), appels[0])));
+  completerSur ? ok('« Compléter » (suivi) ne crée jamais une déclaration et ne s\'écrit que sur son clic') : nok('« Compléter » ne crée rien', 'garde du mois noté ou du geste absente');
+  ecritures.filter((i) => !dansCompleter(i)).length === 2 && ecritures.filter((i) => !dansCompleter(i)).every(dansGeste)
     ? ok('le registre ne s\'écrit que sur son clic (« J\'ai déclaré ce mois » / « retirer »), jamais tout seul')
     : nok('le registre ne s\'écrit que sur son clic', `${ecritures.length} écriture(s), hors geste : ${ecritures.filter((i) => !dansGeste(i)).length}`);
 }
