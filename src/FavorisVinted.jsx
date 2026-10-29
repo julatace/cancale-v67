@@ -149,11 +149,12 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const rythmeTexte=vueFile?.intervalleMaxMinutes?`entre ${vueFile.intervalleMinutes} et ${vueFile.intervalleMaxMinutes} min, au hasard`:vueFile?.intervalleMinutes?`toutes les ${vueFile.intervalleMinutes} min`:'';
 
   const blocDestinataires=!!selectionnees.length&&<div className="vrm-favoris-destinataires" aria-label="Destinataires sélectionnés"><strong>{selection.length} destinataire{selection.length>1?'s':''} · {nomCompte||'ce compte Vinted'}</strong><ul>{selectionnees.map(x=><li key={x.id}><div><b>{x.nom||'Nom indisponible'}</b><span>{sansNom(x)}</span></div><button type="button" disabled={selectionVerrouillee} aria-label={`Retirer ${x.nom||'ce favori'} de la sélection`} onClick={()=>choisir(x.id)}>Retirer</button></li>)}</ul></div>;
+  const assistance=<DiagnosticFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} controle={controle} controleEnvoi={controleEnvoi} copierControle={(controleEnvoi||controle&&controle.preuve!=='confirmee')?async()=>{try{await navigator.clipboard.writeText(JSON.stringify({...(controle||{diagnostic:'VRM-favoris-controle-v1'}),...(controleEnvoi?{lancement:controleEnvoi}:{})},null,2));setRetour('Contrôle copié, sans identifiant, lien ni message privé.');}catch{setRetour('Copie indisponible dans ce navigateur.');}}:null}/>;
   const alertes=<>
     {etat.scope===scope&&etat.erreur&&<p role="alert">{etat.erreur}</p>}
     {erreurOuverture&&<p role="alert" className="vrm-favoris-note"><strong>Vérification interrompue : </strong>{erreurOuverture}</p>}
     {retour&&<p role="status">{retour}</p>}
-    {(controleEnvoi||controle&&controle.preuve!=='confirmee')&&<button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(JSON.stringify({...(controle||{diagnostic:'VRM-favoris-controle-v1'}),...(controleEnvoi?{lancement:controleEnvoi}:{})},null,2));setRetour('Contrôle copié, sans identifiant, lien ni message privé.');}catch{setRetour('Copie indisponible dans ce navigateur.');}}}>Copier le contrôle</button>}
+
   </>;
   const ligneFavori=(x,coche)=><article key={x.id} className={selection.includes(x.id)?'is-selected':''} data-favori={x.id}>
     {coche?<label className="vrm-favoris-check"><input type="checkbox" aria-label={`Sélectionner ${x.nom||x.body.slice(0,100)}`} checked={selection.includes(x.id)} disabled={selectionVerrouillee||importation||bloque(x)||!selection.includes(x.id)&&selection.length>=10} onChange={()=>choisir(x.id)}/></label>:<span aria-hidden="true"/>}
@@ -171,7 +172,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       </div>
       <div className="vrm-favoris-feuille-corps">
         {etat.charge&&!data&&<p role="status">Lecture des favoris…</p>}
-        {feuille&&alertes}
+        {feuille&&alertes}{feuille&&assistance}
 
         {etape==='choix'&&data&&<>
           <p className="vrm-favoris-note">Choisis jusqu’à 10 favoris. Ceux déjà contactés (ou en conversation) ne peuvent pas être recochés.</p>
@@ -237,6 +238,6 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       <button type="button" className="is-principal" data-favoris-ouvrir disabled={importation} onClick={ouvrirFeuille}>{fileActive?'Suivre l’envoi en cours':'Envoyer un message aux favoris'}</button>
     </div>}
     {uid&&owner&&(typeof document!=='undefined'?createPortal(contenuFeuille,document.body):contenuFeuille)}
-    <DiagnosticFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} controle={controle} controleEnvoi={controleEnvoi}/>
+    {!feuille&&assistance}
   </section>;
 }

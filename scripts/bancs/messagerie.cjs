@@ -217,6 +217,26 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   let b;
   try {
     b = await chromium.launch({ executablePath:process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    if(process.env.VRM_MESSAGES_LIVE_ONLY==='1'){
+      for(const tel of [false,true]){
+        const r=await rendre(b,{version:'5.135.0',tel});
+        const boite=rows.find(x=>x.id==='harvest_111_inbox').data.payload.conversations.find(x=>x.id===301);
+        const avant={updated:boite.updated_at,description:boite.description,n:FIL_OFFRE.messages.length};
+        try{
+          dit(await r.pg.locator('[data-a-repondre]').getAttribute('data-a-repondre')==='1','capture initiale : un acheteur attend');
+          let date=new Date().toISOString();boite.updated_at=date;boite.description='Réponse déjà envoyée';FIL_OFFRE.messages.push({id:9991,created_at_ts:Math.floor(Date.parse(date)/1000),entity_type:'message',entity:{user_id:111,body:'Réponse déjà envoyée'}});
+          await r.pg.evaluate(()=>window.postMessage({__vmr:'evt',evt:{type:'maj',quoi:'messages',uid:'111',conv:'301'}},'*'));
+          await r.pg.waitForFunction(()=>document.querySelector('[data-a-repondre]')?.getAttribute('data-a-repondre')==='0',null,{timeout:10000});
+          dit(true,'capture vendeur reçue : le fil sort de À répondre sans rechargement');
+          await r.pg.waitForTimeout(1100);date=new Date().toISOString();boite.updated_at=date;boite.description='Nouvelle question ?';FIL_OFFRE.messages.push({id:9992,created_at_ts:Math.floor(Date.parse(date)/1000),entity_type:'message',entity:{user_id:5301,body:'Nouvelle question ?'}});
+          await r.pg.evaluate(()=>window.postMessage({__vmr:'evt',evt:{type:'maj',quoi:'messages',uid:'111',conv:'301'}},'*'));
+          await r.pg.waitForFunction(()=>document.querySelector('[data-a-repondre]')?.getAttribute('data-a-repondre')==='1',null,{timeout:10000});
+          dit(true,'nouvelle capture acheteur : le fil revient dans À répondre sans attendre une minute');
+          dit(r.execs.every(x=>x.method==='GET'),'aucune mutation Vinted pendant la mise à jour de la boîte');
+        }finally{boite.updated_at=avant.updated;boite.description=avant.description;FIL_OFFRE.messages.splice(avant.n);await r.ctx.close();}
+      }
+      process.exitCode=ko?1:0;return;
+    }
     for (const tel of [false, true]) {
       console.log(`── extension à jour (5.135) · ${tel ? '390 px' : '1512 px'}`);
       const r = await rendre(b, { version: '5.135.0', tel });
@@ -262,6 +282,9 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       // l'offre 45 € de la 301 est ≥ au mini 40 € posé sur l'annonce 444.
       const banMini = await r.pg.evaluate(() => { const e = document.querySelector('[data-offres-au-mini]'); return e ? { n: e.getAttribute('data-offres-au-mini'), txt: e.innerText } : null; });
       dit(banMini && banMini.n === '1' && /prix mini/i.test(banMini.txt) && /1 tap/i.test(banMini.txt) && /rien n['’]est accepté tout seul/i.test(banMini.txt), 'le bandeau dit « 1 offre au-dessus de ton prix mini » + 1 tap + rien tout seul', JSON.stringify(banMini));
+      await r.pg.locator('[data-a-repondre]').click();
+      dit(JSON.stringify(await r.pg.locator('[data-conv]').evaluateAll(xs=>xs.map(x=>x.getAttribute('data-conv'))))==='["301"]','À répondre : le vendeur et l’auteur non vérifié sont exclus');
+      await r.pg.getByRole('button',{name:/^Toutes /}).click();
       // 6. la boîte figée de compte_a (vente il y a 3 h, dernière conversation il y a 26 h)
       const fige = await r.pg.evaluate(() => { const e = document.querySelectorAll('[data-boites-perimees]'); return { n: e.length, uids: e[0] ? e[0].getAttribute('data-boites-perimees') : null, txt: e[0] ? e[0].innerText : '' }; });
       dit(fige.n === 1 && fige.uids === '111', 'une boîte figée se dit, UNE fois, pour le compte concerné seulement', JSON.stringify(fige));
@@ -284,6 +307,13 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(fil.carte && fil.carte.item === '444' && fil.carte.num === '7' && fil.carte.prix === '59' && fil.carte.etat === 'question' && /Air Max 1/.test(fil.carte.txt), 'en tête du fil : la carte de la paire (titre, N°7, 59 €, état)', JSON.stringify(fil.carte));
       dit(fil.seps.length === 2 && new Set(fil.seps).size === 2, 'les messages sont groupés par jour (deux jours, deux séparateurs)', JSON.stringify(fil.seps));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-fil-' + (tel ? 390 : 1512) + '.png') });
+      dit(await r.pg.locator('.vrm-chat-negociation-etat b').innerText()==='Offre reçue','négociation : offre reçue issue du fil natif');
+      const reperes=await r.pg.locator('.vrm-chat-offre-reperes').innerText();
+      dit(reperes.includes('59')&&reperes.includes('40'),'prix affiché et minimum exacts sont réunis près de l’offre');
+      const boutons=await r.pg.locator('.vrm-chat-offre-actions button').evaluateAll(xs=>xs.map(x=>({top:x.getBoundingClientRect().top,left:x.getBoundingClientRect().left})));
+      dit(boutons.length===3&&boutons.every(x=>Math.abs(x.top-boutons[0].top)<2)&&boutons[0].left<boutons[1].left&&boutons[1].left<boutons[2].left,'Accepter, Refuser et Contre-proposer sont côte à côte');
+      await r.pg.getByRole('button',{name:'Contre-proposer',exact:true}).click();
+      dit(await r.pg.getByRole('textbox',{name:"Prix de l'offre"}).isVisible(),'Contre-proposer ouvre le prix sans envoyer de requête');
       await r.pg.getByRole('button', { name: /Accepter/ }).first().click();
       await r.pg.waitForTimeout(500);
       // Ouvrir un fil le relit par l'extension (une LECTURE, `GET`) : seul un
@@ -313,6 +343,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(r.execs.filter(x=>/\/replies$/.test(x.endpoint)).length===avantReponses+1,'double clic : une seule réponse envoyée');
       dit(await champ.inputValue()==='Brouillon suivant conservé','le texte modifié pendant l’envoi n’est pas effacé');
       dit((await r.pg.locator('[role=status]').allTextContents()).some(t=>t.includes('Message envoyé sur Vinted')),'une réponse confirmée a un retour visible');
+      dit(await r.pg.locator('[data-a-repondre]').getAttribute('data-a-repondre')==='0','la capture déjà traitée ne reste pas dans À répondre après un envoi confirmé');
       await r.pg.evaluate(()=>window.__reponseMode='panne');
       await r.pg.locator('.vrm-chat-send').click();await r.pg.waitForTimeout(850);
       dit(await champ.inputValue()==='Brouillon suivant conservé','une réponse incertaine conserve le texte');
