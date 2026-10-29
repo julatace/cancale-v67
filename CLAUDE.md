@@ -1,5 +1,23 @@
 # VRM — dossier de passation
 
+> **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
+> vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
+> mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
+> **203 100 €** (188 700 € ne vaut plus ; dépassé 2 ans de suite ⇒ sortie au 1er janvier suivant) ; franchise de TVA **85 000 €**
+> (dépassé ⇒ TVA au 1er janvier suivant) et seuil majoré **93 500 €** (⇒ TVA dès le jour du dépassement) ; versement libératoire
+> +1 %, payé avec les cotisations au même rythme, RFR N-2 < 29 579 € (personne seule), option avant le 30 sept. pour l'année
+> suivante ; l'URSSAF ne propose que mensuel ou trimestriel (pas d'annuel). Règle pure `src/microEntreprise.js` (`SEUILS_MICRO` par
+> année — une année sans chiffres vérifiés ⇒ la jauge se tait ; `jaugeSeuils` sur la ligne publiée `vinted_urssaf_mois`, « au
+> moins » si une plateforme pas lue ou des ventes sans date, N-1 jugé seulement comme MINIMUM, projection après 60 j et jamais sur
+> un partiel ; `calendrierUrssaf` : le mois M se déclare ET se paie du 1er au dernier jour de M+1, trimestres 30/04 · 31/07 · 31/10
+> · 31/01 ; `optionsMicro`). `MicroEntreprise` (App.jsx) remplace la carte du taux : « Ton profil URSSAF » (rythme — UN réglage
+> `vinted_urssaf_freq`, la carte du mois n'a plus son propre choix et le suit, `useFreqUrssaf` — ; versement libératoire DEMANDÉ
+> dans `vrm_micro_options`, synchronisé, `null` = « À confirmer », jamais deviné ; ACRE ; taux détaillé ligne par ligne, un taux
+> posé à la main n'est jamais réécrit), « Ton calendrier » (3 échéances, ✓ si notée), « Tes seuils {année} » (deux jauges, ambre
+> seulement si proche/dépassé). Le mot « encaissé » reste interdit à l'écran (`audit-urssaf`) : « Reçu en 2026 ». Preuves :
+> `audit-micro-entreprise.cjs` (20 ; 7 mutations rouges), banc `suivi-urssaf.cjs` section M (profil, question VL, « Non » rangé,
+> rythme partagé ; 390/1512). ⚠️ Non mesuré : sa vraie base ; le CA de l'année n'est que ce que VRM a capté (plateformes reliées).
+
 > ⚠️⚠️ **29 octobre — REPUBLIER « COMME VINTEX » (5.277), après la restriction de 24 h d'angeled92 :** Vinted a écrit
 > « activité automatisée » après une republication de VRM. Mesuré (extension VRM Observateur, lecture seule, 266 requêtes
 > de Vintex sur 2 articles) : Vintex fait TOUT depuis l'onglet vinted.fr (cookies du site, `x-csrf-token` de la page,

@@ -145,6 +145,23 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         dit(!!l && l.etat === 'declaree' && l.decl === '300' && l.paye === '', `A ${T} : septembre « déclarée », 300 € déclarés, cotisations pas notées`, JSON.stringify(l && { etat: l.etat, decl: l.decl, paye: l.paye }));
         dit(!!l && !/payé 300|payées 300/.test(l.texte) && /cotisations ≈/.test(l.texte), `A ${T} : le CA tapé n'est jamais affiché comme un paiement`, l && l.texte.replace(/\n/g, ' | ').slice(0, 160));
         if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-avant-${vp.width}.png` }); }
+        // (29 oct.) Ta micro-entreprise : profil, calendrier, seuils.
+        const mp = await attrs(pg, '[data-micro-profil]', 'data-micro-');
+        dit(!!mp && mp.profil === 'passu' && await pg.$('[data-micro-vl-question]') != null, `M ${T} : versement libératoire pas encore répondu ⇒ la question est posée`, JSON.stringify(mp));
+        const mc = await attrs(pg, '[data-micro-calendrier]', 'data-micro-');
+        dit(!!mc && mc.calendrier === 'mensuel', `M ${T} : le calendrier suit son rythme (mensuel)`, JSON.stringify(mc));
+        const ms = await attrs(pg, '[data-micro-seuils]', 'data-micro-');
+        dit(!!ms && ms.seuils === 'lu' && ms.tva === 'ok' && ms.plafond === 'ok' && Number(ms.ca) > 0, `M ${T} : jauge des seuils lue (TVA et plafond)`, JSON.stringify(ms));
+        if (process.env.SHOTS) { const el = await pg.$('[data-micro-entreprise]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/micro-${vp.width}.png` }); }
+        await touche(pg, '[data-micro-vl-choix="non"]', vp);
+        await pg.waitForTimeout(1600);
+        dit(opts.main && opts.main.vrm_micro_options && opts.main.vrm_micro_options.liberatoire === 'non', `M ${T} : « Non » est rangé au nuage`, JSON.stringify(opts.main && opts.main.vrm_micro_options));
+        dit((await attrs(pg, '[data-micro-profil]', 'data-micro-') || {}).profil === 'non' && await pg.$('[data-micro-vl-question]') == null, `M ${T} : la question disparaît une fois répondue`);
+        await touche(pg, '[data-micro-freq-choix="trimestriel"]', vp);
+        await pg.waitForTimeout(1600);
+        dit(opts.main && opts.main.vinted_urssaf_freq === 'trimestriel' && (await attrs(pg, '[data-micro-calendrier]', 'data-micro-') || {}).calendrier === 'trimestriel' && (await attrs(pg, '[data-urssaf-rythme]', 'data-urssaf-') || {}).rythme === 'trimestriel', `M ${T} : changer le rythme ⇒ un seul réglage, suivi par le calendrier et la carte du mois`);
+        await touche(pg, '[data-micro-freq-choix="mensuel"]', vp);
+        await pg.waitForTimeout(1200);
         await touche(pg, '[data-suivi-completer="2026-09"]', vp);
         await pg.waitForSelector('[data-suivi-edit="2026-09"]', { timeout: 5000 });
         // B : une saisie illisible
