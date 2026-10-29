@@ -38,6 +38,7 @@ import { cheminMonotone } from "./courbeMonotone.js";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
+import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
@@ -1727,7 +1728,7 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
@@ -32813,31 +32814,220 @@ function StatutFiscal({ liveStats, onNav }) {
   return (
     <>
       {entete}
-      <Card style={{ padding: '14px 16px', marginBottom: 12 }}>
-        <div data-statut-taux={String(taux)} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>Ton taux : <b className="vrm-display">{String(taux).replace('.', ',')} %</b> de ce que tu encaisses{officiel ? '' : ' (posé à la main)'}.</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" data-taux-option="liberatoire" aria-pressed={vl} className="vrm-pastille-choix" onClick={() => poserTaux({ liberatoire: !vl, acre })}>Versement libératoire de l'impôt</button>
-            <button type="button" data-taux-option="acre" aria-pressed={acre} className="vrm-pastille-choix" onClick={() => poserTaux({ liberatoire: vl, acre: !acre })}>ACRE (1ʳᵉ année)</button>
-          </div>
-          <Pourquoi label="D'où vient ce taux">Achat-revente en micro-entreprise (vente de marchandises, BIC) : {String(TAUX_MICRO.cotisations).replace('.', ',')} % de cotisations sociales + {String(TAUX_MICRO.formation).replace('.', ',')} % de contribution à la formation. Le versement libératoire ajoute {TAUX_MICRO.liberatoire} % (l'impôt sur le revenu payé en même temps). L'ACRE réduit les cotisations à {String(TAUX_MICRO.acre).replace('.', ',')} % la première année. Vérifie le tien sur ton espace autoentrepreneur.urssaf.fr ; un autre taux se pose à la main dans Réglages.</Pourquoi>
-        </div>
-      </Card>
+      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
       <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
       <SuiviUrssaf onNav={onNav} />
     </>
   );
 }
+// ── TA MICRO-ENTREPRISE (29 octobre) ─────────────────────────────────────
+// Julien : « vois si la personne a choisi le versement libératoire », « si elle
+// paie tous les mois, elle déclare août mais paie en septembre », « une jauge
+// avec le plafond et le seuil de TVA », « une interface plus pro ». Trois cartes,
+// une règle pure (`src/microEntreprise.js`, chiffres officiels vérifiés) :
+//   1. Ton profil URSSAF — le rythme (UN réglage, `vinted_urssaf_freq`, partagé
+//      par la carte du mois et le suivi), le versement libératoire DEMANDÉ
+//      (`vrm_micro_options` : VRM ne lit pas son espace URSSAF), l'ACRE, et le
+//      taux détaillé ligne par ligne.
+//   2. Ton calendrier — quel mois se paie quand, avec SES dates.
+//   3. Tes seuils — CA de l'année (la ligne publiée, datée au versement) face
+//      au seuil de TVA et au plafond du régime ; « au moins » quand c'est un
+//      minimum ; une projection à ce rythme, jamais sur un total partiel.
+const lireFreqUrssaf = () => load('vinted_urssaf_freq', 'trimestriel') === 'mensuel' ? 'mensuel' : 'trimestriel';
+function useFreqUrssaf() {
+  const [f, setF] = React.useState(lireFreqUrssaf);
+  React.useEffect(() => onCloudReady(() => setF(lireFreqUrssaf())), []);
+  React.useEffect(() => {
+    const h = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setF(lireFreqUrssaf()); };
+    window.addEventListener('vrm:save', h); return () => window.removeEventListener('vrm:save', h);
+  }, []);
+  return f;
+}
+const lireOptionsMicro = () => optionsMicro(load('vrm_micro_options', null));
+const eurMicro = (n) => n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+const eurRond = (n) => `${Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+const pctFr = (n) => `${String(n).replace('.', ',')} %`;
+function LigneProfil({ titre, aide, children, attr }) {
+  return (
+    <div className="vrm-micro-ligne" {...(attr || {})} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{titre}</span>
+        {children}
+      </div>
+      {aide ? <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{aide}</div> : null}
+    </div>
+  );
+}
+function JaugeBarre({ pct, marques = [], etat, attr }) {
+  const alerte = etat && etat !== 'ok';
+  const fond = alerte ? C.warn : C.text;
+  return (
+    <div {...(attr || {})} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(pct))} style={{ position: 'relative', height: 10, borderRadius: 999, background: C.card2 || C.bg, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.max(0, Math.min(100, pct))}%`, background: fond, opacity: alerte ? 0.9 : 0.55, borderRadius: 999 }} />
+      {marques.map((m) => <div key={m} aria-hidden="true" style={{ position: 'absolute', top: -1, bottom: -1, left: `${m}%`, width: 2, background: C.muted, opacity: 0.7 }} />)}
+    </div>
+  );
+}
+function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
+  const freq = useFreqUrssaf();
+  const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
+  const ligne = useLigneUrssaf();
+  const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const now = new Date();
+  const jauge = React.useMemo(() => jaugeSeuils({ ligne, now }), [ligne]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cal = React.useMemo(() => calendrierUrssaf(freq, now, 3), [freq]); // eslint-disable-line react-hooks/exhaustive-deps
+  const vl = opts.liberatoire;                     // 'oui' · 'non' · null (pas répondu)
+  const acre = opts.acre || (opts.at === 0 && acreTaux);
+  const s = seuilsDe(now.getFullYear());
+  const poserOptions = (o) => {
+    const n = { ...opts, ...o, at: Date.now() };
+    save('vrm_micro_options', { liberatoire: n.liberatoire, acre: !!n.acre, at: n.at });
+    // Le taux suit ses réponses — sauf un taux posé À LA MAIN (Réglages), qu'on
+    // ne remplace jamais en silence.
+    if (officiel) poserTaux({ liberatoire: n.liberatoire === 'oui', acre: !!n.acre });
+  };
+  const poserFreq = (f) => save('vinted_urssaf_freq', f);
+  const jour = (d) => `${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
+  const sTitre = { fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: -0.15 };
+  const sCarte = { padding: '16px 18px', marginBottom: 12 };
+  const lignesTaux = [
+    ['Cotisations sociales', acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
+    ['Formation professionnelle', TAUX_MICRO.formation, 'commerçant'],
+    ...(vl === 'oui' || (vl == null && vlTaux) ? [['Impôt sur le revenu', TAUX_MICRO.liberatoire, 'versement libératoire']] : []),
+  ];
+  // ── 1. Profil ──
+  const profil = (
+    <Card style={sCarte}>
+      <div data-micro-profil={vl || 'passu'}>
+        <div style={sTitre}>Ton profil URSSAF</div>
+        <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, marginBottom: 6, lineHeight: 1.5 }}>VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</div>
+        <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
+          <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
+            options={[{ v: 'mensuel', l: 'Chaque mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Chaque trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
+        </LigneProfil>
+        <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
+          aide={<>
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
+            {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire} %) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire} %), ou à part sur ta déclaration de revenus.</>}
+            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire} % pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
+          </>}>
+          <Segmente label="Versement libératoire" value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
+            options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'liberatoire' } }, { v: 'non', l: 'Non', data: { 'data-micro-vl-choix': 'non' } }]} />
+        </LigneProfil>
+        <LigneProfil titre="ACRE (première année)" attr={{ 'data-micro-acre': acre ? 'oui' : 'non' }} aide="L'aide à la création réduit tes cotisations sociales la première année d'activité.">
+          <Segmente label="ACRE" value={acre ? 'oui' : 'non'} onChange={(v) => poserOptions({ acre: v === 'oui' })}
+            options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'acre' } }, { v: 'non', l: 'Non' }]} />
+        </LigneProfil>
+        <div data-statut-taux={String(taux)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, marginTop: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Ton taux</span>
+            <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{pctFr(taux)}</span>
+          </div>
+          {officiel ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 12px', marginTop: 8, fontSize: 13, color: C.muted }}>
+              {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 11.5 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
+            </div>
+          ) : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>Posé à la main dans Réglages : VRM ne le change pas quand tu réponds ci-dessus.</div>}
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. Je ne suis pas comptable.</div>
+        </div>
+      </div>
+    </Card>
+  );
+  // ── 2. Calendrier ──
+  const calendrier = (
+    <Card style={sCarte}>
+      <div data-micro-calendrier={freq}>
+        <div style={sTitre}>Ton calendrier</div>
+        <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+          {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
+          {vl === 'oui' ? ' Ton impôt (1 %) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
+          {cal.map((p, i) => {
+            const notee = regPret && p.ym.every((ym) => moisDeclare(regLu, ym));
+            const presse = !notee && p.ouverte && p.joursRestants <= 7;
+            return (
+              <div key={p.periode} data-micro-echeance={p.ym.join(',')} data-micro-echeance-etat={notee ? 'notee' : p.ouverte ? 'ouverte' : 'avenir'}
+                style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 12px', alignItems: 'baseline', padding: '10px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>{p.periode}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: notee ? C.muted : presse ? C.warn : C.muted, whiteSpace: 'nowrap' }}>
+                  {notee ? '✓ notée déclarée' : !p.ouverte ? 'à venir' : p.joursRestants <= 0 ? "dernier jour aujourd'hui" : `${p.joursRestants} j restants`}
+                </span>
+                <span style={{ gridColumn: '1 / -1', fontSize: 12.5, color: C.muted }}>Déclarer et payer du {jour(p.ouvre)} au {jour(p.limite)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
+  );
+  // ── 3. Seuils ──
+  let seuils;
+  if (!s) seuils = null;
+  else if (!jauge) seuils = (
+    <Card style={sCarte}><div data-micro-seuils="passu"><div style={sTitre}>Tes seuils {now.getFullYear()}</div><div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Ton chiffre d'affaires de l'année se calcule dans l'écran Ventes : ouvre-le une fois sur cet appareil.</div></div></Card>
+  );
+  else {
+    const j = jauge, am = j.partiel ? 'au moins ' : '';
+    const tvaTxt = {
+      due_depuis_janvier: <>Ton chiffre d'affaires {j.annee - 1} a dépassé {eurRond(j.seuils.tvaBase)} : la TVA est due depuis le 1er janvier {j.annee}. Vérifie avec ton service des impôts des entreprises.</>,
+      majore_depasse: <>Seuil majoré de {eurRond(j.seuils.tvaMajore)} dépassé : la TVA est due <b>depuis le jour du dépassement</b>. Contacte ton service des impôts des entreprises sans attendre.</>,
+      base_depasse: <>Seuil de {eurRond(j.seuils.tvaBase)} dépassé : tu restes sans TVA jusqu'au 31 décembre, puis tu factures la TVA dès le 1er janvier {j.annee + 1}. Attention, au-delà de {eurRond(j.seuils.tvaMajore)} (encore {eurMicro(j.tva.resteMajore)}), elle serait due tout de suite.</>,
+      proche: <>Plus que {eurMicro(j.tva.reste)} avant le seuil de {eurRond(j.seuils.tvaBase)}.</>,
+      ok: <>Encore {am ? 'au plus ' : ''}{eurMicro(j.tva.reste)} avant {eurRond(j.seuils.tvaBase)}. Au-delà, tu factures la TVA à partir du 1er janvier suivant.</>,
+    }[j.tva.etat];
+    const plafTxt = {
+      sortie: <>Plafond dépassé deux années de suite : sortie du régime micro au 1er janvier {j.annee + 1}. Parles-en à un comptable.</>,
+      depasse: <>Plafond dépassé cette année. Un dépassement isolé ne fait pas sortir du régime ; s'il se répète l'an prochain, tu en sors au 1er janvier suivant.</>,
+      proche: <>Plus que {eurMicro(j.plafond.reste)} avant le plafond.</>,
+      ok: <>Encore {am ? 'au plus ' : ''}{eurMicro(j.plafond.reste)} de marge.</>,
+    }[j.plafond.etat];
+    seuils = (
+      <Card style={sCarte}>
+        <div data-micro-seuils="lu" data-micro-ca={String(j.ca)} data-micro-partiel={j.partiel ? '1' : ''} data-micro-tva={j.tva.etat} data-micro-plafond={j.plafond.etat} data-micro-projection={j.projection == null ? '' : String(j.projection)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={sTitre}>Tes seuils {j.annee}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 16 }}>{am}{eurMicro(j.ca)}</b></span>
+          </div>
+          {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 12.5, color: C.muted, marginTop: 4 }}>C'est un minimum : {j.raisons.join(' · ')}.</div> : null}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
+              <span style={{ fontWeight: 600, color: C.text }}>Franchise de TVA</span>
+              <span style={{ color: j.tva.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pctFr(Math.round(j.tva.pct))} de {eurRond(j.seuils.tvaBase)}</span>
+            </div>
+            <JaugeBarre attr={{ 'data-micro-jauge': 'tva' }} pct={j.ca / j.seuils.tvaMajore * 100} marques={[j.seuils.tvaBase / j.seuils.tvaMajore * 100]} etat={j.tva.etat} />
+            <div style={{ position: 'relative', height: 16, fontSize: 11, color: C.muted, marginTop: 3 }}>
+              <span style={{ position: 'absolute', left: 0 }}>0</span>
+              <span style={{ position: 'absolute', right: `${100 - j.seuils.tvaBase / j.seuils.tvaMajore * 100}%`, transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>{eurRond(j.seuils.tvaBase)}</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted }}>Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</div>
+            <div data-micro-tva-texte="" style={{ fontSize: 12.5, color: j.tva.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{tvaTxt}</div>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
+              <span style={{ fontWeight: 600, color: C.text }}>Plafond de la micro-entreprise</span>
+              <span style={{ color: j.plafond.etat === 'ok' ? C.muted : C.warn, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{pctFr(Math.round(j.plafond.pct))} de {eurRond(j.seuils.plafondVente)}</span>
+            </div>
+            <JaugeBarre attr={{ 'data-micro-jauge': 'plafond' }} pct={j.plafond.pct} etat={j.plafond.etat} />
+            <div data-micro-plafond-texte="" style={{ fontSize: 12.5, color: j.plafond.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{plafTxt}</div>
+          </div>
+          {j.projection != null ? (
+            <div data-micro-projection-texte="" style={{ fontSize: 12.5, color: (j.projTva || j.projPlafond) ? C.text : C.muted, marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
+              À ce rythme, tu finirais l'année vers <b>{eurRond(j.projection)}</b>{j.projPlafond ? <> : au-dessus du plafond de {eurRond(j.seuils.plafondVente)}.</> : j.projTva ? <> : au-dessus du seuil de TVA — anticipe ({eurRond(j.seuils.tvaBase)}).</> : '.'} Une estimation, pas une prévision.
+            </div>
+          ) : null}
+          <Pourquoi label="D'où viennent ces seuils">Seuils {j.annee} de la vente de marchandises, vérifiés le {j.seuils.verifie} : franchise de TVA {eurRond(j.seuils.tvaBase)} (seuil majoré {eurRond(j.seuils.tvaMajore)}), plafond du régime micro {eurRond(j.seuils.plafondVente)}. Le chiffre est ce que tes plateformes t'ont versé dans l'année (toutes plateformes), hors comptes que tu as retirés.</Pourquoi>
+        </div>
+      </Card>
+    );
+  }
+  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}</div>);
+}
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   // Son rythme : synchronisé (§5.49) et suivi s'il le change ailleurs.
-  const [freq, setFreq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
-  React.useEffect(() => onCloudReady(() => setFreq(load('vinted_urssaf_freq', 'trimestriel'))), []);
-  React.useEffect(() => {
-    const f = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setFreq(load('vinted_urssaf_freq', 'trimestriel')); };
-    window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f);
-  }, []);
+  const freq = useFreqUrssaf();
   const [ouvert, setOuvert] = React.useState(false);
   const [edit, setEdit] = React.useState(null);   // { ym, montant, paye, erreur? }
   const suivi = React.useMemo(() => regPret ? suiviUrssaf({ freq, declare: regLu, ligne: v }) : undefined, [regPret, regLu, v, freq]);
@@ -32959,9 +33149,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const moisCourantN = urssafMois ? (eCour ? (eCour.n || 0) : 0) : null;
   const urssafEstime = moisCourantCA == null ? null : aPayerUrssaf(moisCourantCA, TAUX_URSSAF * 100);
   const netApresUrssaf = moisCourantCA == null ? null : netApresUrssafDe(moisCourantCA, TAUX_URSSAF * 100);
-  const [urssafFreq, setUrssafFreq] = React.useState(() => load('vinted_urssaf_freq', 'trimestriel'));
-  // §5.49 : réglage synchronisé, rattrapé seulement s'il est resté au défaut.
-  React.useEffect(() => onCloudReady(() => setUrssafFreq((x) => x === 'trimestriel' ? load('vinted_urssaf_freq', 'trimestriel') : x)), []);
+  // (29 oct.) UN réglage, posé dans « Ton profil URSSAF » : la carte le suit.
+  const urssafFreq = useFreqUrssaf();
   const urssafDue = React.useMemo(() => nextUrssafDeadline(urssafFreq), [urssafFreq]);
   // (22 oct.) Le registre « J'ai déclaré ce mois », en TROIS états : `null` tant
   // que le nuage n'est pas arrivé (pas su ⇒ on ne dit pas « déclarée »).
@@ -33096,11 +33285,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
         <div style={{marginTop:12,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
             <span style={{...sTitre,fontSize:13,flex:1}}>Prochaine déclaration</span>
-            <div style={{display:'flex',gap:2,background:C.card2||C.surface,borderRadius:10,padding:2}}>
-              {[['trimestriel','Trimestre'],['mensuel','Mois']].map(([v,l])=>(
-                <button type="button" key={v} onClick={()=>{setUrssafFreq(v);save('vinted_urssaf_freq',v);}} style={{border:'none',borderRadius:8,padding:'5px 11px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',minHeight:0,background:urssafFreq===v?C.card:'transparent',color:urssafFreq===v?C.text:C.muted,boxShadow:urssafFreq===v?C.shadow:'none'}}>{l}</button>
-              ))}
-            </div>
+            <span data-urssaf-rythme={urssafFreq} style={{fontSize:12.5,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span>
           </div>
           {urssafDue ? (()=>{
             // (22 oct.) « C'EST DÉCLARÉ » ICI, À CÔTÉ DU LIEN : le rappel envoie sur
