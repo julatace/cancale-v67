@@ -27,6 +27,8 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
     );
     for (const k of memo.current.lignes.keys())
       if (!permis.has(k)) {
+        // A returning source must be processed even when its payload is unchanged.
+        memo.current.empreintes.delete(memo.current.lignes.get(k).source);
         memo.current.lignes.delete(k);
         memo.current.donnees.delete(k);
         change = true;
@@ -50,12 +52,19 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
       });
   }, [owner, empreinte]);
   if (!owner || vue?.owner !== owner) return null;
-  const changements = vue.lignes.reduce(
+  // Filter during render as well: effects run after the account list changes.
+  const permis = new Set(
+    sources.flatMap((s) =>
+      (s.comptes || []).map((c) => s.id + ":" + String(c.uid)),
+    ),
+  );
+  const lignes = vue.lignes.filter((l) => permis.has(l.source + ":" + l.uid));
+  const changements = lignes.reduce(
     (n, l) => n + (l.ajouts?.length || 0) + (l.modifies?.length || 0),
     0,
   );
   const erreurs = new Set(
-    vue.lignes
+    lignes
       .filter((l) => l.etat === "erreur")
       .map((l) => l.uid + ":" + l.source),
   ).size;
@@ -87,7 +96,7 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
         })}{" "}
         · pas l’heure de capture sur la plateforme
       </time>
-      {vue.lignes.map((l) => (
+      {lignes.map((l) => (
         <article key={l.source + ":" + l.uid}>
           <div>
             <strong>{l.nom}</strong>
