@@ -20,6 +20,10 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 (plateforme agréée de facturation électronique) :
 //                                 statut · connecter · deconnecter · envoyer ·
 //                                 relire — voir api/_lib/superpdp.js
+//   /api/compte?mode=photoroom    (GET/POST, session) SA clé Photoroom, rangée
+//                                 chiffrée dans le coffre : statut (4 derniers
+//                                 caractères, date) · poser · verifier · retirer
+//                                 — voir api/_lib/photoroom-cle.js
 //   /api/compte?mode=equipe       (GET/POST, session) LE MODE ÉQUIPE (migration
 //                                 016) : lister · inviter · accepter · révoquer ·
 //                                 quitter — voir api/_lib/equipe.js
@@ -41,12 +45,13 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    vérifiée, dans une table que le vendeur peut lire mais pas écrire
 //    (supabase/migrations/005-abonnements.sql). Sinon on s'abonnerait soi-même
 //    depuis la console du navigateur.
-import { utilisateurDe, jetonDe, vendeurExige } from './_lib/session.js';
+import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
+import { routePhotoroom } from './_lib/photoroom-cle.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
@@ -1047,6 +1052,14 @@ async function superpdp(req, res) {
   return routeSuperPdp(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id) });
 }
 
+// ── La clé Photoroom du vendeur : la session d'abord (api/_lib/photoroom-cle.js)
+async function photoroom(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routePhotoroom(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
+}
+
 // ── SIRET → nom de l'entreprise (api/_lib/entreprise.js) : la session d'abord ─
 async function entreprise(req, res) {
   const vendeur = await vendeurExige(req, res);
@@ -1134,6 +1147,7 @@ export default async function handler(req, res) {
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'discord-debut') return m === 'POST' ? discordDebut(req, res) : repondre(res, 405, { erreur: 'POST seulement' });

@@ -104,7 +104,8 @@ export async function routeFavoris(req,res){
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         const version5281=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=281;
-        decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant,version5281});
+        const version5280=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=280;
+        decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant,version5281,version5280});
       }else if(c.action==='verifier'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         decision=d=>verifierReservation(d,{owner,jeton:c.jeton,maintenant});

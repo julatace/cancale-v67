@@ -15,11 +15,30 @@
 > recherche d'avant). Relu à l'ouverture de l'onglet puis au plus toutes les 15 min, page visible, une à une ; « nouveau »
 > par itemId depuis la dernière visite (cet appareil). Repère du MODÈLE (`moyennesParModele` sur ses ventes, ≥ 3), dit
 > « le modèle, pas cette paire ». Rien n'est acheté : « Voir sur eBay ↗ ». Les achats gagnés (WonList) restent, repliés,
-> lus à l'ouverture seulement. Preuves : `audit-ebay-recherche.cjs` (42 ; **31 rouges sur origin/main** ; 6 mutations
+> lus à l'ouverture seulement. Preuves : `audit-ebay-recherche.cjs` (43 ; **31 rouges sur origin/main** ; 7 mutations
 > rouges) · banc `ebay-achats-recherche.cjs` (390 tactile + 1512 sombre ; **18 rouges sur le build d'origin/main** ;
 > mutations « relecture sans borne » et « tout est nouveau » rouges). ⚠️ **Non mesuré** : aucun appel réel à eBay
 > (formes de la doc Browse/OAuth/Analytics) ; la pointure part dans les mots-clés (« 42.5 »). **Geste de Julien** : rien —
 > l'onglet marche avec les clés eBay déjà posées.
+
+> **29 octobre — offres, extension 5.286 :** la fusion partagée `src/conversations.js` /
+> worker garde un état accepté/refusé/expiré/précédent face à une ancienne copie en attente.
+> Deux identités d’offre contradictoires pour le même message font refuser la fusion.
+> `suiviNegociationVinted` exclut une offre d’une autre transaction explicitement identifiée ;
+> le sélecteur et le résumé ne réactivent plus « précédente » via un doublon.
+> `offres-fusion.test.mjs` exécute les deux versions. Archives 5.286 générées.
+> Rien n’a été envoyé à un compte marchand. Voir `docs/offres-etats-stables.md`.
+
+> **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
+> trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
+> planification pendant un réveil effaçait une paire) ; un job resté « en cours » (Chrome a tué le service worker)
+> n'est jamais rejoué, il est dit « incertain » ; « Brouillons → en ligne » refuse un brouillon déjà planifié, déjà
+> publié, verrouillé, ou dont l'ANCIENNE annonce n'est pas prouvée supprimée (sinon deux fois la même paire en ligne) ;
+> un brouillon sans réponse claire verrouille l'annonce 30 min ; une requête jamais partie (pas d'onglet Vinted, pause)
+> n'est plus « incertaine » et rend ses actions réservées ; avec la 5.277+, « via brouillon » est forcé (la création
+> directe n'existe plus côté extension) ; le serveur refuse une offre en % à une extension < 5.280 (elle ne
+> l'enverrait pas). Preuves : `audit-recreer.cjs` §R (7 contrôles, 7 rouges avec `BG_SRC=` le background.js
+> d'origin/main), `favoris-message.test.mjs`. ⚠️ Non mesuré : le vrai Vinted.
 
 > **29 octobre (suite, « c'est trop incompréhensible ») — Comptabilité allégée :** « Ta micro-entreprise » (calendrier,
 > seuils, profil, impôts) est REPLIÉE sous une ligne-résumé (taux · prochaine période à déclarer · seuils et impôts,
@@ -36,6 +55,29 @@
 > secondaire (§7 : un seul aplat d'accent). « Par mois / Par trimestre » (tenait mal à 390 px), espaces insécables
 > (« URSSAF ? », « « Compléter » »), « VRM ne remplace pas un comptable » (au lieu de « Je ne suis pas comptable »).
 > Aucune règle de calcul touchée. Banc `suivi-urssaf.cjs` : `SHOTS=dossier` capture maintenant tout l'écran.
+
+> **29 octobre — LE REÇU D'ACHAT REÇU PAR EMAIL, SUR LA LIGNE DE CHAQUE ACHAT (Achats) :** Julien : « essaie pour les achats
+> de mettre en place les factures si tu les reçois par mail ». **Mesuré (lecture seule)** : 81 reçus Vinted (« Ton reçu pour la
+> commande « … » »), **0 PDF**, `transaction` **vide sur les 117** lignes `email_achat_*` (l'astérisque du gras cassait le motif) ;
+> par ce n°, **61 reçus = 61 achats distincts** captés ; **20 ne correspondent à aucun achat capté** — dont 2 dont le n° est dans
+> SES ventes (achat d'un de ses comptes à un autre), le reste **cause non mesurée** ; **70 des 81 ne nomment aucun compte**.
+> **Fait** : règle partagée `api/_lib/recu-achat.js` (§11) — n° lu ligne par ligne, gras retiré ; un achat se relie par SON n° et
+> rien d'autre (repli par TITRE retiré, §5) ; les lignes d'un même n° = le même achat (PDF, puis détaillée, puis récente) ;
+> « pas su » ne relie rien. Le serveur range le n° dans `transaction` mais garde **une clé PAR EMAIL** (sujet + début du texte +
+> n° + PDF) — ⚠️ revue : le premier jet rangeait sous `email_achat_{n°}` et la copie « TR: » d'un reçu ÉCRASAIT le premier, PDF
+> compris. Sur la ligne de l'achat : « Reçu d'achat » (`data-achat-facture`, 44 px touchables, y compris sur un achat en litige),
+> qui ouvre la feuille ; un PDF joint ne se lit qu'au clic (§4.4). **Un nom pour ce document** (`NOM_RECU_ACHAT`) sur la ligne,
+> le menu ⋯, la feuille et la visionneuse — pas « facture » : Vinted envoie un reçu de paiement, aucune facture entre
+> particuliers (§5). L'archive (`bilanRecusAchat`) compte les ACHATS reliés (n° distincts), dit à part les reçus sans n° et
+> ceux dont le n° n'est porté par aucun achat affiché, ne compare rien pour un compte dont les achats n'ont pas pu être lus
+> (« pas su », compte NOMMÉ) — aucune cause devinée. Preuves : `audit-facture-achat.cjs` (la vraie route ; 11 mutations
+> rouges, dont `cle-tx` = le premier jet), `audit-identite` §12 sur la RÈGLE exécutée (50+50 reçus au même titre), banc
+> `facture-achat.cjs` (390 clair/sombre, 1512, reçus illisibles, litige au doigt, compte pas lu ; 23 rouges sur la branche
+> d'avant la revue, 44 sur origin/main), `csp.cjs` injecte la règle partagée (il mourait sur `transactionDeLaLigne`).
+> ⚠️ Non mesuré : un vrai reçu avec PDF joint ; un vrai email après déploiement ; la projection `data->>texte` sur SA base.
+> **Gestes de Julien** : (1) s'il veut d'autres reçus, faire suivre les emails Vinted de ses autres comptes vers son adresse
+> VRM (Réglages → Mes adresses de réception) ; (2) le mot : il avait dit « factures » — s'il y tient malgré §5, c'est
+> `NOM_RECU_ACHAT`, une ligne.
 
 > **29 octobre — cotisations dans Ma journée, déclaration de revenus, CFE, ventes Leboncoin datées à la main :**
 > (2) Ma journée, sous « Reçu en {mois} » : « ≈ X € de cotisations à mettre de côté » = `aPayerUrssaf` du CA DÉCLARÉ du mois
@@ -62,6 +104,65 @@
 > par échéance (`urssaf_reminder_dedup.veille`), même texte et montant que le 1er ; réglages/mémo illisibles ⇒ rien.
 > Preuves : `audit-rappel-echeance.cjs` (9 ; mutations seuil/declare/passu rouges), banc `suivi-urssaf.cjs` S (mutation
 > « pas d'enchaînement » ⇒ 4 KO).
+
+> **29 octobre (revue) — « TA CLÉ PHOTOROOM » : dix défauts reproduits, corrigés :** (1) « Vérifier » sans réponse de
+> Photoroom (coupure, 5xx, forme inconnue) n'écrit plus RIEN : la dernière réponse connue reste (un REFUS restait sinon
+> effacé, et le Studio reproposait le détourage), la route dit `sansReponse` et la carte nomme la dernière vérification ;
+> (2) Studio : une opération (détourage local ou Photoroom, rangement, retrait) reste liée à SA paire — changer de paire
+> pendant un détourage affichait la photo de la N°42 sous « N°43 » et la téléchargeait « VRM-43 » ; (3) la copie EN CLAIR
+> est recherchée et effacée à CHAQUE ouverture tant qu'elle existe (un DELETE raté n'était jamais retenté), « maintenant
+> chiffrée » n'est dit que si la base a confirmé l'effacement ; une clé en clair PLUS RÉCENTE (ancienne app restée
+> ouverte) ou un coffre illisible : elle remplace celle du coffre ; (4) clé du vendeur pas lue ⇒ 503 `cle-pas-su`, jamais
+> un repli sur la clé du serveur (§2.9 : avec `PHOTOROOM_POUR=tous`, le hoquet dépensait la clé de Julien) ; le Studio
+> n'attribue plus à Photoroom un refus de VRM (`source`) ; (5) « acceptée » exige un JSON `images|credits` en objet —
+> un 200 de portail/proxy vaut « pas su » (forme notée dans les journaux, jamais une valeur) ; (6) « en clair » dit SA
+> cause (`cause` : rangement raté · coffre absent) et ne prétend plus que Photoroom a été interrogé ; (7) vérification et
+> migration en comparer-et-échanger (`data.rev`, PATCH filtré ; création seule `INSERT` puis annulation de NOTRE ligne si
+> l'ancienne a disparu entre-temps) : une clé RETIRÉE ou REMPLACÉE pendant une vérification ne revient plus ; (8) « une
+> photo déjà détourée n'est jamais repayée » → « …et gardée par VRM n'est pas repayée » ; (9) « sans formule API » ⇒ pas
+> de bouton dans le Studio, la raison dite une fois ; (10) ⚠️ **la carte n'est PLUS dans Paramètres → Mon compte**
+> (décision du 17 oct. « ne le mets pas dans les paramètres » ; la demande du 29 n'en parlait pas) : elle vit sur l'écran
+> Vestiaire Collective, et `detourage-reglage.cjs` refuse la CARTE (`data-photoroom-cle`) dans les deux onglets des
+> Paramètres, pas un mot. Preuves : `audit-photoroom-cle.cjs` **88 contrôles** (33 rouges sur 321dcad, 58 sur
+> origin/main ; 10 mutations sur 10 rouges, script de mutations hors dépôt) ; bancs
+> `photoroom-carte.cjs` 140 (24 rouges sur 321dcad, 76 sur origin/main, mutation « maintenant chiffrée sans effacement »
+> rouge), `studio-photo.cjs` (+ course et sans formule API : 6 rouges sur 321dcad, mutation « toujours la même paire »
+> rouge), `detourage-reglage.cjs` (2 rouges sur 321dcad — vert sur origin/main, où la carte n'était pas dans les Paramètres : le
+> défaut venait du chantier ; mutation « carte remise sous un autre titre » rouge). Preuves refaites à la reprise (après la
+> limite d'utilisation) : build, audit, trois bancs, arbres d'avant (`a0d43bde` = origin/main d'alors, `321dcad`), 10 mutations.
+> Le banc `detourage.cjs` exigeait l'ANCIEN repli (« clé vendeur pas lue ⇒ clé du serveur, 403 ») : il exige maintenant 503
+> `cle-pas-su` et zéro appel à Photoroom (rouge sur 321dcad et origin/main, rouge sous la mutation « pas su lu aucune »).
+> Rouges hérités d'origin/main, pas touchés : `audit-politique-hotes` (vinted.fr dans 2 fichiers), `audit-pont-session`,
+> `audit-preuve-vente`, banc `reglages-premium` (chevrons à 1512 px).
+> ⚠️ Non mesuré : la vraie réponse de `v2/account`, le `DELETE … return=representation` filtré sur `data->>at` et le
+> `PATCH` filtré sur `data->>rev` contre SA PostgREST (formes documentées, jamais envoyées d'ici) ; l'extension ne
+> connaît pas `cle-pas-su` (elle garde la photo d'origine et réessaie photo par photo — pas touchée ici). **Geste de
+> Julien** : dire s'il veut AUSSI la carte dans Paramètres → Mon compte (retirée par prudence) ; sa clé se range depuis
+> l'écran Vestiaire Collective.
+
+> **29 octobre — « TA CLÉ PHOTOROOM » : chaque vendeur range SA clé (chiffrée), carte refaite, bouton dans Studio photo :**
+> Julien : « fais un meilleur visuel pour la clé API Photoroom des personnes qui utilisent VRM ». Mode `photoroom` de
+> `/api/compte` (`api/_lib/photoroom-cle.js`, toujours 12 fonctions) : GET = état (`aucune` · `posee` · `illisible` ·
+> `en-clair` sans coffre · 503 pas su), POST `poser` (vérifiée chez Photoroom par `GET image-api.photoroom.com/v2/account`,
+> qui ne consomme aucune image — 401/403 ⇒ refusée, RIEN rangé ; 402 ⇒ « sans formule API » ; muet ⇒ rangée « pas encore
+> vérifiée »), `verifier`, `retirer` (`confirme: true` exigé). La clé va dans `app_data.photoroom_cle`, CHIFFRÉE (coffre
+> commun `api/_lib/coffre.js`, AES-256-GCM, `VRM_COFFRE_CLE` ou dérivée de `SUPABASE_SERVICE_KEY` ; Super PDP y passe, même
+> format) ; sans coffre, rien n'est rangé ; aucune réponse ne la contient (4 derniers caractères seulement). Une clé d'avant
+> en clair (`vrm_photoroom_cle`, lisible par le navigateur — **1 ligne en production, mesurée le 29 oct.**) est chiffrée puis
+> effacée à la première lecture. `api/_lib/detourage.js` lit le coffre (puis l'ancienne ligne en repli) : avec SA clé, son
+> compte paie, sans plafond ; sans clé à lui, comme avant (§2.9). App : `ClePhotoroom` (`src/photoroomCle.js`) sur
+> l'écran Vestiaire (⚠️ plus dans Mon compte depuis la revue, voir au-dessus) — trois états (`data-photoroom-cle`), ce que ça coûte (son compte, à la photo,
+> ~0,02 $ relevé le 4 oct.), où elle sert (Vestiaire, Studio photo ; Leboncoin/eBay gardent leurs photos d'origine), le lien
+> vers Photoroom. ⚠️ Ce n'est PAS le réglage « détourer avant de publier » refusé le 17 oct. (`detourage-reglage.cjs` exige
+> toujours son absence, Mon compte compris). **Studio photo** : « Détourer avec Photoroom » seulement si SA clé est lue et
+> pas refusée ; la photo part à `/api/ai?mode=detourage` avec sa session (jamais à Photoroom depuis le navigateur). Retirés :
+> `lireClePhotoroom`/`sauverClePhotoroom` (lecture/écriture EN CLAIR côté navigateur). Preuves : `audit-photoroom-cle.cjs`
+> (44 ; 33 rouges sur origin/main ; 7 mutations rouges), banc `photoroom-carte.cjs` (390 tactile + 1512, clair et sombre, 110 ;
+> 41 rouges sur le build d'origin/main ; mutations « Retirer sans confirmer » et « pas su lu aucune » rouges),
+> `studio-photo.cjs` (+ scénario clé rangée ; 4 rouges sur l'avant ; mutation « bouton sans clé » rouge).
+> ⚠️ Non mesuré : la vraie réponse de `v2/account` (forme tirée de la doc indexée de Photoroom) ; une clé « sandbox » ;
+> la carte sur un vrai iPhone. **Geste de Julien** : ouvrir l'écran Vestiaire Collective → « Ta clé Photoroom » (sa clé
+> d'avant se chiffre toute seule), puis « Vérifier chez Photoroom ».
 
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août

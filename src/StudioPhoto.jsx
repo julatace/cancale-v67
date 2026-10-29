@@ -9,12 +9,25 @@
 //   2. la caméra s'ouvre avec un CADRE au format des annonces (3:4), une ligne
 //      de sol et des repères : toutes les paires se photographient pareil ;
 //   3. la photo prise est rangée pour CETTE paire (`studio_photos_{N°}`) ;
-//   4. on peut la détourer ICI, dans le navigateur, sans envoi ni clé.
+//   4. on peut la détourer ICI, dans le navigateur, sans envoi ni clé ;
+//   5. (29 oct.) et, SI le vendeur a rangé SA clé Photoroom (écran Vestiaire
+//      Collective), la détourer avec Photoroom : la photo part au serveur, qui
+//      appelle Photoroom avec SA clé (son compte paie — jamais celle de Julien,
+//      §2.9). Sans clé utilisable à lui, le bouton n'existe pas (la raison est
+//      dite une fois) et le détourage local reste.
+// ⚠️ (29 oct., revue) Une opération (détourage, rangement, retrait) est LIÉE à
+//    la paire où elle a commencé : si la personne change de paire pendant
+//    qu'elle tourne (un détourage Photoroom peut durer 20 s), le résultat est
+//    rangé avec SA paire, et l'écran — qui montre une AUTRE paire — n'est pas
+//    touché. Sinon la photo de la N°42 s'affichait sous « N°43 » et se
+//    téléchargeait nommée « VRM-43 » (§5 : une photo n'est jamais rattachée à
+//    une autre paire).
 // VRM ne publie RIEN sur Vinted : la photo s'enregistre sur l'appareil et c'est
 // lui qui l'ajoute dans l'app Vinted. Caméra refusée ou absente ⇒ l'appareil
 // photo du téléphone (champ fichier), recadré au même format, et on le DIT.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RATIO_CADRE, PHOTOS_MAX_PAR_PAIRE, recadrer, recadrerFichier, lireStudio, modifierStudio, detourerLocal } from './studioPhoto.js';
+import { lirePhotoroom, cleUtilisable, raisonSansPhotoroom, detourerAvecPhotoroom } from './photoroomCle.js';
 
 const damier = 'repeating-conic-gradient(#d9dde3 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
 
@@ -43,6 +56,28 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
   const [msg, setMsg] = useState('');
   const [occupe, setOccupe] = useState('');
   const videoRef = useRef(null), fluxRef = useRef(null), fichierRef = useRef(null);
+  // SA clé Photoroom : trois états (undefined lecture · null pas su · objet).
+  // Le bouton ne s'affiche que sur une clé LUE et utilisable.
+  const [cleP, setCleP] = useState(undefined);
+  useEffect(() => {
+    let vivant = true;
+    // Sans session (accès direct, base non cloisonnée), aucune clé n'est à lui :
+    // on ne demande rien.
+    const e = base && typeof base.entete === 'function' ? base.entete() : null;
+    if (!e || !e.Authorization) { setCleP(null); return undefined; }
+    lirePhotoroom(e).then((j) => { if (vivant) setCleP(j); });
+    return () => { vivant = false; };
+  }, [base]);
+  const avecPhotoroom = cleUtilisable(cleP);
+  const sansPhotoroom = avecPhotoroom ? null : raisonSansPhotoroom(cleP);
+  // La paire AFFICHÉE en ce moment (lue à la fin d'une opération longue).
+  const selRef = useRef(sel); selRef.current = sel;
+  const toujoursLa = (p) => !!(p && selRef.current && selRef.current.cle === p.cle);
+  // Ce qu'une opération rapporte, pour la paire `p` où elle a commencé.
+  const appliquer = (p, photos, texte) => {
+    if (toujoursLa(p)) { if (photos) setPhotos(photos); setMsg(texte); return; }
+    setMsg(`Photo de la N°${p.num} — ${texte} (Tu regardes maintenant une autre paire : rien n’a été rangé sous celle-ci.)`);
+  };
 
   const liste = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -76,13 +111,14 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
 
   const ranger = async (img) => {
     if (!img) { setMsg('La photo n’a pas pu être lue — rien n’a été rangé. Réessaie.'); return; }
+    const p = sel;
     setOccupe('rangement');
     const ph = { id: 'sp' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: new Date().toISOString(), img, cadre: mode === 'camera' ? 'camera' : 'fichier' };
-    const r = await modifierStudio(base, sel.cle, sel.num, (l) => (l.length >= PHOTOS_MAX_PAR_PAIRE ? false : [...l, ph]));
+    const r = await modifierStudio(base, p.cle, p.num, (l) => (l.length >= PHOTOS_MAX_PAR_PAIRE ? false : [...l, ph]));
     setOccupe('');
     if (!r.ok) { setMsg(r.raison === 'lecture' ? 'La base n’a pas répondu : je n’ai rien rangé (pour ne pas effacer les photos déjà là). Réessaie.' : 'La photo n’a pas pu être enregistrée — réessaie.'); return; }
     if (r.rien) { setMsg(`Cette paire a déjà ${PHOTOS_MAX_PAR_PAIRE} photos : retire-en une pour en ranger une autre.`); return; }
-    setPhotos(r.photos); setMsg(`Photo rangée pour la paire N°${sel.num}.`);
+    appliquer(p, r.photos, `Photo rangée pour la paire N°${p.num}.`);
   };
 
   const declencher = () => {
@@ -97,18 +133,40 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
   };
 
   const detourer = async (ph) => {
+    const p = sel;
     setOccupe('detour:' + ph.id); setMsg('Détourage dans ce navigateur… (la première fois, il charge environ 16 Mo)');
     const r = await detourerLocal(ph.img);
-    if (!r.ok) { setOccupe(''); setMsg(`Le détourage n’a pas pu se faire dans ce navigateur (${r.raison}). Ta photo d’origine est gardée.`); return; }
-    const w = await modifierStudio(base, sel.cle, sel.num, (l) => l.map((x) => (x.id === ph.id ? { ...x, detoure: r.img, detoureAt: new Date().toISOString() } : x)));
+    if (!r.ok) { setOccupe(''); appliquer(p, null, `Le détourage n’a pas pu se faire dans ce navigateur (${r.raison}). Ta photo d’origine est gardée.`); return; }
+    const w = await modifierStudio(base, p.cle, p.num, (l) => l.map((x) => (x.id === ph.id ? { ...x, detoure: r.img, detoureAt: new Date().toISOString() } : x)));
     setOccupe('');
-    if (!w.ok) { setMsg('Détourée, mais la base n’a pas répondu : rien n’a été enregistré. Réessaie.'); return; }
-    setPhotos(w.photos); setMsg('Détourée ici, sans rien envoyer. Vérifie les bords : la photo d’origine reste à côté.');
+    if (!w.ok) { appliquer(p, null, 'Détourée, mais la base n’a pas répondu : rien n’a été enregistré. Réessaie.'); return; }
+    appliquer(p, w.photos, 'Détourée ici, sans rien envoyer. Vérifie les bords : la photo d’origine reste à côté.');
+  };
+  const detourerPhotoroom = async (ph) => {
+    const p = sel;
+    setOccupe('photoroom:' + ph.id); setMsg('Détourage avec Photoroom… (ton compte Photoroom paie cette photo)');
+    const r = await detourerAvecPhotoroom(base.entete(), ph.img);
+    if (!r.ok) {
+      setOccupe('');
+      // (revue) Seul un refus qui VIENT de Photoroom lui est attribué : un refus
+      // de VRM (clé pas lue, session, abonnement…) n'a rien envoyé à Photoroom.
+      appliquer(p, null, r.incertain
+        ? 'Pas de réponse : Photoroom l’a peut-être détourée (et facturée). Ta photo d’origine est gardée ; réessaie dans un moment.'
+        : r.source === 'photoroom'
+          ? `Photoroom n’a pas détouré cette photo : ${r.raison}. Ta photo d’origine est gardée.`
+          : `La photo n’est pas partie chez Photoroom : ${r.raison}. Ta photo d’origine est gardée.`);
+      return;
+    }
+    const w = await modifierStudio(base, p.cle, p.num, (l) => l.map((x) => (x.id === ph.id ? { ...x, detoure: r.img, detoureAt: new Date().toISOString(), detourePar: 'photoroom' } : x)));
+    setOccupe('');
+    if (!w.ok) { appliquer(p, null, 'Détourée par Photoroom, mais la base n’a pas répondu : rien n’a été enregistré. Réessaie.'); return; }
+    appliquer(p, w.photos, r.cache ? 'Déjà détourée par Photoroom : reprise sans être repayée.' : 'Détourée par Photoroom, sur fond blanc. La photo d’origine reste à côté.');
   };
   const retirer = async (ph) => {
-    const w = await modifierStudio(base, sel.cle, sel.num, (l) => l.filter((x) => x.id !== ph.id));
-    if (!w.ok) { setMsg('La base n’a pas répondu : rien n’a été retiré.'); return; }
-    setPhotos(w.photos); setMsg('');
+    const p = sel;
+    const w = await modifierStudio(base, p.cle, p.num, (l) => l.filter((x) => x.id !== ph.id));
+    if (!w.ok) { appliquer(p, null, 'La base n’a pas répondu : rien n’a été retiré.'); return; }
+    if (toujoursLa(p)) { setPhotos(w.photos); setMsg(''); }
   };
 
   const fermer = () => { couper(); onClose && onClose(); };
@@ -181,7 +239,8 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {!ph.detoure && <button type="button" data-studio-detourer={ph.id} style={{ ...btn, padding: '6px 8px', fontSize: 11.5 }} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
-                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} style={{ ...btn, padding: '6px 8px', fontSize: 11.5, textDecoration: 'none' }}>Enregistrer</a>
+                      {!ph.detoure && avecPhotoroom && <button type="button" data-studio-photoroom={ph.id} style={{ ...btn, padding: '6px 8px', fontSize: 11.5 }} disabled={!!occupe} onClick={() => detourerPhotoroom(ph)}>{occupe === 'photoroom:' + ph.id ? 'Photoroom…' : 'Détourer avec Photoroom'}</button>}
+                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} style={{ ...btn, padding: '6px 8px', fontSize: 11.5, textDecoration: 'none' }}>Enregistrer</a>
                       <button type="button" style={{ ...btn, padding: '6px 8px', fontSize: 11.5, color: C.muted }} disabled={!!occupe} onClick={() => retirer(ph)}>Retirer</button>
                     </div>
                   </div>
@@ -190,6 +249,8 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
             )}
           <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginTop: 10 }}>
             « Détourer ici » tourne dans ce navigateur, sans envoyer la photo nulle part et sans clé (modèle libre U²-Net). Détourage automatique : vérifie les bords avant de t’en servir.
+            {avecPhotoroom && <span data-studio-photoroom-note="" style={{ display: 'block', marginTop: 4 }}>« Détourer avec Photoroom » envoie la photo à Photoroom avec <b>ta</b> clé (se termine par {(cleP && cleP.fin) || '····'}) : c’est ton compte Photoroom qui paie, à la photo, sur fond blanc.</span>}
+            {sansPhotoroom && <span data-studio-photoroom-indispo={cleP.verif} style={{ display: 'block', marginTop: 4 }}>{sansPhotoroom}</span>}
           </div>
         </>)}
       </div>
