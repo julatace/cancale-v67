@@ -145,6 +145,7 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         dit(!!l && l.etat === 'declaree' && l.decl === '300' && l.paye === '', `A ${T} : septembre « déclarée », 300 € déclarés, cotisations pas notées`, JSON.stringify(l && { etat: l.etat, decl: l.decl, paye: l.paye }));
         dit(!!l && !/payé 300|payées 300/.test(l.texte) && /cotisations ≈/.test(l.texte), `A ${T} : le CA tapé n'est jamais affiché comme un paiement`, l && l.texte.replace(/\n/g, ' | ').slice(0, 160));
         if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-avant-${vp.width}.png` }); }
+        if (process.env.SHOTS) { await pg.setViewportSize({ width: vp.width, height: 7000 }); await pg.waitForTimeout(600); await pg.screenshot({ path: `${process.env.SHOTS}/compta-${vp.width}.png` }); await pg.setViewportSize(vp); await pg.waitForTimeout(300); }
         // (29 oct.) Ta micro-entreprise : profil, calendrier, seuils.
         const mp = await attrs(pg, '[data-micro-profil]', 'data-micro-');
         dit(!!mp && mp.profil === 'passu' && await pg.$('[data-micro-vl-question]') != null, `M ${T} : versement libératoire pas encore répondu ⇒ la question est posée`, JSON.stringify(mp));

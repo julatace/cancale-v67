@@ -32813,9 +32813,11 @@ function StatutFiscal({ liveStats, onNav }) {
   return (
     <>
       {entete}
-      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
+      {/* (29 oct.) Ce qui se FAIT ce mois d'abord (la déclaration, le suivi),
+          puis le profil, le calendrier, les seuils et l'impôt — qui se lisent. */}
       <CarteUrssafMois liveStats={liveStats} onNav={onNav} />
       <SuiviUrssaf onNav={onNav} />
+      <MicroEntreprise taux={taux} poserTaux={(o) => poserTaux(o)} officiel={officiel} vlTaux={vl} acreTaux={acre} />
     </>
   );
 }
@@ -32888,7 +32890,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const poserFreq = (f) => save('vinted_urssaf_freq', f);
   const jour = (d) => `${d.getDate() === 1 ? '1er' : d.getDate()} ${d.toLocaleDateString('fr-FR', { month: 'long' })}`;
   const sTitre = { fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: -0.15 };
-  const sCarte = { padding: '16px 18px', marginBottom: 12 };
+  const sCarte = { padding: '16px 18px', margin: 0, height: '100%', boxSizing: 'border-box' };
   const lignesTaux = [
     ['Cotisations sociales', acre ? TAUX_MICRO.acre : TAUX_MICRO.cotisations, acre ? 'ACRE, 1ʳᵉ année' : 'vente de marchandises (BIC)'],
     ['Formation professionnelle', TAUX_MICRO.formation, 'commerçant'],
@@ -32902,11 +32904,11 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
         <div style={{ fontSize: 12.5, color: C.muted, marginTop: 2, marginBottom: 6, lineHeight: 1.5 }}>VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</div>
         <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
           <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
-            options={[{ v: 'mensuel', l: 'Chaque mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Chaque trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
+            options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
         </LigneProfil>
         <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
           aide={<>
-            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
             {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire} %) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire} %), ou à part sur ta déclaration de revenus.</>}
             <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire} % pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
           </>}>
@@ -32927,7 +32929,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
               {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 11.5 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
             </div>
           ) : <div style={{ fontSize: 12.5, color: C.muted, marginTop: 6 }}>Posé à la main dans Réglages : VRM ne le change pas quand tu réponds ci-dessus.</div>}
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. Je ne suis pas comptable.</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
         </div>
       </div>
     </Card>
@@ -33046,7 +33048,10 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
       </div>
     </Card>
   );
-  return (<div data-micro-entreprise="">{profil}{calendrier}{seuils}{impots}</div>);
+  // (29 oct.) Sur ordinateur, le calendrier et les seuils côte à côte (puis le
+  // profil et l'impôt) : une carte pleine largeur de 1 300 px pour trois lignes
+  // de dates laissait l'écran à moitié vide. Au téléphone, une colonne.
+  return (<div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', margin: '12px 0' }}>{calendrier}{seuils}{profil}{impots}</div>);
 }
 function SuiviUrssaf({ onNav }) {
   const v = useLigneUrssaf();
@@ -33085,7 +33090,7 @@ function SuiviUrssaf({ onNav }) {
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
           {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « C'est déclaré » : VRM garde ce que tu as déclaré et payé.</>
-            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
+            : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
         {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée ». Si tu l'as déjà déclarée sur l'URSSAF, touche « C'est déclaré » pour la noter ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
         {(() => {
@@ -33205,7 +33210,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
   const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
   return (
     <section data-compta-urssaf="" style={{display:'flex',flexDirection:'column',gap:8}}>
-      <h3 className="vrm-set-titre vrm-titre-compta" style={{color:C.muted,margin:'0 16px'}}>Ta déclaration URSSAF</h3>
+      <h3 className="vrm-titre-compta" data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'8px 2px 0'}}>Ta déclaration URSSAF</h3>
       {/* ── LE MOIS EN COURS, EN UNE SEULE CARTE ────────────────────────────
           ⚠️ Il y en avait DEUX à la suite, toutes deux titrées du même mois
           (« Mois en cours — septembre », puis « À payer pour septembre »), et
@@ -33404,8 +33409,8 @@ function RecapComptableMensuel() {
       {moisRecap.length>0&&(
         <Card>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-            <span style={{fontSize:13,fontWeight:600,color:C.text}}>📊 Récap comptable mensuel</span>
-            <Btn small onClick={exportCompta} style={{fontSize:13}}>📥 Exporter (CSV · Excel · Numbers)</Btn>
+            <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Récap comptable mensuel</span>
+            <Btn small outline onClick={exportCompta} style={{fontSize:13}}>Exporter (CSV)</Btn>
           </div>
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -33751,7 +33756,7 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
   return (
     <section className="vrm-set-groupe vrm-compta-groupe" data-compta-section={data} style={{ margin: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, margin: '0 16px 8px' }}>
-        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0 }}>{titre}</h3>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0 }}>{titre}</h3>
         {total != null && <span style={{ fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}><b className="vrm-display" style={{ color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</b>{totalSub ? ` ${totalSub}` : ''}</span>}
       </div>
       <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>{children}</div>
@@ -33898,7 +33903,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense }) {
       data-benef-couverture={B ? couvertureBenefice(B) : ''} data-benef-plateformes={B ? (B.toutes ? 'toutes' : 'vinted') : ''}
       data-benef-depenses={B ? (nuagePret ? B.depenses : 'passu') : ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 16px 8px' }}>
-        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: 0, flex: '1 1 auto' }}>Ton bénéfice{B ? ` · ${B.libelle}` : ''}</h3>
         <Segmente label="Période du bénéfice" plein value={periode} onChange={choisir} style={{ margin: 0, flex: '0 1 300px' }}
           options={PERIODES_BENEF.map(([k, l]) => ({ v: k, l, data: { 'data-benef-choix': k } }))} />
       </div>
@@ -34644,7 +34649,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       {/* Trois repères de charges — une liste groupée, comme Réglages : le
           libellé à gauche, le montant à droite (les data-compta-kpi restent). */}
       <section id="compta-charges" className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0, scrollMarginTop: 72 }}>
-        <h3 className="vrm-set-titre vrm-titre-compta" style={{ color: C.muted }}>Tes charges</h3>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15, margin: '0 2px 8px' }}>Tes charges</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           {[
             { k: 'abo', l: 'Abonnements ce mois', v: chargesDuMois.abo, s: abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : 'aucun déclaré' },

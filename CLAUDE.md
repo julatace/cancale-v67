@@ -1,5 +1,14 @@
 # VRM — dossier de passation
 
+> **29 octobre — Comptabilité plus pro (mise en page) :** l'URSSAF « à faire » d'abord (carte du mois + prochaine
+> échéance, puis le suivi), ensuite calendrier · seuils · profil · déclaration de revenus, en GRILLE sur ordinateur
+> (`vrm-micro-grille`, deux colonnes ≥ 2 × 440 px), une colonne au téléphone. Les titres « Ton bénéfice », « Ta déclaration
+> URSSAF », « Tes charges », les sections et le récap ont tous le même style (15 px, 600, encre, `data-titre-section`) —
+> plus de petites capitales grises à côté de titres en gras. Récap mensuel : plus d'emoji, « Exporter (CSV) » en bouton
+> secondaire (§7 : un seul aplat d'accent). « Par mois / Par trimestre » (tenait mal à 390 px), espaces insécables
+> (« URSSAF ? », « « Compléter » »), « VRM ne remplace pas un comptable » (au lieu de « Je ne suis pas comptable »).
+> Aucune règle de calcul touchée. Banc `suivi-urssaf.cjs` : `SHOTS=dossier` capture maintenant tout l'écran.
+
 > **29 octobre — cotisations dans Ma journée, déclaration de revenus, CFE, ventes Leboncoin datées à la main :**
 > (2) Ma journée, sous « Reçu en {mois} » : « ≈ X € de cotisations à mettre de côté » = `aPayerUrssaf` du CA DÉCLARÉ du mois
 > (`declarables`, mois de versement, une vente déclarée ailleurs exclue), « au moins » si un compte ou des ventes sans date
