@@ -43152,8 +43152,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   ];
   return (
     <div style={{padding:'16px 14px 40px'}}>
-      {['journee','annonces','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
-      {['journee','annonces'].includes(curSub)&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
+      {['annonces','messages'].includes(curSub)&&<BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>}
+      {curSub==='annonces'&&<VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>}
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
@@ -43881,6 +43881,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 Réglages ⇒ toujours visible (un seul propriétaire, §11). */}
             {!baseKO && !premierJour && !aWidget('vendu') && <BeneficeJournee onNav={onNav} place="carte"/>}
             {!baseKO && !premierJour && <BeneficeJournee onNav={onNav} place="lien"/>}
+            {/* (29 oct.) Les deux résumés de contrôle passent SOUS la journée : au-dessus du
+                bonjour ils repoussaient les compteurs du jour. Les vraies doubles ventes
+                restent en tête (alertes qui coûtent de l'argent). */}
+            <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
+            <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
           </div>
         );      })()}
 

@@ -5,7 +5,10 @@ s=s.replace(marker,`
   for(const width of [320,390,430]){
    await p.setViewportSize({width,height:844});
    for(const [tab,section] of [['journee',null],['plat_vinted','Ventes'],['plat_leboncoin','Ventes'],['plat_ebay','Ventes'],['dashboard',null]]){
-    await p.goto(base+'/?tab='+tab);await p.locator('main').waitFor();await p.evaluate(()=>document.fonts.ready);
+    // Une navigation interrompue (ERR_ABORTED) par le chargement précédent se refait : c'est l'outil qui l'abandonne, pas l'app.
+    await p.waitForTimeout(450); // une feuille qui se ferme rend son entrée d'historique (history.back) : un goto dans la même milliseconde est défait (CLAUDE.md, retour-historique)
+    for(let k=0;;k++){try{await p.goto(base+'/?tab='+tab);break;}catch(e){if(!/ERR_ABORTED/.test(String(e&&e.message))||k>=2)throw e;await p.waitForTimeout(800);}}
+    await p.waitForFunction(t=>new URLSearchParams(location.search).get('tab')===t||document.querySelector('main'),tab);await p.locator('main').waitFor();await p.evaluate(()=>document.fonts.ready);
     if(tab==='journee')await p.locator('[data-stock-en-ligne="1"]').waitFor();
     else if(tab==='dashboard')await p.locator('[data-courbe-vendu]').waitFor();
     else await p.locator('.vrm-platform-tabs').getByRole('button',{name:section,exact:true}).click();
@@ -27,10 +30,17 @@ s=s.replace(marker,`
      check(await p.getByRole('dialog').evaluate(e=>{const titre=e.querySelector('h2'),prix=e.querySelector('header p'),a=titre.getBoundingClientRect(),b=prix.getBoundingClientRect();return titre.scrollWidth<=titre.clientWidth+1&&b.top>=a.bottom&&b.right<=e.getBoundingClientRect().right;}),'titre complet et montant sans chevauchement '+width);
     }
     if(tab==='plat_vinted')await p.getByRole('button',{name:'Fermer les détails de la vente',exact:true}).click();
-    if(tab==='journee')check(await p.locator('.vrm-day-bar').evaluate(e=>(()=>{const lum=c=>{const a=c.match(/[0-9.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return a[0]*.2126+a[1]*.7152+a[2]*.0722;};const a=lum(getComputedStyle(e).backgroundColor),b=lum(getComputedStyle(e.querySelector('.vrm-day-bar-n')).color);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;})()),'bandeau des tâches contrasté '+width);
+    if(tab==='journee')check(await p.locator('.vrm-day-bar .vrm-day-bar-n').first().evaluate(n=>{
+      // Le fond VISIBLE : les couches translucides (la tuile, le bandeau transparent depuis le 27 oct.)
+      // posées sur le premier fond opaque en remontant — jamais « transparent » lu comme noir.
+      const rgba=c=>{const a=(c.match(/[0-9.]+/g)||[]).map(Number);return [a[0]||0,a[1]||0,a[2]||0,a.length>3?a[3]:1];};
+      const couches=[];for(let e=n;e;e=e.parentElement){const c=rgba(getComputedStyle(e).backgroundColor);if(c[3]>0)couches.push(c);if(c[3]>=0.999)break;}
+      let fond=[255,255,255];for(const c of couches.reverse())fond=fond.map((v,k)=>c[k]*c[3]+v*(1-c[3]));
+      const lum=a=>a.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((s,v,k)=>s+v*[.2126,.7152,.0722][k],0);
+      const a=lum(fond),b=lum(rgba(getComputedStyle(n).color).slice(0,3));return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5;}),'bandeau des tâches contrasté '+width);
     if(tab==='journee')check(await p.locator('.vrm-app-header button[aria-label="Tous les écrans"]').isHidden(),'menu Gestion sans doublon en haut '+width);
-    if(tab==='journee')check(await p.locator('.vrm-day-greeting').isHidden(),'bonjour retiré pour remonter les actions '+width);
-    if(tab==='journee')check(await p.locator('.vrm-day-money').evaluate(e=>{const clone=e.cloneNode(true);Object.assign(clone.style,{position:'fixed',left:'-10000px',width:e.getBoundingClientRect().width+'px',boxSizing:'border-box'});e.parentElement.appendChild(clone);const n=clone.querySelector('.vrm-day-hero-n');n.textContent='1 234 567 €';const a=n.getBoundingClientRect(),b=clone.querySelector('.vrm-day-recu').getBoundingClientRect(),ok=n.scrollWidth<=n.clientWidth+1&&a.right<=b.left;clone.remove();return ok;}),'grand montant sans chevauchement '+width);
+    if(tab==='journee')check(await p.locator('.vrm-day-greeting').isVisible()&&await p.locator('.vrm-day-bar').evaluate(e=>e.getBoundingClientRect().bottom<=innerHeight),'(27 oct.) le bandeau du bonjour est là et les compteurs du jour restent visibles sans défiler '+width);
+    if(tab==='journee')check(await p.locator('.vrm-day-money').evaluate(e=>{const clone=e.cloneNode(true);Object.assign(clone.style,{position:'fixed',left:'-10000px',width:e.getBoundingClientRect().width+'px',boxSizing:'border-box'});e.parentElement.appendChild(clone);const n=clone.querySelector('.vrm-day-hero-n');n.textContent='1 234 567 €';const a=n.getBoundingClientRect(),b=clone.querySelector('.vrm-day-recu').getBoundingClientRect(),ok=n.scrollWidth<=n.clientWidth+1&&(a.right<=b.left||a.bottom<=b.top);clone.remove();return ok;}),'grand montant sans chevauchement '+width);
     if(process.env.BANC_CAPTURES){await p.waitForTimeout(1300);fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,tab+'-'+width+'.png')});}
    }
   }
