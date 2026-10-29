@@ -35,7 +35,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const reglagesLus=React.useRef(false),edition=React.useRef(0),sauvegarde=React.useRef(false);
   const change=()=>{edition.current++;setRetour('');setReglages(x=>x.prets?{...x,enregistres:false,erreur:''}:x);};
   const apercu=preparerMessageFavori(message,reduction);
-  const configuration={message,pourcentage:reduction,intervalleMinutes:intervalle,intervalleMaxMinutes:rythme==='aleatoire'?intervalleMax:null};
+  const configuration={message,pourcentage:reduction,intervalleMinutes:rythme==='vintex'?'0':intervalle,intervalleMaxMinutes:rythme==='aleatoire'?intervalleMax:null};
   let erreurRythme='';try{validerReglagesFavoris({...configuration,message:apercu.message?message:'x',pourcentage:apercu.erreur?null:reduction});}catch(e){erreurRythme=e.message;}
   const requete=React.useRef(0),occupe=React.useRef(false);
   const scope=owner+':'+uid, data=etat.scope===scope?etat.data:undefined;
@@ -49,7 +49,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
       if(n!==requete.current||ownerActuel()!==owner)return;
       if(prefs.status==='fulfilled'&&prefs.value){
         reglagesLus.current=true;setReglages({prets:true,enregistres:prefs.value.enregistres&&edition.current===0});
-        if(edition.current===0){const v=prefs.value;setMessage(v.message);setReduction(v.pourcentage==null?'':String(v.pourcentage));setIntervalle(String(v.intervalleMinutes));if(v.intervalleMaxMinutes){setRythme('aleatoire');setIntervalleMax(String(v.intervalleMaxMinutes));}else{setRythme('fixe');setIntervalleMax(String(v.intervalleMinutes*2));}}
+        if(edition.current===0){const v=prefs.value;setMessage(v.message);setReduction(v.pourcentage==null?'':String(v.pourcentage));if(v.intervalleMinutes===0){setRythme('vintex');setIntervalle('6');setIntervalleMax('12');}else{setIntervalle(String(v.intervalleMinutes));if(v.intervalleMaxMinutes){setRythme('aleatoire');setIntervalleMax(String(v.intervalleMaxMinutes));}else{setRythme('fixe');setIntervalleMax(String(v.intervalleMinutes*2));}}}
       }else if(prefs.status==='rejected')setReglages({erreur:prefs.reason?.message||'Lecture des réglages impossible.'});
       if(favoris.status==='rejected')throw favoris.reason;
       setEtat({scope,data:favoris.value});
@@ -146,7 +146,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   const compter=f=>lignes.filter(x=>correspond(x,f)).length;
   const nomFavori=x=>x.nom||x.body.slice(0,60);
   const sansNom=x=>x.nom&&x.body.startsWith(x.nom+' ')?x.body.slice(x.nom.length).trim():x.body;
-  const rythmeTexte=vueFile?.intervalleMaxMinutes?`entre ${vueFile.intervalleMinutes} et ${vueFile.intervalleMaxMinutes} min, au hasard`:vueFile?.intervalleMinutes?`toutes les ${vueFile.intervalleMinutes} min`:'';
+  const rythmeTexte=vueFile?.intervalleMinutes===0?'6 à 10 s entre deux, comme Vintex':vueFile?.intervalleMaxMinutes?`entre ${vueFile.intervalleMinutes} et ${vueFile.intervalleMaxMinutes} min, au hasard`:vueFile?.intervalleMinutes?`toutes les ${vueFile.intervalleMinutes} min`:'';
 
   const blocDestinataires=!!selectionnees.length&&<div className="vrm-favoris-destinataires" aria-label="Destinataires sélectionnés"><strong>{selection.length} destinataire{selection.length>1?'s':''} · {nomCompte||'ce compte Vinted'}</strong><ul>{selectionnees.map(x=><li key={x.id}><div><b>{x.nom||'Nom indisponible'}</b><span>{sansNom(x)}</span></div><button type="button" disabled={selectionVerrouillee} aria-label={`Retirer ${x.nom||'ce favori'} de la sélection`} onClick={()=>choisir(x.id)}>Retirer</button></li>)}</ul></div>;
   const assistance=<DiagnosticFavoris uid={uid} owner={owner} ownerActuel={ownerActuel} base={base} headers={headers} controle={controle} controleEnvoi={controleEnvoi} copierControle={(controleEnvoi||controle&&controle.preuve!=='confirmee')?async()=>{try{await navigator.clipboard.writeText(JSON.stringify({...(controle||{diagnostic:'VRM-favoris-controle-v1'}),...(controleEnvoi?{lancement:controleEnvoi}:{})},null,2));setRetour('Contrôle copié, sans identifiant, lien ni message privé.');}catch{setRetour('Copie indisponible dans ce navigateur.');}}:null}/>;
@@ -204,10 +204,10 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
         {etape==='envoi'&&<div className="vrm-favoris-envoi">
           <div className="vrm-favoris-rythme" data-favoris-rythme={rythme}>
             <strong>Temps entre deux messages</strong>
-            <div role="group" aria-label="Temps entre deux messages" className="vrm-favoris-segment"><button type="button" disabled={selectionVerrouillee} aria-pressed={rythme==='fixe'} onClick={()=>{setRythme('fixe');change();}}>Fixe</button><button type="button" disabled={selectionVerrouillee} aria-pressed={rythme==='aleatoire'} onClick={()=>{setRythme('aleatoire');change();}}>Aléatoire</button></div>
-            {rythme==='fixe'?<label className="vrm-favoris-cadence">Un message toutes les<input disabled={selectionVerrouillee} aria-label="Minutes entre deux messages" type="text" inputMode="numeric" maxLength={4} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/>minutes</label>
+            <div role="group" aria-label="Temps entre deux messages" className="vrm-favoris-segment"><button type="button" disabled={selectionVerrouillee} aria-pressed={rythme==='fixe'} onClick={()=>{setRythme('fixe');change();}}>Fixe</button><button type="button" disabled={selectionVerrouillee} aria-pressed={rythme==='aleatoire'} onClick={()=>{setRythme('aleatoire');change();}}>Aléatoire</button><button type="button" data-favoris-rythme-vintex disabled={selectionVerrouillee} aria-pressed={rythme==='vintex'} onClick={()=>{setRythme('vintex');change();}}>Comme Vintex</button></div>
+            {rythme==='vintex'?<p className="vrm-favoris-cadence">Un message toutes les 6 à 10 secondes environ, tiré au hasard : le rythme mesuré chez Vintex.</p>:rythme==='fixe'?<label className="vrm-favoris-cadence">Un message toutes les<input disabled={selectionVerrouillee} aria-label="Minutes entre deux messages" type="text" inputMode="numeric" maxLength={4} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/>minutes</label>
               :<div className="vrm-favoris-cadence"><span>Entre</span><input disabled={selectionVerrouillee} aria-label="Minimum (minutes)" type="text" inputMode="numeric" maxLength={4} value={intervalle} onChange={e=>{setIntervalle(e.target.value);change();}}/><span>et</span><input disabled={selectionVerrouillee} aria-label="Maximum (minutes)" type="text" inputMode="numeric" maxLength={4} value={intervalleMax} onChange={e=>{setIntervalleMax(e.target.value);change();}}/><span>minutes</span></div>}
-            <small>{rythme==='aleatoire'?'Avant chaque message, un temps est tiré au hasard entre ces deux bornes. ':''}Le plafond de 10 messages sur 60 minutes par compte passe toujours avant. Le premier message part tout de suite.</small>
+            <small>{rythme==='aleatoire'?'Avant chaque message, un temps est tiré au hasard entre ces deux bornes. ':''}Le plafond de 10 messages sur 60 minutes par compte passe toujours avant. Le premier message part tout de suite. Les messages partent de l’onglet vinted.fr ouvert dans ce Chrome, comme Vintex : garde-le ouvert pendant l’envoi.</small>
             {erreurRythme&&!selectionVerrouillee&&<p role="alert">{erreurRythme}</p>}
           </div>
           {!!destinataires.length&&<div className="vrm-favoris-compte-rendu" data-favoris-compte-rendu aria-label="Compte rendu par favori"><strong>{selectionnees.length?`${destinataires.length} favori${destinataires.length>1?'s':''} à contacter`:'Dernier envoi'}</strong><ul>{destinataires.map(x=>{const j=statut(x),e=selectionnees.includes(x)&&!j?'pret':j?.etat||'pret';return <li key={x.id} data-favoris-envoi={e}><span>{nomFavori(x)}</span><b>{e==='pret'?'Prêt':e==='refuse'?(RAISONS_FAVORIS[j.raison]||ETAT_ENVOI.refuse):ETAT_ENVOI[e]||e}</b></li>;})}</ul></div>}
