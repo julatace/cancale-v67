@@ -202,6 +202,9 @@ const projette = (row, sel) => {
       // ── Proposition 9 : la paire qui dort, AUSSI sur eBay — baisse en un clic.
       try {
         // Le repricing vit sous « Conseils & signalements » (replié par défaut).
+        // La feuille du prix d'achat (juste au-dessus) doit être PARTIE avant le clic
+        // suivant : sous charge, sa sortie animée couvrait encore le repli.
+        await pg.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, { timeout: 15000, polling: 100 }).catch(() => {});
         if (!(await pg.$('[data-reprice-ailleurs]'))) await pg.getByText('Conseils & signalements', { exact: true }).click({ timeout: 4000 });
         await pg.waitForTimeout(800);
         const av = await pg.evaluate(() => ({
@@ -219,6 +222,16 @@ const projette = (row, sel) => {
         await pg.click('[data-reprice-ebay="5550001"]');
         await pg.waitForTimeout(300);
         dit(envoisEbay.length === 0, 'rien ne part avant la confirmation', `${envoisEbay.length} envoi(s)`);
+        // (29 oct.) La feuille de confirmation MONTE (animation) : sous une machine
+        // chargée, un clic à 300 ms tombait au milieu du mouvement et Playwright
+        // abandonnait au bout de 4 s. On attend la fin de l'animation — un ÉTAT,
+        // jamais un délai — puis on clique.
+        await pg.waitForFunction(() => {
+          const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Baisser sur eBay');
+          if (!b) return false;
+          let e = b; while (e && e !== document.body) { if (e.getAnimations && e.getAnimations().some((a) => a.playState === 'running')) return false; e = e.parentElement; }
+          return true;
+        }, null, { timeout: 15000, polling: 100 }).catch(() => {});
         await pg.getByRole('button', { name: 'Baisser sur eBay', exact: true }).click({ timeout: 4000 });
         await pg.waitForTimeout(600);
         const e = envoisEbay[0] || {};
