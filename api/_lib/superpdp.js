@@ -59,6 +59,7 @@ import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { baseCloisonnee } from './session.js';
 import { lireDonnee, modifierDonnee } from './ebay.js';
+import { coffrePret as coffrePretCommun, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 export const SUPERPDP_API = 'https://api.superpdp.tech';
@@ -74,31 +75,11 @@ const DELAI_MS = Number(process.env.SUPERPDP_DELAI_MS) || 25000;
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
 
 // ── LE COFFRE ────────────────────────────────────────────────────────────────
-function cleCoffre() {
-  const base = process.env.VRM_COFFRE_CLE || sbKey();
-  if (!base) return null;
-  return Buffer.from(crypto.hkdfSync('sha256', Buffer.from(base, 'utf8'), Buffer.from('vrm-coffre'), Buffer.from('superpdp-v1'), 32));
-}
-export const coffrePret = () => !!cleCoffre();
-export function chiffrer(owner, obj) {
-  const k = cleCoffre(); if (!k) return null;
-  const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', k, iv);
-  c.setAAD(Buffer.from(String(owner)));
-  const ct = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
-  return ['v1', iv.toString('base64'), c.getAuthTag().toString('base64'), ct.toString('base64')].join('.');
-}
-export function dechiffrer(owner, s) {
-  const k = cleCoffre(); if (!k) return null;
-  const p = String(s || '').split('.');
-  if (p.length !== 4 || p[0] !== 'v1') return null;
-  try {
-    const d = crypto.createDecipheriv('aes-256-gcm', k, Buffer.from(p[1], 'base64'));
-    d.setAAD(Buffer.from(String(owner)));
-    d.setAuthTag(Buffer.from(p[2], 'base64'));
-    return JSON.parse(Buffer.concat([d.update(Buffer.from(p[3], 'base64')), d.final()]).toString('utf8'));
-  } catch (_) { return null; }
-}
+// La règle vit dans api/_lib/coffre.js (une seule pour tous les secrets d'un
+// vendeur, §11) ; ici, son usage « superpdp-v1 » — le même chiffré qu'avant.
+export const coffrePret = coffrePretCommun;
+export const chiffrer = (owner, obj) => chiffrerCoffre('superpdp-v1', owner, obj);
+export const dechiffrer = (owner, s) => dechiffrerCoffre('superpdp-v1', owner, s);
 
 // ── LA BASE (clé de service, filtrée sur le vendeur) ─────────────────────────
 // La connexion rangée. TROIS états, jamais deux : `undefined` pas su ·
