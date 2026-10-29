@@ -19,8 +19,8 @@
 > saisie d'achat non enregistrée, allumer sans confirmation, raccourcis écrasés dans la feuille, ton du panneau d'une autre
 > source. `audit-choix-periode.cjs` (règles exécutées, 32 contrôles ; 5 rouges sur origin/main ; `--prouve` 9/9). Bancs voisins
 > mis à la nouvelle fiche sans les affaiblir : `annonces-carte` (une fiche par rangée au téléphone), `feuilles-coque`
-> (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension
-> inchangée. Julien : rien.
+> (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). Rouges déjà sur origin/main (mêmes lignes, prouvé sur son build) : `stats-premium` 3, `revue-20oct` 12, `capacites` 38, `feuilles-coque`
+> 7 (Tout imprimer, Passeport). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension inchangée. Julien : rien.
 
 > **29 octobre (soir) — revue de la republication et des favoris (5.285) :** « tout doit être parfait ». Dix défauts
 > trouvés en relisant le code, tous corrigés : la file des mises en ligne planifiées s'écrit une à la fois (une
