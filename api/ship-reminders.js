@@ -197,7 +197,7 @@ async function lireDonneesBilan() {
   const mm = m === undefined ? null : objet(m);
   return {
     comptes, commandes,
-    masquesTx: mm ? ensemble(mm.vinted_sales_hidden) : null,
+    masquesTx: mm ? new Set() : null,   // (29 oct.) une vente ne se masque plus
     masquesComptes: mm ? ensemble(mm.vinted_accounts_hidden) : null,
     panneau: panneau === undefined ? null : objet(panneau),
     lbc: lbcL === undefined ? null : Object.values(objet(lbcL && lbcL.ventes)),
@@ -223,7 +223,7 @@ function txsAExpedier(d) {
   if (!d.commandes || !d.main || !Array.isArray(d.comptes)) return null;
   const vivants = new Set(d.comptes.map((c) => c.uid));
   const shipDone = objet(d.main.vinted_ship_done), bordsShipped = objet(d.main.vinted_bords_shipped);
-  const masquees = ensemble(d.main.vinted_sales_hidden);
+  const masquees = new Set();   // (29 oct.) une vente ne se masque plus
   const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !masquees.has(t);
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};

@@ -555,7 +555,7 @@ export default async function handler(req, res) {
     const pickupDone = m.vinted_pickup_done || {};
     const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
     const bordsShipped = (m.vinted_bords_shipped && typeof m.vinted_bords_shipped === 'object') ? m.vinted_bords_shipped : {};
-    const ventesMasquees = new Set(Array.isArray(m.vinted_sales_hidden) ? m.vinted_sales_hidden.map(String) : []);
+    const ventesMasquees = new Set();   // (29 oct.) une vente ne se masque plus
     const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !ventesMasquees.has(t);
     const shipTxns = new Set((txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter(pasPartie));
     const shipTotal = shipTxns.size;

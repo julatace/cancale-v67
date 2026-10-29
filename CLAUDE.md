@@ -50,6 +50,18 @@
 > Mercari) sans qu'il le redemande. Les comptes eBay.co.uk/.com déjà gérés (26 oct.) restent, sans plus.
 > La priorité : que tout ce qui est français soit juste et fiable.
 
+> **29 octobre — PLUS DE VENTES MASQUÉES, et le Stock 3D écarte les comptes supprimés :** Julien : « on ne doit plus pouvoir
+> les masquer ». Le bouton ✕ / « Masquer de la compta » d'une vente, « Supprimer cette annulation », le masquage d'un colis
+> sans bordereau et l'onglet « Ventes masquées » de l'écran Masqués sont RETIRÉS ; `vinted_sales_hidden` n'est plus lu
+> nulle part (`VENTES_MASQUEES_AUCUNE`, app ; widget et rappels côté serveur) — la ligne reste en base, ignorée, et une
+> vente masquée d'avant compte de nouveau partout (Vendu, Finalisé, bénéfice, colis à poster). Les ACHATS masqués restent.
+> Et « j'avais demandé de supprimer les annonces et elles réapparaissent dans le stock » (shop_cancale) : la vue 3D
+> (`fichesStockToutes`) n'appliquait pas `comptesStockEcartes` ; elle l'applique, et celle-ci écarte aussi les comptes
+> supprimés pour de bon (`vrm_comptes_supprimes`, rangée sur l'appareil par `fetchVintedAccounts` sur une lecture réussie).
+> ⚠️ Non mesuré : sa vraie base (connecteur Supabase de la session sans le projet VRM) — la cause exacte chez lui n'est
+> pas prouvée. Preuves : bancs `stock-plateformes` (+ fiche shop_cancale), `bilan-semaine`, `audit-reel-20oct` B,
+> `audit-colis-heure` mis à la décision ; `stock-partis` ouvre « Ma pièce ».
+
 > **28 octobre (nuit, fin) — STOCK : un article une fois, et les articles de TOUTES les plateformes :** Julien
 > (« les deux ») : (1) une paire sur Vinted, Leboncoin et eBay n'apparaît qu'UNE fois dans « À ranger » — même N° (clé)
 > ou même PHOTO EXACTE (deux fiches = une paire, l'autre N° dit à côté ; l'une rangée ⇒ aucune proposée) :

@@ -34,6 +34,8 @@ const FICHES = {
   '7047': { numero: '47', title: 'Adidas Samba blanche 41', photo: ph('PHOTOC').url },
   '7060': { numero: '60', title: 'Samba (annonce Vinted supprimée)', photo: ph('PHOTOE').url },
   '7063': { numero: '63', title: 'Asics vendue', photo: ph('PHOTOV').url },
+  // (29 oct.) une fiche d'un compte SUPPRIMÉ pour de bon (shop_cancale) : jamais au Stock.
+  '7070': { numero: '70', title: 'Paire de shop_cancale', photo: ph('PHOTOS').url, accountId: 199082413 },
 };
 const VENTES = [{ transaction_id: 9063, title: 'Asics vendue', status: 'Commande finalisée', price: { amount: '40.0', currency_code: 'EUR' }, date: iso(48), photo: ph('PHOTOV') }];
 const EBAY = [
@@ -52,6 +54,7 @@ const lignes = () => [
   { id: 'lbc_listings', data: { items: LBC_ITEMS } },
   { id: 'ebay_listings', data: { items: EBAY, capturedAt: iso(0.1), complet: true } },
   { id: 'vrm_room', data: JSON.parse(JSON.stringify(PLAN)) },
+  { id: 'vrm_blocked_accounts', data: { uids: ['199082413'], logins: ['shop_cancale'] } },
   { id: 'harvest_111_listings', data: { uid: '111', capturedAt: iso(0.1), nItems: ANNS.length, payload: { items: ANNS, pagination: { total_entries: ANNS.length, total_pages: 1 } } } },
   { id: 'harvest_111_orders_sold', data: { uid: '111', capturedAt: iso(0.1), nItems: VENTES.length, payload: { my_orders: VENTES, pagination: { total_pages: 1 } } } },
 ];
@@ -141,6 +144,7 @@ const attendre = async (fn, ms = 20000) => { const t0 = Date.now(); while (Date.
       dit(!!l61 && /Leboncoin/.test(l61.t), 'N°61 (seulement sur Leboncoin) est à ranger, « Leboncoin » écrit' + T, JSON.stringify(l61 || null));
       dit(!ns.includes('62') && !ns.includes('63') && !ns.includes('46'), 'ni 62, ni 63, ni la N°46 déjà rangée' + T, ns.join(','));
       dit(ns.includes('47'), 'la N°47 (Vinted seule) reste' + T, ns.join(','));
+      dit(!ns.includes('70'), 'la N°70 (compte supprimé, shop_cancale) n’est pas à ranger' + T, ns.join(','));
       dit(!errs.length, 'aucune erreur de page' + T, errs.join(' | '));
       await ctx.close();
     } catch (e) { dit(false, 'le scénario a pu s’exécuter' + T, String(e && e.message || e).split('\n')[0]); }

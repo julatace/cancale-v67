@@ -62,19 +62,20 @@ const bord = (tx, dateLimite) => ({ id: 'email_bord_' + tx, data: { transaction:
 //   902 tomj683 : limite « 22/10/2026 07 h 00 »                          → en retard à 7 h 10
 //   903 tomj606 : vendue le 15, AUCUN email de bordereau                   → aujourd'hui (estimée)
 //   906 tomj606 : vendue le 21 au soir, aucun email                        → plus tard (estimée)
-//   904 tomj683 : coché « posté » ; 905 : masquée ; 990 : compte retiré    → jamais comptés
+//   904 tomj683 : coché « posté » ; 990 : compte retiré    → jamais comptés
 const base = () => ({
   A: {
     subs: [{ endpoint: 'https://fcm.googleapis.com/A1', keys: {} }],
     comptes: [{ vinted_user_id: '683', login: 'compte_683' }, { vinted_user_id: '606', login: 'compte_606' }],
-    main: { vinted_sales_hidden: ['905'], vinted_accounts_hidden: [], vinted_ship_done: { 904: MATIN - 86400000 }, vinted_bords_shipped: {},
+    main: { vinted_sales_hidden: [],   // (29 oct.) une vente ne se masque plus
+      vinted_accounts_hidden: [], vinted_ship_done: { 904: MATIN - 86400000 }, vinted_bords_shipped: {},
       vinted_bords_printed: { 901: '2026-10-20T10:31:05.111Z' }, vinted_bords_hidden: {}, vrm_widget_token: 'tokA', vinted_pickup_done: {} },
     ventes: {
-      683: { txns: ['901', '902', '904', '905'], orders: [vente(901, '2026-10-15T22:49:32Z'), vente(902, '2026-10-14T05:00:00Z'), vente(904, '2026-10-14T06:00:00Z'), vente(905, '2026-10-14T07:00:00Z')] },
+      683: { txns: ['901', '902', '904'], orders: [vente(901, '2026-10-15T22:49:32Z'), vente(902, '2026-10-14T05:00:00Z'), vente(904, '2026-10-14T06:00:00Z')] },
       606: { txns: ['903', '906'], orders: [vente(903, '2026-10-15T09:00:00Z', 'Le paiement a été validé'), vente(906, '2026-10-21T22:08:37Z', 'Le paiement a été validé')] },
       999: { txns: ['990'], orders: [vente(990, '2026-10-13T08:00:00Z')] },
     },
-    bords: [bord(901, '23/10/2026 10 h 00'), bord(902, '22/10/2026 07 h 00'), bord(904, '21/10/2026 10 h 00'), bord(905, '21/10/2026 10 h 00'), bord(990, '20/10/2026 10 h 00')],
+    bords: [bord(901, '23/10/2026 10 h 00'), bord(902, '22/10/2026 07 h 00'), bord(904, '21/10/2026 10 h 00'), bord(990, '20/10/2026 10 h 00')],
   },
 });
 

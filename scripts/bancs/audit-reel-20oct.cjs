@@ -126,9 +126,11 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
     await essaie('B statistiques', async () => {
       await aller(pg, 'dashboard', 5500);
       const n = await pg.evaluate(() => { const e = document.querySelector('[data-finalise-masquees]'); return e ? [e.getAttribute('data-finalise-masquees'), e.getAttribute('data-finalise-masquees-eur'), e.innerText] : null; });
-      dit(!!n && n[0] === '1' && n[1] === '3000', 'B. le « finalisé » dit la vente masquée qu\'il ne compte pas (1 · 30 €)', n ? n.join(' | ') : 'aucune mention');
+      // (29 oct., décision de Julien) « on ne doit plus pouvoir masquer » : la vente
+      // masquée d'avant (9002, 30 €) COMPTE, et plus rien ne parle de ventes masquées.
+      dit(!n || n[0] === '0', 'B. plus aucune « vente masquée » écartée du finalisé', n ? n.join(' | ') : 'aucune mention');
       const hero = await pg.evaluate(() => { const e = document.querySelector('[data-stats-carte="hero"]'); return e ? e.innerText : ''; });
-      dit(/50,00\s*€/.test(hero), 'B. … et le chiffre lui-même ne change pas (50 €, la vente visible)', hero.split('\n').slice(0, 2).join(' | '));
+      dit(/80,00\s*€/.test(hero), 'B. … le finalisé compte la vente masquée d’avant (80 € = 50 + 30)', hero.split('\n').slice(0, 2).join(' | '));
     });
     await essaie('C leboncoin', async () => {
       await aller(pg, 'plat_leboncoin');
