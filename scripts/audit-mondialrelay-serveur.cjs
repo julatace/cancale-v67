@@ -56,10 +56,10 @@ const MUTATIONS = {
   'mr-toujours-navigateur': ['api/_lib/transporteurs.js', "    if (!(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;", "    if (it.carrier !== 'mondialrelay' && !(refusServeur(t) || enPause(pause, it.carrier, maintenant))) continue;"],
   'recul-serveur-retarde-extension': ['api/_lib/transporteurs.js', "vue.set(k, refusServeur(t) ? { ...t, essai: null } : t);", "vue.set(k, t);"],
   'refus-extension-sans-recul': ['api/_lib/transporteurs.js', "t.essaiRes === 'bloque' && t.essaiSource !== 'extension' && t.essaiSource !== 'page';", "t.essaiRes === 'bloque';"],
-  'pause-ignoree': ['api/_lib/transporteurs-lecture.js', '      if (T.enPause(b.pause, carrier, Date.now())) continue;', '      if (false) continue;'],
+  'pause-ignoree': ['api/_lib/transporteurs-lecture.js', 'const pauseEnCours = (p, carrier) => T.enPause(pauseConnue(p), carrier, Date.now());', 'const pauseEnCours = () => false;'],
   'ua-navigateur': ['api/_lib/transporteurs-lecture.js', "headers: { 'User-Agent': UA_HONNETE,", "headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36',"],
   'redirection-suivie': ['api/_lib/transporteurs-lecture.js', "        redirect: 'error',", "        redirect: 'follow',"],
-  'essai-compte-introuvable': ['api/_lib/transporteurs-lecture.js', "      if (cpEssaye && (lu.res === 'introuvable' || lu.res === 'forme')) lu = { res: 'cp-inconnu' };\n", ''],
+  'essai-compte-introuvable': ['api/_lib/transporteurs.js', "  if (lu.res === 'introuvable' && (essaye || !prouve)) return", "  if (lu.res === 'introuvable' && !essaye && !prouve) return"],
   'sans-cp-lu-quand-meme': ['api/_lib/transporteurs-lecture.js', "  if (carrier === 'mondialrelay') return /^\\d{5}$/.test(String(cp || '')) ? `https://www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive?NumeroExpedition=${n}&CodePostal=${cp}` : null;", "  if (carrier === 'mondialrelay') return `https://www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive?NumeroExpedition=${n}&CodePostal=${cp || '00000'}`;"],
   'phrase-ordinateur-toujours': ['src/App.jsx', "const mrSans = (transp === null || mrServeur) ? 0 :", "const mrSans = (transp === null) ? 0 :"],
   'carte-mr-cachee': ['src/App.jsx', "if (!t && c === 'mondialrelay' && !LECTURE_SERVEUR_TRANSP.mondialrelay && extSait('transp') !== 'ok') return null;", "if (!t && c === 'mondialrelay' && extSait('transp') !== 'ok') return null;"],
@@ -336,7 +336,7 @@ const ligneDe = (n) => base.get(`${A}|transp_mondialrelay_${n}`) || null;
     const r = await appel(route, 'transp');
     const besoin = (r.corps && r.corps.besoinNavigateur) || [];
     dit(r.code === 200 && besoin.some((b) => b.carrier === 'mondialrelay' && b.suivi === N1 && b.cp === CP1 && b.voie === 'mr-fr-mvc'), 'refusé (403) ⇒ le n° part au navigateur, avec son code postal, par la route `_mvc` (`mr-fr-mvc`, la voie que l’extension lit d’abord)', JSON.stringify(besoin));
-    const p = base.get(`${A}|transp_pause`);
+    const p = base.get('00000000-0000-0000-0000-000000000000|transp_pause') || base.get(`${A}|transp_pause`);
     dit(!!(p && p.mondialrelay && Date.parse(p.mondialrelay.jusqua) > Date.now()), 'la pause de Mondial Relay est posée', JSON.stringify(p || null));
     const l1 = ligneDe(N1);
     dit(!!l1 && l1.essaiRes === 'bloque' && l1.voie === 'mr-fr-mvc', 'la ligne dit le refus (`bloque`), voie du serveur', l1 ? `${l1.essaiRes}/${l1.voie}` : 'absente');
@@ -357,7 +357,8 @@ const ligneDe = (n) => base.get(`${A}|transp_mondialrelay_${n}`) || null;
     const c4 = await appel(route, 'transp-brut', { corps: { v: 1, carrier: 'mondialrelay', suivi: N1, cp: CP1, voie: 'mr-fr-mvc', statut: 403, ctype: 'text/html', corps: CF_HTML } });
     const l1b = ligneDe(N1);
     dit(c4.code === 200 && !!l1b && l1b.essaiRes === 'bloque' && l1b.essaiSource === 'extension', 'C4 : le refus relayé par l’extension est rangé comme SON essai', `${c4.code} ${l1b ? l1b.essaiRes + '/' + l1b.essaiSource : 'absente'}`);
-    base.delete(`${A}|transp_pause`);
+    base.delete(`${A}|transp_pause`); base.delete('00000000-0000-0000-0000-000000000000|transp_pause');
+    if (typeof L !== 'undefined' && L && typeof L._oublierPauseInstance === 'function') L._oublierPauseInstance();
     const c3b = await appel(route, 'transp-a-lire', { methode: 'GET' });
     dit(c3b.code === 200 && Array.isArray(c3b.corps.items) && !c3b.corps.items.some((x) => x.suivi === N1), 'après le refus relayé par l’extension (pause levée) : pas relu aussitôt — le recul s’applique à elle aussi', JSON.stringify(c3b.corps && c3b.corps.items));
   });

@@ -62,7 +62,8 @@ import { normaliserSuivi } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { relireLigneMeta, SELECT_SUIVI_META, txDuColis, liensDesLignes, suiviDeLigne } from './suivi-colis.js';
 import * as T from './transporteurs.js';
-import { notifierChangementTransp } from './transporteurs-notif.js';
+import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
+import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -85,10 +86,59 @@ export const MAX_CRON = 12;         // un passage du cron, par vendeur
 export const BUDGET_CRON_MS = 20000;
 export const MAX_FERMETURE = 6;     // les anciens n° jamais fermés, par passage
 export const MAX_C3 = 6;
+// (29 oct., revue n° 20) LA BORNE TIENT : un élément ne part que s'il reste de
+// quoi le FINIR (le délai du transporteur, l'écart, et ce qu'il faut pour ranger
+// et sonner) — la vérification « avant chaque élément » laissait partir une
+// lecture à 11,9 s d'un budget de 12 s (le relais répondait à 16,6 s).
+export const MARGE_RANGEMENT_MS = 1500;
+// (29 oct., revue n° 17) Le BAIL d'une lecture en vol, sur la ligne `transp_` :
+// deux passages simultanés (iPhone + Mac, le cron + l'app) ne lisent pas deux
+// fois le même n° (le rythme en route : une lecture toutes les 2 h).
+export const BAIL_MS = 30000;
+// (29 oct., revue n° 19) Une réponse relayée (C4) est datée par son `at` : plus
+// vieille que ça, ou plus vieille que la dernière lecture de la ligne, elle ne
+// change rien (un colis retiré ne redevient pas « à retirer »).
+export const C4_AGE_MAX_MS = 30 * 60000;
+export const NOTIFS_REPRISES_MAX = 6;
 
 // Les bancs règlent l'écart (jamais la production : rien ne lit d'environnement ici).
-let _ecartMs = ECART_MS;
-export function _reglerPourBanc({ ecartMs } = {}) { if (Number.isFinite(ecartMs) && ecartMs >= 0) _ecartMs = ecartMs; }
+let _ecartMs = ECART_MS, _delaiMs = DELAI_MS;
+export function _reglerPourBanc({ ecartMs, delaiMs } = {}) {
+  if (Number.isFinite(ecartMs) && ecartMs >= 0) _ecartMs = ecartMs;
+  if (Number.isFinite(delaiMs) && delaiMs > 0) _delaiMs = delaiMs;
+}
+
+// ── (29 oct., revue n° 15) LA PAUSE EST CELLE DU SERVEUR, PAS D'UN VENDEUR ──
+// Un 403 de Chronopost refuse l'ADRESSE du serveur — la même pour tous les
+// vendeurs. Rangée par vendeur, elle n'arrêtait rien : le cron (8 vendeurs en
+// parallèle) envoyait encore 4 requêtes après le refus, et l'app d'un autre
+// vendeur une de plus. Elle vit donc :
+//   · dans UNE ligne au propriétaire NEUTRE (`transp_pause`, clé de service —
+//     aucune session ne la voit), lue par chaque passage ;
+//   · et en mémoire d'instance, posée DANS la file du transporteur au moment
+//     même du refus, consultée juste avant CHAQUE requête.
+let _pauseInstance = {};
+export const _oublierPauseInstance = () => { _pauseInstance = {}; };
+const pauseConnue = (p) => {
+  const out = { ...(p && typeof p === 'object' ? p : {}) };
+  for (const c of T.CARRIERS_LUS) {
+    const a = out[c], b = _pauseInstance[c];
+    const ja = Date.parse(a && a.jusqua || ''), jb = Date.parse(b && b.jusqua || '');
+    if (Number.isFinite(jb) && !(Number.isFinite(ja) && ja >= jb)) out[c] = b;
+  }
+  return out;
+};
+// Une règle pour les deux points d'arrêt (le tri du passage et la file, juste
+// avant la requête) : la pause rangée en base OU connue de l'instance.
+const pauseEnCours = (p, carrier) => T.enPause(pauseConnue(p), carrier, Date.now());
+async function lirePauseServeur() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${T.ID_PAUSE}&owner=eq.${PROPRIETAIRE_NEUTRE}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+}
 
 // ── NOTRE BASE, AU NOM DU VENDEUR (owner=eq., paginée) ──────────────────────
 async function lireTout(chemin) {
@@ -114,17 +164,18 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 export async function lireBaseTransp({ avecRelais = true } = {}) {
   const [lignes, transp, manuels, vinted, bords, pause, mainRow, relaisRow] = await Promise.all([
     lireTout(`app_data?id=like.email_track_*&select=${SELECT_SUIVI_META}`),
-    lireTout(`app_data?id=like.transp_*&select=${T.SELECT_TRANSP_META}`),
+    lireTout(`app_data?id=like.transp_*&select=${T.SELECT_TRANSP_META},notifEnAttente:meta->>notifEnAttente`),
     lireTout('app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at'),
     lireTout('app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt'),
     lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi'),
-    lireTout(`app_data?id=eq.${T.ID_PAUSE}&select=data`),
+    lirePauseServeur(),
     lireTout('app_data?id=eq.main&select=points:data->vrm_points_relais'),
     avecRelais ? lireTout('app_data?id=eq.panel_colis_relais&select=data') : Promise.resolve([]),
   ]);
   if (![lignes, transp, manuels, vinted, bords, pause, mainRow, relaisRow].every(Array.isArray)) return null;
   const tMap = new Map();
-  for (const x of transp) { const t = T.ligneTranspDeMeta(x); if (t) tMap.set(t.suivi, t); }
+  const attente = [];
+  for (const x of transp) { const t = T.ligneTranspDeMeta(x); if (t) { tMap.set(t.suivi, t); if (x.notifEnAttente) attente.push(t.id); } }
   const relais = objet(relaisRow[0] && relaisRow[0].data);
   const liens = liensDesLignes(vinted, manuels) || [];
   // Les codes postaux PROUVÉS chez ce vendeur : ceux de ses lectures Mondial
@@ -139,8 +190,8 @@ export async function lireBaseTransp({ avecRelais = true } = {}) {
     manuels: manuels.map((m) => ({ ...m, suivi: normaliserSuivi(m.suivi), cp: /^\d{5}$/.test(String(m.cp || '')) ? String(m.cp) : '' })),
     vinted: vinted.map((v) => ({ ...v, suivi: normaliserSuivi(v.suivi) })),
     envoyes: bords.map((b) => b && b.suivi).filter(Boolean),
-    pause: objet(pause[0] && pause[0].data),
-    relais, liens, prouves: [...new Set(prouves)],
+    pause: pauseConnue(objet(pause[0] && pause[0].data)),
+    relais, liens, prouves: [...new Set(prouves)], attente,
   };
 }
 // Les lieux de la conversation Vinted reliée à CE n° par identité (pour son code
@@ -162,6 +213,16 @@ const arriveeDe = (b, k) => {
   for (const l of b.lignes) { if (suiviDeLigne(l) !== k) continue; const a = arriveeColisEmail(l); if (a && (ms == null || a.ms < ms)) ms = a.ms; }
   return ms;
 };
+// (29 oct., revue n° 18) La RAISON de lire ce n° (« actif », « fermeture »),
+// par la règle de la sélection : une ligne `transp_` déjà là n'est jamais une
+// fermeture ; sinon la sélection jugée sur ce n° seul, sans le rythme.
+export function raisonDu(b, carrier, suivi, maintenant = Date.now()) {
+  const k = normaliserSuivi(suivi);
+  if (b.transp instanceof Map && b.transp.has(k)) return 'actif';
+  const c = T.suivisAInterroger({ lignes: b.lignes, transp: new Map(), manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, maintenant, seul: k, max: 1, parTransporteur: 1 });
+  const it = c.find((x) => x.suivi === k && x.carrier === carrier);
+  return it ? it.raison : null;
+}
 // Ce n° est-il un ACHAT de ce vendeur (§1.5) ? La même règle que la sélection.
 export function estAchatDuVendeur(b, carrier, suivi) {
   const k = normaliserSuivi(suivi);
@@ -215,61 +276,147 @@ const ENTETES = {
   // cookie, aucun jeton, le User-Agent honnête.
   mondialrelay: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
 };
-// Rend { statut, ctype, corps, retryAfter, defi } ou { echec: 'voie'|'suivi'|'reseau' }.
-export async function lireTransporteur(carrier, suivi, { cp = '' } = {}) {
+// Rend { statut, ctype, corps, retryAfter, defi } ou { echec: 'voie'|'suivi'|'reseau'|'pause'|'budget' }.
+// `fin` : l'heure (ms) à laquelle la lecture doit être finie (la borne du
+// passage) ; `signal` : l'arrêt du passage (le cron qui a répondu).
+export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, signal = null } = {}) {
   if (!LECTURE_SERVEUR[carrier]) return { echec: 'voie' };
   const url = urlTransporteur(carrier, suivi, cp);
   if (!url) return { echec: 'suivi' };
   return unParTransporteur(carrier, async () => {
+    // Juste avant la requête (après l'attente de la file) : la pause posée par
+    // un autre passage de CETTE instance, la borne, l'arrêt.
+    if (pauseEnCours(null, carrier)) return { echec: 'pause' };
+    if (signal && signal.aborted) return { echec: 'budget' };
+    const reste = Number.isFinite(fin) ? fin - Date.now() : _delaiMs;
+    if (reste < Math.min(_delaiMs, 1000)) return { echec: 'budget' };
     try {
+      const signaux = [AbortSignal.timeout(Math.min(_delaiMs, reste))];
+      if (signal) signaux.push(signal);
       const r = await fetch(url, {
         redirect: 'error',
-        signal: AbortSignal.timeout(DELAI_MS),
+        signal: signaux.length > 1 && typeof AbortSignal.any === 'function' ? AbortSignal.any(signaux) : signaux[0],
         headers: { 'User-Agent': UA_HONNETE, ...(ENTETES[carrier] || { Accept: 'application/json' }) },
       });
       const h = (k) => { try { return r.headers.get(k) || ''; } catch (_) { return ''; } };
-      return { statut: r.status, ctype: h('content-type'), corps: await corpsBorne(r, carrier === 'mondialrelay' ? CORPS_MAX_MR : CORPS_MAX), retryAfter: h('retry-after'), defi: /challenge/i.test(h('cf-mitigated')) };
-    } catch (_) { return { echec: 'reseau' }; }
+      const rep = { statut: r.status, ctype: h('content-type'), corps: await corpsBorne(r, carrier === 'mondialrelay' ? CORPS_MAX_MR : CORPS_MAX), retryAfter: h('retry-after'), defi: /challenge/i.test(h('cf-mitigated')) };
+      // Un REFUS se note ICI, avant que la file ne laisse partir la suivante.
+      if (rep.defi || T.lireReponse(carrier, rep.statut, rep.ctype, rep.corps, { suivi, cp, voie: T.VOIE_SERVEUR[carrier] }).res === 'bloque') {
+        const p = T.pauseApresRefus(_pauseInstance, carrier, { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
+        if (p) _pauseInstance = p;
+      }
+      return rep;
+    } catch (_) { return { echec: (signal && signal.aborted) ? 'budget' : 'reseau' }; }
   });
 }
 
 // ── RANGER UN ESSAI (C1), PUIS SONNER S'IL Y A UN CHANGEMENT ─────────────────
 // `lu` : le rendu d'un analyseur. Rend { res, etat, change, ecrit } (ecrit :
 // true · false · null = pas su).
-async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, maintenant = Date.now(), silence = false, cp = '', cpSource = '', cpEssaye = '', voie = '' } = {}) {
+// (29 oct., revue n° 13) Ce qui doit sonner est écrit DANS la ligne, par le
+// même comparer-et-échanger que le changement (`notif` + `notifEnAttente`, une
+// chaîne que la base copie dans `meta` pour la retrouver) : un hoquet de notre
+// base au moment de sonner ne consomme plus le changement, le passage suivant
+// reprend la notification (`reprendreNotifs`). Un nouvel état remplace une
+// notification encore en attente de l'état d'avant (elle ne vaut plus).
+async function rangerEssai(b, item, lu, { source = 'serveur', statut = null, maintenant = Date.now(), silence = false, cp = '', cpSource = '', cpEssaye = '', voie = '', signal = null } = {}) {
   const id = T.cleTransp(item.carrier, item.suivi);
   let avant = null, apres = null;
+  const arriveeMs = arriveeDe(b, item.suivi);
   const ecrit = await modifierCas(id, (d) => {
+    // L'arrêt (le cron a déjà répondu) : plus aucune écriture (revue n° 20).
+    if (signal && signal.aborted) return undefined;
     avant = d ? { ...d } : null;
     apres = T.ligneApresEssai(d, lu, { carrier: item.carrier, suivi: item.suivi, voie: voie || (source === 'serveur' ? T.VOIE_SERVEUR : T.VOIE_DE)[item.carrier], source, statut, maintenant, cp, cpSource, cpEssaye });
+    if (apres.essaiRes === 'ok' && T.etatAChange(avant, apres)) {
+      delete apres.notif; delete apres.notifEnAttente;
+      const ch = T.changementANotifier(avant, apres, { maintenant, silence, arriveeMs });
+      if (ch) { apres.notif = { ...ch, at: new Date(maintenant).toISOString() }; apres.notifEnAttente = ch.cle; }
+    }
     return apres;
   });
-  if (ecrit !== true) return { res: lu.res, etat: (avant && avant.etat) || null, change: false, ecrit };
+  if (ecrit !== true || !apres) return { res: lu.res, etat: (avant && avant.etat) || null, change: false, ecrit };
   // La base du passage suit ce qui vient d'être écrit (le `besoinNavigateur`
   // final se juge sur l'état à jour, la même règle que C3).
   if (b && b.transp instanceof Map) { const t = T.ligneTranspDeMeta({ id, ...apres }); if (t) b.transp.set(t.suivi, t); }
-  const change = !!(apres.etat && (!avant || avant.etat !== apres.etat || (avant.detail || null) !== (apres.detail || null)));
-  if (apres.essaiRes === 'ok' && change) {
-    const k = item.suivi;
-    try { await notifierChangementTransp(avant, apres, { maintenant, silence, arriveeMs: arriveeDe(b, k), txs: txsDe(b, k), codes: b.lignes.filter((l) => suiviDeLigne(l) === k).map((l) => l.code).filter(Boolean) }); } catch (_) {}
-  }
+  const change = apres.essaiRes === 'ok' && T.etatAChange(avant, apres);
+  if (apres.notif && !(signal && signal.aborted)) { try { await sonnerEnAttente(b, id, apres, maintenant); } catch (_) {} }
   return { res: apres.essaiRes, etat: apres.etat || null, change, ecrit };
 }
-async function poserPause(carrier, rep, maintenant) {
-  return modifierCas(T.ID_PAUSE, (d) => T.pauseApresRefus(d, carrier, { statut: rep && rep.statut, ctype: rep && rep.ctype, retryAfter: rep && rep.retryAfter, maintenant }));
+// La notification EN ATTENTE d'une ligne : envoyée (ou décidée), puis effacée
+// de la ligne — sauf « pas su » (rien n'a été réservé : on la garde).
+async function sonnerEnAttente(b, id, t, maintenant = Date.now()) {
+  const k = t.suivi;
+  const cle = t.notifEnAttente;
+  let r;
+  if (!notifEncoreValable(t, maintenant)) r = { envoye: false, raison: 'perimee' };
+  else r = await envoyerNotifTransp(t, t.notif, { txs: txsDe(b, k), codes: b.lignes.filter((l) => suiviDeLigne(l) === k).map((l) => l.code).filter(Boolean) });
+  if (r.raison === 'pas-su') return r;
+  await modifierCas(id, (d) => {
+    if (!d || d.notifEnAttente !== cle) return undefined;
+    const o = { ...d }; delete o.rev; delete o.notif; delete o.notifEnAttente;
+    return o;
+  });
+  return r;
+}
+// Les notifications restées en attente (un hoquet de la base au moment de
+// sonner) : reprises en tête de passage, 6 au plus.
+async function reprendreNotifs(b, { signal = null } = {}) {
+  const ids = (b.attente || []).slice(0, NOTIFS_REPRISES_MAX);
+  if (!ids.length) return 0;
+  const rows = await lireTout(`app_data?id=in.(${ids.map((x) => encodeURIComponent(x)).join(',')})&select=id,data`);
+  if (!Array.isArray(rows)) return 0;
+  let n = 0;
+  for (const row of rows) {
+    if (signal && signal.aborted) break;
+    const t = row && row.data;
+    if (!t || !t.notifEnAttente) continue;
+    try { const r = await sonnerEnAttente(b, row.id, t); if (r.envoye) n++; } catch (_) {}
+  }
+  return n;
+}
+// (29 oct., revue n° 17) Le bail : on ne lit un n° que s'il n'a pas été relu
+// depuis la lecture de la base de CE passage, et qu'aucun autre passage ne le
+// lit en ce moment. Rend true (à nous) · false (un autre l'a, ou l'a déjà relu).
+async function prendreBail(b, it, maintenant = Date.now()) {
+  const id = T.cleTransp(it.carrier, it.suivi);
+  const vu = b.transp instanceof Map ? b.transp.get(it.suivi) : null;
+  const r = await modifierCas(id, (d) => {
+    const enVol = Date.parse(d && d.enVol || '');
+    if (Number.isFinite(enVol) && maintenant - enVol < BAIL_MS) return undefined;
+    if (((d && d.essai) || null) !== ((vu && vu.essai) || null)) return undefined;
+    const o = d ? { ...d } : { v: 1, suivi: normaliserSuivi(it.suivi), carrier: it.carrier };
+    delete o.rev;
+    o.enVol = new Date(maintenant).toISOString();
+    return o;
+  });
+  return r === true;
+}
+async function poserPause(rep, carrier, maintenant) {
+  const r = await modifierCas(T.ID_PAUSE, (d) => T.pauseApresRefus(d, carrier, { statut: rep && rep.statut, ctype: rep && rep.ctype, retryAfter: rep && rep.retryAfter, maintenant }), 6, { owner: PROPRIETAIRE_NEUTRE });
+  const p = T.pauseApresRefus(_pauseInstance, carrier, { statut: rep && rep.statut, ctype: rep && rep.ctype, retryAfter: rep && rep.retryAfter, maintenant });
+  if (p) _pauseInstance = p;
+  return r;
 }
 async function leverPause(b, carrier) {
+  const li = T.pauseLevee(_pauseInstance, carrier); if (li) _pauseInstance = li;
   if (!T.enPause(b.pause, carrier) && !(b.pause[carrier] && b.pause[carrier].palier)) return;
-  await modifierCas(T.ID_PAUSE, (d) => T.pauseLevee(d, carrier));
+  await modifierCas(T.ID_PAUSE, (d) => T.pauseLevee(d, carrier), 6, { owner: PROPRIETAIRE_NEUTRE });
 }
 
 // ── UN PASSAGE (C5, et le cron) ──────────────────────────────────────────────
 // Rend { ok, raison?, lus: [{carrier, suivi, res, etat, change}], besoinNavigateur, pause }.
-export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_APP_MS, suivi = null, force = false, cpPage = '', maintenant = null } = {}) {
+// `signal` : l'arrêt (le cron qui a déjà répondu) — plus aucune lecture, aucune
+// écriture, aucune notification ne part après lui (revue n° 20).
+export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_APP_MS, suivi = null, force = false, cpPage = '', maintenant = null, signal = null } = {}) {
   const t0 = Date.now();
+  const fin = t0 + budgetMs;
   const b = await lireBaseTransp();
   if (!b) return { ok: false, raison: 'pas-su', lus: [], besoinNavigateur: [], pause: {} };
   const now = maintenant || Date.now();
+  // Les notifications restées en attente (un hoquet de la base au moment de
+  // sonner) partent d'abord (revue n° 13).
+  if (!(signal && signal.aborted)) await reprendreNotifs(b, { signal });
   const items = T.suivisAInterroger({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, maintenant: now, max: 50, parTransporteur: 50, seul: suivi, force: !!(suivi && force) });
   const lus = [];
   let nFermeture = 0, nLus = 0;
@@ -280,7 +427,10 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   for (const it of items) (parC[it.carrier] || []).push(it);
   const traiterServeur = async (carrier) => {
     for (const it of parC[carrier]) {
-      if (Date.now() - t0 > budgetMs || nLus >= max) break;
+      if (signal && signal.aborted) break;
+      if (nLus >= max) break;
+      // Un élément ne part que s'il reste de quoi le finir (revue n° 20).
+      if (Date.now() + _delaiMs + _ecartMs + MARGE_RANGEMENT_MS > fin) break;
       if (it.raison === 'fermeture') { if (nFermeture >= MAX_FERMETURE) continue; }
       // Mondial Relay : le code postal du point relais. Sans lui, AUCUNE requête :
       // on le DIT (la carte donne le geste).
@@ -301,10 +451,16 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
         const t = b.transp.get(it.suivi);
         if ((cpSource === 'essai' || cpSource === 'page') && !(t && t.cp === cp)) cpEssaye = cp;
       }
-      if (T.enPause(b.pause, carrier, Date.now())) continue;   // l'extension le lit à sa place (besoinNavigateur, plus bas)
+      if (pauseEnCours(b.pause, carrier)) continue;   // l'extension le lit à sa place (besoinNavigateur, plus bas)
+      // Le bail : un autre passage le lit déjà, ou vient de le relire (revue n° 17).
+      if (!(await prendreBail(b, it, Date.now()))) continue;
       nLus++;
       if (it.raison === 'fermeture') nFermeture++;
-      const rep = await lireTransporteur(carrier, it.suivi, { cp });
+      const rep = await lireTransporteur(carrier, it.suivi, { cp, fin, signal });
+      // Pas lu (pause posée par un autre passage, borne atteinte, arrêt) : le
+      // bail tombe de lui-même (30 s), rien n'est rangé, rien ne compte.
+      if (rep.echec === 'pause' || rep.echec === 'budget') { nLus--; if (it.raison === 'fermeture') nFermeture--; if (rep.echec === 'pause') b.pause = pauseConnue(b.pause); continue; }
+      if (signal && signal.aborted) break;
       if (rep.echec) {
         const r = await rangerEssai(b, it, { res: 'passu' }, { maintenant: Date.now(), voie: T.VOIE_SERVEUR[carrier] });
         lus.push({ carrier, suivi: it.suivi, res: 'passu', etat: r.etat, change: false });
@@ -312,8 +468,8 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
       }
       let lu = rep.defi ? { res: 'bloque' } : T.lireReponse(carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, cp, voie: T.VOIE_SERVEUR[carrier] });
       if (lu.res === 'bloque') {
-        await poserPause(carrier, rep, Date.now());
-        b.pause = T.pauseApresRefus(b.pause, carrier, { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
+        await poserPause(rep, carrier, Date.now());
+        b.pause = pauseConnue(b.pause);
       } else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') await leverPause(b, carrier);
       // Un code postal pas encore PROUVÉ pour CE colis (essayé, donné par la page,
       // ou SAISI à la main — revue n° 7) : « pas de colis » pour ce couple ne veut
@@ -321,15 +477,15 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
       // d'échec (sinon trois refus fermeraient le n° pour toujours). La règle :
       // `resultatMondialRelay` (api/_lib/transporteurs.js, la même qu'en C4).
       if (carrier === 'mondialrelay') lu = T.resultatMondialRelay(lu, { cp, cpSource, cpEssaye, transp: b.transp.get(it.suivi) });
-      const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture', voie: T.VOIE_SERVEUR[carrier], cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye });
+      const r = await rangerEssai(b, it, lu, { statut: rep.statut, maintenant: Date.now(), silence: it.raison === 'fermeture', voie: T.VOIE_SERVEUR[carrier], cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye, signal });
       lus.push({ carrier, suivi: it.suivi, res: r.res, etat: r.etat, change: r.change });
     }
   };
   await Promise.all([traiterServeur('chronopost'), traiterServeur('vinted'), traiterServeur('mondialrelay')]);
   // Ce que le serveur n'a pas pu lire, pour l'extension : la règle de C3, sur la
   // base à jour de ce passage (un n° demandé seul : lui seul).
-  const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: b.pause, maintenant: Date.now(), seul: suivi, cpSeul: cpPage, max: MAX_C3 });
-  return { ok: true, lus, besoinNavigateur: besoin, pause: T.pausePublique(b.pause) };
+  const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: pauseConnue(b.pause), maintenant: Date.now(), seul: suivi, cpSeul: cpPage, max: MAX_C3 });
+  return { ok: true, lus, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), arrete: !!(signal && signal.aborted) };
 }
 
 // ── C3 : CE QUE L'EXTENSION DOIT LIRE DEPUIS LE NAVIGATEUR ──────────────────
@@ -367,8 +523,21 @@ export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
   const b = await lireBaseTransp();
   if (!b) return { status: 503, corps: { error: 'pas-su' } };
   if (!estAchatDuVendeur(b, carrier, suivi)) return { status: 409, corps: { error: 'inconnu' } };
-  const now = maintenant || Date.now();
   const t = b.transp.get(suivi) || null;
+  // (29 oct., revue n° 19) La lecture est DATÉE par son `at` (quand le
+  // navigateur l'a lue), borné : plus vieille que 30 min, ou que la dernière
+  // lecture de la ligne ⇒ elle ne change rien (un colis retiré redevenait « à
+  // retirer » sur une réponse lue avant le retrait). Sans `at` : maintenant.
+  const ici = maintenant || Date.now();
+  const atMs = Date.parse(String(x.at || ''));
+  const now = Number.isFinite(atMs) ? Math.min(atMs, ici) : ici;
+  if (ici - now > C4_AGE_MAX_MS) return { status: 409, corps: { error: 'perime' } };
+  const luMs = Date.parse(String((t && t.lu) || ''));
+  if (Number.isFinite(luMs) && now < luMs) return { status: 409, corps: { error: 'perime' } };
+  // (29 oct., revue n° 18) Un ANCIEN n° jamais fermé (« fermeture ») se lit
+  // UNE fois, SANS notification — par l'extension comme par le serveur : la
+  // même règle (`suivisAInterroger`), jugée sur ce n° seul.
+  const silence = raisonDu(b, carrier, suivi, ici) === 'fermeture';
   const voie = String(x.voie);
   // La voie relayée choisit l'analyseur : `mr-fr-mvc` (la route `_mvc`, écho
   // exigé) ou `mr-be` (l'API .be) — la même fonction que nos propres lectures.
@@ -382,7 +551,7 @@ export async function appliquerReponseBrute(body, { maintenant = null } = {}) {
     // inconnu » (la règle du serveur, `resultatMondialRelay`, revue n° 7).
     lu = T.resultatMondialRelay(lu, { cp, cpSource, cpEssaye, transp: t });
   }
-  const r = await rangerEssai(b, { carrier, suivi }, lu, { source, statut, maintenant: now, cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye, voie });
+  const r = await rangerEssai(b, { carrier, suivi }, lu, { source, statut, maintenant: now, silence, cp: lu.res === 'ok' ? cp : '', cpSource, cpEssaye, voie });
   if (r.ecrit === null) return { status: 503, corps: { error: 'pas-su' } };
   return { status: 200, corps: { ok: true, res: r.res, etat: r.etat, change: r.change } };
 }

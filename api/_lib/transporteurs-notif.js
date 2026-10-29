@@ -9,70 +9,76 @@
 //   2. le silence si une autre voie l'a DÉJÀ annoncé — par une IDENTITÉ : le n°
 //      (`relais-{n°}-*`, `retour-{n°}`, `retire-{n°}`…), la transaction reliée
 //      (`relais-tx{tx}-*`), le code de retrait de l'e-mail (`retrait-code-{CODE}`) ;
-//   3. la RÉSERVATION, atomique : `push_transp_{n°}` par comparer-et-échanger sur
-//      `data.rev` (la règle `modifierCas`) — on réserve, PUIS on envoie : deux
-//      passages simultanés n'envoient qu'une fois ;
-//   4. la clé partagée posée dans `push_dedup` (comparer-et-échanger aussi) pour
-//      que l'e-mail et le suivi Vinted se taisent ensuite.
-// Jamais sur une lecture ratée, un évènement de plus de 72 h (la fermeture des
-// anciens n° comprise : `silence`), une préférence coupée, un abonnement coupé.
+//   3. (29 oct., revues n° 14 et 16) LA VÉRIFICATION ET LA RÉSERVATION EN UN
+//      SEUL comparer-et-échanger sur `push_dedup` (`data.rev`, la règle
+//      `modifierCas`) : le modificateur relit les clés au moment d'écrire et
+//      ABANDONNE si l'une est apparue (un e-mail « disponible » traité pendant
+//      le passage, le suivi Vinted de la même transaction) — deux voies, deux
+//      passages : une notification. On réserve, PUIS on envoie.
+//      (Avant : lire `push_dedup`, réserver `push_transp_{n°}`, puis écrire la
+//      clé — l'e-mail passé entre les deux sonnait, le passage aussi.)
+// Jamais sur un évènement de plus de 72 h (la fermeture des anciens n° comprise :
+// `silence`), une préférence coupée, un abonnement coupé.
+// (29 oct., revue n° 13) « PAS SU » NE CONSOMME RIEN : ce qui doit sonner est
+// écrit DANS la ligne `transp_` (`notif`, `notifEnAttente`) par le même
+// comparer-et-échanger que le changement ; la notification l'efface une fois
+// FAITE ou DÉCIDÉE (déjà annoncée, préférence, abonnement…). Une base qui
+// hoquette au moment de sonner la laisse : le passage suivant la reprend
+// (`reprendreNotifs`), dans les 72 h.
 // ────────────────────────────────────────────────────────────────────────────
 import { sendPushToAll, pushCategorieActive } from './push.js';
 import { modifierCas } from './suivi-vinted.js';
-import { proprietaireCourant } from './owner.js';
-import { sbCle } from './cle.js';
-import { changementANotifier, texteNotifTransp } from './transporteurs.js';
+import { changementANotifier, texteNotifTransp, clesEtapeTx, NOTIF_AGE_MAX_MS } from './transporteurs.js';
 import { normaliserSuivi } from './etat-colis-email.js';
 import { cleCodeRetrait } from '../email-inbound.js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
+const msDe = (v) => { const ms = Date.parse(String(v || '')); return Number.isFinite(ms) ? ms : null; };
 
-async function lireDedup() {
-  const owner = proprietaireCourant();
-  if (!owner) return null;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_dedup&select=data&owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(SUPABASE_KEY) } });
-    if (!r.ok) return null;
-    const j = await r.json();
-    if (!Array.isArray(j)) return null;
-    return (j[0] && j[0].data && Array.isArray(j[0].data.keys)) ? j[0].data.keys.filter((k) => typeof k === 'string') : [];
-  } catch (_) { return null; }
+// `t` : la ligne `transp_` (après l'essai), `ch` : ce qui doit sonner (la règle
+// `changementANotifier`). `txs` : les transactions reliées à CE n° par identité ;
+// `codes` : les codes de retrait des e-mails de CE n°. Rend { envoye, raison } —
+// `raison: 'pas-su'` seulement si RIEN n'a été réservé (à reprendre).
+export async function envoyerNotifTransp(t, ch, { txs = [], codes = [] } = {}) {
+  if (!t || !ch || !ch.cle) return { envoye: false, raison: 'rien' };
+  if (!(await pushCategorieActive(ch.categorie))) return { envoye: false, raison: 'preference' };
+  // La PREMIÈRE arrivée se tait devant toute annonce de l'arrivée (e-mail,
+  // conversation, suivi Vinted : `relais-{n°}-*`, `relais-tx{tx}-*`, le code) ;
+  // une NOUVELLE arrivée devant sa seule clé (revue n° 12).
+  const premiere = ch.etape === 'relais' && !ch.nouvelleArrivee;
+  const prefixes = [...(ch.prefixesSilence || []), ...(premiere ? (txs || []).filter(Boolean).map((x) => `relais-tx${x}-`) : [])];
+  const exactes = [ch.cle, ...(premiere ? (codes || []).map((c) => cleCodeRetrait(c)).filter(Boolean) : [])];
+  const aEcrire = [ch.cle];
+  for (const tx of (txs || []).filter(Boolean)) {
+    const c = clesEtapeTx(ch.etape, tx, ch.jour);
+    if (c.vinted) exactes.push(c.vinted);
+    if (c.transp) { exactes.push(c.transp); aEcrire.push(c.transp); }
+  }
+  const r = await modifierCas('push_dedup', (d) => {
+    const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : [];
+    if (ks.some((x) => exactes.includes(x) || prefixes.some((p) => x.startsWith(p)))) return undefined;
+    return { ...(d || {}), keys: [...aEcrire.filter((x) => !ks.includes(x)), ...ks].slice(0, 300) };
+  });
+  if (r === null) return { envoye: false, raison: 'pas-su' };
+  if (r === false) return { envoye: false, raison: 'deja-annonce' };
+  const txt = texteNotifTransp(t, ch);
+  const e = await sendPushToAll({ title: txt.title, body: txt.body, tag: ch.cle, url: '/?tab=cat_achats' });
+  if (e && e.coupe) return { envoye: false, raison: 'abonnement' };
+  if (!e || !(Number(e.sent) > 0)) return { envoye: false, raison: e && e.erreur ? 'envoi-impossible' : 'aucun-appareil' };
+  return { envoye: true, raison: ch.etat };
 }
 
-// `avant`/`apres` : la ligne `transp_` avant et après l'essai. `txs` : les
-// transactions reliées à CE n° par identité ; `codes` : les codes de retrait des
-// e-mails de CE n°. Rend { envoye, raison }.
+// Toujours exportée (la règle complète, pour qui a `avant`/`apres`).
 export async function notifierChangementTransp(avant, apres, { arriveeMs = null, silence = false, maintenant = Date.now(), txs = [], codes = [] } = {}) {
   const ch = changementANotifier(avant, apres, { maintenant, arriveeMs, silence });
   if (!ch) return { envoye: false, raison: 'rien' };
-  if (!(await pushCategorieActive(ch.categorie))) return { envoye: false, raison: 'preference' };
-  const k = normaliserSuivi(apres.suivi);
-  let keys = await lireDedup();
-  if (keys === null) keys = await lireDedup();              // un hoquet : on relit une fois
-  if (keys === null) return { envoye: false, raison: 'pas-su' };
-  const prefixes = [...ch.prefixesSilence, ...(ch.etat === 'disponible' ? (txs || []).filter(Boolean).map((t) => `relais-tx${t}-`) : [])];
-  const exactes = [ch.cle, ...(ch.etat === 'disponible' ? (codes || []).map((c) => cleCodeRetrait(c)).filter(Boolean) : [])];
-  if (keys.some((x) => exactes.includes(x) || prefixes.some((p) => x.startsWith(p)))) return { envoye: false, raison: 'deja-annonce' };
-  const iso = new Date(maintenant).toISOString();
-  const reserve = await modifierCas(`push_transp_${k}`, (d) => {
-    const faits = (d && d.faits && typeof d.faits === 'object') ? d.faits : {};
-    if (faits[ch.fait]) return undefined;
-    const entrees = Object.entries(faits).sort((a, b) => String(b[1]).localeCompare(String(a[1]))).slice(0, 19);
-    return { v: 1, suivi: k, faits: Object.fromEntries([[ch.fait, iso], ...entrees]) };
-  });
-  if (reserve === null) return { envoye: false, raison: 'pas-su' };
-  if (reserve === false) return { envoye: false, raison: 'deja' };
-  // La clé partagée : l'e-mail et le suivi Vinted se tairont (au mieux — un raté
-  // ici ne coûte qu'une notification de plus, jamais une de moins).
-  await modifierCas('push_dedup', (d) => {
-    const ks = (d && Array.isArray(d.keys)) ? d.keys : [];
-    if (ks.includes(ch.cle)) return undefined;
-    return { ...(d || {}), keys: [ch.cle, ...ks].slice(0, 300) };
-  });
-  const txt = texteNotifTransp(apres, ch);
-  const r = await sendPushToAll({ title: txt.title, body: txt.body, tag: ch.cle, url: '/?tab=cat_achats' });
-  if (r && r.coupe) return { envoye: false, raison: 'abonnement' };
-  if (!r || !(Number(r.sent) > 0)) return { envoye: false, raison: r && r.erreur ? 'envoi-impossible' : 'aucun-appareil' };
-  return { envoye: true, raison: ch.etat };
+  return envoyerNotifTransp({ ...apres, suivi: normaliserSuivi(apres.suivi) }, ch, { txs, codes });
+}
+
+// La notification EN ATTENTE d'une ligne : encore à faire ? (même état, moins de
+// 72 h) — sinon elle tombe.
+export function notifEncoreValable(t, maintenant = Date.now()) {
+  const n = t && t.notif;
+  if (!n || !n.cle || t.notifEnAttente !== n.cle || t.etat !== n.etat) return false;
+  const at = msDe(t.etatAt);
+  return at != null && maintenant - at <= NOTIF_AGE_MAX_MS;
 }

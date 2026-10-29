@@ -241,9 +241,14 @@ export function lireReponseChronopost(statut, ctype, corps, { suivi = '' } = {})
   const iR = evs.findIndex((e) => e.code === 'R');
   // 1. UN R N'IMPORTE OÙ : le colis repart chez l'expéditeur. Un D après lui est
   //    la livraison… à l'expéditeur — jamais « retiré par toi ».
+  // (29 oct., revue n° 21) `etatAt` = la date de l'évènement qui a CRÉÉ cet
+  // état — le PREMIER R (ou le D qui l'a rendu) —, jamais le dernier évènement
+  // du trajet retour : un R vieux de 6 jours suivi d'un TT d'hier sonnait comme
+  // neuf (la garde des 72 h jugeait le TT). La date du dernier évènement reste
+  // à part (`dernierAt`).
   if (iR >= 0) {
-    const rendu_ = evs.slice(iR + 1).some((e) => e.code === 'D');
-    return rendu('ok', { ...base, etat: 'retour_expediteur', detail: rendu_ ? 'rendu' : null, etatAt: dernier.at });
+    const dApres = evs.slice(iR + 1).find((e) => e.code === 'D');
+    return rendu('ok', { ...base, etat: 'retour_expediteur', detail: dApres ? 'rendu' : null, etatAt: (dApres || evs[iR]).at, dernierAt: dernier.at });
   }
   // 2. D (sans R) : retiré au point relais (une info « Type de retrait »), sinon livré.
   const dD = [...evs].reverse().find((e) => e.code === 'D');
@@ -317,7 +322,18 @@ export function lireReponseVintedGo(statut, ctype, corps, { suivi = '' } = {}) {
   const iRetour = evs.findIndex(estRetourVg);                       // le plus récent (evs : du plus récent au plus ancien)
   const iAnnule = evs.findIndex((e) => e.group === 'return_cancelled');
   if (iRetour >= 0 && !(iAnnule >= 0 && iAnnule < iRetour)) {
-    return rendu('ok', { ...base, etat: 'retour_expediteur', detail: /^(?:returned|return_returned)$/.test(d.group) ? 'rendu' : null });
+    // (29 oct., revue n° 21) La date du RETOUR : le début de la phase de retour
+    // (les évènements de retour qui se suivent, `state: return` ou un groupe
+    // `return*`, jusqu'au premier qui n'en est pas un), jamais le dernier
+    // évènement — un retour créé il y a 5 jours ne sonne pas comme neuf.
+    let iDebut = iRetour;
+    for (let i = iRetour + 1; i < evs.length; i++) {
+      const e = evs[i];
+      if (e.group === 'return_cancelled' || !(e.state === 'return' || /^return/.test(e.group) || estRetourVg(e))) break;
+      iDebut = i;
+    }
+    const debut = evs[iDebut];
+    return rendu('ok', { ...base, etat: 'retour_expediteur', detail: /^(?:returned|return_returned)$/.test(d.group) ? 'rendu' : null, etatAt: /^(?:returned|return_returned)$/.test(d.group) ? isoDe(d.ms) : (isoDe(debut.ms) || base.etatAt), dernierAt: base.etatAt });
   }
   const pret = evs.find((e) => e.group === 'ready_for_pickup');
   if (d.group === 'delivered' && (d.state === 'delivery' || !d.state)) {
@@ -546,9 +562,17 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
   // refus du SERVEUR ne retarde pas l'extension, qui lit à sa place (C3).
   const out = { ...a, v: 1, suivi: normaliserSuivi(suivi), carrier, voie: voie || a.voie || VOIE_DE[carrier] || '', essai: iso, essaiRes: res, essaiSource: source, essaiStatut: Number.isFinite(Number(statut)) && statut !== null ? Number(statut) : null };
   delete out.rev;
+  // (29 oct., revue n° 17) Le bail d'une lecture en vol tombe avec l'essai.
+  delete out.enVol;
+  // (29 oct., revue n° 19) UN ÉTAT FINAL NE REDESCEND JAMAIS. Un colis retiré,
+  // livré ou rendu à l'expéditeur ne redevient pas « à retirer » sur une lecture
+  // plus pauvre (une réponse relayée par un Chrome qui l'avait lue AVANT le
+  // retrait) : l'essai est noté, l'état reste.
+  const finalEtat = (t) => !!t && (t.etat === 'retire' || t.etat === 'livre' || (t.etat === 'retour_expediteur' && t.detail === 'rendu'));
+  if (res === 'ok' && finalEtat(a) && !finalEtat(lu)) { out.essais = 0; out.fini = finiApres(out); return out; }
   if (res === 'ok') {
     out.essais = 0;
-    for (const k of ['etat', 'detail', 'etatAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'limite', 'limiteSure', 'limiteAt']) out[k] = lu[k] === undefined ? null : lu[k];
+    for (const k of ['etat', 'detail', 'etatAt', 'dernierAt', 'libelle', 'lieuNom', 'lieuVille', 'lieuCp', 'limite', 'limiteSure', 'limiteAt']) out[k] = lu[k] === undefined ? null : lu[k];
     if (msDe(out.limiteAt) == null) out.limiteAt = null;
     out.cpRefuse = ''; out.cpRefuseSource = '';
     // Une voie qui ne porte pas le lieu (Mondial Relay `mr-fr-mvc`) : la ligne
@@ -561,6 +585,12 @@ export function ligneApresEssai(avant, lu, { carrier, suivi, voie, source = 'ser
     out.evenements = Array.isArray(lu.evenements) ? lu.evenements.slice(-20) : [];
     out.forme = '';
     if (carrier === 'mondialrelay' && cp) { out.cp = cp; out.cpSource = cpSource || a.cpSource || 'lu'; }
+    // (29 oct., revue n° 12) Les ARRIVÉES vues (lieu + date de l'arrivée) : une
+    // nouvelle arrivée (un autre point, ou le retour au point après « a quitté
+    // le point relais ») se reconnaît à son occurrence, pas au n° seul.
+    const ar = Array.isArray(a.arrivees) ? a.arrivees.filter((x) => typeof x === 'string').slice(-5) : [];
+    if (out.etat === 'disponible') { const o = occurrenceArrivee(out); if (o && !ar.includes(o)) ar.push(o); }
+    out.arrivees = ar.slice(-5);
   } else if (res !== 'cp-inconnu') {
     out.essais = (Number(a.essais) || 0) + 1;
     if (lu && lu.forme) out.forme = propre(lu.forme, 500);
@@ -850,9 +880,13 @@ export const PAUSE_OUBLI_MS = 24 * 3600000;
 export const RETRY_AFTER_MAX_MS = 48 * 3600000;
 export const enPause = (pause, carrier, maintenant = Date.now()) => { const p = pause && pause[carrier]; const j = p && msDe(p.jusqua); return j != null && j > maintenant; };
 // La pause posée après un refus (403, 429, défi, HTML, 401 Mondial Relay).
+// (29 oct., revue n° 17) Une pause DÉJÀ en cours ne monte pas : deux refus
+// simultanés (deux passages, deux vendeurs) sont UN refus — la même règle que
+// l'extension. Rend `undefined` (rien à écrire) dans ce cas.
 export function pauseApresRefus(pause, carrier, { statut = 0, ctype = '', retryAfter = null, maintenant = Date.now() } = {}) {
   const p = { ...(pause && typeof pause === 'object' ? pause : {}) };
   delete p.rev;
+  if (enPause(p, carrier, maintenant)) return undefined;
   const cur = p[carrier] && typeof p[carrier] === 'object' ? p[carrier] : {};
   const recent = msDe(cur.dernier && cur.dernier.at) != null && maintenant - msDe(cur.dernier.at) < PAUSE_OUBLI_MS;
   const palier = recent ? Math.min((Number(cur.palier) || 0) + 1, PAUSE_MS.length - 1) : 0;
@@ -874,29 +908,72 @@ export const pausePublique = (pause) => { const o = {}; for (const c of CARRIERS
 // ══ LES NOTIFICATIONS (§1.8) ═════════════════════════════════════════════════
 export const NOTIF_AGE_MAX_MS = 72 * 3600000;
 const lieuNorm = (t) => normLibelle(`${t.lieuNom || ''} ${t.lieuCp || ''}`).replace(/[^a-z0-9]+/g, '');
+// (29 oct., revue n° 12) L'OCCURRENCE d'une arrivée : son lieu et sa date (la
+// date de l'évènement d'arrivée — stable d'une lecture à l'autre).
+export function occurrenceArrivee(t) {
+  if (!t || t.etat !== 'disponible') return '';
+  return `${lieuNorm(t)}|${msDe(t.etatAt) != null ? new Date(msDe(t.etatAt)).toISOString() : ''}`;
+}
+// (29 oct., revue n° 12) UNE règle du « l'état a changé » pour la ligne (la
+// lecture) et pour ce qui sonne : l'état, son détail, et, pour une arrivée, son
+// LIEU (un autre point relais avec le même détail n'atteignait pas le notifieur).
+export const clefEtat = (t) => (t && t.etat ? `${t.etat}|${t.detail || ''}|${t.etat === 'disponible' ? lieuNorm(t) : ''}` : '');
+export const etatAChange = (avant, apres) => !!(apres && apres.etat) && clefEtat(avant) !== clefEtat(apres);
+// Une NOUVELLE arrivée : une arrivée a déjà été vue sur ce n° (une autre
+// occurrence), ou la ligne d'avant dit qu'il a quitté un point relais.
+function estNouvelleArrivee(a, apres) {
+  if (!a) return false;
+  const occ = occurrenceArrivee(apres);
+  const vues = Array.isArray(a.arrivees) ? a.arrivees : [];
+  if (vues.some((x) => x && x !== occ)) return true;
+  if (a.etat === 'disponible' && occurrenceArrivee(a) && occurrenceArrivee(a) !== occ) return true;
+  return a.etat === 'incident' && a.detail === 'quitte_relais';
+}
 // Ce qu'un CHANGEMENT d'état doit dire (un libellé qui change sans changer
 // l'état ne sonne pas). `avant`/`apres` : la ligne avant et après l'essai.
-// Rend { etat, cle, categorie, fait, prefixesSilence } ou null.
+// Rend { etat, etape, cle, categorie, fait, prefixesSilence, nouvelleArrivee, jour } ou null.
+// · la PREMIÈRE arrivée garde la clé partagée avec l'e-mail et le suivi Vinted
+//   (`relais-{n°}-sans`, se tait devant toute clé `relais-{n°}-…`) ;
+// · une NOUVELLE arrivée (revue n° 12) a SA clé (`relais-{n°}-r{occurrence}`) :
+//   les clés de l'arrivée d'avant ne la font plus taire — sinon, après « a
+//   quitté le point relais — ne te déplace pas », il n'apprenait jamais que le
+//   colis était revenu ;
+// · `etape` et `jour` : la clé partagée avec le suivi Vinted de la même
+//   transaction (revue n° 14) — `retire`, `retour` une fois ; `track` par jour.
 export function changementANotifier(avant, apres, { maintenant = Date.now(), arriveeMs = null, silence = false } = {}) {
   if (silence || !apres || apres.essaiRes !== 'ok' || !apres.etat) return null;
   const at = msDe(apres.etatAt);
   if (at == null || maintenant - at > NOTIF_AGE_MAX_MS || at > maintenant + 10 * 60000) return null;
   const a = avant && avant.etat ? avant : null;
   const k = normaliserSuivi(apres.suivi);
-  const fait = `${apres.etat}|${apres.detail || ''}|${apres.etat === 'disponible' ? lieuNorm(apres) : ''}`;
-  if (a && `${a.etat}|${a.detail || ''}|${a.etat === 'disponible' ? lieuNorm(a) : ''}` === fait) return null;
+  if (a && !etatAChange(a, apres)) return null;
+  const fait = clefEtat(apres);
+  const jour = jourParis(at);
   const e = apres.etat;
-  if (e === 'disponible') return { etat: e, fait, categorie: 'colis', cle: `relais-${k}-sans`, prefixesSilence: [`relais-${k}-`] };
-  if (e === 'retour_expediteur') return { etat: e, fait, categorie: 'colis', cle: `retour-${k}`, prefixesSilence: [] };
-  if (e === 'incident') return { etat: e, fait, categorie: 'colis', cle: `incident-${k}-${apres.detail || 'x'}`, prefixesSilence: [] };
+  if (e === 'disponible') {
+    const occ = occurrenceArrivee(apres);
+    if (estNouvelleArrivee(avant, apres)) return { etat: e, etape: 'relais', jour, fait: `${fait}|${occ}`, categorie: 'colis', cle: `relais-${k}-r${empreinte(occ)}`, prefixesSilence: [], nouvelleArrivee: true };
+    return { etat: e, etape: 'relais', jour, fait: `${fait}|${occ}`, categorie: 'colis', cle: `relais-${k}-sans`, prefixesSilence: [`relais-${k}-`], nouvelleArrivee: false };
+  }
+  if (e === 'retour_expediteur') return { etat: e, etape: 'retour', jour, fait, categorie: 'colis', cle: `retour-${k}`, prefixesSilence: [] };
+  if (e === 'incident') return { etat: e, etape: 'incident', jour, fait, categorie: 'colis', cle: `incident-${k}-${apres.detail || 'x'}`, prefixesSilence: [] };
   if (e === 'inconnu') {
     const apresArrivee = (a && a.etat === 'disponible') || (Number.isFinite(arriveeMs) && arriveeMs && at >= arriveeMs);
     if (!apresArrivee) return null;
-    return { etat: e, fait: `${fait}|${empreinte(normLibelle(apres.libelle))}`, categorie: 'colis', cle: `inconnu-${k}-${empreinte(normLibelle(apres.libelle))}`, prefixesSilence: [] };
+    return { etat: e, etape: 'inconnu', jour, fait: `${fait}|${empreinte(normLibelle(apres.libelle))}`, categorie: 'colis', cle: `inconnu-${k}-${empreinte(normLibelle(apres.libelle))}`, prefixesSilence: [] };
   }
-  if (e === 'retire' || e === 'livre') return { etat: e, fait, categorie: 'suivi', cle: `retire-${k}`, prefixesSilence: [] };
-  if (e === 'en_route') { if (a) return null; return { etat: e, fait, categorie: 'suivi', cle: `track-${k}`, prefixesSilence: [] }; }
+  if (e === 'retire' || e === 'livre') return { etat: e, etape: 'retire', jour, fait, categorie: 'suivi', cle: `retire-${k}`, prefixesSilence: [] };
+  if (e === 'en_route') { if (a) return null; return { etat: e, etape: 'track', jour, fait, categorie: 'suivi', cle: `track-${k}`, prefixesSilence: [] }; }
   return null;
+}
+// (29 oct., revue n° 14) LES CLÉS PARTAGÉES AVEC LE SUIVI VINTED d'une même
+// transaction (une identité : la transaction reliée au n°). Le transporteur
+// écrit `{étape}-tx{tx}` (+ le jour pour « en route ») ; le suivi Vinted écrit
+// `vs-{étape}-tx{tx}` : chacun se tait devant celle de l'autre.
+export function clesEtapeTx(etape, tx, jour = '') {
+  if (!tx || !['retire', 'retour', 'track'].includes(etape)) return { transp: '', vinted: '' };
+  const suf = etape === 'track' ? `-${jour}` : '';
+  return { transp: `${etape}-tx${tx}${suf}`, vinted: `vs-${etape}-tx${tx}${suf}` };
 }
 const jjmm = (d) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}` : ''; };
 const jjmmDe = (iso) => { const ms = msDe(iso); return ms == null ? '' : jjmm(jourParis(ms)); };

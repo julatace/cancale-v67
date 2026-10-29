@@ -32,14 +32,14 @@ const MUTATIONS = {
   'sortant-interroge': ['api/_lib/transporteurs.js', '    if (envoyesN.has(e.k) || e.sortant || !e.entrant) continue;', '    if (!e.entrant && !e.sortant) continue;'],
   'cp-echo-be-ignore': ['api/_lib/transporteurs.js', '  if (numero !== n || !c || cpRendu !== c) return', '  if (numero !== n) return'],
   'vg-limite-apres-retrait': ['api/_lib/transporteurs.js', "    return rendu('ok', { ...base, etat: 'retire', lieuNom: nomPoint(), ...(pret ? lieuDe(pret.lieu) : {}) });", "    return rendu('ok', { ...base, etat: 'retire', lieuNom: nomPoint(), ...(pret ? lieuDe(pret.lieu) : {}), limite: msDe(j.meta && j.meta.expiration_time) ? jourParis(msDe(j.meta.expiration_time)) : null, limiteSure: true });"],
-  'notif-sans-push-dedup': ['api/_lib/transporteurs-notif.js', "  if (keys.some((x) => exactes.includes(x) || prefixes.some((p) => x.startsWith(p)))) return { envoye: false, raison: 'deja-annonce' };", ''],
-  'notif-sans-reservation': ['api/_lib/transporteurs-notif.js', '    if (faits[ch.fait]) return undefined;', ''],
+  'notif-sans-push-dedup': ['api/_lib/transporteurs-notif.js', '    if (ks.some((x) => exactes.includes(x) || prefixes.some((p) => x.startsWith(p)))) return undefined;\n', ''],
+  'notif-sans-reservation': ['api/_lib/transporteurs-notif.js', 'keys: [...aEcrire.filter((x) => !ks.includes(x)), ...ks].slice(0, 300)', 'keys: ks'],
   'libelle-inconnu-en-route': ['api/_lib/transporteurs.js', "  if (dernier && !classeMr(dernier.libelle)) return rendu('ok', { ...base, etat: 'inconnu' });", ''],
   'mvc-libelle-inconnu-en-route': ['api/_lib/transporteurs.js', "  if (!classeMr(dernier.libelle)) return rendu('ok', { ...base, etat: 'inconnu' });", ''],
   'fermeture-notifie': ['api/_lib/transporteurs-lecture.js', "silence: it.raison === 'fermeture',", 'silence: false,'],
   'expire-lu-livre': ['api/_lib/transporteurs.js', '  if (s === 404) return rendu(', "  if (s === 404 && j && j.error_code === 'shipment_expired') return rendu('ok', { etat: 'livre', etatAt: isoDe(Date.now()) });\n  if (s === 404) return rendu("],
   'relecture-sans-intervalle': ['api/_lib/transporteurs.js', 'export function prochainEssai(t) {\n  if (!t) return 0;', 'export function prochainEssai(t) {\n  return 0;'],
-  'pause-ignoree': ['api/_lib/transporteurs-lecture.js', '      if (T.enPause(b.pause, carrier, Date.now())) continue;', ''],
+  'pause-ignoree': ['api/_lib/transporteurs-lecture.js', 'const pauseEnCours = (p, carrier) => T.enPause(pauseConnue(p), carrier, Date.now());', 'const pauseEnCours = () => false;'],
   // ── Mondial Relay par le serveur (route `_mvc`) ──
   'mvc-echo-numero-ignore': ['api/_lib/transporteurs.js', '  if (!mN || numero !== n || !c || (mC && cpRendu !== c)) return', '  if (!c) return'],
   'mvc-echo-cp-ignore': ['api/_lib/transporteurs.js', '  if (!mN || numero !== n || !c || (mC && cpRendu !== c)) return', '  if (!mN || numero !== n || !c) return'],
@@ -412,6 +412,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
   };
   const resetBase = () => {
     base.clear(); pannes = new Set(); pushes.length = 0; appels.length = 0;
+    if (L && typeof L._oublierPauseInstance === 'function') L._oublierPauseInstance();   // (29 oct.) la pause gardée par l'instance
     base.set(`${A}|main`, { vrm_colis_collected: [] });
     base.set(`${A}|push_subs`, { subs: [{ endpoint: 'https://web.push.apple.com/iphone' }] });
     base.set(`${A}|push_prefs`, { colis: true, suivi: true });
@@ -437,6 +438,10 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     if (u.hostname === 'carrier.vintedgo.com') return vg === 'ok' ? { status: 200, ctype: 'application/json', body: vgJson([{ group: 'in_transit', ms: NOW - 2 * H }, { group: 'shipped', ms: NOW - 20 * H }]) } : null;
     return null;
   };
+  // (29 oct., revue n° 15) la pause est GLOBALE au transporteur : rangée au
+  // propriétaire neutre (`transp_pause`), la ligne du vendeur en repli (code d'avant).
+  const NEUTRE = '00000000-0000-0000-0000-000000000000';
+  const lirePauseBanc = () => base.get(`${NEUTRE}|transp_pause`) || base.get(`${A}|transp_pause`) || {};
   const passage = (o = {}) => contexteVendeur.run({ owner: A }, () => L.passageTransporteurs({ max: 12, budgetMs: 20000, ...o }));
   const ligneT = (c, n) => base.get(`${A}|transp_${c}_${n}`) || null;
   if (L && typeof L._reglerPourBanc === 'function') L._reglerPourBanc({ ecartMs: 0 });
@@ -475,23 +480,29 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(n === 1, 'deux passages en même temps : comparer-et-échanger, UNE notification', `${pushes.length} envoi(s)`);
   });
 
-  await essaie('un même fait ne sonne qu\'une fois (la réservation `push_transp_{n°}`)', async () => {
+  await essaie('un même fait ne sonne qu\'une fois, et « pas su » ne le consomme pas', async () => {
     resetBase(); await oublis();
     base.set(`${A}|email_track_chronopost_XW000000001TS`, ligneCp());
-    // La clé partagée (`push_dedup`) ne s'écrit pas (« au mieux ») : seule la
-    // réservation par n° empêche la seconde notification.
+    // (29 oct., revues n° 13-14) La vérification et la réservation sont UN
+    // comparer-et-échanger sur `push_dedup` : tant qu'il ne s'écrit pas, rien ne
+    // sonne et la notification reste EN ATTENTE dans la ligne ; dès qu'il
+    // s'écrit, elle sonne UNE fois — et le même fait relu ne re-sonne jamais.
     base.set(`${A}|push_dedup`, { keys: [] }); pannes.add('ecrire:push_dedup');
     const ab = (ms) => cpEv('AB', ms, 'Colis disponible au point de retrait', { infos: { 'Point de livraison': 'TABAC TEST - 1 RUE EXEMPLE - 99999 - TESTVILLE' } });
-    const suite = [[ab(NOW - 5 * H)], [ab(NOW - 5 * H), cpEv('TS', NOW - 4 * H, 'Colis en cours d\'acheminement', { office: 'LYON - FR - AGENCE' })], [ab(NOW - 5 * H), cpEv('TS', NOW - 4 * H, 'Acheminement', { office: 'LYON - FR - AGENCE' }), ab(NOW - 3 * H)]];
-    const etats = [];
-    for (const evs of suite) {
-      transporteur = (u) => u.hostname === 'ws.chronopost.fr' ? { status: 200, ctype: 'text/xml', body: cpXml('XW000000001TS', evs) } : null;
-      const k = `${A}|transp_chronopost_XW000000001TS`; const d = base.get(k); if (d) base.set(k, { ...d, essai: iso(Date.now() - 3 * H) });
-      await passage();
-      etats.push((ligneT('chronopost', 'XW000000001TS') || {}).etat);
-    }
-    const n = pushes.filter((p) => /disponible/.test(p.title || '')).length;
-    dit(etats.join(',') === 'disponible,en_route,disponible' && n === 1, 'disponible → en route → disponible au MÊME point : une seule notification (le fait est réservé), même quand la clé partagée n\'a pas pu s\'écrire', `${etats.join(',')} · ${n} notification(s)`);
+    transporteur = (u) => u.hostname === 'ws.chronopost.fr' ? { status: 200, ctype: 'text/xml', body: cpXml('XW000000001TS', [ab(NOW - 5 * H)]) } : null;
+    const vieillir = () => { const k = `${A}|transp_chronopost_XW000000001TS`; const d = base.get(k); if (d) base.set(k, { ...d, essai: iso(Date.now() - 3 * H) }); };
+    const compte = () => pushes.filter((p) => /disponible/.test(p.title || '')).length;
+    await passage();
+    const l1 = ligneT('chronopost', 'XW000000001TS') || {};
+    dit(compte() === 0 && l1.etat === 'disponible' && !!l1.notifEnAttente, 'la clé partagée ne s\'écrit pas : rien ne sonne, la notification reste EN ATTENTE dans la ligne', `${compte()} notification(s) · attente ${l1.notifEnAttente || '—'}`);
+    pannes.delete('ecrire:push_dedup');
+    vieillir(); await passage();
+    vieillir(); await passage();
+    vieillir(); await passage();
+    const l2 = ligneT('chronopost', 'XW000000001TS') || {};
+    dit(compte() === 1 && !l2.notifEnAttente, 'la base revenue : UNE notification, puis le même fait relu trois fois ne re-sonne pas', `${compte()} notification(s) · attente ${l2.notifEnAttente || '—'}`);
+    const cles = ((base.get(`${A}|push_dedup`) || {}).keys || []);
+    dit(cles.some((x) => /^relais-XW000000001TS-/.test(x)), 'la notification est RÉSERVÉE dans `push_dedup` (`relais-{n°}-…`) : l\'e-mail « disponible » du même n° se taira', JSON.stringify(cles));
   });
 
   await essaie('refusé par Mondial Relay : la pause, puis l\'extension (C3, voie de secours)', async () => {
@@ -499,7 +510,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr({ status: 'available', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville' }));
     transporteur = repond({ mr: '403' });
     const r = await passage();
-    const p = base.get(`${A}|transp_pause`) || {};
+    const p = lirePauseBanc();
     const lm = ligneT('mondialrelay', '12345678');
     const b0 = (r.besoinNavigateur || [])[0] || {};
     dit(p.mondialrelay && Date.parse(p.mondialrelay.jusqua) > Date.now(), '403 ⇒ une PAUSE pour Mondial Relay (`transp_pause`)', JSON.stringify(p.mondialrelay || null));
@@ -519,7 +530,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
       base.set(`${A}|email_track_mondialrelay_12345678`, ligneMr({ status: 'available', lieu: 'TABAC TEST, 1 Rue Exemple, 99999 Testville' }));
       transporteur = repond({ mr: cas });
       const rr = await passage();
-      const pp = (base.get(`${A}|transp_pause`) || {}).mondialrelay;
+      const pp = lirePauseBanc().mondialrelay;
       dit((ligneT('mondialrelay', '12345678') || {}).essaiRes === attendu && pp && (rr.besoinNavigateur || []).length === 1, `${cas === '429' ? '429' : 'un défi (cf-mitigated)'} ⇒ pause et secours`, JSON.stringify(pp || null));
       if (cas === '429') dit(pp && Date.parse(pp.jusqua) - Date.now() >= 2 * H - 60000, '`Retry-After` plus long que la pause est respecté', pp && pp.jusqua);
     }

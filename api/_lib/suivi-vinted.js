@@ -44,6 +44,7 @@ import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { etatColisDepuisTexte, normaliserSuivi } from './etat-colis-email.js';
 import { cleCodeRetrait } from '../email-inbound.js';
+import { clesEtapeTx, jourParis } from './transporteurs.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -55,8 +56,8 @@ export const SUIVI_FUTUR_TOLERE_MS = 10 * 60000;
 
 // Une lecture AU NOM du vendeur de la requête : `null` = pas su (la base n'a pas
 // répondu, ou pas de vendeur) ; un tableau sinon.
-async function lire(chemin) {
-  const owner = proprietaireCourant();
+async function lire(chemin, ownerForce = '') {
+  const owner = ownerForce || proprietaireCourant();
   if (!owner) return null;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(SUPABASE_KEY) } });
@@ -85,12 +86,15 @@ async function ecrire(id, data) {
 // lecture ou une écriture a échoué, ou toujours devancé — rien n'est affirmé).
 // (24 oct.) Exportée telle quelle : les lignes `transp_*` et `push_transp_*`
 // (api/_lib/transporteurs-lecture.js) s'écrivent par la même règle.
-export async function modifierCas(id, modifier, essais = 6) {
-  const owner = proprietaireCourant();
+// (29 oct.) `owner` : une ligne d'un AUTRE propriétaire que le vendeur de la
+// requête — seulement le propriétaire NEUTRE (la pause d'un transporteur, la
+// même pour tous les vendeurs : le refus vient de l'adresse du SERVEUR).
+export async function modifierCas(id, modifier, essais = 6, { owner: ownerForce = '' } = {}) {
+  const owner = ownerForce || proprietaireCourant();
   if (!owner || !/^[a-z0-9_]+$/i.test(String(id || ''))) return null;
   const tete = { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json' };
   for (let n = 0; n < essais; n++) {
-    const rows = await lire(`app_data?id=eq.${id}&select=data`);
+    const rows = await lire(`app_data?id=eq.${id}&select=data`, owner);
     if (rows === null) return null;
     const present = !!rows[0];
     const d = present ? (rows[0].data || {}) : null;
@@ -201,6 +205,27 @@ export async function notifierSuiviVinted(tx, uid) {
     if (keys.some((k) => typeof k === 'string' && (prefixes.some((p) => k.startsWith(p)) || (cleCode && k === cleCode)))) {
       return { status: 200, envoye: false, raison: 'relais-deja' };
     }
+  }
+  // 5 bis. (29 oct., revue n° 14) LE MÊME ÉVÈNEMENT LU CHEZ LE TRANSPORTEUR :
+  //    retiré, reparti (une fois par transaction), en route (une fois par jour).
+  //    Le transporteur écrit `{étape}-tx{tx}` ; on se tait devant elle (et
+  //    devant `retire-{n°}` / `retour-{n°}`, la clé du n° que l'e-mail et le
+  //    transporteur posent) et on écrit `vs-{étape}-tx{tx}` — vérifiée et écrite
+  //    dans le MÊME comparer-et-échanger : deux voies, une notification.
+  const classe = etatColisDepuisTexte(dernier.t);
+  const etape = classe === 'delivered' ? 'retire' : classe === 'retour' ? 'retour' : (relais ? '' : 'track');
+  if (etape) {
+    const c = clesEtapeTx(etape, tx, jourParis(at));
+    const bloquantes = [c.transp, ...(numero && etape !== 'track' ? [`${etape}-${numero}`] : [])].filter(Boolean);
+    let bloque = false;
+    const ecrit = await modifierCas('push_dedup', (d) => {
+      const keys = (d && Array.isArray(d.keys)) ? d.keys.filter((k) => typeof k === 'string') : [];
+      bloque = keys.some((k) => bloquantes.includes(k));
+      if (bloque || keys.includes(c.vinted)) return undefined;
+      return { ...(d || {}), keys: [c.vinted, ...keys].slice(0, 300) };
+    });
+    if (ecrit === null) return { status: 503, raison: 'pas-su' };
+    if (bloque) return { status: 200, envoye: false, raison: 'transporteur-deja' };
   }
   // 6. Une fois par étape : la réservation ATOMIQUE, écrite AVANT l'envoi.
   const cle = `suivi-${tx}-${empreinteEtape(tx, dernier)}`;

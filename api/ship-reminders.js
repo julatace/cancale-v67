@@ -469,16 +469,21 @@ async function lireTransporteursDuVendeur() {
   const owner = proprietaireCourant() || '';
   if (!owner) return { fait: false, reason: 'vendeur' };
   if ((await accesVendeur(owner)) === false) return { fait: false, reason: 'abonnement' };
+  // (29 oct., revue n° 20) La borne TIENT : le passage ne lance un élément que
+  // s'il peut le finir dans son budget, et à l'expiration du filet l'ARRÊT lui
+  // est signalé (`AbortController`) — plus aucune lecture, écriture ni
+  // notification après la réponse du cron. Le bilan dit ce qui a été FAIT.
+  const arret = new AbortController();
   let minuteur;
   try {
     const r = await Promise.race([
-      passageTransporteurs({ max: MAX_CRON, budgetMs: BUDGET_CRON_MS - 2000 }),
+      passageTransporteurs({ max: MAX_CRON, budgetMs: BUDGET_CRON_MS - 2000, signal: arret.signal }),
       new Promise((ok) => { minuteur = setTimeout(() => ok({ ok: false, raison: 'delai' }), BUDGET_CRON_MS); }),
     ]);
     if (!r || !r.ok) return { fait: false, reason: (r && r.raison) || 'pas-su' };
-    return { fait: true, lus: r.lus.filter((x) => x.res === 'ok').length, echecs: r.lus.filter((x) => x.res !== 'ok').length, changes: r.lus.filter((x) => x.change).length, navigateur: r.besoinNavigateur.length };
+    return { fait: true, lus: r.lus.filter((x) => x.res === 'ok').length, echecs: r.lus.filter((x) => x.res !== 'ok').length, changes: r.lus.filter((x) => x.change).length, navigateur: r.besoinNavigateur.length, ...(r.arrete ? { arrete: true } : {}) };
   } catch (_) { return { fait: false, reason: 'erreur' }; }
-  finally { clearTimeout(minuteur); }
+  finally { clearTimeout(minuteur); arret.abort(); }   // l'arrêt, dès la réponse (le filet ou le passage)
 }
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
