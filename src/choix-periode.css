@@ -93,8 +93,9 @@
 .vrm-cal-feuille > :not(.vrm-cal-defile) { flex-shrink: 0; }
 .vrm-cal-tete { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px 6px 18px; font-size: 16px; }
 .vrm-cal-fermer { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--vrm-ink); font-size: 26px; line-height: 1; cursor: pointer; }
-.vrm-cal-feuille .vrm-cal-raccourcis { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 0 16px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
-.vrm-cal-feuille .vrm-cal-raccourcis::-webkit-scrollbar { display: none; }
+/* (29 oct., revue) Les raccourcis passent à la ligne : en une rangée qui défile,
+   « Cette année » était hors de l'écran à 390 px, sans rien qui le dise. */
+.vrm-cal-feuille .vrm-cal-raccourcis { flex-wrap: wrap; padding: 0 16px; margin-bottom: 10px; }
 .vrm-cal-feuille .vrm-cal-raccourcis > button { min-height: 44px; flex: 0 0 auto; font-size: 14px; }
 .vrm-cal-feuille > .vrm-cal-jours-tete { padding: 0 16px 6px; margin: 0; border-bottom: 1px solid var(--vrm-line); font-size: 12px; }
 .vrm-cal-defile { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 8px; -webkit-overflow-scrolling: touch; }
@@ -107,6 +108,20 @@
 .vrm-cal-feuille .vrm-cal-appliquer { flex: 1; min-height: 48px; font-size: 15px; }
 .vrm-cal-feuille .vrm-cal-effacer { min-height: 48px; font-size: 14px; }
 .vrm-cal-feuille .vrm-cal-plage { flex-basis: 100%; font-size: 15px; }
+
+/* (29 oct., revue) Tablette au doigt (pointeur grossier, au-delà de 767 px : la
+   fenêtre à deux mois reste) : jours, flèches et boutons à 44 px — ils faisaient
+   38 et 34 px sur un iPad. La fenêtre s'élargit pour que 7 jours de 44 px
+   tiennent dans chaque mois. */
+@media (pointer: coarse) {
+  .vrm-cal-pop { width: 780px; padding: 16px 16px 14px; }
+  .vrm-cal-pop .vrm-cal-duo { grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 6px 10px; }
+  .vrm-cal-pop .vrm-cal-fleche { width: 44px; height: 44px; }
+  .vrm-cal-pop .vrm-cal-case, .vrm-cal-pop .vrm-cal-vide { height: 46px; }
+  .vrm-cal-pop .vrm-cal-jour { width: 44px; height: 44px; font-size: 14px; }
+  .vrm-cal-pop .vrm-cal-raccourcis > button { min-height: 44px; }
+  .vrm-cal-pop .vrm-cal-effacer, .vrm-cal-pop .vrm-cal-appliquer { min-height: 44px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .vrm-cal-pop, .vrm-cal-feuille, .vrm-cal-voile { animation: none !important; }

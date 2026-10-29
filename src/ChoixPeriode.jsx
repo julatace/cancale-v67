@@ -102,7 +102,9 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
     setVue(decalerMois(droite.annee, droite.mois, -1));
     // Au doigt, la liste remonte au moins jusqu'au mois du début choisi.
     if (s.from) { const ecart = (auj.getFullYear() - s.from.getFullYear()) * 12 + (auj.getMonth() - s.from.getMonth()) + 1; setNbMois(Math.max(18, Math.min(120, ecart + 1))); } else setNbMois(18);
-    try { const r = ev.currentTarget.getBoundingClientRect(); setCote(r.left + 660 > window.innerWidth - 16 ? 'droite' : 'gauche'); } catch (_) {}
+    // La fenêtre fait 660 px à la souris, 780 px au doigt (tablette : 44 px par jour).
+    let large = 660; try { if (window.matchMedia('(pointer: coarse)').matches) large = 780; } catch (_) {}
+    try { const r = ev.currentTarget.getBoundingClientRect(); setCote(r.left + large > window.innerWidth - 16 ? 'droite' : 'gauche'); } catch (_) {}
     setOuvert(true);
   };
   const fermer = () => { setOuvert(false); setSurvol(null); };
@@ -121,7 +123,27 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
     if (!ouvert || !etroit || !defile.current) return;
     const k = sel.from ? cleJour(sel.from).slice(0, 7) : cleJour(auj).slice(0, 7);
     const m = defile.current.querySelector(`[data-periode-mois="${k}"]`);
-    try { if (m) defile.current.scrollTop = Math.max(0, m.offsetTop - 8); else defile.current.scrollTop = defile.current.scrollHeight; } catch (_) {}
+    // (29 oct., revue) `m.offsetTop` est compté depuis la FEUILLE (en-tête,
+    // raccourcis, jours de la semaine compris), pas depuis la zone qui défile :
+    // on défilait ~130 px trop loin et le nom du mois passait sous « L M M J V S
+    // D ». Écart des deux `offsetTop` (même parent, insensible à l'animation).
+    // Le HAUT de la zone se cale toujours sur le DÉBUT d'un mois (son nom se lit) :
+    // le plus ancien à partir duquel le mois visé tient en entier dans la zone
+    // (on voit un peu de passé au-dessus), sinon le mois visé lui-même. Quand il
+    // est le dernier (le mois en cours), la liste ne descend pas assez pour l'y
+    // caler : une marge basse est ajoutée, plutôt qu'un mois coupé sous l'en-tête.
+    try {
+      const el = defile.current, base = el.offsetTop;
+      const haut = (x) => Math.max(0, x.offsetTop - base); // le mois a 14 px de marge haute : aucun reste du mois d'avant
+      if (!m) { el.scrollTop = el.scrollHeight; return; }
+      const mois = [...el.querySelectorAll('[data-periode-mois]')];
+      const i = mois.indexOf(m), basM = haut(m) + m.offsetHeight;
+      let cible = haut(m);
+      for (let j = i - 1; j >= 0; j--) { const h = haut(mois[j]); if (basM - h <= el.clientHeight) cible = h; else break; }
+      const max = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (cible > max) { const pb = parseFloat(getComputedStyle(el).paddingBottom) || 0; el.style.paddingBottom = `${Math.ceil(pb + cible - max)}px`; }
+      el.scrollTop = cible;
+    } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ouvert, etroit]);
 

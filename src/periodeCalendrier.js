@@ -73,6 +73,17 @@ export function libellePlage(from, to) {
   return `du ${court(f)} au ${court(t)}`;
 }
 
+// (29 oct., revue) La plage DANS UNE PHRASE (« 3 ventes finalisées en octobre
+// 2026 ») : `libellePlage` est un libellé de bouton (« octobre 2026 », « année
+// 2026 ») — collé après un nom, il donnait « finalisée octobre 2026 ».
+export function phrasePlage(from, to) {
+  const l = libellePlage(from, to);
+  if (l === 'Toute la période') return 'sur toute la période';
+  if (/^année \d{4}$/.test(l)) return 'en ' + l.slice(6);
+  if (/^(le |du |depuis |jusqu)/.test(l)) return l;
+  return 'en ' + l; // un mois entier : « en octobre 2026 »
+}
+
 // Les raccourcis, dans l'ordre demandé : 7 jours · 30 jours · ce mois · mois
 // dernier · cette année. Chacun rend une VALEUR prête (`{from, to, label}`).
 export function raccourcisPeriode(maintenant = new Date()) {

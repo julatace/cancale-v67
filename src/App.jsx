@@ -86,7 +86,7 @@ import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/
 import { retoursEnCours, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
-import { libellePlage } from "./periodeCalendrier.js";
+import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
@@ -187,6 +187,27 @@ function gesteHorsNavigation(cible) {
   }
   return false;
 }
+// (29 oct., revue) LA PRÉPARATION D'UNE PAIRE POUR LEBONCOIN — une règle pour
+// la fiche ET l'en-tête d'Annonces (§11). `aucune` : aucune photo captée ·
+// `partielle` : x/y · `desc` : photos là, description pas captée · `prete`.
+// `null` : sans N°, ou total de photos inconnu (on ne juge pas, §5).
+const etatPrepaLbc = (item, num) => {
+  if (!num) return null;
+  const total = Number(item && item.photoCount) || 0, capt = Number(item && item.captPhotos) || 0, descOk = (Number(item && item.descLen) || 0) > 0;
+  if (!(total > 0)) return null;
+  if (capt === 0) return { code: 'aucune', texte: 'photos pas encore captées' };
+  if (capt < total) return { code: 'partielle', texte: `${capt}/${total} photos captées` };
+  if (!descOk) return { code: 'desc', texte: 'description pas encore captée' };
+  return { code: 'prete', texte: 'prête pour Leboncoin' };
+};
+// L'état COMMUN (porté par plus de la moitié des paires jugées, au moins deux) se
+// dit UNE fois au-dessus de la grille, jamais sur chaque fiche (§7). « x/y » reste
+// sur la fiche : ses chiffres distinguent la paire.
+const prepaCommunDe = (compte) => {
+  const total = Object.values(compte).reduce((a, b) => a + b, 0);
+  for (const [k, n] of Object.entries(compte)) if (k !== 'partielle' && n >= 2 && n * 2 > total) return k;
+  return null;
+};
 const MP_PLACES = [
   { cle: 'lbc',  nom: 'Leboncoin', defaut: true,  cap: 'places', capPhotos: 'photoslbc' },
   { cle: 'ebay', nom: 'eBay',      defaut: false, cap: 'ebay',   capPhotos: 'photosebay', ui: false },
@@ -24412,22 +24433,23 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // à leur date de VENTE (§5 — jamais la date d'encaissement). Bornes incluses ;
   // une borne vide = ouverte de ce côté. On n'affiche que ce qu'on sait (le
   // nombre de ventes de la période à côté du total, jamais un total « complet »).
+  // ⚠️ (29 oct., revue) Il sommait `sales`, l'ANCIENNE archive (vide depuis
+  //    juillet) : « 0 vente finalisée · 0,00 € » sous « Finalisé sur Vinted
+  //    338 € », sur la même page. Il somme maintenant le CA finalisé par jour de
+  //    vente publié par la coque (`caFinaliseParJour`, la population de
+  //    « Finalisé sur Vinted », §11). Pas encore lu ⇒ `{passu}` : « — », jamais 0.
   const caRange=useMemo(()=>{
     if(!caDu && !caAu) return null;
-    const toNum=(iso)=> iso ? parseInt(iso.replace(/-/g,''),10) : null;   // YYYY-MM-DD → YYYYMMDD
-    const from=toNum(caDu), to=toNum(caAu);
+    const parJour = liveStats && liveStats.caFinaliseParJour;
+    if(!parJour || typeof parJour!=='object') return { passu:true, enCours: !liveStats || !liveStats.venduPasSu };
     let ca=0, count=0;
-    sales.forEach(v=>{
-      const p=(v.saleDate||'').trim().split('/');
-      if(p.length!==3) return;
-      const n=parseInt(p[2]+p[1].padStart(2,'0')+p[0].padStart(2,'0'),10);  // AAAAMMJJ
-      if(!Number.isFinite(n)) return;
-      if(from!=null && n<from) return;
-      if(to!=null && n>to) return;
-      ca+=+v.sellPrice||0; count++;
-    });
-    return {ca,count};
-  },[sales,caDu,caAu]);
+    for(const [k,v] of Object.entries(parJour)){
+      if(caDu && k<caDu) continue;
+      if(caAu && k>caAu) continue;
+      ca+=Number(v&&v.ca)||0; count+=Number(v&&v.n)||0;
+    }
+    return {ca:Math.round(ca*100)/100,count};
+  },[liveStats,caDu,caAu]);
 
   // ── GRAPHIQUES « épuré / haut de gamme » (Julien, 28 sept.) : une seule teinte
   //    d'accent, variée par OPACITÉ fixée par plateforme (jamais par rang, §7 +
@@ -24932,15 +24954,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* CA SUR MESURE : d'une date à une autre (Julien, 28 sept.). */}
       <Card>
         <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>📅 Chiffre d'affaires entre deux dates</div>
-        <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées, à leur date de vente.</div>
+        <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:10}}>Choisis une période — le total porte sur tes ventes finalisées Vinted (comme « Finalisé sur Vinted »), à leur date de vente.</div>
         {/* (29 oct.) Le même calendrier « comme Airbnb » que Ventes et Achats (§11). */}
         <PeriodePicker titre="Période du chiffre d'affaires" value={(caDu||caAu)?{from:caDu?new Date(caDu+'T00:00:00'):null,to:caAu?new Date(caAu+'T00:00:00'):null}:null}
           onChange={v=>{ const k=(d)=>{ if(!d) return ''; const t=d instanceof Date?d:new Date(d); return isNaN(t.getTime())?'':`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }; setCaDu(v?k(v.from):''); setCaAu(v?k(v.to):''); }}/>
         {caRange ? (
           <div style={{marginTop:14}}>
-            <div className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caRange.ca)}</div>
-            <div style={{fontSize:13,color:C.muted,marginTop:2}}>
-              {caRange.count} vente{caRange.count>1?'s':''} finalisée{caRange.count>1?'s':''}{' '}{libellePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)}
+            <div className="vrm-display" data-ca-plage={caRange.passu?'':String(Math.round(caRange.ca*100))} style={{fontSize:28,fontWeight:800,color:C.text}}>{caRange.passu?'—':fmt(caRange.ca)}</div>
+            <div data-ca-plage-phrase style={{fontSize:13,color:C.muted,marginTop:2}}>
+              {caRange.passu
+                ? (caRange.enCours ? `Lecture de tes ventes Vinted… (${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)})` : `Tes ventes Vinted n'ont pas pu être lues — le total ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} ne se calcule pas pour l'instant.`)
+                : `${caRange.count} vente${caRange.count>1?'s':''} finalisée${caRange.count>1?'s':''} ${phrasePlage(caDu?new Date(caDu+'T00:00:00'):null, caAu?new Date(caAu+'T00:00:00'):null)} · Vinted, tous comptes`}
             </div>
           </div>
         ) : (
@@ -33900,7 +33924,7 @@ function BoostRentable({ panelOff }) {
         ))}
       </div>
       <div style={{...sNote,fontSize:11,marginTop:10}}>
-        Un repère, pas de la comptabilité : rien ici n'entre dans un total. Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son « Boost payé » (Annonces → Gérer l’annonce). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.
+        Un repère, pas de la comptabilité : rien ici n'entre dans un total. Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son boost payé (la case « boost » de sa fiche, écran Annonces). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.
       </div>
     </div>
   );
@@ -36325,6 +36349,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const emptyMin = next.min == null || String(next.min).trim() === '';
       // (27 oct., refus auto) Le seuil de refus `refuse` compte aussi comme une valeur.
       const emptyRefuse = next.refuse == null || String(next.refuse).trim() === '';
+      // (29 oct., revue) Le « boost » payé `fees` compte aussi : la fiche montre
+      // la case boost sur TOUTES les annonces, y compris sans N° — sans ça, un
+      // boost tapé sur une annonce sans N° ni prix d'achat était jeté sans un mot.
+      const emptyFees = next.fees == null || String(next.fees).trim() === '';
       // ⚠️ (relecture du 11 octobre) Après une remise à zéro, la base REFUSE
       //    qu'une fiche numérotée disparaisse (`vrm_fiche_perdue` : c'est la
       //    signature d'un appareil chargé avant qu'un autre ne numérote). Effacer
@@ -36332,7 +36360,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    appareil… »), et plus rien ne se synchronisait. On garde la fiche,
       //    son N° vide — elle compte exactement comme une fiche absente partout.
       const etaitNumerotee = !!String(c.numero || '').trim();
-      if (emptyNum && emptyBuy && emptyMp && emptyMin && emptyRefuse && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
+      if (emptyNum && emptyBuy && emptyMp && emptyMin && emptyRefuse && emptyFees && !(etaitNumerotee && archiveNumeros())) delete u[item.id]; else u[item.id] = next;
       save('vinted_annonce_numeros', u); return u;
     });
     // Miroir DURABLE du prix d'achat par NUMÉRO (survit à la vente/republication).
@@ -39245,6 +39273,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Julien demande : savoir si une paire est PRÊTE à partir sur Leboncoin.
     // Un total inconnu ne se juge pas (mieux vaut un blanc qu'un faux, §5).
     let pretLbc=0, aRecapturer=0, boostees=0, aussiLbc=0;
+    const prepaCompte = {};
     for (const it of arr) {
       if (it.promoted === true) boostees++;
       if (lbcAussi.has(String(it.id))) aussiLbc++;
@@ -39262,9 +39291,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (numeros[it.id]?.numero) {
         const total = Number(it.photoCount)||0, capt = Number(it.captPhotos)||0, descOk = (Number(it.descLen)||0) > 0;
         if (total > 0) { if (capt >= total && descOk) pretLbc++; else aRecapturer++; }
+        const ep = etatPrepaLbc(it, numeros[it.id].numero); if (ep) prepaCompte[ep.code] = (prepaCompte[ep.code] || 0) + 1;
       }
     }
-    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc };
+    return { n:arr.length, val, favs, views, hasFav, hasView, sansNum, sleeping, sleepingVal, datesKnown, surLbc, surEbay, pretLbc, aRecapturer, boostees, aussiLbc, prepaCompte, prepaCommun: prepaCommunDe(prepaCompte) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annBase, numeros, listingDates, lbcAussi]);
   // ── « LES PAIRES QUI DORMENT » EST PUBLIÉ, LE BILAN DE LA SEMAINE LE CONSOMME ──
@@ -46122,7 +46152,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items?.length>0 && (() => {
           const nbMini = (annBase || []).filter((it) => { const v = Number(String(((numeros || {})[it.id] || {}).min ?? '').replace(',', '.')); return isFinite(v) && v > 0; }).length;
           const ext = offresAuto ? extSait('offresauto') : 'ok';
-          const etat = !offresAuto ? 'Éteintes' : nbMini === 0 ? 'Allumées · aucune annonce n’a de mini' : `Allumées · ${nbMini} annonce${nbMini > 1 ? 's' : ''} avec un mini`;
+          // (29 oct., revue) Court, et il passe à la ligne s'il le faut : au téléphone il
+          // était coupé (« Allumées · 2 annonces avec u… ») — justement le nombre.
+          const etat = !offresAuto ? 'Éteintes' : nbMini === 0 ? 'Allumées · aucun mini posé' : `Allumées · ${nbMini} annonce${nbMini > 1 ? 's' : ''} avec mini`;
           return (
           <div data-offres-auto-carte data-offres-auto-etat={offresAuto ? 'on' : 'off'} data-offres-auto-mini={offresAuto ? String(nbMini) : undefined} className={`vrm-offres-auto${offresAuto ? ' on' : ''}`}>
             <div className="vrm-offres-auto-ligne">
@@ -46450,12 +46482,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {` · ${annStats.val.toFixed(0)} € de valeur`}
             {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
             {annStats.hasView?<> · <Icon name="eye" size={12} style={{verticalAlign:'-2px'}}/> {annStats.views}</>:null}
-            {annStats.pretLbc>0 && annStats.aRecapturer===0 ? ` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin` : ''}
+            {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin`}</span> : ''}
           </div>
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
             {annStats.sansNum>0 && <span style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.sansNum} sans N°</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
-            {annStats.aRecapturer>0 && <span title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
+            {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:8,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
             <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:8,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
@@ -46862,15 +46894,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // La préparation pour Leboncoin, COURTE sur la carte (§7 : « passe sur
             // Vinted (ce compte) » écrit sur 40 cartes serait une phrase répétée) ;
             // le geste est dans l'infobulle.
-            const prepa = (() => {
-              if (!num) return null;
-              const total = Number(item.photoCount)||0, capt = Number(item.captPhotos)||0, descOk = (Number(item.descLen)||0) > 0;
-              if (total>0 && capt===0) return 'photos pas encore captées';
-              if (total>0 && capt<total) return `${capt}/${total} photos captées`;
-              if (total>0 && !descOk) return 'description pas encore captée';
-              if (total>0) return 'prête pour Leboncoin';
-              return null;
-            })();
+            // (29 oct., revue) Raccourcir la phrase ne suffisait pas : chez lui ~125
+            // fiches sur 179 auraient porté « photos pas encore captées ». L'état
+            // COMMUN se dit une fois au-dessus de la grille (`annStats.prepaCommun`).
+            const prepaEtat = etatPrepaLbc(item, num);
+            const prepa = prepaEtat && (prepaEtat.code === 'partielle' || prepaEtat.code !== annStats.prepaCommun) ? prepaEtat.texte : null;
             const tailleHorsTitre = it.size && !tailleDansTitre(it.title, it.size) ? it.size : '';
             return (
               <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
@@ -46953,14 +46981,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     )}
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
+                      // (29 oct., revue) Une paire PROUVÉE sur Leboncoin (`ailleurs` : la
+                      // marque Leboncoin est déjà sur la fiche) n'a pas de bascule « À publier
+                      // sur Leboncoin » — deux affirmations contraires sur la même fiche.
+                      // Et le geste reste NEUTRE (Leboncoin est coché par défaut : l'accent
+                      // sur chaque fiche ne serait plus rare, §7) : coché = encre, retiré = gris.
+                      if (pl.cle === 'lbc' && ailleurs) return null;
                       return (
-                        <button key={pl.cle} type="button" className="vrm-fiche-geste" data-fiche-place={pl.cle} aria-pressed={on}
+                        <button key={pl.cle} type="button" className="vrm-fiche-geste" data-fiche-place={pl.cle} data-fiche-place-etat={on?'on':'off'} aria-pressed={on}
                           onClick={()=>updatePair(item,{ mp: { ...(e.mp||{}), [pl.cle]: !on } })}
                           title={!num
                             ? `Mets un N° à cet article d'abord : c'est la référence qui permet de le retrouver ensuite sur ${pl.nom}.`
                             : on ? `Elle est dans la file ${pl.nom}. Clique pour l'en retirer.`
                                  : `Elle n'ira pas sur ${pl.nom}. Clique pour l'y mettre.`}
-                          style={{...geste,border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}14`:'transparent',color:on?C.accent:C.muted}}>
+                          style={{...geste,color:on?C.text:C.muted}}>
                           {on ? '✓ ' : ''}À publier sur {pl.nom}
                         </button>
                       );
@@ -46973,7 +47007,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(!num || prepa) && (
                     <div data-fiche-infos style={{fontSize:12,color:C.muted,lineHeight:1.35}}>
                       {!num && <span style={{color:C.warn}}>il lui faut un N° pour aller sur Leboncoin</span>}
-                      {prepa && <span data-prepa title={/prête/.test(prepa) ? 'Photos et description captées : elle peut partir sur Leboncoin.' : 'Passe sur Vinted, connecté sur ce compte : l’extension capte les photos et la description.'}>Leboncoin : {prepa}</span>}
+                      {prepa && <span data-prepa={prepaEtat.code} title={/prête/.test(prepa) ? 'Photos et description captées : elle peut partir sur Leboncoin.' : 'Passe sur Vinted, connecté sur ce compte : l’extension capte les photos et la description.'}>Leboncoin : {prepa}</span>}
                     </div>
                   )}
                 </div>
@@ -56707,6 +56741,11 @@ function AppCoeur() {
       // mois » (ventes faites ce mois-là, hors annulées) — pour la courbe des
       // Statistiques. Calculé ICI pour ne pas créer une seconde règle.
       const caParMois={}, ventesParMois={};
+      // (29 oct., revue) Le CA FINALISÉ PAR JOUR DE VENTE (jour local), la MÊME
+      // population que `caEncaisse` (§11) : « CA entre deux dates » (Statistiques)
+      // le somme. Il sommait l'ancienne archive, vide depuis juillet : 0,00 €
+      // affiché face à « Finalisé sur Vinted 338 € » sur la même page.
+      const caFinaliseParJour={};
 
       // Comptes BLOQUÉS (détectés) ou MASQUÉS (à la main) : on les EXCLUT
       // totalement des stats — leurs annonces sont périmées et leurs ventes ne
@@ -56798,6 +56837,7 @@ function AppCoeur() {
           const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
           if(st==='pending'){ enCours++; enAttente+=amt0; }
           if(st==='completed'){ caEncaisse+=amt0; soldTotal++; if(okD) joursVenteSet.add(d.toISOString().slice(0,10));
+            if(okD){ const kj=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; const cj=caFinaliseParJour[kj]||(caFinaliseParJour[kj]={ca:0,n:0}); cj.ca+=amt0; cj.n++; }
             const lg=String(a.login||a.vinted_user_id||'').trim(); if(lg) caParCompte[lg]=(caParCompte[lg]||0)+amt0; }
           // CA + ventes DU MOIS = ventes FAITES ce mois (par DATE de vente), hors
           // annulées — qu'elles soient déjà finalisées ou encore en cours. Une
@@ -56910,7 +56950,7 @@ function AppCoeur() {
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
+      setLiveStats({caMois,caEncaisse,caFinaliseParJour,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
         annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
@@ -57005,7 +57045,7 @@ function AppCoeur() {
   //    Et un total PARTIEL (un compte, Leboncoin ou eBay illisibles) NOMME ce
   //    qui manque (`venduManque`) — jamais présenté comme complet (§5).
   const VENDU_PAS_SU = { caJour: null, ventesJour: null, caMois: null, ventesMois: null, caParMois: null, ventesParMois: null,
-    caEncaisse: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduPasSu: true };
+    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduPasSu: true };
   const liveStatsVus = useMemo(() => {
     if (!liveStats) return liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
