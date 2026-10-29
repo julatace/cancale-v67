@@ -203,7 +203,14 @@ const envoisEbay = []; let avertir = false;
   // un bloc dit qu'eBay gère, et on ne réclame jamais un prix à Julien.
   const shipTxt = (await T());
   dit(/livraison.{0,30}g[ée]r[ée]e? par eBay|eBay.{0,20}(g[èe]re|propose).{0,20}(livraison|tarif|prix)/i.test(shipTxt), 'un bloc dit que la LIVRAISON est gérée par eBay (il propose le prix)', shipTxt.replace(/\s+/g,' ').slice(0,80));
-  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipTxt), 'et que Julien ne paie jamais le port / ne fixe rien');
+  // Sur téléphone (390 px), la phrase d'explication « tu ne paies jamais le
+  // port » porte `vrm-aide` et se tait depuis l'épuré du 27 oct. (choix de
+  // Julien, styles-telephone.css). Ce qui reste VISIBLE doit dire qu'eBay fixe
+  // le montant et l'encaisse ; et la phrase doit toujours être écrite dans le
+  // bloc (ordinateur), jamais retirée.
+  dit(/eBay.{0,40}fixe le montant.{0,30}encaisse/i.test(shipTxt), 'ce qui reste visible dit qu\'eBay fixe le montant et l\'encaisse (§2.8)');
+  const shipSrc = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('b')].find(x=>/livraison est g[ée]r[ée]e par eBay/i.test(x.textContent)); return b&&b.parentElement ? b.parentElement.textContent : ''; });
+  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipSrc), 'et que Julien ne paie jamais le port / ne fixe rien (écrit dans le bloc)', shipSrc.replace(/\s+/g,' ').slice(0,80));
   // Aucune saisie de prix de port ne doit être demandée (eBay s'en charge).
   const aChampPort = await pg.evaluate(()=>[...document.querySelectorAll('label')].some(x=>/Frais de port/i.test(x.textContent)));
   dit(!aChampPort, 'aucun champ « frais de port » à remplir — eBay gère le tarif');
