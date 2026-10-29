@@ -62,18 +62,19 @@
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
   }, false);
   // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre) ───────────────────────────
+  // (29 oct.) et SUPPRIMER, sur son clic confirmé : même chemin, l'ordre dit lequel.
   // L'ordre ne vient QUE du fond de l'extension (jamais de la page), et ne vaut
   // que pour le cadre principal. Il passe au capteur (monde MAIN, lbc-inject.js)
   // qui seul porte l'adresse et les en-têtes du site. Pas de réponse en 15 s ⇒
   // « muet » : le fond dit qu'il ne SAIT PAS (jamais « fait », jamais « pas fait »).
   try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
-    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcPauseAnnonce')return;
+    if(!msg||msg.from!=='vrm-fond'||(msg.action!=='lbcPauseAnnonce'&&msg.action!=='lbcSupprimeAnnonce'))return;
     if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
     const id=String(msg.id||'');if(!/^\d{6,12}$/.test(id)){sendResponse({ok:false,code:'invalide'});return;}
     const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
     const t=setTimeout(()=>{if(pausesEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},15000);
     pausesEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
-    window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:'pause',id,jeton},'*');
+    window.postMessage({__tag:'CANCALE_LBC_ORDRE',kind:msg.action==='lbcSupprimeAnnonce'?'supprime':'pause',id,jeton},'*');
     return true;
   });}catch(_){}
   window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*');

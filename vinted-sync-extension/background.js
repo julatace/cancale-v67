@@ -9923,7 +9923,9 @@ async function etatPourApp() {
   // 22 oct. : `lbcPause` — cette extension sait mettre une annonce Leboncoin en
   //    pause sur commande (l'app ne montre le bouton qu'à elle, capacité par
   //    présence comme `pause` et `vivant`).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true },
+  // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
+  //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -10247,6 +10249,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'publierBrouillon') return await publierBrouillon(msg);
   if (msg && msg.cmd === 'refaireBrouillon') return await refaireBrouillon(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
+  // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
+  if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
@@ -14117,6 +14121,101 @@ async function pauseLbcDepuisApp(msg) {
     noterDiag('lbc_pause_' + statut);
     if (statut >= 200 && statut < 300) {
       const note = await noterPauseLbc(id, statut);
+      try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
+      return { accepte: true, etape: 'fait', statut, reponse, note };
+    }
+    return { accepte: true, etape: 'refuse', statut, reponse };
+  } finally {
+    PAUSE_LBC_EN_VOL = false;
+    if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
+  }
+}
+// ══════════════════════════════════════════════════════════════════════════
+// SUPPRIMER UNE ANNONCE LEBONCOIN, SUR SON CLIC (29 octobre)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « J'ai vendu une paire sur Vinted et VRM ne m'a pas dit de la
+// supprimer, je veux pouvoir sur VRM supprimer une annonce de Leboncoin ».
+// ⚠️ La requête n'est PAS devinée : l'extension l'a VUE dans ses propres gestes
+//    (`lbc_recon.envois`, 28 octobre 22:47, 5.267) — `DELETE api.leboncoin.fr/
+//    api/pintad/v1/public/manual/delete/ads`, corps `{list_ids:[nombre]}`. Sa
+//    réponse n'a jamais été vue : elle est rendue telle quelle, un refus dit
+//    « pas fait », un silence dit « je ne sais pas ».
+// Garde-fous (ceux de la pause, plus un) : la CONFIRMATION de l'app est exigée
+// ici aussi (`confirme: true`, sinon rien ne part — c'est sans retour) · sur SON
+// clic, jamais automatique · l'annonce est relue EN BASE (l'app n'envoie qu'un
+// identifiant) et doit être sur le compte Leboncoin CONNECTÉ dans l'onglet ·
+// UNE action Leboncoin à la fois (même verrou que la pause) · 10 par heure ·
+// adresse exacte écrite en dur dans `lbc-inject.js`. Une 2xx est une preuve :
+// l'annonce est notée supprimée (`status: 'deleted'`, `supprimeeAt`), comme une
+// suppression faite sur la page (`noterRetraitVuLbc`).
+const LBC_SUPPRIME_MAX_HEURE = 10;
+async function noterSuppressionLbc(id, statut) {
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGet('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) return false;
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      const ad = items[id];
+      if (!ad) return false;
+      const nowIso = new Date().toISOString();
+      items[id] = Object.assign({}, ad, { statutLbc: ad.status === 'deleted' ? (ad.statutLbc || '') : (ad.status || ''), status: 'deleted', supprimeeAt: nowIso, supprimeeStatut: statut, supprimeePar: 'vrm' });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: nowIso }) }], 'id');
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+}
+async function supprimeLbcDepuisApp(msg) {
+  const id = String((msg && msg.id) || '');
+  if (!/^\d{6,12}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: "la suppression n'a pas été confirmée — rien n'est parti" };
+  if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action sur Leboncoin est en cours — une à la fois' };
+  PAUSE_LBC_EN_VOL = true;
+  let ouvert = null;
+  try {
+    let journal;
+    try { journal = ((await chrome.storage.local.get('vrmLbcSuppressions')).vrmLbcSuppressions || []).filter((t) => Date.now() - Number(t) < 3600e3); } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    if (journal.length >= LBC_SUPPRIME_MAX_HEURE) return { accepte: false, code: 'plafond', raison: `déjà ${LBC_SUPPRIME_MAX_HEURE} suppressions cette heure-ci — réessaie plus tard` };
+    // L'annonce, relue EN BASE juste avant (l'app n'envoie qu'un identifiant).
+    const [rows, accRows] = await Promise.all([
+      sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->${id}`),
+      sbGet('app_data?id=eq.lbc_accounts&select=a:data->accounts'),
+    ]);
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
+    const ad = rows[0] && rows[0].a;
+    if (!ad || typeof ad !== 'object') return { accepte: false, code: 'inconnue', raison: "cette annonce n'est pas parmi tes annonces Leboncoin captées — rien n'est parti" };
+    if (ad.status === 'deleted' && ad.supprimeeAt) return { accepte: false, code: 'deja', raison: "elle est déjà notée supprimée de Leboncoin — rien n'est reparti" };
+    const compte = idCompteLbc(ad.account || ad.lbcUser);
+    if (!/^[0-9a-f-]{8,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette annonce — rien n'est parti" };
+    const accs = (accRows && accRows[0] && accRows[0].a) || {};
+    const nom = nomCompteLbc(accs, compte) || 'le compte de cette annonce';
+    const autreCompte = (autre) => ({ accepte: false, code: 'autre-compte', raison: `Leboncoin est connecté sur ${nomCompteLbc(accs, autre) || 'un autre compte'} dans ce Chrome, l'annonce est sur ${nom} — connecte-toi sur ${nom}, puis réessaie` });
+    let o = await ongletLbcDuCompte(compte);
+    if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
+    if (!o.ok && o.autres && o.autres.length) return autreCompte(o.autres[0]);
+    if (!o.ok) {
+      try { ouvert = await chrome.tabs.create({ url: 'https://www.leboncoin.fr/compte/part/mes-annonces', active: false }); } catch (_) { ouvert = null; }
+      if (!ouvert || ouvert.id == null) return { accepte: false, code: 'lbc-absent', raison: `ouvre leboncoin.fr dans ce Chrome, connecté sur ${nom}, puis réessaie` };
+      const c = await attendreSessionOnglet(ouvert.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+      if (!c || c.ambigue || !c.compte) return { accepte: false, code: 'session', raison: `Leboncoin ne m'a pas dit quel compte est connecté — ouvre leboncoin.fr connecté sur ${nom}, puis réessaie` };
+      if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
+      o = { ok: true, tabId: ouvert.id };
+    }
+    // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
+    try { await chrome.storage.local.set({ vrmLbcSuppressions: [...journal, Date.now()] }); } catch (_) {}
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
+    try { await storeLbcRecon({ envoiOne: { cle: 'VRM DELETE api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'DELETE', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
+    if (rep && rep.ok === true && rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
+    if (!rep || rep.ok !== true || !statut) {
+      noterDiag('lbc_supprime_incertain');
+      return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si l'annonce est supprimée : regarde-la sur Leboncoin avant de recliquer" };
+    }
+    noterDiag('lbc_supprime_' + statut);
+    if (statut >= 200 && statut < 300) {
+      const note = await noterSuppressionLbc(id, statut);
       try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
       return { accepte: true, etape: 'fait', statut, reponse, note };
     }

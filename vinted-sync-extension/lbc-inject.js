@@ -715,10 +715,17 @@
   // suppression, jamais une autre adresse. La réponse de Leboncoin repart telle
   // quelle (statut + 300 premiers caractères + la FORME du corps).
   const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads';
+  // 29 oct. : SUPPRIMER, sur son clic confirmé. UNE autre adresse, écrite en dur
+  // elle aussi, VUE dans ses gestes (`lbc_recon.envois`, 28 oct. 22:47) :
+  // `DELETE …/manual/delete/ads`, même corps. Elle ne part QUE sur un ordre
+  // `supprime` — jamais sur un ordre `pause`, quoi que contienne l'ordre.
+  const URL_SUPPRIME_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads';
+  const ORDRES_LBC = { pause: { url: URL_PAUSE_LBC, methode: 'PUT' }, supprime: { url: URL_SUPPRIME_LBC, methode: 'DELETE' } };
   let pauseEnCours = false;
   try { window.addEventListener('message', async (event) => {
     const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'pause') return;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || !Object.prototype.hasOwnProperty.call(ORDRES_LBC, d.kind)) return;
+    const ordre = ORDRES_LBC[d.kind];
     const id = String(d.id || ''), jeton = String(d.jeton || '');
     if (!/^\d{6,12}$/.test(id) || !/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
     if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return;
@@ -728,13 +735,13 @@
       const h = Object.assign({}, entetesPintad || entetesApi || {}, { 'Content-Type': 'application/json', Accept: 'application/json' });
       let statut = 0, corps = '', erreur = '';
       try {
-        const res = await origFetch.call(window, URL_PAUSE_LBC, { method: 'PUT', credentials: 'include', headers: h, body: JSON.stringify({ list_ids: [Number(id)] }) });
+        const res = await origFetch.call(window, ordre.url, { method: ordre.methode, credentials: 'include', headers: h, body: JSON.stringify({ list_ids: [Number(id)] }) });
         statut = Number(res.status) || 0;
         try { corps = String(await res.text()).slice(0, 2000); } catch (_) {}
       } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
       let cles = [];
       try { cles = cheminsDeCles(JSON.parse(corps)).slice(0, 60); } catch (_) {}
-      post({ kind: 'lbcpauseresultat', jeton, id, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
+      post({ kind: 'lbcpauseresultat', jeton, id, quoi: d.kind, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
     } finally { pauseEnCours = false; }
   }); } catch (_) {}
 })();

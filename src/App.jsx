@@ -51008,6 +51008,49 @@ function LeboncoinScreen() {
     setPauseRes((l) => [{ id: r.id, numero: r.numero, titre: r.title || '', rep, at: Date.now() }, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
     if (rep && rep.accepte && rep.etape === 'fait') reload();
   };
+  // ── SUPPRIMER DE LEBONCOIN, SUR SON CLIC CONFIRMÉ (29 octobre) ──────────
+  // Julien : « je veux pouvoir sur VRM supprimer une annonce de Leboncoin ».
+  // Même chemin que la pause : l'app n'envoie qu'UN identifiant et la
+  // confirmation ; l'extension relit l'annonce en base, vérifie le compte
+  // Leboncoin connecté et envoie la requête VUE dans ses gestes (DELETE
+  // …/manual/delete/ads). C'est SANS RETOUR : la confirmation le dit, en rouge.
+  // Trois états de l'extension (absente · on vérifie · elle sait `lbcSupprime`)
+  // — le bouton n'est montré qu'à une extension qui sait.
+  const supprEtat = () => {
+    if (!vmrExtPresent()) return 'absente';
+    if (__vmrEtat === undefined) return 'verif';
+    if (__vmrEtat === null) return 'muette';
+    return __vmrEtat.lbcSupprime === true ? 'ok' : 'retard';
+  };
+  const [supprRes, setSupprRes] = useState([]);
+  const supprimerSurLbc = async (r) => {
+    if (pauseEnVol || !r || !r.id) return;
+    const prix = r.prix != null && isFinite(Number(r.prix)) && Number(r.prix) > 0 ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')} €` : '';
+    const ok = await askConfirm({
+      title: `Supprimer « ${r.title || 'cette annonce'} » de Leboncoin ?`,
+      desc: `${r.numero ? `N°${r.numero}` : 'Annonce Leboncoin'}${prix}${r.pourquoi ? ` — ${r.pourquoi}` : ''}.\n\nC'est sans retour : l'annonce disparaît de Leboncoin, avec ses favoris et ses statistiques. Pour la remettre, il faudra la republier.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
+      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true,
+    });
+    if (!ok) return;
+    setPauseEnVol(r.id);
+    let rep = null;
+    try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(r.id), confirme: true }, 70000); } catch (_) { rep = null; }
+    setPauseEnVol(null);
+    const res = { id: r.id, numero: r.numero || '', titre: r.title || '', rep, at: Date.now() };
+    setSupprRes((l) => [res, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
+    // Le résultat se dit AUSSI là où il a cliqué (la carte de résultat est plus bas).
+    try { const ph = phraseSuppr(res); toast(`${res.numero ? 'N°' + res.numero + ' · ' : ''}${res.titre || 'Annonce'} — ${ph.t}`, ph.etape === 'fait' ? 'ok' : 'err'); } catch (_) {}
+    if (rep && rep.accepte && rep.etape === 'fait') reload();
+  };
+  const phraseSuppr = (x) => {
+    const rp = x.rep;
+    const cite = rp && rp.reponse ? ` « ${String(rp.reponse).slice(0, 160)} »` : '';
+    if (!rp) return { etape: 'incertain', t: "je ne sais pas si elle est supprimée : l'extension n'a pas répondu à temps. Regarde l'annonce sur Leboncoin avant de recliquer." };
+    if (rp.accepte === false) return { etape: 'refuse', t: `pas fait — ${rp.raison || 'refusé par l’extension'}.` };
+    if (rp.etape === 'fait') return { etape: 'fait', t: `supprimée : Leboncoin a répondu ${rp.statut}${cite}.${rp.note === false ? " (VRM n'a pas pu le noter : elle restera affichée jusqu'à la prochaine lecture complète de tes annonces.)" : ''}` };
+    if (rp.etape === 'refuse') return { etape: 'refuse', t: `pas fait — Leboncoin a répondu ${rp.statut}${cite}. L'annonce est toujours en ligne.` };
+    return { etape: 'incertain', t: `je ne sais pas si elle est supprimée — ${rp.raison || "pas de réponse de Leboncoin"}.` };
+  };
   // Ce que Leboncoin a répondu, en clair — et seulement ce qu'on sait.
   const phrasePause = (x) => {
     const rp = x.rep;
@@ -51136,7 +51179,7 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe}/>}
+      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
@@ -51231,6 +51274,7 @@ function LeboncoinScreen() {
           const pause = data.removals.filter(r => r.etat === 'pause');
           const doute = data.removals.filter(r => r.etat !== 'vendue' && r.etat !== 'pause');
           const pe = pauseEtat();
+          const se = supprEtat();
           const Ligne = (r, i, coul, pausable) => (
             <div key={i} data-lbc-retirer={r.id || r.numero} data-lbc-retirer-sortie={r.sortie || undefined} style={{ fontSize: 12.5, color: C.text, padding: '3px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
               <span><b>N°{r.numero}</b> · {r.title || '—'}
@@ -51240,6 +51284,12 @@ function LeboncoinScreen() {
                 <button type="button" data-lbc-pause={r.id} disabled={!!pauseEnVol} onClick={() => mettreEnPause(r)}
                   style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
                   {pauseEnVol === r.id ? 'Mise en pause…' : '⏸ Mettre en pause sur Leboncoin'}
+                </button>
+              ) : null}
+              {pausable && se === 'ok' && r.lbc && r.id ? (
+                <button type="button" data-lbc-supprimer={r.id} disabled={!!pauseEnVol} onClick={() => supprimerSurLbc({ ...r, pourquoi: r.ou === 'eBay' ? 'vendue sur eBay' : 'vendue sur Vinted' })}
+                  style={{ border: `1px solid ${C.danger}`, background: 'transparent', color: C.danger, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
+                  {pauseEnVol === r.id ? 'Suppression…' : 'Supprimer de Leboncoin'}
                 </button>
               ) : null}
             </div>
@@ -51261,7 +51311,8 @@ function LeboncoinScreen() {
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{vendues.length} vendue{vendues.length > 1 ? 's' : ''} sur Vinted — à retirer de Leboncoin</Titre>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente est <b>certaine</b> (la transaction Vinted désigne cette annonce). Retire-{vendues.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois — cherche la référence <b>VRM-N°</b> dans l'annonce. Le numéro de l'article ne change pas.
-                  {pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression, elle se remet en ligne depuis « Mes annonces ».</span></> : null}
+                  {pausables && se === 'ok' ? <> <span data-lbc-supprimer-geste="ok">Tu peux {vendues.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {vendues.length > 1 ? 'les' : 'la'} mettre en pause (elle se remet en ligne depuis « Mes annonces »), une à la fois.</span></>
+                    : pausables && pe === 'ok' ? <> <span data-lbc-pause-geste="ok">Ou mets-{vendues.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression, elle se remet en ligne depuis « Mes annonces ».</span></> : null}
                   {pausables && pe === 'retard' ? <> <span data-lbc-pause-geste="retard">Pour {vendues.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
                 {vendues.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
@@ -51272,7 +51323,8 @@ function LeboncoinScreen() {
               <Card style={{ borderColor: C.warn }}>
                 <Titre>{venduesEbay.length} vendue{venduesEbay.length > 1 ? 's' : ''} sur eBay — à retirer de Leboncoin</Titre>
                 <div data-lbc-retirer-ebay={venduesEbay.length} style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>La vente eBay est <b>certaine</b> (le SKU <b>VRM-N°</b> de la commande désigne cette paire). Retire-{venduesEbay.length > 1 ? 'les' : 'la'} de Leboncoin pour ne pas vendre le même article deux fois. Le numéro de l'article ne change pas.
-                  {venduesEbay.some((r) => r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
+                  {venduesEbay.some((r) => r.lbc && r.id) && se === 'ok' ? <> <span data-lbc-supprimer-geste-ebay="ok">Tu peux {venduesEbay.length > 1 ? 'les' : 'la'} supprimer d'ici (sans retour) ou {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause, une à la fois.</span></>
+                    : venduesEbay.some((r) => r.lbc && r.id) && pe === 'ok' ? <> <span data-lbc-pause-geste-ebay="ok">Ou mets-{venduesEbay.length > 1 ? 'les' : 'la'} en pause d'ici, une à la fois : ce n'est pas une suppression.</span></> : null}
                   {venduesEbay.some((r) => r.lbc && r.id) && pe === 'retard' ? <> <span data-lbc-pause-geste-ebay="retard">Pour {venduesEbay.length > 1 ? 'les' : 'la'} mettre en pause d'ici, mets l'extension à jour (Réglages).</span></> : null}
                 </div>
                 {venduesEbay.slice(0, 30).map((r, i) => Ligne(r, i, C.danger, true))}
@@ -51299,6 +51351,16 @@ function LeboncoinScreen() {
         {/* (22 oct.) Ce que Leboncoin a répondu à chaque mise en pause demandée
             d'ici — la ligne « à retirer » disparaît une fois la pause acceptée,
             la réponse, elle, reste lisible. */}
+        {supprRes.length > 0 && (
+          <Card className="vrm-lbc-suppressions">
+            <Titre>Suppression sur Leboncoin</Titre>
+            {supprRes.map((x) => { const p = phraseSuppr(x); return (
+              <div key={x.id} data-lbc-supprimer-resultat={x.id} data-etape={p.etape} style={{ fontSize: 12.5, color: p.etape === 'fait' ? C.text : C.warn, padding: '3px 0', lineHeight: 1.45 }}>
+                {x.numero ? <b>N°{x.numero} · </b> : null}{x.titre || '—'} — {p.t}
+              </div>
+            ); })}
+          </Card>
+        )}
         {pauseRes.length > 0 && (
           <Card className="vrm-lbc-pauses">
             <Titre>Mise en pause sur Leboncoin</Titre>
