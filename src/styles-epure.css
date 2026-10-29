@@ -156,3 +156,8 @@
   }
   .vrm-app-shell .vrm-main .vrm-ann-toolbar > .vrm-ann-outils { width: 44px; }
 }
+
+/* (29 oct.) Ventes : les vérifications sous la liste — même forme pour les quatre. */
+.vrm-ventes-controles > *{margin:0 !important;}
+.vrm-ventes-controles .vrm-fiabilite-ventes{padding:12px 14px;border:1px solid var(--vrm-line,#dbe5e3);border-radius:12px;background:var(--vrm-surface,#fff);color:var(--vrm-ink,inherit);}
+.vrm-ventes-controles .vrm-fiabilite-ventes > summary{display:flex;align-items:center;min-height:0;padding-block:0;font-weight:650;}

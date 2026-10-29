@@ -1,5 +1,5 @@
 // Temps aléatoire entre deux messages aux favoris (28 oct.) : tiré par le
-// SERVEUR entre le minimum et le maximum choisis, le plafond 10/60 min passe
+// SERVEUR entre le minimum et le maximum choisis, (plus de plafond 10/60 min depuis le 29 oct.)
 // avant. Données inventées, aucune requête.
 import assert from 'node:assert/strict';
 import {lancerFile,reserverFile,terminerFile,consommerFile,delaiFavori,RefusFavoris} from '../../api/_lib/favoris-file.js';
@@ -29,10 +29,10 @@ ok(d.groupes.o.prochain===t0+1000+attendu,'après l’accusé, le même temps ti
 ok(reserverFile(d,{owner:'o',maintenant:t0+1000+attendu-1,jeton:'j2'}).valeur.travail===undefined,'rien avant l’échéance tirée');
 ok(reserverFile(d,{owner:'o',maintenant:t0+1000+attendu,jeton:'j2'}).valeur.travail,'le suivant part à l’échéance');
 assert.throws(()=>lancerFile(null,{owner:'o',targets:cibles(1),message:'B',intervalleMinutes:7,intervalleMax:3,maintenant:t0}),RefusFavoris);n++;
-// plafond 10/60 min prioritaire même avec un tirage court
+// 29 oct. : plus de plafond 10/60 min (sa demande) — 10 messages dans l'heure n'empêchent pas le suivant
 d=lancerFile(null,{owner:'o',targets:cibles(10),message:'B',intervalleMinutes:1,intervalleMax:2,maintenant:t0}).data;
 d.tentatives=Array.from({length:10},(_,i)=>t0-10*60000+i);
-ok(reserverFile(d,{owner:'o',maintenant:t0,jeton:'z'}).valeur.travail===undefined,'10 messages dans l’heure : on attend, quel que soit le tirage');
+ok(reserverFile(d,{owner:'o',maintenant:t0,jeton:'z'}).valeur.travail,'10 messages dans l’heure : le suivant part quand même');
 // 29 oct. (5.280), « comme Vintex » : 0 minute = 6 à 9,6 s entre deux favoris (mesuré).
 for(let i=0;i<200;i++){const v=delaiFavori(0,null,'v-'+i);ok(v>=6000&&v<=9600,'comme Vintex : 6 à 9,6 s');}
 ok(validerReglagesFavoris({message:'Bonjour',intervalleMinutes:'0'}).intervalleMinutes===0,'0 = comme Vintex, accepté');
