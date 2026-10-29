@@ -1,0 +1,131 @@
+/* ══ LES TROIS BOUTONS (29 octobre) ═════════════════════════════════════════
+   Julien : « ça fait encore de faible qualité, améliore les boutons ». Mesuré
+   avant : ~830 <button> dans App.jsx, styles en ligne disparates — bordure
+   grise carrée, rayons 6/8/10/22, graisses 500/600/700, et un bouton principal
+   au texte BLANC sur l'accent menthe du thème sombre (illisible).
+   ⇒ TROIS formes, et seulement trois :
+     · .vrm-b-primaire   — fond accent plein, texte « sur accent ». UN par écran.
+     · .vrm-b-secondaire — fond teinté (accent ~8 %), texte encre, AUCUNE bordure.
+     · .vrm-b-discret    — texte seul (couleur d'accent), zone de toucher 44 px.
+   Les couleurs viennent des variables posées par la coque (`variablesTheme`,
+   src/themeMineral.js) : --vrm-accent, --vrm-ink, --vrm-bg. Pas de rouge (§7 :
+   il est réservé à deux paires sous un même N°), pas de vert en dur.
+   Composant React : <Bouton variante="primaire|secondaire|discret" icone="…">
+   (src/App.jsx, à côté de Segmente). Ce fichier est chargé EN DERNIER.
+
+   ⚠️ Rien ici ne touche `display` des <button> en général (§7, index.html) :
+   seules les classes .vrm-b-* posent inline-flex, sur des boutons qui les
+   portent EXPRÈS. Le rail, la barre du bas, les pastilles, les onglets,
+   Segmente et les interrupteurs ne changent pas. */
+
+:root {
+  --vrm-on-accent: #FFFFFF;
+  --vrm-b-teinte: rgba(36, 78, 84, .08);
+  --vrm-b-teinte-f: rgba(36, 78, 84, .14);
+  --vrm-b-encre: var(--vrm-ink, #213B41);
+  --vrm-b-lien: var(--vrm-accent, #244E54);
+  --vrm-b-h: 40px;
+}
+:root[data-theme="dark"] {
+  --vrm-on-accent: #173A40;
+  --vrm-b-teinte: rgba(183, 214, 200, .11);
+  --vrm-b-teinte-f: rgba(183, 214, 200, .18);
+}
+@supports (color: color-mix(in srgb, red 10%, transparent)) {
+  :root { --vrm-b-teinte: color-mix(in srgb, var(--vrm-accent, #244E54) 8%, transparent); --vrm-b-teinte-f: color-mix(in srgb, var(--vrm-accent, #244E54) 14%, transparent); }
+  :root[data-theme="dark"] { --vrm-b-teinte: color-mix(in srgb, var(--vrm-accent, #B7D6C8) 11%, transparent); --vrm-b-teinte-f: color-mix(in srgb, var(--vrm-accent, #B7D6C8) 18%, transparent); }
+}
+/* Au doigt (aucune souris), la cible fait 44 px. Le contenu du téléphone est à
+   l'échelle 1 (styles-iphone.css annule l'ancien zoom de 80 %) : 44 px CSS =
+   44 px affichés. */
+@media (pointer: coarse), (max-width: 767px) { :root { --vrm-b-h: 44px; } }
+
+/* ── 1. LES CLASSES (opt-in explicite) ──────────────────────────────────── */
+.vrm-b {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  box-sizing: border-box; min-height: var(--vrm-b-h) !important; max-width: 100%;
+  padding: 0 14px; margin: 0;
+  border: 0 !important; border-radius: 10px !important; box-shadow: none !important;
+  font-family: inherit !important; font-size: 13px; font-weight: 600 !important; line-height: 1.2;
+  letter-spacing: -.005em; text-decoration: none !important; text-align: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  transition: background-color .12s ease, color .12s ease, opacity .12s ease, transform .1s ease;
+}
+.vrm-b > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.vrm-b-plein { width: 100%; }
+.vrm-b-court { white-space: normal; }
+.vrm-b-icone { padding: 0 !important; width: var(--vrm-b-h); min-width: var(--vrm-b-h); }
+
+.vrm-b-primaire { background: var(--vrm-accent, #244E54) !important; color: var(--vrm-on-accent) !important; }
+.vrm-b-secondaire { background: var(--vrm-b-teinte) !important; color: var(--vrm-b-encre) !important; }
+.vrm-b-discret {
+  background: transparent !important; color: var(--vrm-b-lien) !important;
+  padding: 0 4px; min-height: 44px !important; margin-block: -6px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vrm-b-primaire:not(:disabled):hover { filter: brightness(1.08); }
+  .vrm-b-secondaire:not(:disabled):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
+  .vrm-b-discret:not(:disabled):hover { text-decoration: underline !important; text-underline-offset: 3px; filter: none; }
+}
+.vrm-b:not(:disabled):active { transform: scale(.97); }
+.vrm-b-secondaire:not(:disabled):active { background: var(--vrm-b-teinte-f) !important; }
+/* Grisé : visible, jamais caché ; la raison est dans `title` ou sur la ligne. */
+.vrm-b:disabled, .vrm-b[aria-disabled="true"] { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
+.vrm-b:focus-visible { outline: 2px solid var(--vrm-accent, #244E54) !important; outline-offset: 2px; }
+
+/* Une rangée de gestes : à droite sur ordinateur, pleine largeur en bas de la
+   carte sur téléphone. */
+.vrm-b-rangee { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+@media (max-width: 767px) {
+  .vrm-b-rangee { justify-content: stretch; }
+  .vrm-b-rangee > .vrm-b:not(.vrm-b-discret) { flex: 1 1 0; min-width: 0; }
+}
+/* L'action principale d'un écran : dans l'en-tête sur ordinateur (slot `right`
+   de ScreenHead), dans une barre posée au-dessus de la navigation sur téléphone. */
+@media (max-width: 767px) {
+  .vrm-b-barre {
+    position: fixed; left: 12px; right: 12px; z-index: 45;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px; padding: 0; pointer-events: none;
+  }
+  .vrm-b-barre > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(16, 32, 36, .18) !important; }
+}
+
+/* ── 2. LA NORMALISATION GLOBALE (prudente) ─────────────────────────────── */
+/* Les boutons SANS classe, écrits en ligne avant cette passe, prennent les
+   mêmes formes. Ciblage vérifié au rendu (29 oct.) sur l'attribut style que
+   React écrit : la bordure C.border (clair rgb(220, 228, 223), sombre
+   rgb(56, 82, 88)), le fond C.card2, le contour accent sur fond vide.
+   Exclus : ce qui porte un état (pastilles, onglets, interrupteurs), un rôle,
+   une carte-bouton (texte aligné à gauche, ombre, contenu en blocs ou photo),
+   les pastilles arrondies, la navigation (rail, en-tête, barre du bas). */
+:is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([class]):not([aria-pressed]):not([aria-selected]):not([aria-checked]):not([aria-current]):not([role]):not([style*="text-align: left"]):not([style*="box-shadow"]):not([style*="border-radius: 99"]):not([style*="border-radius: 50%"]):not(:has(div, img, picture, canvas, input)):not(:is(.vrm-sidebar, .vrm-tabbar, .vrm-mobile-nav, .vrm-app-header, .vrm-seg, .vrm-filtres, .vrm-rangee, [role="tablist"], [role="radiogroup"]) *):is(
+    [style*="solid rgb(220, 228, 223)"], [style*="solid rgb(56, 82, 88)"],
+    [style*="background: rgb(234, 240, 236)"], [style*="background: rgb(39, 65, 71)"],
+    [style*="solid rgb(36, 78, 84)"]:not([style*="background: rgb(36, 78, 84)"]),
+    [style*="solid rgb(183, 214, 200)"]:not([style*="background: rgb(183, 214, 200)"])
+  ) {
+  background: var(--vrm-b-teinte) !important; border-color: transparent !important;
+  border-radius: 10px !important; box-shadow: none !important;
+  color: var(--vrm-b-encre) !important; font-weight: 600 !important; font-family: inherit !important;
+  min-height: 36px; text-decoration: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([class]):not([aria-pressed]):not([role]):not(:disabled):is([style*="solid rgb(220, 228, 223)"], [style*="solid rgb(56, 82, 88)"], [style*="background: rgb(234, 240, 236)"], [style*="background: rgb(39, 65, 71)"]):not(:has(div, img)):not([style*="text-align: left"]):not([style*="box-shadow"]):hover { background: var(--vrm-b-teinte-f) !important; filter: none; }
+}
+
+/* Le bouton plein de l'accent (C.accent), avec ou sans classe : même rayon,
+   pas de bordure, et le texte « sur accent » du thème. En sombre l'accent est
+   une menthe claire : un texte blanc écrit en dur y était illisible (vu au
+   rendu sur « Tout imprimer »). */
+:is(.vrm-app-shell, body > :not(#root)) :is(button, a[href]):not([aria-pressed]):not([aria-selected]):not([aria-checked]):not([aria-current]):not([role]):not(:is(.vrm-sidebar, .vrm-tabbar, .vrm-mobile-nav, .vrm-seg, .vrm-filtres) *):is([style*="background: rgb(36, 78, 84)"], [style*="background: rgb(183, 214, 200)"]) {
+  border-color: transparent !important; border-radius: 10px !important; box-shadow: none !important;
+  color: var(--vrm-on-accent) !important; font-weight: 600 !important; font-family: inherit !important;
+}
+/* Le lien-texte (sans fond, sans bordure, sans marge intérieure) : la couleur
+   du bouton discret, partout la même. */
+:is(.vrm-app-shell, body > :not(#root)) button.vrm-lien-action,
+:is(.vrm-app-shell, body > :not(#root)) button:not([class]):not([aria-label]):not([role]):not(:has(div, img, svg:only-child)):is([style*="background: transparent"], [style*="background: none"]):is([style*="border: none"], [style*="border-style: none"], [style*="border: 0px"]):is([style*="padding: 0px;"]) {
+  color: var(--vrm-b-lien) !important; font-weight: 600 !important;
+}

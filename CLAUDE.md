@@ -13809,6 +13809,48 @@ Une fonction, une forme. Avant d'écrire un contrôle, **réutiliser** celui-ci 
   (« 5 numérox portés par deux paires », la coquille comprise) pour chaque paire
   rangée. `audit-conflits-numeros.cjs` : 3 rouges sur l'avant.
 
+### Les trois boutons (29 octobre) — `src/styles-boutons.css`, composant `Bouton`
+Julien : « ça fait encore de faible qualité, améliore les boutons, arrête les
+messages écrits dans tous les sens ». TROIS formes, et seulement trois :
+- **`.vrm-b-primaire`** — fond `--vrm-accent`, texte `--vrm-on-accent` (#fff clair,
+  #173A40 sombre : l'accent sombre est une menthe claire, un texte blanc y était
+  illisible — vu sur « Tout imprimer »). **UN par écran** : l'action principale,
+  en haut à droite (slot `right` de `ScreenHead`) sur ordinateur, dans
+  `.vrm-b-barre` (fixe au-dessus de la barre du bas) sur téléphone.
+- **`.vrm-b-secondaire`** — fond teinté (accent ~8 %, `--vrm-b-teinte`), texte
+  encre, **aucune bordure**, rayon 10, 40 px souris / 44 px doigt.
+- **`.vrm-b-discret`** — texte seul couleur d'accent (`--vrm-b-lien`), zone 44 px.
+  « Annuler » d'une feuille est TOUJOURS discret, son geste principal primaire.
+- Classe de base `.vrm-b` (+ `.vrm-b-plein`, `.vrm-b-icone`, `.vrm-b-court` pour
+  revenir à la ligne), rangée de gestes `.vrm-b-rangee` (à droite sur ordinateur,
+  pleine largeur en bas de carte sur téléphone). En React :
+  `<Bouton variante="primaire|secondaire|discret" icone="…" plein href=…>` (à côté
+  de `Segmente`) ; tout le reste (`data-*`, `title`, `disabled`, `style`) passe.
+- **Normalisation globale** (même fichier, section 2) : un `<button>`/`<a>` SANS
+  classe dont le style en ligne porte la bordure `C.border`, le fond `C.card2` ou
+  un contour accent prend l'apparence secondaire ; un fond `C.accent` prend le
+  rayon et le texte « sur accent ». Exclus : `aria-pressed|selected|checked|current`,
+  `role`, carte-bouton (`text-align: left`, ombre, contenu `div`/`img`), pastille
+  arrondie, navigation, `.vrm-seg`, `.vrm-filtres`, `.vrm-rangee`. ⚠️ Un style en
+  ligne qui change de couleur de bordure sort de la règle : utiliser `Bouton`.
+- Un geste rare va dans « ⋯ » ; deux boutons qui font la même chose, c'est un de
+  trop ; un bouton grisé garde sa raison (`title` ou une ligne) et n'est jamais
+  caché ; pas de rouge (sauf le doublon de N°), pas de vert en dur.
+
+### Le texte : une ligne, le reste derrière ⓘ
+Sur chaque bloc, **au plus UNE ligne visible** (≈ 90 caractères). L'explication
+passe derrière `<Pourquoi label="…">` (ⓘ, replié) ou un `<details className=
+"vrm-repli">`, ou disparaît si un autre élément de l'écran la dit déjà (§7). Les
+libellés sont des mots, les états des pastilles courtes (« À expédier », « Pas
+lu »). ⚠️ NE DISPARAÎT JAMAIS (on raccourcit) : un « pas su / pas pu lire », la
+couverture d'un total partiel (« au moins », « sur X »), le geste d'une alerte,
+le rouge du doublon de N°, les confirmations d'argent (« une offre acceptée vend
+la paire »), le panneau Sécurité des données. ⚠️ `innerText` ne lit pas le
+contenu d'un `<details>` fermé : un banc qui jugeait une phrase déplacée derrière
+ⓘ doit juger la RÈGLE (`data-*`, présence de l'information), jamais être retiré.
+Appliqué d'abord à la coque (panneau « Actions possibles / Lecture seule »,
+confirmations `askConfirm`/`askText`/choix, feuille « Ranger »).
+
 - Une couleur en dur qui n'est pas dans `THEMES` ne suivra pas un changement de
   palette : `grep -oE '#[0-9a-fA-F]{6}' src/App.jsx` après chaque passe.
 - Un emoji utilisé **comme icône** devient une icône au trait (`ICON_PATHS`, qui

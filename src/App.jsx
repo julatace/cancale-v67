@@ -2071,8 +2071,8 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
         ))}
       </div>
       <div style={{display:'flex',gap:8,marginTop:12}}>
-        <button type="button" onClick={onLibre} style={{flex:1,padding:'10px 12px',borderRadius:10,border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Autre numéro…</button>
-        <button type="button" onClick={onClose} style={{flex:1,padding:'10px 12px',borderRadius:10,border:'none',background:C.card2,color:C.muted,fontSize:12.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+        <Bouton variante="discret" onClick={onClose} style={{flex:1}}>Annuler</Bouton>
+        <Bouton variante="secondaire" onClick={onLibre} style={{flex:1}}>Autre numéro…</Bouton>
       </div>
     </SheetShell>
   );
@@ -2098,14 +2098,12 @@ function AskTextSheet({ q, close }) {
           inputMode={q.numeric ? 'numeric' : undefined}
           style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:10,background:C.surface,color:C.text,fontSize:16,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
         <div style={{display:'flex',gap:9,marginTop:12}}>
-          <button type="button" onClick={() => close(null)}
-            style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          <Bouton variante="discret" onClick={() => close(null)} style={{flex:1}}>
             {q.cancel || 'Annuler'}
-          </button>
-          <button type="submit"
-            style={{flex:2,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+          </Bouton>
+          <Bouton variante="primaire" type="submit" style={{flex:2}}>
             {q.ok || 'Valider'}
-          </button>
+          </Bouton>
         </div>
       </form>
     </SheetShell>
@@ -2127,12 +2125,10 @@ function ConfirmHost() {
         {cc.length > 0 && <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{cc.join('\n')}</div>}
         <div data-ask-choix style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,marginTop:14}}>
           {(q.options || []).map(([val, lib]) => (
-            <button type="button" key={val} data-choix={val} onClick={() => close(val)}
-              style={{minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'10px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{lib}</button>
+            <Bouton variante="secondaire" key={val} data-choix={val} onClick={() => close(val)} className="vrm-b-court" style={{minHeight:44}}>{lib}</Bouton>
           ))}
         </div>
-        <button type="button" onClick={() => close(null)}
-          style={{width:'100%',minHeight:44,marginTop:12,border:'none',background:'transparent',color:C.muted,fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{q.cancel || 'Annuler'}</button>
+        <Bouton variante="discret" plein onClick={() => close(null)} style={{marginTop:12}}>{q.cancel || 'Annuler'}</Bouton>
       </SheetShell>, document.body);
   }
   // Le premier paragraphe du message sert de titre : les anciens messages
@@ -2140,19 +2136,19 @@ function ConfirmHost() {
   const { titre, corps } = sheetTexte(q, 'Confirmer ?');
   return createPortal(
     <SheetShell onClose={() => close(false)} z={Z_CONFIRMATION}>
-      <div style={{fontSize:17,fontWeight:700,color:q.danger?C.danger:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
+      {/* (29 oct.) Plus de rouge sur une confirmation (§7 : le rouge, c'est deux
+          paires sous un même N°) : la conséquence est dite par le texte. */}
+      <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:12.5,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
       )}
       <div style={{display:'flex',gap:9,marginTop:16}}>
-        <button type="button" onClick={() => close(false)}
-          style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        <Bouton variante="discret" onClick={() => close(false)} style={{flex:1}}>
           {q.cancel || 'Annuler'}
-        </button>
-        <button type="button" autoFocus onClick={() => close(true)}
-          style={{flex:2,border:'none',background:q.danger?C.danger:C.accent,color:'#fff',borderRadius:10,padding:'12px',fontSize:13.5,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+        </Bouton>
+        <Bouton variante="primaire" autoFocus onClick={() => close(true)} style={{flex:2}}>
           {q.ok || 'Confirmer'}
-        </button>
+        </Bouton>
       </div>
     </SheetShell>, document.body
   );
@@ -16269,19 +16265,18 @@ function EtatActions({ onNav, ordi, sombre }) {
     : { s: 'non', t: 'aucun compte ouvert' };
 
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
-  const btn = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', display: 'inline-block' };
   let geste = null;
   if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
   else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Réglages → Extension), puis ⟳ dans chrome://extensions.</span>;
   else if (code === 'telephone') geste = <span>Ouvre VRM sur l'ordinateur où l'extension est installée pour générer un bordereau, répondre ou publier{rl.niveau === 'absent' ? ' — avec l’extension à jour, tu pourras aussi le faire d’ici' : ''}.</span>;
-  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" style={btn} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
-  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" className="vrm-b vrm-b-primaire" onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
+  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
   // chrome://extensions) — on le dit tel quel, puis on recharge la page.
-  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
   // ouvrir chrome://extensions) — on le DIT, puis on recharge.
-  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -16312,14 +16307,14 @@ function EtatActions({ onNav, ordi, sombre }) {
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
     : voie === 'retard'
-      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" style={{ ...btn, padding: '4px 9px', fontSize: 12 }} onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Réglages).</span>
       : voie === 'serveur'
         ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
-        : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
+        : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
   else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
-    : <button type="button" data-etat-geste="recharger" style={btn} onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+    : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   else if (code === 'vinted' && st.relais) geste = <span data-etat-geste="vinted-ordinateur">Sur ton ordinateur, ouvre vinted.fr connecté sur le compte des colis.</span>;
-  else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" style={btn}>Ouvrir vinted.fr et me connecter</a>;
+  else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
 
   const poserPanneau = ordi ? (x) => x : (x) => createPortal(x, document.body);
@@ -16355,23 +16350,27 @@ function EtatActions({ onNav, ordi, sombre }) {
           <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>
             {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
           </div>
+          {/* (29 oct.) UNE ligne courte ; le détail derrière ⓘ (Julien : « arrête
+              les messages écrits dans tous les sens »). Ce qui distingue (le
+              compte qui agit, l'exception de publication) reste visible. */}
           {st.niveau === 'ok' && st.relais ? (
             <div data-etat-relais-texte="" style={{ color: C.muted, marginBottom: 8 }}>
-              Générer un bordereau, répondre, faire une offre, publier sur Leboncoin : ta demande part dans ta base, l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute au nom de <b style={{ color: C.text }}>{loginVinted}</b>, avec les mêmes garde-fous que là-bas. Rien n'est dit « fait » avant qu'elle l'ait écrit.
+              Tes demandes partent à ton ordinateur, qui agit au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
+              <Pourquoi label="Comment ça marche">La demande part dans ta base ; l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute avec les mêmes garde-fous. Rien n'est dit « fait » avant qu'elle l'ait écrit.</Pourquoi>
             </div>
           ) : st.niveau === 'ok' ? (
             <div style={{ color: C.muted, marginBottom: 8 }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
-              {['Générer un bordereau', extSait('messagerie') === 'ok' ? 'répondre, faire une offre' : null].filter(Boolean).join(', ')} : ça part au nom de <b style={{ color: C.text }}>{loginVinted}</b>, le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.
-              {!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}
+              {['Bordereaux', extSait('messagerie') === 'ok' ? 'réponses et offres' : null].filter(Boolean).join(', ')} : au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
+              <Pourquoi label="Un autre compte ?">C'est le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.{!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}</Pourquoi>
               {st.exception ? <span data-etat-exception-texte="publication"><br/><b style={{ color: C.text }}>Sauf publier sur Leboncoin</b> : {st.exception.texte}</span> : null}
             </div>
           ) : (
             <div style={{ color: C.muted, marginBottom: 8 }}>
-              Tout ce qui est déjà dans VRM marche : tes ventes, achats, annonces et messages, les colis à retirer et leurs codes, l'impression des bordereaux déjà reçus.
-              {' '}{code === 'pause' || code === 'plusieurs' ? st.glob.texte
-                : <>Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</>}
+              Tes ventes, colis à retirer, codes et bordereaux déjà reçus restent là.
+              {code === 'pause' || code === 'plusieurs' ? <> {st.glob.texte}</>
+                : <>{' '}<Pourquoi label="Ce qui manque">Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</Pourquoi></>}
             </div>
           )}
           <Ligne nom="Extension" l={ligneExt}/>
@@ -17007,6 +17006,21 @@ function KpiVentes({ tuiles, note, plateforme }) {
 // segment actif en surface. Pour un CHOIX d'écran on pose aria-pressed ; les
 // sous-onglets gardent aria-current (PlatSubNav). `data` passe les attributs
 // que les bancs lisent (data-ca-choix, data-detourage-choix…).
+// (29 oct.) LES TROIS BOUTONS — Julien : « ça fait encore de faible qualité,
+// améliore les boutons ». Une forme par rôle, et seulement trois :
+//   · primaire   — l'action principale de l'écran (UNE par écran), fond accent ;
+//   · secondaire — tout autre geste : fond teinté, AUCUNE bordure ;
+//   · discret    — un lien-action, texte seul, zone de toucher 44 px.
+// Le dessin vit dans src/styles-boutons.css (.vrm-b-*) ; ce composant ne fait
+// que poser la classe et l'icône (18 px, ICON_PATHS). `href` ⇒ un <a>. Tout le
+// reste (data-*, title, disabled, aria-*) passe tel quel : un bouton grisé garde
+// sa raison dans `title`, il n'est jamais caché.
+function Bouton({ variante = 'secondaire', icone, plein = false, className = '', children, type = 'button', href, ...rest }) {
+  const cls = `vrm-b vrm-b-${variante}${plein ? ' vrm-b-plein' : ''}${!children && icone ? ' vrm-b-icone' : ''}${className ? ' ' + className : ''}`;
+  const contenu = <>{icone && ICON_PATHS[icone] ? <Icon name={icone} size={18}/> : null}{children}</>;
+  if (href) return <a href={href} className={cls} {...rest}>{contenu}</a>;
+  return <button type={type} className={cls} {...rest}>{contenu}</button>;
+}
 function Segmente({ label, options, value, onChange, plein = false, disabled = false, className = '', style }) {
   return (
     <div role="group" aria-label={label} className={`vrm-seg${plein ? ' vrm-seg-plein' : ''}${className ? ' ' + className : ''}`} style={style}>
