@@ -1,5 +1,27 @@
 # VRM — dossier de passation
 
+> **29 octobre — ÉCRANS VINTED : grandes photos, état en jauge, calendrier « comme Airbnb », offres auto, pastille (app seule) :**
+> Julien : « augmente la taille des photos », « l'état plus original avec à côté la saisie du prix d'achat », « toutes les infos
+> des 3 petits points », « un calendrier comme Airbnb » pour les périodes, « accepter les offres automatiquement… c'est moche »,
+> « améliore la pastille Actions possibles / Lecture seule ». **Fiche d'annonce** : au téléphone UNE fiche par rangée (photo
+> ≈ 360 px), à l'ordinateur côte à côte (≥ 330 px) ; l'état en **jauge à cinq barres** (`src/carteAnnonce.js`, `etatVinted` :
+> les cinq libellés MESURÉS chez lui le 29 oct. — 131 « Très bon état », 18 « Bon état », 4/2/2 —, comparés EN ENTIER ; inconnu ⇒
+> affiché tel quel sans niveau ; aucun ⇒ « — ») et le prix d'achat saisi À CÔTÉ (`EnLigne data="achat"`, le même geste) ; le
+> « ⋯ Gérer l'annonce » est retiré : ses gestes (`data-fiche-gestes`, 44 px au doigt) et ses infos sont à la vue. **Calendrier**
+> (`src/ChoixPeriode.jsx` + règle pure `src/periodeCalendrier.js`) : deux mois côte à côte à l'ordinateur, un calendrier qui
+> défile au doigt (feuille), raccourcis 7 jours · 30 jours · ce mois · mois dernier · cette année, deux touchers puis Appliquer,
+> plage dite en clair ; UN composant pour Ventes, Achats et la période du CA (`PeriodePicker` n'est plus qu'un nom) ; la valeur
+> garde sa forme `{from, to, label?}` lue par `dansPeriodeDate` (§11, aucun filtre réécrit). **Offres automatiques** : une
+> ligne (statut + interrupteur), le texte derrière ⓘ ; comportement INCHANGÉ (éteindre sans question, allumer demande).
+> **Pastille Actions** : ton, chevron, panneau avec en-tête et la chaîne des maillons, même source (`etatActionsExt`, sur `raisonExtGlobale`). Rien sur
+> les favoris (sa demande). Preuves : banc `vinted-ui.cjs` (port `BANC_PORT`, données inventées, 390 tactile + 1512, clair et
+> sombre) **68 rouges sur le build d'origin/main (634932dd)**, 0 après ; mutations rouges : deux fiches par rangée au téléphone,
+> saisie d'achat non enregistrée, allumer sans confirmation, raccourcis écrasés dans la feuille, ton du panneau d'une autre
+> source. `audit-choix-periode.cjs` (règles exécutées, 32 contrôles ; 5 rouges sur origin/main ; `--prouve` 9/9). Bancs voisins
+> mis à la nouvelle fiche sans les affaiblir : `annonces-carte` (une fiche par rangée au téléphone), `feuilles-coque`
+> (« Passeport » dans les gestes), `revue-20oct` (gestes 44 px). ⚠️ Non mesuré : sa vraie base, un vrai iPhone/Safari. Extension
+> inchangée. Julien : rien.
+
 > **29 octobre — TA MICRO-ENTREPRISE : profil, calendrier, seuils (Comptabilité) :** Julien : « une jauge plafond + seuil de TVA,
 > vérifie les seuils officiels 2026 », « vois si la personne a choisi le versement libératoire », « mensuel : elle déclare août
 > mais paie en septembre », « plus pro ». **Vérifié sur service-public.gouv.fr le 29 oct.** : plafond vente de marchandises
