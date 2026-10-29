@@ -34,7 +34,14 @@
     { re: /\/api\/v\d+\/items\/(\d+)(?:\?|$)/,   type: 'item'     },
     { re: /\/api\/v\d+\/my_orders/,             type: 'orders'   },
     { re: /\/api\/v\d+\/(?:inbox|conversations)(?:\?|$)/, type: 'inbox' },
-    { re: /\/api\/v\d+\/conversations\/(\d+)/,  type: 'conversation' },
+    // (29 octobre) Une conversation a aussi un identifiant UUID : celui que
+    // portent les commandes (`conversation_id`, 36 caractères, mesuré en base) ;
+    // une page qui charge la conversation par lui n'était jamais captée. Et la
+    // règle est ANCRÉE : `…/conversations/{id}` seul (ou suivi d'une requête),
+    // jamais un sous-chemin (`…/replies`, `…/mark_as_read`), dont la réponse
+    // n'est pas une conversation. Le fond range la conversation sous l'id
+    // NUMÉRIQUE que porte la réponse (`storeHarvest`), jamais sous l'UUID.
+    { re: /\/api\/v\d+\/conversations\/(\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?(?:\?|$)/i, type: 'conversation' },
     // Détail d'une transaction (vente/achat) : son ÉTAT (`status`, `status_title`,
     // `shipment {id, status, status_title, status_updated_at}`), capté passivement
     // quand tu ouvres une commande ou télécharges un bordereau. On ne matche QUE le
@@ -269,10 +276,23 @@ function clocheFavorisNative(activer=false,origine){
   //    JAMAIS le contenu, jamais les paramètres — les identifiants numériques
   //    sont même remplacés par `{id}` (voir `chemin()`).
   const PAGE_A_NOTER = /(export|download|telecharg|takeout|gdpr|rgpd|privacy|donnees|data|settings|parametres|reglages|account|compte|blocked|bloque|suspend|restrict)/i;
+  // <chemin-regle> (29 octobre) — la MÊME dans la page et dans le fond (§11).
+  // Mesuré en base : les pages d'une conversation appellent un contrôle
+  // anti-hameçonnage dont le chemin porte un UUID, qui passait EN CLAIR dans
+  // `seen_urls` (17 à 55 clés de ce genre par compte) — un identifiant réel, et
+  // une clé de plus par conversation ouverte. Un UUID devient `{uuid}`, une
+  // longue suite hexadécimale `{hex}`, un nombre de 3 chiffres ou plus `{id}`.
+  function cheminNormalise(p) {
+    return String(p == null ? '' : p)
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}')
+      .replace(/\/(?=[0-9a-f]*\d)[0-9a-f]{20,}(?=\/|$)/gi, '/{hex}')
+      .replace(/\/\d{3,}/g, '/{id}');
+  }
+  // </chemin-regle>
   const chemin = (url) => {
     let p = url;
     try { p = new URL(url, location.origin).pathname; } catch (_) { p = String(url).split('?')[0]; }
-    return p.replace(/\/\d{3,}/g, '/{id}');       // jamais un identifiant réel
+    return cheminNormalise(p);                     // jamais un identifiant réel
   };
   const noteSeen = (url, method, status) => {
     try {
@@ -301,10 +321,188 @@ function clocheFavorisNative(activer=false,origine){
       try { if (Number(status) >= 400 || PAGE_A_NOTER.test(p) || traceNotificationsVinted(url)) setTimeout(flushSeen, 0); } catch (_) {}
     } catch (_) {}
   };
+  // ═══ LA PAGE D'UNE CONVERSATION : PAR OÙ PASSENT LES MESSAGES ? (29 oct.) ═══
+  // Mesuré en lecture seule (sa base) : depuis le 18 octobre, PLUS AUCUNE
+  // requête `/api/v2/conversations/…` (ni `mark_as_read`) ne part de la page
+  // d'une conversation. On n'y voit que l'escrow, les bannières, les litiges et
+  // un contrôle anti-hameçonnage. Les messages arrivent donc par une route
+  // qu'on ne connaît pas : hors `/api/` (que `noteSeen` ignore), une socket, un
+  // flux d'évènements, ou les données de la page (Next). ON NE LA DEVINE PAS.
+  // Sur la page d'une conversation seulement, on relève :
+  //   · chaque requête de la page vers Vinted (méthode, chemin NORMALISÉ,
+  //     statut, type de contenu), y compris hors `/api/` ;
+  //   · pour une réponse qui PORTE une liste de messages, sa FORME : où elle
+  //     est, combien, les noms de clés de ses éléments et leur type — jamais
+  //     une valeur ; et, pour une réponse JSON, les clés de tête (forme) ;
+  //   · l'ouverture d'une socket (WebSocket) ou d'un flux (EventSource), sur
+  //     toute page de Vinted : hôte et chemin normalisé (jamais la requête),
+  //     combien de trames, la forme de la première trame JSON et celle d'une
+  //     trame qui porte des messages ;
+  //   · si la page porte des données Next (`__NEXT_DATA__`, `self.__next_f`)
+  //     et si elles parlent de messages (oui / non, jamais leur texte).
+  // Le relevé part avec `seen_urls` (ligne `harvest_{uid}_seen_urls`, clé
+  // `conversation`). AUCUNE requête de plus ; bornes par construction.
+  const PAGE_CONV = /^\/(?:inbox|conversations?|messages?)(?:\/|$)/i;
+  const surPageConv = () => { try { return PAGE_CONV.test(location.pathname); } catch (_) { return false; } };
+  const hoteVinted = (h) => /(?:^|\.)vinted\.[a-z.]{2,6}$/i.test(String(h || ''));
+  const relConv = { req: {}, canaux: {}, pages: {}, next: null };
+  let relConvDirty = false;
+  const REL_CONV_REQ_MAX = 60, REL_CONV_CANAUX_MAX = 12, REL_CONV_PAGES_MAX = 10;
+  const MOTIF_MESSAGES_TEXTE = /"messages"\s*:\s*\[|\\"messages\\"\s*:\s*\[/;
+  const typeDe = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
+  // Une clé d'objet n'est relevée que si elle a la forme d'un NOM de champ ;
+  // un identifiant (UUID, nombre) devient un repère, le reste `{x}`.
+  const cleForme = (k) => {
+    const t = String(k);
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) return '{uuid}';
+    if (/\d{3,}/.test(t)) return '{id}';
+    return /^[A-Za-z_$][\w$-]{0,39}$/.test(t) ? t : '{x}';
+  };
+  // Les clés de tête d'un JSON (deux niveaux), avec leur type.
+  const formeTete = (racine) => {
+    const out = {};
+    if (!racine || typeof racine !== 'object') return { racine: typeDe(racine) };
+    const tete = Array.isArray(racine) ? { '[]': racine[0] } : racine;
+    for (const k of Object.keys(tete).slice(0, 30)) {
+      const ck = cleForme(k), v = tete[k];
+      out[ck] = typeDe(v);
+      if (v && typeof v === 'object' && !Array.isArray(v)) for (const k2 of Object.keys(v).slice(0, 20)) out[ck + '.' + cleForme(k2)] = typeDe(v[k2]);
+      if (Object.keys(out).length >= 60) break;
+    }
+    return out;
+  };
+  // Une liste (non vide) d'OBJETS rangée sous une clé « message(s) », à six
+  // niveaux au plus : sa place, sa longueur, et la forme de ses éléments.
+  const formeMessages = (racine) => {
+    const file = [[racine, '', 0]];
+    let vus = 0, trouve = null;
+    while (file.length && vus < 4000 && !trouve) {
+      const [v, ch, d] = file.shift(); vus++;
+      if (!v || typeof v !== 'object' || d > 6) continue;
+      if (Array.isArray(v)) { for (const x of v.slice(0, 3)) file.push([x, ch + '[]', d + 1]); continue; }
+      for (const k of Object.keys(v).slice(0, 200)) {
+        const x = v[k], c = ch ? ch + '.' + cleForme(k) : cleForme(k);
+        if (/^messages?$/i.test(k) && Array.isArray(x) && x.some((e) => e && typeof e === 'object' && !Array.isArray(e))) { trouve = { chemin: c, liste: x }; break; }
+        if (x && typeof x === 'object') file.push([x, c, d + 1]);
+      }
+    }
+    if (!trouve) return null;
+    const cles = {};
+    for (const e of trouve.liste.slice(0, 20)) {
+      if (!e || typeof e !== 'object' || Array.isArray(e)) continue;
+      for (const k of Object.keys(e).slice(0, 60)) {
+        const ck = cleForme(k), ty = typeDe(e[k]);
+        if (!cles[ck]) cles[ck] = ty; else if (!cles[ck].split('|').includes(ty)) cles[ck] = (cles[ck] + '|' + ty).slice(0, 40);
+        const sous = e[k];
+        if (sous && typeof sous === 'object' && !Array.isArray(sous)) for (const k2 of Object.keys(sous).slice(0, 40)) { const c2 = ck + '.' + cleForme(k2); if (!cles[c2]) cles[c2] = typeDe(sous[k2]); }
+      }
+      if (Object.keys(cles).length >= 80) break;
+    }
+    return { chemin: trouve.chemin.slice(0, 120), n: trouve.liste.length, cles };
+  };
+  let nextVuPour = null;
+  const noteNextConv = () => {
+    try {
+      if (!surPageConv()) return;
+      const p = cheminNormalise(location.pathname).slice(0, 120);
+      const pg = relConv.pages[p] || (Object.keys(relConv.pages).length < REL_CONV_PAGES_MAX ? (relConv.pages[p] = { n: 0 }) : null);
+      if (pg && nextVuPour !== location.pathname) { pg.n++; pg.at = new Date().toISOString(); relConvDirty = true; }
+      if (nextVuPour === location.pathname && relConv.next && relConv.next.messages) return;
+      nextVuPour = location.pathname;
+      const nd = document.getElementById('__NEXT_DATA__');
+      const nf = self.__next_f;
+      let txt = nd ? String(nd.textContent || '').slice(0, 2000000) : '';
+      if (Array.isArray(nf)) for (const x of nf.slice(0, 500)) { if (Array.isArray(x) && typeof x[1] === 'string') txt += x[1]; if (txt.length > 4000000) break; }
+      const r = { nextData: !!nd, nextF: Array.isArray(nf), messages: MOTIF_MESSAGES_TEXTE.test(txt) };
+      const av = relConv.next;
+      if (!av || av.nextData !== r.nextData || av.nextF !== r.nextF || av.messages !== r.messages) { relConv.next = Object.assign(r, { at: new Date().toISOString() }); relConvDirty = true; }
+    } catch (_) {}
+  };
+  const noteConvPage = (method, url, status, ct, lireTexte) => {
+    try {
+      if (!surPageConv()) return;
+      noteNextConv();
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!/^https?:$/.test(u.protocol) || !hoteVinted(u.hostname)) return;
+      const hote = u.hostname === location.hostname ? '' : u.hostname;
+      const cle = `${String(method || 'GET').toUpperCase()} ${hote}${cheminNormalise(u.pathname)}`.slice(0, 200);
+      if (!relConv.req[cle] && Object.keys(relConv.req).length >= REL_CONV_REQ_MAX) return;
+      const typeCt = String(ct || '').split(';')[0].trim().toLowerCase().slice(0, 60);
+      const e = relConv.req[cle] || (relConv.req[cle] = {});
+      e.st = Number(status) || 0; e.ct = typeCt; e.n = (e.n || 0) + 1; e.at = new Date().toISOString();
+      relConvDirty = true;
+      // Le corps n'est lu que pour une réponse 2xx de texte, une fois par chemin.
+      if (e.messages || e.tete || !(e.st >= 200 && e.st < 300) || typeof lireTexte !== 'function') return;
+      if (!/json|javascript|x-component|text\/plain/.test(typeCt)) return;
+      // Lu TOUT DE SUITE (une copie du corps) : la page lit le sien juste après.
+      let lecture; try { lecture = lireTexte(); } catch (_) { return; }
+      Promise.resolve(lecture).then((t) => {
+        try {
+          if (typeof t !== 'string' || !t || t.length > 3000000) return;
+          let j;
+          if (/json/.test(typeCt) || /^[\[{]/.test(t.trim())) { try { j = JSON.parse(t); } catch (_) { j = undefined; } }
+          const f = j !== undefined ? formeMessages(j) : null;
+          if (j !== undefined) e.tete = formeTete(j);
+          if (f) e.messages = f;
+          else if (MOTIF_MESSAGES_TEXTE.test(t)) e.messages = { texte: true };
+          relConvDirty = true;
+          if (e.messages) setTimeout(flushSeen, 0);
+        } catch (_) {}
+      }).catch(() => {});
+    } catch (_) {}
+  };
+  const noteCanal = (sorte, url) => {
+    try {
+      let u; try { u = new URL(String(url), location.href); } catch (_) { return null; }
+      const cle = `${sorte} ${u.hostname}${cheminNormalise(u.pathname)}`.slice(0, 200);
+      if (!relConv.canaux[cle] && Object.keys(relConv.canaux).length >= REL_CONV_CANAUX_MAX) return null;
+      const c = relConv.canaux[cle] || (relConv.canaux[cle] = { ouvert: 0, trames: 0 });
+      c.ouvert++; c.at = new Date().toISOString(); c.page = surPageConv() ? 'conversation' : 'autre';
+      relConvDirty = true;
+      return c;
+    } catch (_) { return null; }
+  };
+  const noteTrame = (c, data) => {
+    try {
+      if (!c) return;
+      c.trames++; relConvDirty = true;
+      if (c.messages || c.trames > 200 || typeof data !== 'string' || !data || data.length > 500000) return;
+      let j; try { j = JSON.parse(data); } catch (_) { return; }
+      if (!c.tete) c.tete = formeTete(j);
+      const f = formeMessages(j);
+      if (f) { c.messages = f; setTimeout(flushSeen, 0); }
+    } catch (_) {}
+  };
+  try {
+    const WS0 = window.WebSocket;
+    if (typeof WS0 === 'function' && typeof Proxy === 'function') {
+      window.WebSocket = new Proxy(WS0, { construct(t, args, nt) {
+        const ws = Reflect.construct(t, args, nt);
+        try { const c = noteCanal('WS', args[0]); if (c) ws.addEventListener('message', (ev) => noteTrame(c, ev && ev.data)); } catch (_) {}
+        return ws;
+      } });
+    }
+    const ES0 = window.EventSource;
+    if (typeof ES0 === 'function' && typeof Proxy === 'function') {
+      window.EventSource = new Proxy(ES0, { construct(t, args, nt) {
+        const es = Reflect.construct(t, args, nt);
+        try { const c = noteCanal('ES', args[0]); if (c) es.addEventListener('message', (ev) => noteTrame(c, ev && ev.data)); } catch (_) {}
+        return es;
+      } });
+    }
+  } catch (_) {}
   const flushSeen = () => {
-    if (!seenDirty || (!seenPaths.size && !Object.keys(seenRep).length)) return;
+    noteNextConv();
+    const avecChemins = seenDirty && (seenPaths.size || Object.keys(seenRep).length);
+    if (!avecChemins && !relConvDirty) return;
     seenDirty = false;
-    post({ kind: 'seen_urls', paths: Array.from(seenPaths).slice(0, 300), reponses: seenRep });
+    const conversation = relConvDirty ? JSON.parse(JSON.stringify(relConv)) : null;
+    relConvDirty = false;
+    // Les 300 chemins les PLUS RÉCENTS (l'ordre d'insertion d'un Set : le plus
+    // ancien d'abord ; garder les premiers jetait ceux qu'on venait de voir).
+    const msg = { kind: 'seen_urls', paths: Array.from(seenPaths).slice(-300), reponses: seenRep };
+    if (conversation) msg.conversation = conversation;
+    post(msg);
   };
   // Envoi RAPIDE puis régulier : une page Vinted est souvent quittée avant 60 s,
   // et le diagnostic ne partait alors jamais. On envoie à 5 s, puis toutes les
@@ -895,6 +1093,7 @@ function contratSuivi(a) {
             noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
+            noteConvPage(method, url, res.status, ct, () => res.clone().text());   // 29 oct. : la route des messages
             if (/application\/pdf/i.test(ct)) {
               maybeCaptureLabel(ct, url, () => res.clone().arrayBuffer());
             } else if (url && matchHarvest(url)) {
@@ -942,6 +1141,7 @@ function contratSuivi(a) {
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
+            noteConvPage(this.__cancaleMethod, url, this.status, ct, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 29 oct.
             // Bordereau PDF via XHR (si Vinted le charge en binaire).
             if (/application\/pdf/i.test(ct) && this.response && this.response.byteLength) {
               maybeCaptureLabel(ct, url, () => Promise.resolve(this.response));

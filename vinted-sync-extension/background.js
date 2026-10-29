@@ -1479,6 +1479,16 @@ function fusionnerConversation(avant, neuf) {
 }
 // END CONVERSATION PARTAGEE
 
+// L'id NUMÉRIQUE d'une réponse de conversation (`{conversation:{id}}` ou
+// `{id}`), sinon null.
+function idConversationReponse(parsed) {
+  const c = parsed && (parsed.conversation || parsed);
+  const v = c && c.id;
+  if (Number.isSafeInteger(v) && v > 0) return String(v);
+  if (typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v)) return v;
+  return null;
+}
+
 async function conversationFusionnee(rowId, neuf) {
   const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=p:data->payload`);
   if (rows === null) return null;
@@ -2067,6 +2077,22 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     const pid = await profilIdRange(uid);
     if (pid === null) { noterDiag('ignore_dressing_profil_pas_lu'); return; }
     if (!pid || id == null || String(id) !== pid) { noterDiag('ignore_dressing_autre_membre'); return; }
+  }
+
+  // (29 octobre) LA CONVERSATION EST RANGÉE SOUS SON ID NUMÉRIQUE. La page peut
+  // la charger par l'UUID que portent les commandes (`conversation_id`) ; l'app
+  // et la boîte de réception, elles, la connaissent par son id numérique
+  // (`harvest_{uid}_conv_{id}`). C'est la RÉPONSE qui le dit
+  // (`conversation.id`) — une identité, jamais une ressemblance (§5) :
+  //   · adresse par UUID ⇒ rangée sous l'id numérique de la réponse ; sans id
+  //     numérique lisible, rien n'est rangé (mieux vaut un blanc qu'un faux) ;
+  //   · adresse numérique et réponse qui porte un AUTRE id ⇒ rien (doute).
+  if (type === 'conversation') {
+    const idRep = idConversationReponse(parsed);
+    if (!/^\d{1,20}$/.test(String(id == null ? '' : id))) {
+      if (!idRep) { noterDiag('ignore_conversation_sans_id_numerique'); return; }
+      id = idRep;
+    } else if (idRep && idRep !== String(id)) { noterDiag('ignore_conversation_id_different'); return; }
   }
 
   // Cle de ligne app_data selon le type de donnee.
@@ -2940,7 +2966,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     storeWriteReq(domain,msg.method,msg.url,msg.body,msg.contexteFavori,sender?.frameId>0?null:sender?.tab?.id).then(()=>sendResponse({ok:true}),()=>sendResponse({ok:false}));
     return true;
   } else if (msg.kind === 'seen_urls' && Array.isArray(msg.paths)) {
-    storeSeenUrls(domain, msg.paths, msg.reponses);
+    storeSeenUrls(domain, msg.paths, msg.reponses, msg.conversation);
   } else if (msg.kind === 'suppression' && msg.itemId) {
     noterSuppression(domain, msg.itemId, msg.status, msg.at);
   } else if (msg.kind === 'publication') {
@@ -3014,10 +3040,92 @@ async function noterStatutsOffres(parsed) {
   } catch (_) { /* purement diagnostique : ne doit jamais gêner la capture */ }
 }
 
+// <chemin-regle> (29 octobre) — la MÊME dans la page et dans le fond (§11).
+  // Mesuré en base : les pages d'une conversation appellent un contrôle
+  // anti-hameçonnage dont le chemin porte un UUID, qui passait EN CLAIR dans
+  // `seen_urls` (17 à 55 clés de ce genre par compte) — un identifiant réel, et
+  // une clé de plus par conversation ouverte. Un UUID devient `{uuid}`, une
+  // longue suite hexadécimale `{hex}`, un nombre de 3 chiffres ou plus `{id}`.
+  function cheminNormalise(p) {
+    return String(p == null ? '' : p)
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{uuid}')
+      .replace(/\/(?=[0-9a-f]*\d)[0-9a-f]{20,}(?=\/|$)/gi, '/{hex}')
+      .replace(/\/\d{3,}/g, '/{id}');
+  }
+  // </chemin-regle>
+
+// La fusion du relevé (29 octobre) — une fonction pure.
+// ⚠️⚠️ ELLE GARDAIT LES 400 PREMIÈRES CLÉS, donc les PLUS ANCIENNES : mesuré
+//    en base, des comptes portent déjà plusieurs centaines de clés (dont une
+//    par conversation ouverte, l'UUID en clair) ; une fois le plafond atteint,
+//    un chemin vu pour la première fois — justement ce que ce relevé doit
+//    attraper — ne serait plus jamais rangé. Désormais :
+//    · chaque clé (ancienne ou neuve) passe par `cheminNormalise` : les UUID
+//      d'avant se fondent en une seule clé `{uuid}` ;
+//    · pour une même clé, l'entrée la plus RÉCENTE (`at`) gagne ;
+//    · on garde les 400 réponses les plus récentes, et les 600 chemins les plus
+//      récemment vus (ceux de ce passage d'abord).
+//    · `conversation` (le relevé de la page d'une conversation, `inject.js`) :
+//      fusionné par clé, le plus récent gagne, une forme déjà vue n'est jamais
+//      perdue, bornes par construction.
+const SEEN_REP_MAX = 400, SEEN_PATHS_MAX = 600;
+const SEEN_CONV_REQ_MAX = 80, SEEN_CONV_CANAUX_MAX = 20, SEEN_CONV_PAGES_MAX = 20;
+function fusionnerSeen(cur, paths, reponses, conversation) {
+  const ms = (e) => { const t = Date.parse((e && e.at) || ''); return Number.isFinite(t) ? t : 0; };
+  const cleRep = (k) => { const t = String(k == null ? '' : k); const i = t.indexOf(' '); return (i > 0 ? t.slice(0, i + 1) + cheminNormalise(t.slice(i + 1)) : cheminNormalise(t)).slice(0, 220); };
+  const plusRecent = (a, b) => (!a ? b : !b ? a : ms(b) >= ms(a) ? b : a);
+  // les réponses
+  const rep = {};
+  for (const src of [(cur && cur.reponses) || {}, reponses || {}]) {
+    if (!src || typeof src !== 'object') continue;
+    for (const [k, v] of Object.entries(src)) { if (!v || typeof v !== 'object') continue; const c = cleRep(k); rep[c] = plusRecent(rep[c], v); }
+  }
+  const reponsesOut = {};
+  for (const [k, v] of Object.entries(rep).sort((a, b) => ms(b[1]) - ms(a[1])).slice(0, SEEN_REP_MAX)) reponsesOut[k] = v;
+  // les chemins : ceux de ce passage (le plus récent d'abord), puis les anciens
+  const vus = new Set(), pathsOut = [];
+  const neufs = (Array.isArray(paths) ? paths : []).slice().reverse();
+  for (const p of [...neufs, ...(Array.isArray(cur && cur.paths) ? cur.paths : [])]) {
+    const n = cheminNormalise(p).slice(0, 300);
+    if (!n || vus.has(n)) continue;
+    vus.add(n); pathsOut.push(n);
+    if (pathsOut.length >= SEEN_PATHS_MAX) break;
+  }
+  // le relevé de la page d'une conversation
+  let conv = (cur && cur.conversation && typeof cur.conversation === 'object') ? cur.conversation : null;
+  if (conversation && typeof conversation === 'object' && JSON.stringify(conversation).length <= 200000) {
+    const fusion = (a, b, max) => {
+      const t = {};
+      for (const src of [a || {}, b || {}]) {
+        if (!src || typeof src !== 'object') continue;
+        for (const [k, v] of Object.entries(src)) {
+          if (!v || typeof v !== 'object') continue;
+          const c = cleRep(k);
+          const av = t[c], neuf = plusRecent(av, v);
+          // une forme déjà vue (messages, tête) n'est jamais perdue
+          t[c] = Object.assign({}, neuf, (!neuf.messages && av && av.messages) ? { messages: av.messages } : {}, (!neuf.tete && av && av.tete) ? { tete: av.tete } : {});
+        }
+      }
+      const o = {};
+      for (const [k, v] of Object.entries(t).sort((x, y) => ms(y[1]) - ms(x[1])).slice(0, max)) o[k] = v;
+      return o;
+    };
+    conv = {
+      req: fusion(conv && conv.req, conversation.req, SEEN_CONV_REQ_MAX),
+      canaux: fusion(conv && conv.canaux, conversation.canaux, SEEN_CONV_CANAUX_MAX),
+      pages: fusion(conv && conv.pages, conversation.pages, SEEN_CONV_PAGES_MAX),
+      next: (conversation.next && typeof conversation.next === 'object') ? conversation.next : ((conv && conv.next) || null),
+    };
+  }
+  const out = { paths: pathsOut, reponses: reponsesOut };
+  if (conv) out.conversation = conv;
+  return out;
+}
+
 // Diagnostic : liste des CHEMINS d'API que le site appelle réellement (aucun
 // contenu, aucun paramètre). Sert à repérer tout de suite quand Vinted déplace
 // un endpoint — c'est ce qui avait rendu la moisson muette pendant 18 jours.
-async function storeSeenUrls(domain, paths, reponses) {
+async function storeSeenUrls(domain, paths, reponses, conversation) {
   const uid = await activeAccountId(domain);
   if (!uid) return;
   if (await compteNonCapte(uid)) return;
@@ -3033,16 +3141,14 @@ async function storeSeenUrls(domain, paths, reponses) {
   const rows = await sbGet(`app_data?id=eq.harvest_${uid}_seen_urls&select=data`);
   if (rows === null) return;
   const cur = (rows[0] && rows[0].data) || {};
-  const tous = new Set([...(Array.isArray(cur.paths) ? cur.paths : []), ...paths]);
-  const rep = Object.assign({}, cur.reponses || {}, reponses || {});
-  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin.
-  const repBorne = {};
-  for (const k of Object.keys(rep).slice(0, 400)) repBorne[k] = rep[k];
-  const data = { uid, paths: Array.from(tous).slice(0, 600), reponses: repBorne,
-    capturedAt: new Date().toISOString(), ver: EXT_VERSION };
+  // Bornes par construction : un diagnostic ne doit jamais grossir sans fin
+  // (`fusionnerSeen` : les plus RÉCENTS gardés, les clés normalisées).
+  const f = fusionnerSeen(cur, paths, reponses, conversation);
+  const data = Object.assign({ uid }, f, { capturedAt: new Date().toISOString(), ver: EXT_VERSION });
   // Rien de neuf → on ne repousse pas la même ligne.
-  if (JSON.stringify(data.paths) === JSON.stringify(cur.paths || [])
-      && JSON.stringify(repBorne) === JSON.stringify(cur.reponses || {})) return;
+  if (JSON.stringify(f.paths) === JSON.stringify(cur.paths || [])
+      && JSON.stringify(f.reponses) === JSON.stringify(cur.reponses || {})
+      && JSON.stringify(f.conversation || null) === JSON.stringify(cur.conversation || null)) return;
   await supabaseUpsert('app_data', [{ id: `harvest_${uid}_seen_urls`, data }], 'id');
 }
 
