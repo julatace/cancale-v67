@@ -125,6 +125,9 @@ const attendre = async (fn, ms = 20000) => { const t0 = Date.now(); while (Date.
       const main = (L.find((r) => r.id === 'main') || {}).data || {};
       dit(JSON.stringify((main.vinted_sale_overrides || OV)['9001']) === JSON.stringify({ numero: '41' }), 'la vente garde son numéro (41)' + T);
       await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
+      // (29 oct.) Le Stock s'ouvre désormais sur « Mes meubles » ; la sortie
+      // automatique porte sur la pièce 3D : sa liste vit dans « Ma pièce ».
+      await pg.waitForSelector('[data-stock-vue="plan"]', { timeout: 30000 }).then((e) => e.click()).catch(() => {});
       const vu = await pg.waitForSelector('[data-stock-sortis]', { timeout: 30000 }).then(() => true).catch(() => false);
       const liste = vu ? await pg.$$eval('[data-stock-sorti]', (els) => els.map((e) => e.getAttribute('data-stock-sorti')).sort().join(',')) : '';
       dit(liste === '41,45,48,49', 'le Stock dit « Sortis du stock car partis » : N°41, 45, 48, 49' + T, liste);
