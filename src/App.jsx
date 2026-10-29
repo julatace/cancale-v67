@@ -37650,7 +37650,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
   const [recreesNum, setRecreesNum] = useState(undefined);
+  // (29 oct.) Relue quand l'ENSEMBLE des annonces change (une republication
+  // apporte un identifiant neuf), pas à chaque nouvelle référence de la liste :
+  // le cache puis la lecture fraîche rendent les mêmes annonces, et la table
+  // était lue deux fois par ouverture d'écran (banc `vitesse.cjs`).
+  // Lue dès l'ouverture (avec les autres lectures : pas un rendu de plus), puis
+  // seulement quand l'ensemble change APRÈS la première liste reçue — l'arrivée
+  // de la première liste ne dit rien de neuf sur les republications.
+  const cleAnnoncesRecrees = useMemo(() => (Array.isArray(listings.items) ? listings.items.map((i) => String(i && i.id)).sort().join(',') : null), [listings.items]);
+  const cleRecreesLue = useRef(undefined);
   useEffect(() => {
+    const avant = cleRecreesLue.current; cleRecreesLue.current = cleAnnoncesRecrees;
+    if (avant === null && cleAnnoncesRecrees != null) return undefined;
     let vivant = true;
     (async () => {
       try {
@@ -37664,7 +37675,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       } catch (_) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); }
     })();
     return () => { vivant = false; };
-  }, [listings.items]);
+  }, [cleAnnoncesRecrees]);
   const takenNums = useMemo(() => {
     const taken = new Set();
     usedNumeros.forEach(x=>{const n=parseInt(String(x),10);if(!isNaN(n))taken.add(n);});

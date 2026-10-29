@@ -163,7 +163,11 @@ const lireAnnonces = (pg) => pg.evaluate(() => {
     // La coche « à jour » se reconnaît à ce qu'elle DIT (elle n'avait pas
     // d'attribut avant : un contrôle posé sur un attribut neuf serait vert par
     // accident sur le code d'avant).
-    aJour: (document.body.innerText.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
+    // 27 oct. (« téléphone épuré », demande de Julien) : sur téléphone la coche
+    // porte `vrm-aide` et se tait. On la compte dans le DOM (cachée comprise) :
+    // « aucune coche au-dessus du dressing » reste plus strict, et « elle reste
+    // sur Ventes » juge qu'elle est rendue, pas qu'elle est montrée au doigt.
+    aJour: (document.body.textContent.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
     texte: el ? el.innerText : '',
     couleurs: el ? [...el.querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color) : [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
