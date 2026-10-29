@@ -46443,7 +46443,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const rf = e.refuse==null||String(e.refuse).trim()===''?null:Number(String(e.refuse).replace(',','.'));
             // (29 oct.) Les gestes de la fiche : hauteur posée par la feuille de style
             // (`.vrm-fiche-geste` : 36 px à la souris, 44 px au doigt — §7).
-            const geste = { border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:9, padding:'0 11px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, textDecoration:'none', boxSizing:'border-box' };
+            const geste = { border:`1px solid ${C.border}`, background:'transparent', color:C.text, borderRadius:8, padding:'0 11px', fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, textDecoration:'none', boxSizing:'border-box' };
             // La préparation pour Leboncoin, COURTE sur la carte (§7 : « passe sur
             // Vinted (ce compte) » écrit sur 40 cartes serait une phrase répétée) ;
             // le geste est dans l'infobulle.
@@ -46458,7 +46458,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             })();
             const tailleHorsTitre = it.size && !tailleDansTitre(it.title, it.size) ? it.size : '';
             return (
-              <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:14,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
+              <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
                     {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
