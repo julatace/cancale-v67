@@ -54,7 +54,8 @@ test('route réelle : session, RLS, CAS sous concurrence, autorisation unique et
   assert.equal((await call('consommer',{jeton:t.jeton,version:'5.216.0'})).code,409,'ancien moteur sans contrôle historique refusé');
   const grants=await Promise.all(Array.from({length:20},()=>call('consommer',{jeton:t.jeton})));
   const uniques=grants.filter(r=>r.code===200);assert.equal(uniques.length,1,'vingt extensions : une seule autorisation consommée');
-  assert.equal(uniques[0].body.travail.message,'Merci !\n\nJe te propose une réduction de 10 % sur cet article.');
+  assert.equal(uniques[0].body.travail.message,'Merci !','29 oct. : le texte part tel quel, la vraie offre Vinted suit');
+  assert.deepEqual(uniques[0].body.travail.offre,{mode:'pct',valeur:10,arrondi:false});assert.equal(uniques[0].body.travail.pourcentage,10);
   assert.equal((await call('verifier',{jeton:t.jeton})).body.autorise,true);
   assert.equal((await call('terminer',{jeton:t.jeton,resultat:'envoye'})).code,200);
   assert.equal((await call('verifier',{jeton:t.jeton})).code,409,'autorisation terminée non réutilisable');

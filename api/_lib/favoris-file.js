@@ -28,8 +28,14 @@ export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
   return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
 }
-export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null}){
+// L'offre jointe (29 oct.) : {mode:'pct'|'euros'|'prix', valeur, arrondi}, ou rien.
+const offreValide=o=>o==null||(o&&typeof o==='object'&&['pct','euros','prix'].includes(o.mode)&&typeof o.valeur==='number'&&o.valeur>0&&o.valeur<=99999&&(o.mode!=='pct'||Number.isInteger(o.valeur)&&o.valeur<=99)&&typeof o.arrondi==='boolean');
+// Variables du message ou offre autre qu'un simple pourcentage : seule
+// l'extension 5.281 sait les faire (une plus ancienne enverrait « {username} »).
+export const exige5281=j=>/[{}]/.test(String(j?.message||''))||!!j?.offre&&(j.offre.mode!=='pct'||j.offre.arrondi===true);
+export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null}){
   d=initialiserFile(d);
+  if(!offreValide(offre))throw new RefusFavoris('Offre invalide.',400);
   if(!Array.isArray(targets)||!targets.length||targets.length>10||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<0||(intervalleMinutes===0&&intervalleMax!=null)||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
   const max=intervalleMax>intervalleMinutes?intervalleMax:null;
   if(!Number.isSafeInteger(maintenant)||maintenant<0)throw new RefusFavoris('Horloge indisponible.',503);
@@ -41,7 +47,7 @@ export function lancerFile(d,{owner,targets,message,intervalleMinutes,intervalle
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
   const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>!['annule','refuse'].includes(x.etat)).map(x=>x.itemId+':'+x.recipientId));
   const nouveaux=[];
-  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,intervalleMinutes,...(max?{intervalleMax:max}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),lot});}}
+  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,intervalleMinutes,...(max?{intervalleMax:max}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),...(offre?{offre:{mode:offre.mode,valeur:offre.valeur,arrondi:offre.arrondi}}:{}),lot});}}
   if(!nouveaux.length)throw new RefusFavoris('Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.');
   const anciens=g.jobs.filter(x=>!nouveaux.some(n=>n.id===x.id));
   if(anciens.length+nouveaux.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');
@@ -98,12 +104,13 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   if(etaitActive&&!g.active){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)};}
   return {data:d,valeur};
 }
-export function consommerFile(d,{owner,jeton,maintenant}){
+export function consommerFile(d,{owner,jeton,maintenant,version5281=true}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
   const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
+  if(!version5281&&exige5281(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci ne sait pas faire les variables du message ni cette offre. Rien n’a été envoyé.');
   e.autorise=true;
-  return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{})}}};
+  return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;

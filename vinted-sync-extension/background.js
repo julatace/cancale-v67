@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.280.0';
+const CODE_VERSION = '5.281.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9613,10 +9613,12 @@ async function executerMessageFavori(uid,acc,body){
   }else noterDiag('favori_sans_transaction');
   const arret=await gardeStricte(uid,acc); // le message (et son offre) consomment UNE action
   if(arret)return rep('refuse');
-  // L'offre native de Vinted : seulement si une réduction est choisie ET le prix lu.
+  // L'offre native de Vinted : seulement si une offre est choisie ET le prix lu.
+  // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
   const pct=Number(body.pourcentage);
-  if(id(tx)&&Number.isInteger(pct)&&pct>=1&&pct<=99){
-    const prix=prixOffreFavori(prixAnnonce,pct);
+  const offre=body.offre&&typeof body.offre==='object'?body.offre:Number.isInteger(pct)&&pct>=1&&pct<=99?{mode:'pct',valeur:pct,arrondi:false}:null;
+  if(id(tx)&&offre){
+    const prix=prixOffreFavori(prixAnnonce,offre);
     if(prix){
       await pauseFavori('offre');
       if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
@@ -9626,10 +9628,14 @@ async function executerMessageFavori(uid,acc,body){
       noterDiag(o.ok?'favori_offre_ok':'favori_offre_refusee_'+(o.status||'reseau'));
     }else noterDiag('favori_offre_prix_inconnu');
   }
+  // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
+  // {a|b} = une variante tirée au hasard pour ce message.
+  const texteFinal=personnaliserMessageFavori(body.message,String(c?.opposite_user?.login||'')).slice(0,2000);
+  if(!texteFinal.trim())return rep('refuse',400);
   await pauseFavori('reponse');
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
-  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:body.message,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
+  const r=await vintedPage(acc,'POST',`/api/v2/conversations/${convId}/replies`,{reply:{body:texteFinal,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}},{timeoutMs:12000});
   if(r.sansPage)return rep('incertain',0,'reponse_inconnue');
   if(r.ok&&r.json?.code===0){etape('confirmation');return rep('envoye',r.status);}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
@@ -9658,14 +9664,53 @@ function prixDeTransaction(tr) {
   }
   return null;
 }
-// Le prix de l'offre, au centime, comme Vinted l'écrit (« 45.00 ») ; jamais ≥ au prix, jamais sous 1 €.
-function prixOffreFavori(montant, pct) {
-  const m = Number(montant);
-  if (!(isFinite(m) && m > 0) || !(pct >= 1 && pct <= 99)) return null;
-  const cents = Math.round(m * 100 * (100 - pct) / 100);
-  if (cents < 100 || cents >= Math.round(m * 100)) return null;
-  return (cents / 100).toFixed(2);
+// 5.281 (29 oct.) : variables du message et offre « Diminuer / Fixer à », comme
+// Vintex. COPIE EXACTE de src/favorisMessage.js (test favoris-message).
+// <favoris-message-regle>) : le test `favoris-message.test.mjs` exige les deux
+// copies identiques. Changer l'une sans l'autre le rend rouge.
+// <favoris-message-regle>
+function erreurVariablesFavori(modele) {
+  const texte = String(modele || '');
+  const reste = texte.replace(/\{([^{}]*)\}/g, (tout, dedans) => {
+    if (dedans === 'username') return '';
+    const options = dedans.split('|');
+    if (options.length >= 2 && options.every((o) => o.length <= 200)) return '';
+    return '\u0000' + tout + '\u0000';
+  });
+  const inconnue = /\u0000(\{[^{}]*\})\u0000/.exec(reste);
+  if (inconnue) return 'Variable inconnue : ' + inconnue[1].slice(0, 40) + '. Utilise {username} ou {a|b} (au moins deux choix séparés par |).';
+  if (/[{}]/.test(reste)) return 'Une accolade n’est pas fermée. Utilise {username} ou {a|b}.';
+  return '';
 }
+function personnaliserMessageFavori(modele, pseudo, hasard) {
+  const tirer = typeof hasard === 'function' ? hasard : Math.random;
+  const nom = typeof pseudo === 'string' ? pseudo.replace(/[{}\s]+/g, ' ').trim().slice(0, 80) : '';
+  return String(modele || '')
+    .replace(/\{([^{}]*)\}/g, (tout, dedans) => {
+      if (dedans === 'username') return nom;
+      const options = dedans.split('|');
+      if (options.length < 2) return tout;
+      return options[Math.min(options.length - 1, Math.floor(tirer() * options.length))];
+    })
+    .split('\n').map((l) => l.replace(/[ \t]{2,}/g, ' ').replace(/ +([,.])/g, '$1').trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+// Le prix de l'offre, au centime, comme Vinted l'écrit (« 45.00 ») ; jamais ≥ au
+// prix de l'annonce, jamais sous 1 €. offre = {mode:'pct'|'euros'|'prix', valeur, arrondi}.
+function prixOffreFavori(montant, offre) {
+  const m = Number(montant);
+  if (!(isFinite(m) && m > 0) || !offre || typeof offre !== 'object') return null;
+  const base = Math.round(m * 100), v = Number(offre.valeur);
+  let c;
+  if (offre.mode === 'pct') { if (!(Number.isInteger(v) && v >= 1 && v <= 99)) return null; c = Math.round(base * (100 - v) / 100); }
+  else if (offre.mode === 'euros') { if (!(isFinite(v) && v > 0)) return null; c = base - Math.round(v * 100); }
+  else if (offre.mode === 'prix') { if (!(isFinite(v) && v > 0)) return null; c = Math.round(v * 100); }
+  else return null;
+  if (offre.arrondi === true) c = Math.floor(c / 100) * 100;
+  if (c < 100 || c >= base) return null;
+  return (c / 100).toFixed(2);
+}
+// </favoris-message-regle>
 let _fileVinted = Promise.resolve();
 function avecVinted(fn) {
   const suite = _fileVinted.then(() => fn(), () => fn());
